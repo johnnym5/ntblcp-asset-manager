@@ -47,6 +47,7 @@ import Image from "next/image";
 import { useToast } from "@/hooks/use-toast";
 import type { Asset } from "@/lib/types";
 import { validateAssetLabel } from "@/ai/flows/ocr-asset-validation";
+import { AssetChecklist } from "./asset-checklist";
 
 const assetFormSchema = z.object({
   assetName: z.string().min(1, "Asset name is required"),
@@ -91,6 +92,8 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
       notes: "",
     },
   });
+
+  const watchedValues = form.watch();
 
   useEffect(() => {
     if (asset) {
@@ -257,6 +260,8 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
                     </div>
                   </CardContent>
                 </Card>
+
+                <AssetChecklist values={watchedValues} photoUrl={imagePreview} />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={form.control} name="assetName" render={({ field }) => (
