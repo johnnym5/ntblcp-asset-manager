@@ -1,0 +1,56 @@
+import type { Asset } from './types';
+
+export const sampleAssets: Asset[] = [
+  {
+    id: '1',
+    serialNumber: 'XPS-15-9510-A1B2',
+    model: 'Dell XPS 15 9510',
+    location: 'Lagos Office - Dev Floor',
+    status: 'In Use',
+    photoUrl: 'https://placehold.co/400x400.png',
+    conditionNotes: 'Excellent condition, used by senior developer.',
+  },
+  {
+    id: '2',
+    serialNumber: 'MBP-M1-2021-C3D4',
+    model: 'MacBook Pro 16" (M1)',
+    location: 'Abuja Office - Design Studio',
+    status: 'In Use',
+    photoUrl: 'https://placehold.co/400x400.png',
+    conditionNotes: 'Minor scratch on the lid.',
+  },
+  {
+    id: '3',
+    serialNumber: 'TRN-001-XYZ',
+    model: 'Truenat Machine',
+    location: 'Central Storage',
+    status: 'In Storage',
+    photoUrl: 'https://placehold.co/400x400.png',
+  },
+  {
+    id: '4',
+    serialNumber: 'GXP-AI-5678',
+    model: 'GeneXpert System',
+    location: 'Main Lab',
+    status: 'For Repair',
+    photoUrl: 'https://placehold.co/400x400.png',
+    conditionNotes: 'Cartridge loader is malfunctioning.',
+  },
+  {
+    id: '5',
+    serialNumber: 'MC-HON-CBR-9981',
+    model: 'Honda CBR Motorcycle',
+    location: 'Vehicle Pool',
+    status: 'In Use',
+    photoUrl: 'https://placehold.co/400x400.png',
+  },
+   {
+    id: '6',
+    serialNumber: 'LP-15-MONITOR-E5F6',
+    model: 'LG 27" 4K Monitor',
+    location: 'Lagos Office - Dev Floor',
+    status: 'Disposed',
+    photoUrl: 'https://placehold.co/400x400.png',
+    conditionNotes: 'Screen cracked, disposed following e-waste protocol.',
+  },
+];
