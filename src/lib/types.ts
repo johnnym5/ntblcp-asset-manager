@@ -14,17 +14,19 @@ export interface Asset {
   id: string;
   category: string; // The name of the sheet it came from
   
-  // Normalized fields
+  // Normalized fields from various sheets
   sn?: string;
+  description?: string;
+  serialNumber?: string;
   location?: string;
   lga?: string;
   assignee?: string;
-  description?: string;
+  condition?: string;
+  
   assetIdCode?: string;
   assetClass?: string;
   manufacturer?: string;
   modelNumber?: string;
-  serialNumber?: string;
   supplier?: string;
   dateReceived?: string | Timestamp;
   grnNo?: string;
@@ -32,26 +34,34 @@ export interface Asset {
   priceNaira?: string;
   priceUSD?: string;
   funder?: string;
-  condition?: string;
   remarks?: string;
   grant?: string;
   usefulLifeYears?: string;
-  verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy' | 'Unverified - New';
-  accumulatedDepreciation?: { ngn?: string; usd?: string };
-  netBookValue?: { ngn?: string; usd?: string };
   imei?: string;
   comments?: string;
 
-  // Motorcycle specific
+  // Vehicle/Motorcycle specific
   chasisNo?: string;
   engineNo?: string;
+
+  // IHVN specific
+  tagNumbers?: string;
+  classification?: string;
+  qty?: string;
+  site?: string;
+  yearOfPurchase?: string;
+  costNgn?: string;
+  state?: string;
   
-  // Financial data over years
+  // Status fields
+  verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy' | 'Unverified - New';
+  syncStatus?: 'synced' | 'local';
+
+  // Financial data (optional)
+  accumulatedDepreciation?: { ngn?: string; usd?: string };
+  netBookValue?: { ngn?: string; usd?: string };
   valuesByYear?: Record<string, { ngn?: string; usd?: string }>;
 
   // Keep a copy of the original row for reference
   originalData: Record<string, any>;
-
-  // For offline/sync status
-  syncStatus?: 'synced' | 'local';
 }

@@ -56,8 +56,9 @@ export async function saveAssetsToFirestore(assetsBySheet: { [sheetName: string]
     // The collection name is the sheet name.
     const collectionRef = collection(db, sheetName);
     assets.forEach((asset) => {
+      const assetWithSync = { ...asset, syncStatus: 'synced' as const };
       const docRef = doc(collectionRef, asset.id);
-      batch.set(docRef, asset);
+      batch.set(docRef, assetWithSync);
       totalAssets++;
     });
   }
@@ -72,8 +73,11 @@ export function getAssetsListener(
   callback: (assets: Asset[]) => void,
   userProfile?: UserProfile | null
 ) {
+  if (!userProfile) {
+    callback([]);
+    return () => {};
+  }
   // If the user is a standard 'user' but has no state, they cannot view assets yet.
-  // Return an empty list and do not attach listeners to prevent permission errors.
   if (userProfile?.role === 'user' && !userProfile.state) {
     callback([]);
     return () => {}; // Return a no-op unsubscribe function
@@ -84,11 +88,11 @@ export function getAssetsListener(
   const unsubscribes = TARGET_SHEETS.map(category => {
     let q = query(collection(db, category));
 
-    // For 'user' roles, filter by their assigned state. Admins see everything.
     if (userProfile?.role === 'user' && userProfile.state) {
       q = query(q, or(
         where('location', '==', userProfile.state),
-        where('lga', '==', userProfile.state)
+        where('lga', '==', userProfile.state),
+        where('state', '==', userProfile.state)
       ));
     }
 
@@ -121,4 +125,18 @@ export async function updateAsset(asset: Asset) {
 export async function deleteAsset(asset: Asset) {
   const assetRef = doc(db, asset.category, asset.id);
   await deleteDoc(assetRef);
+}
+
+export async function batchDeleteAssets(assetsToDelete: Asset[]) {
+  if (assetsToDelete.length === 0) return;
+
+  const batch = writeBatch(db);
+
+  assetsToDelete.forEach(asset => {
+    // Each asset is in a collection named after its category
+    const assetRef = doc(db, asset.category, asset.id);
+    batch.delete(assetRef);
+  });
+
+  await batch.commit();
 }
