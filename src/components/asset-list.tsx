@@ -35,14 +35,10 @@ import {
   PlusCircle,
   Loader2,
   Trash2,
-  X,
-  Cloud,
-  HardDrive,
   ArrowLeft,
   Folder,
   Edit,
 } from "lucide-react";
-import { AlertDialogTrigger } from "@radix-ui/react-alert-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 
@@ -50,19 +46,17 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
-import { useAuth } from "@/contexts/auth-context";
 import { TARGET_SHEETS } from "@/lib/constants";
-import { getAssetsListener, updateAsset, deleteAsset, saveAssetsToFirestore, batchDeleteAssets } from "@/lib/firestore";
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFormReadOnly, setIsFormReadOnly] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isImporting, setIsImporting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false); // No initial loading from firestore
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
-  const { userProfile } = useAuth();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
@@ -70,21 +64,6 @@ export default function AssetList() {
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
-
-  useEffect(() => {
-    if (!userProfile) {
-        setIsLoading(true);
-        return;
-    }
-    
-    setIsLoading(true);
-    const unsubscribe = getAssetsListener((loadedAssets) => {
-        setAssets(loadedAssets);
-        setIsLoading(false);
-    }, userProfile);
-
-    return () => unsubscribe();
-  }, [userProfile]);
 
   const assetsByCategory = useMemo(() => {
     return assets.reduce((acc, asset) => {
@@ -106,23 +85,27 @@ export default function AssetList() {
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
+    setIsFormReadOnly(false);
+    setIsFormOpen(true);
+  };
+  
+  const handleViewAsset = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setIsFormReadOnly(true);
     setIsFormOpen(true);
   };
 
   const handleEditAsset = (asset: Asset) => {
     setSelectedAsset(asset);
+    setIsFormReadOnly(false);
     setIsFormOpen(true);
   };
   
   const handleDeleteConfirm = async () => {
     if (assetToDelete) {
         toast({ title: "Deleting Asset...", description: `Removing "${assetToDelete.description}"` });
-        try {
-            await deleteAsset(assetToDelete);
-            toast({ title: "Asset Deleted", description: `Asset was successfully removed.`});
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: "Delete Failed", description: error.message });
-        }
+        setAssets(prev => prev.filter(a => a.id !== assetToDelete.id));
+        toast({ title: "Asset Deleted", description: `Asset was successfully removed.`});
     }
     setAssetToDelete(null);
     setIsDeleteDialogOpen(false);
@@ -130,29 +113,27 @@ export default function AssetList() {
 
   const handleBatchDelete = async () => {
     setIsBatchDeleting(true);
-    const assetsToDelete = assets.filter(asset => selectedAssetIds.includes(asset.id));
-    toast({ title: "Deleting Assets...", description: `Removing ${assetsToDelete.length} selected assets.` });
-    try {
-        await batchDeleteAssets(assetsToDelete);
-        toast({ title: "Assets Deleted", description: `Successfully removed ${assetsToDelete.length} assets.`});
-        setSelectedAssetIds([]);
-    } catch (error: any) {
-        toast({ variant: 'destructive', title: "Batch Delete Failed", description: error.message });
-    } finally {
-        setIsBatchDeleting(false);
-    }
+    const assetsToDeleteCount = selectedAssetIds.length;
+    toast({ title: "Deleting Assets...", description: `Removing ${assetsToDeleteCount} selected assets.` });
+    
+    setAssets(prev => prev.filter(asset => !selectedAssetIds.includes(asset.id)));
+    
+    toast({ title: "Assets Deleted", description: `Successfully removed ${assetsToDeleteCount} assets.`});
+    setSelectedAssetIds([]);
+    setIsBatchDeleting(false);
   }
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    toast({ title: "Saving Asset...", description: "Your changes are being saved." });
-    try {
-        const assetWithSync = { ...assetToSave, syncStatus: 'synced' as const };
-        await updateAsset(assetWithSync);
-        toast({ title: "Saved Successfully", description: "Asset changes have been saved." });
-        setIsFormOpen(false);
-    } catch(e: any) {
-        toast({ variant: 'destructive', title: "Save Failed", description: e.message });
-    }
+    toast({ title: "Saving Asset Locally...", description: "Your changes are being saved." });
+    setAssets(prev => {
+        const existingAsset = prev.find(a => a.id === assetToSave.id);
+        if (existingAsset) {
+            return prev.map(a => a.id === assetToSave.id ? assetToSave : a);
+        }
+        return [...prev, assetToSave];
+    });
+    toast({ title: "Saved Successfully", description: "Asset changes have been saved locally." });
+    setIsFormOpen(false);
   };
 
   const handleImportClick = () => fileInputRef.current?.click();
@@ -171,14 +152,10 @@ export default function AssetList() {
         toast({ title: "Import Notice", description: `${skippedRows} rows were skipped due to missing required fields.` });
     }
 
-    if (Object.keys(assetsBySheet).length > 0) {
-        try {
-            toast({ title: "Syncing to Server...", description: "This may take a moment." });
-            const totalSaved = await saveAssetsToFirestore(assetsBySheet);
-            toast({ title: "Import Successful", description: `Successfully saved ${totalSaved} new assets.` });
-        } catch (error: any) {
-            toast({ variant: 'destructive', title: "Sync Failed", description: error.message });
-        }
+    const allNewAssets = Object.values(assetsBySheet).flat();
+    if (allNewAssets.length > 0) {
+        setAssets(prev => [...prev, ...allNewAssets]);
+        toast({ title: "Import Successful", description: `Successfully imported ${allNewAssets.length} new assets.` });
     } else if (errors.length === 0) {
         toast({ title: "No Data Found", description: "No valid asset sheets were found in the file."});
     }
@@ -256,7 +233,7 @@ export default function AssetList() {
                 </Card>
             ))}
         </div>
-        <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} />
+        <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} isReadOnly={isFormReadOnly} />
       </div>
     )
   }
@@ -306,17 +283,16 @@ export default function AssetList() {
                     <TableHead>S/N</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Serial Number</TableHead>
-                    <TableHead className="hidden md:table-cell">Location</TableHead>
-                    <TableHead>Condition</TableHead>
-                    <TableHead>Sync Status</TableHead>
+                    <TableHead>Verified Status</TableHead>
+                    <TableHead>Verified Date</TableHead>
                     <TableHead className="w-[50px] text-right">Actions</TableHead>
                     </TableRow>
                 </TableHeader>
                 <TableBody>
                     {currentAssets.length > 0 ? (
                     currentAssets.map((asset) => (
-                        <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"}>
-                        <TableCell>
+                        <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                        <TableCell onClick={e => e.stopPropagation()}>
                             <Checkbox 
                                 checked={selectedAssetIds.includes(asset.id)}
                                 onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
@@ -325,21 +301,20 @@ export default function AssetList() {
                         <TableCell>{asset.sn || 'N/A'}</TableCell>
                         <TableCell className="font-medium">{asset.description}</TableCell>
                         <TableCell>{asset.serialNumber || asset.chasisNo || 'N/A'}</TableCell>
-                        <TableCell className="hidden md:table-cell">{asset.location}</TableCell>
-                        <TableCell><Badge variant="secondary">{asset.condition}</Badge></TableCell>
-                        <TableCell>
-                            {asset.syncStatus === 'synced' ? (
-                                <Badge variant="outline" className="text-green-600 border-green-600"><Cloud className="mr-2 h-3 w-3"/>Synced</Badge>
-                            ) : (
-                                <Badge variant="secondary"><HardDrive className="mr-2 h-3 w-3"/>Local</Badge>
-                            )}
-                        </TableCell>
-                        <TableCell className="text-right">
+                        <TableCell><Badge variant={asset.verifiedStatus === 'Verified' ? 'default' : (asset.verifiedStatus === 'Discrepancy' ? 'destructive' : 'secondary')}>{asset.verifiedStatus || 'Unverified'}</Badge></TableCell>
+                        <TableCell>{asset.verifiedDate || 'N/A'}</TableCell>
+                        <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                             <DropdownMenu>
                             <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={() => handleEditAsset(asset)}>View/Edit</DropdownMenuItem>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={() => { setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">Delete</DropdownMenuItem>
+                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
+                                    <Edit className="mr-2 h-4 w-4" />
+                                    Edit
+                                </DropdownMenuItem>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Delete
+                                </DropdownMenuItem>
                             </DropdownMenuContent>
                             </DropdownMenu>
                         </TableCell>
@@ -351,14 +326,14 @@ export default function AssetList() {
                 </TableBody>
             </Table>
         </div>
-        <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} />
+        <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} isReadOnly={isFormReadOnly} />
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
                         This action cannot be undone. This will permanently delete the asset
-                        and remove its data from our servers.
+                        from your local data.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

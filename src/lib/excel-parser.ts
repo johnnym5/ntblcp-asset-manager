@@ -55,8 +55,11 @@ function findHeaderRow(worksheet: XLSX.WorkSheet, sheetName: string): { headerRo
  */
 function getColumnValue(row: any, ...possibleKeys: string[]): string {
     for (const key of possibleKeys) {
-        if (row[key]) {
-            return String(row[key]);
+        const lowerKey = key.toLowerCase();
+        for(const rowKey in row) {
+            if(rowKey.toLowerCase().trim() === lowerKey) {
+                return String(row[rowKey]);
+            }
         }
     }
     return '';
@@ -80,6 +83,7 @@ function mapRowToAsset(row: any, category: string): Asset | null {
         id: uuidv4(),
         category,
         syncStatus: 'local',
+        verifiedStatus: 'Unverified',
         description: description,
         sn: sn,
         location: getColumnValue(row, 'Location', 'LOCATION', 'State'),
@@ -117,7 +121,7 @@ export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sh
         const workbook = XLSX.read(data, { type: 'array' });
 
         workbook.SheetNames.forEach(sheetName => {
-          const matchedSheetName = TARGET_SHEETS.find(target => sheetName.trim().toLowerCase() === target.toLowerCase());
+          const matchedSheetName = TARGET_SHEETS.find(target => sheetName.trim().toLowerCase().includes(target.toLowerCase()));
 
           if (matchedSheetName) {
             const worksheet = workbook.Sheets[sheetName];
@@ -175,15 +179,23 @@ export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sh
  */
 export function exportToExcel(assets: Asset[], fileName: string): void {
   const dataToExport = assets.map(asset => {
+    // Create a new object to control key order
     const flattenedAsset: Record<string, any> = {};
+
+    // Add all keys except the ones we want at the end
     for (const [key, value] of Object.entries(asset)) {
-        if (key !== 'originalData' && key !== 'syncStatus' && typeof value !== 'object') {
+        if (key !== 'originalData' && key !== 'syncStatus' && key !== 'verifiedStatus' && key !== 'verifiedDate' && typeof value !== 'object') {
             flattenedAsset[key] = value;
         }
     }
-    // Include some of the original data for context if needed
+    
+    // Add the original data for context
     flattenedAsset['Original S/N'] = asset.originalData['S/N'];
     flattenedAsset['Original Description'] = asset.originalData['Asset Description'] || asset.originalData['DESCRIPTION'];
+
+    // Add the verification fields at the end
+    flattenedAsset['Verified Status'] = asset.verifiedStatus;
+    flattenedAsset['Verified Date'] = asset.verifiedDate;
 
     return flattenedAsset;
   });

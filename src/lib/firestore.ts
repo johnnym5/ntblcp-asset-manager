@@ -1,35 +1,17 @@
 
 'use client';
 
-import {
-  collection,
-  doc,
-  onSnapshot,
-  writeBatch,
-  getDoc,
-  setDoc,
-  query,
-  where,
-  deleteDoc,
-  or,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
 import type { Asset, UserProfile } from '@/lib/types';
 import type { User } from 'firebase/auth';
-import { TARGET_SHEETS } from './constants';
 
 // --- User Profile ---
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const userDocRef = doc(db, 'users', uid);
-  const docSnap = await getDoc(userDocRef);
-  if (docSnap.exists()) {
-    return docSnap.data() as UserProfile;
-  }
-  return null;
+  console.log("Firestore is disabled. Returning null for user profile.");
+  return Promise.resolve(null);
 }
 
 export async function createUserProfile(user: User): Promise<UserProfile> {
-  const userDocRef = doc(db, 'users', user.uid);
+  console.log("Firestore is disabled. Mocking user profile creation.");
   const newUserProfile: UserProfile = {
     uid: user.uid,
     email: user.email,
@@ -37,106 +19,43 @@ export async function createUserProfile(user: User): Promise<UserProfile> {
     photoURL: user.photoURL,
     role: 'user', // Default role
   };
-  await setDoc(userDocRef, newUserProfile);
-  return newUserProfile;
+  return Promise.resolve(newUserProfile);
 }
 
 export async function updateUserProfile(uid: string, data: Partial<UserProfile>) {
-  const userDocRef = doc(db, 'users', uid);
-  await setDoc(userDocRef, data, { merge: true });
+  console.log("Firestore is disabled. Skipping user profile update.");
+  return Promise.resolve();
 }
 
 // --- Assets ---
 export async function saveAssetsToFirestore(assetsBySheet: { [sheetName: string]: Asset[] }) {
-  const batch = writeBatch(db);
-  let totalAssets = 0;
-
-  for (const sheetName in assetsBySheet) {
-    const assets = assetsBySheet[sheetName];
-    // The collection name is the sheet name.
-    const collectionRef = collection(db, sheetName);
-    assets.forEach((asset) => {
-      const assetWithSync = { ...asset, syncStatus: 'synced' as const };
-      const docRef = doc(collectionRef, asset.id);
-      batch.set(docRef, assetWithSync);
-      totalAssets++;
-    });
-  }
-
-  if (totalAssets > 0) {
-    await batch.commit();
-  }
-  return totalAssets;
+  console.log("Firestore is disabled. Skipping save to Firestore.");
+  const totalAssets = Object.values(assetsBySheet).reduce((acc, assets) => acc + assets.length, 0);
+  return Promise.resolve(totalAssets);
 }
 
 export function getAssetsListener(
   callback: (assets: Asset[]) => void,
   userProfile?: UserProfile | null
 ) {
-  if (!userProfile) {
-    callback([]);
-    return () => {};
-  }
-  // If the user is a standard 'user' but has no state, they cannot view assets yet.
-  if (userProfile?.role === 'user' && !userProfile.state) {
-    callback([]);
-    return () => {}; // Return a no-op unsubscribe function
-  }
-
-  const assetsByCategory: { [key: string]: Asset[] } = {};
-
-  const unsubscribes = TARGET_SHEETS.map(category => {
-    let q = query(collection(db, category));
-
-    if (userProfile?.role === 'user' && userProfile.state) {
-      q = query(q, or(
-        where('location', '==', userProfile.state),
-        where('lga', '==', userProfile.state),
-        where('state', '==', userProfile.state)
-      ));
-    }
-
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      assetsByCategory[category] = snapshot.docs.map(doc => doc.data() as Asset);
-      const allAssets = Object.values(assetsByCategory).flat();
-      callback(allAssets);
-    }, (error) => {
-      console.error(`Error listening to ${category}:`, error);
-      delete assetsByCategory[category];
-      const allAssets = Object.values(assetsByCategory).flat();
-      callback(allAssets);
-    });
-
-    return unsubscribe;
-  });
-
-  return () => {
-    unsubscribes.forEach(unsub => unsub());
-  };
+  console.log("Firestore is disabled. Not listening for assets.");
+  // Immediately return an empty array and a no-op unsubscribe function
+  callback([]);
+  return () => {};
 }
 
 
 export async function updateAsset(asset: Asset) {
-  // The asset's category determines its collection
-  const assetRef = doc(db, asset.category, asset.id);
-  await setDoc(assetRef, asset, { merge: true });
+  console.log(`Firestore is disabled. Skipping update for asset: ${asset.id}`);
+  return Promise.resolve();
 }
 
 export async function deleteAsset(asset: Asset) {
-  const assetRef = doc(db, asset.category, asset.id);
-  await deleteDoc(assetRef);
+  console.log(`Firestore is disabled. Skipping delete for asset: ${asset.id}`);
+  return Promise.resolve();
 }
 
 export async function batchDeleteAssets(assetsToDelete: Asset[]) {
-  if (assetsToDelete.length === 0) return;
-
-  const batch = writeBatch(db);
-
-  assetsToDelete.forEach(asset => {
-    // Each asset is in a collection named after its category
-    const assetRef = doc(db, asset.category, asset.id);
-    batch.delete(assetRef);
-  });
-
-  await batch.commit();
+  console.log(`Firestore is disabled. Skipping batch delete for ${assetsToDelete.length} assets.`);
+  return Promise.resolve();
 }

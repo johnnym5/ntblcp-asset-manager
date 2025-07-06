@@ -34,7 +34,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Asset } from "@/lib/types";
-import { AlertCircle, Loader2, Sparkles, Upload } from "lucide-react";
+import { AlertCircle, Loader2, Sparkles, Upload, FileText, Check } from "lucide-react";
 import { TARGET_SHEETS } from "@/lib/constants";
 import { AssetChecklist } from "./asset-checklist";
 import { useAuth } from "@/contexts/auth-context";
@@ -51,6 +51,8 @@ const assetFormSchema = z.object({
   condition: z.string().optional(),
   remarks: z.string().optional(),
   assignee: z.string().optional(),
+  verifiedStatus: z.string().optional(),
+  verifiedDate: z.string().optional(),
 });
 
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
@@ -60,9 +62,10 @@ interface AssetFormProps {
   onOpenChange: (isOpen: boolean) => void;
   asset?: Asset;
   onSave: (assetToSave: Asset) => Promise<void>;
+  isReadOnly: boolean;
 }
 
-export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProps) {
+export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<Record<string, any> | null>(null);
@@ -78,28 +81,35 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
     location: userProfile?.state || '',
     condition: '',
     remarks: '',
-    assignee: ''
+    assignee: '',
+    verifiedStatus: 'Unverified',
+    verifiedDate: '',
   };
 
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
-    defaultValues: asset || defaultValues,
+    defaultValues: asset ? { ...asset, verifiedStatus: asset.verifiedStatus || 'Unverified' } : defaultValues,
     mode: 'onChange',
   });
   
   const watchedValues = form.watch();
+  const watchedStatus = form.watch('verifiedStatus');
+
+  useEffect(() => {
+    if (watchedStatus === 'Verified' && !form.getValues('verifiedDate')) {
+        form.setValue('verifiedDate', new Date().toLocaleDateString('en-CA')); // YYYY-MM-DD
+    } else if (watchedStatus !== 'Verified' && !isReadOnly) {
+        form.setValue('verifiedDate', '');
+    }
+  }, [watchedStatus, form, isReadOnly]);
 
   useEffect(() => {
     if (isOpen) {
       if (asset) {
         form.reset({
-          category: asset.category,
-          description: asset.description,
-          serialNumber: asset.serialNumber,
-          location: asset.location,
-          condition: asset.condition,
-          remarks: asset.remarks,
-          assignee: asset.assignee,
+          ...defaultValues,
+          ...asset,
+          verifiedStatus: asset.verifiedStatus || 'Unverified',
         });
       } else {
         form.reset(defaultValues);
@@ -195,10 +205,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-4xl w-full flex flex-col">
         <SheetHeader>
-          <SheetTitle>{asset ? `Edit Asset (${asset.description})` : 'Add New Asset'}</SheetTitle>
+          <SheetTitle>{isReadOnly ? 'View Asset' : (asset ? `Edit Asset` : 'Add New Asset')}</SheetTitle>
           <SheetDescription>
-            {asset ? 'View and edit the details of the asset.' : 'Fill in the details for the new asset.'}
-            {' '}Changes are saved locally first.
+            {isReadOnly ? 'Viewing asset details.' : (asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto pr-4 py-4">
@@ -209,13 +218,45 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4 p-1"
               >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <FormField
+                      control={form.control}
+                      name="verifiedStatus"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Verified Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
+                              <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                              <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField control={form.control} name="verifiedDate" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Verified Date</FormLabel>
+                            <FormControl><Input {...field} disabled /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                </div>
+                
                 <FormField
                   control={form.control}
                   name="category"
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <Select onValueChange={field.onChange} defaultValue={field.value} disabled={!!asset}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={!!asset || isReadOnly}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a category for the asset" />
@@ -235,7 +276,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
                 <FormField control={form.control} name="description" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Asset Description</FormLabel>
-                    <FormControl><Textarea {...field} /></FormControl>
+                    <FormControl><Textarea {...field} disabled={isReadOnly} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -244,14 +285,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
                   <FormField control={form.control} name="serialNumber" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Serial/Chasis Number</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl><Input {...field} disabled={isReadOnly} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="location" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl><Input {...field} disabled={isReadOnly} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -260,14 +301,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
                   <FormField control={form.control} name="condition" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Condition</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl><Input {...field} disabled={isReadOnly} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="assignee" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assignee</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl><Input {...field} disabled={isReadOnly} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -275,7 +316,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
                 <FormField control={form.control} name="remarks" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Remarks/Comments</FormLabel>
-                    <FormControl><Textarea {...field} /></FormControl>
+                    <FormControl><Textarea {...field} disabled={isReadOnly} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -306,7 +347,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
                         variant="outline"
                         className="w-full"
                         onClick={() => fileInputRef.current?.click()}
-                        disabled={isScanning}
+                        disabled={isScanning || isReadOnly}
                     >
                         {isScanning ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -322,7 +363,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
                             <AlertDescription>{scanError}</AlertDescription>
                         </Alert>
                     )}
-                    {scanResult && (
+                    {scanResult && !isReadOnly && (
                         <div className="space-y-3 rounded-md border p-4">
                             <h4 className="font-medium">AI Suggestions:</h4>
                             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
@@ -342,12 +383,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
         </div>
         <SheetFooter className="mt-auto pt-4 border-t">
           <SheetClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline">Close</Button>
           </SheetClose>
-          <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
-            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Save Changes
-          </Button>
+          {!isReadOnly && (
+            <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+            </Button>
+          )}
         </SheetFooter>
       </SheetContent>
     </Sheet>

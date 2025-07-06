@@ -54,7 +54,8 @@ export interface Asset {
   state?: string;
   
   // Status fields
-  verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy' | 'Unverified - New';
+  verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy';
+  verifiedDate?: string;
   syncStatus?: 'synced' | 'local';
 
   // Financial data (optional)
