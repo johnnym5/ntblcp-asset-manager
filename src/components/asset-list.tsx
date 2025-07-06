@@ -27,7 +27,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   FileDown,
   FileUp,
@@ -59,6 +58,7 @@ import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { TARGET_SHEETS } from "@/lib/constants";
 import { MultiSelectFilter, type OptionType } from "./multi-select-filter";
 import { useAppState } from "@/contexts/app-state-context";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -69,6 +69,7 @@ export default function AssetList() {
   const [isLoading, setIsLoading] = useState(true); // Default to true to show loader
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { userProfile } = useAuth();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
@@ -293,11 +294,15 @@ export default function AssetList() {
       return;
     }
     try {
-      const exportCategory = currentCategory || 'all-assets';
-      exportToExcel(assetsToExport, `asset-export-${exportCategory}-${new Date().toISOString().split('T')[0]}.xlsx`);
+      const isAdmin = userProfile?.displayName?.trim().toLowerCase() === 'admin';
+      const exportPrefix = isAdmin ? 'admin' : userProfile?.state || 'assets';
+      const fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      exportToExcel(assetsToExport, fileName);
       toast({ title: "Export Successful" });
     } catch(error) {
-      toast({ title: "Export Failed", variant: "destructive" });
+      console.error("Export Error:", error);
+      toast({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
     }
   };
 

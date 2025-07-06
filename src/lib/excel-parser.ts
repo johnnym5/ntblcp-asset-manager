@@ -20,14 +20,14 @@ function findHeaderRow(worksheet: XLSX.WorkSheet, sheetName: string): { headerRo
 
     // Scan the first 15 rows to find the best header match
     for (let i = 0; i < Math.min(sheetData.length, 15); i++) {
-        const rowData = sheetData[i].map(cell => String(cell).trim());
+        const rowData = sheetData[i].map(cell => String(cell).trim().replace(/\s+/g, ' '));
         let currentScore = 0;
         
-        const lowerCaseExpected = expectedHeaders.map(h => h.toLowerCase());
+        const lowerCaseExpected = expectedHeaders.map(h => h.toLowerCase().trim().replace(/\s+/g, ' '));
         
         rowData.forEach(cell => {
             const lowerCell = cell.toLowerCase();
-            if (lowerCell && lowerCaseExpected.some(expected => expected === lowerCell)) {
+            if (lowerCell && lowerCaseExpected.some(expected => expected === lowerCell || expected.includes(lowerCell))) {
                 currentScore++;
             }
         });
@@ -55,10 +55,16 @@ function findHeaderRow(worksheet: XLSX.WorkSheet, sheetName: string): { headerRo
  */
 function getColumnValue(row: any, ...possibleKeys: string[]): string {
     for (const key of possibleKeys) {
-        const lowerKey = key.toLowerCase();
+        const lowerKey = key.toLowerCase().replace(/\s+/g, ' ');
         for(const rowKey in row) {
-            if(rowKey.toLowerCase().trim() === lowerKey) {
-                return String(row[rowKey]);
+            if(rowKey.toLowerCase().trim().replace(/\s+/g, ' ') === lowerKey) {
+                const value = row[rowKey];
+                // Handle Excel date serial numbers
+                if (typeof value === 'number' && value > 10000 && lowerKey.includes('date')) {
+                  const date = XLSX.SSF.parse_date_code(value);
+                  return new Date(date.y, date.m - 1, date.d).toLocaleDateString('en-CA');
+                }
+                return String(value);
             }
         }
     }
@@ -95,11 +101,30 @@ function mapRowToAsset(row: any, category: string): Asset | null {
         modelNumber: getColumnValue(row, 'Model Number', 'MODEL NUMBERS'),
         serialNumber: getColumnValue(row, 'Serial Number', 'ASSET SERIAL NUMBERS'),
         supplier: getColumnValue(row, 'Supplier', 'Suppliers'),
-        dateReceived: getColumnValue(row, 'Date Purchased or Received', 'YEAR OF PURCHASE'),
+        dateReceived: getColumnValue(row, 'Date Purchased or Received', 'Date Purchased or  Received', 'YEAR OF PURCHASE'),
         condition: getColumnValue(row, 'Condition'),
         remarks: getColumnValue(row, 'Remarks', 'Comments'),
         chasisNo: getColumnValue(row, 'Chasis no'),
         engineNo: getColumnValue(row, 'Engine no'),
+        qty: getColumnValue(row, 'QTY'),
+        site: getColumnValue(row, 'SITE'),
+        costNgn: getColumnValue(row, 'COST (NGN)'),
+        priceNaira: getColumnValue(row, 'Purchase price (Naira)'),
+        priceUSD: getColumnValue(row, 'Purchase Price [USD)'), // Match typo in header
+        funder: getColumnValue(row, 'Funder'),
+        grant: getColumnValue(row, 'GRANT'),
+        usefulLifeYears: getColumnValue(row, 'Useful Life (Years)'),
+        imei: getColumnValue(row, 'IMEI (TABLETS & MOBILE PHONES)'),
+        grnNo: getColumnValue(row, 'Chq No / Goods Received Note No.'),
+        pvNo: getColumnValue(row, 'PV No'),
+        accumulatedDepreciation: {
+            ngn: getColumnValue(row, 'Accumulated Depreciation (NGN)'),
+            usd: getColumnValue(row, 'Accumulated Depreciation (USD)')
+        },
+        netBookValue: {
+            ngn: getColumnValue(row, 'Net Book Value (NGN)'),
+            usd: getColumnValue(row, 'Net Book Value (USD)')
+        }
     };
     return asset;
 }
@@ -150,7 +175,7 @@ export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sh
             });
 
             if(sheetAssets.length > 0) {
-                 assetsBySheet[matchedSheetName] = sheetAssets;
+                 assetsBySheet[matchedSheetName] = (assetsBySheet[matchedSheetName] || []).concat(sheetAssets);
             }
             if(sheetSkipped > 0) {
                  totalSkipped += sheetSkipped;
@@ -173,30 +198,111 @@ export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sh
   });
 }
 
+
+const headerToAssetKeyMap: { [key: string]: keyof Asset | string } = {
+    's/n': 'sn',
+    'location': 'location',
+    'state': 'location',
+    'lga': 'lga',
+    'assignee': 'assignee',
+    'asset description': 'description',
+    'description': 'description',
+    'asset id code': 'assetIdCode',
+    'tag numbers': 'assetIdCode',
+    'asset class': 'assetClass',
+    'classification': 'assetClass',
+    'manufacturer': 'manufacturer',
+    'model number': 'modelNumber',
+    'model numbers': 'modelNumber',
+    'serial number': 'serialNumber',
+    'asset serial numbers': 'serialNumber',
+    'supplier': 'supplier',
+    'suppliers': 'supplier',
+    'date purchased or received': 'dateReceived',
+    'date purchased or  received': 'dateReceived',
+    'year of purchase': 'dateReceived',
+    'chq no / goods received note no.': 'grnNo',
+    'pv no': 'pvNo',
+    'purchase price (naira)': 'priceNaira',
+    'cost (ngn)': 'costNgn',
+    'purchase price [usd)': 'priceUSD',
+    'funder': 'funder',
+    'condition': 'condition',
+    'remarks': 'remarks',
+    'comments': 'remarks',
+    'grant': 'grant',
+    'useful life (years)': 'usefulLifeYears',
+    'accumulated depreciation (ngn)': 'accumulatedDepreciation.ngn',
+    'net book value (ngn)': 'netBookValue.ngn',
+    'accumulated depreciation (usd)': 'accumulatedDepreciation.usd',
+    'net book value (usd)': 'netBookValue.usd',
+    'imei (tablets & mobile phones)': 'imei',
+    'chasis no': 'chasisNo',
+    'engine no': 'engineNo',
+    'qty': 'qty',
+    'site': 'site'
+};
+
+function getNestedValue(obj: any, path: string): any {
+    if (!path || typeof path !== 'string') return undefined;
+    return path.split('.').reduce((o, k) => (o && typeof o === 'object' && o[k] !== undefined) ? o[k] : undefined, obj);
+}
+
 /**
- * Exports a list of assets to an Excel file.
+ * Exports a list of assets to an Excel file, preserving original column structures.
  */
 export function exportToExcel(assets: Asset[], fileName: string): void {
-  const dataToExport = assets.map(asset => {
-    // Create a new object to control key order
-    const flattenedAsset: Record<string, any> = {};
-
-    // Add all keys except the ones we want at the end
-    for (const [key, value] of Object.entries(asset)) {
-        if (key !== 'syncStatus' && key !== 'verifiedStatus' && key !== 'verifiedDate' && typeof value !== 'object') {
-            flattenedAsset[key] = value;
-        }
-    }
-    
-    // Add the verification fields at the end
-    flattenedAsset['Verified Status'] = asset.verifiedStatus;
-    flattenedAsset['Verified Date'] = asset.verifiedDate;
-
-    return flattenedAsset;
-  });
-
-  const worksheet = XLSX.utils.json_to_sheet(dataToExport);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Assets');
+
+  const assetsByCategory = assets.reduce((acc, asset) => {
+      const category = asset.category;
+      if (!acc[category]) {
+          acc[category] = [];
+      }
+      acc[category].push(asset);
+      return acc;
+  }, {} as Record<string, Asset[]>);
+
+  for (const category in assetsByCategory) {
+      if (Object.prototype.hasOwnProperty.call(assetsByCategory, category)) {
+          const categoryAssets = assetsByCategory[category];
+          const headers = HEADER_DEFINITIONS[category];
+
+          if (!headers) {
+              console.warn(`No header definition for category: ${category}. Skipping.`);
+              continue;
+          }
+
+          const finalHeaders = [...headers, 'Verified Status', 'Verified Date'];
+
+          const dataRows = categoryAssets.map(asset => {
+              const row: any[] = [];
+              headers.forEach(header => {
+                  const cleanHeader = header.toLowerCase().trim().replace(/\s+/g, ' ');
+                  const assetKeyPath = headerToAssetKeyMap[cleanHeader];
+                  if (assetKeyPath) {
+                      row.push(getNestedValue(asset, assetKeyPath as string) ?? '');
+                  } else {
+                      row.push('');
+                  }
+              });
+              row.push(asset.verifiedStatus || 'Unverified');
+              row.push(asset.verifiedDate || '');
+              return row;
+          });
+
+          const dataWithHeaders = [finalHeaders, ...dataRows];
+          const worksheet = XLSX.utils.aoa_to_sheet(dataWithHeaders);
+          
+          // Auto-fit columns
+          const cols = finalHeaders.map((header, i) => ({
+            wch: Math.max(...dataRows.map(r => r[i]?.toString().length), header.length) + 2
+          }));
+          worksheet['!cols'] = cols;
+
+          XLSX.utils.book_append_sheet(workbook, worksheet, category.substring(0, 31));
+      }
+  }
+
   XLSX.writeFile(workbook, fileName);
 }
