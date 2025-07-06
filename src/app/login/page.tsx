@@ -17,7 +17,6 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2, User, UserPlus } from 'lucide-react';
-import Image from 'next/image';
 
 const signInSchema = z.object({
   email: z.string().email({ message: 'Invalid email address.' }),
@@ -59,10 +58,16 @@ export default function LoginPage() {
       await loginWithEmail(values.email, values.password);
       router.push('/assets');
     } catch (error: any) {
+      let description = 'An unexpected error occurred. Please try again.';
+      if (error.code === 'auth/invalid-credential') {
+        description = 'Invalid email or password. Please check your credentials and try again.';
+      } else {
+        description = error.message;
+      }
       toast({
         variant: 'destructive',
         title: 'Sign In Failed',
-        description: error.message,
+        description: description,
       });
     } finally {
       setIsLoading(false);
