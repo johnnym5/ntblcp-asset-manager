@@ -40,6 +40,7 @@ import {
   AlertCircle,
   Check,
   FileText,
+  ClipboardEdit,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -56,9 +57,9 @@ import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { TARGET_SHEETS } from "@/lib/constants";
-import { MultiSelectFilter, type OptionType } from "./multi-select-filter";
-import { useAppState } from "@/contexts/app-state-context";
+import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
+import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -66,7 +67,7 @@ export default function AssetList() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isImporting, setIsImporting] = useState(false);
-  const [isLoading, setIsLoading] = useState(true); // Default to true to show loader
+  const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { userProfile } = useAuth();
@@ -77,16 +78,16 @@ export default function AssetList() {
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
 
-  // --- Filter State ---
-  const { searchTerm, isOnline, globalStateFilter } = useAppState();
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  // --- Global state from context ---
+  const { 
+    searchTerm, isOnline, globalStateFilter,
+    selectedLocations, selectedAssignees, selectedStatuses,
+    sortConfig, setLocationOptions, setAssigneeOptions
+  } = useAppState();
 
   // --- LOCAL STORAGE PERSISTENCE ---
-
-  // Load assets from localStorage on initial render
   useEffect(() => {
     try {
       const localData = localStorage.getItem('ntblcp-assets');
@@ -101,26 +102,23 @@ export default function AssetList() {
         variant: "destructive" 
       });
     } finally {
-      setIsLoading(false); // We're done loading, whether it succeeded or not
+      setIsLoading(false);
     }
   }, [toast]);
 
-  // Save assets to localStorage whenever they change
   useEffect(() => {
-    // We don't save during the initial load phase
     if (!isLoading) {
       try {
-        // A special case for clearing all assets
-        if (assets.length === 0) {
+        if (assets.length === 0 && localStorage.getItem('ntblcp-assets')) {
           localStorage.removeItem('ntblcp-assets');
-        } else {
+        } else if (assets.length > 0) {
           localStorage.setItem('ntblcp-assets', JSON.stringify(assets));
         }
       } catch (error) {
         console.error("Failed to save assets to local storage", error);
         toast({ 
           title: "Could not save data", 
-          description: "There was an error saving your assets locally.", 
+          description: "There was an error saving your assets locally. You may be out of space.", 
           variant: "destructive" 
         });
       }
@@ -165,39 +163,41 @@ export default function AssetList() {
     }, {} as { [key: string]: Asset[] });
   }, [stateFilteredAssets]);
   
-  // --- Memoized Filter Options ---
-  const locationOptions = useMemo<OptionType[]>(() => {
-    if (view !== 'table' || !currentCategory) return [];
-    const locations = new Set((assetsByCategory[currentCategory] || []).map(a => a.location).filter(Boolean));
-    return Array.from(locations).map(l => ({ label: l!, value: l! })).sort((a,b) => a.label.localeCompare(b.label));
-  }, [view, currentCategory, assetsByCategory]);
+  // --- Set Filter Options in Global Context ---
+  useEffect(() => {
+    const locations = new Set(stateFilteredAssets.map(a => a.location).filter(Boolean));
+    setLocationOptions(Array.from(locations).map(l => ({ label: l!, value: l! })).sort((a,b) => a.label.localeCompare(b.label)));
 
-  const assigneeOptions = useMemo<OptionType[]>(() => {
-      if (view !== 'table' || !currentCategory) return [];
-      const assignees = new Set((assetsByCategory[currentCategory] || []).map(a => a.assignee).filter(Boolean));
-      return Array.from(assignees).map(a => ({ label: a!, value: a! })).sort((a,b) => a.label.localeCompare(b.label));
-  }, [view, currentCategory, assetsByCategory]);
+    const assignees = new Set(stateFilteredAssets.map(a => a.assignee).filter(Boolean));
+    setAssigneeOptions(Array.from(assignees).map(a => ({ label: a!, value: a! })).sort((a,b) => a.label.localeCompare(b.label)));
+  }, [stateFilteredAssets, setLocationOptions, setAssigneeOptions]);
 
-  const statusOptions: OptionType[] = [
-      { value: "Verified", label: "Verified" },
-      { value: "Unverified", label: "Unverified" },
-      { value: "Discrepancy", label: "Discrepancy" },
-  ];
-  
+
+  const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
+    if (!config) return assetsToSort;
+    return [...assetsToSort].sort((a, b) => {
+        const aVal = a[config.key] ?? '';
+        const bVal = b[config.key] ?? '';
+        if (aVal < bVal) return config.direction === 'asc' ? -1 : 1;
+        if (aVal > bVal) return config.direction === 'asc' ? 1 : -1;
+        return 0;
+    });
+  };
+
   // --- Memoized Filtered Assets for Table View---
   const filteredAssets = useMemo(() => {
     if (view !== 'table' || !currentCategory) return [];
-    const baseAssets = assetsByCategory[currentCategory] || [];
+    let baseAssets = assetsByCategory[currentCategory] || [];
 
-    return baseAssets.filter(asset => {
-        // Search term is handled globally now, so we don't check it here.
+    let assetsToFilter = baseAssets.filter(asset => {
         const locationMatch = selectedLocations.length === 0 || (asset.location && selectedLocations.includes(asset.location));
         const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.includes(asset.assignee));
         const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
-
         return locationMatch && assigneeMatch && statusMatch;
     });
-  }, [view, currentCategory, assetsByCategory, selectedLocations, selectedAssignees, selectedStatuses]);
+    
+    return sortAssets(assetsToFilter, sortConfig);
+  }, [view, currentCategory, assetsByCategory, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
   
   // --- Memoized Global Search Results ---
   const searchResults = useMemo(() => {
@@ -213,20 +213,15 @@ export default function AssetList() {
       return [];
     }
 
-    return stateFilteredAssets.filter(asset => {
+    const results = stateFilteredAssets.filter(asset => {
       const assetHaystack = Object.values(asset)
-        .map(value => {
-          if (typeof value === 'object' && value !== null) {
-            return Object.values(value).join(' ');
-          }
-          return String(value);
-        })
-        .join(' ')
-        .toLowerCase();
-      
+        .map(value => (typeof value === 'object' && value !== null) ? Object.values(value).join(' ') : String(value))
+        .join(' ').toLowerCase();
       return lowerCaseSearchTokens.every(token => assetHaystack.includes(token));
     });
-  }, [searchTerm, stateFilteredAssets]);
+
+    return sortAssets(results, sortConfig);
+  }, [searchTerm, stateFilteredAssets, sortConfig]);
 
 
   const handleAddAsset = () => {
@@ -268,6 +263,29 @@ export default function AssetList() {
     setSelectedAssetIds([]);
     setIsBatchDeleting(false);
   }
+
+  const handleBatchEdit = () => setIsBatchEditOpen(true);
+  
+  const handleSaveBatchEdit = async (data: BatchUpdateData) => {
+    const assetsToUpdateCount = selectedAssetIds.length;
+    toast({ title: "Batch Updating Assets...", description: `Applying changes to ${assetsToUpdateCount} assets.` });
+    
+    setAssets(prev => prev.map(asset => {
+        if (selectedAssetIds.includes(asset.id)) {
+            const updatedAsset = { ...asset, ...data };
+            if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
+                updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
+            } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
+                 updatedAsset.verifiedDate = '';
+            }
+            return updatedAsset;
+        }
+        return asset;
+    }));
+    
+    toast({ title: "Assets Updated", description: `Successfully updated ${assetsToUpdateCount} assets.`});
+    setSelectedAssetIds([]);
+  };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
     toast({ title: "Saving Asset Locally...", description: "Your changes are being saved." });
@@ -356,6 +374,16 @@ export default function AssetList() {
               {selectedAssetIds.length > 0 ? (
                   <div className="flex items-center gap-2">
                       <span className="text-sm text-muted-foreground">{selectedAssetIds.length} of {searchResults.length} selected</span>
+                       {selectedAssetIds.length === 1 && (
+                            <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)}>
+                                <Edit className="mr-2 h-4 w-4" /> Edit
+                            </Button>
+                        )}
+                        {selectedAssetIds.length > 0 && (
+                            <Button variant="outline" size="sm" onClick={handleBatchEdit}>
+                                <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
+                            </Button>
+                        )}
                       <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting}>
                           {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                           Delete
@@ -445,6 +473,7 @@ export default function AssetList() {
               </Table>
           </div>
           <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} />
+          <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
           <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the asset from your local data.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       </div>
     );
@@ -507,6 +536,7 @@ export default function AssetList() {
           onQuickSave={handleQuickSaveAsset}
           isReadOnly={isFormReadOnly} 
         />
+        <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
       </div>
     )
   }
@@ -524,6 +554,16 @@ export default function AssetList() {
             {selectedAssetIds.length > 0 ? (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
+                     {selectedAssetIds.length === 1 && (
+                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)}>
+                            <Edit className="mr-2 h-4 w-4" /> Edit
+                        </Button>
+                    )}
+                    {selectedAssetIds.length > 0 && (
+                        <Button variant="outline" size="sm" onClick={handleBatchEdit}>
+                            <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
+                        </Button>
+                    )}
                     <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting}>
                         {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                         Delete
@@ -541,27 +581,6 @@ export default function AssetList() {
                     </Button>
                 </div>
             )}
-        </div>
-        
-        <div className="flex flex-wrap items-center gap-2 border-b pb-4">
-          <MultiSelectFilter
-            title="Location"
-            options={locationOptions}
-            selected={selectedLocations}
-            onChange={setSelectedLocations}
-          />
-          <MultiSelectFilter
-            title="Assignee"
-            options={assigneeOptions}
-            selected={selectedAssignees}
-            onChange={setSelectedAssignees}
-          />
-          <MultiSelectFilter
-            title="Status"
-            options={statusOptions}
-            selected={selectedStatuses}
-            onChange={setSelectedStatuses}
-          />
         </div>
         
         <div className="rounded-lg border shadow-sm flex-1 overflow-auto">
@@ -671,6 +690,12 @@ export default function AssetList() {
           onSave={handleSaveAsset} 
           onQuickSave={handleQuickSaveAsset}
           isReadOnly={isFormReadOnly}
+        />
+        <AssetBatchEditForm 
+            isOpen={isBatchEditOpen} 
+            onOpenChange={setIsBatchEditOpen}
+            selectedAssetCount={selectedAssetIds.length}
+            onSave={handleSaveBatchEdit}
         />
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogContent>

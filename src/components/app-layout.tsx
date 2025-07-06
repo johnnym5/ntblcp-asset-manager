@@ -31,17 +31,22 @@ import {
   User,
   Search,
   Cloud,
-  CloudOff
+  CloudOff,
+  Filter,
+  ArrowUpDown,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { Skeleton } from "./ui/skeleton";
-import { useAppState } from "@/contexts/app-state-context";
+import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import { MultiSelectFilter, type OptionType } from "./multi-select-filter";
+import type { Asset } from "@/lib/types";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -49,7 +54,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { userProfile, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const { isOnline, setIsOnline, searchTerm, setSearchTerm } = useAppState();
+  const { 
+    isOnline, setIsOnline, 
+    searchTerm, setSearchTerm, 
+    locationOptions,
+    assigneeOptions,
+    selectedLocations, setSelectedLocations,
+    selectedAssignees, setSelectedAssignees,
+    selectedStatuses, setSelectedStatuses,
+    sortConfig, setSortConfig
+  } = useAppState();
 
   const handleLogout = () => {
     logout();
@@ -71,6 +85,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const getUserName = () => {
     return userProfile?.displayName || "User";
   }
+
+  const statusOptions: OptionType[] = [
+      { value: "Verified", label: "Verified" },
+      { value: "Unverified", label: "Unverified" },
+      { value: "Discrepancy", label: "Discrepancy" },
+  ];
+
+  const sortableFields: { key: keyof Asset, label: string }[] = [
+      { key: 'description', label: 'Description' },
+      { key: 'category', label: 'Category' },
+      { key: 'location', label: 'Location' },
+      { key: 'verifiedDate', label: 'Verified Date' },
+      { key: 'assetIdCode', label: 'Asset ID' },
+  ];
+
+  const handleSort = (key: keyof Asset) => {
+    setSortConfig(prev => {
+        if (prev?.key === key && prev.direction === 'asc') {
+            return { key, direction: 'desc' };
+        }
+        return { key, direction: 'asc' };
+    });
+  };
 
   return (
     <SidebarProvider>
@@ -122,16 +159,67 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarTrigger>
           <div className="flex-1">
              {pathname === '/assets' && (
-              <div className="relative w-full max-w-md">
-                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  placeholder="Search by any detail (e.g. 'Dell XPS Lagos')..."
-                  className="pl-8 w-full h-9 bg-muted"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
+                <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary max-w-lg">
+                    <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="search"
+                        placeholder="Search assets..."
+                        className="pl-10 pr-20 w-full h-full bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Sort assets">
+                                    <ArrowUpDown className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {sortableFields.map(field => (
+                                    <DropdownMenuItem key={field.key} onClick={() => handleSort(field.key)}>
+                                        {field.label}
+                                        {sortConfig?.key === field.key && (
+                                            <span className="ml-auto text-xs">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                        )}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Filter assets">
+                                    <Filter className="h-4 w-4" />
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-auto p-0">
+                                <div className="p-4 space-y-4">
+                                    <MultiSelectFilter
+                                        title="Location"
+                                        options={locationOptions}
+                                        selected={selectedLocations}
+                                        onChange={setSelectedLocations}
+                                    />
+                                    <MultiSelectFilter
+                                        title="Assignee"
+                                        options={assigneeOptions}
+                                        selected={selectedAssignees}
+                                        onChange={setSelectedAssignees}
+                                    />
+                                    <MultiSelectFilter
+                                        title="Status"
+                                        options={statusOptions}
+                                        selected={selectedStatuses}
+                                        onChange={setSelectedStatuses}
+                                    />
+                                </div>
+                            </PopoverContent>
+                        </Popover>
+                    </div>
+                </div>
             )}
           </div>
           <div className="flex items-center gap-2">
