@@ -3,64 +3,11 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // --- Helper Functions ---
-    function getUserData(userId) {
-      return get(/databases/$(database)/documents/users/$(userId)).data;
-    }
-
-    function isAdmin(userId) {
-      return exists(/databases/$(database)/documents/users/$(userId)) &&
-             getUserData(userId).role == 'admin';
-    }
     
-    function isUserWithState(userId) {
-      return exists(/databases/$(database)/documents/users/$(userId)) &&
-             'state' in getUserData(userId) && getUserData(userId).state != null;
-    }
-
-    // --- User Profiles ---
-    match /users/{userId} {
-      // Users can create their own profile
-      allow create: if request.auth.uid == userId;
-      // Users can read their own profile
-      allow read: if request.auth.uid == userId;
-      // Users can update their own profile, but cannot change their role
-      allow update: if request.auth.uid == userId && request.resource.data.role == resource.data.role;
-    }
-
-    // --- Asset Collections (Dynamic) ---
-    // This rule applies to any collection listed in TARGET_SHEETS
-    match /{category}/{assetId} {
-      // Admins can read and write all asset data
-      allow read, write: if request.auth != null && isAdmin(request.auth.uid);
-
-      // Logged-in users can also read assets, but with restrictions
-      allow read: if request.auth != null &&
-                   isUserWithState(request.auth.uid) &&
-                   (
-                     ('location' in resource.data && resource.data.location == getUserData(request.auth.uid).state) ||
-                     ('lga' in resource.data && resource.data.lga == getUserData(request.auth.uid).state)
-                   );
-                   
-      // Logged-in users can create new assets
-      allow create: if request.auth != null;
-
-      // Logged-in users can update assets that match their state
-      allow update: if request.auth != null &&
-                     isUserWithState(request.auth.uid) &&
-                     (
-                       ('location' in resource.data && resource.data.location == getUserData(request.auth.uid).state) ||
-                       ('lga' in resource.data && resource.data.lga == getUserData(request.auth.uid).state)
-                     );
-
-      // Logged-in users can delete assets that match their state
-      allow delete: if request.auth != null &&
-                     isUserWithState(request.auth.uid) &&
-                     (
-                       ('location' in resource.data && resource.data.location == getUserData(request.auth.uid).state) ||
-                       ('lga' in resource.data && resource.data.lga == getUserData(request.auth.uid).state)
-                     );
+    // WARNING: This is insecure and should only be used for initial setup/debugging.
+    // This allows all reads and writes to all collections.
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
