@@ -7,7 +7,7 @@ import { useAppState } from './app-state-context';
 // Using a simplified profile for local-only use
 interface LocalUserProfile {
   displayName: string;
-  state: string;
+  state: string; // state can be '' for admin
 }
 
 interface AuthContextType {
@@ -38,10 +38,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const savedProfile = localStorage.getItem('ntblcp-user-profile');
       if (savedProfile) {
         const profile: LocalUserProfile = JSON.parse(savedProfile);
-        // Ensure the loaded profile is valid before setting it
-        if (profile.displayName && profile.state) {
+        // A valid profile just needs a displayName now. State can be empty for admin.
+        if (profile.displayName) {
           setUserProfile(profile);
-          setGlobalStateFilter(profile.state);
+          setGlobalStateFilter(profile.state || ''); // Use state if present, otherwise no filter.
           setProfileSetupComplete(true);
         } else {
           // If profile is invalid, remove it
@@ -59,12 +59,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     const newProfile: LocalUserProfile = {
       displayName: data.displayName,
-      state: data.state,
+      state: data.state, // state will be '' for admin
     };
     try {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
-      setGlobalStateFilter(data.state);
+      setGlobalStateFilter(data.state || ''); // Set filter to state, or empty for admin
       setProfileSetupComplete(true);
     } catch(e) {
       console.error("Failed to save user profile to local storage", e);

@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -33,11 +33,21 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
   const [displayName, setDisplayName] = useState(defaultDisplayName || '');
   const [selectedState, setSelectedState] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+
+  useEffect(() => {
+    const isAdminUser = displayName.trim().toLowerCase() === 'admin';
+    setIsAdmin(isAdminUser);
+    if (isAdminUser) {
+      setSelectedState(''); // Admin doesn't need a state
+    }
+  }, [displayName]);
+
 
   const handleConfirm = async () => {
-    if (displayName && selectedState) {
+    if ((isAdmin && displayName) || (displayName && selectedState)) {
       setIsSaving(true);
-      await onSubmit({ displayName, state: selectedState });
+      await onSubmit({ displayName, state: isAdmin ? '' : selectedState });
       // The parent component will handle closing the dialog on success
       setIsSaving(false);
     }
@@ -49,7 +59,7 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
         <AlertDialogHeader>
           <AlertDialogTitle>Complete Your Profile</AlertDialogTitle>
           <AlertDialogDescription>
-            Please provide your name and assigned state to continue. This will tailor the app experience for you.
+            Please provide your name and assigned state. Enter 'admin' as your name to view all assets without a state filter.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="py-4 space-y-4">
@@ -59,27 +69,29 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
               id="displayName" 
               value={displayName} 
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="John Doe"
+              placeholder="John Doe or 'admin'"
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="state">Assigned State</Label>
-            <Select onValueChange={setSelectedState} value={selectedState}>
-              <SelectTrigger id="state">
-                <SelectValue placeholder="Select a state..." />
-              </SelectTrigger>
-              <SelectContent>
-                {NIGERIAN_STATES.map((state) => (
-                  <SelectItem key={state} value={state}>
-                    {state}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {!isAdmin && (
+            <div className="space-y-2">
+              <Label htmlFor="state">Assigned State</Label>
+              <Select onValueChange={setSelectedState} value={selectedState}>
+                <SelectTrigger id="state">
+                  <SelectValue placeholder="Select a state..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {NIGERIAN_STATES.map((state) => (
+                    <SelectItem key={state} value={state}>
+                      {state}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
         <AlertDialogFooter>
-          <Button onClick={handleConfirm} disabled={!selectedState || !displayName || isSaving}>
+          <Button onClick={handleConfirm} disabled={isSaving || !displayName || (!isAdmin && !selectedState)}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirm and Continue
           </Button>
