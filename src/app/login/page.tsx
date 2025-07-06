@@ -112,10 +112,16 @@ export default function LoginPage() {
       await anonymousSignIn();
       router.push('/assets');
     } catch (error: any) {
+      let description = 'Could not sign in as guest. Please try again.';
+      if (error.code === 'auth/admin-restricted-operation') {
+        description = 'Anonymous sign-in is not enabled. Please enable it in your Firebase project settings.';
+      } else {
+        description = error.message;
+      }
        toast({
         variant: 'destructive',
         title: 'Guest Sign In Failed',
-        description: 'Could not sign in as guest. Please try again.',
+        description: description,
       });
     } finally {
       setIsGuestLoading(false);
