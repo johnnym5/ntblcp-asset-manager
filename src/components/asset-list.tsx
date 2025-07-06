@@ -81,38 +81,72 @@ export default function AssetList() {
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const newAssets: Asset[] = json.map((row, index) => {
-          if (!row.serialNumber || !row.model || !row.location || !row.status) {
-            throw new Error(
-              `Row ${
+        const validStatuses: Asset["status"][] = [
+          "In Use",
+          "In Storage",
+          "For Repair",
+          "Disposed",
+        ];
+
+        const validRows = json.filter((row, index) => {
+          const hasRequiredFields =
+            row.serialNumber && row.model && row.location && row.status;
+          if (!hasRequiredFields) {
+            console.warn(
+              `Skipping row ${
                 index + 2
-              } is missing required fields (serialNumber, model, location, status).`
+              } due to missing required fields.`
             );
+            return false;
           }
-          const validStatuses: Asset['status'][] = ["In Use", "In Storage", "For Repair", "Disposed"];
-          if (!validStatuses.includes(row.status)) {
-            throw new Error(`Row ${index + 2} has an invalid status: ${row.status}. Valid statuses are: ${validStatuses.join(', ')}.`);
+          const hasValidStatus = validStatuses.includes(row.status);
+          if (!hasValidStatus) {
+            console.warn(
+              `Skipping row ${index + 2} due to invalid status: ${
+                row.status
+              }.`
+            );
+            return false;
           }
-          return {
-            id: `imported-${Date.now()}-${index}`,
-            serialNumber: String(row.serialNumber),
-            model: String(row.model),
-            location: String(row.location),
-            status: row.status as Asset["status"],
-            photoUrl: String(
-              row.photoUrl || "https://placehold.co/400x400.png"
-            ),
-            conditionNotes: row.conditionNotes
-              ? String(row.conditionNotes)
-              : undefined,
-          };
+          return true;
         });
 
-        setAssets((prevAssets) => [...prevAssets, ...newAssets]);
-        toast({
-          title: "Import Successful",
-          description: `${newAssets.length} assets have been imported.`,
-        });
+        const skippedCount = json.length - validRows.length;
+
+        const newAssets: Asset[] = validRows.map((row, index) => ({
+          id: `imported-${Date.now()}-${index}`,
+          serialNumber: String(row.serialNumber),
+          model: String(row.model),
+          location: String(row.location),
+          status: row.status as Asset["status"],
+          photoUrl: String(
+            row.photoUrl || "https://placehold.co/400x400.png"
+          ),
+          conditionNotes: row.conditionNotes
+            ? String(row.conditionNotes)
+            : undefined,
+        }));
+
+        if (newAssets.length > 0) {
+          setAssets((prevAssets) => [...prevAssets, ...newAssets]);
+          toast({
+            title: "Import Successful",
+            description: `${newAssets.length} assets imported. ${
+              skippedCount > 0 ? `${skippedCount} rows skipped.` : ""
+            }`.trim(),
+          });
+        } else if (skippedCount > 0) {
+          toast({
+            title: "Import Finished",
+            description: `No new assets were imported. ${skippedCount} rows were skipped.`,
+          });
+        } else {
+          toast({
+            title: "Import Finished",
+            description:
+              "The file was empty or contained no valid asset data.",
+          });
+        }
       } catch (error) {
         console.error("Failed to import Excel file:", error);
         toast({
