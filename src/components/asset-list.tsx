@@ -45,7 +45,6 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
-import { saveAssetsToFirestore, getAssetsListener, deleteAsset, updateAsset } from "@/lib/firestore";
 import { useAuth } from "@/contexts/auth-context";
 import { TARGET_SHEETS } from "@/lib/constants";
 
@@ -74,17 +73,10 @@ export default function AssetList() {
   const [assigneeFilters, setAssigneeFilters] = useState<string[]>([]);
   
   useEffect(() => {
-    if (!userProfile) {
-      return;
-    }
-    
-    setIsLoading(true);
-    const unsubscribe = getAssetsListener((fetchedAssets) => {
-      setAssets(fetchedAssets.map(asset => ({ ...asset, syncStatus: 'synced' })));
-      setIsLoading(false);
-    }, userProfile);
-
-    return () => unsubscribe();
+    // Firestore is disabled. Manage assets locally.
+    setIsLoading(false);
+    // We would normally fetch data here, but since Firestore is off, we just stop loading.
+    // If you have locally saved data (e.g., in localStorage), you could load it here.
   }, [userProfile]);
 
   const handleAddAsset = () => {
@@ -98,21 +90,27 @@ export default function AssetList() {
   };
   
   const handleDeleteAsset = async (assetToDelete: Asset) => {
-    try {
-      await deleteAsset(assetToDelete);
-      toast({ title: "Asset Deleted", description: `Asset "${assetToDelete.description}" was deleted from the database.`});
-    } catch(e: any) {
-        toast({ title: "Delete Failed", description: e.message, variant: "destructive"});
-    }
+    // Firestore is disabled. Update local state only.
+    setAssets(prevAssets => prevAssets.filter(a => a.id !== assetToDelete.id));
+    toast({ title: "Asset Deleted Locally", description: `Asset "${assetToDelete.description}" was removed from this device.`});
   }
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    try {
-      await updateAsset({ ...assetToSave, syncStatus: 'synced' });
-      toast({ title: "Save Successful", description: "Asset changes have been saved." });
-    } catch (e: any) {
-      toast({ title: "Save Failed", description: e.message, variant: "destructive" });
-    }
+    // Firestore is disabled. Update local state only.
+    setAssets(prevAssets => {
+        const existingIndex = prevAssets.findIndex(a => a.id === assetToSave.id);
+        if (existingIndex > -1) {
+            // Update existing asset
+            const newAssets = [...prevAssets];
+            newAssets[existingIndex] = { ...assetToSave, syncStatus: 'local' };
+            return newAssets;
+        } else {
+            // Add new asset
+            return [...prevAssets, { ...assetToSave, syncStatus: 'local' }];
+        }
+    });
+    toast({ title: "Saved Locally", description: "Asset changes have been saved to this device." });
+    setIsFormOpen(false); // Close form on save
   };
 
   const handleImportClick = () => {
@@ -138,15 +136,12 @@ export default function AssetList() {
 
     const sheetNames = Object.keys(assetsBySheet);
     if (sheetNames.length > 0) {
-      try {
-        const totalSaved = await saveAssetsToFirestore(assetsBySheet);
-        toast({
-            title: "Import Successful",
-            description: `Successfully saved ${totalSaved} assets to the database.`,
-        });
-      } catch (e: any) {
-        toast({ title: "Firestore Save Failed", description: e.message, variant: "destructive" });
-      }
+      const importedAssets = Object.values(assetsBySheet).flat().map(asset => ({ ...asset, syncStatus: 'local' as const }));
+      setAssets(prevAssets => [...prevAssets, ...importedAssets]);
+      toast({
+          title: "Import Successful",
+          description: `Successfully loaded ${importedAssets.length} assets locally.`,
+      });
     } else if (errors.length === 0) {
         toast({ title: "No Data Found", description: "No valid sheets for import were found in the file."});
     }
@@ -327,7 +322,7 @@ export default function AssetList() {
                 </TableRow>
               ))
             ) : (
-                <TableRow><TableCell colSpan={7} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center h-24">No assets found. Import a file or add a new asset to get started.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

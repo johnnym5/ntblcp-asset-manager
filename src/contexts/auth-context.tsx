@@ -2,9 +2,7 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { getUserProfile, createUserProfile } from '@/lib/firestore';
+import type { User } from 'firebase/auth';
 import type { UserProfile } from '@/lib/types';
 
 interface AuthContextType {
@@ -25,23 +23,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      setLoading(true);
-      if (user) {
-        setUser(user);
-        let profile = await getUserProfile(user.uid);
-        if (!profile) {
-          profile = await createUserProfile(user);
-        }
-        setUserProfile(profile);
-      } else {
-        setUser(null);
-        setUserProfile(null);
-      }
-      setLoading(false);
-    });
+    setLoading(true);
+    // Mock a logged-in guest user and profile to bypass auth and Firestore checks
+    const mockUser = {
+      uid: 'mock-guest-uid',
+      isAnonymous: true,
+      displayName: 'Guest User',
+      email: null,
+      photoURL: null,
+    } as User;
 
-    return () => unsubscribe();
+    const mockProfile: UserProfile = {
+      uid: 'mock-guest-uid',
+      email: null,
+      displayName: 'Guest User',
+      role: 'admin', // Give admin role to avoid any client-side permission checks
+      state: 'Lagos', // Give a default state to bypass state selector
+    };
+    
+    setUser(mockUser);
+    setUserProfile(mockProfile);
+    setLoading(false);
+    
+    // Return an empty unsubscribe function
+    return () => {};
   }, []);
 
   const value = { user, userProfile, loading };
