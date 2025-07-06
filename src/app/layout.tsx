@@ -4,8 +4,8 @@ import { Toaster } from "@/components/ui/toaster"
 import { ThemeProvider } from "@/components/theme-provider"
 
 export const metadata: Metadata = {
-  title: 'Offline Asset Assist',
-  description: 'A full-featured, offline-first web app to manage assets efficiently.',
+  title: 'NTBLCP Asset Manager',
+  description: 'A full-featured, offline-first web app to manage assets efficiently for NTBLCP.',
 };
 
 export default function RootLayout({
