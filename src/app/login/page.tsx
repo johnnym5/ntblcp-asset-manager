@@ -1,12 +1,11 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/contexts/auth-context';
 import { loginWithEmail, signUpWithEmail, signInWithGoogle, anonymousSignIn } from '@/lib/auth';
 import { motion } from 'framer-motion';
 
@@ -35,7 +34,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isGoogleLoading, setIsGoogleLoading] = useState(false);
   const [isGuestLoading, setIsGuestLoading] = useState(false);
-  const { user } = useAuth();
   
   const signInForm = useForm<z.infer<typeof signInSchema>>({
     resolver: zodResolver(signInSchema),
@@ -46,16 +44,6 @@ export default function LoginPage() {
     resolver: zodResolver(signUpSchema),
     defaultValues: { displayName: '', email: '', password: '' },
   });
-  
-  useEffect(() => {
-    if (user) {
-      router.push('/assets');
-    }
-  }, [user, router]);
-
-  if (user) {
-    return null;
-  }
 
   const onSignInSubmit = async (values: z.infer<typeof signInSchema>) => {
     setIsLoading(true);

@@ -68,7 +68,7 @@ export default function AssetList() {
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
 
   // --- Filter State ---
-  const { searchTerm, isOnline } = useAppState();
+  const { searchTerm, isOnline, globalStateFilter } = useAppState();
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -125,13 +125,26 @@ export default function AssetList() {
             ? 'Application is now connected to the server.'
             : 'Application is running in offline mode. Changes are saved locally.',
     });
-    // Here you would typically trigger data sync logic based on the mode.
-    // e.g., if (isOnline) { syncLocalData(); }
   }, [isOnline, toast]);
 
 
+  const stateFilteredAssets = useMemo(() => {
+    if (!globalStateFilter) {
+      return assets;
+    }
+    return assets.filter(
+      (asset) =>
+        (asset.location || "")
+          .toLowerCase()
+          .trim() === globalStateFilter.toLowerCase().trim() ||
+        (asset.lga || "")
+          .toLowerCase()
+          .trim() === globalStateFilter.toLowerCase().trim()
+    );
+  }, [assets, globalStateFilter]);
+  
   const assetsByCategory = useMemo(() => {
-    return assets.reduce((acc, asset) => {
+    return stateFilteredAssets.reduce((acc, asset) => {
         const category = asset.category || 'Uncategorized';
         if (!acc[category]) {
             acc[category] = [];
@@ -139,7 +152,7 @@ export default function AssetList() {
         acc[category].push(asset);
         return acc;
     }, {} as { [key: string]: Asset[] });
-  }, [assets]);
+  }, [stateFilteredAssets]);
   
   // --- Memoized Filter Options ---
   const locationOptions = useMemo<OptionType[]>(() => {
@@ -253,7 +266,6 @@ export default function AssetList() {
 
     const allNewAssets = Object.values(assetsBySheet).flat();
     if (allNewAssets.length > 0) {
-        // Data is saved locally to the state
         setAssets(prev => [...prev, ...allNewAssets]);
         toast({ title: "Import Successful", description: `Successfully imported ${allNewAssets.length} new assets. Data is saved locally.` });
     } else if (errors.length === 0) {
@@ -265,7 +277,7 @@ export default function AssetList() {
   };
   
   const handleExportClick = () => {
-    const assetsToExport = view === 'table' ? filteredAssets : assets;
+    const assetsToExport = view === 'table' ? filteredAssets : stateFilteredAssets;
     if (assetsToExport.length === 0) {
       toast({ title: "No Data to Export", description: "There are no assets in the current view to export." });
       return;
@@ -316,7 +328,13 @@ export default function AssetList() {
         </div>
         <Card>
             <CardHeader>
-                <CardTitle>Total Assets: {assets.length}</CardTitle>
+              <CardTitle>
+                {globalStateFilter 
+                  ? `Displaying Assets for ${globalStateFilter}: ${stateFilteredAssets.length}`
+                  : `Total Assets: ${assets.length}`
+                }
+                {globalStateFilter && ` (out of ${assets.length} total)`}
+              </CardTitle>
             </CardHeader>
         </Card>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

@@ -8,6 +8,8 @@ interface AppStateContextType {
   setIsOnline: Dispatch<SetStateAction<boolean>>;
   searchTerm: string;
   setSearchTerm: Dispatch<SetStateAction<string>>;
+  globalStateFilter: string;
+  setGlobalStateFilter: Dispatch<SetStateAction<string>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -15,12 +17,15 @@ const AppStateContext = createContext<AppStateContextType | undefined>(undefined
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [isOnline, setIsOnline] = useState(false); // Default to offline
   const [searchTerm, setSearchTerm] = useState('');
+  const [globalStateFilter, setGlobalStateFilter] = useState('');
 
   const value = {
     isOnline,
     setIsOnline,
     searchTerm,
     setSearchTerm,
+    globalStateFilter,
+    setGlobalStateFilter,
   };
 
   return (

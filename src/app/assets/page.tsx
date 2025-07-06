@@ -5,9 +5,19 @@ import { useAuth } from '@/contexts/auth-context';
 import AppLayout from '@/components/app-layout';
 import AssetList from '@/components/asset-list';
 import { Loader2 } from 'lucide-react';
+import UserProfileSetup from '@/components/state-selector';
+import { useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 
 export default function AssetsPage() {
-  const { loading } = useAuth();
+  const { user, loading, profileSetupComplete, updateProfile, userProfile } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push('/login');
+    }
+  }, [user, loading, router]);
 
   if (loading) {
     return (
@@ -16,6 +26,22 @@ export default function AssetsPage() {
       </div>
     );
   }
+
+  if (!user) {
+    // Redirect is handled by useEffect
+    return null;
+  }
+
+  if (!profileSetupComplete) {
+    return (
+      <UserProfileSetup
+        isOpen={true}
+        onSubmit={updateProfile}
+        defaultDisplayName={userProfile?.displayName}
+      />
+    );
+  }
+
 
   return (
     <AppLayout>
