@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useRouter } from 'next/navigation';
 import {
   SidebarProvider,
@@ -45,6 +45,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
   const { user } = useAuth();
   const router = useRouter();
+  const [hasMounted, setHasMounted] = useState(false);
+
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
 
   useEffect(() => {
     if (isOnline === false) {
@@ -122,16 +128,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarTrigger>
           <div className="flex-1">
             <h1 className="text-lg font-semibold md:text-xl flex items-center gap-2">
-              {isOnline ? (
-                <>
-                  <Signal className="h-5 w-5 text-green-500" />
-                  Online
-                </>
-              ) : (
-                <>
-                  <SignalZero className="h-5 w-5 text-red-500" />
-                  Offline
-                </>
+              {hasMounted && (
+                isOnline ? (
+                  <>
+                    <Signal className="h-5 w-5 text-green-500" />
+                    Online
+                  </>
+                ) : (
+                  <>
+                    <SignalZero className="h-5 w-5 text-red-500" />
+                    Offline
+                  </>
+                )
               )}
             </h1>
           </div>
