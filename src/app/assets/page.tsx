@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/auth-context';
 import AppLayout from '@/components/app-layout';
@@ -9,21 +9,43 @@ import AssetList from '@/components/asset-list';
 import { Loader2 } from 'lucide-react';
 import StateSelector from '@/components/state-selector';
 import { updateUserProfile } from '@/lib/firestore';
+import { anonymousSignIn } from '@/lib/auth';
+import { useToast } from '@/hooks/use-toast';
 
 export default function AssetsPage() {
   const { user, userProfile, loading } = useAuth();
   const router = useRouter();
+  const { toast } = useToast();
   const [isStateSelectorOpen, setIsStateSelectorOpen] = useState(false);
+  const guestSignInAttempted = useRef(false);
 
   useEffect(() => {
-    if (!loading) {
-      if (!user) {
-        router.push('/login');
-      } else if (userProfile?.role === 'user' && !userProfile.state) {
-        setIsStateSelectorOpen(true);
-      }
+    if (loading) {
+      return; // Wait until auth is resolved
     }
-  }, [user, userProfile, loading, router]);
+
+    if (!user) {
+      // Prevent multiple sign-in attempts
+      if (guestSignInAttempted.current) return;
+      guestSignInAttempted.current = true;
+      
+      toast({ description: 'Signing in as guest...' });
+      anonymousSignIn().catch((error: any) => {
+        let description = 'Could not sign in as guest. Please try again.';
+        if (error.code === 'auth/admin-restricted-operation') {
+          description = 'Anonymous sign-in is not enabled. Please enable it in your Firebase project settings.';
+        }
+        toast({
+          variant: 'destructive',
+          title: 'Guest Sign In Failed',
+          description: description,
+        });
+        router.push('/login'); // Fallback to login if guest sign in fails
+      });
+    } else if (userProfile?.role === 'user' && !userProfile.state) {
+      setIsStateSelectorOpen(true);
+    }
+  }, [user, userProfile, loading, router, toast]);
 
   const handleStateSelect = async (state: string) => {
     if (user) {
