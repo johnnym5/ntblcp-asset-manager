@@ -42,7 +42,7 @@ import {
   FileText,
   ClipboardEdit,
 } from "lucide-react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
@@ -51,6 +51,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Progress } from "@/components/ui/progress";
 
 import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
@@ -481,6 +482,10 @@ export default function AssetList() {
 
   // DASHBOARD VIEW
   if (view === 'dashboard') {
+    const totalStateAssets = stateFilteredAssets.length;
+    const verifiedStateAssets = stateFilteredAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
+    const verificationPercentage = totalStateAssets > 0 ? (verifiedStateAssets / totalStateAssets) * 100 : 0;
+    
     return (
       <div className="flex flex-col h-full gap-4">
         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
@@ -507,26 +512,48 @@ export default function AssetList() {
             <CardHeader>
               <CardTitle>
                 {globalStateFilter 
-                  ? `Displaying Assets for ${globalStateFilter}: ${stateFilteredAssets.length}`
-                  : `Total Assets: ${assets.length}`
+                  ? `Asset Verification Status for ${globalStateFilter}`
+                  : `Overall Asset Verification Status`
                 }
-                {globalStateFilter && ` (out of ${assets.length} total)`}
               </CardTitle>
             </CardHeader>
+             <CardContent className="pt-2 space-y-2">
+                <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
+                <p className="text-sm text-muted-foreground">
+                    <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{totalStateAssets}</span> assets verified.
+                    {globalStateFilter && userProfile?.displayName?.toLowerCase() !== 'admin' && ` (Total in database: ${assets.length})`}
+                </p>
+            </CardContent>
         </Card>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {TARGET_SHEETS.map(category => (
-                <Card key={category} className="hover:shadow-md transition-shadow">
-                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                        <CardTitle className="text-sm font-medium">{category}</CardTitle>
-                        <Folder className="h-4 w-4 text-muted-foreground" />
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-2xl font-bold">{assetsByCategory[category]?.length || 0}</div>
-                        <Button variant="link" className="p-0 h-auto mt-2" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
-                    </CardContent>
-                </Card>
-            ))}
+            {TARGET_SHEETS.map(category => {
+                const categoryAssets = assetsByCategory[category] || [];
+                const total = categoryAssets.length;
+                const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
+                const percentage = total > 0 ? (verified / total) * 100 : 0;
+                
+                return (
+                    <Card key={category} className="hover:shadow-md transition-shadow flex flex-col">
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                            <CardTitle className="text-sm font-medium">{category}</CardTitle>
+                            <Folder className="h-4 w-4 text-muted-foreground" />
+                        </CardHeader>
+                        <CardContent className="flex-grow space-y-4">
+                            <div>
+                                <div className="text-2xl font-bold">{total}</div>
+                                <p className="text-xs text-muted-foreground">Total assets in this category</p>
+                            </div>
+                            <div className="space-y-2">
+                                <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
+                                <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
+                            </div>
+                        </CardContent>
+                        <CardFooter className="pt-0 pb-4">
+                           <Button variant="link" className="p-0 h-auto" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
+                        </CardFooter>
+                    </Card>
+                );
+            })}
         </div>
         <AssetForm 
           isOpen={isFormOpen} 
