@@ -25,7 +25,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -40,6 +39,7 @@ import {
   Cloud,
   HardDrive,
 } from "lucide-react";
+import { AlertDialogTrigger } from "@radix-ui/react-alert-dialog";
 import { MultiSelectFilter, type OptionType } from "./multi-select-filter";
 import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
@@ -47,6 +47,7 @@ import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { useAuth } from "@/contexts/auth-context";
 import { TARGET_SHEETS } from "@/lib/constants";
+import { getAssetsListener, updateAsset, deleteAsset, saveAssetsToFirestore } from "@/lib/firestore";
 
 const VERIFIED_STATUS_OPTIONS: OptionType[] = [
     { value: 'Verified', label: 'Verified' },
@@ -73,10 +74,18 @@ export default function AssetList() {
   const [assigneeFilters, setAssigneeFilters] = useState<string[]>([]);
   
   useEffect(() => {
-    // Firestore is disabled. Manage assets locally.
-    setIsLoading(false);
-    // We would normally fetch data here, but since Firestore is off, we just stop loading.
-    // If you have locally saved data (e.g., in localStorage), you could load it here.
+    if (!userProfile) {
+        setIsLoading(true); // Wait for profile
+        return;
+    }
+    
+    setIsLoading(true);
+    const unsubscribe = getAssetsListener((loadedAssets) => {
+        setAssets(loadedAssets);
+        setIsLoading(false);
+    }, userProfile);
+
+    return () => unsubscribe();
   }, [userProfile]);
 
   const handleAddAsset = () => {
@@ -90,27 +99,27 @@ export default function AssetList() {
   };
   
   const handleDeleteAsset = async (assetToDelete: Asset) => {
-    // Firestore is disabled. Update local state only.
-    setAssets(prevAssets => prevAssets.filter(a => a.id !== assetToDelete.id));
-    toast({ title: "Asset Deleted Locally", description: `Asset "${assetToDelete.description}" was removed from this device.`});
+    toast({ title: "Deleting Asset...", description: `Removing "${assetToDelete.description}" from the server.` });
+    try {
+        await deleteAsset(assetToDelete);
+        toast({ title: "Asset Deleted", description: `Asset was successfully removed.`});
+        // UI will update automatically via listener
+    } catch (error: any) {
+        toast({ variant: 'destructive', title: "Delete Failed", description: error.message });
+    }
   }
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    // Firestore is disabled. Update local state only.
-    setAssets(prevAssets => {
-        const existingIndex = prevAssets.findIndex(a => a.id === assetToSave.id);
-        if (existingIndex > -1) {
-            // Update existing asset
-            const newAssets = [...prevAssets];
-            newAssets[existingIndex] = { ...assetToSave, syncStatus: 'local' };
-            return newAssets;
-        } else {
-            // Add new asset
-            return [...prevAssets, { ...assetToSave, syncStatus: 'local' }];
-        }
-    });
-    toast({ title: "Saved Locally", description: "Asset changes have been saved to this device." });
-    setIsFormOpen(false); // Close form on save
+    toast({ title: "Saving Asset...", description: "Your changes are being saved to the server." });
+    try {
+        const assetWithSync = { ...assetToSave, syncStatus: 'synced' as const };
+        await updateAsset(assetWithSync);
+        toast({ title: "Saved Successfully", description: "Asset changes have been saved." });
+        setIsFormOpen(false); // Close form on save
+        // UI will update automatically via listener
+    } catch(e: any) {
+        toast({ variant: 'destructive', title: "Save Failed", description: e.message });
+    }
   };
 
   const handleImportClick = () => {
@@ -136,12 +145,14 @@ export default function AssetList() {
 
     const sheetNames = Object.keys(assetsBySheet);
     if (sheetNames.length > 0) {
-      const importedAssets = Object.values(assetsBySheet).flat().map(asset => ({ ...asset, syncStatus: 'local' as const }));
-      setAssets(prevAssets => [...prevAssets, ...importedAssets]);
-      toast({
-          title: "Import Successful",
-          description: `Successfully loaded ${importedAssets.length} assets locally.`,
-      });
+        try {
+            toast({ title: "Syncing to Server...", description: "This may take a moment." });
+            const totalSaved = await saveAssetsToFirestore(assetsBySheet);
+            toast({ title: "Import Successful", description: `Successfully saved ${totalSaved} new assets to the server.` });
+            // The listener will automatically update the UI with new data.
+        } catch (error: any) {
+            toast({ variant: 'destructive', title: "Sync Failed", description: error.message });
+        }
     } else if (errors.length === 0) {
         toast({ title: "No Data Found", description: "No valid sheets for import were found in the file."});
     }
