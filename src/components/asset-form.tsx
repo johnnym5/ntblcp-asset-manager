@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -34,10 +34,14 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Asset } from "@/lib/types";
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Loader2, Sparkles, Upload } from "lucide-react";
 import { TARGET_SHEETS } from "@/lib/constants";
 import { AssetChecklist } from "./asset-checklist";
 import { useAuth } from "@/contexts/auth-context";
+import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
+import { validateAssetLabel } from "@/ai/flows/ocr-asset-validation";
+import { useToast } from "@/hooks/use-toast";
+import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 const assetFormSchema = z.object({
   category: z.string({ required_error: "Please select a category." }),
@@ -60,7 +64,12 @@ interface AssetFormProps {
 
 export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [isScanning, setIsScanning] = useState(false);
+  const [scanResult, setScanResult] = useState<Record<string, any> | null>(null);
+  const [scanError, setScanError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const { userProfile } = useAuth();
+  const { toast } = useToast();
   
   const defaultValues = {
     category: '',
@@ -95,8 +104,73 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
       } else {
         form.reset(defaultValues);
       }
+      setScanResult(null);
+      setScanError(null);
     }
   }, [asset, form, isOpen]);
+
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      handleScan(file);
+    }
+    if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+    }
+  };
+
+  const handleScan = async (file: File) => {
+    setIsScanning(true);
+    setScanResult(null);
+    setScanError(null);
+    toast({ title: 'AI Scan Started', description: 'Analyzing the asset label...' });
+
+    try {
+      const reader = new FileReader();
+      reader.readAsDataURL(file);
+      reader.onload = async () => {
+        const photoDataUri = reader.result as string;
+        const result = await validateAssetLabel({
+          photoDataUri,
+          currentValues: form.getValues(),
+        });
+
+        if (result.extractedData && Object.keys(result.extractedData).length > 0) {
+            setScanResult(result.extractedData);
+            toast({ title: 'Scan Complete', description: 'AI has extracted data from the image.' });
+        } else {
+            setScanError('The AI could not extract any relevant data from the image. Please try another image or enter the data manually.');
+            toast({ title: 'Scan Inconclusive', description: 'No data could be extracted.', variant: 'destructive' });
+        }
+      };
+      reader.onerror = (error) => {
+        throw new Error('Failed to read file for scanning.');
+      };
+    } catch (e: any) {
+      setScanError(`An error occurred during the AI scan: ${e.message}`);
+      toast({ title: 'AI Scan Failed', description: e.message, variant: 'destructive' });
+    } finally {
+      setIsScanning(false);
+    }
+  };
+  
+  const applySuggestions = () => {
+      if (!scanResult) return;
+      
+      const formFields = Object.keys(form.getValues()) as (keyof AssetFormValues)[];
+      let appliedCount = 0;
+      
+      for(const key in scanResult) {
+          const formKey = formFields.find(field => field.toLowerCase() === key.toLowerCase() || key.toLowerCase().includes(field.toLowerCase()));
+          if (formKey) {
+              form.setValue(formKey, scanResult[key], { shouldValidate: true, shouldDirty: true });
+              appliedCount++;
+          }
+      }
+      
+      toast({ title: 'Suggestions Applied', description: `Applied ${appliedCount} fields from the AI scan.` });
+      setScanResult(null);
+  }
 
   const onSubmit = async (data: AssetFormValues) => {
     setIsSaving(true);
@@ -217,8 +291,53 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
               </form>
             </Form>
           </div>
-          <div className="md:col-span-1">
-             <AssetChecklist values={watchedValues} />
+          <div className="md:col-span-1 space-y-6">
+            <AssetChecklist values={watchedValues} />
+             <Card>
+                <CardHeader>
+                    <CardTitle className="flex items-center gap-2">
+                        <Sparkles className="text-primary" />
+                        AI Document Scanner
+                    </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <input type="file" ref={fileInputRef} onChange={handleFileSelect} accept="image/*" className="hidden" />
+                    <Button
+                        variant="outline"
+                        className="w-full"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isScanning}
+                    >
+                        {isScanning ? (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        ) : (
+                            <Upload className="mr-2 h-4 w-4" />
+                        )}
+                        Scan Asset Label Image
+                    </Button>
+                    {scanError && (
+                         <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Scan Error</AlertTitle>
+                            <AlertDescription>{scanError}</AlertDescription>
+                        </Alert>
+                    )}
+                    {scanResult && (
+                        <div className="space-y-3 rounded-md border p-4">
+                            <h4 className="font-medium">AI Suggestions:</h4>
+                            <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
+                                {Object.entries(scanResult).map(([key, value]) => (
+                                    <li key={key}><strong>{key}:</strong> {String(value)}</li>
+                                ))}
+                            </ul>
+                            <Button className="w-full" size="sm" onClick={applySuggestions}>
+                                <Sparkles className="mr-2 h-4 w-4" />
+                                Apply Suggestions
+                            </Button>
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
           </div>
         </div>
         <SheetFooter className="mt-auto pt-4 border-t">
