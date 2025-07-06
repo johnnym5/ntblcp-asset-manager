@@ -4,40 +4,44 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Helper function to check if the requesting user is an admin.
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    // --- Helper Functions ---
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
     }
 
-    // Helper function to get the requesting user's assigned state.
+    function isAdmin() {
+      // Check if the user is authenticated and their profile document shows they are an admin.
+      return request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
     function getUserState() {
+      // Get the assigned state from the user's profile.
       return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.state;
     }
 
-    // Rules for the 'users' collection where user profiles are stored.
+    // --- Collection Rules ---
+
+    // User Profiles
     match /users/{userId} {
-      // Users can read and update their own profile.
-      allow read, update: if request.auth != null && request.auth.uid == userId;
-      // Users can create their own profile document upon sign-up.
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.uid;
-      // Deleting profiles is not allowed from the client.
-      allow delete: if false;
+      // Allow users to create their own profile upon sign-up.
+      allow create: if request.auth != null;
+      // Allow users to read and update their own profile.
+      allow read, update: if isOwner(userId);
     }
 
-    // Wildcard match for all asset collections (e.g., 'NTBLCP-TB-FAR', 'MOTORCYCLES-C19RM', etc.)
-    match /{sheetName}/{assetId} {
-      // Only authenticated users can perform actions.
-      allow read: if request.auth != null && (
-        // Admins can read all assets.
-        isAdmin() ||
-        // Non-admins can only read assets where the location or LGA matches their assigned state.
-        // This rule supports the `or` query used in the application code.
-        (resource.data.location == getUserState() || resource.data.lga == getUserState())
+    // Asset Collections
+    match /{category}/{assetId} where category in ['NTBLCP-TB-FAR', 'MOTORCYCLES-C19RM', 'PDX-C19RM', 'TB LAMP-C19RM', 'ECG monitors', 'IHVN-GF N-THRIP', 'TRUENAT-C19RM', 'Vehicles-TB (IHVN)', 'GeneXpert machines-TB'] {
+      
+      // Define read access rule
+      allow read: if isAdmin() || (
+        request.auth != null && !isAdmin() && (
+          resource.data.location == getUserState() ||
+          resource.data.lga == getUserState()
+        )
       );
 
-      // Only admins can create, update, or delete assets.
-      allow write: if request.auth != null && isAdmin();
+      // Define write access rule (create, update, delete)
+      allow write: if isAdmin();
     }
   }
 }

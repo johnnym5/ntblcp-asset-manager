@@ -72,14 +72,19 @@ export function getAssetsListener(
   callback: (assets: Asset[]) => void,
   userProfile?: UserProfile | null
 ) {
+  // If the user is a standard 'user' but has no state, they cannot view assets yet.
+  // Return an empty list and do not attach listeners to prevent permission errors.
+  if (userProfile?.role === 'user' && !userProfile.state) {
+    callback([]);
+    return () => {}; // Return a no-op unsubscribe function
+  }
+
   const assetsByCategory: { [key: string]: Asset[] } = {};
 
   const unsubscribes = TARGET_SHEETS.map(category => {
     let q = query(collection(db, category));
 
-    // For 'user' roles, filter by their assigned state.
-    // This query is more complex as it needs to check two fields (Location and LGA).
-    // An admin sees everything.
+    // For 'user' roles, filter by their assigned state. Admins see everything.
     if (userProfile?.role === 'user' && userProfile.state) {
       q = query(q, or(
         where('location', '==', userProfile.state),
