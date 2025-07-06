@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import * as XLSX from "xlsx";
 import {
   Table,
   TableBody,
@@ -34,12 +33,14 @@ import {
   MoreHorizontal,
   PlusCircle,
   Trash2,
+  Loader2,
 } from "lucide-react";
 import Image from "next/image";
 import { AssetForm, type AssetFormValues } from "./asset-form";
 import { sampleAssets } from "@/lib/data";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
+import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 
 const LOCAL_STORAGE_KEY = 'ntblcp-assets';
 
@@ -48,6 +49,7 @@ export default function AssetList() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+  const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -180,79 +182,68 @@ export default function AssetList() {
     fileInputRef.current?.click();
   };
 
-  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: "array" });
-        const sheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[sheetName];
-        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+    setIsImporting(true);
+    try {
+      const { newAssets, skippedCount, error } = await parseExcelFile(file);
 
-        const requiredFields = ['assetName', 'serialNumber', 'category', 'location', 'status', 'condition'];
-
-        const validRows = json.filter((row, index) => {
-           const missingFields = requiredFields.filter(field => !row[field]);
-           if (missingFields.length > 0) {
-             console.warn(`Skipping row ${index + 2} due to missing required fields: ${missingFields.join(', ')}.`);
-             return false;
-           }
-           return true;
-        });
-
-        const skippedCount = json.length - validRows.length;
-
-        const newAssets: Asset[] = validRows.map((row, index) => ({
-          id: `imported-${Date.now()}-${index}`,
-          assetName: String(row.assetName),
-          serialNumber: String(row.serialNumber),
-          category: String(row.category),
-          location: String(row.location),
-          status: row.status as Asset["status"],
-          condition: row.condition as Asset["condition"],
-          assignedTo: row.assignedTo ? String(row.assignedTo) : undefined,
-          purchaseDate: row.purchaseDate ? String(row.purchaseDate) : undefined,
-          notes: row.notes ? String(row.notes) : undefined,
-          photoUrl: String(row.photoUrl || "https://placehold.co/400x400.png"),
-        }));
-
-        if (newAssets.length > 0) {
-          setAssets((prevAssets) => [...prevAssets, ...newAssets]);
-          toast({
-            title: "Import Successful",
-            description: `${newAssets.length} assets imported. ${skippedCount > 0 ? `${skippedCount} rows skipped.` : ""}`.trim(),
-          });
-        } else if (skippedCount > 0) {
-          toast({
-            title: "Import Finished",
-            description: `No new assets were imported. ${skippedCount} rows were skipped due to missing data.`,
-            variant: "destructive"
-          });
-        } else {
-          toast({
-            title: "Import Finished",
-            description: "The file was empty or contained no valid asset data.",
-          });
-        }
-      } catch (error) {
-        console.error("Failed to import Excel file:", error);
+      if (error) {
+        throw new Error(error);
+      }
+      
+      if (newAssets.length > 0) {
+        setAssets((prevAssets) => [...prevAssets, ...newAssets]);
         toast({
-          title: "Import Failed",
-          description: error instanceof Error ? error.message : "An unexpected error occurred.",
-          variant: "destructive",
+          title: "Import Successful",
+          description: `${newAssets.length} assets imported. ${skippedCount > 0 ? `${skippedCount} rows skipped.` : ""}`.trim(),
+        });
+      } else if (skippedCount > 0) {
+        toast({
+          title: "Import Finished",
+          description: `No new assets were imported. ${skippedCount} rows were skipped due to missing data.`,
+          variant: "destructive"
+        });
+      } else {
+        toast({
+          title: "Import Finished",
+          description: "The file was empty or contained no valid asset data.",
         });
       }
-
+    } catch (error) {
+      console.error("Failed to import Excel file:", error);
+      toast({
+        title: "Import Failed",
+        description: error instanceof Error ? error.message : "An unexpected error occurred during import.",
+        variant: "destructive",
+      });
+    } finally {
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
-    };
-    reader.readAsArrayBuffer(file);
+      setIsImporting(false);
+    }
   };
+
+  const handleExportClick = () => {
+    try {
+      exportToExcel(assets, `ntblcp-asset-export-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({
+        title: "Export Successful",
+        description: "Your asset list has been exported.",
+      });
+    } catch(error) {
+      console.error("Failed to export assets:", error);
+      toast({
+        title: "Export Failed",
+        description: "Could not export your asset list.",
+        variant: "destructive",
+      });
+    }
+  };
+
 
   return (
     <div className="flex flex-col h-full">
@@ -267,11 +258,11 @@ export default function AssetList() {
         <h2 className="text-2xl font-bold tracking-tight flex-1">
           Asset Register
         </h2>
-        <Button variant="outline" className="hidden sm:flex" onClick={handleImportClick}>
-          <FileUp className="mr-2 h-4 w-4" />
+        <Button variant="outline" className="hidden sm:flex" onClick={handleImportClick} disabled={isImporting}>
+          {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
           Import
         </Button>
-        <Button variant="outline" className="hidden sm:flex">
+        <Button variant="outline" className="hidden sm:flex" onClick={handleExportClick}>
           <FileDown className="mr-2 h-4 w-4" />
           Export
         </Button>
