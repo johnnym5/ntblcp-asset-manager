@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
   Sidebar,
@@ -27,50 +27,31 @@ import {
   Home,
   PanelLeft,
   Settings,
-  Signal,
-  SignalZero,
   LogOut,
   User,
+  Search,
+  Cloud,
+  CloudOff
 } from "lucide-react";
-import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { logout } from "@/lib/auth";
 import { Skeleton } from "./ui/skeleton";
+import { useAppState } from "@/contexts/app-state-context";
+import { Input } from "./ui/input";
+import { Label } from "./ui/label";
+import { Switch } from "./ui/switch";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const isOnline = useOnlineStatus();
   const { toast } = useToast();
   const { user, loading } = useAuth();
   const router = useRouter();
-  const [hasMounted, setHasMounted] = useState(false);
+  const pathname = usePathname();
+  const { isOnline, setIsOnline, searchTerm, setSearchTerm } = useAppState();
 
-  useEffect(() => {
-    setHasMounted(true);
-  }, []);
-
-
-  useEffect(() => {
-    if (isOnline === false) {
-      toast({
-        title: "You are offline",
-        description: "Your changes will be saved locally and synced when you're back online.",
-        variant: "destructive",
-      });
-    } else if (isOnline === true) {
-      // This toast can be annoying if it shows on every page load when online.
-      // Consider showing it only when transitioning from offline to online.
-      // For now, we'll keep it as requested.
-      toast({
-        title: "You are back online",
-        description: "Your data has been synced with the server.",
-      });
-    }
-  }, [isOnline, toast]);
-  
   const handleLogout = async () => {
     await logout();
     toast({
@@ -107,6 +88,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
+              <div className="flex items-center justify-between w-full p-2 text-sm">
+                <Label htmlFor="online-mode-toggle" className="flex items-center gap-2">
+                  {isOnline ? <Cloud className="h-4 w-4 text-green-500" /> : <CloudOff className="h-4 w-4 text-red-500" />}
+                  {isOnline ? 'Online Mode' : 'Offline Mode'}
+                </Label>
+                <Switch
+                  id="online-mode-toggle"
+                  checked={isOnline}
+                  onCheckedChange={setIsOnline}
+                  aria-label={`Switch to ${isOnline ? 'Offline' : 'Online'} mode`}
+                />
+              </div>
+            </SidebarMenuItem>
+            <SidebarMenuItem>
               <SidebarMenuButton href="/assets" >
                 <Home />
                 Assets
@@ -128,21 +123,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <span className="sr-only">Toggle Sidebar</span>
           </SidebarTrigger>
           <div className="flex-1">
-            <h1 className="text-lg font-semibold md:text-xl flex items-center gap-2">
-              {hasMounted && (
-                isOnline ? (
-                  <>
-                    <Signal className="h-5 w-5 text-green-500" />
-                    Online
-                  </>
-                ) : (
-                  <>
-                    <SignalZero className="h-5 w-5 text-red-500" />
-                    Offline
-                  </>
-                )
-              )}
-            </h1>
+             {pathname === '/assets' && (
+              <div className="relative w-full max-w-md">
+                <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  placeholder="Search assets..."
+                  className="pl-8 w-full h-9 bg-muted"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                />
+              </div>
+            )}
           </div>
           <div className="flex items-center gap-2">
             <ThemeToggle />

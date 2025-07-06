@@ -38,11 +38,9 @@ import {
   ArrowLeft,
   Folder,
   Edit,
-  Search,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
 
 import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
@@ -50,6 +48,7 @@ import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { TARGET_SHEETS } from "@/lib/constants";
 import { MultiSelectFilter, type OptionType } from "./multi-select-filter";
+import { useAppState } from "@/contexts/app-state-context";
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -69,10 +68,23 @@ export default function AssetList() {
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
 
   // --- Filter State ---
-  const [searchTerm, setSearchTerm] = useState('');
+  const { searchTerm, isOnline } = useAppState();
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+
+  // --- Mode Change Notifier ---
+  useEffect(() => {
+    toast({
+        title: `Mode Changed to ${isOnline ? 'Online' : 'Offline'}`,
+        description: isOnline 
+            ? 'Application is now connected to the server.'
+            : 'Application is running in offline mode. Changes are saved locally.',
+    });
+    // Here you would typically trigger data sync logic based on the mode.
+    // e.g., if (isOnline) { syncLocalData(); }
+  }, [isOnline, toast]);
+
 
   const assetsByCategory = useMemo(() => {
     return assets.reduce((acc, asset) => {
@@ -322,16 +334,6 @@ export default function AssetList() {
         </div>
         
         <div className="flex flex-wrap items-center gap-2 border-b pb-4">
-          <div className="relative flex-1 min-w-[200px] sm:min-w-[300px]">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              type="search"
-              placeholder="Search assets..."
-              className="pl-8 w-full"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
           <MultiSelectFilter
             title="Location"
             options={locationOptions}
