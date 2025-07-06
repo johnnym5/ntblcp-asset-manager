@@ -29,18 +29,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(true);
       if (user) {
         setUser(user);
-        // Temporarily bypass Firestore to allow app entry
-        // let profile = await getUserProfile(user.uid);
-        // if (!profile) {
-        //   profile = await createUserProfile(user);
-        // }
-        const mockProfile: UserProfile = {
-            uid: user.uid,
-            email: user.email,
-            displayName: user.displayName || 'Guest User',
-            role: 'admin', // Mock admin role to bypass state selection
-        };
-        setUserProfile(mockProfile);
+        let profile = await getUserProfile(user.uid);
+        if (!profile) {
+          profile = await createUserProfile(user);
+        }
+        setUserProfile(profile);
       } else {
         setUser(null);
         setUserProfile(null);

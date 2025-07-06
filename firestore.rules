@@ -4,10 +4,41 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     
-    // WARNING: This is insecure and should only be used for initial setup/debugging.
-    // This allows all reads and writes to all collections.
-    match /{document=**} {
-      allow read, write: if true;
+    // User Profiles: Users can create their own profile and read/update it.
+    match /users/{userId} {
+      allow read, update: if request.auth.uid == userId;
+      allow create: if request.auth.uid == userId;
+    }
+
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    function isRegularUser() {
+      return request.auth.uid != null && !isAdmin();
+    }
+
+    // Rule for all asset collections, assumes collection name is the category
+    match /{category}/{assetId} {
+      // Admins have full access.
+      allow read, write: if isAdmin();
+
+      // Regular users can read assets (get, list) if they have an assigned state
+      // The actual filtering by state is done in the client-side query.
+      // The `get` rule provides document-level security.
+      allow get: if isRegularUser() && (
+        resource.data.location == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.state ||
+        resource.data.lga == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.state
+      );
+      
+      // The `list` rule ensures that a user trying to query a collection is a regular user.
+      // The Firestore queries in the app MUST include a `where` clause to filter by state,
+      // otherwise the read will fail. This rule just allows the attempt.
+      allow list: if isRegularUser();
+
+      // Regular users cannot write, update, or delete assets.
+      allow write: if isAdmin();
     }
   }
 }

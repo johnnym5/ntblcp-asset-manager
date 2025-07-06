@@ -57,7 +57,6 @@ const VERIFIED_STATUS_OPTIONS: OptionType[] = [
 ];
 
 const CATEGORY_OPTIONS: OptionType[] = TARGET_SHEETS.map(sheet => ({ value: sheet, label: sheet }));
-const LOCAL_STORAGE_KEY = 'ntblcp-assets';
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -75,26 +74,18 @@ export default function AssetList() {
   const [assigneeFilters, setAssigneeFilters] = useState<string[]>([]);
   
   useEffect(() => {
-    // This effect runs once on the client to load initial data from localStorage
-    try {
-      const localData = window.localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (localData) {
-        setAssets(JSON.parse(localData));
-      }
-    } catch (error) {
-      console.error("Error reading from localStorage", error);
+    if (!userProfile) {
+      return;
     }
-    setIsLoading(false);
-  }, []);
+    
+    setIsLoading(true);
+    const unsubscribe = getAssetsListener((fetchedAssets) => {
+      setAssets(fetchedAssets.map(asset => ({ ...asset, syncStatus: 'synced' })));
+      setIsLoading(false);
+    }, userProfile);
 
-  // Effect to save any changes to local storage
-  useEffect(() => {
-    try {
-      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(assets));
-    } catch (error) {
-      console.error("Error writing to localStorage", error);
-    }
-  }, [assets]);
+    return () => unsubscribe();
+  }, [userProfile]);
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -107,17 +98,21 @@ export default function AssetList() {
   };
   
   const handleDeleteAsset = async (assetToDelete: Asset) => {
-    setAssets(prev => prev.filter(a => a.id !== assetToDelete.id));
-    toast({ title: "Asset Deleted Locally", description: `Asset "${assetToDelete.description}" was deleted locally. Syncing is disabled.`});
+    try {
+      await deleteAsset(assetToDelete);
+      toast({ title: "Asset Deleted", description: `Asset "${assetToDelete.description}" was deleted from the database.`});
+    } catch(e: any) {
+        toast({ title: "Delete Failed", description: e.message, variant: "destructive"});
+    }
   }
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    const isNew = !assets.some(a => a.id === assetToSave.id);
-    setAssets(prev => {
-        if (isNew) return [...prev, assetToSave];
-        return prev.map(a => a.id === assetToSave.id ? assetToSave : a);
-    });
-    toast({ title: "Local Save", description: "Asset changes saved locally. Syncing is disabled." });
+    try {
+      await updateAsset({ ...assetToSave, syncStatus: 'synced' });
+      toast({ title: "Save Successful", description: "Asset changes have been saved." });
+    } catch (e: any) {
+      toast({ title: "Save Failed", description: e.message, variant: "destructive" });
+    }
   };
 
   const handleImportClick = () => {
@@ -143,17 +138,15 @@ export default function AssetList() {
 
     const sheetNames = Object.keys(assetsBySheet);
     if (sheetNames.length > 0) {
-      const allNewAssets = Object.values(assetsBySheet).flat().map(a => ({ ...a, syncStatus: 'local' as const }));
-      setAssets(prev => {
-          const newAssetIds = new Set(allNewAssets.map(a => a.id));
-          const oldAssets = prev.filter(a => !newAssetIds.has(a.id));
-          return [...oldAssets, ...allNewAssets];
-      });
-      
-      toast({
-          title: "Local Import Successful",
-          description: `Imported ${allNewAssets.length} assets locally. Syncing to the cloud is disabled.`,
-      });
+      try {
+        const totalSaved = await saveAssetsToFirestore(assetsBySheet);
+        toast({
+            title: "Import Successful",
+            description: `Successfully saved ${totalSaved} assets to the database.`,
+        });
+      } catch (e: any) {
+        toast({ title: "Firestore Save Failed", description: e.message, variant: "destructive" });
+      }
     } else if (errors.length === 0) {
         toast({ title: "No Data Found", description: "No valid sheets for import were found in the file."});
     }
@@ -282,7 +275,7 @@ export default function AssetList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading && assets.length === 0 ? (
+            {isLoading ? (
                 <TableRow><TableCell colSpan={7} className="text-center"><Loader2 className="mx-auto my-4 h-8 w-8 animate-spin" /></TableCell></TableRow>
             ) : filteredAssets.length > 0 ? (
               filteredAssets.map((asset) => (
