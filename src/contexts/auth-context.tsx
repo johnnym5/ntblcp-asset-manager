@@ -2,82 +2,89 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { getUserProfile, createUserProfile, updateUserProfile } from '@/lib/firestore';
-import type { UserProfile } from '@/lib/types';
 import { useAppState } from './app-state-context';
 
+// Using a simplified profile for local-only use
+interface LocalUserProfile {
+  displayName: string;
+  state: string;
+}
+
 interface AuthContextType {
-  user: User | null;
-  userProfile: UserProfile | null;
+  userProfile: LocalUserProfile | null;
   loading: boolean;
   profileSetupComplete: boolean;
   updateProfile: (data: { displayName: string; state: string }) => Promise<void>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
   userProfile: null,
   loading: true,
   profileSetupComplete: false,
   updateProfile: async () => {},
+  logout: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
-      setLoading(true);
-      if (authUser) {
-        setUser(authUser);
-        let profile = await getUserProfile(authUser.uid);
-        if (!profile) {
-          profile = await createUserProfile(authUser);
-        }
-        setUserProfile(profile);
-
-        if (profile?.state) {
-          setProfileSetupComplete(true);
+    // Load profile from local storage on initial render
+    try {
+      const savedProfile = localStorage.getItem('ntblcp-user-profile');
+      if (savedProfile) {
+        const profile: LocalUserProfile = JSON.parse(savedProfile);
+        // Ensure the loaded profile is valid before setting it
+        if (profile.displayName && profile.state) {
+          setUserProfile(profile);
           setGlobalStateFilter(profile.state);
+          setProfileSetupComplete(true);
         } else {
-          setProfileSetupComplete(false);
-          setGlobalStateFilter('');
+          // If profile is invalid, remove it
+          localStorage.removeItem('ntblcp-user-profile');
         }
-      } else {
-        setUser(null);
-        setUserProfile(null);
-        setProfileSetupComplete(false);
-        setGlobalStateFilter('');
       }
+    } catch (e) {
+      console.error("Failed to load user profile from local storage", e);
+    } finally {
       setLoading(false);
-    });
-
-    return () => unsubscribe();
+    }
   }, [setGlobalStateFilter]);
 
   const updateProfile = async (data: { displayName: string; state: string }) => {
-    if (user && userProfile) {
-      setLoading(true);
-      const updatedProfileData = {
-        ...userProfile,
-        displayName: data.displayName,
-        state: data.state,
-      };
-      await updateUserProfile(user.uid, updatedProfileData);
-      setUserProfile(updatedProfileData);
+    setLoading(true);
+    const newProfile: LocalUserProfile = {
+      displayName: data.displayName,
+      state: data.state,
+    };
+    try {
+      localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
+      setUserProfile(newProfile);
       setGlobalStateFilter(data.state);
       setProfileSetupComplete(true);
+    } catch(e) {
+      console.error("Failed to save user profile to local storage", e);
+    } finally {
       setLoading(false);
     }
   };
 
-  const value = { user, userProfile, loading, profileSetupComplete, updateProfile };
+  const logout = () => {
+    try {
+      localStorage.removeItem('ntblcp-user-profile');
+      setUserProfile(null);
+      setProfileSetupComplete(false);
+      setGlobalStateFilter('');
+    } catch (e) {
+      console.error("Failed to clear user profile from local storage", e);
+    }
+  };
+
+  const value = { userProfile, loading, profileSetupComplete, updateProfile, logout };
 
   return (
     <AuthContext.Provider value={value}>

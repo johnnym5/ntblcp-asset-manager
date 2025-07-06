@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React from "react";
 import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
@@ -37,7 +37,6 @@ import { useToast } from "@/hooks/use-toast";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/auth-context";
-import { logout } from "@/lib/auth";
 import { Skeleton } from "./ui/skeleton";
 import { useAppState } from "@/contexts/app-state-context";
 import { Input } from "./ui/input";
@@ -47,22 +46,22 @@ import { Switch } from "./ui/switch";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { toast } = useToast();
-  const { user, loading } = useAuth();
+  const { userProfile, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const { isOnline, setIsOnline, searchTerm, setSearchTerm } = useAppState();
 
-  const handleLogout = async () => {
-    await logout();
+  const handleLogout = () => {
+    logout();
     toast({
-      title: 'Logged Out',
-      description: 'You have been successfully logged out.',
+      title: 'Session Ended',
+      description: 'You have been logged out.',
     });
-    router.push('/login');
+    router.refresh();
   };
 
   const getInitials = (name: string | null | undefined) => {
-    if (!name) return 'G';
+    if (!name) return 'U';
     if (name.includes(' ')) {
       return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     }
@@ -70,8 +69,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   const getUserName = () => {
-    if (user?.isAnonymous) return "Guest User";
-    return user?.displayName || user?.email || "User";
+    return userProfile?.displayName || "User";
   }
 
   return (
@@ -145,8 +143,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <DropdownMenuTrigger asChild>
                   <Button variant="secondary" className="relative h-10 w-10 rounded-full">
                     <Avatar className="h-9 w-9">
-                      <AvatarImage src={user?.photoURL || ''} alt={getUserName()} />
-                      <AvatarFallback>{getInitials(user?.isAnonymous ? 'Guest' : (user?.displayName || user?.email))}</AvatarFallback>
+                      <AvatarImage src={''} alt={getUserName()} />
+                      <AvatarFallback>{getInitials(userProfile?.displayName)}</AvatarFallback>
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
@@ -154,7 +152,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">{getUserName()}</p>
-                      {!user?.isAnonymous && <p className="text-xs leading-none text-muted-foreground">{user?.email}</p>}
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
