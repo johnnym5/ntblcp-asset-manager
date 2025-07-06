@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -62,18 +62,7 @@ const LOCAL_STORAGE_KEY = 'ntblcp-assets';
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
-  const [assets, setAssets] = useState<Asset[]>(() => {
-    if (typeof window === 'undefined') {
-      return [];
-    }
-    try {
-      const localData = window.localStorage.getItem(LOCAL_STORAGE_KEY);
-      return localData ? JSON.parse(localData) : [];
-    } catch (error) {
-      console.error("Error reading from localStorage", error);
-      return [];
-    }
-  });
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -85,6 +74,19 @@ export default function AssetList() {
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
   const [assigneeFilters, setAssigneeFilters] = useState<string[]>([]);
   
+  useEffect(() => {
+    // This effect runs once on the client to load initial data from localStorage
+    // to prevent hydration mismatch.
+    try {
+      const localData = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (localData) {
+        setAssets(JSON.parse(localData));
+      }
+    } catch (error) {
+      console.error("Error reading from localStorage", error);
+    }
+  }, []);
+
   // Effect to sync with Firestore and merge data
   useEffect(() => {
     if (!userProfile) return; // Wait for profile to load
