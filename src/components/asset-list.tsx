@@ -38,15 +38,18 @@ import {
   ArrowLeft,
   Folder,
   Edit,
+  Search,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 
 import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { TARGET_SHEETS } from "@/lib/constants";
+import { MultiSelectFilter, type OptionType } from "./multi-select-filter";
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -65,6 +68,12 @@ export default function AssetList() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
 
+  // --- Filter State ---
+  const [searchTerm, setSearchTerm] = useState('');
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+
   const assetsByCategory = useMemo(() => {
     return assets.reduce((acc, asset) => {
         const category = asset.category || 'Uncategorized';
@@ -76,12 +85,42 @@ export default function AssetList() {
     }, {} as { [key: string]: Asset[] });
   }, [assets]);
   
-  const currentAssets = useMemo(() => {
-    if (view === 'table' && currentCategory) {
-        return assetsByCategory[currentCategory] || [];
-    }
-    return [];
+  // --- Memoized Filter Options ---
+  const locationOptions = useMemo<OptionType[]>(() => {
+    if (view !== 'table' || !currentCategory) return [];
+    const locations = new Set((assetsByCategory[currentCategory] || []).map(a => a.location).filter(Boolean));
+    return Array.from(locations).map(l => ({ label: l!, value: l! })).sort((a,b) => a.label.localeCompare(b.label));
   }, [view, currentCategory, assetsByCategory]);
+
+  const assigneeOptions = useMemo<OptionType[]>(() => {
+      if (view !== 'table' || !currentCategory) return [];
+      const assignees = new Set((assetsByCategory[currentCategory] || []).map(a => a.assignee).filter(Boolean));
+      return Array.from(assignees).map(a => ({ label: a!, value: a! })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [view, currentCategory, assetsByCategory]);
+
+  const statusOptions: OptionType[] = [
+      { value: "Verified", label: "Verified" },
+      { value: "Unverified", label: "Unverified" },
+      { value: "Discrepancy", label: "Discrepancy" },
+  ];
+  
+  // --- Memoized Filtered Assets ---
+  const filteredAssets = useMemo(() => {
+    if (view !== 'table' || !currentCategory) return [];
+    const baseAssets = assetsByCategory[currentCategory] || [];
+
+    return baseAssets.filter(asset => {
+        const searchMatch = !searchTerm || Object.values(asset).some(value =>
+            String(value).toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        const locationMatch = selectedLocations.length === 0 || (asset.location && selectedLocations.includes(asset.location));
+        const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.includes(asset.assignee));
+        const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
+
+        return searchMatch && locationMatch && assigneeMatch && statusMatch;
+    });
+  }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses]);
+
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -170,7 +209,7 @@ export default function AssetList() {
   };
   
   const handleExportClick = () => {
-    const assetsToExport = view === 'table' ? currentAssets : assets;
+    const assetsToExport = view === 'table' ? filteredAssets : assets;
     if (assetsToExport.length === 0) {
       toast({ title: "No Data to Export", description: "There are no assets in the current view to export." });
       return;
@@ -185,7 +224,7 @@ export default function AssetList() {
   };
 
   const handleSelectAll = (checked: boolean) => {
-    setSelectedAssetIds(checked ? currentAssets.map(a => a.id) : []);
+    setSelectedAssetIds(checked ? filteredAssets.map(a => a.id) : []);
   };
 
   const handleSelectSingle = (assetId: string, checked: boolean) => {
@@ -282,14 +321,46 @@ export default function AssetList() {
             )}
         </div>
         
+        <div className="flex flex-wrap items-center gap-2 border-b pb-4">
+          <div className="relative flex-1 min-w-[200px] sm:min-w-[300px]">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              type="search"
+              placeholder="Search assets..."
+              className="pl-8 w-full"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <MultiSelectFilter
+            title="Location"
+            options={locationOptions}
+            selected={selectedLocations}
+            onChange={setSelectedLocations}
+          />
+          <MultiSelectFilter
+            title="Assignee"
+            options={assigneeOptions}
+            selected={selectedAssignees}
+            onChange={setSelectedAssignees}
+          />
+          <MultiSelectFilter
+            title="Status"
+            options={statusOptions}
+            selected={selectedStatuses}
+            onChange={setSelectedStatuses}
+          />
+        </div>
+        
         <div className="rounded-lg border shadow-sm flex-1 overflow-auto">
             <Table>
                 <TableHeader>
                     <TableRow>
                     <TableHead className="w-[50px]">
                         <Checkbox
-                            checked={currentAssets.length > 0 && selectedAssetIds.length === currentAssets.length}
+                            checked={filteredAssets.length > 0 && selectedAssetIds.length === filteredAssets.length}
                             onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                            aria-label="Select all"
                         />
                     </TableHead>
                     <TableHead>S/N</TableHead>
@@ -301,13 +372,14 @@ export default function AssetList() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {currentAssets.length > 0 ? (
-                    currentAssets.map((asset) => (
+                    {filteredAssets.length > 0 ? (
+                    filteredAssets.map((asset) => (
                         <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
                         <TableCell onClick={e => e.stopPropagation()}>
                             <Checkbox 
                                 checked={selectedAssetIds.includes(asset.id)}
                                 onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
+                                aria-label={`Select asset ${asset.description}`}
                             />
                         </TableCell>
                         <TableCell>{asset.sn || 'N/A'}</TableCell>
@@ -333,7 +405,7 @@ export default function AssetList() {
                         </TableRow>
                     ))
                     ) : (
-                        <TableRow><TableCell colSpan={8} className="text-center h-24">No assets found in this category.</TableCell></TableRow>
+                        <TableRow><TableCell colSpan={8} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
                     )}
                 </TableBody>
             </Table>
