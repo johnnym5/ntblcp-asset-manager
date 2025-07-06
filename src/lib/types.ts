@@ -12,3 +12,10 @@ export type Asset = {
   files?: string[];
   notes?: string;
 };
+
+export type RoomUser = {
+  id: string;
+  displayName: string | null;
+  photoURL: string | null;
+  lastSeen: number;
+};

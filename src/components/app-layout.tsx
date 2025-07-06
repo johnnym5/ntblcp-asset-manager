@@ -30,6 +30,7 @@ import {
   SignalZero,
   LogOut,
   User,
+  Users,
 } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useToast } from "@/hooks/use-toast";
@@ -99,9 +100,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <SidebarContent>
           <SidebarMenu>
             <SidebarMenuItem>
-              <SidebarMenuButton href="/assets" isActive>
+              <SidebarMenuButton href="/assets" >
                 <Home />
                 Assets
+              </SidebarMenuButton>
+            </SidebarMenuItem>
+             <SidebarMenuItem>
+              <SidebarMenuButton href="/room">
+                <Users />
+                Collaboration
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
@@ -124,12 +131,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {isOnline ? (
                 <>
                   <Signal className="h-5 w-5 text-green-500" />
-                  Online Assets
+                  Online
                 </>
               ) : (
                 <>
                   <SignalZero className="h-5 w-5 text-red-500" />
-                  Locally Saved Assets
+                  Offline
                 </>
               )}
             </h1>
