@@ -30,7 +30,7 @@ interface UserProfileSetupProps {
 }
 
 export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName }: UserProfileSetupProps) {
-  const [displayName, setDisplayName] = useState(defaultDisplayName || '');
+  const [displayName, setDisplayName] = useState('');
   const [selectedState, setSelectedState] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
@@ -69,7 +69,6 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
               id="displayName" 
               value={displayName} 
               onChange={(e) => setDisplayName(e.target.value)}
-              placeholder="John Doe or 'admin'"
             />
           </div>
           {!isAdmin && (
