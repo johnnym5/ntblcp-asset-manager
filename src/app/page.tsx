@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { Boxes } from "lucide-react";
+import Link from "next/link";
 
 export default function Home() {
   return (
@@ -15,7 +16,9 @@ export default function Home() {
           A full-featured, offline-first web app to manage your assets efficiently.
         </p>
         <div>
-          <Button size="lg">Start Managing Assets</Button>
+          <Button size="lg" asChild>
+            <Link href="/assets">Start Managing Assets</Link>
+          </Button>
         </div>
       </div>
     </main>
