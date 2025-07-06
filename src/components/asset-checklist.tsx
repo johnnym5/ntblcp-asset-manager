@@ -1,8 +1,9 @@
+
 'use client';
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle2, XCircle, FileText, User, Camera, ShieldQuestion } from 'lucide-react';
+import { CheckCircle2, XCircle, FileText, User, Camera, ShieldQuestion, ListTree } from 'lucide-react';
 import type { AssetFormValues } from './asset-form';
 
 interface AssetChecklistProps {
@@ -25,20 +26,20 @@ const ChecklistItem = ({ label, isCompleted, icon }: { label: string; isComplete
 );
 
 export function AssetChecklist({ values, photoUrl }: AssetChecklistProps) {
-  const isPhotoProvided = photoUrl && !photoUrl.includes('placehold.co');
+  const isPhotoProvided = !!photoUrl;
 
   const requiredItems = [
-    { label: 'Asset Name', completed: !!values.assetName, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Category', completed: !!values.category, icon: <ListTree className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Asset Description', completed: !!values.description, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Serial Number', completed: !!values.serialNumber, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Location', completed: !!values.location, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
-    { label: 'Status', completed: !!values.status, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Condition', completed: !!values.condition, icon: <ShieldQuestion className="h-4 w-4 text-muted-foreground" /> },
   ];
 
   const optionalItems = [
     { label: 'Photo', completed: isPhotoProvided, icon: <Camera className="h-4 w-4 text-muted-foreground" /> },
-    { label: 'Assigned To', completed: !!values.assignedTo, icon: <User className="h-4 w-4 text-muted-foreground" /> },
-    { label: 'Condition', completed: !!values.condition, icon: <ShieldQuestion className="h-4 w-4 text-muted-foreground" /> },
-    { label: 'Documents/Notes', completed: !!values.notes, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Assignee', completed: !!values.assignee, icon: <User className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Remarks/Notes', completed: !!values.remarks, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
   ];
 
   return (

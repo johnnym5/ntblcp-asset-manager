@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, from "react";
 import {
   Table,
   TableBody,
@@ -16,6 +16,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -26,6 +37,8 @@ import {
   Loader2,
   Trash2,
   X,
+  Cloud,
+  HardDrive,
 } from "lucide-react";
 import { MultiSelectFilter, type OptionType } from "./multi-select-filter";
 import { AssetForm } from "./asset-form";
@@ -74,15 +87,21 @@ export default function AssetList() {
   
   // Effect to sync with Firestore and merge data
   useEffect(() => {
+    if (!userProfile) return; // Wait for profile to load
     setIsLoading(true);
+
     const unsubscribe = getAssetsListener(
         (loadedAssets) => {
             const syncedAssets = loadedAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
             
             setAssets(prevAssets => {
-                const assetMap = new Map(prevAssets.map(a => [a.id, a]));
-                syncedAssets.forEach(a => assetMap.set(a.id, a));
-                return Array.from(assetMap.values());
+                // Merge logic: Firestore is the source of truth for synced assets.
+                // Local changes are preserved until they are synced.
+                const localChanges = prevAssets.filter(a => a.syncStatus === 'local');
+                const localIds = new Set(localChanges.map(a => a.id));
+                const syncedWithoutConflicts = syncedAssets.filter(a => !localIds.has(a.id));
+                
+                return [...syncedWithoutConflicts, ...localChanges];
             });
 
             setIsLoading(false);
@@ -113,27 +132,29 @@ export default function AssetList() {
   };
   
   const handleDeleteAsset = async (assetToDelete: Asset) => {
-    if(confirm(`Are you sure you want to delete "${assetToDelete.description}"?`)) {
-        const originalAssets = assets;
-        setAssets(prev => prev.filter(a => a.id !== assetToDelete.id));
+    const originalAssets = [...assets];
+    setAssets(prev => prev.filter(a => a.id !== assetToDelete.id));
 
-        try {
-            await deleteAsset(assetToDelete);
-            toast({ title: "Asset Deleted", description: `Asset "${assetToDelete.description}" deleted successfully.`});
-        } catch(e) {
-            setAssets(originalAssets);
-            toast({ title: "Error", description: "Failed to delete asset from server. It remains locally.", variant: "destructive"});
-        }
+    try {
+        await deleteAsset(assetToDelete);
+        toast({ title: "Asset Deleted", description: `Asset "${assetToDelete.description}" deleted successfully.`});
+    } catch(e) {
+        setAssets(originalAssets);
+        toast({ title: "Sync Error", description: "Failed to delete asset from server. It remains locally.", variant: "destructive"});
     }
   }
 
-  const handleSaveAsset = async (updatedAsset: Asset) => {
-    setAssets(prev => prev.map(a => a.id === updatedAsset.id ? updatedAsset : a));
+  const handleSaveAsset = async (assetToSave: Asset) => {
+    const isNew = !assets.some(a => a.id === assetToSave.id);
+    setAssets(prev => {
+        if (isNew) return [...prev, assetToSave];
+        return prev.map(a => a.id === assetToSave.id ? assetToSave : a);
+    });
     toast({ title: "Local Save", description: "Asset changes saved locally. Syncing..." });
 
     try {
-        await updateAsset(updatedAsset);
-        setAssets(prev => prev.map(a => a.id === updatedAsset.id ? { ...a, syncStatus: 'synced' } : a));
+        await updateAsset(assetToSave);
+        setAssets(prev => prev.map(a => a.id === assetToSave.id ? { ...a, syncStatus: 'synced' } : a));
         toast({ title: "Sync Successful", description: "Asset changes have been synced." });
     } catch (error) {
         toast({ title: "Sync Error", description: "Could not sync asset changes. They are saved locally.", variant: "destructive" });
@@ -165,7 +186,12 @@ export default function AssetList() {
     const sheetNames = Object.keys(assetsBySheet);
     if (sheetNames.length > 0) {
       const allNewAssets = Object.values(assetsBySheet).flat().map(a => ({ ...a, syncStatus: 'local' as const }));
-      setAssets(prev => [...prev, ...allNewAssets]);
+      setAssets(prev => {
+          const newAssetIds = new Set(allNewAssets.map(a => a.id));
+          const oldAssets = prev.filter(a => !newAssetIds.has(a.id));
+          return [...oldAssets, ...allNewAssets];
+      });
+      
       toast({
           title: "Local Import Successful",
           description: `Imported ${allNewAssets.length} assets locally. Syncing to the cloud...`,
@@ -264,9 +290,9 @@ export default function AssetList() {
               <FileDown className="mr-2 h-4 w-4" />
               Export
             </Button>
-            <Button onClick={handleAddAsset} disabled={true}>
+            <Button onClick={handleAddAsset}>
               <PlusCircle className="mr-2 h-4 w-4" />
-              Add Asset (Manual)
+              Add Asset
             </Button>
         </div>
       </div>
@@ -307,7 +333,7 @@ export default function AssetList() {
               <TableHead>Serial Number</TableHead>
               <TableHead className="hidden md:table-cell">Location</TableHead>
               <TableHead>Condition</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead>Sync Status</TableHead>
               <TableHead className="w-[50px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -317,16 +343,20 @@ export default function AssetList() {
             ) : filteredAssets.length > 0 ? (
               filteredAssets.map((asset) => (
                 <TableRow key={asset.id}>
-                  <TableCell>{asset.sn}</TableCell>
+                  <TableCell>{asset.sn || 'N/A'}</TableCell>
                   <TableCell className="font-medium">{asset.description}</TableCell>
                   <TableCell>{asset.serialNumber || asset.chasisNo || 'N/A'}</TableCell>
                   <TableCell className="hidden md:table-cell">{asset.location}</TableCell>
                   <TableCell><Badge variant="secondary">{asset.condition}</Badge></TableCell>
                    <TableCell>
                       {asset.syncStatus === 'synced' ? (
-                          <Badge variant="outline" className="text-green-600 border-green-600">Synced</Badge>
+                          <Badge variant="outline" className="text-green-600 border-green-600">
+                            <Cloud className="mr-2 h-3 w-3"/>Synced
+                          </Badge>
                       ) : (
-                          <Badge variant="secondary">Local</Badge>
+                          <Badge variant="secondary">
+                            <HardDrive className="mr-2 h-3 w-3"/>Local
+                          </Badge>
                       )}
                   </TableCell>
                   <TableCell className="text-right">
@@ -336,7 +366,24 @@ export default function AssetList() {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         <DropdownMenuItem onClick={() => handleEditAsset(asset)}>View/Edit</DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleDeleteAsset(asset)} className="text-destructive">Delete</DropdownMenuItem>
+                        <AlertDialog>
+                            <AlertDialogTrigger asChild>
+                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="text-destructive focus:bg-destructive/20">Delete</DropdownMenuItem>
+                            </AlertDialogTrigger>
+                            <AlertDialogContent>
+                                <AlertDialogHeader>
+                                <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                                <AlertDialogDescription>
+                                    This action cannot be undone. This will permanently delete the asset
+                                    and remove its data from our servers.
+                                </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                <AlertDialogAction onClick={() => handleDeleteAsset(asset)} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
+                                </AlertDialogFooter>
+                            </AlertDialogContent>
+                        </AlertDialog>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </TableCell>
