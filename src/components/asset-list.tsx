@@ -32,7 +32,7 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
-import { saveAssetsToFirestore, getAssetsListener, deleteAsset } from "@/lib/firestore";
+import { saveAssetsToFirestore, getAssetsListener, deleteAsset, updateAsset } from "@/lib/firestore";
 import { useAuth } from "@/contexts/auth-context";
 import { TARGET_SHEETS } from "@/lib/constants";
 
@@ -44,11 +44,23 @@ const VERIFIED_STATUS_OPTIONS: OptionType[] = [
 ];
 
 const CATEGORY_OPTIONS: OptionType[] = TARGET_SHEETS.map(sheet => ({ value: sheet, label: sheet }));
+const LOCAL_STORAGE_KEY = 'ntblcp-assets';
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
-  const [assets, setAssets] = useState<Asset[]>([]);
+  const [assets, setAssets] = useState<Asset[]>(() => {
+    if (typeof window === 'undefined') {
+      return [];
+    }
+    try {
+      const localData = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+      return localData ? JSON.parse(localData) : [];
+    } catch (error) {
+      console.error("Error reading from localStorage", error);
+      return [];
+    }
+  });
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -60,11 +72,19 @@ export default function AssetList() {
   const [locationFilters, setLocationFilters] = useState<string[]>([]);
   const [assigneeFilters, setAssigneeFilters] = useState<string[]>([]);
   
+  // Effect to sync with Firestore and merge data
   useEffect(() => {
     setIsLoading(true);
     const unsubscribe = getAssetsListener(
         (loadedAssets) => {
-            setAssets(loadedAssets);
+            const syncedAssets = loadedAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
+            
+            setAssets(prevAssets => {
+                const assetMap = new Map(prevAssets.map(a => [a.id, a]));
+                syncedAssets.forEach(a => assetMap.set(a.id, a));
+                return Array.from(assetMap.values());
+            });
+
             setIsLoading(false);
         },
         userProfile
@@ -72,6 +92,15 @@ export default function AssetList() {
 
     return () => unsubscribe();
   }, [userProfile]);
+
+  // Effect to save any changes to local storage
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(assets));
+    } catch (error) {
+      console.error("Error writing to localStorage", error);
+    }
+  }, [assets]);
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -83,16 +112,34 @@ export default function AssetList() {
     setIsFormOpen(true);
   };
   
-  const handleDeleteAsset = async (asset: Asset) => {
-      if(confirm(`Are you sure you want to delete "${asset.description}"?`)) {
-          try {
-              await deleteAsset(asset);
-              toast({ title: "Asset Deleted", description: `Asset "${asset.description}" deleted successfully.`});
-          } catch(e) {
-              toast({ title: "Error", description: "Failed to delete asset.", variant: "destructive"});
-          }
-      }
+  const handleDeleteAsset = async (assetToDelete: Asset) => {
+    if(confirm(`Are you sure you want to delete "${assetToDelete.description}"?`)) {
+        const originalAssets = assets;
+        setAssets(prev => prev.filter(a => a.id !== assetToDelete.id));
+
+        try {
+            await deleteAsset(assetToDelete);
+            toast({ title: "Asset Deleted", description: `Asset "${assetToDelete.description}" deleted successfully.`});
+        } catch(e) {
+            setAssets(originalAssets);
+            toast({ title: "Error", description: "Failed to delete asset from server. It remains locally.", variant: "destructive"});
+        }
+    }
   }
+
+  const handleSaveAsset = async (updatedAsset: Asset) => {
+    setAssets(prev => prev.map(a => a.id === updatedAsset.id ? updatedAsset : a));
+    toast({ title: "Local Save", description: "Asset changes saved locally. Syncing..." });
+
+    try {
+        await updateAsset(updatedAsset);
+        setAssets(prev => prev.map(a => a.id === updatedAsset.id ? { ...a, syncStatus: 'synced' } : a));
+        toast({ title: "Sync Successful", description: "Asset changes have been synced." });
+    } catch (error) {
+        toast({ title: "Sync Error", description: "Could not sync asset changes. They are saved locally.", variant: "destructive" });
+        throw error;
+    }
+  };
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -103,7 +150,7 @@ export default function AssetList() {
     if (!file) return;
 
     setIsImporting(true);
-    toast({ title: "Importing file...", description: "Please wait while we process your Excel file." });
+    toast({ title: "Parsing file...", description: "Please wait while we process your Excel file." });
     
     const { assetsBySheet, errors, skippedRows } = await parseExcelFile(file);
     
@@ -117,14 +164,25 @@ export default function AssetList() {
 
     const sheetNames = Object.keys(assetsBySheet);
     if (sheetNames.length > 0) {
+      const allNewAssets = Object.values(assetsBySheet).flat().map(a => ({ ...a, syncStatus: 'local' as const }));
+      setAssets(prev => [...prev, ...allNewAssets]);
+      toast({
+          title: "Local Import Successful",
+          description: `Imported ${allNewAssets.length} assets locally. Syncing to the cloud...`,
+      });
+
       try {
         const count = await saveAssetsToFirestore(assetsBySheet);
         toast({
-          title: "Import Successful",
-          description: `Successfully imported ${count} assets from ${sheetNames.length} sheets: ${sheetNames.join(", ")}.`,
+          title: "Sync Successful",
+          description: `Successfully synced ${count} assets from ${sheetNames.length} sheets: ${sheetNames.join(", ")}.`,
         });
+        setAssets(prev => prev.map(a => {
+            const isNewlyImported = allNewAssets.some(newAsset => newAsset.id === a.id);
+            return isNewlyImported ? { ...a, syncStatus: 'synced' } : a;
+        }));
       } catch (error) {
-        toast({ title: "Firestore Error", description: "Could not save assets to the database.", variant: "destructive" });
+        toast({ title: "Firestore Sync Error", description: "Could not save assets to the database. They remain saved locally.", variant: "destructive" });
       }
     } else if (errors.length === 0) {
         toast({ title: "No Data Found", description: "No valid sheets for import were found in the file."});
@@ -249,12 +307,13 @@ export default function AssetList() {
               <TableHead>Serial Number</TableHead>
               <TableHead className="hidden md:table-cell">Location</TableHead>
               <TableHead>Condition</TableHead>
+              <TableHead>Status</TableHead>
               <TableHead className="w-[50px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {isLoading ? (
-                <TableRow><TableCell colSpan={6} className="text-center"><Loader2 className="mx-auto my-4 h-8 w-8 animate-spin" /></TableCell></TableRow>
+            {isLoading && assets.length === 0 ? (
+                <TableRow><TableCell colSpan={7} className="text-center"><Loader2 className="mx-auto my-4 h-8 w-8 animate-spin" /></TableCell></TableRow>
             ) : filteredAssets.length > 0 ? (
               filteredAssets.map((asset) => (
                 <TableRow key={asset.id}>
@@ -263,6 +322,13 @@ export default function AssetList() {
                   <TableCell>{asset.serialNumber || asset.chasisNo || 'N/A'}</TableCell>
                   <TableCell className="hidden md:table-cell">{asset.location}</TableCell>
                   <TableCell><Badge variant="secondary">{asset.condition}</Badge></TableCell>
+                   <TableCell>
+                      {asset.syncStatus === 'synced' ? (
+                          <Badge variant="outline" className="text-green-600 border-green-600">Synced</Badge>
+                      ) : (
+                          <Badge variant="secondary">Local</Badge>
+                      )}
+                  </TableCell>
                   <TableCell className="text-right">
                     <DropdownMenu>
                       <DropdownMenuTrigger asChild>
@@ -277,7 +343,7 @@ export default function AssetList() {
                 </TableRow>
               ))
             ) : (
-                <TableRow><TableCell colSpan={6} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={7} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -287,6 +353,7 @@ export default function AssetList() {
         isOpen={isFormOpen}
         onOpenChange={setIsFormOpen}
         asset={selectedAsset}
+        onSave={handleSaveAsset}
       />
     </div>
   );

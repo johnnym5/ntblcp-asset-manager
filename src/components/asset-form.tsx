@@ -27,7 +27,6 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
 import type { Asset } from "@/lib/types";
-import { updateAsset } from "@/lib/firestore";
 import { Loader2 } from "lucide-react";
 
 const assetFormSchema = z.object({
@@ -46,9 +45,10 @@ interface AssetFormProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   asset?: Asset;
+  onSave: (updatedAsset: Asset) => Promise<void>;
 }
 
-export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
+export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProps) {
   const [isSaving, setIsSaving] = React.useState(false);
   const { toast } = useToast();
 
@@ -71,18 +71,18 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
   }, [asset, form, isOpen]);
 
   const onSubmit = async (data: AssetFormValues) => {
-    if (!asset) return;
+    if (!asset || !onSave) return;
     setIsSaving(true);
     try {
         const updatedAssetData: Asset = {
             ...asset,
             ...data,
+            syncStatus: 'local', // Mark as a local change
         };
-        await updateAsset(updatedAssetData);
-        toast({ title: "Success", description: "Asset updated successfully." });
+        await onSave(updatedAssetData);
         onOpenChange(false);
     } catch (e) {
-        toast({ title: "Error", description: "Failed to update asset.", variant: "destructive" });
+        // Error toast is handled by the caller in asset-list
     } finally {
         setIsSaving(false);
     }
@@ -94,7 +94,7 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
         <SheetHeader>
           <SheetTitle>Asset Details ({asset?.category})</SheetTitle>
           <SheetDescription>
-            View and edit the details of the asset.
+            View and edit the details of the asset. Changes are saved locally first.
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto pr-4">
