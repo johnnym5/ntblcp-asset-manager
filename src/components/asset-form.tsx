@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -49,22 +49,27 @@ import type { Asset } from "@/lib/types";
 import { validateAssetLabel } from "@/ai/flows/ocr-asset-validation";
 
 const assetFormSchema = z.object({
+  assetName: z.string().min(1, "Asset name is required"),
   serialNumber: z.string().min(1, "Serial number is required"),
-  model: z.string().min(1, "Model is required"),
+  category: z.string().min(1, "Category is required"),
   location: z.string().min(1, "Location is required"),
   status: z.enum(["In Use", "In Storage", "For Repair", "Disposed"]),
-  conditionNotes: z.string().optional(),
+  condition: z.enum(["New", "Good", "Fair", "Poor"]),
+  assignedTo: z.string().optional(),
+  purchaseDate: z.string().optional(),
+  notes: z.string().optional(),
 });
 
-type AssetFormValues = z.infer<typeof assetFormSchema>;
+export type AssetFormValues = z.infer<typeof assetFormSchema>;
 
 interface AssetFormProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   asset?: Asset;
+  onSave: (data: AssetFormValues) => void;
 }
 
-export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
+export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<any>(null);
@@ -72,15 +77,39 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
 
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
-    defaultValues: asset || {
+    defaultValues: {
+      assetName: "",
       serialNumber: "",
-      model: "",
+      category: "",
       location: "",
       status: "In Use",
-      conditionNotes: "",
+      condition: "Good",
+      assignedTo: "",
+      purchaseDate: "",
+      notes: "",
     },
   });
-  
+
+  useEffect(() => {
+    if (asset) {
+      form.reset(asset);
+      setImagePreview(asset.photoUrl);
+    } else {
+      form.reset({
+        assetName: "",
+        serialNumber: "",
+        category: "",
+        location: "",
+        status: "In Use",
+        condition: "Good",
+        assignedTo: "",
+        purchaseDate: "",
+        notes: "",
+      });
+      setImagePreview(null);
+    }
+  }, [asset, form, isOpen]);
+
   const handleImageUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -93,14 +122,16 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
       setImagePreview(photoDataUri);
 
       try {
-        const result = await validateAssetLabel({ photoDataUri });
+        const currentValues = form.getValues();
+        const result = await validateAssetLabel({ photoDataUri, currentValues });
         if (result.extractedData && Object.keys(result.extractedData).length > 0) {
           if (result.shouldOverride) {
             setAiSuggestion(result.extractedData);
           } else {
              toast({
-              title: "AI Suggestion",
-              description: "AI extracted data, but it might not be better than current values.",
+              title: "AI Suggestion Available",
+              description: "AI extracted data, but it might not be better than current values. Click to review.",
+              action: <Button onClick={() => setAiSuggestion(result.extractedData)}>Review</Button>
             });
           }
         } else {
@@ -125,8 +156,14 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
   
   const applyAiSuggestion = () => {
     if (!aiSuggestion) return;
+    // Map potential model/name variations to assetName
+    const suggestedAssetName = aiSuggestion.assetName || aiSuggestion.model || aiSuggestion.name;
+    if (suggestedAssetName) {
+        form.setValue("assetName", suggestedAssetName);
+    }
+    // Apply other fields if they exist in the form
     for (const key in aiSuggestion) {
-      if (key in form.getValues()) {
+      if (key !== 'assetName' && key !== 'model' && key !== 'name' && key in form.getValues()) {
         form.setValue(key as keyof AssetFormValues, aiSuggestion[key]);
       }
     }
@@ -138,14 +175,8 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
   };
 
   const onSubmit = (data: AssetFormValues) => {
-    console.log(data);
-    toast({
-      title: "Asset Saved",
-      description: "The asset has been successfully saved.",
-    });
+    onSave(data);
     onOpenChange(false);
-    form.reset();
-    setImagePreview(null);
   };
   
   return (
@@ -160,11 +191,12 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
                 : "Fill in the details for the new asset. You can use the OCR scanner to autofill."}
             </SheetDescription>
           </SheetHeader>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto pr-4">
             <Form {...form}>
               <form
+                id="asset-form"
                 onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-8 p-1 pr-4"
+                className="space-y-6 p-1"
               >
                 <Card>
                   <CardHeader>
@@ -183,16 +215,18 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
                             <Image
                               src={imagePreview}
                               alt="Asset label preview"
-                              layout="fill"
-                              objectFit="contain"
-                              className="rounded-md"
+                              fill
+                              className="rounded-md object-contain"
                             />
                             <Button
                               type="button"
                               variant="destructive"
                               size="icon"
                               className="absolute top-2 right-2 h-7 w-7"
-                              onClick={() => setImagePreview(null)}
+                              onClick={() => {
+                                setImagePreview(null);
+                                if (fileInputRef.current) fileInputRef.current.value = "";
+                              }}
                             >
                               <X className="h-4 w-4" />
                             </Button>
@@ -201,7 +235,7 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
                           <>
                             <UploadCloud className="h-10 w-10 text-muted-foreground" />
                             <p className="mt-2 text-sm text-muted-foreground">
-                              Upload or drag an image of the asset label
+                              Upload an image of the asset label
                             </p>
                             <Input
                               id="picture"
@@ -218,84 +252,95 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
                 </Card>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="serialNumber"
-                    render={({ field }) => (
+                  <FormField control={form.control} name="assetName" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Serial Number</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., SN123456789" {...field} />
-                        </FormControl>
+                        <FormLabel>Asset Name</FormLabel>
+                        <FormControl><Input placeholder="e.g., Dell Latitude 5420" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
-                  <FormField
-                    control={form.control}
-                    name="model"
-                    render={({ field }) => (
+                  <FormField control={form.control} name="serialNumber" render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Model</FormLabel>
-                        <FormControl>
-                          <Input placeholder="e.g., Latitude 5420" {...field} />
-                        </FormControl>
+                        <FormLabel>Serial Number</FormLabel>
+                        <FormControl><Input placeholder="e.g., SN123456789" {...field} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )}
                   />
                 </div>
-                <FormField
-                  control={form.control}
-                  name="location"
-                  render={({ field }) => (
+                 <FormField control={form.control} name="category" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Category</FormLabel>
+                      <FormControl><Input placeholder="e.g., Laptop, Vehicle, Medical Equipment" {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField control={form.control} name="location" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
-                      <FormControl>
-                        <Input placeholder="e.g., Abuja Office, Room 101" {...field} />
-                      </FormControl>
+                      <FormControl><Input placeholder="e.g., Abuja Office, Room 101" {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
-                <FormField
-                  control={form.control}
-                  name="status"
-                  render={({ field }) => (
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="status" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Status</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select asset status" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="In Use">In Use</SelectItem>
+                              <SelectItem value="In Storage">In Storage</SelectItem>
+                              <SelectItem value="For Repair">For Repair</SelectItem>
+                              <SelectItem value="Disposed">Disposed</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField control={form.control} name="condition" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Condition</FormLabel>
+                          <Select onValueChange={field.onChange} defaultValue={field.value} value={field.value}>
+                            <FormControl><SelectTrigger><SelectValue placeholder="Select asset condition" /></SelectTrigger></FormControl>
+                            <SelectContent>
+                              <SelectItem value="New">New</SelectItem>
+                              <SelectItem value="Good">Good</SelectItem>
+                              <SelectItem value="Fair">Fair</SelectItem>
+                              <SelectItem value="Poor">Poor</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                 </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="assignedTo" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Assigned To</FormLabel>
+                          <FormControl><Input placeholder="e.g., John Doe" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField control={form.control} name="purchaseDate" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Purchase Date</FormLabel>
+                          <FormControl><Input type="date" {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                </div>
+                <FormField control={form.control} name="notes" render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Status</FormLabel>
-                      <Select
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                      >
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select asset status" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          <SelectItem value="In Use">In Use</SelectItem>
-                          <SelectItem value="In Storage">In Storage</SelectItem>
-                          <SelectItem value="For Repair">For Repair</SelectItem>
-                          <SelectItem value="Disposed">Disposed</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                <FormField
-                  control={form.control}
-                  name="conditionNotes"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Condition Notes</FormLabel>
-                      <FormControl>
-                        <Textarea
-                          placeholder="e.g., Minor scratches on the casing."
-                          {...field}
-                        />
-                      </FormControl>
+                      <FormLabel>Notes</FormLabel>
+                      <FormControl><Textarea placeholder="e.g., Minor scratches on the casing." {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
@@ -303,11 +348,11 @@ export function AssetForm({ isOpen, onOpenChange, asset }: AssetFormProps) {
               </form>
             </Form>
           </div>
-          <SheetFooter className="mt-auto pt-4">
+          <SheetFooter className="mt-auto pt-4 border-t">
             <SheetClose asChild>
               <Button variant="outline">Cancel</Button>
             </SheetClose>
-            <Button onClick={form.handleSubmit(onSubmit)} type="submit">
+            <Button type="submit" form="asset-form">
               Save Asset
             </Button>
           </SheetFooter>

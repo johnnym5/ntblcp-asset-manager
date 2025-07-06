@@ -1,10 +1,14 @@
 export type Asset = {
   id: string;
+  assetName: string;
   serialNumber: string;
-  model: string;
+  category: string;
   location: string;
   status: 'In Use' | 'In Storage' | 'For Repair' | 'Disposed';
+  assignedTo?: string;
+  purchaseDate?: string;
+  condition: 'New' | 'Good' | 'Fair' | 'Poor';
   photoUrl: string;
-  attachments?: string[];
-  conditionNotes?: string;
+  files?: string[];
+  notes?: string;
 };

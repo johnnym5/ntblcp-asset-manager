@@ -16,6 +16,17 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -23,19 +34,19 @@ import {
   FileUp,
   MoreHorizontal,
   PlusCircle,
+  Trash2,
 } from "lucide-react";
 import Image from "next/image";
-import { AssetForm } from "./asset-form";
+import { AssetForm, type AssetFormValues } from "./asset-form";
 import { sampleAssets } from "@/lib/data";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(
-    undefined
-  );
+  const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
   const [assets, setAssets] = useState<Asset[]>(sampleAssets);
+  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -48,6 +59,56 @@ export default function AssetList() {
     setSelectedAsset(asset);
     setIsFormOpen(true);
   };
+
+  const handleSaveAsset = (data: AssetFormValues) => {
+    const newAssetData = {
+      ...data,
+      photoUrl: selectedAsset?.photoUrl || "https://placehold.co/400x400.png",
+    };
+
+    if (selectedAsset) {
+      // Update existing asset
+      setAssets(
+        assets.map((asset) =>
+          asset.id === selectedAsset.id
+            ? { ...asset, ...newAssetData }
+            : asset
+        )
+      );
+      toast({
+        title: "Asset Updated",
+        description: `Asset "${data.assetName}" has been successfully updated.`,
+      });
+    } else {
+      // Create new asset
+      const newAsset: Asset = {
+        id: `asset-${Date.now()}`,
+        ...newAssetData,
+      };
+      setAssets([newAsset, ...assets]);
+      toast({
+        title: "Asset Added",
+        description: `New asset "${data.assetName}" has been successfully added.`,
+      });
+    }
+  };
+  
+  const handleDeleteClick = (asset: Asset) => {
+    setAssetToDelete(asset);
+  }
+
+  const confirmDelete = () => {
+    if (assetToDelete) {
+      setAssets(assets.filter((asset) => asset.id !== assetToDelete.id));
+      toast({
+        title: "Asset Deleted",
+        description: `Asset "${assetToDelete.assetName}" has been deleted.`,
+        variant: 'destructive',
+      });
+      setAssetToDelete(null);
+    }
+  }
+
 
   const getStatusVariant = (status: Asset["status"]) => {
     switch (status) {
@@ -81,80 +142,56 @@ export default function AssetList() {
         const worksheet = workbook.Sheets[sheetName];
         const json = XLSX.utils.sheet_to_json<any>(worksheet);
 
-        const validStatuses: Asset["status"][] = [
-          "In Use",
-          "In Storage",
-          "For Repair",
-          "Disposed",
-        ];
+        const requiredFields = ['assetName', 'serialNumber', 'category', 'location', 'status', 'condition'];
 
         const validRows = json.filter((row, index) => {
-          const hasRequiredFields =
-            row.serialNumber && row.model && row.location && row.status;
-          if (!hasRequiredFields) {
-            console.warn(
-              `Skipping row ${
-                index + 2
-              } due to missing required fields.`
-            );
-            return false;
-          }
-          const hasValidStatus = validStatuses.includes(row.status);
-          if (!hasValidStatus) {
-            console.warn(
-              `Skipping row ${index + 2} due to invalid status: ${
-                row.status
-              }.`
-            );
-            return false;
-          }
-          return true;
+           const missingFields = requiredFields.filter(field => !row[field]);
+           if (missingFields.length > 0) {
+             console.warn(`Skipping row ${index + 2} due to missing required fields: ${missingFields.join(', ')}.`);
+             return false;
+           }
+           return true;
         });
 
         const skippedCount = json.length - validRows.length;
 
         const newAssets: Asset[] = validRows.map((row, index) => ({
           id: `imported-${Date.now()}-${index}`,
+          assetName: String(row.assetName),
           serialNumber: String(row.serialNumber),
-          model: String(row.model),
+          category: String(row.category),
           location: String(row.location),
           status: row.status as Asset["status"],
-          photoUrl: String(
-            row.photoUrl || "https://placehold.co/400x400.png"
-          ),
-          conditionNotes: row.conditionNotes
-            ? String(row.conditionNotes)
-            : undefined,
+          condition: row.condition as Asset["condition"],
+          assignedTo: row.assignedTo ? String(row.assignedTo) : undefined,
+          purchaseDate: row.purchaseDate ? String(row.purchaseDate) : undefined,
+          notes: row.notes ? String(row.notes) : undefined,
+          photoUrl: String(row.photoUrl || "https://placehold.co/400x400.png"),
         }));
 
         if (newAssets.length > 0) {
           setAssets((prevAssets) => [...prevAssets, ...newAssets]);
           toast({
             title: "Import Successful",
-            description: `${newAssets.length} assets imported. ${
-              skippedCount > 0 ? `${skippedCount} rows skipped.` : ""
-            }`.trim(),
+            description: `${newAssets.length} assets imported. ${skippedCount > 0 ? `${skippedCount} rows skipped.` : ""}`.trim(),
           });
         } else if (skippedCount > 0) {
           toast({
             title: "Import Finished",
-            description: `No new assets were imported. ${skippedCount} rows were skipped.`,
+            description: `No new assets were imported. ${skippedCount} rows were skipped due to missing data.`,
+            variant: "destructive"
           });
         } else {
           toast({
             title: "Import Finished",
-            description:
-              "The file was empty or contained no valid asset data.",
+            description: "The file was empty or contained no valid asset data.",
           });
         }
       } catch (error) {
         console.error("Failed to import Excel file:", error);
         toast({
           title: "Import Failed",
-          description:
-            error instanceof Error
-              ? error.message
-              : "An unexpected error occurred.",
+          description: error instanceof Error ? error.message : "An unexpected error occurred.",
           variant: "destructive",
         });
       }
@@ -179,11 +216,7 @@ export default function AssetList() {
         <h2 className="text-2xl font-bold tracking-tight flex-1">
           Asset Register
         </h2>
-        <Button
-          variant="outline"
-          className="hidden sm:flex"
-          onClick={handleImportClick}
-        >
+        <Button variant="outline" className="hidden sm:flex" onClick={handleImportClick}>
           <FileUp className="mr-2 h-4 w-4" />
           Import
         </Button>
@@ -196,14 +229,14 @@ export default function AssetList() {
           Add Asset
         </Button>
       </div>
-      <div className="rounded-lg border shadow-sm flex-1 overflow-hidden">
+      <div className="rounded-lg border shadow-sm flex-1 overflow-auto">
         <Table>
           <TableHeader>
             <TableRow>
               <TableHead className="w-[80px]">Image</TableHead>
+              <TableHead>Asset Name</TableHead>
               <TableHead>Serial Number</TableHead>
-              <TableHead>Model</TableHead>
-              <TableHead className="hidden md:table-cell">Location</TableHead>
+              <TableHead className="hidden md:table-cell">Category</TableHead>
               <TableHead>Status</TableHead>
               <TableHead className="w-[50px] text-right">Actions</TableHead>
             </TableRow>
@@ -214,7 +247,7 @@ export default function AssetList() {
                 <TableCell>
                   <Image
                     src={asset.photoUrl}
-                    alt={asset.model}
+                    alt={asset.assetName}
                     width={50}
                     height={50}
                     className="rounded-md object-cover"
@@ -222,11 +255,11 @@ export default function AssetList() {
                   />
                 </TableCell>
                 <TableCell className="font-medium">
-                  {asset.serialNumber}
+                  {asset.assetName}
                 </TableCell>
-                <TableCell>{asset.model}</TableCell>
+                <TableCell>{asset.serialNumber}</TableCell>
                 <TableCell className="hidden md:table-cell">
-                  {asset.location}
+                  {asset.category}
                 </TableCell>
                 <TableCell>
                   <Badge variant={getStatusVariant(asset.status)}>
@@ -244,7 +277,8 @@ export default function AssetList() {
                       <DropdownMenuItem onClick={() => handleEditAsset(asset)}>
                         Edit
                       </DropdownMenuItem>
-                      <DropdownMenuItem className="text-destructive">
+                      <DropdownMenuItem onClick={() => handleDeleteClick(asset)} className="text-destructive focus:text-destructive">
+                        <Trash2 className="mr-2 h-4 w-4"/>
                         Delete
                       </DropdownMenuItem>
                     </DropdownMenuContent>
@@ -260,7 +294,27 @@ export default function AssetList() {
         isOpen={isFormOpen}
         onOpenChange={setIsFormOpen}
         asset={selectedAsset}
+        onSave={handleSaveAsset}
       />
+      
+      <AlertDialog open={!!assetToDelete} onOpenChange={(open) => !open && setAssetToDelete(null)}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      This action cannot be undone. This will permanently delete the asset
+                      <span className="font-bold"> "{assetToDelete?.assetName}"</span>.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setAssetToDelete(null)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
+                      Delete
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }
