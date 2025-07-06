@@ -25,14 +25,9 @@ import {
   PlusCircle,
   Loader2,
   Trash2,
+  X,
 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { MultiSelectFilter, type OptionType } from "./multi-select-filter";
 import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -40,6 +35,15 @@ import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { saveAssetsToFirestore, getAssetsListener, deleteAsset } from "@/lib/firestore";
 import { useAuth } from "@/contexts/auth-context";
 import { TARGET_SHEETS } from "@/lib/constants";
+
+const VERIFIED_STATUS_OPTIONS: OptionType[] = [
+    { value: 'Verified', label: 'Verified' },
+    { value: 'Unverified', label: 'Unverified' },
+    { value: 'Discrepancy', label: 'Discrepancy' },
+    { value: 'Unverified - New', label: 'Unverified - New' },
+];
+
+const CATEGORY_OPTIONS: OptionType[] = TARGET_SHEETS.map(sheet => ({ value: sheet, label: sheet }));
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -51,8 +55,11 @@ export default function AssetList() {
   const { toast } = useToast();
   const { userProfile } = useAuth();
 
-  const [categoryFilter, setCategoryFilter] = useState('All Sheets');
-
+  const [categoryFilters, setCategoryFilters] = useState<string[]>([]);
+  const [statusFilters, setStatusFilters] = useState<string[]>([]);
+  const [locationFilters, setLocationFilters] = useState<string[]>([]);
+  const [assigneeFilters, setAssigneeFilters] = useState<string[]>([]);
+  
   useEffect(() => {
     setIsLoading(true);
     const unsubscribe = getAssetsListener(
@@ -129,12 +136,25 @@ export default function AssetList() {
     setIsImporting(false);
   };
 
+  const locationOptions = useMemo((): OptionType[] => {
+    const allLocations = assets.map(asset => asset.location).filter(Boolean) as string[];
+    return [...new Set(allLocations)].sort().map(loc => ({ value: loc, label: loc }));
+  }, [assets]);
+
+  const assigneeOptions = useMemo((): OptionType[] => {
+    const allAssignees = assets.map(asset => asset.assignee).filter(Boolean) as string[];
+    return [...new Set(allAssignees)].sort().map(assignee => ({ value: assignee, label: assignee }));
+  }, [assets]);
+
   const filteredAssets = useMemo(() => {
-    if (categoryFilter === 'All Sheets') {
-      return assets;
-    }
-    return assets.filter(asset => asset.category === categoryFilter);
-  }, [assets, categoryFilter]);
+    return assets.filter(asset => {
+        const categoryMatch = categoryFilters.length === 0 || categoryFilters.includes(asset.category);
+        const statusMatch = statusFilters.length === 0 || statusFilters.includes(asset.verifiedStatus || '');
+        const locationMatch = locationFilters.length === 0 || locationFilters.includes(asset.location || '');
+        const assigneeMatch = assigneeFilters.length === 0 || assigneeFilters.includes(asset.assignee || '');
+        return categoryMatch && statusMatch && locationMatch && assigneeMatch;
+    });
+  }, [assets, categoryFilters, statusFilters, locationFilters, assigneeFilters]);
   
   const handleExportClick = () => {
     if (filteredAssets.length === 0) {
@@ -142,12 +162,26 @@ export default function AssetList() {
       return;
     }
     try {
-      const exportCategory = categoryFilter !== 'All Sheets' ? categoryFilter : 'all-categories';
+      const exportCategory = categoryFilters.join('-') || 'filtered-assets';
       exportToExcel(filteredAssets, `asset-export-${exportCategory}-${new Date().toISOString().split('T')[0]}.xlsx`);
       toast({ title: "Export Successful" });
     } catch(error) {
       toast({ title: "Export Failed", variant: "destructive" });
     }
+  };
+  
+  const activeFilters = [
+    ...categoryFilters,
+    ...statusFilters,
+    ...locationFilters,
+    ...assigneeFilters
+  ];
+
+  const clearFilter = (filterToRemove: string) => {
+    setCategoryFilters(prev => prev.filter(f => f !== filterToRemove));
+    setStatusFilters(prev => prev.filter(f => f !== filterToRemove));
+    setLocationFilters(prev => prev.filter(f => f !== filterToRemove));
+    setAssigneeFilters(prev => prev.filter(f => f !== filterToRemove));
   };
 
   return (
@@ -179,20 +213,31 @@ export default function AssetList() {
         </div>
       </div>
       
-      <div className="flex flex-wrap items-center gap-2 p-4 border rounded-lg bg-card">
-        <div className="w-full sm:w-auto">
-          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-            <SelectTrigger className="w-full sm:w-[250px]">
-              <SelectValue placeholder="Filter by sheet..." />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="All Sheets">All Sheets</SelectItem>
-              {TARGET_SHEETS.map(sheet => (
-                <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="flex flex-col gap-2 p-4 border rounded-lg bg-card">
+        <div className="flex flex-wrap items-center gap-2">
+          <MultiSelectFilter title="Category" options={CATEGORY_OPTIONS} selected={categoryFilters} onChange={setCategoryFilters} />
+          <MultiSelectFilter title="Status" options={VERIFIED_STATUS_OPTIONS} selected={statusFilters} onChange={setStatusFilters} />
+          <MultiSelectFilter title="Location" options={locationOptions} selected={locationFilters} onChange={setLocationFilters} />
+          <MultiSelectFilter title="Assignee" options={assigneeOptions} selected={assigneeFilters} onChange={setAssigneeFilters} />
         </div>
+        {activeFilters.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+                <p className="text-sm font-medium">Active Filters:</p>
+                {activeFilters.map(filter => (
+                    <Badge key={filter} variant="secondary" className="pl-2 pr-1">
+                        {filter}
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            className="w-4 h-4 ml-1"
+                            onClick={() => clearFilter(filter)}
+                        >
+                            <X className="w-3 h-3"/>
+                        </Button>
+                    </Badge>
+                ))}
+            </div>
+        )}
       </div>
 
       <div className="rounded-lg border shadow-sm flex-1 overflow-auto">
