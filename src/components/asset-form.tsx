@@ -42,6 +42,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { validateAssetLabel } from "@/ai/flows/ocr-asset-validation";
 import { useToast } from "@/hooks/use-toast";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
+import { Label } from "./ui/label";
 
 const assetFormSchema = z.object({
   category: z.string({ required_error: "Please select a category." }),
@@ -53,6 +54,9 @@ const assetFormSchema = z.object({
   assignee: z.string().optional(),
   verifiedStatus: z.string().optional(),
   verifiedDate: z.string().optional(),
+  lga: z.string().optional(),
+  assetIdCode: z.string().optional(),
+  manufacturer: z.string().optional(),
 });
 
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
@@ -62,10 +66,17 @@ interface AssetFormProps {
   onOpenChange: (isOpen: boolean) => void;
   asset?: Asset;
   onSave: (assetToSave: Asset) => Promise<void>;
+  onQuickSave: (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy'; verifiedDate?: string; }) => Promise<void>;
   isReadOnly: boolean;
 }
 
-export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: AssetFormProps) {
+export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, isReadOnly }: AssetFormProps) {
+  // --- State for Quick View ---
+  const [quickViewRemarks, setQuickViewRemarks] = useState('');
+  const [quickViewStatus, setQuickViewStatus] = useState<'Verified' | 'Unverified' | 'Discrepancy'>('Unverified');
+  const [isQuickSaving, setIsQuickSaving] = useState(false);
+
+  // --- State for Full Form ---
   const [isSaving, setIsSaving] = useState(false);
   const [isScanning, setIsScanning] = useState(false);
   const [scanResult, setScanResult] = useState<Record<string, any> | null>(null);
@@ -84,6 +95,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
     assignee: '',
     verifiedStatus: 'Unverified',
     verifiedDate: '',
+    lga: '',
+    assetIdCode: '',
+    manufacturer: '',
   };
 
   const form = useForm<AssetFormValues>({
@@ -93,31 +107,59 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
   });
   
   const watchedValues = form.watch();
-  const watchedStatus = form.watch('verifiedStatus');
 
-  useEffect(() => {
-    if (watchedStatus === 'Verified' && !form.getValues('verifiedDate')) {
-        form.setValue('verifiedDate', new Date().toLocaleDateString('en-CA')); // YYYY-MM-DD
-    } else if (watchedStatus !== 'Verified' && !isReadOnly) {
-        form.setValue('verifiedDate', '');
-    }
-  }, [watchedStatus, form, isReadOnly]);
-
+  // --- Effects ---
   useEffect(() => {
     if (isOpen) {
       if (asset) {
+        // Sync state for quick view when sheet opens
+        setQuickViewRemarks(asset.remarks || '');
+        setQuickViewStatus(asset.verifiedStatus || 'Unverified');
+        
+        // Reset full form as well
         form.reset({
           ...defaultValues,
           ...asset,
           verifiedStatus: asset.verifiedStatus || 'Unverified',
         });
       } else {
+        // Reset for new asset form
         form.reset(defaultValues);
       }
+      // Reset scanner state
       setScanResult(null);
       setScanError(null);
     }
-  }, [asset, form, isOpen]);
+  }, [isOpen, asset, form]);
+  
+  const watchedStatusInForm = form.watch('verifiedStatus');
+  useEffect(() => {
+    if (watchedStatusInForm === 'Verified' && !form.getValues('verifiedDate')) {
+        form.setValue('verifiedDate', new Date().toLocaleDateString('en-CA')); // YYYY-MM-DD
+    } else if (watchedStatusInForm !== 'Verified' && !isReadOnly) {
+        form.setValue('verifiedDate', '');
+    }
+  }, [watchedStatusInForm, form, isReadOnly]);
+
+
+  // --- Handlers ---
+  const handleQuickSaveClick = async () => {
+    if (!asset) return;
+    setIsQuickSaving(true);
+    try {
+      const verifiedDate = quickViewStatus === 'Verified' ? new Date().toLocaleDateString('en-CA') : '';
+      await onQuickSave(asset.id, {
+        remarks: quickViewRemarks,
+        verifiedStatus: quickViewStatus,
+        verifiedDate,
+      });
+      toast({ title: "Saved", description: "Your changes have been saved locally." });
+    } catch(e) {
+      toast({ title: "Error", description: "Could not save changes.", variant: "destructive" });
+    } finally {
+      setIsQuickSaving(false);
+    }
+  }
 
   const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -187,8 +229,8 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
     try {
         const assetToSave: Asset = {
             id: asset?.id || uuidv4(),
-            ...asset, // Carry over existing fields
-            ...data, // Overwrite with form data
+            ...asset,
+            ...data,
             syncStatus: 'local',
             originalData: asset?.originalData || { source: 'manual-entry' },
         };
@@ -201,13 +243,89 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
     }
   };
   
+  // --- RENDER LOGIC ---
+
+  if (isReadOnly && asset) {
+    // --- QUICK VIEW RENDER ---
+    return (
+      <Sheet open={isOpen} onOpenChange={onOpenChange}>
+        <SheetContent className="sm:max-w-2xl w-full flex flex-col">
+          <SheetHeader>
+            <SheetTitle>Asset Quick View</SheetTitle>
+            <SheetDescription>
+              Viewing asset details. Comments and status can be updated here.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 space-y-6 overflow-y-auto pr-6 py-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">Asset ID</p>
+                    <p>{asset.assetIdCode || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">Serial Number</p>
+                    <p>{asset.serialNumber || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">Manufacturer</p>
+                    <p>{asset.manufacturer || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">Location</p>
+                    <p>{asset.location || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">LGA</p>
+                    <p>{asset.lga || 'N/A'}</p>
+                </div>
+            </div>
+            <div className="space-y-1 text-sm">
+                <p className="text-xs font-semibold text-muted-foreground">Asset Description</p>
+                <p>{asset.description || 'N/A'}</p>
+            </div>
+            
+            <div className="space-y-4 border-t pt-6">
+                 <div className="space-y-2">
+                    <Label htmlFor="quick-view-status">Verified Status</Label>
+                    <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
+                        <SelectTrigger id="quick-view-status">
+                            <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
+                            <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                            <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="quick-view-remarks">Remarks/Comments</Label>
+                    <Textarea id="quick-view-remarks" value={quickViewRemarks} onChange={(e) => setQuickViewRemarks(e.target.value)} rows={5} />
+                </div>
+                <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
+                    {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Comments & Status
+                </Button>
+            </div>
+          </div>
+          <SheetFooter className="mt-auto pt-4 border-t">
+            <SheetClose asChild>
+              <Button variant="outline">Close</Button>
+            </SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    );
+  }
+
+  // --- FULL EDIT/ADD FORM RENDER ---
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-4xl w-full flex flex-col">
         <SheetHeader>
-          <SheetTitle>{isReadOnly ? 'View Asset' : (asset ? `Edit Asset` : 'Add New Asset')}</SheetTitle>
+          <SheetTitle>{asset ? `Edit Asset` : 'Add New Asset'}</SheetTitle>
           <SheetDescription>
-            {isReadOnly ? 'Viewing asset details.' : (asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
+            {asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.'}
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto pr-4 py-4">
@@ -225,7 +343,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Verified Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
+                          <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select status" />
@@ -256,7 +374,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
                   render={({ field }) => (
                     <FormItem>
                       <FormLabel>Category</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={!!asset || isReadOnly}>
+                      <Select onValueChange={field.onChange} value={field.value} disabled={!!asset}>
                         <FormControl>
                           <SelectTrigger>
                             <SelectValue placeholder="Select a category for the asset" />
@@ -276,7 +394,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
                 <FormField control={form.control} name="description" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Asset Description</FormLabel>
-                    <FormControl><Textarea {...field} disabled={isReadOnly} /></FormControl>
+                    <FormControl><Textarea {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -285,14 +403,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
                   <FormField control={form.control} name="serialNumber" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Serial/Chasis Number</FormLabel>
-                      <FormControl><Input {...field} disabled={isReadOnly} /></FormControl>
+                      <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="location" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
-                      <FormControl><Input {...field} disabled={isReadOnly} /></FormControl>
+                      <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -301,14 +419,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
                   <FormField control={form.control} name="condition" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Condition</FormLabel>
-                      <FormControl><Input {...field} disabled={isReadOnly} /></FormControl>
+                      <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="assignee" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Assignee</FormLabel>
-                      <FormControl><Input {...field} disabled={isReadOnly} /></FormControl>
+                      <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
@@ -316,7 +434,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
                 <FormField control={form.control} name="remarks" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Remarks/Comments</FormLabel>
-                    <FormControl><Textarea {...field} disabled={isReadOnly} /></FormControl>
+                    <FormControl><Textarea {...field} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -347,7 +465,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
                         variant="outline"
                         className="w-full"
                         onClick={() => fileInputRef.current?.click()}
-                        disabled={isScanning || isReadOnly}
+                        disabled={isScanning}
                     >
                         {isScanning ? (
                             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -363,7 +481,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
                             <AlertDescription>{scanError}</AlertDescription>
                         </Alert>
                     )}
-                    {scanResult && !isReadOnly && (
+                    {scanResult && (
                         <div className="space-y-3 rounded-md border p-4">
                             <h4 className="font-medium">AI Suggestions:</h4>
                             <ul className="list-disc list-inside text-sm text-muted-foreground space-y-1">
@@ -385,12 +503,10 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
           <SheetClose asChild>
             <Button variant="outline">Close</Button>
           </SheetClose>
-          {!isReadOnly && (
-            <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Changes
-            </Button>
-          )}
+          <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+          </Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>

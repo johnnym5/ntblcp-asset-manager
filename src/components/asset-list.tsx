@@ -136,6 +136,10 @@ export default function AssetList() {
     setIsFormOpen(false);
   };
 
+  const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
+    setAssets(prev => prev.map(a => a.id === assetId ? { ...a, ...data } : a));
+  };
+
   const handleImportClick = () => fileInputRef.current?.click();
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -154,8 +158,9 @@ export default function AssetList() {
 
     const allNewAssets = Object.values(assetsBySheet).flat();
     if (allNewAssets.length > 0) {
+        // Data is saved locally to the state
         setAssets(prev => [...prev, ...allNewAssets]);
-        toast({ title: "Import Successful", description: `Successfully imported ${allNewAssets.length} new assets.` });
+        toast({ title: "Import Successful", description: `Successfully imported ${allNewAssets.length} new assets. Data is saved locally.` });
     } else if (errors.length === 0) {
         toast({ title: "No Data Found", description: "No valid asset sheets were found in the file."});
     }
@@ -233,7 +238,14 @@ export default function AssetList() {
                 </Card>
             ))}
         </div>
-        <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} isReadOnly={isFormReadOnly} />
+        <AssetForm 
+          isOpen={isFormOpen} 
+          onOpenChange={setIsFormOpen} 
+          asset={selectedAsset} 
+          onSave={handleSaveAsset}
+          onQuickSave={handleQuickSaveAsset}
+          isReadOnly={isFormReadOnly} 
+        />
       </div>
     )
   }
@@ -326,7 +338,14 @@ export default function AssetList() {
                 </TableBody>
             </Table>
         </div>
-        <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} isReadOnly={isFormReadOnly} />
+        <AssetForm 
+          isOpen={isFormOpen} 
+          onOpenChange={setIsFormOpen} 
+          asset={selectedAsset} 
+          onSave={handleSaveAsset} 
+          onQuickSave={handleQuickSaveAsset}
+          isReadOnly={isFormReadOnly}
+        />
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
