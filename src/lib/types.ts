@@ -62,7 +62,4 @@ export interface Asset {
   accumulatedDepreciation?: { ngn?: string; usd?: string };
   netBookValue?: { ngn?: string; usd?: string };
   valuesByYear?: Record<string, { ngn?: string; usd?: string }>;
-
-  // Keep a copy of the original row for reference
-  originalData: Record<string, any>;
 }

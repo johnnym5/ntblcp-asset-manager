@@ -100,7 +100,6 @@ function mapRowToAsset(row: any, category: string): Asset | null {
         remarks: getColumnValue(row, 'Remarks', 'Comments'),
         chasisNo: getColumnValue(row, 'Chasis no'),
         engineNo: getColumnValue(row, 'Engine no'),
-        originalData: row,
     };
     return asset;
 }
@@ -184,15 +183,11 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
 
     // Add all keys except the ones we want at the end
     for (const [key, value] of Object.entries(asset)) {
-        if (key !== 'originalData' && key !== 'syncStatus' && key !== 'verifiedStatus' && key !== 'verifiedDate' && typeof value !== 'object') {
+        if (key !== 'syncStatus' && key !== 'verifiedStatus' && key !== 'verifiedDate' && typeof value !== 'object') {
             flattenedAsset[key] = value;
         }
     }
     
-    // Add the original data for context
-    flattenedAsset['Original S/N'] = asset.originalData['S/N'];
-    flattenedAsset['Original Description'] = asset.originalData['Asset Description'] || asset.originalData['DESCRIPTION'];
-
     // Add the verification fields at the end
     flattenedAsset['Verified Status'] = asset.verifiedStatus;
     flattenedAsset['Verified Date'] = asset.verifiedDate;

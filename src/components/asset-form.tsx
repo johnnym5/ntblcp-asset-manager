@@ -232,7 +232,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
             ...asset,
             ...data,
             syncStatus: 'local',
-            originalData: asset?.originalData || { source: 'manual-entry' },
         };
         await onSave(assetToSave);
         onOpenChange(false);
@@ -438,15 +437,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     <FormMessage />
                   </FormItem>
                 )} />
-
-                {asset?.originalData && (
-                    <>
-                        <h3 className="text-lg font-medium border-t pt-4">Original Imported Data</h3>
-                        <pre className="mt-2 w-full overflow-auto rounded-md bg-muted p-4 text-xs">
-                            {JSON.stringify(asset.originalData, null, 2)}
-                        </pre>
-                    </>
-                )}
               </form>
             </Form>
           </div>
