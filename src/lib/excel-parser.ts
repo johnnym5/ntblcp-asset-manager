@@ -49,7 +49,7 @@ export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sh
             const headerRow = XLSX.utils.sheet_to_json(worksheet, { header: 1, range: 'A1:ZZ1' })[0] as string[];
             
             if (config.headers && !validateHeaders(headerRow, config.headers)) {
-              errors.push(`Sheet "${sheetName}" has invalid headers.`);
+              errors.push(`Sheet "${sheetName}" has an invalid format or header mismatch.`);
               return;
             }
             
@@ -77,9 +77,9 @@ export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sh
 
 // --- UTILITY FUNCTIONS ---
 function validateHeaders(actualHeaders: string[], expectedHeaders: string[]): boolean {
-  if (!actualHeaders || actualHeaders.length === 0) return false;
-  // Check if all expected headers are present in the actual headers
-  return expectedHeaders.every((header, index) => actualHeaders[index]?.trim() === header.trim());
+    if (!actualHeaders || actualHeaders.length < expectedHeaders.length) return false;
+    // Check if all expected headers are present in the actual headers in the correct order
+    return expectedHeaders.every((header, index) => actualHeaders[index]?.trim() === header.trim());
 }
 
 function createBaseAsset(row: any, category: string): Asset {
@@ -128,6 +128,7 @@ function parseWithSkipping(data: any[], category: string, parserFn: (row: any, c
     const assets: Asset[] = [];
     let skipped = 0;
     data.forEach(row => {
+        // Skip rows that don't have a serial number or an asset description.
         if (row['S/N'] && row['Asset Description']) {
             assets.push(parserFn(row, category));
         } else {
@@ -143,7 +144,7 @@ function parseNtblcpFar(data: any[], category: string): { assets: Asset[], skipp
     asset.valuesByYear = {
       '2019': { ngn: String(row['2019 (NGN)'] || ''), usd: String(row['2019 (USD)'] || '') },
       '2020': { ngn: String(row['2020 (NGN)'] || ''), usd: String(row['2020 (USD)'] || '') },
-      '2121': { ngn: String(row['2021 (NGN)'] || ''), usd: String(row['2021 (USD)'] || '') },
+      '2021': { ngn: String(row['2021 (NGN)'] || ''), usd: String(row['2021 (USD)'] || '') },
       '2022': { ngn: String(row['2022 (NGN)'] || ''), usd: String(row['2022 (USD)'] || '') },
     };
     return asset;
@@ -158,7 +159,7 @@ function parseMotorcyclesC19rm(data: any[], category: string): { assets: Asset[]
     asset.valuesByYear = {
       '2019': { ngn: String(row['2019 (NGN)'] || ''), usd: String(row['2019 (USD)'] || '') },
       '2020': { ngn: String(row['2020 (NGN)'] || ''), usd: String(row['2020 (USD)'] || '') },
-      '2121': { ngn: String(row['2021 (NGN)'] || ''), usd: String(row['2021 (USD)'] || '') },
+      '2021': { ngn: String(row['2021 (NGN)'] || ''), usd: String(row['2021 (USD)'] || '') },
       '2022': { ngn: String(row['2022 (NGN)'] || ''), usd: String(row['2022 (USD)'] || '') },
     };
     return asset;

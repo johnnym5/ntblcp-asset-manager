@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect } from "react";
@@ -30,7 +31,6 @@ import {
   SignalZero,
   LogOut,
   User,
-  Users,
 } from "lucide-react";
 import { useOnlineStatus } from "@/hooks/use-online-status";
 import { useToast } from "@/hooks/use-toast";
@@ -105,12 +105,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 Assets
               </SidebarMenuButton>
             </SidebarMenuItem>
-             <SidebarMenuItem>
-              <SidebarMenuButton href="/room">
-                <Users />
-                Collaboration
-              </SidebarMenuButton>
-            </SidebarMenuItem>
             <SidebarMenuItem>
               <SidebarMenuButton href="#">
                 <Settings />
@@ -120,7 +114,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </SidebarMenu>
         </SidebarContent>
       </Sidebar>
-      <SidebarInset>
+      <div className="flex flex-col w-full">
         <header className="flex h-14 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm sm:h-16 md:px-6">
           <SidebarTrigger className="flex md:hidden">
             <PanelLeft />
@@ -178,7 +172,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="flex-1 flex flex-col p-4 md:p-6">{children}</main>
-      </SidebarInset>
+      </div>
     </SidebarProvider>
   );
 }

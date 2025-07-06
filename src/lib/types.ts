@@ -36,7 +36,7 @@ export interface Asset {
   remarks?: string;
   grant?: string;
   usefulLifeYears?: string;
-  verifiedStatus?: 'Verified' | 'Unverified';
+  verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy' | 'Unverified - New';
   accumulatedDepreciation?: { ngn?: string; usd?: string };
   netBookValue?: { ngn?: string; usd?: string };
   imei?: string;

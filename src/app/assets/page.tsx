@@ -37,7 +37,7 @@ export default function AssetsPage() {
     }
   };
 
-  if (loading || !user || isStateSelectorOpen) {
+  if (loading || !user || (userProfile?.role === 'user' && !userProfile.state)) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         {isStateSelectorOpen && user ? (

@@ -31,6 +31,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(user);
         let profile = await getUserProfile(user.uid);
         if (!profile) {
+          // If no profile, create one with default role 'user'
           profile = await createUserProfile(user);
         }
         setUserProfile(profile);

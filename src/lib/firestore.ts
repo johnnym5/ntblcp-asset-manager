@@ -11,6 +11,7 @@ import {
   query,
   where,
   deleteDoc,
+  or,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Asset, UserProfile } from '@/lib/types';
@@ -52,7 +53,8 @@ export async function saveAssetsToFirestore(assetsBySheet: { [sheetName: string]
 
   for (const sheetName in assetsBySheet) {
     const assets = assetsBySheet[sheetName];
-    const collectionRef = collection(db, sheetName); // Use sheet name as collection ID
+    // The collection name is the sheet name.
+    const collectionRef = collection(db, sheetName);
     assets.forEach((asset) => {
       const docRef = doc(collectionRef, asset.id);
       batch.set(docRef, asset);
@@ -70,29 +72,27 @@ export function getAssetsListener(
   callback: (assets: Asset[]) => void,
   userProfile?: UserProfile | null
 ) {
-  // This listener is a composite of listeners for each target sheet.
-  // It fetches all assets the user is allowed to see.
   const assetsByCategory: { [key: string]: Asset[] } = {};
 
   const unsubscribes = TARGET_SHEETS.map(category => {
     let q = query(collection(db, category));
 
-    // For non-admin users, filter by their assigned state at the query level.
-    // This is important for security and data reduction.
+    // For 'user' roles, filter by their assigned state.
+    // This query is more complex as it needs to check two fields (Location and LGA).
+    // An admin sees everything.
     if (userProfile?.role === 'user' && userProfile.state) {
-      q = query(q, where('location', '==', userProfile.state));
+      q = query(q, or(
+        where('location', '==', userProfile.state),
+        where('lga', '==', userProfile.state)
+      ));
     }
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
-      const docs = snapshot.docs.map(doc => doc.data() as Asset);
-      assetsByCategory[category] = docs;
-
-      // Combine assets from all categories and update the state via callback
+      assetsByCategory[category] = snapshot.docs.map(doc => doc.data() as Asset);
       const allAssets = Object.values(assetsByCategory).flat();
       callback(allAssets);
     }, (error) => {
       console.error(`Error listening to ${category}:`, error);
-      // Even if one listener fails, we should update with the rest
       delete assetsByCategory[category];
       const allAssets = Object.values(assetsByCategory).flat();
       callback(allAssets);
@@ -101,7 +101,6 @@ export function getAssetsListener(
     return unsubscribe;
   });
 
-  // Return a function that unsubscribes from all listeners
   return () => {
     unsubscribes.forEach(unsub => unsub());
   };
@@ -109,6 +108,7 @@ export function getAssetsListener(
 
 
 export async function updateAsset(asset: Asset) {
+  // The asset's category determines its collection
   const assetRef = doc(db, asset.category, asset.id);
   await setDoc(assetRef, asset, { merge: true });
 }
