@@ -1,7 +1,7 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import * as z from 'zod';
@@ -47,8 +47,13 @@ export default function LoginPage() {
     defaultValues: { displayName: '', email: '', password: '' },
   });
   
+  useEffect(() => {
+    if (user) {
+      router.push('/assets');
+    }
+  }, [user, router]);
+
   if (user) {
-    router.push('/assets');
     return null;
   }
 
