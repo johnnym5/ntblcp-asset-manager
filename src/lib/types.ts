@@ -5,6 +5,7 @@ export interface UserProfile {
   uid: string;
   email: string | null;
   displayName: string | null;
+  photoURL?: string | null;
   role: 'admin' | 'user';
   state?: string; // e.g., 'Lagos'
 }
@@ -35,6 +36,7 @@ export interface Asset {
   remarks?: string;
   grant?: string;
   usefulLifeYears?: string;
+  verifiedStatus?: 'Verified' | 'Unverified';
   accumulatedDepreciation?: { ngn?: string; usd?: string };
   netBookValue?: { ngn?: string; usd?: string };
   imei?: string;

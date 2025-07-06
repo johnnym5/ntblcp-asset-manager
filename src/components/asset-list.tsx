@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import {
   Table,
   TableBody,
@@ -16,13 +16,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -32,15 +25,15 @@ import {
   PlusCircle,
   Loader2,
   Trash2,
+  X,
 } from "lucide-react";
-import Image from "next/image";
 import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { saveAssetsToFirestore, getAssetsListener, deleteAsset } from "@/lib/firestore";
-import { TARGET_SHEETS } from "@/lib/constants";
 import { useAuth } from "@/contexts/auth-context";
+import { MultiSelectFilter } from "./multi-select-filter";
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -48,15 +41,20 @@ export default function AssetList() {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedCategory, setSelectedCategory] = useState<string>(TARGET_SHEETS[0]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
   const { userProfile } = useAuth();
 
+  // State for advanced filters
+  const [categoryFilter, setCategoryFilter] = useState<string[]>([]);
+  const [statusFilter, setStatusFilter] = useState<string[]>([]);
+  const [locationFilter, setLocationFilter] = useState<string[]>([]);
+  const [assigneeFilter, setAssigneeFilter] = useState<string[]>([]);
+
   useEffect(() => {
     setIsLoading(true);
+    // This listener now fetches all assets the user is permitted to see across all target sheets.
     const unsubscribe = getAssetsListener(
-        [selectedCategory], 
         (loadedAssets) => {
             setAssets(loadedAssets);
             setIsLoading(false);
@@ -65,7 +63,7 @@ export default function AssetList() {
     );
 
     return () => unsubscribe();
-  }, [selectedCategory, userProfile]);
+  }, [userProfile]);
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -99,10 +97,14 @@ export default function AssetList() {
     setIsImporting(true);
     toast({ title: "Importing file...", description: "Please wait while we process your Excel file." });
     
-    const { assetsBySheet, errors } = await parseExcelFile(file);
+    const { assetsBySheet, errors, skippedRows } = await parseExcelFile(file);
     
     if (errors.length > 0) {
       errors.forEach(error => toast({ title: "Import Error", description: error, variant: "destructive" }));
+    }
+    
+    if (skippedRows > 0) {
+        toast({ title: "Import Notice", description: `${skippedRows} rows were skipped due to missing required fields.` });
     }
 
     const sheetNames = Object.keys(assetsBySheet);
@@ -127,21 +129,66 @@ export default function AssetList() {
   };
 
   const handleExportClick = () => {
-    if (assets.length === 0) {
+    if (filteredAssets.length === 0) {
       toast({ title: "No Data to Export", description: "There are no assets in the current view to export." });
       return;
     }
     try {
-      exportToExcel(assets, `asset-export-${selectedCategory}-${new Date().toISOString().split('T')[0]}.xlsx`);
+      const exportCategory = categoryFilter.length === 1 ? categoryFilter[0] : 'multiple-categories';
+      exportToExcel(filteredAssets, `asset-export-${exportCategory}-${new Date().toISOString().split('T')[0]}.xlsx`);
       toast({ title: "Export Successful" });
     } catch(error) {
       toast({ title: "Export Failed", variant: "destructive" });
     }
   };
 
+  // Memoized options for filters
+  const { categories, locations, assignees, statuses } = useMemo(() => {
+    const uniqueCategories = [...new Set(assets.map(a => a.category).filter(Boolean))];
+    const uniqueLocations = [...new Set(assets.map(a => a.location).filter(Boolean))];
+    const uniqueAssignees = [...new Set(assets.map(a => a.assignee).filter(Boolean))];
+    const uniqueStatuses = [...new Set(assets.map(a => a.verifiedStatus).filter(Boolean))];
+
+    return {
+      categories: uniqueCategories.map(c => ({ value: c!, label: c! })),
+      locations: uniqueLocations.map(l => ({ value: l!, label: l! })),
+      assignees: uniqueAssignees.map(a => ({ value: a!, label: a! })),
+      statuses: uniqueStatuses.map(s => ({ value: s!, label: s! })),
+    }
+  }, [assets]);
+  
+  // Memoized filtered assets
+  const filteredAssets = useMemo(() => {
+    return assets.filter(asset => {
+      const categoryMatch = categoryFilter.length === 0 || categoryFilter.includes(asset.category);
+      const statusMatch = statusFilter.length === 0 || (asset.verifiedStatus && statusFilter.includes(asset.verifiedStatus));
+      const locationMatch = locationFilter.length === 0 || (asset.location && locationFilter.includes(asset.location));
+      const assigneeMatch = assigneeFilter.length === 0 || (asset.assignee && assigneeFilter.includes(asset.assignee));
+      return categoryMatch && statusMatch && locationMatch && assigneeMatch;
+    });
+  }, [assets, categoryFilter, statusFilter, locationFilter, assigneeFilter]);
+  
+  // Combined list of active filters to render as badges
+  const activeFilters = [
+    ...categoryFilter.map(value => ({ type: 'Category', value, setter: setCategoryFilter })),
+    ...statusFilter.map(value => ({ type: 'Status', value, setter: setStatusFilter })),
+    ...locationFilter.map(value => ({ type: 'Location', value, setter: setLocationFilter })),
+    ...assigneeFilter.map(value => ({ type: 'Assignee', value, setter: setAssigneeFilter })),
+  ];
+
+  const removeFilter = (setter: React.Dispatch<React.SetStateAction<string[]>>, value: string) => {
+      setter(prev => prev.filter(item => item !== value));
+  };
+  
+  const clearAllFilters = () => {
+    setCategoryFilter([]);
+    setStatusFilter([]);
+    setLocationFilter([]);
+    setAssigneeFilter([]);
+  }
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full gap-4">
       <input
         type="file"
         ref={fileInputRef}
@@ -149,35 +196,50 @@ export default function AssetList() {
         accept=".xlsx, .xls"
         className="hidden"
       />
-      <div className="flex flex-wrap items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-2xl font-bold tracking-tight flex-1">
           Asset Register
         </h2>
-        <div className="w-full sm:w-auto">
-            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger className="w-full sm:w-[240px]">
-                    <SelectValue placeholder="Select a category" />
-                </SelectTrigger>
-                <SelectContent>
-                    {TARGET_SHEETS.map(sheet => (
-                        <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
-                    ))}
-                </SelectContent>
-            </Select>
+        <div className="flex flex-wrap items-center gap-2">
+            <Button variant="outline" className="hidden sm:flex" onClick={handleImportClick} disabled={isImporting}>
+              {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
+              Import
+            </Button>
+            <Button variant="outline" className="hidden sm:flex" onClick={handleExportClick}>
+              <FileDown className="mr-2 h-4 w-4" />
+              Export
+            </Button>
+            <Button onClick={handleAddAsset} disabled={true}>
+              <PlusCircle className="mr-2 h-4 w-4" />
+              Add Asset (Manual)
+            </Button>
         </div>
-        <Button variant="outline" className="hidden sm:flex" onClick={handleImportClick} disabled={isImporting}>
-          {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
-          Import
-        </Button>
-        <Button variant="outline" className="hidden sm:flex" onClick={handleExportClick}>
-          <FileDown className="mr-2 h-4 w-4" />
-          Export
-        </Button>
-        <Button onClick={handleAddAsset} disabled={true}>
-          <PlusCircle className="mr-2 h-4 w-4" />
-          Add Asset (Manual)
-        </Button>
       </div>
+      
+      {/* Advanced Filters */}
+      <div className="flex flex-wrap items-center gap-2 p-4 border rounded-lg bg-card">
+        <MultiSelectFilter title="Category" options={categories} selected={categoryFilter} onChange={setCategoryFilter} />
+        <MultiSelectFilter title="Verified Status" options={statuses} selected={statusFilter} onChange={setStatusFilter} />
+        <MultiSelectFilter title="Location" options={locations} selected={locationFilter} onChange={setLocationFilter} />
+        <MultiSelectFilter title="Assignee" options={assignees} selected={assigneeFilter} onChange={setAssigneeFilter} />
+      </div>
+
+      {/* Active Filter Badges */}
+      {activeFilters.length > 0 && (
+        <div className="flex flex-wrap gap-2 items-center">
+          <h3 className="text-sm font-medium">Active Filters:</h3>
+          {activeFilters.map(({ value, setter }) => (
+            <Badge key={value} variant="secondary" className="pl-2.5 pr-1 py-0.5">
+              {value}
+              <button onClick={() => removeFilter(setter, value)} className="ml-1.5 rounded-full p-0.5 hover:bg-background/50 text-muted-foreground hover:text-foreground">
+                <X className="h-3 w-3" />
+              </button>
+            </Badge>
+          ))}
+          <Button variant="link" size="sm" className="h-auto p-0 text-destructive" onClick={clearAllFilters}>Clear All</Button>
+        </div>
+      )}
+
       <div className="rounded-lg border shadow-sm flex-1 overflow-auto">
         <Table>
           <TableHeader>
@@ -193,8 +255,8 @@ export default function AssetList() {
           <TableBody>
             {isLoading ? (
                 <TableRow><TableCell colSpan={6} className="text-center"><Loader2 className="mx-auto my-4 h-8 w-8 animate-spin" /></TableCell></TableRow>
-            ) : assets.length > 0 ? (
-              assets.map((asset) => (
+            ) : filteredAssets.length > 0 ? (
+              filteredAssets.map((asset) => (
                 <TableRow key={asset.id}>
                   <TableCell>{asset.sn}</TableCell>
                   <TableCell className="font-medium">{asset.description}</TableCell>
@@ -215,7 +277,7 @@ export default function AssetList() {
                 </TableRow>
               ))
             ) : (
-                <TableRow><TableCell colSpan={6} className="text-center h-24">No assets found in this category.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={6} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>

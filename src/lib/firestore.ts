@@ -10,12 +10,12 @@ import {
   setDoc,
   query,
   where,
-  getDocs,
-  collectionGroup,
+  deleteDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Asset, UserProfile } from '@/lib/types';
 import type { User } from 'firebase/auth';
+import { TARGET_SHEETS } from './constants';
 
 // --- User Profile ---
 export async function getUserProfile(uid: string): Promise<UserProfile | null> {
@@ -33,6 +33,7 @@ export async function createUserProfile(user: User): Promise<UserProfile> {
     uid: user.uid,
     email: user.email,
     displayName: user.displayName,
+    photoURL: user.photoURL,
     role: 'user', // Default role
   };
   await setDoc(userDocRef, newUserProfile);
@@ -66,49 +67,46 @@ export async function saveAssetsToFirestore(assetsBySheet: { [sheetName: string]
 }
 
 export function getAssetsListener(
-  categories: string[],
   callback: (assets: Asset[]) => void,
   userProfile?: UserProfile | null
 ) {
-  if (categories.length === 0) {
-    callback([]);
-    return () => {};
-  }
-  
-  // This is complex. For "All Sheets", we need multiple listeners.
-  // For simplicity in this phase, we'll listen to one category at a time.
-  // A more robust solution would query across collections.
-  const category = categories[0];
-  let q = query(collection(db, category));
-  
-  // Apply state-based filtering if user is not an admin
-  if (userProfile?.role === 'user' && userProfile.state) {
-      q = query(collection(db, category), where('location', '==', userProfile.state));
-      // In a real app, you might need to query on 'lga' as well, which requires composite indexes.
-  }
+  // This listener is a composite of listeners for each target sheet.
+  // It fetches all assets the user is allowed to see.
+  const assetsByCategory: { [key: string]: Asset[] } = {};
 
-  const unsubscribe = onSnapshot(q, (snapshot) => {
-    const assets = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Asset));
-    callback(assets);
-  }, (error) => {
-    console.error(`Error listening to ${category}:`, error);
-    callback([]);
+  const unsubscribes = TARGET_SHEETS.map(category => {
+    let q = query(collection(db, category));
+
+    // For non-admin users, filter by their assigned state at the query level.
+    // This is important for security and data reduction.
+    if (userProfile?.role === 'user' && userProfile.state) {
+      q = query(q, where('location', '==', userProfile.state));
+    }
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => doc.data() as Asset);
+      assetsByCategory[category] = docs;
+
+      // Combine assets from all categories and update the state via callback
+      const allAssets = Object.values(assetsByCategory).flat();
+      callback(allAssets);
+    }, (error) => {
+      console.error(`Error listening to ${category}:`, error);
+      // Even if one listener fails, we should update with the rest
+      delete assetsByCategory[category];
+      const allAssets = Object.values(assetsByCategory).flat();
+      callback(allAssets);
+    });
+
+    return unsubscribe;
   });
 
-  return unsubscribe;
+  // Return a function that unsubscribes from all listeners
+  return () => {
+    unsubscribes.forEach(unsub => unsub());
+  };
 }
 
-export async function getAllAssets(userProfile?: UserProfile | null): Promise<Asset[]> {
-    const q = query(collectionGroup(db, 'assets')); // This requires Firestore indexes
-    const querySnapshot = await getDocs(q);
-    const allAssets = querySnapshot.docs.map(doc => doc.data() as Asset);
-
-    if (userProfile?.role === 'user' && userProfile.state) {
-        return allAssets.filter(asset => asset.location === userProfile.state || asset.lga === userProfile.state);
-    }
-    
-    return allAssets;
-}
 
 export async function updateAsset(asset: Asset) {
   const assetRef = doc(db, asset.category, asset.id);
