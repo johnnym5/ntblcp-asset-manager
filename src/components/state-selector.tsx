@@ -13,14 +13,17 @@ import {
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { NIGERIAN_STATES } from '@/lib/constants';
+import { NIGERIAN_STATES, ZONE_NAMES } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 
 interface UserProfileSetupProps {
@@ -59,7 +62,7 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
         <AlertDialogHeader>
           <AlertDialogTitle>Complete Your Profile</AlertDialogTitle>
           <AlertDialogDescription>
-            Please provide your name and assigned state. Enter 'admin' as your name to view all assets without a state filter.
+            Please provide your name and assigned state/zone. Enter 'admin' as your name to view all assets.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="py-4 space-y-4">
@@ -73,17 +76,29 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
           </div>
           {!isAdmin && (
             <div className="space-y-2">
-              <Label htmlFor="state">Assigned State</Label>
+              <Label htmlFor="state">Assigned Zone or State</Label>
               <Select onValueChange={setSelectedState} value={selectedState}>
                 <SelectTrigger id="state">
-                  <SelectValue placeholder="Select a state..." />
+                  <SelectValue placeholder="Select a zone or state..." />
                 </SelectTrigger>
                 <SelectContent>
-                  {NIGERIAN_STATES.map((state) => (
-                    <SelectItem key={state} value={state}>
-                      {state}
-                    </SelectItem>
-                  ))}
+                  <SelectGroup>
+                    <SelectLabel>Geopolitical Zones</SelectLabel>
+                    {ZONE_NAMES.map((zone) => (
+                      <SelectItem key={zone} value={zone}>
+                        {zone}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectSeparator />
+                  <SelectGroup>
+                    <SelectLabel>States</SelectLabel>
+                    {NIGERIAN_STATES.map((state) => (
+                      <SelectItem key={state} value={state}>
+                        {state}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>

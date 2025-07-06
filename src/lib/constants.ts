@@ -19,6 +19,18 @@ export const NIGERIAN_STATES = [
   "Taraba", "Yobe", "Zamfara"
 ];
 
+export const NIGERIAN_ZONES: Record<string, string[]> = {
+  "North Central": ["Benue", "FCT - Abuja", "Kogi", "Kwara", "Nasarawa", "Niger", "Plateau"],
+  "North East": ["Adamawa", "Bauchi", "Borno", "Gombe", "Taraba", "Yobe"],
+  "North West": ["Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Sokoto", "Zamfara"],
+  "South East": ["Abia", "Anambra", "Ebonyi", "Enugu", "Imo"],
+  "South South": ["Akwa Ibom", "Bayelsa", "Cross River", "Delta", "Edo", "Rivers"],
+  "South West": ["Ekiti", "Lagos", "Ogun", "Ondo", "Osun", "Oyo"],
+};
+
+export const ZONE_NAMES = Object.keys(NIGERIAN_ZONES);
+
+
 // This defines the expected headers for each sheet.
 // The parser will use this to find the header row and map columns.
 export const HEADER_DEFINITIONS: { [key: string]: string[] } = {

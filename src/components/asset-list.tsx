@@ -57,7 +57,7 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
-import { TARGET_SHEETS } from "@/lib/constants";
+import { TARGET_SHEETS, NIGERIAN_ZONES } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
@@ -140,18 +140,31 @@ export default function AssetList() {
 
   const stateFilteredAssets = useMemo(() => {
     if (!globalStateFilter) {
-      return assets;
+      return assets; // Admin view or no filter set
     }
-    return assets.filter(
-      (asset) =>
-        (asset.location || "")
-          .toLowerCase()
-          .trim() === globalStateFilter.toLowerCase().trim() ||
-        (asset.lga || "")
-          .toLowerCase()
-          .trim() === globalStateFilter.toLowerCase().trim()
-    );
-  }, [assets, globalStateFilter]);
+    
+    const zones: Record<string, string[]> = NIGERIAN_ZONES;
+    const statesInZone = zones[globalStateFilter]; // Check if the filter is a zone name
+
+    if (statesInZone) {
+      // The filter is a zone, get all states for that zone
+      const lowerCaseStatesInZone = statesInZone.map(s => s.toLowerCase());
+      return assets.filter(asset => {
+        const assetLocation = (asset.location || "").toLowerCase().trim();
+        if (!assetLocation) return false;
+        // Check if the asset's location starts with any of the states in the selected zone
+        return lowerCaseStatesInZone.some(stateName => assetLocation.startsWith(stateName));
+      });
+    } else {
+      // The filter is a single state, handle variations
+      const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
+      return assets.filter(asset => {
+        const assetLocation = (asset.location || "").toLowerCase().trim();
+        // Check if location starts with the state name for variations like "Edo State"
+        return assetLocation.startsWith(lowerCaseFilter);
+      });
+    }
+}, [assets, globalStateFilter]);
   
   const assetsByCategory = useMemo(() => {
     return stateFilteredAssets.reduce((acc, asset) => {
