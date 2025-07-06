@@ -29,6 +29,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
 import { MoreHorizontal, PlusCircle, Trash2, Users, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { AssetForm, type AssetFormValues } from "./asset-form";
@@ -41,6 +42,8 @@ import { uploadImage } from "@/lib/storage";
 interface CollaborationRoomProps {
   roomId: string;
 }
+
+const MotionTableRow = motion(TableRow);
 
 export default function CollaborationRoom({ roomId }: CollaborationRoomProps) {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -230,8 +233,13 @@ export default function CollaborationRoom({ roomId }: CollaborationRoomProps) {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {assets.map((asset) => (
-              <TableRow key={asset.id}>
+            {assets.map((asset, index) => (
+              <MotionTableRow
+                key={asset.id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+              >
                 <TableCell>
                   <Image
                     src={asset.photoUrl || "https://placehold.co/400x400.png"}
@@ -264,7 +272,7 @@ export default function CollaborationRoom({ roomId }: CollaborationRoomProps) {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
-              </TableRow>
+              </MotionTableRow>
             ))}
           </TableBody>
         </Table>

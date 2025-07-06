@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { motion } from "framer-motion";
 import {
   FileDown,
   FileUp,
@@ -43,6 +44,7 @@ import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 
 const LOCAL_STORAGE_KEY = 'ntblcp-assets';
+const MotionTableRow = motion(TableRow);
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -284,8 +286,13 @@ export default function AssetList() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {assets.map((asset) => (
-              <TableRow key={asset.id}>
+            {assets.map((asset, index) => (
+              <MotionTableRow
+                key={asset.id}
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3, delay: index * 0.05 }}
+              >
                 <TableCell>
                   <Image
                     src={asset.photoUrl}
@@ -326,7 +333,7 @@ export default function AssetList() {
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </TableCell>
-              </TableRow>
+              </MotionTableRow>
             ))}
           </TableBody>
         </Table>
