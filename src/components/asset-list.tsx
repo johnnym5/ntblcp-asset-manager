@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useRef } from "react";
+import * as XLSX from "xlsx";
 import {
   Table,
   TableBody,
@@ -27,11 +28,16 @@ import Image from "next/image";
 import { AssetForm } from "./asset-form";
 import { sampleAssets } from "@/lib/data";
 import type { Asset } from "@/lib/types";
+import { useToast } from "@/hooks/use-toast";
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(
+    undefined
+  );
   const [assets, setAssets] = useState<Asset[]>(sampleAssets);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -42,29 +48,108 @@ export default function AssetList() {
     setSelectedAsset(asset);
     setIsFormOpen(true);
   };
-  
-  const getStatusVariant = (status: Asset['status']) => {
+
+  const getStatusVariant = (status: Asset["status"]) => {
     switch (status) {
-      case 'In Use':
-        return 'default';
-      case 'In Storage':
-        return 'secondary';
-      case 'For Repair':
-        return 'destructive';
-      case 'Disposed':
-        return 'outline';
+      case "In Use":
+        return "default";
+      case "In Storage":
+        return "secondary";
+      case "For Repair":
+        return "destructive";
+      case "Disposed":
+        return "outline";
       default:
-        return 'default';
+        return "default";
     }
+  };
+
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target?.result as ArrayBuffer);
+        const workbook = XLSX.read(data, { type: "array" });
+        const sheetName = workbook.SheetNames[0];
+        const worksheet = workbook.Sheets[sheetName];
+        const json = XLSX.utils.sheet_to_json<any>(worksheet);
+
+        const newAssets: Asset[] = json.map((row, index) => {
+          if (!row.serialNumber || !row.model || !row.location || !row.status) {
+            throw new Error(
+              `Row ${
+                index + 2
+              } is missing required fields (serialNumber, model, location, status).`
+            );
+          }
+          const validStatuses: Asset['status'][] = ["In Use", "In Storage", "For Repair", "Disposed"];
+          if (!validStatuses.includes(row.status)) {
+            throw new Error(`Row ${index + 2} has an invalid status: ${row.status}. Valid statuses are: ${validStatuses.join(', ')}.`);
+          }
+          return {
+            id: `imported-${Date.now()}-${index}`,
+            serialNumber: String(row.serialNumber),
+            model: String(row.model),
+            location: String(row.location),
+            status: row.status as Asset["status"],
+            photoUrl: String(
+              row.photoUrl || "https://placehold.co/400x400.png"
+            ),
+            conditionNotes: row.conditionNotes
+              ? String(row.conditionNotes)
+              : undefined,
+          };
+        });
+
+        setAssets((prevAssets) => [...prevAssets, ...newAssets]);
+        toast({
+          title: "Import Successful",
+          description: `${newAssets.length} assets have been imported.`,
+        });
+      } catch (error) {
+        console.error("Failed to import Excel file:", error);
+        toast({
+          title: "Import Failed",
+          description:
+            error instanceof Error
+              ? error.message
+              : "An unexpected error occurred.",
+          variant: "destructive",
+        });
+      }
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    };
+    reader.readAsArrayBuffer(file);
   };
 
   return (
     <div className="flex flex-col h-full">
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileImport}
+        accept=".xlsx, .xls, .csv"
+        className="hidden"
+      />
       <div className="flex items-center gap-2 mb-4">
         <h2 className="text-2xl font-bold tracking-tight flex-1">
           Asset Register
         </h2>
-        <Button variant="outline" className="hidden sm:flex">
+        <Button
+          variant="outline"
+          className="hidden sm:flex"
+          onClick={handleImportClick}
+        >
           <FileUp className="mr-2 h-4 w-4" />
           Import
         </Button>
@@ -102,13 +187,17 @@ export default function AssetList() {
                     data-ai-hint="product photo"
                   />
                 </TableCell>
-                <TableCell className="font-medium">{asset.serialNumber}</TableCell>
+                <TableCell className="font-medium">
+                  {asset.serialNumber}
+                </TableCell>
                 <TableCell>{asset.model}</TableCell>
                 <TableCell className="hidden md:table-cell">
                   {asset.location}
                 </TableCell>
                 <TableCell>
-                  <Badge variant={getStatusVariant(asset.status)}>{asset.status}</Badge>
+                  <Badge variant={getStatusVariant(asset.status)}>
+                    {asset.status}
+                  </Badge>
                 </TableCell>
                 <TableCell className="text-right">
                   <DropdownMenu>
