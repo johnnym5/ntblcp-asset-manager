@@ -1,179 +1,161 @@
+
 import * as XLSX from 'xlsx';
 import type { Asset } from './types';
+import { TARGET_SHEETS } from './constants';
+import { v4 as uuidv4 } from 'uuid';
 
-// --- CONFIGURATION FOR CUSTOM PARSERS ---
+// --- HEADER DEFINITIONS ---
+const HEADERS_NTBLCP_TB_FAR = ["S/N", "Location", "LGA", "Assignee", "Asset Description", "Asset ID Code", "Asset Class", "Manufacturer", "Model Number", "Serial Number", "Supplier", "Date Purchased or Received", "Chq No / Goods Received Note No.", "PV No", "Purchase price (Naira)", "Purchase Price [USD)", "Funder", "Condition", "Remarks", "GRANT", "Useful Life (Years)", "2019 (NGN)", "2020 (NGN)", "2021 (NGN)", "2022 (NGN)", "Accumulated Depreciation (NGN)", "Net Book Value (NGN)", "X", "2019 (USD)", "2020 (USD)", "2021 (USD)", "2022 (USD)", "Accumulated Depreciation (USD)", "Net Book Value (USD)", "x", "ADDED ASSETS (2022–2023)", "IMEI (TABLETS & MOBILE PHONES)", "a", "Assignee", "Asset ID Code", "Asset Class", "Manufacturer", "Model Number", "Serial Number", "Suppliers", "Date Purchased or Received", "Chq No / Goods Received Note No.", "PV No", "Purchase price (Naira)", "Purchase Price [USD)", "Funder", "Condition", "Comments"];
+const HEADERS_MOTORCYCLES_C19RM = ["S/N", "Location", "LGA", "Assignee", "Asset Description", "Asset ID Code", "Asset Class", "Manufacturer", "Chasis no", "Engine no", "Suppliers", "Date Purchased or Received", "Chq No / Goods Received Note No.", "PV No", "Purchase price (Naira)", "Purchase Price [USD)", "Funder", "Condition", "Remarks", "GRANT", "Useful Life (Years)", "2019 (NGN)", "2020 (NGN)", "2021 (NGN)", "2022 (NGN)", "Accumulated Depreciation (NGN)", "Net Book Value (NGN)", "X", "2019 (USD)", "2020 (USD)", "2021 (USD)", "2022 (USD)", "Accumulated Depreciation (USD)", "Net Book Value (USD)", "x"];
 
-// Map sheet names (or keywords in them) to specific parser functions
-const parserConfig: { [key: string]: (data: any[]) => Asset[] } = {
-  'MOTORCYCLES': parseMotorcycles,
-  'NTBLCP-FAR': parseNtblcpFar,
-  // Add more mappings here for other custom sheets
-  // e.g., 'VEHICLES': parseVehicles,
+// --- SHEET CONFIGURATION ---
+const SHEET_CONFIGS: { [key: string]: { headers: string[] | null, parser: (data: any[], category: string) => Asset[] } } = {
+  'NTBLCP-TB-FAR': { headers: HEADERS_NTBLCP_TB_FAR, parser: parseNtblcpFar },
+  'MOTORCYCLES-C19RM': { headers: HEADERS_MOTORCYCLES_C19RM, parser: parseMotorcyclesC19rm },
+  'PDX-C19RM': { headers: null, parser: parseGeneric }, // Placeholder
+  'TB LAMP-C19RM': { headers: null, parser: parseGeneric }, // Placeholder
+  'ECG monitors': { headers: null, parser: parseGeneric }, // Placeholder
+  'IHVN-GF N-THRIP': { headers: null, parser: parseGeneric }, // Placeholder
+  'TRUENAT-C19RM': { headers: null, parser: parseGeneric }, // Placeholder
+  'Vehicles-TB (IHVN)': { headers: null, parser: parseGeneric }, // Placeholder
+  'GeneXpert machines-TB': { headers: null, parser: parseGeneric }, // Placeholder
 };
 
-// --- EXPORTED FUNCTIONS ---
-
-/**
- * Parses an uploaded Excel file, routing to the correct parser based on sheet names.
- * @param file The Excel file to parse.
- * @returns A promise resolving to the parsed assets and a count of skipped rows.
- */
-export async function parseExcelFile(file: File): Promise<{ newAssets: Asset[], skippedCount: number, error: string | null }> {
+// --- MAIN EXPORTED FUNCTION ---
+export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sheetName: string]: Asset[] }, errors: string[] }> {
   return new Promise((resolve) => {
     const reader = new FileReader();
-
     reader.onload = (e) => {
+      let assetsBySheet: { [sheetName: string]: Asset[] } = {};
+      let errors: string[] = [];
+
       try {
         const data = new Uint8Array(e.target?.result as ArrayBuffer);
         const workbook = XLSX.read(data, { type: 'array' });
-        
-        let allNewAssets: Asset[] = [];
-        let totalSkipped = 0;
 
         workbook.SheetNames.forEach(sheetName => {
-          const parser = findParser(sheetName);
-          const worksheet = workbook.Sheets[sheetName];
-          const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+          const matchedSheetName = TARGET_SHEETS.find(target => sheetName.trim().toLowerCase() === target.toLowerCase());
 
-          const parsedAssets = parser(jsonData);
-          const validAssets = parsedAssets.filter(asset => validateRequiredFields(asset));
-          
-          allNewAssets = allNewAssets.concat(validAssets);
-          totalSkipped += (parsedAssets.length - validAssets.length) + (jsonData.length - parsedAssets.length);
+          if (matchedSheetName) {
+            const config = SHEET_CONFIGS[matchedSheetName];
+            const worksheet = workbook.Sheets[sheetName];
+            const headerRow = XLSX.utils.sheet_to_json(worksheet, { header: 1 })[0] as string[];
+            
+            if (config.headers && !validateHeaders(headerRow, config.headers)) {
+              errors.push(`Sheet "${sheetName}" has invalid headers. Expected: [${config.headers.join(", ")}]. Got: [${headerRow.join(", ")}].`);
+              return;
+            }
+            
+            const jsonData = XLSX.utils.sheet_to_json<any>(worksheet);
+            const parsedAssets = config.parser(jsonData, matchedSheetName);
+            assetsBySheet[matchedSheetName] = parsedAssets;
+          }
         });
-
-        resolve({ newAssets: allNewAssets, skippedCount: totalSkipped, error: null });
+        resolve({ assetsBySheet, errors });
 
       } catch (err) {
         console.error("Error parsing Excel file:", err);
         const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during parsing.";
-        resolve({ newAssets: [], skippedCount: 0, error: errorMessage });
+        resolve({ assetsBySheet: {}, errors: [errorMessage] });
       }
     };
-
     reader.onerror = (err) => {
       console.error("FileReader error:", err);
-      resolve({ newAssets: [], skippedCount: 0, error: "Failed to read the file." });
+      resolve({ assetsBySheet: {}, errors: ["Failed to read the file."] });
     };
-
     reader.readAsArrayBuffer(file);
   });
 }
 
-/**
- * Exports an array of assets to an Excel file and triggers a download.
- * @param assets The array of assets to export.
- * @param fileName The desired name for the downloaded file.
- */
-export function exportToExcel(assets: Asset[], fileName: string): void {
-  // Create a worksheet from the assets data
-  const worksheet = XLSX.utils.json_to_sheet(assets);
-  
-  // Create a new workbook
-  const workbook = XLSX.utils.book_new();
-  
-  // Append the worksheet to the workbook
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'Assets');
-  
-  // Write the workbook and trigger the download
-  XLSX.writeFile(workbook, fileName);
-}
-
-
-// --- PARSER IMPLEMENTATIONS ---
-
-/**
- * Finds the appropriate parser function for a given sheet name.
- * Falls back to a generic parser if no specific one is found.
- */
-function findParser(sheetName: string): (data: any[]) => Asset[] {
-  const upperSheetName = sheetName.toUpperCase();
-  for (const key in parserConfig) {
-    if (upperSheetName.includes(key)) {
-      return parserConfig[key];
-    }
-  }
-  return parseGeneric;
-}
-
-/**
- * A generic parser that maps common field names to the Asset type.
- */
-function parseGeneric(data: any[]): Asset[] {
-  return data.map((row, index) => {
-    const asset: Partial<Asset> = {
-      id: `imported-${Date.now()}-${index}`,
-      assetName: String(row.assetName || row['Asset Name'] || row['Description'] || ''),
-      serialNumber: String(row.serialNumber || row['Serial Number'] || row['Serial No.'] || ''),
-      category: String(row.category || row['Category'] || ''),
-      location: String(row.location || row['Location'] || ''),
-      status: (row.status || row['Status'] || 'In Storage') as Asset['status'],
-      condition: (row.condition || row['Condition'] || 'Good') as Asset['condition'],
-      assignedTo: String(row.assignedTo || row['Assigned To'] || ''),
-      purchaseDate: String(row.purchaseDate || row['Purchase Date'] || ''),
-      notes: String(row.notes || row['Notes'] || ''),
-      photoUrl: String(row.photoUrl || 'https://placehold.co/400x400.png'),
-    };
-    return asset as Asset;
-  });
-}
-
-/**
- * Custom parser for sheets named "MOTORCYCLES".
- */
-function parseMotorcycles(data: any[]): Asset[] {
-  return data.map((row, index) => {
-    const asset: Partial<Asset> = {
-      id: `imported-motorcycle-${Date.now()}-${index}`,
-      assetName: String(row['Motorcycle Model'] || row['Model'] || ''),
-      serialNumber: String(row['Chassis Number'] || row['VIN'] || ''),
-      category: 'Vehicle', // Hardcoded category
-      location: String(row['State'] || row['Location'] || ''),
-      status: 'In Use', // Default status
-      condition: 'Good', // Default condition
-      assignedTo: String(row['Rider'] || row['Assigned To'] || ''),
-      purchaseDate: '',
-      notes: `Plate Number: ${row['Plate Number'] || 'N/A'}`,
-      photoUrl: 'https://placehold.co/400x400.png',
-    };
-    return asset as Asset;
-  });
-}
-
-/**
- * Custom parser for sheets named "NTBLCP-FAR".
- */
-function parseNtblcpFar(data: any[]): Asset[] {
-  return data.map((row, index) => {
-    const asset: Partial<Asset> = {
-      id: `imported-far-${Date.now()}-${index}`,
-      assetName: String(row['Asset Description'] || ''),
-      serialNumber: String(row['Serial No.'] || ''),
-      category: String(row['Asset Category'] || 'Uncategorized'),
-      location: String(row['Location'] || ''),
-      status: 'In Use',
-      condition: 'Good',
-      purchaseDate: String(row['Date of Purchase'] || ''),
-      notes: `Asset Tag No: ${row['Asset Tag No.'] || 'N/A'}`,
-      photoUrl: 'https://placehold.co/400x400.png',
-    };
-    return asset as Asset;
-  });
-}
-
-
 // --- UTILITY FUNCTIONS ---
+function validateHeaders(actualHeaders: string[], expectedHeaders: string[]): boolean {
+  if (actualHeaders.length < expectedHeaders.length) return false;
+  return expectedHeaders.every((header, index) => actualHeaders[index]?.trim() === header.trim());
+}
 
-/**
- * Validates that an asset object contains all required fields.
- */
-function validateRequiredFields(asset: Asset): boolean {
-  const requiredFields: (keyof Asset)[] = ['assetName', 'serialNumber', 'category', 'location', 'status', 'condition'];
-  for (const field of requiredFields) {
-    if (!asset[field]) {
-      // console.warn(`Skipping asset due to missing required field: ${field}`, asset);
-      return false;
-    }
-  }
-  return true;
+function createBaseAsset(row: any, category: string): Asset {
+  return {
+    id: uuidv4(),
+    category: category,
+    sn: String(row['S/N'] || ''),
+    location: String(row['Location'] || ''),
+    lga: String(row['LGA'] || ''),
+    assignee: String(row['Assignee'] || ''),
+    description: String(row['Asset Description'] || ''),
+    assetIdCode: String(row['Asset ID Code'] || ''),
+    assetClass: String(row['Asset Class'] || ''),
+    manufacturer: String(row['Manufacturer'] || ''),
+    modelNumber: String(row['Model Number'] || ''),
+    serialNumber: String(row['Serial Number'] || ''),
+    supplier: String(row['Supplier'] || row['Suppliers'] || ''),
+    dateReceived: String(row['Date Purchased or Received'] || ''),
+    grnNo: String(row['Chq No / Goods Received Note No.'] || ''),
+    pvNo: String(row['PV No'] || ''),
+    priceNaira: String(row['Purchase price (Naira)'] || ''),
+    priceUSD: String(row['Purchase Price [USD)'] || ''),
+    funder: String(row['Funder'] || ''),
+    condition: String(row['Condition'] || ''),
+    remarks: String(row['Remarks'] || ''),
+    grant: String(row['GRANT'] || ''),
+    usefulLifeYears: String(row['Useful Life (Years)'] || ''),
+    accumulatedDepreciation: {
+        ngn: String(row['Accumulated Depreciation (NGN)'] || ''),
+        usd: String(row['Accumulated Depreciation (USD)'] || ''),
+    },
+    netBookValue: {
+        ngn: String(row['Net Book Value (NGN)'] || ''),
+        usd: String(row['Net Book Value (USD)'] || ''),
+    },
+    imei: String(row['IMEI (TABLETS & MOBILE PHONES)'] || ''),
+    comments: String(row['Comments'] || ''),
+    originalData: row,
+  };
+}
+
+
+// --- CUSTOM PARSERS ---
+function parseNtblcpFar(data: any[], category: string): Asset[] {
+  return data.map(row => {
+    const asset = createBaseAsset(row, category);
+    asset.valuesByYear = {
+      '2019': { ngn: String(row['2019 (NGN)'] || ''), usd: String(row['2019 (USD)'] || '') },
+      '2020': { ngn: String(row['2020 (NGN)'] || ''), usd: String(row['2020 (USD)'] || '') },
+      '2121': { ngn: String(row['2021 (NGN)'] || ''), usd: String(row['2021 (USD)'] || '') },
+      '2022': { ngn: String(row['2022 (NGN)'] || ''), usd: String(row['2022 (USD)'] || '') },
+    };
+    return asset;
+  });
+}
+
+function parseMotorcyclesC19rm(data: any[], category: string): Asset[] {
+  return data.map(row => {
+    const asset = createBaseAsset(row, category);
+    asset.chasisNo = String(row['Chasis no'] || '');
+    asset.engineNo = String(row['Engine no'] || '');
+    asset.valuesByYear = {
+      '2019': { ngn: String(row['2019 (NGN)'] || ''), usd: String(row['2019 (USD)'] || '') },
+      '2020': { ngn: String(row['2020 (NGN)'] || ''), usd: String(row['2020 (USD)'] || '') },
+      '2121': { ngn: String(row['2021 (NGN)'] || ''), usd: String(row['2021 (USD)'] || '') },
+      '2022': { ngn: String(row['2022 (NGN)'] || ''), usd: String(row['2022 (USD)'] || '') },
+    };
+    return asset;
+  });
+}
+
+// Generic parser for sheets without specific header configs yet
+function parseGeneric(data: any[], category: string): Asset[] {
+  return data.map(row => createBaseAsset(row, category));
+}
+
+// --- EXPORT FUNCTIONALITY ---
+export function exportToExcel(assets: Asset[], fileName: string): void {
+  const dataToExport = assets.map(asset => ({
+    ...asset.originalData,
+    Category: asset.category,
+    ID: asset.id,
+  }));
+  const worksheet = XLSX.utils.json_to_sheet(dataToExport);
+  const workbook = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'Assets');
+  XLSX.writeFile(workbook, fileName);
 }

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
@@ -16,83 +17,55 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { motion } from "framer-motion";
 import {
   FileDown,
   FileUp,
   MoreHorizontal,
   PlusCircle,
-  Trash2,
   Loader2,
+  Trash2,
 } from "lucide-react";
 import Image from "next/image";
-import { AssetForm, type AssetFormValues } from "./asset-form";
-import { sampleAssets } from "@/lib/data";
+import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
-
-const LOCAL_STORAGE_KEY = 'ntblcp-assets';
-const MotionTableRow = motion(TableRow);
+import { saveAssetsToFirestore, getAssetsListener, deleteAsset } from "@/lib/firestore";
+import { TARGET_SHEETS } from "@/lib/constants";
+import { useAuth } from "@/contexts/auth-context";
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [selectedCategory, setSelectedCategory] = useState<string>(TARGET_SHEETS[0]);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { userProfile } = useAuth();
 
-  // Load assets from local storage on initial render
   useEffect(() => {
-    try {
-      const savedAssets = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (savedAssets) {
-        setAssets(JSON.parse(savedAssets));
-      } else {
-        // If no data in local storage, initialize with sample data
-        setAssets(sampleAssets);
-      }
-    } catch (error) {
-      console.error("Failed to load assets from local storage:", error);
-      toast({
-        title: "Could not load local data",
-        description: "Falling back to default sample data.",
-        variant: "destructive",
-      });
-      setAssets(sampleAssets);
-    }
-  }, [toast]);
+    setIsLoading(true);
+    const unsubscribe = getAssetsListener(
+        [selectedCategory], 
+        (loadedAssets) => {
+            setAssets(loadedAssets);
+            setIsLoading(false);
+        },
+        userProfile
+    );
 
-  // Save assets to local storage whenever they change
-  useEffect(() => {
-    // Don't save the initial empty array before hydration from the first effect
-    if (assets.length > 0) {
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(assets));
-      } catch (error) {
-        console.error("Failed to save assets to local storage:", error);
-        toast({
-          title: "Could not save data locally",
-          description: "Your latest changes might not be saved.",
-          variant: "destructive",
-        });
-      }
-    }
-  }, [assets, toast]);
-
+    return () => unsubscribe();
+  }, [selectedCategory, userProfile]);
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -103,82 +76,17 @@ export default function AssetList() {
     setSelectedAsset(asset);
     setIsFormOpen(true);
   };
-
-  const handleSaveAsset = async (data: AssetFormValues, imageFile: File | null) => {
-    let photoUrl = selectedAsset?.photoUrl || "https://placehold.co/400x400.png";
-
-    if (imageFile) {
-      photoUrl = await new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => resolve(e.target?.result as string);
-        reader.onerror = (e) => reject(e);
-        reader.readAsDataURL(imageFile);
-      });
-    }
-
-    const newAssetData = {
-      ...data,
-      photoUrl,
-    };
-
-    if (selectedAsset) {
-      // Update existing asset
-      setAssets(
-        assets.map((asset) =>
-          asset.id === selectedAsset.id
-            ? { ...asset, ...newAssetData }
-            : asset
-        )
-      );
-      toast({
-        title: "Asset Updated",
-        description: `Asset "${data.assetName}" has been successfully updated.`,
-      });
-    } else {
-      // Create new asset
-      const newAsset: Asset = {
-        id: `asset-${Date.now()}`,
-        ...newAssetData,
-      };
-      setAssets([newAsset, ...assets]);
-      toast({
-        title: "Asset Added",
-        description: `New asset "${data.assetName}" has been successfully added.`,
-      });
-    }
-  };
   
-  const handleDeleteClick = (asset: Asset) => {
-    setAssetToDelete(asset);
+  const handleDeleteAsset = async (asset: Asset) => {
+      if(confirm(`Are you sure you want to delete "${asset.description}"?`)) {
+          try {
+              await deleteAsset(asset);
+              toast({ title: "Asset Deleted", description: `Asset "${asset.description}" deleted successfully.`});
+          } catch(e) {
+              toast({ title: "Error", description: "Failed to delete asset.", variant: "destructive"});
+          }
+      }
   }
-
-  const confirmDelete = () => {
-    if (assetToDelete) {
-      setAssets(assets.filter((asset) => asset.id !== assetToDelete.id));
-      toast({
-        title: "Asset Deleted",
-        description: `Asset "${assetToDelete.assetName}" has been deleted.`,
-        variant: 'destructive',
-      });
-      setAssetToDelete(null);
-    }
-  }
-
-
-  const getStatusVariant = (status: Asset["status"]) => {
-    switch (status) {
-      case "In Use":
-        return "default";
-      case "In Storage":
-        return "secondary";
-      case "For Repair":
-        return "destructive";
-      case "Disposed":
-        return "outline";
-      default:
-        return "default";
-    }
-  };
 
   const handleImportClick = () => {
     fileInputRef.current?.click();
@@ -189,60 +97,45 @@ export default function AssetList() {
     if (!file) return;
 
     setIsImporting(true);
-    try {
-      const { newAssets, skippedCount, error } = await parseExcelFile(file);
+    toast({ title: "Importing file...", description: "Please wait while we process your Excel file." });
+    
+    const { assetsBySheet, errors } = await parseExcelFile(file);
+    
+    if (errors.length > 0) {
+      errors.forEach(error => toast({ title: "Import Error", description: error, variant: "destructive" }));
+    }
 
-      if (error) {
-        throw new Error(error);
-      }
-      
-      if (newAssets.length > 0) {
-        setAssets((prevAssets) => [...prevAssets, ...newAssets]);
+    const sheetNames = Object.keys(assetsBySheet);
+    if (sheetNames.length > 0) {
+      try {
+        const count = await saveAssetsToFirestore(assetsBySheet);
         toast({
           title: "Import Successful",
-          description: `${newAssets.length} assets imported. ${skippedCount > 0 ? `${skippedCount} rows skipped.` : ""}`.trim(),
+          description: `Successfully imported ${count} assets from ${sheetNames.length} sheets: ${sheetNames.join(", ")}.`,
         });
-      } else if (skippedCount > 0) {
-        toast({
-          title: "Import Finished",
-          description: `No new assets were imported. ${skippedCount} rows were skipped due to missing data.`,
-          variant: "destructive"
-        });
-      } else {
-        toast({
-          title: "Import Finished",
-          description: "The file was empty or contained no valid asset data.",
-        });
+      } catch (error) {
+        toast({ title: "Firestore Error", description: "Could not save assets to the database.", variant: "destructive" });
       }
-    } catch (error) {
-      console.error("Failed to import Excel file:", error);
-      toast({
-        title: "Import Failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred during import.",
-        variant: "destructive",
-      });
-    } finally {
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
-      }
-      setIsImporting(false);
+    } else if (errors.length === 0) {
+        toast({ title: "No Data Found", description: "No valid sheets for import were found in the file."});
     }
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    setIsImporting(false);
   };
 
   const handleExportClick = () => {
+    if (assets.length === 0) {
+      toast({ title: "No Data to Export", description: "There are no assets in the current view to export." });
+      return;
+    }
     try {
-      exportToExcel(assets, `ntblcp-asset-export-${new Date().toISOString().split('T')[0]}.xlsx`);
-      toast({
-        title: "Export Successful",
-        description: "Your asset list has been exported.",
-      });
+      exportToExcel(assets, `asset-export-${selectedCategory}-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: "Export Successful" });
     } catch(error) {
-      console.error("Failed to export assets:", error);
-      toast({
-        title: "Export Failed",
-        description: "Could not export your asset list.",
-        variant: "destructive",
-      });
+      toast({ title: "Export Failed", variant: "destructive" });
     }
   };
 
@@ -253,13 +146,25 @@ export default function AssetList() {
         type="file"
         ref={fileInputRef}
         onChange={handleFileImport}
-        accept=".xlsx, .xls, .csv"
+        accept=".xlsx, .xls"
         className="hidden"
       />
-      <div className="flex items-center gap-2 mb-4">
+      <div className="flex flex-wrap items-center gap-2 mb-4">
         <h2 className="text-2xl font-bold tracking-tight flex-1">
           Asset Register
         </h2>
+        <div className="w-full sm:w-auto">
+            <Select value={selectedCategory} onValueChange={setSelectedCategory}>
+                <SelectTrigger className="w-full sm:w-[240px]">
+                    <SelectValue placeholder="Select a category" />
+                </SelectTrigger>
+                <SelectContent>
+                    {TARGET_SHEETS.map(sheet => (
+                        <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
+                    ))}
+                </SelectContent>
+            </Select>
+        </div>
         <Button variant="outline" className="hidden sm:flex" onClick={handleImportClick} disabled={isImporting}>
           {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
           Import
@@ -268,73 +173,50 @@ export default function AssetList() {
           <FileDown className="mr-2 h-4 w-4" />
           Export
         </Button>
-        <Button onClick={handleAddAsset}>
+        <Button onClick={handleAddAsset} disabled={true}>
           <PlusCircle className="mr-2 h-4 w-4" />
-          Add Asset
+          Add Asset (Manual)
         </Button>
       </div>
       <div className="rounded-lg border shadow-sm flex-1 overflow-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead className="w-[80px]">Image</TableHead>
-              <TableHead>Asset Name</TableHead>
+              <TableHead>S/N</TableHead>
+              <TableHead>Description</TableHead>
               <TableHead>Serial Number</TableHead>
-              <TableHead className="hidden md:table-cell">Category</TableHead>
-              <TableHead>Status</TableHead>
+              <TableHead className="hidden md:table-cell">Location</TableHead>
+              <TableHead>Condition</TableHead>
               <TableHead className="w-[50px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
-            {assets.map((asset, index) => (
-              <MotionTableRow
-                key={asset.id}
-                initial={{ opacity: 0, y: 15 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3, delay: index * 0.05 }}
-              >
-                <TableCell>
-                  <Image
-                    src={asset.photoUrl}
-                    alt={asset.assetName}
-                    width={50}
-                    height={50}
-                    className="rounded-md object-cover"
-                    data-ai-hint="product photo"
-                  />
-                </TableCell>
-                <TableCell className="font-medium">
-                  {asset.assetName}
-                </TableCell>
-                <TableCell>{asset.serialNumber}</TableCell>
-                <TableCell className="hidden md:table-cell">
-                  {asset.category}
-                </TableCell>
-                <TableCell>
-                  <Badge variant={getStatusVariant(asset.status)}>
-                    {asset.status}
-                  </Badge>
-                </TableCell>
-                <TableCell className="text-right">
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon">
-                        <MoreHorizontal className="h-4 w-4" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => handleEditAsset(asset)}>
-                        Edit
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => handleDeleteClick(asset)} className="text-destructive focus:text-destructive">
-                        <Trash2 className="mr-2 h-4 w-4"/>
-                        Delete
-                      </DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                </TableCell>
-              </MotionTableRow>
-            ))}
+            {isLoading ? (
+                <TableRow><TableCell colSpan={6} className="text-center"><Loader2 className="mx-auto my-4 h-8 w-8 animate-spin" /></TableCell></TableRow>
+            ) : assets.length > 0 ? (
+              assets.map((asset) => (
+                <TableRow key={asset.id}>
+                  <TableCell>{asset.sn}</TableCell>
+                  <TableCell className="font-medium">{asset.description}</TableCell>
+                  <TableCell>{asset.serialNumber || asset.chasisNo || 'N/A'}</TableCell>
+                  <TableCell className="hidden md:table-cell">{asset.location}</TableCell>
+                  <TableCell><Badge variant="secondary">{asset.condition}</Badge></TableCell>
+                  <TableCell className="text-right">
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handleEditAsset(asset)}>View/Edit</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDeleteAsset(asset)} className="text-destructive">Delete</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </TableCell>
+                </TableRow>
+              ))
+            ) : (
+                <TableRow><TableCell colSpan={6} className="text-center h-24">No assets found in this category.</TableCell></TableRow>
+            )}
           </TableBody>
         </Table>
       </div>
@@ -343,27 +225,7 @@ export default function AssetList() {
         isOpen={isFormOpen}
         onOpenChange={setIsFormOpen}
         asset={selectedAsset}
-        onSave={handleSaveAsset}
       />
-      
-      <AlertDialog open={!!assetToDelete} onOpenChange={(open) => !open && setAssetToDelete(null)}>
-          <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      This action cannot be undone. This will permanently delete the asset
-                      <span className="font-bold"> "{assetToDelete?.assetName}"</span>.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setAssetToDelete(null)}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={confirmDelete} className="bg-destructive hover:bg-destructive/90">
-                      Delete
-                  </AlertDialogAction>
-              </AlertDialogFooter>
-          </AlertDialogContent>
-      </AlertDialog>
-
     </div>
   );
 }

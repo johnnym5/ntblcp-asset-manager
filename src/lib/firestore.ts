@@ -1,79 +1,121 @@
+
 'use client';
 
 import {
   collection,
   doc,
   onSnapshot,
-  addDoc,
-  updateDoc,
-  deleteDoc,
-  serverTimestamp,
+  writeBatch,
+  getDoc,
+  setDoc,
   query,
   where,
   getDocs,
-  writeBatch,
-  Timestamp,
-  setDoc,
+  collectionGroup,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Asset, RoomUser } from '@/lib/types';
-import type { AssetFormValues } from '@/components/asset-form';
+import type { Asset, UserProfile } from '@/lib/types';
 import type { User } from 'firebase/auth';
 
-// ASSET CRUD in Room
-export function getAssetsStream(roomId: string, callback: (assets: Asset[]) => void) {
-  const assetsCol = collection(db, 'rooms', roomId, 'assets');
-  return onSnapshot(assetsCol, (snapshot) => {
+// --- User Profile ---
+export async function getUserProfile(uid: string): Promise<UserProfile | null> {
+  const userDocRef = doc(db, 'users', uid);
+  const docSnap = await getDoc(userDocRef);
+  if (docSnap.exists()) {
+    return docSnap.data() as UserProfile;
+  }
+  return null;
+}
+
+export async function createUserProfile(user: User): Promise<UserProfile> {
+  const userDocRef = doc(db, 'users', user.uid);
+  const newUserProfile: UserProfile = {
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName,
+    role: 'user', // Default role
+  };
+  await setDoc(userDocRef, newUserProfile);
+  return newUserProfile;
+}
+
+export async function updateUserProfile(uid: string, data: Partial<UserProfile>) {
+  const userDocRef = doc(db, 'users', uid);
+  await setDoc(userDocRef, data, { merge: true });
+}
+
+// --- Assets ---
+export async function saveAssetsToFirestore(assetsBySheet: { [sheetName: string]: Asset[] }) {
+  const batch = writeBatch(db);
+  let totalAssets = 0;
+
+  for (const sheetName in assetsBySheet) {
+    const assets = assetsBySheet[sheetName];
+    const collectionRef = collection(db, sheetName); // Use sheet name as collection ID
+    assets.forEach((asset) => {
+      const docRef = doc(collectionRef, asset.id);
+      batch.set(docRef, asset);
+      totalAssets++;
+    });
+  }
+
+  if (totalAssets > 0) {
+    await batch.commit();
+  }
+  return totalAssets;
+}
+
+export function getAssetsListener(
+  categories: string[],
+  callback: (assets: Asset[]) => void,
+  userProfile?: UserProfile | null
+) {
+  if (categories.length === 0) {
+    callback([]);
+    return () => {};
+  }
+  
+  // This is complex. For "All Sheets", we need multiple listeners.
+  // For simplicity in this phase, we'll listen to one category at a time.
+  // A more robust solution would query across collections.
+  const category = categories[0];
+  let q = query(collection(db, category));
+  
+  // Apply state-based filtering if user is not an admin
+  if (userProfile?.role === 'user' && userProfile.state) {
+      q = query(collection(db, category), where('location', '==', userProfile.state));
+      // In a real app, you might need to query on 'lga' as well, which requires composite indexes.
+  }
+
+  const unsubscribe = onSnapshot(q, (snapshot) => {
     const assets = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() } as Asset));
     callback(assets);
+  }, (error) => {
+    console.error(`Error listening to ${category}:`, error);
+    callback([]);
   });
+
+  return unsubscribe;
 }
 
-export async function addAsset(roomId: string, assetData: AssetFormValues, photoUrl: string) {
-  const assetsCol = collection(db, 'rooms', roomId, 'assets');
-  await addDoc(assetsCol, {
-    ...assetData,
-    photoUrl,
-  });
+export async function getAllAssets(userProfile?: UserProfile | null): Promise<Asset[]> {
+    const q = query(collectionGroup(db, 'assets')); // This requires Firestore indexes
+    const querySnapshot = await getDocs(q);
+    const allAssets = querySnapshot.docs.map(doc => doc.data() as Asset);
+
+    if (userProfile?.role === 'user' && userProfile.state) {
+        return allAssets.filter(asset => asset.location === userProfile.state || asset.lga === userProfile.state);
+    }
+    
+    return allAssets;
 }
 
-export async function updateAsset(roomId: string, assetId: string, assetData: Partial<Asset>) {
-  const assetRef = doc(db, 'rooms', roomId, 'assets', assetId);
-  await updateDoc(assetRef, assetData);
+export async function updateAsset(asset: Asset) {
+  const assetRef = doc(db, asset.category, asset.id);
+  await setDoc(assetRef, asset, { merge: true });
 }
 
-export async function deleteAsset(roomId: string, assetId: string) {
-  const assetRef = doc(db, 'rooms', roomId, 'assets', assetId);
+export async function deleteAsset(asset: Asset) {
+  const assetRef = doc(db, asset.category, asset.id);
   await deleteDoc(assetRef);
-}
-
-// PRESENCE MANAGEMENT
-export function getRoomUsersStream(roomId: string, callback: (users: RoomUser[]) => void) {
-  const usersCol = collection(db, 'rooms', roomId, 'users');
-  const q = query(usersCol, where('lastSeen', '>', new Date(Date.now() - 1000 * 60))); // Active in last minute
-  
-  return onSnapshot(q, (snapshot) => {
-    const users = snapshot.docs.map((doc) => doc.data() as RoomUser);
-    callback(users);
-  });
-}
-
-export async function updateUserPresence(roomId: string, user: User) {
-  const userRef = doc(db, 'rooms', roomId, 'users', user.uid);
-  try {
-     await setDoc(userRef, {
-      id: user.uid,
-      displayName: user.isAnonymous ? 'Anonymous' : (user.displayName || user.email),
-      photoURL: user.photoURL,
-      lastSeen: serverTimestamp(),
-    }, { merge: true });
-  } catch (error) {
-    console.error("Failed to update user presence: ", error);
-  }
-}
-
-
-// Helper to get a server-safe timestamp
-export function getTimestamp() {
-  return Timestamp.now();
 }
