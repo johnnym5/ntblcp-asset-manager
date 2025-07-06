@@ -1,4 +1,3 @@
-
 "use client"
 
 import * as React from "react"
@@ -72,9 +71,11 @@ export function MultiSelectFilter({ title, options, selected, onChange, classNam
                       } else {
                         onChange([...selected, option.value])
                       }
-                      // Keep popover open for multi-selection
-                      setOpen(true);
                     }}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
+                    }}
+                    className="cursor-pointer"
                   >
                     <div
                       className={cn(
@@ -96,11 +97,11 @@ export function MultiSelectFilter({ title, options, selected, onChange, classNam
                 <CommandSeparator />
                 <CommandGroup>
                   <CommandItem
-                    onSelect={() => {
-                        onChange([]);
-                        setOpen(true);
+                    onSelect={() => onChange([])}
+                    onPointerDown={(e) => {
+                      e.preventDefault();
                     }}
-                    className="justify-center text-center text-destructive"
+                    className="justify-center text-center cursor-pointer text-destructive"
                   >
                     Clear filters
                   </CommandItem>
