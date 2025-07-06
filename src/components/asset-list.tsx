@@ -184,22 +184,49 @@ export default function AssetList() {
       { value: "Discrepancy", label: "Discrepancy" },
   ];
   
-  // --- Memoized Filtered Assets ---
+  // --- Memoized Filtered Assets for Table View---
   const filteredAssets = useMemo(() => {
     if (view !== 'table' || !currentCategory) return [];
     const baseAssets = assetsByCategory[currentCategory] || [];
 
     return baseAssets.filter(asset => {
-        const searchMatch = !searchTerm || Object.values(asset).some(value =>
-            String(value).toLowerCase().includes(searchTerm.toLowerCase())
-        );
+        // Search term is handled globally now, so we don't check it here.
         const locationMatch = selectedLocations.length === 0 || (asset.location && selectedLocations.includes(asset.location));
         const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.includes(asset.assignee));
         const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
 
-        return searchMatch && locationMatch && assigneeMatch && statusMatch;
+        return locationMatch && assigneeMatch && statusMatch;
     });
-  }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses]);
+  }, [view, currentCategory, assetsByCategory, selectedLocations, selectedAssignees, selectedStatuses]);
+  
+  // --- Memoized Global Search Results ---
+  const searchResults = useMemo(() => {
+    if (!searchTerm) {
+      return [];
+    }
+    const lowerCaseSearchTokens = searchTerm
+      .toLowerCase()
+      .split(' ')
+      .filter(token => token.length > 0);
+
+    if (lowerCaseSearchTokens.length === 0) {
+      return [];
+    }
+
+    return stateFilteredAssets.filter(asset => {
+      const assetHaystack = Object.values(asset)
+        .map(value => {
+          if (typeof value === 'object' && value !== null) {
+            return Object.values(value).join(' ');
+          }
+          return String(value);
+        })
+        .join(' ')
+        .toLowerCase();
+      
+      return lowerCaseSearchTokens.every(token => assetHaystack.includes(token));
+    });
+  }, [searchTerm, stateFilteredAssets]);
 
 
   const handleAddAsset = () => {
@@ -288,7 +315,7 @@ export default function AssetList() {
   };
   
   const handleExportClick = () => {
-    const assetsToExport = view === 'table' ? filteredAssets : stateFilteredAssets;
+    const assetsToExport = view === 'table' ? filteredAssets : (searchTerm ? searchResults : stateFilteredAssets);
     if (assetsToExport.length === 0) {
       toast({ title: "No Data to Export", description: "There are no assets in the current view to export." });
       return;
@@ -306,8 +333,8 @@ export default function AssetList() {
     }
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    setSelectedAssetIds(checked ? filteredAssets.map(a => a.id) : []);
+  const handleSelectAll = (checked: boolean, assetsToSelect: Asset[]) => {
+    setSelectedAssetIds(checked ? assetsToSelect.map(a => a.id) : []);
   };
 
   const handleSelectSingle = (assetId: string, checked: boolean) => {
@@ -318,6 +345,112 @@ export default function AssetList() {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
+  // SEARCH RESULTS VIEW
+  if (searchTerm) {
+    return (
+      <div className="flex flex-col h-full gap-4">
+          <div className="flex flex-wrap items-center gap-2">
+              <h2 className="text-2xl font-bold tracking-tight flex-1">
+                  Search Results for "{searchTerm}"
+              </h2>
+              {selectedAssetIds.length > 0 ? (
+                  <div className="flex items-center gap-2">
+                      <span className="text-sm text-muted-foreground">{selectedAssetIds.length} of {searchResults.length} selected</span>
+                      <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting}>
+                          {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                          Delete
+                      </Button>
+                  </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">{searchResults.length} assets found</span>
+                  <Button variant="outline" onClick={handleExportClick}>
+                      <FileDown className="mr-2 h-4 w-4" />
+                      Export Results
+                  </Button>
+                </div>
+              )}
+          </div>
+          
+          <div className="rounded-lg border shadow-sm flex-1 overflow-auto">
+              <Table>
+                  <TableHeader>
+                      <TableRow>
+                      <TableHead className="w-[50px]">
+                          <Checkbox
+                              checked={searchResults.length > 0 && selectedAssetIds.length === searchResults.length}
+                              onCheckedChange={(checked) => handleSelectAll(checked as boolean, searchResults)}
+                              aria-label="Select all"
+                          />
+                      </TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Asset ID</TableHead>
+                      <TableHead>Location</TableHead>
+                      <TableHead>Verified Status</TableHead>
+                      <TableHead className="w-[50px] text-right">Actions</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {searchResults.length > 0 ? (
+                      searchResults.map((asset) => (
+                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                          <TableCell onClick={e => e.stopPropagation()}>
+                              <Checkbox 
+                                  checked={selectedAssetIds.includes(asset.id)}
+                                  onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
+                                  aria-label={`Select asset ${asset.description}`}
+                              />
+                          </TableCell>
+                          <TableCell>{asset.category}</TableCell>
+                          <TableCell className="font-medium">{asset.description}</TableCell>
+                          <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
+                          <TableCell>{asset.location || 'N/A'}</TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Select
+                              value={asset.verifiedStatus || "Unverified"}
+                              onValueChange={(status) => {
+                                const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
+                                handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate });
+                                toast({ title: "Status Updated", description: `Asset status changed to ${status}.` });
+                              }}
+                            >
+                              <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4" />Unverified</div></SelectItem>
+                                <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4" />Verified</div></SelectItem>
+                                <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4" />Discrepancy</div></SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                              <DropdownMenu>
+                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
+                                      <Edit className="mr-2 h-4 w-4" /> Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
+                                      <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                  </DropdownMenuItem>
+                              </DropdownMenuContent>
+                              </DropdownMenu>
+                          </TableCell>
+                          </TableRow>
+                      ))
+                      ) : (
+                          <TableRow><TableCell colSpan={7} className="text-center h-24">No assets found matching your search.</TableCell></TableRow>
+                      )}
+                  </TableBody>
+              </Table>
+          </div>
+          <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} />
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the asset from your local data.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      </div>
+    );
+  }
+
+  // DASHBOARD VIEW
   if (view === 'dashboard') {
     return (
       <div className="flex flex-col h-full gap-4">
@@ -438,7 +571,7 @@ export default function AssetList() {
                     <TableHead className="w-[50px]">
                         <Checkbox
                             checked={filteredAssets.length > 0 && selectedAssetIds.length === filteredAssets.length}
-                            onCheckedChange={(checked) => handleSelectAll(checked as boolean)}
+                            onCheckedChange={(checked) => handleSelectAll(checked as boolean, filteredAssets)}
                             aria-label="Select all"
                         />
                     </TableHead>

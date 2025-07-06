@@ -126,7 +126,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
                   type="search"
-                  placeholder="Search assets..."
+                  placeholder="Search by any detail (e.g. 'Dell XPS Lagos')..."
                   className="pl-8 w-full h-9 bg-muted"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
