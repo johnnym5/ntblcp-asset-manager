@@ -3,12 +3,11 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle2, XCircle, FileText, User, Camera, ShieldQuestion, ListTree } from 'lucide-react';
+import { CheckCircle2, XCircle, FileText, User, ShieldQuestion, ListTree } from 'lucide-react';
 import type { AssetFormValues } from './asset-form';
 
 interface AssetChecklistProps {
   values: Partial<AssetFormValues>;
-  photoUrl?: string | null;
 }
 
 const ChecklistItem = ({ label, isCompleted, icon }: { label: string; isCompleted: boolean; icon: React.ReactNode }) => (
@@ -25,9 +24,7 @@ const ChecklistItem = ({ label, isCompleted, icon }: { label: string; isComplete
   </div>
 );
 
-export function AssetChecklist({ values, photoUrl }: AssetChecklistProps) {
-  const isPhotoProvided = !!photoUrl;
-
+export function AssetChecklist({ values }: AssetChecklistProps) {
   const requiredItems = [
     { label: 'Category', completed: !!values.category, icon: <ListTree className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Asset Description', completed: !!values.description, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
@@ -37,7 +34,6 @@ export function AssetChecklist({ values, photoUrl }: AssetChecklistProps) {
   ];
 
   const optionalItems = [
-    { label: 'Photo', completed: isPhotoProvided, icon: <Camera className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Assignee', completed: !!values.assignee, icon: <User className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Remarks/Notes', completed: !!values.remarks, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
   ];
