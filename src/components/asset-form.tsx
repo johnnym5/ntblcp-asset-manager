@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -66,14 +66,16 @@ interface AssetFormProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   asset?: Asset;
-  onSave: (data: AssetFormValues) => void;
+  onSave: (data: AssetFormValues, imageFile: File | null) => void;
 }
 
 export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProps) {
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [imageFile, setImageFile] = useState<File | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [aiSuggestion, setAiSuggestion] = useState<any>(null);
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
@@ -94,6 +96,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
     if (asset) {
       form.reset(asset);
       setImagePreview(asset.photoUrl);
+      setImageFile(null);
     } else {
       form.reset({
         assetName: "",
@@ -107,6 +110,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
         notes: "",
       });
       setImagePreview(null);
+      setImageFile(null);
     }
   }, [asset, form, isOpen]);
 
@@ -114,6 +118,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
     const file = event.target.files?.[0];
     if (!file) return;
 
+    setImageFile(file);
     setIsProcessing(true);
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -175,7 +180,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
   };
 
   const onSubmit = (data: AssetFormValues) => {
-    onSave(data);
+    onSave(data, imageFile);
     onOpenChange(false);
   };
   
@@ -225,6 +230,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
                               className="absolute top-2 right-2 h-7 w-7"
                               onClick={() => {
                                 setImagePreview(null);
+                                setImageFile(null);
                                 if (fileInputRef.current) fileInputRef.current.value = "";
                               }}
                             >
@@ -240,6 +246,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave }: AssetFormProp
                             <Input
                               id="picture"
                               type="file"
+                              ref={fileInputRef}
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                               accept="image/*"
                               onChange={handleImageUpload}

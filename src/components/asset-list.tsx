@@ -100,10 +100,21 @@ export default function AssetList() {
     setIsFormOpen(true);
   };
 
-  const handleSaveAsset = (data: AssetFormValues) => {
+  const handleSaveAsset = async (data: AssetFormValues, imageFile: File | null) => {
+    let photoUrl = selectedAsset?.photoUrl || "https://placehold.co/400x400.png";
+
+    if (imageFile) {
+      photoUrl = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = (e) => resolve(e.target?.result as string);
+        reader.onerror = (e) => reject(e);
+        reader.readAsDataURL(imageFile);
+      });
+    }
+
     const newAssetData = {
       ...data,
-      photoUrl: selectedAsset?.photoUrl || "https://placehold.co/400x400.png",
+      photoUrl,
     };
 
     if (selectedAsset) {

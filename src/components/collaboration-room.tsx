@@ -29,13 +29,14 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { MoreHorizontal, PlusCircle, Trash2, Users } from "lucide-react";
+import { MoreHorizontal, PlusCircle, Trash2, Users, Loader2 } from "lucide-react";
 import Image from "next/image";
 import { AssetForm, type AssetFormValues } from "./asset-form";
 import type { Asset, RoomUser } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/auth-context";
 import { getAssetsStream, addAsset, updateAsset, deleteAsset, getRoomUsersStream, updateUserPresence } from "@/lib/firestore";
+import { uploadImage } from "@/lib/storage";
 
 interface CollaborationRoomProps {
   roomId: string;
@@ -47,6 +48,7 @@ export default function CollaborationRoom({ roomId }: CollaborationRoomProps) {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [activeUsers, setActiveUsers] = useState<RoomUser[]>([]);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -97,18 +99,28 @@ export default function CollaborationRoom({ roomId }: CollaborationRoomProps) {
     setIsFormOpen(true);
   };
 
-  const handleSaveAsset = async (data: AssetFormValues) => {
+  const handleSaveAsset = async (data: AssetFormValues, imageFile: File | null) => {
+    setIsSaving(true);
     try {
+      let photoUrl = selectedAsset?.photoUrl;
+
+      if (imageFile) {
+        toast({ title: "Uploading image...", description: "Please wait." });
+        photoUrl = await uploadImage(imageFile, `rooms/${roomId}/assets`);
+      }
+
       if (selectedAsset) {
-        // Update existing asset
-        await updateAsset(roomId, selectedAsset.id, data);
+        const dataToUpdate: Partial<Asset> = { ...data };
+        if (photoUrl) {
+          dataToUpdate.photoUrl = photoUrl;
+        }
+        await updateAsset(roomId, selectedAsset.id, dataToUpdate);
         toast({
           title: "Asset Updated",
           description: `Asset "${data.assetName}" has been successfully updated.`,
         });
       } else {
-        // Create new asset
-        await addAsset(roomId, data, "https://placehold.co/400x400.png");
+        await addAsset(roomId, data, photoUrl || "https://placehold.co/400x400.png");
         toast({
           title: "Asset Added",
           description: `New asset "${data.assetName}" has been successfully added.`,
@@ -121,6 +133,8 @@ export default function CollaborationRoom({ roomId }: CollaborationRoomProps) {
         description: "Could not save asset to the database.",
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -194,8 +208,12 @@ export default function CollaborationRoom({ roomId }: CollaborationRoomProps) {
              <Users className="h-5 w-5"/>
             <span>{activeUsers.length}</span>
         </div>
-        <Button onClick={handleAddAsset}>
-          <PlusCircle className="mr-2 h-4 w-4" />
+        <Button onClick={handleAddAsset} disabled={isSaving}>
+          {isSaving ? (
+             <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+          ) : (
+            <PlusCircle className="mr-2 h-4 w-4" />
+          )}
           Add Asset
         </Button>
       </div>

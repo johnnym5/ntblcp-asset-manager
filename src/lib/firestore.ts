@@ -13,6 +13,7 @@ import {
   getDocs,
   writeBatch,
   Timestamp,
+  setDoc,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Asset, RoomUser } from '@/lib/types';
@@ -36,13 +37,9 @@ export async function addAsset(roomId: string, assetData: AssetFormValues, photo
   });
 }
 
-export async function updateAsset(roomId: string, assetId: string, assetData: Partial<AssetFormValues>, photoUrl?: string) {
+export async function updateAsset(roomId: string, assetId: string, assetData: Partial<Asset>) {
   const assetRef = doc(db, 'rooms', roomId, 'assets', assetId);
-  const dataToUpdate: Partial<Asset> = { ...assetData };
-  if (photoUrl) {
-    dataToUpdate.photoUrl = photoUrl;
-  }
-  await updateDoc(assetRef, dataToUpdate);
+  await updateDoc(assetRef, assetData);
 }
 
 export async function deleteAsset(roomId: string, assetId: string) {
@@ -53,7 +50,7 @@ export async function deleteAsset(roomId: string, assetId: string) {
 // PRESENCE MANAGEMENT
 export function getRoomUsersStream(roomId: string, callback: (users: RoomUser[]) => void) {
   const usersCol = collection(db, 'rooms', roomId, 'users');
-  const q = query(usersCol, where('lastSeen', '>', Date.now() - 1000 * 60)); // Active in last minute
+  const q = query(usersCol, where('lastSeen', '>', new Date(Date.now() - 1000 * 60))); // Active in last minute
   
   return onSnapshot(q, (snapshot) => {
     const users = snapshot.docs.map((doc) => doc.data() as RoomUser);
@@ -64,23 +61,17 @@ export function getRoomUsersStream(roomId: string, callback: (users: RoomUser[])
 export async function updateUserPresence(roomId: string, user: User) {
   const userRef = doc(db, 'rooms', roomId, 'users', user.uid);
   try {
-     await updateDoc(userRef, {
+     await setDoc(userRef, {
       id: user.uid,
       displayName: user.isAnonymous ? 'Anonymous' : (user.displayName || user.email),
       photoURL: user.photoURL,
       lastSeen: serverTimestamp(),
-    });
-  } catch (error: any) {
-    if (error.code === 'not-found') {
-      await updateDoc(userRef, {
-        id: user.uid,
-        displayName: user.isAnonymous ? 'Anonymous' : (user.displayName || user.email),
-        photoURL: user.photoURL,
-        lastSeen: serverTimestamp(),
-      }, { merge: true });
-    }
+    }, { merge: true });
+  } catch (error) {
+    console.error("Failed to update user presence: ", error);
   }
 }
+
 
 // Helper to get a server-safe timestamp
 export function getTimestamp() {
