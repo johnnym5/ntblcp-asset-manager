@@ -144,16 +144,14 @@ export default function AssetList() {
     }
     
     const zones: Record<string, string[]> = NIGERIAN_ZONES;
-    const statesInZone = zones[globalStateFilter]; // Check if the filter is a zone name
+    const isZone = !!zones[globalStateFilter]; // Check if the filter is a zone name
 
-    if (statesInZone) {
-      // The filter is a zone, get all states for that zone
-      const lowerCaseStatesInZone = statesInZone.map(s => s.toLowerCase());
+    if (isZone) {
+      // The filter is a zone, look for zonal stores
+      const lowerCaseZone = globalStateFilter.toLowerCase();
       return assets.filter(asset => {
         const assetLocation = (asset.location || "").toLowerCase().trim();
-        if (!assetLocation) return false;
-        // Check if the asset's location starts with any of the states in the selected zone
-        return lowerCaseStatesInZone.some(stateName => assetLocation.startsWith(stateName));
+        return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
       });
     } else {
       // The filter is a single state, handle variations
