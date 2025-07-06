@@ -76,7 +76,6 @@ export default function AssetList() {
   
   useEffect(() => {
     // This effect runs once on the client to load initial data from localStorage
-    // to prevent hydration mismatch.
     try {
       const localData = window.localStorage.getItem(LOCAL_STORAGE_KEY);
       if (localData) {
@@ -85,34 +84,8 @@ export default function AssetList() {
     } catch (error) {
       console.error("Error reading from localStorage", error);
     }
+    setIsLoading(false);
   }, []);
-
-  // Effect to sync with Firestore and merge data
-  useEffect(() => {
-    if (!userProfile) return; // Wait for profile to load
-    setIsLoading(true);
-
-    const unsubscribe = getAssetsListener(
-        (loadedAssets) => {
-            const syncedAssets = loadedAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
-            
-            setAssets(prevAssets => {
-                // Merge logic: Firestore is the source of truth for synced assets.
-                // Local changes are preserved until they are synced.
-                const localChanges = prevAssets.filter(a => a.syncStatus === 'local');
-                const localIds = new Set(localChanges.map(a => a.id));
-                const syncedWithoutConflicts = syncedAssets.filter(a => !localIds.has(a.id));
-                
-                return [...syncedWithoutConflicts, ...localChanges];
-            });
-
-            setIsLoading(false);
-        },
-        userProfile
-    );
-
-    return () => unsubscribe();
-  }, [userProfile]);
 
   // Effect to save any changes to local storage
   useEffect(() => {
@@ -134,16 +107,8 @@ export default function AssetList() {
   };
   
   const handleDeleteAsset = async (assetToDelete: Asset) => {
-    const originalAssets = [...assets];
     setAssets(prev => prev.filter(a => a.id !== assetToDelete.id));
-
-    try {
-        await deleteAsset(assetToDelete);
-        toast({ title: "Asset Deleted", description: `Asset "${assetToDelete.description}" deleted successfully.`});
-    } catch(e) {
-        setAssets(originalAssets);
-        toast({ title: "Sync Error", description: "Failed to delete asset from server. It remains locally.", variant: "destructive"});
-    }
+    toast({ title: "Asset Deleted Locally", description: `Asset "${assetToDelete.description}" was deleted locally. Syncing is disabled.`});
   }
 
   const handleSaveAsset = async (assetToSave: Asset) => {
@@ -152,16 +117,7 @@ export default function AssetList() {
         if (isNew) return [...prev, assetToSave];
         return prev.map(a => a.id === assetToSave.id ? assetToSave : a);
     });
-    toast({ title: "Local Save", description: "Asset changes saved locally. Syncing..." });
-
-    try {
-        await updateAsset(assetToSave);
-        setAssets(prev => prev.map(a => a.id === assetToSave.id ? { ...a, syncStatus: 'synced' } : a));
-        toast({ title: "Sync Successful", description: "Asset changes have been synced." });
-    } catch (error) {
-        toast({ title: "Sync Error", description: "Could not sync asset changes. They are saved locally.", variant: "destructive" });
-        throw error;
-    }
+    toast({ title: "Local Save", description: "Asset changes saved locally. Syncing is disabled." });
   };
 
   const handleImportClick = () => {
@@ -196,22 +152,8 @@ export default function AssetList() {
       
       toast({
           title: "Local Import Successful",
-          description: `Imported ${allNewAssets.length} assets locally. Syncing to the cloud...`,
+          description: `Imported ${allNewAssets.length} assets locally. Syncing to the cloud is disabled.`,
       });
-
-      try {
-        const count = await saveAssetsToFirestore(assetsBySheet);
-        toast({
-          title: "Sync Successful",
-          description: `Successfully synced ${count} assets from ${sheetNames.length} sheets: ${sheetNames.join(", ")}.`,
-        });
-        setAssets(prev => prev.map(a => {
-            const isNewlyImported = allNewAssets.some(newAsset => newAsset.id === a.id);
-            return isNewlyImported ? { ...a, syncStatus: 'synced' } : a;
-        }));
-      } catch (error) {
-        toast({ title: "Firestore Sync Error", description: "Could not save assets to the database. They remain saved locally.", variant: "destructive" });
-      }
     } else if (errors.length === 0) {
         toast({ title: "No Data Found", description: "No valid sheets for import were found in the file."});
     }
