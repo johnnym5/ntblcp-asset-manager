@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import * as XLSX from "xlsx";
 import {
   Table,
@@ -25,7 +25,6 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-  AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -42,13 +41,54 @@ import { sampleAssets } from "@/lib/data";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 
+const LOCAL_STORAGE_KEY = 'ntblcp-assets';
+
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
-  const [assets, setAssets] = useState<Asset[]>(sampleAssets);
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Load assets from local storage on initial render
+  useEffect(() => {
+    try {
+      const savedAssets = localStorage.getItem(LOCAL_STORAGE_KEY);
+      if (savedAssets) {
+        setAssets(JSON.parse(savedAssets));
+      } else {
+        // If no data in local storage, initialize with sample data
+        setAssets(sampleAssets);
+      }
+    } catch (error) {
+      console.error("Failed to load assets from local storage:", error);
+      toast({
+        title: "Could not load local data",
+        description: "Falling back to default sample data.",
+        variant: "destructive",
+      });
+      setAssets(sampleAssets);
+    }
+  }, [toast]);
+
+  // Save assets to local storage whenever they change
+  useEffect(() => {
+    // Don't save the initial empty array before hydration from the first effect
+    if (assets.length > 0) {
+      try {
+        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(assets));
+      } catch (error) {
+        console.error("Failed to save assets to local storage:", error);
+        toast({
+          title: "Could not save data locally",
+          description: "Your latest changes might not be saved.",
+          variant: "destructive",
+        });
+      }
+    }
+  }, [assets, toast]);
+
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
