@@ -38,9 +38,19 @@ import {
   ArrowLeft,
   Folder,
   Edit,
+  AlertCircle,
+  Check,
+  FileText,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
@@ -429,7 +439,7 @@ export default function AssetList() {
                     </TableHead>
                     <TableHead>S/N</TableHead>
                     <TableHead>Description</TableHead>
-                    <TableHead>Serial Number</TableHead>
+                    <TableHead>Asset ID</TableHead>
                     <TableHead>Verified Status</TableHead>
                     <TableHead>Verified Date</TableHead>
                     <TableHead className="w-[50px] text-right">Actions</TableHead>
@@ -448,8 +458,50 @@ export default function AssetList() {
                         </TableCell>
                         <TableCell>{asset.sn || 'N/A'}</TableCell>
                         <TableCell className="font-medium">{asset.description}</TableCell>
-                        <TableCell>{asset.serialNumber || asset.chasisNo || 'N/A'}</TableCell>
-                        <TableCell><Badge variant={asset.verifiedStatus === 'Verified' ? 'default' : (asset.verifiedStatus === 'Discrepancy' ? 'destructive' : 'secondary')}>{asset.verifiedStatus || 'Unverified'}</Badge></TableCell>
+                        <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
+                        <TableCell onClick={(e) => e.stopPropagation()}>
+                          <Select
+                            value={asset.verifiedStatus || "Unverified"}
+                            onValueChange={(status) => {
+                              const verifiedDate =
+                                status === "Verified"
+                                  ? new Date().toLocaleDateString("en-CA")
+                                  : "";
+                              handleQuickSaveAsset(asset.id, {
+                                verifiedStatus: status as any,
+                                verifiedDate,
+                              });
+                              toast({
+                                title: "Status Updated",
+                                description: `Asset status changed to ${status}.`,
+                              });
+                            }}
+                          >
+                            <SelectTrigger className="w-[150px] h-9 text-sm">
+                              <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="Unverified">
+                                <div className="flex items-center">
+                                  <FileText className="mr-2 h-4 w-4" />
+                                  Unverified
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="Verified">
+                                <div className="flex items-center">
+                                  <Check className="mr-2 h-4 w-4" />
+                                  Verified
+                                </div>
+                              </SelectItem>
+                              <SelectItem value="Discrepancy">
+                                <div className="flex items-center">
+                                  <AlertCircle className="mr-2 h-4 w-4" />
+                                  Discrepancy
+                                </div>
+                              </SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </TableCell>
                         <TableCell>{asset.verifiedDate || 'N/A'}</TableCell>
                         <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                             <DropdownMenu>
