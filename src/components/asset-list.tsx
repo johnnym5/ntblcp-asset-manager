@@ -56,7 +56,7 @@ export default function AssetList() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [isImporting, setIsImporting] = useState(false);
-  const [isLoading, setIsLoading] = useState(false); // No initial loading from firestore
+  const [isLoading, setIsLoading] = useState(true); // Default to true to show loader
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
 
@@ -72,6 +72,50 @@ export default function AssetList() {
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+
+  // --- LOCAL STORAGE PERSISTENCE ---
+
+  // Load assets from localStorage on initial render
+  useEffect(() => {
+    try {
+      const localData = localStorage.getItem('ntblcp-assets');
+      if (localData) {
+        setAssets(JSON.parse(localData));
+      }
+    } catch (error) {
+      console.error("Failed to load assets from local storage", error);
+      toast({ 
+        title: "Could not load saved data", 
+        description: "There was an error reading your locally saved assets.", 
+        variant: "destructive" 
+      });
+    } finally {
+      setIsLoading(false); // We're done loading, whether it succeeded or not
+    }
+  }, [toast]);
+
+  // Save assets to localStorage whenever they change
+  useEffect(() => {
+    // We don't save during the initial load phase
+    if (!isLoading) {
+      try {
+        // A special case for clearing all assets
+        if (assets.length === 0) {
+          localStorage.removeItem('ntblcp-assets');
+        } else {
+          localStorage.setItem('ntblcp-assets', JSON.stringify(assets));
+        }
+      } catch (error) {
+        console.error("Failed to save assets to local storage", error);
+        toast({ 
+          title: "Could not save data", 
+          description: "There was an error saving your assets locally.", 
+          variant: "destructive" 
+        });
+      }
+    }
+  }, [assets, isLoading, toast]);
+
 
   // --- Mode Change Notifier ---
   useEffect(() => {
