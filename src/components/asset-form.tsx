@@ -279,6 +279,10 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     <p className="text-xs font-semibold text-muted-foreground">LGA</p>
                     <p>{asset.lga || 'N/A'}</p>
                 </div>
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">Assignee</p>
+                    <p>{asset.assignee || 'N/A'}</p>
+                </div>
             </div>
             <div className="space-y-1 text-sm">
                 <p className="text-xs font-semibold text-muted-foreground">Asset Description</p>
