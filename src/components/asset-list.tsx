@@ -83,6 +83,8 @@ export default function AssetList() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
+
 
   // --- Global state from context ---
   const { 
@@ -118,11 +120,18 @@ export default function AssetList() {
         } else if (assets.length > 0) {
           localStorage.setItem('ntblcp-assets', JSON.stringify(assets));
         }
-      } catch (error) {
+      } catch (error: any) {
         console.error("Failed to save assets to local storage", error);
+        
+        let description = `There was an error saving your assets locally. ${error instanceof Error ? error.message : ''}`;
+        // Check for QuotaExceededError which is what happens when localStorage is full
+        if (error && (error.name === 'QuotaExceededError' || (error.message && error.message.toLowerCase().includes('quota')))) {
+            description = "Browser storage limit reached. Please export and then clear your existing assets before importing a large new file.";
+        }
+        
         toast({ 
-          title: "Could not save data", 
-          description: `There was an error saving your assets locally. ${error instanceof Error ? error.message : ''}`, 
+          title: "Storage Error", 
+          description: description, 
           variant: "destructive" 
         });
       }
@@ -386,6 +395,12 @@ export default function AssetList() {
     setSelectedAssetIds(prev => checked ? [...prev, assetId] : prev.filter(id => id !== assetId));
   };
   
+  const handleClearAllAssets = () => {
+    setAssets([]);
+    toast({ title: "All Assets Cleared", description: "Your local asset database has been cleared." });
+    setIsClearAllDialogOpen(false);
+  }
+
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -545,6 +560,10 @@ export default function AssetList() {
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Add Asset
                 </Button>
+                <Button variant="destructive" onClick={() => setIsClearAllDialogOpen(true)} disabled={assets.length === 0}>
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Clear All
+                </Button>
             </div>
         </div>
         <Card>
@@ -636,6 +655,22 @@ export default function AssetList() {
           isReadOnly={isFormReadOnly} 
         />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
+        <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        This action cannot be undone. This will permanently delete all {assets.length} assets from your local data. It is highly recommended to export your data first.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearAllAssets} className="bg-destructive hover:bg-destructive/90">
+                        Yes, delete all assets
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
       </div>
     )
   }
@@ -814,3 +849,4 @@ export default function AssetList() {
     </div>
   );
 }
+
