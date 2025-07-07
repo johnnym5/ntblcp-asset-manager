@@ -66,6 +66,9 @@ import { TARGET_SHEETS, NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOC
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
+import { PaginationControls } from "./pagination-controls";
+
+const ITEMS_PER_PAGE = 25;
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -85,6 +88,7 @@ export default function AssetList() {
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
 
   // --- Global state from context ---
@@ -96,6 +100,12 @@ export default function AssetList() {
     selectedStatus, setSelectedStatus,
     sortConfig, setLocationOptions, setAssigneeOptions
   } = useAppState();
+
+  // Reset page number when filters or view change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm, selectedLocation, selectedAssignee, selectedStatus, globalStateFilter, view, currentCategory]);
+
 
   // --- LOCAL STORAGE PERSISTENCE ---
   useEffect(() => {
@@ -243,8 +253,6 @@ export default function AssetList() {
     if (view === 'table' && currentCategory) {
         baseAssets = assetsByCategory[currentCategory] || [];
     } else {
-        // This case is for when we are not in a specific category table view.
-        // The dashboard view filtering will be handled by a different memo.
         return [];
     }
 
@@ -274,18 +282,6 @@ export default function AssetList() {
     
     return sortAssets(assetsToFilter, sortConfig);
   }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocation, selectedAssignee, selectedStatus, sortConfig]);
-
-  const groupedResults = useMemo(() => {
-    if (!showUnifiedResults) return {};
-    return unifiedResults.reduce((acc, asset) => {
-        const category = asset.category || 'Uncategorized';
-        if (!acc[category]) {
-            acc[category] = [];
-        }
-        acc[category].push(asset);
-        return acc;
-    }, {} as { [key: string]: Asset[] });
-  }, [unifiedResults, showUnifiedResults]);
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -414,18 +410,13 @@ export default function AssetList() {
     }
   };
   
-  const handleSelectAllForGroup = (checked: boolean, assetsToSelect: Asset[]) => {
-    const groupIds = assetsToSelect.map(a => a.id);
-    setSelectedAssetIds(prev => {
-        const otherIds = prev.filter(id => !groupIds.includes(id));
-        return checked ? [...otherIds, ...groupIds] : otherIds;
-    });
+  const handleSelectAll = (checked: boolean, assetsInView: Asset[]) => {
+    if (checked) {
+      setSelectedAssetIds(assetsInView.map(a => a.id));
+    } else {
+      setSelectedAssetIds([]);
+    }
   };
-
-  const areAllInGroupSelected = (assetsInGroup: Asset[]) => {
-      if (assetsInGroup.length === 0) return false;
-      return assetsInGroup.every(asset => selectedAssetIds.includes(asset.id));
-  }
 
   const handleSelectSingle = (assetId: string, checked: boolean) => {
     setSelectedAssetIds(prev => checked ? [...prev, assetId] : prev.filter(id => id !== assetId));
@@ -451,7 +442,13 @@ export default function AssetList() {
   // UNIFIED RESULTS VIEW (SEARCH OR FILTER)
   if (showUnifiedResults) {
     const results = unifiedResults;
-    
+    const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
+    const paginatedResults = results.slice(
+      (currentPage - 1) * ITEMS_PER_PAGE,
+      currentPage * ITEMS_PER_PAGE
+    );
+    const areAllInViewSelected = selectedAssetIds.length > 0 && paginatedResults.every(a => selectedAssetIds.includes(a.id));
+
     let title = "Search Results";
     const hasFilters = !!selectedLocation || !!selectedAssignee || !!selectedStatus;
     
@@ -471,7 +468,7 @@ export default function AssetList() {
               </h2>
               {selectedAssetIds.length > 0 ? (
                   <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{selectedAssetIds.length} of {results.length} selected</span>
+                      <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
                        {selectedAssetIds.length === 1 && (
                             <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)}>
                                 <Edit className="mr-2 h-4 w-4" /> Edit
@@ -502,94 +499,94 @@ export default function AssetList() {
               )}
           </div>
           
-          <div className="flex-1 overflow-auto space-y-6">
-                {Object.keys(groupedResults).length > 0 ? (
-                    Object.entries(groupedResults).map(([category, categoryAssets]) => (
-                        <Card key={category}>
-                            <CardHeader>
-                                <CardTitle>
-                                    {category} 
-                                    <span className="text-muted-foreground font-normal ml-2">({categoryAssets.length} found)</span>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <Table>
-                                    <TableHeader>
-                                      <TableRow>
-                                          <TableHead className="w-[50px]">
-                                              <Checkbox
-                                                  checked={areAllInGroupSelected(categoryAssets)}
-                                                  onCheckedChange={(checked) => handleSelectAllForGroup(checked as boolean, categoryAssets)}
-                                                  aria-label={`Select all in ${category}`}
-                                              />
-                                          </TableHead>
-                                          <TableHead>Description</TableHead>
-                                          <TableHead>Asset ID</TableHead>
-                                          <TableHead>Location</TableHead>
-                                          <TableHead>Assignee</TableHead>
-                                          <TableHead>Verified Status</TableHead>
-                                          <TableHead className="w-[50px] text-right">Actions</TableHead>
-                                      </TableRow>
-                                    </TableHeader>
-                                    <TableBody>
-                                        {categoryAssets.map(asset => (
-                                            <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
-                                                <TableCell onClick={e => e.stopPropagation()}>
-                                                    <Checkbox 
-                                                        checked={selectedAssetIds.includes(asset.id)}
-                                                        onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
-                                                        aria-label={`Select asset ${asset.description}`}
-                                                    />
-                                                </TableCell>
-                                                <TableCell className="font-medium">{asset.description}</TableCell>
-                                                <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
-                                                <TableCell>{asset.location || 'N/A'}</TableCell>
-                                                <TableCell>{asset.assignee || 'N/A'}</TableCell>
-                                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                                  <Select
-                                                    value={asset.verifiedStatus || "Unverified"}
-                                                    onValueChange={(status) => {
-                                                      const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
-                                                      handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate });
-                                                      addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
-                                                    }}
-                                                  >
-                                                    <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
-                                                    <SelectContent>
-                                                      <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4" />Unverified</div></SelectItem>
-                                                      <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4" />Verified</div></SelectItem>
-                                                      <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4" />Discrepancy</div></SelectItem>
-                                                    </SelectContent>
-                                                  </Select>
-                                                </TableCell>
-                                                <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                                                    <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end">
-                                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
-                                                            <Edit className="mr-2 h-4 w-4" /> Edit
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
-                                                            <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                                        </DropdownMenuItem>
-                                                    </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                </TableCell>
-                                            </TableRow>
-                                        ))}
-                                    </TableBody>
-                                </Table>
-                            </CardContent>
-                        </Card>
-                    ))
-                ) : (
+            <Card className="flex-1 flex flex-col">
+              <CardContent className="p-0 flex-1 overflow-auto">
+                 {paginatedResults.length > 0 ? (
+                  <Table>
+                      <TableHeader>
+                        <TableRow>
+                            <TableHead className="w-[50px]">
+                                <Checkbox
+                                    checked={areAllInViewSelected}
+                                    onCheckedChange={(checked) => handleSelectAll(checked as boolean, paginatedResults)}
+                                    aria-label="Select all on this page"
+                                />
+                            </TableHead>
+                            <TableHead>Description</TableHead>
+                            <TableHead>Category</TableHead>
+                            <TableHead>Location</TableHead>
+                            <TableHead>Assignee</TableHead>
+                            <TableHead>Verified Status</TableHead>
+                            <TableHead className="w-[50px] text-right">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                          {paginatedResults.map(asset => (
+                              <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                                  <TableCell onClick={e => e.stopPropagation()}>
+                                      <Checkbox 
+                                          checked={selectedAssetIds.includes(asset.id)}
+                                          onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
+                                          aria-label={`Select asset ${asset.description}`}
+                                      />
+                                  </TableCell>
+                                  <TableCell className="font-medium">{asset.description}</TableCell>
+                                  <TableCell>{asset.category || 'N/A'}</TableCell>
+                                  <TableCell>{asset.location || 'N/A'}</TableCell>
+                                  <TableCell>{asset.assignee || 'N/A'}</TableCell>
+                                  <TableCell onClick={(e) => e.stopPropagation()}>
+                                    <Select
+                                      value={asset.verifiedStatus || "Unverified"}
+                                      onValueChange={(status) => {
+                                        const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
+                                        handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate });
+                                        addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
+                                      }}
+                                    >
+                                      <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4" />Unverified</div></SelectItem>
+                                        <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4" />Verified</div></SelectItem>
+                                        <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4" />Discrepancy</div></SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </TableCell>
+                                  <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                                      <DropdownMenu>
+                                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                      <DropdownMenuContent align="end">
+                                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
+                                              <Edit className="mr-2 h-4 w-4" /> Edit
+                                          </DropdownMenuItem>
+                                          <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
+                                              <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                          </DropdownMenuItem>
+                                      </DropdownMenuContent>
+                                      </DropdownMenu>
+                                  </TableCell>
+                              </TableRow>
+                          ))}
+                      </TableBody>
+                  </Table>
+                  ) : (
                     <div className="text-center py-24 text-muted-foreground">
                         <FolderSearch className="mx-auto h-12 w-12" />
                         <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
                         <p className="mt-2 text-sm">Try adjusting your search or filter criteria.</p>
                     </div>
                 )}
-            </div>
+              </CardContent>
+              <CardFooter className="border-t pt-4">
+                  <PaginationControls 
+                    currentPage={currentPage}
+                    totalPages={totalPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    totalItems={results.length}
+                  />
+              </CardFooter>
+            </Card>
+
           <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} />
           <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
           <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the asset from your local data.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
@@ -747,6 +744,14 @@ export default function AssetList() {
   }
 
   // TABLE VIEW
+  const filteredAssets = categoryFilteredAssets;
+  const totalCategoryPages = Math.ceil(filteredAssets.length / ITEMS_PER_PAGE);
+  const paginatedCategoryAssets = filteredAssets.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+  const areAllCategoryPageSelected = paginatedCategoryAssets.length > 0 && paginatedCategoryAssets.every(a => selectedAssetIds.includes(a.id));
+
   return (
     <div className="flex flex-col h-full gap-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -758,7 +763,7 @@ export default function AssetList() {
             </h2>
             {selectedAssetIds.length > 0 ? (
                 <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{selectedAssetIds.length} of {categoryFilteredAssets.length} selected</span>
+                    <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
                      {selectedAssetIds.length === 1 && (
                         <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
@@ -788,108 +793,119 @@ export default function AssetList() {
             )}
         </div>
         
-        <div className="rounded-lg border shadow-sm flex-1 overflow-auto">
-            <Table>
-                <TableHeader>
-                    <TableRow>
-                    <TableHead className="w-[50px]">
-                        <Checkbox
-                            checked={categoryFilteredAssets.length > 0 && areAllInGroupSelected(categoryFilteredAssets)}
-                            onCheckedChange={(checked) => handleSelectAllForGroup(checked as boolean, categoryFilteredAssets)}
-                            aria-label="Select all in this category"
-                        />
-                    </TableHead>
-                    <TableHead>S/N</TableHead>
-                    <TableHead>Description</TableHead>
-                    <TableHead>Asset ID</TableHead>
-                    <TableHead>Assignee</TableHead>
-                    <TableHead>Verified Status</TableHead>
-                    <TableHead>Verified Date</TableHead>
-                    <TableHead className="w-[50px] text-right">Actions</TableHead>
-                    </TableRow>
-                </TableHeader>
-                <TableBody>
-                    {categoryFilteredAssets.length > 0 ? (
-                    categoryFilteredAssets.map((asset) => (
-                        <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
-                        <TableCell onClick={e => e.stopPropagation()}>
-                            <Checkbox 
-                                checked={selectedAssetIds.includes(asset.id)}
-                                onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
-                                aria-label={`Select asset ${asset.description}`}
-                            />
-                        </TableCell>
-                        <TableCell>{asset.sn || 'N/A'}</TableCell>
-                        <TableCell className="font-medium">{asset.description}</TableCell>
-                        <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
-                        <TableCell>{asset.assignee || 'N/A'}</TableCell>
-                        <TableCell onClick={(e) => e.stopPropagation()}>
-                          <Select
-                            value={asset.verifiedStatus || "Unverified"}
-                            onValueChange={(status) => {
-                              const verifiedDate =
-                                status === "Verified"
-                                  ? new Date().toLocaleDateString("en-CA")
-                                  : "";
-                              handleQuickSaveAsset(asset.id, {
-                                verifiedStatus: status as any,
-                                verifiedDate,
-                              });
-                              addNotification({
-                                title: "Status Updated",
-                                description: `Asset status changed to ${status}.`,
-                              });
-                            }}
-                          >
-                            <SelectTrigger className="w-[150px] h-9 text-sm">
-                              <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="Unverified">
-                                <div className="flex items-center">
-                                  <FileText className="mr-2 h-4 w-4" />
-                                  Unverified
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="Verified">
-                                <div className="flex items-center">
-                                  <Check className="mr-2 h-4 w-4" />
-                                  Verified
-                                </div>
-                              </SelectItem>
-                              <SelectItem value="Discrepancy">
-                                <div className="flex items-center">
-                                  <AlertCircle className="mr-2 h-4 w-4" />
-                                  Discrepancy
-                                </div>
-                              </SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </TableCell>
-                        <TableCell>{asset.verifiedDate || 'N/A'}</TableCell>
-                        <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                            <DropdownMenu>
-                            <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
-                                    <Edit className="mr-2 h-4 w-4" />
-                                    Edit
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                </DropdownMenuItem>
-                            </DropdownMenuContent>
-                            </DropdownMenu>
-                        </TableCell>
-                        </TableRow>
-                    ))
-                    ) : (
-                        <TableRow><TableCell colSpan={8} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
-                    )}
-                </TableBody>
-            </Table>
-        </div>
+        <Card className="flex-1 flex flex-col">
+            <CardContent className="p-0 flex-1 overflow-auto">
+              <Table>
+                  <TableHeader>
+                      <TableRow>
+                      <TableHead className="w-[50px]">
+                          <Checkbox
+                              checked={areAllCategoryPageSelected}
+                              onCheckedChange={(checked) => handleSelectAll(checked as boolean, paginatedCategoryAssets)}
+                              aria-label="Select all on this page"
+                          />
+                      </TableHead>
+                      <TableHead>S/N</TableHead>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Asset ID</TableHead>
+                      <TableHead>Assignee</TableHead>
+                      <TableHead>Verified Status</TableHead>
+                      <TableHead>Verified Date</TableHead>
+                      <TableHead className="w-[50px] text-right">Actions</TableHead>
+                      </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                      {paginatedCategoryAssets.length > 0 ? (
+                      paginatedCategoryAssets.map((asset) => (
+                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                          <TableCell onClick={e => e.stopPropagation()}>
+                              <Checkbox 
+                                  checked={selectedAssetIds.includes(asset.id)}
+                                  onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
+                                  aria-label={`Select asset ${asset.description}`}
+                              />
+                          </TableCell>
+                          <TableCell>{asset.sn || 'N/A'}</TableCell>
+                          <TableCell className="font-medium">{asset.description}</TableCell>
+                          <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
+                          <TableCell>{asset.assignee || 'N/A'}</TableCell>
+                          <TableCell onClick={(e) => e.stopPropagation()}>
+                            <Select
+                              value={asset.verifiedStatus || "Unverified"}
+                              onValueChange={(status) => {
+                                const verifiedDate =
+                                  status === "Verified"
+                                    ? new Date().toLocaleDateString("en-CA")
+                                    : "";
+                                handleQuickSaveAsset(asset.id, {
+                                  verifiedStatus: status as any,
+                                  verifiedDate,
+                                });
+                                addNotification({
+                                  title: "Status Updated",
+                                  description: `Asset status changed to ${status}.`,
+                                });
+                              }}
+                            >
+                              <SelectTrigger className="w-[150px] h-9 text-sm">
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="Unverified">
+                                  <div className="flex items-center">
+                                    <FileText className="mr-2 h-4 w-4" />
+                                    Unverified
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="Verified">
+                                  <div className="flex items-center">
+                                    <Check className="mr-2 h-4 w-4" />
+                                    Verified
+                                  </div>
+                                </SelectItem>
+                                <SelectItem value="Discrepancy">
+                                  <div className="flex items-center">
+                                    <AlertCircle className="mr-2 h-4 w-4" />
+                                    Discrepancy
+                                  </div>
+                                </SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                          <TableCell>{asset.verifiedDate || 'N/A'}</TableCell>
+                          <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                              <DropdownMenu>
+                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
+                                      <Edit className="mr-2 h-4 w-4" />
+                                      Edit
+                                  </DropdownMenuItem>
+                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      Delete
+                                  </DropdownMenuItem>
+                              </DropdownMenuContent>
+                              </DropdownMenu>
+                          </TableCell>
+                          </TableRow>
+                      ))
+                      ) : (
+                          <TableRow><TableCell colSpan={8} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
+                      )}
+                  </TableBody>
+              </Table>
+            </CardContent>
+            <CardFooter className="border-t pt-4">
+               <PaginationControls 
+                    currentPage={currentPage}
+                    totalPages={totalCategoryPages}
+                    onPageChange={setCurrentPage}
+                    itemsPerPage={ITEMS_PER_PAGE}
+                    totalItems={filteredAssets.length}
+                  />
+            </CardFooter>
+        </Card>
         <AssetForm 
           isOpen={isFormOpen} 
           onOpenChange={setIsFormOpen} 

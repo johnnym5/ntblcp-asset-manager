@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
@@ -60,6 +60,7 @@ import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import type { OptionType } from "./multi-select-filter";
 import type { Asset } from "@/lib/types";
+import { useDebounce } from "@/hooks/use-debounce";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -76,6 +77,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     selectedStatus, setSelectedStatus,
     sortConfig, setSortConfig
   } = useAppState();
+
+  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
+  const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
+
+  useEffect(() => {
+    setSearchTerm(debouncedSearchTerm);
+  }, [debouncedSearchTerm, setSearchTerm]);
+
+  // Reset local search when global search is cleared
+  useEffect(() => {
+    if (searchTerm === '') {
+        setLocalSearchTerm('');
+    }
+  }, [searchTerm]);
   
   const handleLogout = () => {
     logout();
@@ -193,8 +208,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         type="search"
                         placeholder="Search assets..."
                         className="pl-10 pr-20 w-full h-full bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                        value={searchTerm}
-                        onChange={(e) => setSearchTerm(e.target.value)}
+                        value={localSearchTerm}
+                        onChange={(e) => setLocalSearchTerm(e.target.value)}
                     />
                     <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                         <DropdownMenu>
