@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -22,6 +23,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { AlertCircle, Check, FileText, Loader2 } from 'lucide-react';
+import { useAuth } from '@/contexts/auth-context';
 
 export interface BatchUpdateData {
   location?: string;
@@ -44,6 +46,8 @@ export function AssetBatchEditForm({
   onSave,
 }: AssetBatchEditFormProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const { userProfile } = useAuth();
+  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
 
   const [applyLocation, setApplyLocation] = useState(false);
   const [location, setLocation] = useState('');
@@ -60,7 +64,7 @@ export function AssetBatchEditForm({
   const handleSubmit = async () => {
     setIsSaving(true);
     const updates: BatchUpdateData = {};
-    if (applyLocation) updates.location = location;
+    if (applyLocation && isAdmin) updates.location = location;
     if (applyAssignee) updates.assignee = assignee;
     if (applyCondition) updates.condition = condition;
     if (applyStatus) updates.verifiedStatus = status;
@@ -88,7 +92,7 @@ export function AssetBatchEditForm({
     onOpenChange(open);
   }
   
-  const canSave = applyLocation || applyAssignee || applyCondition || applyStatus;
+  const canSave = (applyLocation && isAdmin) || applyAssignee || applyCondition || applyStatus;
 
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
@@ -101,10 +105,10 @@ export function AssetBatchEditForm({
         </SheetHeader>
         <div className="py-6 space-y-6">
           <div className="flex items-center space-x-4">
-            <Checkbox id="applyLocation" checked={applyLocation} onCheckedChange={(checked) => setApplyLocation(!!checked)} />
+            <Checkbox id="applyLocation" checked={applyLocation} onCheckedChange={(checked) => setApplyLocation(!!checked)} disabled={!isAdmin} />
             <div className="w-full space-y-2">
-              <Label htmlFor="location" className={!applyLocation ? 'text-muted-foreground' : ''}>Location</Label>
-              <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} disabled={!applyLocation} />
+              <Label htmlFor="location" className={!applyLocation || !isAdmin ? 'text-muted-foreground' : ''}>Location</Label>
+              <Input id="location" value={location} onChange={(e) => setLocation(e.target.value)} disabled={!applyLocation || !isAdmin} />
             </div>
           </div>
           <div className="flex items-center space-x-4">

@@ -122,7 +122,7 @@ export default function AssetList() {
         console.error("Failed to save assets to local storage", error);
         toast({ 
           title: "Could not save data", 
-          description: "There was an error saving your assets locally. You may be out of space.", 
+          description: `There was an error saving your assets locally. ${error instanceof Error ? error.message : ''}`, 
           variant: "destructive" 
         });
       }
@@ -199,8 +199,45 @@ export default function AssetList() {
     });
   };
 
-  // --- Memoized Filtered Assets for Table View---
-  const filteredAssets = useMemo(() => {
+  const showUnifiedResults = useMemo(() => {
+    return !!searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses]);
+
+
+  const unifiedResults = useMemo(() => {
+    if (!showUnifiedResults) return [];
+
+    let results = stateFilteredAssets;
+
+    // Apply filters
+    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+    if (hasFilters) {
+        results = results.filter(asset => {
+            const locationMatch = selectedLocations.length === 0 || (asset.location && selectedLocations.includes(asset.location));
+            const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.includes(asset.assignee));
+            const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
+            return locationMatch && assigneeMatch && statusMatch;
+        });
+    }
+    
+    // Apply search term to the (already filtered) results
+    if (searchTerm) {
+        const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
+        if (lowerCaseSearchTokens.length > 0) {
+            results = results.filter(asset => {
+                const assetHaystack = Object.values(asset)
+                    .map(value => (typeof value === 'object' && value !== null) ? Object.values(value).join(' ') : String(value))
+                    .join(' ').toLowerCase();
+                return lowerCaseSearchTokens.every(token => assetHaystack.includes(token));
+            });
+        }
+    }
+    
+    return sortAssets(results, sortConfig);
+}, [showUnifiedResults, searchTerm, stateFilteredAssets, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
+
+
+  const categoryFilteredAssets = useMemo(() => {
     if (view !== 'table' || !currentCategory) return [];
     let baseAssets = assetsByCategory[currentCategory] || [];
 
@@ -213,31 +250,6 @@ export default function AssetList() {
     
     return sortAssets(assetsToFilter, sortConfig);
   }, [view, currentCategory, assetsByCategory, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
-  
-  // --- Memoized Global Search Results ---
-  const searchResults = useMemo(() => {
-    if (!searchTerm) {
-      return [];
-    }
-    const lowerCaseSearchTokens = searchTerm
-      .toLowerCase()
-      .split(' ')
-      .filter(token => token.length > 0);
-
-    if (lowerCaseSearchTokens.length === 0) {
-      return [];
-    }
-
-    const results = stateFilteredAssets.filter(asset => {
-      const assetHaystack = Object.values(asset)
-        .map(value => (typeof value === 'object' && value !== null) ? Object.values(value).join(' ') : String(value))
-        .join(' ').toLowerCase();
-      return lowerCaseSearchTokens.every(token => assetHaystack.includes(token));
-    });
-
-    return sortAssets(results, sortConfig);
-  }, [searchTerm, stateFilteredAssets, sortConfig]);
-
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -348,7 +360,7 @@ export default function AssetList() {
   };
   
   const handleExportClick = () => {
-    const assetsToExport = view === 'table' ? filteredAssets : (searchTerm ? searchResults : stateFilteredAssets);
+    const assetsToExport = showUnifiedResults ? unifiedResults : (view === 'table' ? categoryFilteredAssets : stateFilteredAssets);
     if (assetsToExport.length === 0) {
       toast({ title: "No Data to Export", description: "There are no assets in the current view to export." });
       return;
@@ -378,17 +390,29 @@ export default function AssetList() {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
-  // SEARCH RESULTS VIEW
-  if (searchTerm) {
+  // UNIFIED RESULTS VIEW (SEARCH OR FILTER)
+  if (showUnifiedResults) {
+    const results = unifiedResults;
+    let title = "Search Results";
+    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+    
+    if (searchTerm && hasFilters) {
+        title = "Filtered Search Results";
+    } else if (searchTerm) {
+        title = `Search Results for "${searchTerm}"`;
+    } else {
+        title = "Filter Results";
+    }
+
     return (
       <div className="flex flex-col h-full gap-4">
           <div className="flex flex-wrap items-center gap-2">
               <h2 className="text-2xl font-bold tracking-tight flex-1">
-                  Search Results for "{searchTerm}"
+                  {title}
               </h2>
               {selectedAssetIds.length > 0 ? (
                   <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{selectedAssetIds.length} of {searchResults.length} selected</span>
+                      <span className="text-sm text-muted-foreground">{selectedAssetIds.length} of {results.length} selected</span>
                        {selectedAssetIds.length === 1 && (
                             <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)}>
                                 <Edit className="mr-2 h-4 w-4" /> Edit
@@ -406,7 +430,7 @@ export default function AssetList() {
                   </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">{searchResults.length} assets found</span>
+                  <span className="text-sm text-muted-foreground">{results.length} assets found</span>
                   <Button variant="outline" onClick={handleExportClick}>
                       <FileDown className="mr-2 h-4 w-4" />
                       Export Results
@@ -421,8 +445,8 @@ export default function AssetList() {
                       <TableRow>
                       <TableHead className="w-[50px]">
                           <Checkbox
-                              checked={searchResults.length > 0 && selectedAssetIds.length === searchResults.length}
-                              onCheckedChange={(checked) => handleSelectAll(checked as boolean, searchResults)}
+                              checked={results.length > 0 && selectedAssetIds.length === results.length}
+                              onCheckedChange={(checked) => handleSelectAll(checked as boolean, results)}
                               aria-label="Select all"
                           />
                       </TableHead>
@@ -435,8 +459,8 @@ export default function AssetList() {
                       </TableRow>
                   </TableHeader>
                   <TableBody>
-                      {searchResults.length > 0 ? (
-                      searchResults.map((asset) => (
+                      {results.length > 0 ? (
+                      results.map((asset) => (
                           <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
                           <TableCell onClick={e => e.stopPropagation()}>
                               <Checkbox 
@@ -482,7 +506,7 @@ export default function AssetList() {
                           </TableRow>
                       ))
                       ) : (
-                          <TableRow><TableCell colSpan={7} className="text-center h-24">No assets found matching your search.</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={7} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
                       )}
                   </TableBody>
               </Table>
@@ -664,8 +688,8 @@ export default function AssetList() {
                     <TableRow>
                     <TableHead className="w-[50px]">
                         <Checkbox
-                            checked={filteredAssets.length > 0 && selectedAssetIds.length === filteredAssets.length}
-                            onCheckedChange={(checked) => handleSelectAll(checked as boolean, filteredAssets)}
+                            checked={categoryFilteredAssets.length > 0 && selectedAssetIds.length === categoryFilteredAssets.length}
+                            onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
                             aria-label="Select all"
                         />
                     </TableHead>
@@ -678,8 +702,8 @@ export default function AssetList() {
                     </TableRow>
                 </TableHeader>
                 <TableBody>
-                    {filteredAssets.length > 0 ? (
-                    filteredAssets.map((asset) => (
+                    {categoryFilteredAssets.length > 0 ? (
+                    categoryFilteredAssets.map((asset) => (
                         <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
                         <TableCell onClick={e => e.stopPropagation()}>
                             <Checkbox 

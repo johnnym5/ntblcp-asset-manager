@@ -83,6 +83,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   const [scanError, setScanError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { userProfile } = useAuth();
+  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
   const { toast } = useToast();
   
   const defaultValues = {
@@ -120,6 +121,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
         form.reset({
           ...defaultValues,
           ...asset,
+          location: asset.location || userProfile?.state || '',
           verifiedStatus: asset.verifiedStatus || 'Unverified',
         });
       } else {
@@ -130,7 +132,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
       setScanResult(null);
       setScanError(null);
     }
-  }, [isOpen, asset, form]);
+  }, [isOpen, asset, form, userProfile]);
   
   const watchedStatusInForm = form.watch('verifiedStatus');
   useEffect(() => {
@@ -409,7 +411,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                   <FormField control={form.control} name="location" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
