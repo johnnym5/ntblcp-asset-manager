@@ -62,7 +62,7 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
         <AlertDialogHeader>
           <AlertDialogTitle>Complete Your Profile</AlertDialogTitle>
           <AlertDialogDescription>
-            Please provide your name and assigned state/zone. Enter 'admin' as your name to view all assets.
+            Please provide your name and assigned state/zone.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="py-4 space-y-4">
