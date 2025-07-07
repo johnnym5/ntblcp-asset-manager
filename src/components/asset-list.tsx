@@ -42,6 +42,7 @@ import {
   FileText,
   ClipboardEdit,
   FolderSearch,
+  X,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -88,8 +89,11 @@ export default function AssetList() {
 
   // --- Global state from context ---
   const { 
-    searchTerm, isOnline, globalStateFilter, setGlobalStateFilter,
-    selectedLocations, selectedAssignees, selectedStatuses,
+    searchTerm, setSearchTerm,
+    isOnline, globalStateFilter, setGlobalStateFilter,
+    selectedLocations, setSelectedLocations,
+    selectedAssignees, setSelectedAssignees,
+    selectedStatuses, setSelectedStatuses,
     sortConfig, setLocationOptions, setAssigneeOptions
   } = useAppState();
 
@@ -432,6 +436,13 @@ export default function AssetList() {
     addNotification({ title: "All Assets Cleared", description: "Your local asset database has been cleared." });
     setIsClearAllDialogOpen(false);
   }
+  
+  const handleClearSearchAndFilters = () => {
+    setSearchTerm('');
+    setSelectedLocations([]);
+    setSelectedAssignees([]);
+    setSelectedStatuses([]);
+  };
 
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
@@ -479,6 +490,10 @@ export default function AssetList() {
               ) : (
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-muted-foreground">{results.length} assets found</span>
+                  <Button variant="outline" size="sm" onClick={handleClearSearchAndFilters}>
+                      <X className="mr-2 h-4 w-4" />
+                      Clear All
+                  </Button>
                   <Button variant="outline" onClick={handleExportClick}>
                       <FileDown className="mr-2 h-4 w-4" />
                       Export Results

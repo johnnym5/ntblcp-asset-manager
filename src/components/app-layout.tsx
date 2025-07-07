@@ -1,7 +1,7 @@
 
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
@@ -45,9 +45,9 @@ import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
-import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { MultiSelectFilter, type OptionType } from "./multi-select-filter";
+import type { OptionType } from "./multi-select-filter";
 import type { Asset } from "@/lib/types";
+import { AssetFilterSheet } from "./asset-filter-sheet";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -64,6 +64,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     selectedStatuses, setSelectedStatuses,
     sortConfig, setSortConfig
   } = useAppState();
+  
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
@@ -108,6 +110,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         return { key, direction: 'asc' };
     });
   };
+  
+  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length;
 
   return (
     <SidebarProvider>
@@ -197,35 +201,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             </DropdownMenuContent>
                         </DropdownMenu>
 
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Filter assets">
-                                    <Filter className="h-4 w-4" />
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent align="end" className="w-auto p-0">
-                                <div className="p-4 space-y-4">
-                                    <MultiSelectFilter
-                                        title="Location"
-                                        options={locationOptions}
-                                        selected={selectedLocations}
-                                        onChange={setSelectedLocations}
-                                    />
-                                    <MultiSelectFilter
-                                        title="Assignee"
-                                        options={assigneeOptions}
-                                        selected={selectedAssignees}
-                                        onChange={setSelectedAssignees}
-                                    />
-                                    <MultiSelectFilter
-                                        title="Status"
-                                        options={statusOptions}
-                                        selected={selectedStatuses}
-                                        onChange={setSelectedStatuses}
-                                    />
-                                </div>
-                            </PopoverContent>
-                        </Popover>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 relative" aria-label="Filter assets" onClick={() => setIsFilterSheetOpen(true)}>
+                            <Filter className="h-4 w-4" />
+                            {activeFilterCount > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                        </Button>
                     </div>
                 </div>
             )}
@@ -271,6 +254,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="flex-1 flex flex-col p-4 md:p-6">{children}</main>
+        <AssetFilterSheet
+            isOpen={isFilterSheetOpen}
+            onOpenChange={setIsFilterSheetOpen}
+            locationOptions={locationOptions}
+            selectedLocations={selectedLocations}
+            setSelectedLocations={setSelectedLocations}
+            assigneeOptions={assigneeOptions}
+            selectedAssignees={selectedAssignees}
+            setSelectedAssignees={setSelectedAssignees}
+            statusOptions={statusOptions}
+            selectedStatuses={selectedStatuses}
+            setSelectedStatuses={setSelectedStatuses}
+        />
       </div>
     </SidebarProvider>
   );
