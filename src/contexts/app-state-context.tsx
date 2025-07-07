@@ -17,12 +17,12 @@ interface AppStateContextType {
   setGlobalStateFilter: Dispatch<SetStateAction<string>>;
   
   // Filters
-  selectedLocations: string[];
-  setSelectedLocations: Dispatch<SetStateAction<string[]>>;
-  selectedAssignees: string[];
-  setSelectedAssignees: Dispatch<SetStateAction<string[]>>;
-  selectedStatuses: string[];
-  setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
+  selectedLocation: string;
+  setSelectedLocation: Dispatch<SetStateAction<string>>;
+  selectedAssignee: string;
+  setSelectedAssignee: Dispatch<SetStateAction<string>>;
+  selectedStatus: string;
+  setSelectedStatus: Dispatch<SetStateAction<string>>;
   
   // Filter Options
   locationOptions: OptionType[];
@@ -42,9 +42,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [globalStateFilter, setGlobalStateFilter] = useState('');
   
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<string>('');
+  const [selectedAssignee, setSelectedAssignee] = useState<string>('');
+  const [selectedStatus, setSelectedStatus] = useState<string>('');
   
   const [locationOptions, setLocationOptions] = useState<OptionType[]>([]);
   const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
@@ -58,12 +58,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setSearchTerm,
     globalStateFilter,
     setGlobalStateFilter,
-    selectedLocations,
-    setSelectedLocations,
-    selectedAssignees,
-    setSelectedAssignees,
-    selectedStatuses,
-    setSelectedStatuses,
+    selectedLocation,
+    setSelectedLocation,
+    selectedAssignee,
+    setSelectedAssignee,
+    selectedStatus,
+    setSelectedStatus,
     locationOptions,
     setLocationOptions,
     assigneeOptions,

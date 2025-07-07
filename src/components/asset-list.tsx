@@ -91,9 +91,9 @@ export default function AssetList() {
   const { 
     searchTerm, setSearchTerm,
     isOnline, globalStateFilter, setGlobalStateFilter,
-    selectedLocations, setSelectedLocations,
-    selectedAssignees, setSelectedAssignees,
-    selectedStatuses, setSelectedStatuses,
+    selectedLocation, setSelectedLocation,
+    selectedAssignee, setSelectedAssignee,
+    selectedStatus, setSelectedStatus,
     sortConfig, setLocationOptions, setAssigneeOptions
   } = useAppState();
 
@@ -201,8 +201,8 @@ export default function AssetList() {
   };
 
   const showUnifiedResults = useMemo(() => {
-    return !!searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
-  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses]);
+    return !!searchTerm || !!selectedLocation || !!selectedAssignee || !!selectedStatus;
+  }, [searchTerm, selectedLocation, selectedAssignee, selectedStatus]);
 
 
   const unifiedResults = useMemo(() => {
@@ -211,12 +211,12 @@ export default function AssetList() {
     let results = stateFilteredAssets;
 
     // Apply filters
-    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+    const hasFilters = !!selectedLocation || !!selectedAssignee || !!selectedStatus;
     if (hasFilters) {
         results = results.filter(asset => {
-            const locationMatch = selectedLocations.length === 0 || (asset.location && selectedLocations.includes(asset.location));
-            const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.includes(asset.assignee));
-            const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
+            const locationMatch = !selectedLocation || asset.location === selectedLocation;
+            const assigneeMatch = !selectedAssignee || asset.assignee === selectedAssignee;
+            const statusMatch = !selectedStatus || asset.verifiedStatus === selectedStatus;
             return locationMatch && assigneeMatch && statusMatch;
         });
     }
@@ -235,7 +235,7 @@ export default function AssetList() {
     }
     
     return sortAssets(results, sortConfig);
-}, [showUnifiedResults, searchTerm, stateFilteredAssets, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
+}, [showUnifiedResults, searchTerm, stateFilteredAssets, selectedLocation, selectedAssignee, selectedStatus, sortConfig]);
 
 
   const categoryFilteredAssets = useMemo(() => {
@@ -250,12 +250,12 @@ export default function AssetList() {
 
     let assetsToFilter = baseAssets;
     
-    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+    const hasFilters = !!selectedLocation || !!selectedAssignee || !!selectedStatus;
     if (hasFilters) {
         assetsToFilter = assetsToFilter.filter(asset => {
-            const locationMatch = selectedLocations.length === 0 || (asset.location && selectedLocations.includes(asset.location));
-            const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.includes(asset.assignee));
-            const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
+            const locationMatch = !selectedLocation || asset.location === selectedLocation;
+            const assigneeMatch = !selectedAssignee || asset.assignee === selectedAssignee;
+            const statusMatch = !selectedStatus || asset.verifiedStatus === selectedStatus;
             return locationMatch && assigneeMatch && statusMatch;
         });
     }
@@ -273,7 +273,7 @@ export default function AssetList() {
     }
     
     return sortAssets(assetsToFilter, sortConfig);
-  }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
+  }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocation, selectedAssignee, selectedStatus, sortConfig]);
 
   const groupedResults = useMemo(() => {
     if (!showUnifiedResults) return {};
@@ -439,9 +439,9 @@ export default function AssetList() {
   
   const handleClearSearchAndFilters = () => {
     setSearchTerm('');
-    setSelectedLocations([]);
-    setSelectedAssignees([]);
-    setSelectedStatuses([]);
+    setSelectedLocation('');
+    setSelectedAssignee('');
+    setSelectedStatus('');
   };
 
   if (isLoading) {
@@ -453,7 +453,7 @@ export default function AssetList() {
     const results = unifiedResults;
     
     let title = "Search Results";
-    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+    const hasFilters = !!selectedLocation || !!selectedAssignee || !!selectedStatus;
     
     if (searchTerm && hasFilters) {
         title = "Filtered Search Results";

@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import { usePathname, useRouter } from 'next/navigation';
 import {
   SidebarProvider,
@@ -21,6 +21,19 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectSeparator,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Boxes,
@@ -41,13 +54,12 @@ import { ThemeToggle } from "./theme-toggle";
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { Skeleton } from "./ui/skeleton";
-import { useAppState, type SortConfig } from "@/contexts/app-state-context";
+import { useAppState } from "@/contexts/app-state-context";
 import { Input } from "./ui/input";
 import { Label } from "./ui/label";
 import { Switch } from "./ui/switch";
 import type { OptionType } from "./multi-select-filter";
 import type { Asset } from "@/lib/types";
-import { AssetFilterSheet } from "./asset-filter-sheet";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -59,14 +71,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     searchTerm, setSearchTerm, 
     locationOptions,
     assigneeOptions,
-    selectedLocations, setSelectedLocations,
-    selectedAssignees, setSelectedAssignees,
-    selectedStatuses, setSelectedStatuses,
+    selectedLocation, setSelectedLocation,
+    selectedAssignee, setSelectedAssignee,
+    selectedStatus, setSelectedStatus,
     sortConfig, setSortConfig
   } = useAppState();
   
-  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-
   const handleLogout = () => {
     logout();
     addNotification({
@@ -111,7 +121,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
   };
   
-  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length;
+  const handleClearFilters = () => {
+    setSelectedLocation('');
+    setSelectedAssignee('');
+    setSelectedStatus('');
+  };
+
+  const activeFilterCount = [selectedLocation, selectedAssignee, selectedStatus].filter(Boolean).length;
 
   return (
     <SidebarProvider>
@@ -201,14 +217,63 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             </DropdownMenuContent>
                         </DropdownMenu>
 
-                        <Button variant="ghost" size="icon" className="h-8 w-8 relative" aria-label="Filter assets" onClick={() => setIsFilterSheetOpen(true)}>
-                            <Filter className="h-4 w-4" />
-                            {activeFilterCount > 0 && (
-                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                                    {activeFilterCount}
-                                </span>
-                            )}
-                        </Button>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 relative" aria-label="Filter assets">
+                                    <Filter className="h-4 w-4" />
+                                    {activeFilterCount > 0 && (
+                                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                                            {activeFilterCount}
+                                        </span>
+                                    )}
+                                </Button>
+                            </PopoverTrigger>
+                            <PopoverContent align="end" className="w-[300px] p-0">
+                                <div className="p-4 space-y-4">
+                                    <h4 className="font-medium leading-none">Filters</h4>
+                                    
+                                    <div className="space-y-2">
+                                        <Label>Location</Label>
+                                        <Select value={selectedLocation} onValueChange={(value) => setSelectedLocation(value === 'all' ? '' : value)}>
+                                            <SelectTrigger><SelectValue placeholder="All Locations" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Locations</SelectItem>
+                                                <SelectSeparator />
+                                                {locationOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    
+                                    <div className="space-y-2">
+                                        <Label>Assignee</Label>
+                                        <Select value={selectedAssignee} onValueChange={(value) => setSelectedAssignee(value === 'all' ? '' : value)}>
+                                            <SelectTrigger><SelectValue placeholder="All Assignees" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Assignees</SelectItem>
+                                                <SelectSeparator />
+                                                {assigneeOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Status</Label>
+                                        <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value === 'all' ? '' : value)}>
+                                            <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="all">All Statuses</SelectItem>
+                                                <SelectSeparator />
+                                                {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    
+                                    <Button variant="outline" className="w-full" onClick={handleClearFilters} disabled={activeFilterCount === 0}>
+                                        Clear All Filters
+                                    </Button>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     </div>
                 </div>
             )}
@@ -254,19 +319,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
         <main className="flex-1 flex flex-col p-4 md:p-6">{children}</main>
-        <AssetFilterSheet
-            isOpen={isFilterSheetOpen}
-            onOpenChange={setIsFilterSheetOpen}
-            locationOptions={locationOptions}
-            selectedLocations={selectedLocations}
-            setSelectedLocations={setSelectedLocations}
-            assigneeOptions={assigneeOptions}
-            selectedAssignees={selectedAssignees}
-            setSelectedAssignees={setSelectedAssignees}
-            statusOptions={statusOptions}
-            selectedStatuses={selectedStatuses}
-            setSelectedStatuses={setSelectedStatuses}
-        />
       </div>
     </SidebarProvider>
   );
