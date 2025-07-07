@@ -106,6 +106,13 @@ export default function AssetList() {
     setCurrentPage(1);
   }, [searchTerm, selectedLocation, selectedAssignee, selectedStatus, globalStateFilter, view, currentCategory]);
 
+  // When a search is performed, switch to the dashboard view to show categorized results
+  useEffect(() => {
+    if (searchTerm) {
+      setView('dashboard');
+    }
+  }, [searchTerm]);
+
 
   // --- LOCAL STORAGE PERSISTENCE ---
   useEffect(() => {
@@ -177,9 +184,26 @@ export default function AssetList() {
       });
     }
 }, [assets, globalStateFilter]);
+
+  // Pre-filter assets for the dashboard if a search term is active
+  const displayedAssetsForDashboard = useMemo(() => {
+    let assetsToDisplay = stateFilteredAssets;
+    if (searchTerm) {
+        const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
+        if (lowerCaseSearchTokens.length > 0) {
+            assetsToDisplay = assetsToDisplay.filter(asset => {
+                const assetHaystack = Object.values(asset)
+                    .map(value => (typeof value === 'object' && value !== null) ? Object.values(value).join(' ') : String(value))
+                    .join(' ').toLowerCase();
+                return lowerCaseSearchTokens.every(token => assetHaystack.includes(token));
+            });
+        }
+    }
+    return assetsToDisplay;
+  }, [stateFilteredAssets, searchTerm]);
   
   const assetsByCategory = useMemo(() => {
-    return stateFilteredAssets.reduce((acc, asset) => {
+    return displayedAssetsForDashboard.reduce((acc, asset) => {
         const category = asset.category || 'Uncategorized';
         if (!acc[category]) {
             acc[category] = [];
@@ -187,7 +211,7 @@ export default function AssetList() {
         acc[category].push(asset);
         return acc;
     }, {} as { [key: string]: Asset[] });
-  }, [stateFilteredAssets]);
+  }, [displayedAssetsForDashboard]);
   
   // --- Set Filter Options in Global Context ---
   useEffect(() => {
@@ -210,9 +234,10 @@ export default function AssetList() {
     });
   };
 
+  // The unified results view is now only for filters, not for search.
   const showUnifiedResults = useMemo(() => {
-    return !!searchTerm || !!selectedLocation || !!selectedAssignee || !!selectedStatus;
-  }, [searchTerm, selectedLocation, selectedAssignee, selectedStatus]);
+    return !!selectedLocation || !!selectedAssignee || !!selectedStatus;
+  }, [selectedLocation, selectedAssignee, selectedStatus]);
 
 
   const unifiedResults = useMemo(() => {
@@ -221,15 +246,12 @@ export default function AssetList() {
     let results = stateFilteredAssets;
 
     // Apply filters
-    const hasFilters = !!selectedLocation || !!selectedAssignee || !!selectedStatus;
-    if (hasFilters) {
-        results = results.filter(asset => {
-            const locationMatch = !selectedLocation || asset.location === selectedLocation;
-            const assigneeMatch = !selectedAssignee || asset.assignee === selectedAssignee;
-            const statusMatch = !selectedStatus || asset.verifiedStatus === selectedStatus;
-            return locationMatch && assigneeMatch && statusMatch;
-        });
-    }
+    results = results.filter(asset => {
+        const locationMatch = !selectedLocation || asset.location === selectedLocation;
+        const assigneeMatch = !selectedAssignee || asset.assignee === selectedAssignee;
+        const statusMatch = !selectedStatus || asset.verifiedStatus === selectedStatus;
+        return locationMatch && assigneeMatch && statusMatch;
+    });
     
     // Apply search term to the (already filtered) results
     if (searchTerm) {
@@ -268,6 +290,8 @@ export default function AssetList() {
         });
     }
 
+    // The search term is already applied via `assetsByCategory`, but we re-apply here
+    // in case the user types in the search bar while in the table view.
     if (searchTerm) {
         const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
         if (lowerCaseSearchTokens.length > 0) {
@@ -392,7 +416,7 @@ export default function AssetList() {
   };
   
   const handleExportClick = () => {
-    const assetsToExport = showUnifiedResults ? unifiedResults : (view === 'table' ? categoryFilteredAssets : stateFilteredAssets);
+    const assetsToExport = showUnifiedResults ? unifiedResults : (view === 'table' ? categoryFilteredAssets : displayedAssetsForDashboard);
     if (assetsToExport.length === 0) {
       addNotification({ title: "No Data to Export", description: "There are no assets in the current view to export." });
       return;
@@ -439,7 +463,7 @@ export default function AssetList() {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
-  // UNIFIED RESULTS VIEW (SEARCH OR FILTER)
+  // UNIFIED RESULTS VIEW (FILTERS ONLY)
   if (showUnifiedResults) {
     const results = unifiedResults;
     const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
@@ -449,16 +473,7 @@ export default function AssetList() {
     );
     const areAllResultsSelected = results.length > 0 && results.every(a => selectedAssetIds.includes(a.id));
 
-    let title = "Search Results";
-    const hasFilters = !!selectedLocation || !!selectedAssignee || !!selectedStatus;
-    
-    if (searchTerm && hasFilters) {
-        title = "Filtered Search Results";
-    } else if (searchTerm) {
-        title = `Search Results for "${searchTerm}"`;
-    } else {
-        title = "Filter Results";
-    }
+    const title = "Filter Results";
 
     return (
       <div className="flex flex-col h-full gap-4">
@@ -572,7 +587,7 @@ export default function AssetList() {
                     <div className="text-center py-24 text-muted-foreground">
                         <FolderSearch className="mx-auto h-12 w-12" />
                         <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
-                        <p className="mt-2 text-sm">Try adjusting your search or filter criteria.</p>
+                        <p className="mt-2 text-sm">Try adjusting your filter criteria.</p>
                     </div>
                 )}
               </CardContent>
@@ -594,10 +609,10 @@ export default function AssetList() {
     );
   }
 
-  // DASHBOARD VIEW
+  // DASHBOARD VIEW (NOW INCLUDES SEARCH RESULTS)
   if (view === 'dashboard') {
-    const totalStateAssets = stateFilteredAssets.length;
-    const verifiedStateAssets = stateFilteredAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
+    const totalStateAssets = displayedAssetsForDashboard.length;
+    const verifiedStateAssets = displayedAssetsForDashboard.filter(asset => asset.verifiedStatus === 'Verified').length;
     const verificationPercentage = totalStateAssets > 0 ? (verifiedStateAssets / totalStateAssets) * 100 : 0;
     const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
     
@@ -606,7 +621,7 @@ export default function AssetList() {
         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
         <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight flex-1">
-                Asset Dashboard
+                {searchTerm ? `Results for "${searchTerm}"` : 'Asset Dashboard'}
             </h2>
             <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" onClick={handleImportClick} disabled={isImporting}>
@@ -630,7 +645,7 @@ export default function AssetList() {
         <Card>
              <CardHeader>
                 <CardTitle>
-                    {isAdmin ? (
+                    {isAdmin && !searchTerm ? (
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
                         <Select
@@ -668,7 +683,7 @@ export default function AssetList() {
                     </div>
                     ) : (
                     <>
-                        {globalStateFilter 
+                        {globalStateFilter && !searchTerm
                         ? `Asset Verification Status for ${globalStateFilter}`
                         : `Overall Asset Verification Status`
                         }
@@ -680,39 +695,50 @@ export default function AssetList() {
                 <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
                 <p className="text-sm text-muted-foreground">
                     <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{totalStateAssets}</span> assets verified.
-                    {globalStateFilter && !isAdmin && ` (Total in database: ${assets.length})`}
+                    {searchTerm && ` (across ${Object.keys(assetsByCategory).length} categories)`}
                 </p>
             </CardContent>
         </Card>
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {TARGET_SHEETS.map(category => {
-                const categoryAssets = assetsByCategory[category] || [];
-                const total = categoryAssets.length;
-                const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
-                const percentage = total > 0 ? (verified / total) * 100 : 0;
-                
-                return (
-                    <Card key={category} className="hover:shadow-md transition-shadow flex flex-col">
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">{category}</CardTitle>
-                            <Folder className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent className="flex-grow space-y-4">
-                            <div>
-                                <div className="text-2xl font-bold">{total}</div>
-                                <p className="text-xs text-muted-foreground">Total assets in this category</p>
-                            </div>
-                            <div className="space-y-2">
-                                <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
-                                <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
-                            </div>
-                        </CardContent>
-                        <CardFooter className="pt-0 pb-4">
-                           <Button variant="link" className="p-0 h-auto" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
-                        </CardFooter>
-                    </Card>
-                );
-            })}
+            {Object.keys(assetsByCategory).length > 0 ? (
+                Object.entries(assetsByCategory).sort(([a], [b]) => a.localeCompare(b)).map(([category, categoryAssets]) => {
+                    const total = categoryAssets.length;
+                    const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
+                    const percentage = total > 0 ? (verified / total) * 100 : 0;
+                    
+                    return (
+                        <Card key={category} className="hover:shadow-md transition-shadow flex flex-col">
+                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                                <CardTitle className="text-sm font-medium">{category}</CardTitle>
+                                <Folder className="h-4 w-4 text-muted-foreground" />
+                            </CardHeader>
+                            <CardContent className="flex-grow space-y-4">
+                                <div>
+                                    <div className="text-2xl font-bold">{total}</div>
+                                    <p className="text-xs text-muted-foreground">{searchTerm ? 'Assets found' : 'Total assets'} in this category</p>
+                                </div>
+                                <div className="space-y-2">
+                                    <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
+                                    <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
+                                </div>
+                            </CardContent>
+                            <CardFooter className="pt-0 pb-4">
+                              <Button variant="link" className="p-0 h-auto" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
+                            </CardFooter>
+                        </Card>
+                    );
+                })
+            ) : (
+                <div className="col-span-full text-center py-24 text-muted-foreground">
+                    <FolderSearch className="mx-auto h-12 w-12" />
+                    <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
+                    {searchTerm ? (
+                        <p className="mt-2 text-sm">Your search for "{searchTerm}" did not match any assets.</p>
+                    ) : (
+                        <p className="mt-2 text-sm">Import a file or add an asset to get started.</p>
+                    )}
+                </div>
+            )}
         </div>
         <AssetForm 
           isOpen={isFormOpen} 
