@@ -47,7 +47,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
@@ -57,7 +60,7 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
-import { TARGET_SHEETS, NIGERIAN_ZONES } from "@/lib/constants";
+import { TARGET_SHEETS, NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
@@ -83,7 +86,7 @@ export default function AssetList() {
 
   // --- Global state from context ---
   const { 
-    searchTerm, isOnline, globalStateFilter,
+    searchTerm, isOnline, globalStateFilter, setGlobalStateFilter,
     selectedLocations, selectedAssignees, selectedStatuses,
     sortConfig, setLocationOptions, setAssigneeOptions
   } = useAppState();
@@ -351,8 +354,8 @@ export default function AssetList() {
       return;
     }
     try {
-      const isAdmin = userProfile?.displayName?.trim().toLowerCase() === 'admin';
-      const exportPrefix = isAdmin ? 'admin' : userProfile?.state || 'assets';
+      const isAdminUser = userProfile?.displayName?.trim().toLowerCase() === 'admin';
+      const exportPrefix = isAdminUser ? 'admin' : userProfile?.state || 'assets';
       const fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
 
       exportToExcel(assetsToExport, fileName);
@@ -496,6 +499,7 @@ export default function AssetList() {
     const totalStateAssets = stateFilteredAssets.length;
     const verifiedStateAssets = stateFilteredAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
     const verificationPercentage = totalStateAssets > 0 ? (verifiedStateAssets / totalStateAssets) * 100 : 0;
+    const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
     
     return (
       <div className="flex flex-col h-full gap-4">
@@ -520,19 +524,52 @@ export default function AssetList() {
             </div>
         </div>
         <Card>
-            <CardHeader>
-              <CardTitle>
-                {globalStateFilter 
-                  ? `Asset Verification Status for ${globalStateFilter}`
-                  : `Overall Asset Verification Status`
-                }
-              </CardTitle>
+             <CardHeader>
+                <CardTitle>
+                    {isAdmin ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
+                        <Select
+                            value={globalStateFilter || 'all'}
+                            onValueChange={(value) => setGlobalStateFilter(value === 'all' ? '' : value)}
+                        >
+                        <SelectTrigger className="w-full sm:w-[280px]">
+                            <SelectValue placeholder="Select a location..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Overall (All Assets)</SelectItem>
+                            <SelectSeparator />
+                            <SelectGroup>
+                                <SelectLabel>Geopolitical Zones</SelectLabel>
+                                {ZONE_NAMES.map((zone) => (
+                                    <SelectItem key={zone} value={zone}>{zone}</SelectItem>
+                                ))}
+                            </SelectGroup>
+                            <SelectSeparator />
+                            <SelectGroup>
+                                <SelectLabel>States</SelectLabel>
+                                {NIGERIAN_STATES.map((state) => (
+                                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                                ))}
+                            </SelectGroup>
+                        </SelectContent>
+                        </Select>
+                    </div>
+                    ) : (
+                    <>
+                        {globalStateFilter 
+                        ? `Asset Verification Status for ${globalStateFilter}`
+                        : `Overall Asset Verification Status`
+                        }
+                    </>
+                    )}
+                </CardTitle>
             </CardHeader>
              <CardContent className="pt-2 space-y-2">
                 <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
                 <p className="text-sm text-muted-foreground">
                     <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{totalStateAssets}</span> assets verified.
-                    {globalStateFilter && userProfile?.displayName?.toLowerCase() !== 'admin' && ` (Total in database: ${assets.length})`}
+                    {globalStateFilter && !isAdmin && ` (Total in database: ${assets.length})`}
                 </p>
             </CardContent>
         </Card>
