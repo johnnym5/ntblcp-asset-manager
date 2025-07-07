@@ -284,6 +284,17 @@ export default function AssetList() {
     return sortAssets(assetsToFilter, sortConfig);
   }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
 
+  const groupedResults = useMemo(() => {
+    return unifiedResults.reduce((acc, asset) => {
+        const category = asset.category || 'Uncategorized';
+        if (!acc[category]) {
+            acc[category] = [];
+        }
+        acc[category].push(asset);
+        return acc;
+    }, {} as { [key: string]: Asset[] });
+  }, [unifiedResults]);
+
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
     setIsFormReadOnly(false);
@@ -441,17 +452,7 @@ export default function AssetList() {
   // UNIFIED RESULTS VIEW (SEARCH OR FILTER)
   if (showUnifiedResults) {
     const results = unifiedResults;
-     const groupedResults = useMemo(() => {
-        return results.reduce((acc, asset) => {
-            const category = asset.category || 'Uncategorized';
-            if (!acc[category]) {
-                acc[category] = [];
-            }
-            acc[category].push(asset);
-            return acc;
-        }, {} as { [key: string]: Asset[] });
-    }, [results]);
-
+    
     let title = "Search Results";
     const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
     
@@ -911,5 +912,6 @@ export default function AssetList() {
     </div>
   );
 }
+
 
 
