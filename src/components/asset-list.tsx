@@ -410,9 +410,9 @@ export default function AssetList() {
     }
   };
   
-  const handleSelectAll = (checked: boolean, assetsInView: Asset[]) => {
+  const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
     if (checked) {
-      setSelectedAssetIds(assetsInView.map(a => a.id));
+      setSelectedAssetIds(allFilteredAssets.map(a => a.id));
     } else {
       setSelectedAssetIds([]);
     }
@@ -447,7 +447,7 @@ export default function AssetList() {
       (currentPage - 1) * ITEMS_PER_PAGE,
       currentPage * ITEMS_PER_PAGE
     );
-    const areAllInViewSelected = selectedAssetIds.length > 0 && paginatedResults.every(a => selectedAssetIds.includes(a.id));
+    const areAllResultsSelected = results.length > 0 && results.every(a => selectedAssetIds.includes(a.id));
 
     let title = "Search Results";
     const hasFilters = !!selectedLocation || !!selectedAssignee || !!selectedStatus;
@@ -507,9 +507,9 @@ export default function AssetList() {
                         <TableRow>
                             <TableHead className="w-[50px]">
                                 <Checkbox
-                                    checked={areAllInViewSelected}
-                                    onCheckedChange={(checked) => handleSelectAll(checked as boolean, paginatedResults)}
-                                    aria-label="Select all on this page"
+                                    checked={areAllResultsSelected}
+                                    onCheckedChange={(checked) => handleSelectAll(checked as boolean, results)}
+                                    aria-label="Select all results"
                                 />
                             </TableHead>
                             <TableHead>Description</TableHead>
@@ -750,7 +750,7 @@ export default function AssetList() {
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
-  const areAllCategoryPageSelected = paginatedCategoryAssets.length > 0 && paginatedCategoryAssets.every(a => selectedAssetIds.includes(a.id));
+  const areAllCategoryResultsSelected = filteredAssets.length > 0 && filteredAssets.every(a => selectedAssetIds.includes(a.id));
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -800,9 +800,9 @@ export default function AssetList() {
                       <TableRow>
                       <TableHead className="w-[50px]">
                           <Checkbox
-                              checked={areAllCategoryPageSelected}
-                              onCheckedChange={(checked) => handleSelectAll(checked as boolean, paginatedCategoryAssets)}
-                              aria-label="Select all on this page"
+                              checked={areAllCategoryResultsSelected}
+                              onCheckedChange={(checked) => handleSelectAll(checked as boolean, filteredAssets)}
+                              aria-label="Select all in this category"
                           />
                       </TableHead>
                       <TableHead>S/N</TableHead>
