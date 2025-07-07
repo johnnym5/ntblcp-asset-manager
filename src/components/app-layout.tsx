@@ -35,7 +35,8 @@ import {
   Filter,
   ArrowUpDown,
 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+import { addNotification } from "@/hooks/use-notifications";
+import { NotificationBell } from "./notification-bell";
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/auth-context";
@@ -50,7 +51,6 @@ import type { Asset } from "@/lib/types";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { toast } = useToast();
   const { userProfile, loading, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -67,7 +67,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const handleLogout = () => {
     logout();
-    toast({
+    addNotification({
       title: 'Session Ended',
       description: 'You have been logged out.',
     });
@@ -131,7 +131,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Switch
                   id="online-mode-toggle"
                   checked={isOnline}
-                  onCheckedChange={setIsOnline}
+                  onCheckedChange={(online) => {
+                    setIsOnline(online);
+                    addNotification({
+                      title: `Mode Changed to ${online ? 'Online' : 'Offline'}`,
+                      description: online
+                        ? 'Application is now connected to the server.'
+                        : 'Application is running in offline mode.',
+                    });
+                  }}
                   aria-label={`Switch to ${isOnline ? 'Offline' : 'Online'} mode`}
                 />
               </div>
@@ -223,6 +231,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
           </div>
           <div className="flex items-center gap-2">
+            <NotificationBell />
             <ThemeToggle />
             {loading ? (
               <Skeleton className="h-10 w-10 rounded-full" />

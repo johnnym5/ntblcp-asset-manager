@@ -40,7 +40,7 @@ import { AssetChecklist } from "./asset-checklist";
 import { useAuth } from "@/contexts/auth-context";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { validateAssetLabel } from "@/ai/flows/ocr-asset-validation";
-import { useToast } from "@/hooks/use-toast";
+import { addNotification } from "@/hooks/use-notifications";
 import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Label } from "./ui/label";
 
@@ -84,7 +84,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { userProfile } = useAuth();
   const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
-  const { toast } = useToast();
   
   const defaultValues = {
     category: '',
@@ -155,9 +154,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
         verifiedStatus: quickViewStatus,
         verifiedDate,
       });
-      toast({ title: "Saved", description: "Your changes have been saved locally." });
+      addNotification({ title: "Saved", description: "Your changes have been saved locally." });
     } catch(e) {
-      toast({ title: "Error", description: "Could not save changes.", variant: "destructive" });
+      addNotification({ title: "Error", description: "Could not save changes.", variant: "destructive" });
     } finally {
       setIsQuickSaving(false);
     }
@@ -177,7 +176,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     setIsScanning(true);
     setScanResult(null);
     setScanError(null);
-    toast({ title: 'AI Scan Started', description: 'Analyzing the asset label...' });
+    addNotification({ title: 'AI Scan Started', description: 'Analyzing the asset label...' });
 
     try {
       const reader = new FileReader();
@@ -191,10 +190,10 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
 
         if (result.extractedData && Object.keys(result.extractedData).length > 0) {
             setScanResult(result.extractedData);
-            toast({ title: 'Scan Complete', description: 'AI has extracted data from the image.' });
+            addNotification({ title: 'Scan Complete', description: 'AI has extracted data from the image.' });
         } else {
             setScanError('The AI could not extract any relevant data from the image. Please try another image or enter the data manually.');
-            toast({ title: 'Scan Inconclusive', description: 'No data could be extracted.', variant: 'destructive' });
+            addNotification({ title: 'Scan Inconclusive', description: 'No data could be extracted.', variant: 'destructive' });
         }
       };
       reader.onerror = (error) => {
@@ -202,7 +201,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
       };
     } catch (e: any) {
       setScanError(`An error occurred during the AI scan: ${e.message}`);
-      toast({ title: 'AI Scan Failed', description: e.message, variant: 'destructive' });
+      addNotification({ title: 'AI Scan Failed', description: e.message, variant: 'destructive' });
     } finally {
       setIsScanning(false);
     }
@@ -222,7 +221,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
           }
       }
       
-      toast({ title: 'Suggestions Applied', description: `Applied ${appliedCount} fields from the AI scan.` });
+      addNotification({ title: 'Suggestions Applied', description: `Applied ${appliedCount} fields from the AI scan.` });
       setScanResult(null);
   }
 

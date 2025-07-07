@@ -59,7 +59,7 @@ import { Progress } from "@/components/ui/progress";
 
 import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
-import { useToast } from "@/hooks/use-toast";
+import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { TARGET_SHEETS, NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
@@ -74,7 +74,6 @@ export default function AssetList() {
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { toast } = useToast();
   const { userProfile } = useAuth();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
@@ -103,7 +102,7 @@ export default function AssetList() {
       }
     } catch (error) {
       console.error("Failed to load assets from local storage", error);
-      toast({ 
+      addNotification({ 
         title: "Could not load saved data", 
         description: "There was an error reading your locally saved assets.", 
         variant: "destructive" 
@@ -111,7 +110,7 @@ export default function AssetList() {
     } finally {
       setIsLoading(false);
     }
-  }, [toast]);
+  }, []);
 
   useEffect(() => {
     if (!isLoading) {
@@ -125,30 +124,18 @@ export default function AssetList() {
         console.error("Failed to save assets to local storage", error);
         
         let description = `There was an error saving your assets locally. ${error instanceof Error ? error.message : ''}`;
-        // Check for QuotaExceededError which is what happens when localStorage is full
         if (error && (error.name === 'QuotaExceededError' || (error.message && error.message.toLowerCase().includes('quota')))) {
             description = "Browser storage limit reached. Please export and then clear your existing assets before importing a large new file.";
         }
         
-        toast({ 
+        addNotification({ 
           title: "Storage Error", 
           description: description, 
           variant: "destructive" 
         });
       }
     }
-  }, [assets, isLoading, toast]);
-
-
-  // --- Mode Change Notifier ---
-  useEffect(() => {
-    toast({
-        title: `Mode Changed to ${isOnline ? 'Online' : 'Offline'}`,
-        description: isOnline 
-            ? 'Application is now connected to the server.'
-            : 'Application is running in offline mode. Changes are saved locally.',
-    });
-  }, [isOnline, toast]);
+  }, [assets, isLoading]);
 
 
   const stateFilteredAssets = useMemo(() => {
@@ -285,6 +272,7 @@ export default function AssetList() {
   }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
 
   const groupedResults = useMemo(() => {
+    if (!showUnifiedResults) return {};
     return unifiedResults.reduce((acc, asset) => {
         const category = asset.category || 'Uncategorized';
         if (!acc[category]) {
@@ -293,7 +281,7 @@ export default function AssetList() {
         acc[category].push(asset);
         return acc;
     }, {} as { [key: string]: Asset[] });
-  }, [unifiedResults]);
+  }, [unifiedResults, showUnifiedResults]);
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -315,9 +303,9 @@ export default function AssetList() {
   
   const handleDeleteConfirm = async () => {
     if (assetToDelete) {
-        toast({ title: "Deleting Asset...", description: `Removing "${assetToDelete.description}"` });
+        addNotification({ title: "Deleting Asset...", description: `Removing "${assetToDelete.description}"` });
         setAssets(prev => prev.filter(a => a.id !== assetToDelete.id));
-        toast({ title: "Asset Deleted", description: `Asset was successfully removed.`});
+        addNotification({ title: "Asset Deleted", description: `Asset was successfully removed.`});
     }
     setAssetToDelete(null);
     setIsDeleteDialogOpen(false);
@@ -326,11 +314,11 @@ export default function AssetList() {
   const handleBatchDelete = async () => {
     setIsBatchDeleting(true);
     const assetsToDeleteCount = selectedAssetIds.length;
-    toast({ title: "Deleting Assets...", description: `Removing ${assetsToDeleteCount} selected assets.` });
+    addNotification({ title: "Deleting Assets...", description: `Removing ${assetsToDeleteCount} selected assets.` });
     
     setAssets(prev => prev.filter(asset => !selectedAssetIds.includes(asset.id)));
     
-    toast({ title: "Assets Deleted", description: `Successfully removed ${assetsToDeleteCount} assets.`});
+    addNotification({ title: "Assets Deleted", description: `Successfully removed ${assetsToDeleteCount} assets.`});
     setSelectedAssetIds([]);
     setIsBatchDeleting(false);
   }
@@ -339,7 +327,7 @@ export default function AssetList() {
   
   const handleSaveBatchEdit = async (data: BatchUpdateData) => {
     const assetsToUpdateCount = selectedAssetIds.length;
-    toast({ title: "Batch Updating Assets...", description: `Applying changes to ${assetsToUpdateCount} assets.` });
+    addNotification({ title: "Batch Updating Assets...", description: `Applying changes to ${assetsToUpdateCount} assets.` });
     
     setAssets(prev => prev.map(asset => {
         if (selectedAssetIds.includes(asset.id)) {
@@ -354,12 +342,12 @@ export default function AssetList() {
         return asset;
     }));
     
-    toast({ title: "Assets Updated", description: `Successfully updated ${assetsToUpdateCount} assets.`});
+    addNotification({ title: "Assets Updated", description: `Successfully updated ${assetsToUpdateCount} assets.`});
     setSelectedAssetIds([]);
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    toast({ title: "Saving Asset Locally...", description: "Your changes are being saved." });
+    addNotification({ title: "Saving Asset Locally...", description: "Your changes are being saved." });
     setAssets(prev => {
         const existingAsset = prev.find(a => a.id === assetToSave.id);
         if (existingAsset) {
@@ -367,7 +355,7 @@ export default function AssetList() {
         }
         return [...prev, assetToSave];
     });
-    toast({ title: "Saved Successfully", description: "Asset changes have been saved locally." });
+    addNotification({ title: "Saved Successfully", description: "Asset changes have been saved locally." });
     setIsFormOpen(false);
   };
 
@@ -382,21 +370,21 @@ export default function AssetList() {
     if (!file) return;
 
     setIsImporting(true);
-    toast({ title: "Parsing file...", description: "Please wait while we process your Excel file." });
+    addNotification({ title: "Parsing file...", description: "Please wait while we process your Excel file." });
     
     const { assetsBySheet, errors, skippedRows } = await parseExcelFile(file);
     
-    errors.forEach(error => toast({ title: "Import Error", description: error, variant: "destructive" }));
+    errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skippedRows > 0) {
-        toast({ title: "Import Notice", description: `${skippedRows} rows were skipped due to missing required fields.` });
+        addNotification({ title: "Import Notice", description: `${skippedRows} rows were skipped due to missing required fields.` });
     }
 
     const allNewAssets = Object.values(assetsBySheet).flat();
     if (allNewAssets.length > 0) {
         setAssets(prev => [...prev, ...allNewAssets]);
-        toast({ title: "Import Successful", description: `Successfully imported ${allNewAssets.length} new assets. Data is saved locally.` });
+        addNotification({ title: "Import Successful", description: `Successfully imported ${allNewAssets.length} new assets. Data is saved locally.` });
     } else if (errors.length === 0) {
-        toast({ title: "No Data Found", description: "No valid asset sheets were found in the file."});
+        addNotification({ title: "No Data Found", description: "No valid asset sheets were found in the file."});
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -406,7 +394,7 @@ export default function AssetList() {
   const handleExportClick = () => {
     const assetsToExport = showUnifiedResults ? unifiedResults : (view === 'table' ? categoryFilteredAssets : stateFilteredAssets);
     if (assetsToExport.length === 0) {
-      toast({ title: "No Data to Export", description: "There are no assets in the current view to export." });
+      addNotification({ title: "No Data to Export", description: "There are no assets in the current view to export." });
       return;
     }
     try {
@@ -415,10 +403,10 @@ export default function AssetList() {
       const fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
 
       exportToExcel(assetsToExport, fileName);
-      toast({ title: "Export Successful" });
+      addNotification({ title: "Export Successful" });
     } catch(error) {
       console.error("Export Error:", error);
-      toast({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
+      addNotification({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
     }
   };
   
@@ -441,7 +429,7 @@ export default function AssetList() {
   
   const handleClearAllAssets = () => {
     setAssets([]);
-    toast({ title: "All Assets Cleared", description: "Your local asset database has been cleared." });
+    addNotification({ title: "All Assets Cleared", description: "Your local asset database has been cleared." });
     setIsClearAllDialogOpen(false);
   }
 
@@ -548,7 +536,7 @@ export default function AssetList() {
                                                     onValueChange={(status) => {
                                                       const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
                                                       handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate });
-                                                      toast({ title: "Status Updated", description: `Asset status changed to ${status}.` });
+                                                      addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
                                                     }}
                                                   >
                                                     <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
@@ -825,7 +813,7 @@ export default function AssetList() {
                                 verifiedStatus: status as any,
                                 verifiedDate,
                               });
-                              toast({
+                              addNotification({
                                 title: "Status Updated",
                                 description: `Asset status changed to ${status}.`,
                               });
@@ -912,6 +900,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-
-
