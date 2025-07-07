@@ -30,6 +30,8 @@ export const NIGERIAN_ZONES: Record<string, string[]> = {
 
 export const ZONE_NAMES = Object.keys(NIGERIAN_ZONES);
 
+export const SPECIAL_LOCATIONS = ["FCMS", "FCT", "NTBLCP"];
+
 
 // This defines the expected headers for each sheet.
 // The parser will use this to find the header row and map columns.

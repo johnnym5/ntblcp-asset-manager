@@ -62,7 +62,7 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
-import { TARGET_SHEETS, NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES } from "@/lib/constants";
+import { TARGET_SHEETS, NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
@@ -645,6 +645,13 @@ export default function AssetList() {
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Overall (All Assets)</SelectItem>
+                            <SelectSeparator />
+                            <SelectGroup>
+                                <SelectLabel>Special Locations</SelectLabel>
+                                {SPECIAL_LOCATIONS.map((loc) => (
+                                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                                ))}
+                            </SelectGroup>
                             <SelectSeparator />
                             <SelectGroup>
                                 <SelectLabel>Geopolitical Zones</SelectLabel>

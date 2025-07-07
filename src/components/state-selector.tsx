@@ -23,7 +23,7 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { NIGERIAN_STATES, ZONE_NAMES } from '@/lib/constants';
+import { NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
 
 interface UserProfileSetupProps {
@@ -62,7 +62,7 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
         <AlertDialogHeader>
           <AlertDialogTitle>Complete Your Profile</AlertDialogTitle>
           <AlertDialogDescription>
-            Please provide your name and assigned state/zone.
+            Please provide your name and assigned location.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="py-4 space-y-4">
@@ -76,12 +76,21 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
           </div>
           {!isAdmin && (
             <div className="space-y-2">
-              <Label htmlFor="state">Assigned Zone or State</Label>
+              <Label htmlFor="state">Assigned Location</Label>
               <Select onValueChange={setSelectedState} value={selectedState}>
                 <SelectTrigger id="state">
-                  <SelectValue placeholder="Select a zone or state..." />
+                  <SelectValue placeholder="Select a location..." />
                 </SelectTrigger>
                 <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>Special Locations</SelectLabel>
+                    {SPECIAL_LOCATIONS.map((loc) => (
+                      <SelectItem key={loc} value={loc}>
+                        {loc}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectSeparator />
                   <SelectGroup>
                     <SelectLabel>Geopolitical Zones</SelectLabel>
                     {ZONE_NAMES.map((zone) => (
