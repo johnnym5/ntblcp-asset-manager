@@ -41,6 +41,7 @@ import {
   Check,
   FileText,
   ClipboardEdit,
+  FolderSearch,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -247,18 +248,41 @@ export default function AssetList() {
 
 
   const categoryFilteredAssets = useMemo(() => {
-    if (view !== 'table' || !currentCategory) return [];
-    let baseAssets = assetsByCategory[currentCategory] || [];
+    let baseAssets: Asset[];
+    if (view === 'table' && currentCategory) {
+        baseAssets = assetsByCategory[currentCategory] || [];
+    } else {
+        // This case is for when we are not in a specific category table view.
+        // The dashboard view filtering will be handled by a different memo.
+        return [];
+    }
 
-    let assetsToFilter = baseAssets.filter(asset => {
-        const locationMatch = selectedLocations.length === 0 || (asset.location && selectedLocations.includes(asset.location));
-        const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.includes(asset.assignee));
-        const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
-        return locationMatch && assigneeMatch && statusMatch;
-    });
+    let assetsToFilter = baseAssets;
+    
+    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+    if (hasFilters) {
+        assetsToFilter = assetsToFilter.filter(asset => {
+            const locationMatch = selectedLocations.length === 0 || (asset.location && selectedLocations.includes(asset.location));
+            const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.includes(asset.assignee));
+            const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
+            return locationMatch && assigneeMatch && statusMatch;
+        });
+    }
+
+    if (searchTerm) {
+        const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
+        if (lowerCaseSearchTokens.length > 0) {
+            assetsToFilter = assetsToFilter.filter(asset => {
+                const assetHaystack = Object.values(asset)
+                    .map(value => (typeof value === 'object' && value !== null) ? Object.values(value).join(' ') : String(value))
+                    .join(' ').toLowerCase();
+                return lowerCaseSearchTokens.every(token => assetHaystack.includes(token));
+            });
+        }
+    }
     
     return sortAssets(assetsToFilter, sortConfig);
-  }, [view, currentCategory, assetsByCategory, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
+  }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -386,10 +410,19 @@ export default function AssetList() {
       toast({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
     }
   };
-
-  const handleSelectAll = (checked: boolean, assetsToSelect: Asset[]) => {
-    setSelectedAssetIds(checked ? assetsToSelect.map(a => a.id) : []);
+  
+  const handleSelectAllForGroup = (checked: boolean, assetsToSelect: Asset[]) => {
+    const groupIds = assetsToSelect.map(a => a.id);
+    setSelectedAssetIds(prev => {
+        const otherIds = prev.filter(id => !groupIds.includes(id));
+        return checked ? [...otherIds, ...groupIds] : otherIds;
+    });
   };
+
+  const areAllInGroupSelected = (assetsInGroup: Asset[]) => {
+      if (assetsInGroup.length === 0) return false;
+      return assetsInGroup.every(asset => selectedAssetIds.includes(asset.id));
+  }
 
   const handleSelectSingle = (assetId: string, checked: boolean) => {
     setSelectedAssetIds(prev => checked ? [...prev, assetId] : prev.filter(id => id !== assetId));
@@ -408,6 +441,17 @@ export default function AssetList() {
   // UNIFIED RESULTS VIEW (SEARCH OR FILTER)
   if (showUnifiedResults) {
     const results = unifiedResults;
+     const groupedResults = useMemo(() => {
+        return results.reduce((acc, asset) => {
+            const category = asset.category || 'Uncategorized';
+            if (!acc[category]) {
+                acc[category] = [];
+            }
+            acc[category].push(asset);
+            return acc;
+        }, {} as { [key: string]: Asset[] });
+    }, [results]);
+
     let title = "Search Results";
     const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
     
@@ -454,78 +498,94 @@ export default function AssetList() {
               )}
           </div>
           
-          <div className="rounded-lg border shadow-sm flex-1 overflow-auto">
-              <Table>
-                  <TableHeader>
-                      <TableRow>
-                      <TableHead className="w-[50px]">
-                          <Checkbox
-                              checked={results.length > 0 && selectedAssetIds.length === results.length}
-                              onCheckedChange={(checked) => handleSelectAll(checked as boolean, results)}
-                              aria-label="Select all"
-                          />
-                      </TableHead>
-                      <TableHead>Category</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>Asset ID</TableHead>
-                      <TableHead>Location</TableHead>
-                      <TableHead>Verified Status</TableHead>
-                      <TableHead className="w-[50px] text-right">Actions</TableHead>
-                      </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                      {results.length > 0 ? (
-                      results.map((asset) => (
-                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
-                          <TableCell onClick={e => e.stopPropagation()}>
-                              <Checkbox 
-                                  checked={selectedAssetIds.includes(asset.id)}
-                                  onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
-                                  aria-label={`Select asset ${asset.description}`}
-                              />
-                          </TableCell>
-                          <TableCell>{asset.category}</TableCell>
-                          <TableCell className="font-medium">{asset.description}</TableCell>
-                          <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
-                          <TableCell>{asset.location || 'N/A'}</TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Select
-                              value={asset.verifiedStatus || "Unverified"}
-                              onValueChange={(status) => {
-                                const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
-                                handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate });
-                                toast({ title: "Status Updated", description: `Asset status changed to ${status}.` });
-                              }}
-                            >
-                              <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4" />Unverified</div></SelectItem>
-                                <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4" />Verified</div></SelectItem>
-                                <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4" />Discrepancy</div></SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                              <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
-                                      <Edit className="mr-2 h-4 w-4" /> Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
-                                      <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                  </DropdownMenuItem>
-                              </DropdownMenuContent>
-                              </DropdownMenu>
-                          </TableCell>
-                          </TableRow>
-                      ))
-                      ) : (
-                          <TableRow><TableCell colSpan={7} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
-                      )}
-                  </TableBody>
-              </Table>
-          </div>
+          <div className="flex-1 overflow-auto space-y-6">
+                {Object.keys(groupedResults).length > 0 ? (
+                    Object.entries(groupedResults).map(([category, categoryAssets]) => (
+                        <Card key={category}>
+                            <CardHeader>
+                                <CardTitle>
+                                    {category} 
+                                    <span className="text-muted-foreground font-normal ml-2">({categoryAssets.length} found)</span>
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="p-0">
+                                <Table>
+                                    <TableHeader>
+                                      <TableRow>
+                                          <TableHead className="w-[50px]">
+                                              <Checkbox
+                                                  checked={areAllInGroupSelected(categoryAssets)}
+                                                  onCheckedChange={(checked) => handleSelectAllForGroup(checked as boolean, categoryAssets)}
+                                                  aria-label={`Select all in ${category}`}
+                                              />
+                                          </TableHead>
+                                          <TableHead>Description</TableHead>
+                                          <TableHead>Asset ID</TableHead>
+                                          <TableHead>Location</TableHead>
+                                          <TableHead>Assignee</TableHead>
+                                          <TableHead>Verified Status</TableHead>
+                                          <TableHead className="w-[50px] text-right">Actions</TableHead>
+                                      </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {categoryAssets.map(asset => (
+                                            <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                                                <TableCell onClick={e => e.stopPropagation()}>
+                                                    <Checkbox 
+                                                        checked={selectedAssetIds.includes(asset.id)}
+                                                        onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
+                                                        aria-label={`Select asset ${asset.description}`}
+                                                    />
+                                                </TableCell>
+                                                <TableCell className="font-medium">{asset.description}</TableCell>
+                                                <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
+                                                <TableCell>{asset.location || 'N/A'}</TableCell>
+                                                <TableCell>{asset.assignee || 'N/A'}</TableCell>
+                                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                                  <Select
+                                                    value={asset.verifiedStatus || "Unverified"}
+                                                    onValueChange={(status) => {
+                                                      const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
+                                                      handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate });
+                                                      toast({ title: "Status Updated", description: `Asset status changed to ${status}.` });
+                                                    }}
+                                                  >
+                                                    <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
+                                                    <SelectContent>
+                                                      <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4" />Unverified</div></SelectItem>
+                                                      <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4" />Verified</div></SelectItem>
+                                                      <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4" />Discrepancy</div></SelectItem>
+                                                    </SelectContent>
+                                                  </Select>
+                                                </TableCell>
+                                                <TableCell className="text-right" onClick={e => e.stopPropagation()}>
+                                                    <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end">
+                                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
+                                                            <Edit className="mr-2 h-4 w-4" /> Edit
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
+                                                            <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                                        </DropdownMenuItem>
+                                                    </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            </CardContent>
+                        </Card>
+                    ))
+                ) : (
+                    <div className="text-center py-24 text-muted-foreground">
+                        <FolderSearch className="mx-auto h-12 w-12" />
+                        <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
+                        <p className="mt-2 text-sm">Try adjusting your search or filter criteria.</p>
+                    </div>
+                )}
+            </div>
           <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} />
           <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
           <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the asset from your local data.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
@@ -687,7 +747,7 @@ export default function AssetList() {
             </h2>
             {selectedAssetIds.length > 0 ? (
                 <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
+                    <span className="text-sm text-muted-foreground">{selectedAssetIds.length} of {categoryFilteredAssets.length} selected</span>
                      {selectedAssetIds.length === 1 && (
                         <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
@@ -723,14 +783,15 @@ export default function AssetList() {
                     <TableRow>
                     <TableHead className="w-[50px]">
                         <Checkbox
-                            checked={categoryFilteredAssets.length > 0 && selectedAssetIds.length === categoryFilteredAssets.length}
-                            onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
-                            aria-label="Select all"
+                            checked={categoryFilteredAssets.length > 0 && areAllInGroupSelected(categoryFilteredAssets)}
+                            onCheckedChange={(checked) => handleSelectAllForGroup(checked as boolean, categoryFilteredAssets)}
+                            aria-label="Select all in this category"
                         />
                     </TableHead>
                     <TableHead>S/N</TableHead>
                     <TableHead>Description</TableHead>
                     <TableHead>Asset ID</TableHead>
+                    <TableHead>Assignee</TableHead>
                     <TableHead>Verified Status</TableHead>
                     <TableHead>Verified Date</TableHead>
                     <TableHead className="w-[50px] text-right">Actions</TableHead>
@@ -750,6 +811,7 @@ export default function AssetList() {
                         <TableCell>{asset.sn || 'N/A'}</TableCell>
                         <TableCell className="font-medium">{asset.description}</TableCell>
                         <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
+                        <TableCell>{asset.assignee || 'N/A'}</TableCell>
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <Select
                             value={asset.verifiedStatus || "Unverified"}
@@ -849,4 +911,5 @@ export default function AssetList() {
     </div>
   );
 }
+
 
