@@ -62,11 +62,12 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
-import { TARGET_SHEETS, NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
+import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
+import { getAssetsListener, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets } from "@/lib/firestore";
 
 const ITEMS_PER_PAGE = 25;
 
@@ -134,49 +135,47 @@ export default function AssetList() {
   }, [searchTerm]);
 
 
-  // --- LOCAL STORAGE PERSISTENCE ---
+  // --- FIRESTORE DATA LISTENER & MIGRATION ---
   useEffect(() => {
-    try {
-      const localData = localStorage.getItem('ntblcp-assets');
-      if (localData) {
-        setAssets(JSON.parse(localData));
+    const migrateData = async () => {
+      try {
+        const migrated = localStorage.getItem('migratedToFirestore');
+        if (migrated === 'true') return;
+
+        const localData = localStorage.getItem('ntblcp-assets');
+        if (localData) {
+          const localAssets: Asset[] = JSON.parse(localData);
+          if (localAssets.length > 0) {
+            addNotification({ title: 'Migrating Data', description: `Moving ${localAssets.length} local assets to Firestore...` });
+            await batchSetAssets(localAssets);
+            localStorage.setItem('migratedToFirestore', 'true');
+            localStorage.removeItem('ntblcp-assets'); // Clean up old data
+            addNotification({ title: 'Migration Complete', description: 'Your data is now stored online.' });
+          } else {
+             localStorage.setItem('migratedToFirestore', 'true');
+          }
+        }
+      } catch (error) {
+        console.error('Migration failed:', error);
+        addNotification({ title: 'Migration Failed', description: 'Could not move local data to Firestore.', variant: 'destructive' });
       }
-    } catch (error) {
-      console.error("Failed to load assets from local storage", error);
-      addNotification({ 
-        title: "Could not load saved data", 
-        description: "There was an error reading your locally saved assets.", 
-        variant: "destructive" 
-      });
-    } finally {
-      setIsLoading(false);
+    };
+
+    if (isOnline) {
+      migrateData();
     }
-  }, []);
+  }, [isOnline]);
 
   useEffect(() => {
-    if (!isLoading) {
-      try {
-        if (assets.length === 0 && localStorage.getItem('ntblcp-assets')) {
-          localStorage.removeItem('ntblcp-assets');
-        } else if (assets.length > 0) {
-          localStorage.setItem('ntblcp-assets', JSON.stringify(assets));
-        }
-      } catch (error: any) {
-        console.error("Failed to save assets to local storage", error);
-        
-        let description = `There was an error saving your assets locally. ${error instanceof Error ? error.message : ''}`;
-        if (error && (error.name === 'QuotaExceededError' || (error.message && error.message.toLowerCase().includes('quota')))) {
-            description = "Browser storage limit reached. Please export and then clear your existing assets before importing a large new file.";
-        }
-        
-        addNotification({ 
-          title: "Storage Error", 
-          description: description, 
-          variant: "destructive" 
-        });
-      }
-    }
-  }, [assets, isLoading]);
+    setIsLoading(true);
+    const unsubscribe = getAssetsListener((fetchedAssets) => {
+      setAssets(fetchedAssets);
+      setIsLoading(false);
+    });
+
+    return () => unsubscribe(); // Cleanup listener on unmount
+  }, []);
+
 
 
   const stateFilteredAssets = useMemo(() => {
@@ -374,8 +373,12 @@ export default function AssetList() {
   const handleDeleteConfirm = async () => {
     if (assetToDelete) {
         addNotification({ title: "Deleting Asset...", description: `Removing "${assetToDelete.description}"` });
-        setAssets(prev => prev.filter(a => a.id !== assetToDelete.id));
-        addNotification({ title: "Asset Deleted", description: `Asset was successfully removed.`});
+        try {
+            await deleteAsset(assetToDelete.id);
+            addNotification({ title: "Asset Deleted", description: `Asset was successfully removed.`});
+        } catch(e) {
+            addNotification({ title: "Error", description: "Could not delete asset.", variant: "destructive" });
+        }
     }
     setAssetToDelete(null);
     setIsDeleteDialogOpen(false);
@@ -386,11 +389,15 @@ export default function AssetList() {
     const assetsToDeleteCount = selectedAssetIds.length;
     addNotification({ title: "Deleting Assets...", description: `Removing ${assetsToDeleteCount} selected assets.` });
     
-    setAssets(prev => prev.filter(asset => !selectedAssetIds.includes(asset.id)));
-    
-    addNotification({ title: "Assets Deleted", description: `Successfully removed ${assetsToDeleteCount} assets.`});
-    setSelectedAssetIds([]);
-    setIsBatchDeleting(false);
+    try {
+        await batchDeleteAssets(selectedAssetIds);
+        addNotification({ title: "Assets Deleted", description: `Successfully removed ${assetsToDeleteCount} assets.`});
+        setSelectedAssetIds([]);
+    } catch(e) {
+        addNotification({ title: "Error", description: "Could not delete all selected assets.", variant: "destructive" });
+    } finally {
+        setIsBatchDeleting(false);
+    }
   }
 
   const handleBatchEdit = () => setIsBatchEditOpen(true);
@@ -399,7 +406,8 @@ export default function AssetList() {
     const assetsToUpdateCount = selectedAssetIds.length;
     addNotification({ title: "Batch Updating Assets...", description: `Applying changes to ${assetsToUpdateCount} assets.` });
     
-    setAssets(prev => prev.map(asset => {
+    const updates: Promise<void>[] = [];
+    assets.forEach(asset => {
         if (selectedAssetIds.includes(asset.id)) {
             const updatedAsset = { ...asset, ...data };
             if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
@@ -407,30 +415,35 @@ export default function AssetList() {
             } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
                  updatedAsset.verifiedDate = '';
             }
-            return updatedAsset;
+            updates.push(updateAsset(updatedAsset));
         }
-        return asset;
-    }));
-    
-    addNotification({ title: "Assets Updated", description: `Successfully updated ${assetsToUpdateCount} assets.`});
-    setSelectedAssetIds([]);
+    });
+
+    try {
+        await Promise.all(updates);
+        addNotification({ title: "Assets Updated", description: `Successfully updated ${assetsToUpdateCount} assets.`});
+        setSelectedAssetIds([]);
+    } catch(e) {
+        addNotification({ title: "Error", description: "Could not update all selected assets.", variant: "destructive" });
+    }
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    addNotification({ title: "Saving Asset Locally...", description: "Your changes are being saved." });
-    setAssets(prev => {
-        const existingAsset = prev.find(a => a.id === assetToSave.id);
-        if (existingAsset) {
-            return prev.map(a => a.id === assetToSave.id ? assetToSave : a);
-        }
-        return [...prev, assetToSave];
-    });
-    addNotification({ title: "Saved Successfully", description: "Asset changes have been saved locally." });
-    setIsFormOpen(false);
+    addNotification({ title: "Saving Asset...", description: "Syncing with the online database." });
+    try {
+        await updateAsset(assetToSave);
+        addNotification({ title: "Saved Successfully", description: "Asset changes have been saved." });
+        setIsFormOpen(false);
+    } catch (e) {
+        addNotification({ title: "Error Saving", description: "Could not save asset to the database.", variant: "destructive" });
+    }
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
-    setAssets(prev => prev.map(a => a.id === assetId ? { ...a, ...data } : a));
+    const asset = assets.find(a => a.id === assetId);
+    if(asset) {
+        await updateAsset({ ...asset, ...data });
+    }
   };
 
   const handleImportClick = () => fileInputRef.current?.click();
@@ -451,8 +464,12 @@ export default function AssetList() {
 
     const allNewAssets = Object.values(assetsBySheet).flat();
     if (allNewAssets.length > 0) {
-        setAssets(prev => [...prev, ...allNewAssets]);
-        addNotification({ title: "Import Successful", description: `Successfully imported ${allNewAssets.length} new assets. Data is saved locally.` });
+        try {
+            await batchSetAssets(allNewAssets);
+            addNotification({ title: "Import Successful", description: `Successfully imported and saved ${allNewAssets.length} new assets.` });
+        } catch (e) {
+            addNotification({ title: "Import Error", description: "Could not save new assets to the database.", variant: "destructive" });
+        }
     } else if (errors.length === 0) {
         addNotification({ title: "No Data Found", description: "No valid asset sheets were found in the file."});
     }
@@ -492,10 +509,16 @@ export default function AssetList() {
     setSelectedAssetIds(prev => checked ? [...prev, assetId] : prev.filter(id => id !== assetId));
   };
   
-  const handleClearAllAssets = () => {
-    setAssets([]);
-    addNotification({ title: "All Assets Cleared", description: "Your local asset database has been cleared." });
-    setIsClearAllDialogOpen(false);
+  const handleClearAllAssets = async () => {
+    addNotification({ title: "Clearing All Assets...", description: "This may take a moment." });
+    try {
+        await batchDeleteAssets(assets.map(a => a.id));
+        addNotification({ title: "All Assets Cleared", description: "Your online asset database has been cleared." });
+    } catch(e) {
+        addNotification({ title: "Error", description: "Could not clear all assets from the database.", variant: "destructive" });
+    } finally {
+        setIsClearAllDialogOpen(false);
+    }
   }
   
   const handleClearSearchAndFilters = () => {
@@ -598,9 +621,9 @@ export default function AssetList() {
                                   <TableCell onClick={(e) => e.stopPropagation()}>
                                     <Select
                                       value={asset.verifiedStatus || "Unverified"}
-                                      onValueChange={(status) => {
+                                      onValueChange={async (status) => {
                                         const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
-                                        handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate });
+                                        await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate });
                                         addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
                                       }}
                                     >
@@ -650,7 +673,7 @@ export default function AssetList() {
 
           <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} />
           <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
-          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the asset from your local data.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the asset from your database.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
       </div>
     );
   }
@@ -800,7 +823,7 @@ export default function AssetList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete all {assets.length} assets from your local data. It is highly recommended to export your data first.
+                        This action cannot be undone. This will permanently delete all {assets.length} assets from your online database. It is highly recommended to export your data first.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -904,12 +927,12 @@ export default function AssetList() {
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <Select
                               value={asset.verifiedStatus || "Unverified"}
-                              onValueChange={(status) => {
+                              onValueChange={async (status) => {
                                 const verifiedDate =
                                   status === "Verified"
                                     ? new Date().toLocaleDateString("en-CA")
                                     : "";
-                                handleQuickSaveAsset(asset.id, {
+                                await handleQuickSaveAsset(asset.id, {
                                   verifiedStatus: status as any,
                                   verifiedDate,
                                 });
@@ -998,7 +1021,7 @@ export default function AssetList() {
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
                         This action cannot be undone. This will permanently delete the asset
-                        from your local data.
+                        from your database.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1010,5 +1033,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    

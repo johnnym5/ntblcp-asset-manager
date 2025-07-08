@@ -1,7 +1,7 @@
 
 'use client';
 
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, setDoc, onSnapshot, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Asset, UserProfile } from '@/lib/types';
 import type { User } from 'firebase/auth';
@@ -34,35 +34,86 @@ export async function updateUserProfile(uid: string, data: Partial<UserProfile>)
 }
 
 // --- Assets ---
-// Asset functions are disabled to keep the app in local/offline mode.
-export async function saveAssetsToFirestore(assetsBySheet: { [sheetName: string]: Asset[] }) {
-  console.log("Firestore is disabled for assets. Skipping save to Firestore.");
-  const totalAssets = Object.values(assetsBySheet).reduce((acc, assets) => acc + assets.length, 0);
-  return Promise.resolve(totalAssets);
-}
 
+/**
+ * Sets up a real-time listener for the assets collection.
+ * @param callback The function to call with the array of assets whenever data changes.
+ * @returns An unsubscribe function to detach the listener.
+ */
 export function getAssetsListener(
   callback: (assets: Asset[]) => void,
-  userProfile?: UserProfile | null
 ) {
-  console.log("Firestore is disabled for assets. Not listening for assets.");
-  // Immediately return an empty array and a no-op unsubscribe function
-  callback([]);
-  return () => {};
+  const assetsCollectionRef = collection(db, 'assets');
+  const q = query(assetsCollectionRef);
+  
+  const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const fetchedAssets: Asset[] = [];
+    querySnapshot.forEach((doc) => {
+      // Combine the document ID with the document data to create the full Asset object
+      fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+    });
+    callback(fetchedAssets);
+  }, (error) => {
+    console.error("Error fetching assets: ", error);
+    // You could add a notification here to inform the user
+  });
+
+  return unsubscribe;
 }
 
 
+/**
+ * Creates or updates an asset document in Firestore.
+ * The document ID is the asset's own `id` property.
+ * @param asset The asset object to save.
+ */
 export async function updateAsset(asset: Asset) {
-  console.log(`Firestore is disabled for assets. Skipping update for asset: ${asset.id}`);
-  return Promise.resolve();
+  const assetRef = doc(db, 'assets', asset.id);
+  await setDoc(assetRef, asset, { merge: true });
 }
 
-export async function deleteAsset(asset: Asset) {
-  console.log(`Firestore is disabled for assets. Skipping delete for asset: ${asset.id}`);
-  return Promise.resolve();
+/**
+ * Deletes an asset document from Firestore.
+ * @param assetId The ID of the asset to delete.
+ */
+export async function deleteAsset(assetId: string) {
+  const assetRef = doc(db, 'assets', assetId);
+  await deleteDoc(assetRef);
 }
 
-export async function batchDeleteAssets(assetsToDelete: Asset[]) {
-  console.log(`Firestore is disabled for assets. Skipping batch delete for ${assetsToDelete.length} assets.`);
-  return Promise.resolve();
+
+/**
+ * Writes a large array of assets to Firestore in batches of 500.
+ * @param assets The array of assets to write.
+ */
+export async function batchSetAssets(assets: Asset[]) {
+    const assetsCollectionRef = collection(db, 'assets');
+    const batchSize = 500;
+    for (let i = 0; i < assets.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const chunk = assets.slice(i, i + batchSize);
+        chunk.forEach((asset) => {
+            const docRef = doc(assetsCollectionRef, asset.id);
+            batch.set(docRef, asset);
+        });
+        await batch.commit();
+    }
+}
+
+
+/**
+ * Deletes an array of assets from Firestore in batches.
+ * @param assetIds The array of asset IDs to delete.
+ */
+export async function batchDeleteAssets(assetIds: string[]) {
+    const batchSize = 500;
+    for (let i = 0; i < assetIds.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const chunk = assetIds.slice(i, i + batchSize);
+        chunk.forEach((assetId) => {
+            const docRef = doc(db, 'assets', assetId);
+            batch.delete(docRef);
+        });
+        await batch.commit();
+    }
 }
