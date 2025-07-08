@@ -1,7 +1,7 @@
 
 'use client';
 
-import { doc, getDoc, getDocs, setDoc, onSnapshot, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
+import { doc, getDoc, getDocs, setDoc, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Asset, UserProfile } from '@/lib/types';
 import type { User } from 'firebase/auth';
@@ -37,6 +37,7 @@ export async function updateUserProfile(uid: string, data: Partial<UserProfile>)
 
 /**
  * Fetches all asset documents from Firestore once.
+ * This is now the primary method for getting cloud data to avoid real-time listener costs.
  * @returns A promise that resolves with an array of assets.
  */
 export async function getAssets(): Promise<Asset[]> {
@@ -49,34 +50,6 @@ export async function getAssets(): Promise<Asset[]> {
   });
   return fetchedAssets;
 }
-
-/**
- * Sets up a real-time listener for the assets collection.
- * @param callback The function to call with the array of assets whenever data changes.
- * @param onError The function to call when the listener encounters an error.
- * @returns An unsubscribe function to detach the listener.
- */
-export function getAssetsListener(
-  callback: (assets: Asset[]) => void,
-  onError: (error: Error) => void
-) {
-  const assetsCollectionRef = collection(db, 'assets');
-  const q = query(assetsCollectionRef);
-  
-  const unsubscribe = onSnapshot(q, (querySnapshot) => {
-    const fetchedAssets: Asset[] = [];
-    querySnapshot.forEach((doc) => {
-      fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
-    });
-    callback(fetchedAssets);
-  }, (error) => {
-    console.error("Error fetching assets in real-time: ", error);
-    onError(error);
-  });
-
-  return unsubscribe;
-}
-
 
 /**
  * Creates or updates an asset document in Firestore.

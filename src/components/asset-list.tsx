@@ -67,7 +67,7 @@ import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssetsListener, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets, getAssets } from "@/lib/firestore";
+import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { UpdatedAssetsDialog } from "./updated-assets-dialog";
 import { cn } from "@/lib/utils";
@@ -173,36 +173,15 @@ export default function AssetList() {
 
 
   // --- DATA LOADING & SYNC ---
-
-  // 1. Load initial data from local DB on first render for a fast startup.
-  useEffect(() => {
-    const loadInitialData = async () => {
-        setIsLoading(true);
-        const localAssets = await getLocalAssetsFromDb();
-        const uniqueAssets = getOldestDuplicates(localAssets);
-        setAssets(uniqueAssets);
-        setIsLoading(false);
-    };
-    loadInitialData();
-  }, []);
-
-  // 2. Handle synchronization based on online status and sync settings.
-  useEffect(() => {
-    let unsubscribe: (() => void) | undefined;
-
-    const handleFetchedAssets = async (fetchedAssets: Asset[]) => {
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
       const uniqueAssets = getOldestDuplicates(fetchedAssets);
 
-      if (isInitialLoad.current || !userProfile) {
+      if (!userProfile) {
         setAssets(uniqueAssets);
         await saveAssets(uniqueAssets);
-        if (userProfile) {
-          isInitialLoad.current = false;
-        }
         return;
       }
 
-      // --- Admin-only Change Detection Logic ---
       const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
       if (isAdmin) {
         const previousAssets = await getLocalAssetsFromDb();
@@ -210,18 +189,17 @@ export default function AssetList() {
         const changes: Asset[] = [];
 
         for (const newAsset of uniqueAssets) {
-          // Admins should not be notified of their own changes
           if (newAsset.lastModifiedBy === userProfile?.displayName) {
             continue; 
           }
           const previousAsset = previousAssetsMap.get(newAsset.id);
           if (!previousAsset) {
-            changes.push(newAsset); // New asset created by someone else
+            changes.push(newAsset); 
           } else {
             const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
             const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
-            if (newTimestamp > prevTimestamp + 1000) { // Buffer to prevent self-notification flicker
-              changes.push(newAsset); // Updated asset
+            if (newTimestamp > prevTimestamp + 1000) { 
+              changes.push(newAsset);
             }
           }
         }
@@ -230,7 +208,6 @@ export default function AssetList() {
           const changesByGroup = changes.reduce((acc, asset) => {
             const modifierIsAdmin = asset.lastModifiedBy?.toLowerCase().trim() === 'admin';
             const state = asset.lastModifiedByState;
-            // Group by 'Admin' if admin made the change, otherwise group by state.
             const groupKey = modifierIsAdmin ? 'Admin' : (state || 'An unknown location');
             
             if (!acc[groupKey]) {
@@ -263,57 +240,51 @@ export default function AssetList() {
 
       setAssets(uniqueAssets);
       await saveAssets(uniqueAssets);
+      isInitialLoad.current = false;
+  }, [userProfile]);
+
+  // Load initial data from local DB on first render for a fast startup.
+  useEffect(() => {
+    const loadInitialData = async () => {
+        setIsLoading(true);
+        const localAssets = await getLocalAssetsFromDb();
+        const uniqueAssets = getOldestDuplicates(localAssets);
+        setAssets(uniqueAssets);
+        setIsLoading(false);
     };
+    loadInitialData();
+  }, []);
 
-
-    const syncAndListen = () => {
-        if (!isOnline) return;
-        setIsSyncing(true);
-        unsubscribe = getAssetsListener(
-            (fetchedAssets) => {
-                handleFetchedAssets(fetchedAssets);
-                if (isSyncingRef.current) {
-                    setIsSyncing(false);
-                }
-            },
-            (error) => {
-                addNotification({ title: 'Sync Error', description: error.message, variant: 'destructive' });
-                setIsOnline(false); 
-                setIsSyncing(false);
-            }
-        );
-    };
-
-    const manualSync = async () => {
-        if (!isOnline) return;
-        setIsSyncing(true);
-        try {
-            const fetchedAssets = await getAssets();
-            await handleFetchedAssets(fetchedAssets);
-        } catch (error) {
-            addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
-        } finally {
-            setIsSyncing(false);
+  // NEW: Handle all Firestore synchronization more carefully to avoid quota issues.
+  useEffect(() => {
+    const syncWithFirestore = async () => {
+      if (!isOnline || isSyncingRef.current) {
+        return;
+      }
+      setIsSyncing(true);
+      if (manualSyncTrigger > 0) {
+          addNotification({ title: 'Syncing with cloud...' });
+      }
+      try {
+        const fetchedAssets = await getAssets();
+        await handleFetchedAssets(fetchedAssets);
+        if (manualSyncTrigger > 0) {
+          addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         }
+      } catch (error) {
+        addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
+        setIsOnline(false); // Go offline to prevent further errors
+      } finally {
+        setIsSyncing(false);
+      }
     };
     
-    if (isOnline) {
-      if (autoSync) {
-        syncAndListen();
-      } else if (manualSyncTrigger > 0) {
-        manualSync();
-      }
-    } else {
-        if(isSyncing) setIsSyncing(false);
+    const isFirstOnlineLoad = isInitialLoad.current && isOnline;
+
+    if (isFirstOnlineLoad || manualSyncTrigger > 0) {
+      syncWithFirestore();
     }
-
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-    };
-  }, [isOnline, autoSync, manualSyncTrigger, setIsOnline, setIsSyncing, userProfile]);
-
+  }, [isOnline, manualSyncTrigger, handleFetchedAssets, setIsOnline, setIsSyncing]);
   // --- END DATA LOADING & SYNC ---
 
   useEffect(() => {
