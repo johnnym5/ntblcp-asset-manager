@@ -8,6 +8,7 @@ import { AppStateProvider } from '@/contexts/app-state-context';
 export const metadata: Metadata = {
   title: 'NTBLCP ASSET VERIFICATOR',
   description: 'A full-featured, offline-first web app to manage assets efficiently for NTBLCP.',
+  manifest: '/manifest.json',
 };
 
 export default function RootLayout({

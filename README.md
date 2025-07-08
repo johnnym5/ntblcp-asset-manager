@@ -10,6 +10,7 @@ This application is designed to solve the critical challenge of managing and ver
 ### Core Features
 
 *   **Offline-First by Default**: The application is built to work completely offline. All data is stored and managed in the browser's local storage, ensuring that work is never lost due to a lack of internet.
+*   **Installable App (PWA)**: The application is a Progressive Web App, which means it can be 'installed' on your mobile device or desktop for a fast, reliable, and app-like experience.
 *   **Role-Based Access**:
     *   **State/Zone User**: Enters a username and selects an assigned State or Geopolitical Zone. The entire application is then automatically filtered to show only assets relevant to that specific location.
     *   **Admin User**: By entering 'admin' as the username, the user gains access to view and manage all assets across all states and zones without any filters.
@@ -46,7 +47,6 @@ This application is designed to solve the critical challenge of managing and ver
 *   **Camera & OCR Integration**: Build a UI to use the device's camera to scan asset labels, feeding the image directly to the existing AI flow to auto-fill and validate asset details.
 *   **Google Sheets Integration**: Allow direct, authenticated import and export with Google Sheets to further streamline data management and collaboration.
 *   **Advanced Reporting**: Create a dedicated reporting module to generate and visualize more detailed analytics from the asset data.
-*   **Progressive Web App (PWA)**: Enhance PWA features to allow the app to be "installed" on a device's home screen for a more seamless, native-like experience.
 
 ---
 
