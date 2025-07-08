@@ -574,37 +574,38 @@ export default function AssetList() {
   };
   
   const handleClearAllAssets = useCallback(async () => {
-    const assetsToDelete = stateFilteredAssets;
-    const assetsToDeleteCount = assetsToDelete.length;
+    // Get all assets from the local DB to ensure we have a complete list.
+    const allLocalAssets = await getLocalAssetsFromDb();
+    const assetsToDeleteCount = allLocalAssets.length;
+
     if (assetsToDeleteCount === 0) {
-      addNotification({ title: 'No Assets to Clear', description: 'There are no assets in the current view to clear.' });
+      addNotification({ title: 'No Assets to Clear', description: 'There are no assets to clear.' });
       setIsClearAllDialogOpen(false);
       return;
     }
 
-    addNotification({ title: 'Clearing Assets...', description: `This will remove ${assetsToDeleteCount} assets.` });
+    addNotification({ title: 'Clearing All Assets...', description: `This will remove all ${assetsToDeleteCount} assets.` });
 
-    const idsToDelete = new Set(assetsToDelete.map((a) => a.id));
     if (isOnline) {
+      const idsToDelete = allLocalAssets.map((a) => a.id);
       try {
-        await batchDeleteAssets(Array.from(idsToDelete));
-        addNotification({ title: 'Cloud Assets Cleared', description: `Successfully removed ${assetsToDeleteCount} assets from the database.` });
+        await batchDeleteAssets(idsToDelete);
+        addNotification({ title: 'Cloud Assets Cleared', description: `Successfully removed all ${assetsToDeleteCount} assets from the database.` });
       } catch (e) {
-        addNotification({ title: 'Error', description: 'Could not clear assets from the database.', variant: 'destructive' });
+        addNotification({ title: 'Error', description: 'Could not clear all assets from the database. Aborting local clear.', variant: 'destructive' });
         setIsClearAllDialogOpen(false);
         return; // Stop if cloud operation fails
       }
     }
 
-    // Update local state and DB regardless of online status (for offline-first)
-    const allLocalAssets = await getLocalAssetsFromDb();
-    const remainingAssets = allLocalAssets.filter((a) => !idsToDelete.has(a.id));
-    await saveAssets(remainingAssets);
-    setAssets(remainingAssets);
+    // Clear local state and IndexedDB
+    await clearLocalAssets();
+    setAssets([]);
 
-    addNotification({ title: 'Assets Cleared', description: `Removed ${assetsToDeleteCount} assets from your list.` });
+    addNotification({ title: 'All Assets Cleared', description: 'The application is now in a clean state.' });
+    setSelectedAssetIds([]); // Clear selection as well
     setIsClearAllDialogOpen(false);
-  }, [isOnline, stateFilteredAssets]);
+  }, [isOnline]);
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
@@ -766,9 +767,7 @@ export default function AssetList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete all {stateFilteredAssets.length} assets
-                        {userProfile?.state ? ` for ${userProfile.state}` : ' in the current view'} from your {isOnline ? 'online database and local storage' : 'local storage'}.
-                         It is highly recommended to export your data first.
+                        This action cannot be undone. This will permanently delete all {assets.length} assets from your local device and, if you are online, from the central database. This will reset the application to a clean state.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -965,5 +964,7 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
 
     
