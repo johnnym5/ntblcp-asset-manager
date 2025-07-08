@@ -5,50 +5,39 @@ import { TARGET_SHEETS, HEADER_DEFINITIONS } from './constants';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
- * Finds the row number containing the headers in a worksheet.
- * @param worksheet The worksheet to scan.
- * @param sheetName The name of the sheet to get expected headers.
- * @returns An object with the row index and the found headers, or null.
+ * Checks if a given row is a header row based on expected header keywords.
+ * @param rowData An array of strings representing a row.
+ * @param sheetName The name of the sheet to get expected headers from constants.
+ * @returns True if the row is likely a header, false otherwise.
  */
-function findHeaderRow(worksheet: XLSX.WorkSheet, sheetName: string): { headerRow: number, headers: string[] } | null {
+function isHeaderRow(rowData: any[], sheetName: string): boolean {
     const expectedHeaders = HEADER_DEFINITIONS[sheetName];
-    if (!expectedHeaders) return null;
+    if (!expectedHeaders) return false;
 
-    const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: '' });
+    const rowStrings = rowData.map(cell => String(cell ?? '').trim().toLowerCase());
+    const nonEmptyCells = rowStrings.filter(c => c).length;
 
-    let bestMatch = { score: 0, row: -1, headers: [] as string[] };
+    // A header must have at least 3 non-empty cells to be considered.
+    if (nonEmptyCells < 3) return false;
 
-    // Scan the first 15 rows to find the best header match
-    for (let i = 0; i < Math.min(sheetData.length, 15); i++) {
-        const rowData = sheetData[i].map(cell => String(cell).trim().replace(/\s+/g, ' '));
-        let currentScore = 0;
-        
-        const lowerCaseExpected = expectedHeaders.map(h => h.toLowerCase().trim().replace(/\s+/g, ' '));
-        
-        rowData.forEach(cell => {
-            const lowerCell = cell.toLowerCase();
-            if (lowerCell && lowerCaseExpected.some(expected => expected === lowerCell || expected.includes(lowerCell))) {
-                currentScore++;
-            }
-        });
-        
-        // A good header row should have at least 3 of the core fields.
-        const hasKeyFields = ['s/n', 'description', 'serial'].reduce((acc, key) => {
-            return acc + (rowData.join(' ').toLowerCase().includes(key) ? 1 : 0);
-        }, 0) >= 2;
+    let matchCount = 0;
+    const lowerCaseExpected = expectedHeaders.map(h => h.toLowerCase().trim());
 
-        if (currentScore > bestMatch.score && hasKeyFields) {
-            bestMatch = { score: currentScore, row: i + 1, headers: rowData };
+    for (const cell of rowStrings) {
+        if (cell && lowerCaseExpected.includes(cell)) {
+            matchCount++;
         }
     }
-    
-    // Require a minimum score to be considered a valid header row
-    if (bestMatch.score > 3) { 
-        return { headerRow: bestMatch.row, headers: bestMatch.headers };
-    }
-    
-    return null;
+
+    // A row is considered a header if it has at least 3 direct matches or a high percentage of matches.
+    // This handles variations and ensures we don't misinterpret data as headers.
+    const hasKeyFields = ['s/n', 'description', 'serial'].reduce((acc, key) => {
+        return acc + (rowStrings.join(' ').toLowerCase().includes(key) ? 1 : 0);
+    }, 0) >= 2;
+
+    return matchCount >= 3 && hasKeyFields;
 }
+
 
 /**
  * Normalizes different header names to a consistent key.
@@ -64,7 +53,7 @@ function getColumnValue(row: any, ...possibleKeys: string[]): string {
                   const date = XLSX.SSF.parse_date_code(value);
                   return new Date(date.y, date.m - 1, date.d).toLocaleDateString('en-CA');
                 }
-                return String(value);
+                return String(value ?? '');
             }
         }
     }
@@ -84,6 +73,11 @@ function mapRowToAsset(row: any, category: string): Asset | null {
         return null; // Skip row if essential data (description) is missing
     }
 
+    // For IHVN sheet, location can be in STATE or LOCATION column. Prioritize STATE.
+    const location = category === 'IHVN-GF N-THRIP'
+        ? getColumnValue(row, 'STATE', 'Location', 'LOCATION')
+        : getColumnValue(row, 'Location', 'LOCATION', 'State');
+
     const asset: Asset = {
         id: uuidv4(),
         category,
@@ -91,7 +85,7 @@ function mapRowToAsset(row: any, category: string): Asset | null {
         verifiedStatus: 'Unverified',
         description: description,
         sn: getColumnValue(row, 'S/N'),
-        location: getColumnValue(row, 'Location', 'LOCATION', 'State'),
+        location: location,
         lga: getColumnValue(row, 'LGA'),
         assignee: getColumnValue(row, 'Assignee'),
         assetIdCode: getColumnValue(row, 'Asset ID Code', 'TAG NUMBERS'),
@@ -129,7 +123,7 @@ function mapRowToAsset(row: any, category: string): Asset | null {
 }
 
 /**
- * Parses an entire Excel file, handling multiple sheets and dynamic header rows.
+ * Parses an entire Excel file, handling multiple sheets and dynamic/multiple header rows within sheets.
  */
 export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sheetName: string]: Asset[] }, errors: string[], skippedRows: number }> {
   return new Promise((resolve) => {
@@ -153,31 +147,50 @@ export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sh
                 return;
             }
 
-            const headerInfo = findHeaderRow(worksheet, matchedSheetName);
-            if (!headerInfo) {
-              errors.push(`Could not find a valid header row in sheet "${sheetName}".`);
-              return;
-            }
-            
-            const jsonData = XLSX.utils.sheet_to_json<any>(worksheet, { range: headerInfo.headerRow -1 });
+            const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
             
             let sheetAssets: Asset[] = [];
             let sheetSkipped = 0;
+            let currentHeaders: string[] | null = null;
 
-            jsonData.forEach(row => {
-                const asset = mapRowToAsset(row, matchedSheetName);
-                if (asset) {
-                    sheetAssets.push(asset);
-                } else {
-                    sheetSkipped++;
+            for (const rowData of sheetData) {
+                // If row is completely empty, skip it.
+                if (!rowData || rowData.every(cell => cell === null)) continue;
+                
+                if (isHeaderRow(rowData, matchedSheetName)) {
+                    currentHeaders = rowData.map(cell => String(cell ?? '').trim());
+                    continue; // Header found, continue to next row for data
                 }
-            });
 
-            if(sheetAssets.length > 0) {
+                if (currentHeaders) {
+                    const rowObject: { [key: string]: any } = {};
+                    currentHeaders.forEach((header, index) => {
+                        if (header) { // only map columns with a header name
+                            rowObject[header] = rowData[index];
+                        }
+                    });
+                    
+                    const asset = mapRowToAsset(rowObject, matchedSheetName);
+                    if (asset) {
+                        sheetAssets.push(asset);
+                    } else {
+                        // Check if the row is not just empty/header-like before counting as skipped
+                        if (rowData.some(cell => cell !== null)) {
+                           sheetSkipped++;
+                        }
+                    }
+                }
+            }
+            
+            if (sheetAssets.length > 0) {
                  assetsBySheet[matchedSheetName] = (assetsBySheet[matchedSheetName] || []).concat(sheetAssets);
             }
-            if(sheetSkipped > 0) {
+            if (sheetSkipped > 0) {
                  totalSkipped += sheetSkipped;
+            }
+             if (sheetAssets.length === 0 && !Object.keys(assetsBySheet).includes(matchedSheetName)) {
+                // Only report error if we found NO assets for this sheet at all.
+                errors.push(`Could not find any valid header or data rows in sheet "${sheetName}".`);
             }
           }
         });
