@@ -70,7 +70,13 @@ interface AppStateContextType {
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
-  const [isOnline, setIsOnline] = useState(false);
+  const [isOnline, setIsOnline] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const savedStatus = localStorage.getItem('ntblcp-online-status');
+      return savedStatus ? JSON.parse(savedStatus) : false;
+    }
+    return false;
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [globalStateFilter, setGlobalStateFilter] = useState('');
   
@@ -112,6 +118,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('ntblcp-autosync', JSON.stringify(autoSync));
   }, [autoSync]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
+    }
+  }, [isOnline]);
 
   const value = {
     isOnline,
