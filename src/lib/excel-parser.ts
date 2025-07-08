@@ -79,10 +79,9 @@ function getColumnValue(row: any, ...possibleKeys: string[]): string {
  */
 function mapRowToAsset(row: any, category: string): Asset | null {
     const description = getColumnValue(row, 'Asset Description', 'DESCRIPTION');
-    const sn = getColumnValue(row, 'S/N');
 
-    if (!description || !sn) {
-        return null; // Skip row if essential data is missing
+    if (!description) {
+        return null; // Skip row if essential data (description) is missing
     }
 
     const asset: Asset = {
@@ -91,7 +90,7 @@ function mapRowToAsset(row: any, category: string): Asset | null {
         syncStatus: 'local',
         verifiedStatus: 'Unverified',
         description: description,
-        sn: sn,
+        sn: getColumnValue(row, 'S/N'),
         location: getColumnValue(row, 'Location', 'LOCATION', 'State'),
         lga: getColumnValue(row, 'LGA'),
         assignee: getColumnValue(row, 'Assignee'),
