@@ -59,7 +59,12 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
         ? getColumnValue(row, 'STATE', 'Location', 'LOCATION')
         : getColumnValue(row, 'Location', 'LOCATION', 'State');
     const lga = getColumnValue(row, 'LGA');
-    const assignee = getColumnValue(row, 'Assignee');
+    
+    let assignee = getColumnValue(row, 'Assignee');
+    if (assignee.toLowerCase() === 'yes' || assignee.toLowerCase() === 'no') {
+        assignee = '';
+    }
+
     const condition = getColumnValue(row, 'Condition');
     const remarks = getColumnValue(row, 'Remarks', 'Comments');
 
@@ -163,13 +168,20 @@ export async function parseExcelFile(
                                 }
                             });
                             
+                            // A row is considered valid if it has any data at all.
+                            const hasAnyData = Object.values(rowObject).some(val => val !== null && val !== '');
+
+                            if (!hasAnyData) {
+                                skipped++;
+                                continue;
+                            }
+                            
                             const idKey = getColumnValue(rowObject, 'Asset ID Code', 'TAG NUMBERS') || getColumnValue(rowObject, 'Serial Number', 'ASSET SERIAL NUMBERS');
                             const existingAsset = idKey ? existingAssetMap.get(idKey) : undefined;
                             
                             const asset = mapRowToAsset(rowObject, matchedSheetName, existingAsset);
                             
-                            // Any row with a description gets imported. This is the main identifier.
-                            if (asset.description) {
+                            if (asset.description || idKey) { // Import if it has a description or a key
                                 if (existingAsset) {
                                     updatedAssets.push(asset);
                                 } else {

@@ -361,17 +361,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4 p-1"
               >
-                <FormField
-                  control={form.control}
-                  name="description"
-                  render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Asset Description</FormLabel>
-                    <FormControl><Textarea {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -395,7 +384,44 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                       </FormItem>
                     )}
                   />
-                   <FormField
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Asset Description</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                  )} />
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="serialNumber" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Serial Number</FormLabel>
+                      <FormControl><Input {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="location" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <FormField control={form.control} name="condition" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Condition</FormLabel>
+                      <FormControl><Input {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField
                       control={form.control}
                       name="verifiedStatus"
                       render={({ field }) => (
@@ -419,74 +445,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="assetIdCode" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Asset ID Code</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                   <FormField control={form.control} name="serialNumber" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Serial/Chasis Number</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="location" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="lga" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>LGA</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <FormField control={form.control} name="assignee" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Assignee</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                   <FormField control={form.control} name="manufacturer" render={({ field }) => (
-                      <FormItem>
-                          <FormLabel>Manufacturer</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                          <FormMessage />
-                      </FormItem>
-                  )} />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="condition" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Condition</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                   <FormField control={form.control} name="verifiedDate" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Verified Date</FormLabel>
-                            <FormControl><Input {...field} disabled /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
-                </div>
-
                 <FormField control={form.control} name="remarks" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Remarks/Comments</FormLabel>
@@ -499,6 +457,38 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                   <AccordionItem value="advanced">
                     <AccordionTrigger>Advanced Information</AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name="assignee" render={({ field }) => (
+                              <FormItem>
+                                <FormLabel>Assignee</FormLabel>
+                                <FormControl><Input {...field} /></FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )} />
+                            <FormField control={form.control} name="lga" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>LGA</FormLabel>
+                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name="assetIdCode" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Asset ID Code</FormLabel>
+                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                            <FormField control={form.control} name="manufacturer" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Manufacturer</FormLabel>
+                                    <FormControl><Input {...field} /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
+                            )} />
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <FormField control={form.control} name="assetClass" render={({ field }) => (
                                 <FormItem><FormLabel>Asset Class</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -521,6 +511,18 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                             )} />
                             <FormField control={form.control} name="grant" render={({ field }) => (
                                 <FormItem><FormLabel>Grant</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <FormField control={form.control} name="dateReceived" render={({ field }) => (
+                                <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                           <FormField control={form.control} name="verifiedDate" render={({ field }) => (
+                                <FormItem>
+                                    <FormLabel>Verified Date</FormLabel>
+                                    <FormControl><Input {...field} disabled /></FormControl>
+                                    <FormMessage />
+                                </FormItem>
                             )} />
                         </div>
                     </AccordionContent>

@@ -81,9 +81,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
     sortConfig, setSortConfig,
-    selectedLocations, selectedAssignees, selectedStatuses,
+    selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     locationOptions, assigneeOptions, statusOptions,
-    setSelectedLocations, setSelectedAssignees, setSelectedStatuses,
+    setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     setManualSyncTrigger, isSyncing,
     dataActions,
   } = useAppState();
@@ -146,7 +146,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setManualSyncTrigger(c => c + 1);
   };
   
-  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length;
+  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
   const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
 
   return (
@@ -311,10 +311,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </DropdownMenuPortal>
                     </DropdownMenuSub>
                   )}
-                  <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
-                    <Settings className="mr-2 h-4 w-4"/>
-                    Settings
-                  </DropdownMenuItem>
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
+                      <Settings className="mr-2 h-4 w-4"/>
+                      Settings
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuSeparator />
                   <div className="flex items-center justify-around py-2">
                      <div className="flex flex-col items-center gap-1">
@@ -350,6 +352,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         statusOptions={statusOptions}
         selectedStatuses={selectedStatuses}
         setSelectedStatuses={setSelectedStatuses}
+        missingFieldFilter={missingFieldFilter}
+        setMissingFieldFilter={setMissingFieldFilter}
       />
     </div>
   );
