@@ -573,44 +573,53 @@ export default function AssetList() {
     setSelectedAssetIds(prev => checked ? [...prev, assetId] : prev.filter(id => id !== assetId));
   };
   
+  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
+
   const handleClearAllAssets = useCallback(async () => {
-    // Get all assets from the local DB to ensure we have a complete list.
-    const allLocalAssets = await getLocalAssetsFromDb();
-    const assetsToDeleteCount = allLocalAssets.length;
-
-    if (assetsToDeleteCount === 0) {
-      addNotification({ title: 'No Assets to Clear', description: 'There are no assets to clear.' });
-      setIsClearAllDialogOpen(false);
-      return;
-    }
-
-    addNotification({ title: 'Clearing All Assets...', description: `This will remove all ${assetsToDeleteCount} assets.` });
-
-    if (isOnline) {
-      const idsToDelete = allLocalAssets.map((a) => a.id);
-      try {
-        await batchDeleteAssets(idsToDelete);
-        addNotification({ title: 'Cloud Assets Cleared', description: `Successfully removed all ${assetsToDeleteCount} assets from the database.` });
-      } catch (e) {
-        addNotification({ title: 'Error', description: 'Could not clear all assets from the database. Aborting local clear.', variant: 'destructive' });
-        setIsClearAllDialogOpen(false);
-        return; // Stop if cloud operation fails
-      }
-    }
-
-    // Clear local state and IndexedDB
-    await clearLocalAssets();
-    setAssets([]);
-
-    addNotification({ title: 'All Assets Cleared', description: 'The application is now in a clean state.' });
-    setSelectedAssetIds([]); // Clear selection as well
     setIsClearAllDialogOpen(false);
-  }, [isOnline]);
+
+    // Offline Mode: Clear local storage only
+    if (!isOnline) {
+        addNotification({ title: 'Clearing Local Assets...', description: 'Removing all assets from your device.' });
+        await clearLocalAssets();
+        setAssets([]);
+        setSelectedAssetIds([]);
+        addNotification({ title: 'Local Data Cleared', description: 'All assets have been removed from this device.' });
+        return;
+    }
+
+    // Online Mode: Admin clears everything
+    if (isOnline && isAdmin) {
+        const allLocalAssets = await getLocalAssetsFromDb();
+        const assetsToDeleteCount = allLocalAssets.length;
+
+        if (assetsToDeleteCount === 0) {
+            addNotification({ title: 'No Assets Found', description: 'The database is already empty.' });
+            return;
+        }
+        
+        addNotification({ title: 'Clearing Database...', description: `This will remove all ${assetsToDeleteCount} assets.` });
+
+        try {
+            const idsToDelete = allLocalAssets.map((a) => a.id);
+            await batchDeleteAssets(idsToDelete);
+            addNotification({ title: 'Cloud Database Cleared', description: `Successfully removed all assets.` });
+            
+            // Also clear locally to ensure consistency
+            await clearLocalAssets();
+            setAssets([]);
+            setSelectedAssetIds([]);
+            
+            addNotification({ title: 'All Assets Cleared', description: 'The application is now in a clean state.' });
+
+        } catch (e) {
+            addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
+        }
+    }
+  }, [isOnline, isAdmin]);
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
-  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
-
   useEffect(() => {
     setDataActions({
         onImport: handleImportClick,
@@ -635,6 +644,14 @@ export default function AssetList() {
       isAdmin, 
       assets.length
   ]);
+
+  const clearAllDialogDescription = useMemo(() => {
+    if (!isOnline) {
+        return "This will permanently delete all asset records from your local device storage. This action cannot be undone.";
+    }
+    // Online case is always admin, since button is disabled for others
+    return `You are in Admin Mode. This action cannot be undone. This will permanently delete ALL asset records from the central database and clear your local storage, resetting the application to a clean state for ALL users.`;
+  }, [isOnline]);
 
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
@@ -767,7 +784,7 @@ export default function AssetList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete all {assets.length} assets from your local device and, if you are online, from the central database. This will reset the application to a clean state.
+                       {clearAllDialogDescription}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>

@@ -300,7 +300,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                           <DropdownMenuItem
                             className="text-destructive focus:bg-destructive/20 focus:text-destructive"
                             onClick={dataActions.onClearAll}
-                            disabled={!dataActions.hasAssets}
+                            disabled={!dataActions.hasAssets || (isOnline && !dataActions.isAdmin)}
                           >
                             <Trash2 className="mr-2 h-4 w-4" />
                             Clear All Assets
