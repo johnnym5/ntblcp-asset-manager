@@ -47,7 +47,7 @@ function getColumnValue(row: any, ...possibleKeys: string[]): string {
     return '';
 }
 
-function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset | null {
+function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset {
     const description = getColumnValue(row, 'Asset Description', 'DESCRIPTION');
     const assetIdCode = getColumnValue(row, 'Asset ID Code', 'TAG NUMBERS');
     const serialNumber = getColumnValue(row, 'Serial Number', 'ASSET SERIAL NUMBERS');
@@ -60,11 +60,6 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
     const assignee = getColumnValue(row, 'Assignee');
     const condition = getColumnValue(row, 'Condition');
     const remarks = getColumnValue(row, 'Remarks', 'Comments');
-
-    // If all these key fields are empty, it's a blank or non-data row.
-    if (!description && !assetIdCode && !serialNumber && !chasisNo && !engineNo && !location && !lga && !assignee && !condition && !remarks) {
-        return null;
-    }
 
     const importedAssetData: Partial<Asset> = {
         description: description || existingAsset?.description,
@@ -145,7 +140,7 @@ export async function parseExcelFile(
                         let currentHeaders: string[] | null = null;
 
                         for (const rowData of sheetData) {
-                            if (!rowData || rowData.every(cell => cell === null)) continue;
+                            if (!rowData || rowData.every(cell => cell === null || String(cell ?? '').trim() === '')) continue;
                             
                             if (isHeaderRow(rowData, matchedSheetName)) {
                                 currentHeaders = rowData.map(cell => String(cell ?? '').trim());
@@ -164,16 +159,11 @@ export async function parseExcelFile(
                                 const existingAsset = idKey ? existingAssetMap.get(idKey) : undefined;
                                 
                                 const asset = mapRowToAsset(rowObject, matchedSheetName, existingAsset);
-                                if (asset) {
-                                    if (existingAsset) {
-                                        updatedAssets.push(asset);
-                                    } else {
-                                        newAssets.push(asset);
-                                    }
+                                
+                                if (existingAsset) {
+                                    updatedAssets.push(asset);
                                 } else {
-                                    if (rowData.some(cell => cell !== null)) {
-                                       skipped++;
-                                    }
+                                    newAssets.push(asset);
                                 }
                             }
                         }
