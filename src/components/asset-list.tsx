@@ -67,36 +67,11 @@ import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssetsListener, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets } from "@/lib/firestore";
+import { getAssetsListener, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets, getAssets } from "@/lib/firestore";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
+
 
 const ITEMS_PER_PAGE = 25;
-
-// --- Local Storage Helpers ---
-const getLocalAssets = (): Asset[] => {
-  if (typeof window === 'undefined') return [];
-  try {
-    const localData = localStorage.getItem('ntblcp-assets');
-    return localData ? JSON.parse(localData) : [];
-  } catch (error) {
-    console.error("Failed to get local assets", error);
-    return [];
-  }
-};
-
-const saveLocalAssets = (assets: Asset[]) => {
-  if (typeof window === 'undefined') return;
-  try {
-    localStorage.setItem('ntblcp-assets', JSON.stringify(assets));
-  } catch (error) {
-    console.error("Failed to save local assets", error);
-    addNotification({
-      title: 'Storage Full',
-      description: 'Browser storage is full. Please export and clear data to prevent data loss.',
-      variant: 'destructive',
-    });
-  }
-};
-
 
 const normalizeAssetLocation = (location?: string): string => {
     if (!location) return '';
@@ -138,73 +113,129 @@ export default function AssetList() {
   const [currentPage, setCurrentPage] = useState(1);
 
 
-  // --- Global state from context ---
   const { 
     searchTerm, setSearchTerm,
     isOnline, globalStateFilter, setGlobalStateFilter,
-    selectedLocation, setSelectedLocation,
-    selectedAssignee, setSelectedAssignee,
-    selectedStatus, setSelectedStatus,
-    sortConfig, setLocationOptions, setAssigneeOptions,
+    selectedLocations, selectedAssignees, selectedStatuses,
+    sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
     enabledSheets,
+    autoSync, manualSyncTrigger, setIsSyncing,
   } = useAppState();
 
-  // Reset page number when filters or view change
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedLocation, selectedAssignee, selectedStatus, globalStateFilter, view, currentCategory]);
+  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, globalStateFilter, view, currentCategory]);
 
-  // When a search is performed, switch to the dashboard view to show categorized results
   useEffect(() => {
     if (searchTerm) {
       setView('dashboard');
     }
   }, [searchTerm]);
 
+  const getOldestDuplicates = (assetsToFilter: Asset[]): Asset[] => {
+    const uniqueAssetMap = new Map<string, Asset>();
 
-  // --- DATA LOADING & SYNC LOGIC ---
-  useEffect(() => {
-    setIsLoading(true);
-    let unsubscribe: (() => void) | undefined;
-  
-    const syncAndListen = async () => {
-      addNotification({ title: 'Online Mode', description: 'Connecting to the database...' });
-      const localAssets = getLocalAssets();
-      if (localAssets.length > 0) {
-        addNotification({ title: 'Syncing...', description: `Uploading ${localAssets.length} offline records.` });
-        try {
-          await batchSetAssets(localAssets);
-          localStorage.removeItem('ntblcp-assets');
-          addNotification({ title: 'Sync Complete', description: 'Offline data saved to the cloud.' });
-        } catch (error) {
-          console.error('Sync failed:', error);
-          addNotification({ title: 'Sync Failed', description: 'Could not save offline changes. Data remains on this device.', variant: 'destructive' });
+    assetsToFilter.forEach(asset => {
+        const key = asset.assetIdCode || asset.serialNumber || asset.description;
+        if (!key) return; // Skip assets without a key
+
+        const existingAsset = uniqueAssetMap.get(key);
+        if (!existingAsset) {
+            uniqueAssetMap.set(key, asset);
+        } else {
+            const existingTimestamp = existingAsset.lastModified ? new Date(existingAsset.lastModified).getTime() : 0;
+            const currentTimestamp = asset.lastModified ? new Date(asset.lastModified).getTime() : 0;
+            if (currentTimestamp > 0 && currentTimestamp < existingTimestamp) {
+                uniqueAssetMap.set(key, asset);
+            }
         }
-      }
-      
-      // After sync attempt, listen for live updates
-      unsubscribe = getAssetsListener((fetchedAssets) => {
-        setAssets(fetchedAssets);
+    });
+    return Array.from(uniqueAssetMap.values());
+  };
+
+
+  useEffect(() => {
+    let unsubscribe: (() => void) | undefined;
+
+    const handleFetchedAssets = async (fetchedAssets: Asset[], source: 'local' | 'remote') => {
+        const uniqueAssets = getOldestDuplicates(fetchedAssets);
+        setAssets(uniqueAssets);
+        
+        if (source === 'remote') {
+            await clearLocalAssets();
+            await saveAssets(uniqueAssets);
+        }
         setIsLoading(false);
-      });
     };
-  
+
+    const syncAndListen = () => {
+        if (!isOnline) return;
+        setIsSyncing(true);
+        addNotification({ title: 'Syncing...', description: 'Fetching latest data from server.' });
+        unsubscribe = getAssetsListener(
+            (fetchedAssets) => {
+                addNotification({ title: 'Data Updated', description: 'Received latest data from the server.' });
+                handleFetchedAssets(fetchedAssets, 'remote');
+                setIsSyncing(false);
+            },
+            (error) => {
+                addNotification({ title: 'Sync Error', description: error.message, variant: 'destructive' });
+                setIsOnline(false); // Fallback to offline mode on error
+                setIsSyncing(false);
+            }
+        );
+    };
+
+    const manualSync = async () => {
+        if (!isOnline) return;
+        setIsSyncing(true);
+        addNotification({ title: 'Manual Sync Started', description: 'Fetching latest data...' });
+        try {
+            const fetchedAssets = await getAssets();
+            await handleFetchedAssets(fetchedAssets, 'remote');
+            addNotification({ title: 'Sync Complete', description: 'Your data is up to date.' });
+        } catch (error) {
+            addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
+        } finally {
+            setIsSyncing(false);
+        }
+    };
+
+    const loadLocalData = async () => {
+        setIsLoading(true);
+        const localAssets = await getLocalAssetsFromDb();
+        await handleFetchedAssets(localAssets, 'local');
+    };
+
     if (isOnline) {
-      syncAndListen();
+        if (autoSync) {
+            syncAndListen();
+        } else {
+            if (manualSyncTrigger > 0) {
+                manualSync();
+            } else {
+                loadLocalData();
+            }
+        }
     } else {
-      addNotification({ title: 'Offline Mode', description: 'Changes are being saved locally.' });
-      setAssets(getLocalAssets());
-      setIsLoading(false);
+        loadLocalData();
     }
-  
+
     return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
+        if (unsubscribe) {
+            unsubscribe();
+        }
     };
-  }, [isOnline]);
+  }, [isOnline, autoSync, manualSyncTrigger]);
 
 
+  useEffect(() => {
+    setStatusOptions([
+      { value: "Verified", label: "Verified" },
+      { value: "Unverified", label: "Unverified" },
+      { value: "Discrepancy", label: "Discrepancy" },
+    ]);
+  }, [setStatusOptions]);
 
   const stateFilteredAssets = useMemo(() => {
     if (!globalStateFilter) {
@@ -216,32 +247,25 @@ export default function AssetList() {
     const isZone = !!zones[globalStateFilter]; // Check if the filter is a zone name
 
     if (isZone) {
-      // The filter is a zone, look for zonal stores
       const lowerCaseZone = globalStateFilter.toLowerCase();
       return assets.filter(asset => {
         const assetLocation = (asset.location || "").toLowerCase().trim();
         return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
       });
     } else {
-      // The filter is a single state or special location.
       const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
       const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
 
       return assets.filter(asset => {
         const assetLocation = (asset.location || "").toLowerCase().trim();
-        
-        // Check if location matches the state/special location name
         const matchesState = assetLocation.startsWith(lowerCaseFilter);
-        
-        // Check if location matches the capital city name (if it exists)
         const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-        
         return matchesState || matchesCapital;
       });
     }
-}, [assets, globalStateFilter]);
+  }, [assets, globalStateFilter]);
 
-  // Pre-filter assets for the dashboard if a search term is active
+
   const displayedAssetsForDashboard = useMemo(() => {
     let assetsToDisplay = stateFilteredAssets;
     if (searchTerm) {
@@ -269,7 +293,6 @@ export default function AssetList() {
     }, {} as { [key: string]: Asset[] });
   }, [displayedAssetsForDashboard]);
   
-  // --- Set Filter Options in Global Context ---
   useEffect(() => {
     const locations = new Set<string>();
     stateFilteredAssets.forEach(asset => {
@@ -307,26 +330,23 @@ export default function AssetList() {
     });
   };
 
-  // The unified results view is now only for filters, not for search.
   const showUnifiedResults = useMemo(() => {
-    return !!selectedLocation || !!selectedAssignee || !!selectedStatus;
-  }, [selectedLocation, selectedAssignee, selectedStatus]);
+    return selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+  }, [selectedLocations, selectedAssignees, selectedStatuses]);
 
 
   const unifiedResults = useMemo(() => {
     if (!showUnifiedResults) return [];
 
     let results = stateFilteredAssets;
-
-    // Apply filters
+    
     results = results.filter(asset => {
-        const locationMatch = !selectedLocation || normalizeAssetLocation(asset.location) === selectedLocation;
-        const assigneeMatch = !selectedAssignee || (asset.assignee && asset.assignee.trim().toLowerCase() === selectedAssignee.toLowerCase());
-        const statusMatch = !selectedStatus || asset.verifiedStatus === selectedStatus;
+        const locationMatch = selectedLocations.length === 0 || selectedLocations.includes(normalizeAssetLocation(asset.location));
+        const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
+        const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
         return locationMatch && assigneeMatch && statusMatch;
     });
     
-    // Apply search term to the (already filtered) results
     if (searchTerm) {
         const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
         if (lowerCaseSearchTokens.length > 0) {
@@ -340,7 +360,7 @@ export default function AssetList() {
     }
     
     return sortAssets(results, sortConfig);
-}, [showUnifiedResults, searchTerm, stateFilteredAssets, selectedLocation, selectedAssignee, selectedStatus, sortConfig]);
+  }, [showUnifiedResults, searchTerm, stateFilteredAssets, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
 
 
   const categoryFilteredAssets = useMemo(() => {
@@ -353,18 +373,16 @@ export default function AssetList() {
 
     let assetsToFilter = baseAssets;
     
-    const hasFilters = !!selectedLocation || !!selectedAssignee || !!selectedStatus;
+    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
     if (hasFilters) {
         assetsToFilter = assetsToFilter.filter(asset => {
-            const locationMatch = !selectedLocation || normalizeAssetLocation(asset.location) === selectedLocation;
-            const assigneeMatch = !selectedAssignee || (asset.assignee && asset.assignee.trim().toLowerCase() === selectedAssignee.toLowerCase());
-            const statusMatch = !selectedStatus || asset.verifiedStatus === selectedStatus;
+            const locationMatch = selectedLocations.length === 0 || selectedLocations.includes(normalizeAssetLocation(asset.location));
+            const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
+            const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
             return locationMatch && assigneeMatch && statusMatch;
         });
     }
 
-    // The search term is already applied via `assetsByCategory`, but we re-apply here
-    // in case the user types in the search bar while in the table view.
     if (searchTerm) {
         const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
         if (lowerCaseSearchTokens.length > 0) {
@@ -378,7 +396,7 @@ export default function AssetList() {
     }
     
     return sortAssets(assetsToFilter, sortConfig);
-  }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocation, selectedAssignee, selectedStatus, sortConfig]);
+  }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -410,10 +428,10 @@ export default function AssetList() {
             addNotification({ title: 'Error', description: 'Could not delete asset from the cloud.', variant: 'destructive' });
         }
     } else {
-        let currentAssets = getLocalAssets();
-        currentAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
-        saveLocalAssets(currentAssets);
-        setAssets(currentAssets);
+        const currentAssets = await getLocalAssetsFromDb();
+        const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
+        await saveAssets(updatedAssets);
+        setAssets(updatedAssets);
         addNotification({ title: 'Deleted Locally', description: 'Asset will be removed from cloud on next sync.' });
     }
 
@@ -437,9 +455,9 @@ export default function AssetList() {
             setIsBatchDeleting(false);
         }
     } else {
-        let currentAssets = getLocalAssets();
+        let currentAssets = await getLocalAssetsFromDb();
         currentAssets = currentAssets.filter(a => !selectedAssetIds.includes(a.id));
-        saveLocalAssets(currentAssets);
+        await saveAssets(currentAssets);
         setAssets(currentAssets);
         setSelectedAssetIds([]);
         addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted. Will sync on next connection.` });
@@ -455,7 +473,7 @@ export default function AssetList() {
 
     const assetsToUpdate = assets.filter(asset => selectedAssetIds.includes(asset.id));
     const updatedAssets = assetsToUpdate.map(asset => {
-        const updatedAsset = { ...asset, ...data };
+        const updatedAsset = { ...asset, ...data, lastModified: new Date().toISOString() };
         if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
             updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
         } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
@@ -473,10 +491,10 @@ export default function AssetList() {
             addNotification({ title: 'Error', description: 'Could not update all selected assets in the cloud.', variant: 'destructive' });
         }
     } else {
-        let currentAssets = getLocalAssets();
+        let currentAssets = await getLocalAssetsFromDb();
         const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
         currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
-        saveLocalAssets(currentAssets);
+        await saveAssets(currentAssets);
         setAssets(currentAssets);
         addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets. Will sync on next connection.` });
     }
@@ -484,24 +502,25 @@ export default function AssetList() {
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
+    const finalAsset = { ...assetToSave, lastModified: new Date().toISOString() };
     if (isOnline) {
         addNotification({ title: 'Saving Asset...', description: 'Syncing with the online database.' });
         try {
-            await updateAsset(assetToSave);
+            await updateAsset(finalAsset);
             addNotification({ title: 'Saved Successfully', description: 'Asset changes have been saved.' });
             setIsFormOpen(false);
         } catch (e) {
             addNotification({ title: 'Error Saving', description: 'Could not save asset to the database.', variant: 'destructive' });
         }
     } else {
-        const currentAssets = getLocalAssets();
-        const existingIndex = currentAssets.findIndex(a => a.id === assetToSave.id);
+        const currentAssets = await getLocalAssetsFromDb();
+        const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
         if (existingIndex > -1) {
-            currentAssets[existingIndex] = assetToSave;
+            currentAssets[existingIndex] = finalAsset;
         } else {
-            currentAssets.unshift(assetToSave);
+            currentAssets.unshift(finalAsset);
         }
-        saveLocalAssets(currentAssets);
+        await saveAssets(currentAssets);
         setAssets(currentAssets);
         addNotification({ title: 'Saved Locally', description: 'Asset saved. Sync when you go online.' });
         setIsFormOpen(false);
@@ -511,16 +530,16 @@ export default function AssetList() {
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
     const asset = assets.find(a => a.id === assetId);
     if (!asset) return;
-    const updatedAsset = { ...asset, ...data };
+    const updatedAsset = { ...asset, ...data, lastModified: new Date().toISOString() };
 
     if (isOnline) {
         await updateAsset(updatedAsset);
     } else {
-        const currentAssets = getLocalAssets();
+        const currentAssets = await getLocalAssetsFromDb();
         const existingIndex = currentAssets.findIndex(a => a.id === assetId);
         if (existingIndex > -1) {
             currentAssets[existingIndex] = updatedAsset;
-            saveLocalAssets(currentAssets);
+            await saveAssets(currentAssets);
             setAssets(currentAssets);
         }
     }
@@ -535,32 +554,37 @@ export default function AssetList() {
     setIsImporting(true);
     addNotification({ title: "Parsing file...", description: "Please wait while we process your Excel file." });
     
-    const { assetsBySheet, errors, skippedRows } = await parseExcelFile(file, enabledSheets);
+    let baseAssets = isOnline ? assets : await getLocalAssetsFromDb();
+
+    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, enabledSheets, baseAssets);
     
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
-    if (skippedRows > 0) {
-        addNotification({ title: "Import Notice", description: `${skippedRows} rows were skipped due to missing required fields.` });
+    if (skipped > 0) {
+        addNotification({ title: "Import Notice", description: `${skipped} rows were skipped due to missing required fields.` });
     }
 
-    const allNewAssets = Object.values(assetsBySheet).flat();
-    if (allNewAssets.length > 0) {
+    const allChanges = [...newAssets, ...updatedAssets];
+    if (allChanges.length > 0) {
         if (isOnline) {
             try {
-                addNotification({ title: "Saving to Cloud...", description: `Importing ${allNewAssets.length} new assets.` });
-                await batchSetAssets(allNewAssets);
-                addNotification({ title: "Import Successful", description: "Successfully saved new assets to the database." });
+                addNotification({ title: "Saving to Cloud...", description: `Importing ${newAssets.length} new and updating ${updatedAssets.length} existing assets.` });
+                await batchSetAssets(allChanges); // batchSetAssets will create or update
+                addNotification({ title: "Import Successful", description: "Successfully saved changes to the database." });
+                if(!autoSync) manualSyncTrigger > 0 && manualSync(); // Trigger a manual sync to get the latest state
             } catch (e) {
-                addNotification({ title: "Import Error", description: "Could not save new assets to the database.", variant: "destructive" });
+                addNotification({ title: "Import Error", description: "Could not save changes to the database.", variant: "destructive" });
             }
         } else {
-            const currentAssets = getLocalAssets();
-            const combinedAssets = [...allNewAssets, ...currentAssets];
-            saveLocalAssets(combinedAssets);
+            const currentAssets = await getLocalAssetsFromDb();
+            const assetMap = new Map(currentAssets.map(a => [a.id, a]));
+            allChanges.forEach(a => assetMap.set(a.id, a));
+            const combinedAssets = Array.from(assetMap.values());
+            await saveAssets(combinedAssets);
             setAssets(combinedAssets);
-            addNotification({ title: 'Imported Locally', description: `${allNewAssets.length} new assets saved. Sync when you go online.` });
+            addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
         }
     } else if (errors.length === 0) {
-        addNotification({ title: "No Data Found", description: "No valid asset sheets were found in the file."});
+        addNotification({ title: "No New Data", description: "No new or updated assets were found in the file."});
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -608,7 +632,7 @@ export default function AssetList() {
             addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
         }
     } else {
-        saveLocalAssets([]);
+        await clearLocalAssets();
         setAssets([]);
         addNotification({ title: 'Local Assets Cleared', description: 'Your local asset list has been cleared.' });
     }
@@ -617,9 +641,9 @@ export default function AssetList() {
   
   const handleClearSearchAndFilters = () => {
     setSearchTerm('');
-    setSelectedLocation('');
-    setSelectedAssignee('');
-    setSelectedStatus('');
+    setSelectedLocations([]);
+    setSelectedAssignees([]);
+    setSelectedStatuses([]);
   };
 
   if (isLoading) {

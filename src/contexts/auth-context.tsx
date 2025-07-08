@@ -33,26 +33,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    // Load profile from local storage on initial render
-    try {
-      const savedProfile = localStorage.getItem('ntblcp-user-profile');
-      if (savedProfile) {
-        const profile: LocalUserProfile = JSON.parse(savedProfile);
-        // A valid profile just needs a displayName now. State can be empty for admin.
-        if (profile.displayName) {
-          setUserProfile(profile);
-          setGlobalStateFilter(profile.state || ''); // Use state if present, otherwise no filter.
-          setProfileSetupComplete(true);
-        } else {
-          // If profile is invalid, remove it
-          localStorage.removeItem('ntblcp-user-profile');
+    let isMounted = true;
+    const loadProfile = () => {
+      try {
+        const savedProfile = localStorage.getItem('ntblcp-user-profile');
+        if (savedProfile) {
+          const profile: LocalUserProfile = JSON.parse(savedProfile);
+          if (profile.displayName) {
+             if (isMounted) {
+                setUserProfile(profile);
+                setGlobalStateFilter(profile.state || '');
+                setProfileSetupComplete(true);
+             }
+          } else {
+            localStorage.removeItem('ntblcp-user-profile');
+          }
+        }
+      } catch (e) {
+        console.error("Failed to load user profile from local storage", e);
+      } finally {
+        if (isMounted) {
+            setLoading(false);
         }
       }
-    } catch (e) {
-      console.error("Failed to load user profile from local storage", e);
-    } finally {
-      setLoading(false);
-    }
+    };
+    
+    loadProfile();
+
+    return () => {
+        isMounted = false;
+    };
   }, [setGlobalStateFilter]);
 
   const updateProfile = async (data: { displayName: string; state: string }) => {

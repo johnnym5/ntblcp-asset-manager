@@ -46,6 +46,8 @@ import {
   ArrowUpDown,
   Check,
   ChevronsUpDown,
+  Loader2,
+  RefreshCw,
 } from "lucide-react";
 import { addNotification } from "@/hooks/use-notifications";
 import { NotificationBell } from "./notification-bell";
@@ -55,14 +57,11 @@ import { useAuth } from "@/contexts/auth-context";
 import { Skeleton } from "./ui/skeleton";
 import { useAppState } from "@/contexts/app-state-context";
 import { Input } from "./ui/input";
-import { Label } from "./ui/label";
-import { Switch } from "./ui/switch";
-import type { OptionType } from "./multi-select-filter";
-import type { Asset } from "@/lib/types";
 import { useDebounce } from "@/hooks/use-debounce";
-import { cn } from "@/lib/utils";
 import { SettingsSheet } from "./settings-sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import { AssetFilterSheet } from "./asset-filter-sheet";
+import type { Asset } from "@/lib/types";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -72,25 +71,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { 
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
-    locationOptions,
-    assigneeOptions,
-    selectedLocation, setSelectedLocation,
-    selectedAssignee, setSelectedAssignee,
-    selectedStatus, setSelectedStatus,
-    sortConfig, setSortConfig
+    sortConfig, setSortConfig,
+    selectedLocations, selectedAssignees, selectedStatuses,
+    locationOptions, assigneeOptions, statusOptions,
+    setSelectedLocations, setSelectedAssignees, setSelectedStatuses,
+    autoSync, setManualSyncTrigger, isSyncing
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
-  const [locationPopoverOpen, setLocationPopoverOpen] = useState(false);
-  const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
 
   useEffect(() => {
     setSearchTerm(debouncedSearchTerm);
   }, [debouncedSearchTerm, setSearchTerm]);
 
-  // Reset local search when global search is cleared
   useEffect(() => {
     if (searchTerm === '') {
         setLocalSearchTerm('');
@@ -118,12 +114,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return userProfile?.displayName || "User";
   }
 
-  const statusOptions: OptionType[] = [
-      { value: "Verified", label: "Verified" },
-      { value: "Unverified", label: "Unverified" },
-      { value: "Discrepancy", label: "Discrepancy" },
-  ];
-
   const sortableFields: { key: keyof Asset, label: string }[] = [
       { key: 'description', label: 'Description' },
       { key: 'category', label: 'Category' },
@@ -141,13 +131,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
   };
   
-  const handleClearFilters = () => {
-    setSelectedLocation('');
-    setSelectedAssignee('');
-    setSelectedStatus('');
+  const handleManualSync = () => {
+    if (isSyncing) return;
+    setManualSyncTrigger(c => c + 1);
   };
-
-  const activeFilterCount = [selectedLocation, selectedAssignee, selectedStatus].filter(Boolean).length;
+  
+  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length;
 
   return (
     <div className="flex flex-col w-full min-h-screen">
@@ -193,137 +182,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 </DropdownMenuContent>
                             </DropdownMenu>
 
-                            <Popover>
-                                <PopoverTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 relative" aria-label="Filter assets">
-                                        <Filter className="h-4 w-4" />
-                                        {activeFilterCount > 0 && (
-                                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                                                {activeFilterCount}
-                                            </span>
-                                        )}
-                                    </Button>
-                                </PopoverTrigger>
-                                <PopoverContent align="end" className="w-[300px] p-0">
-                                    <div className="p-4 space-y-4">
-                                        <h4 className="font-medium leading-none">Filters</h4>
-                                        
-                                        <div className="space-y-2">
-                                            <Label>Location</Label>
-                                            <Popover open={locationPopoverOpen} onOpenChange={setLocationPopoverOpen}>
-                                              <PopoverTrigger asChild>
-                                                <Button
-                                                  variant="outline"
-                                                  role="combobox"
-                                                  aria-expanded={locationPopoverOpen}
-                                                  className="w-full justify-between"
-                                                >
-                                                  {selectedLocation
-                                                    ? locationOptions.find((option) => option.value === selectedLocation)?.label
-                                                    : "All Locations"}
-                                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                </Button>
-                                              </PopoverTrigger>
-                                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                                <Command>
-                                                  <CommandInput placeholder="Search location..." />
-                                                  <CommandList>
-                                                    <ScrollArea className="h-[200px]">
-                                                      <CommandEmpty>No location found.</CommandEmpty>
-                                                      <CommandGroup>
-                                                        <CommandItem value="All Locations" onSelect={() => { setSelectedLocation(''); setLocationPopoverOpen(false); }}>
-                                                          <Check className={cn("mr-2 h-4 w-4", selectedLocation === '' ? "opacity-100" : "opacity-0")} />
-                                                          All Locations
-                                                        </CommandItem>
-                                                        {locationOptions.map((option) => (
-                                                          <CommandItem
-                                                            key={option.value}
-                                                            value={option.label}
-                                                            onSelect={(currentValue) => {
-                                                              const value = locationOptions.find(o => o.label.toLowerCase() === currentValue.toLowerCase())?.value || ''
-                                                              setSelectedLocation(value);
-                                                              setLocationPopoverOpen(false);
-                                                            }}
-                                                          >
-                                                            <Check className={cn("mr-2 h-4 w-4", selectedLocation === option.value ? "opacity-100" : "opacity-0")} />
-                                                            {option.label}
-                                                          </CommandItem>
-                                                        ))}
-                                                      </CommandGroup>
-                                                    </ScrollArea>
-                                                  </CommandList>
-                                                </Command>
-                                              </PopoverContent>
-                                            </Popover>
-                                        </div>
-                                        
-                                        <div className="space-y-2">
-                                            <Label>Assignee</Label>
-                                            <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
-                                              <PopoverTrigger asChild>
-                                                <Button
-                                                  variant="outline"
-                                                  role="combobox"
-                                                  aria-expanded={assigneePopoverOpen}
-                                                  className="w-full justify-between"
-                                                >
-                                                  {selectedAssignee
-                                                    ? assigneeOptions.find((option) => option.value === selectedAssignee)?.label
-                                                    : "All Assignees"}
-                                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                                </Button>
-                                              </PopoverTrigger>
-                                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                                <Command>
-                                                  <CommandInput placeholder="Search assignee..." />
-                                                  <CommandList>
-                                                    <ScrollArea className="h-[200px]">
-                                                      <CommandEmpty>No assignee found.</CommandEmpty>
-                                                      <CommandGroup>
-                                                        <CommandItem value="All Assignees" onSelect={() => { setSelectedAssignee(''); setAssigneePopoverOpen(false); }}>
-                                                          <Check className={cn("mr-2 h-4 w-4", selectedAssignee === '' ? "opacity-100" : "opacity-0")} />
-                                                          All Assignees
-                                                        </CommandItem>
-                                                        {assigneeOptions.map((option) => (
-                                                          <CommandItem
-                                                            key={option.value}
-                                                            value={option.label}
-                                                            onSelect={(currentValue) => {
-                                                              const value = assigneeOptions.find(o => o.label.toLowerCase() === currentValue.toLowerCase())?.value || ''
-                                                              setSelectedAssignee(value);
-                                                              setAssigneePopoverOpen(false);
-                                                            }}
-                                                          >
-                                                            <Check className={cn("mr-2 h-4 w-4", selectedAssignee === option.value ? "opacity-100" : "opacity-0")} />
-                                                            {option.label}
-                                                          </CommandItem>
-                                                        ))}
-                                                      </CommandGroup>
-                                                    </ScrollArea>
-                                                  </CommandList>
-                                                </Command>
-                                              </PopoverContent>
-                                            </Popover>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label>Status</Label>
-                                            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value === 'all' ? '' : value)}>
-                                                <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="all">All Statuses</SelectItem>
-                                                    <SelectSeparator />
-                                                    {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        
-                                        <Button variant="outline" className="w-full" onClick={handleClearFilters} disabled={activeFilterCount === 0}>
-                                            Clear All Filters
-                                        </Button>
-                                    </div>
-                                </PopoverContent>
-                            </Popover>
+                             <Button variant="ghost" size="icon" className="h-8 w-8 relative" onClick={() => setIsFilterSheetOpen(true)}>
+                                <Filter className="h-4 w-4" />
+                                {activeFilterCount > 0 && (
+                                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                                        {activeFilterCount}
+                                    </span>
+                                )}
+                             </Button>
                         </div>
                     </div>
                 )}
@@ -332,6 +198,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
+            {!autoSync && isOnline && (
+              <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                         <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing}>
+                           {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Sync Now</p></TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
+
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -344,7 +223,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                 addNotification({
                                     title: `Mode Changed to ${newIsOnline ? 'Online' : 'Offline'}`,
                                     description: newIsOnline
-                                        ? 'Application is now connected to the server.'
+                                        ? 'Application is now connecting to the server.'
                                         : 'Application is running in offline mode.',
                                 });
                             }}
@@ -413,6 +292,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </header>
       <main className="flex-1 flex flex-col p-4 md:p-6 bg-muted/40">{children}</main>
       <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      <AssetFilterSheet
+        isOpen={isFilterSheetOpen}
+        onOpenChange={setIsFilterSheetOpen}
+        locationOptions={locationOptions}
+        selectedLocations={selectedLocations}
+        setSelectedLocations={setSelectedLocations}
+        assigneeOptions={assigneeOptions}
+        selectedAssignees={selectedAssignees}
+        setSelectedAssignees={setSelectedAssignees}
+        statusOptions={statusOptions}
+        selectedStatuses={selectedStatuses}
+        setSelectedStatuses={setSelectedStatuses}
+      />
     </div>
   );
 }

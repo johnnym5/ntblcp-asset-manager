@@ -25,7 +25,7 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
-  const { enabledSheets, setEnabledSheets } = useAppState();
+  const { enabledSheets, setEnabledSheets, autoSync, setAutoSync } = useAppState();
 
   const handleToggleSheet = (sheetName: string, checked: boolean) => {
     setEnabledSheets(prev => {
@@ -52,40 +52,63 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Sheet Configuration</SheetTitle>
+          <SheetTitle>Application Settings</SheetTitle>
           <SheetDescription>
-            Enable or disable specific sheets for Excel file imports.
+            Manage application behavior and import settings.
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto pr-2 py-4">
-            <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-medium">Toggle all sheets</p>
-                <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handleToggleAll(true)} disabled={allEnabled}>
-                        Enable All
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleToggleAll(false)} disabled={noneEnabled}>
-                        Disable All
-                    </Button>
+          <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-4">Synchronization</h3>
+              <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
+                <div className="space-y-0.5">
+                  <Label htmlFor="auto-sync-switch">Automatic Sync</Label>
+                  <p className="text-xs text-muted-foreground">
+                    When online, sync data in real-time.
+                  </p>
                 </div>
+                <Switch
+                  id="auto-sync-switch"
+                  checked={autoSync}
+                  onCheckedChange={setAutoSync}
+                />
+              </div>
             </div>
-          <Separator className="mb-4" />
-          <ScrollArea className="h-full">
-            <div className="space-y-4">
-              {TARGET_SHEETS.map(sheet => (
-                <div key={sheet} className="flex items-center justify-between">
-                  <Label htmlFor={`switch-${sheet}`} className="text-sm">
-                    {sheet}
-                  </Label>
-                  <Switch
-                    id={`switch-${sheet}`}
-                    checked={enabledSheets.includes(sheet)}
-                    onCheckedChange={(checked) => handleToggleSheet(sheet, checked)}
-                  />
-                </div>
-              ))}
+            <Separator />
+            <div>
+              <h3 className="text-lg font-medium mb-4">Enabled Excel Sheets</h3>
+              <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-medium">Toggle all sheets</p>
+                  <div className="flex gap-2">
+                      <Button size="sm" variant="outline" onClick={() => handleToggleAll(true)} disabled={allEnabled}>
+                          Enable All
+                      </Button>
+                      <Button size="sm" variant="outline" onClick={() => handleToggleAll(false)} disabled={noneEnabled}>
+                          Disable All
+                      </Button>
+                  </div>
+              </div>
+              <div className="rounded-lg border p-3">
+                <ScrollArea className="h-full">
+                  <div className="space-y-4">
+                    {TARGET_SHEETS.map(sheet => (
+                      <div key={sheet} className="flex items-center justify-between">
+                        <Label htmlFor={`switch-${sheet}`} className="text-sm">
+                          {sheet}
+                        </Label>
+                        <Switch
+                          id={`switch-${sheet}`}
+                          checked={enabledSheets.includes(sheet)}
+                          onCheckedChange={(checked) => handleToggleSheet(sheet, checked)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </div>
             </div>
-          </ScrollArea>
+          </div>
         </div>
         <SheetFooter className="mt-auto pt-4 border-t">
           <SheetClose asChild>

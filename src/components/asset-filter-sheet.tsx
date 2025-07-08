@@ -22,10 +22,14 @@ import {
 } from '@/components/ui/command';
 import { Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { OptionType } from './multi-select-filter';
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { Label } from './ui/label';
+
+export interface OptionType {
+  label: string;
+  value: string;
+}
 
 interface AssetFilterSheetProps {
   isOpen: boolean;

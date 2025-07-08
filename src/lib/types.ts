@@ -57,6 +57,7 @@ export interface Asset {
   verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy';
   verifiedDate?: string;
   syncStatus?: 'synced' | 'local';
+  lastModified?: string; // ISO 8601 date string
 
   // Financial data (optional)
   accumulatedDepreciation?: { ngn?: string; usd?: string };

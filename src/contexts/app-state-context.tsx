@@ -1,7 +1,7 @@
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
-import type { OptionType } from '@/components/multi-select-filter';
+import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
 
 export interface SortConfig {
@@ -18,18 +18,20 @@ interface AppStateContextType {
   setGlobalStateFilter: Dispatch<SetStateAction<string>>;
   
   // Filters
-  selectedLocation: string;
-  setSelectedLocation: Dispatch<SetStateAction<string>>;
-  selectedAssignee: string;
-  setSelectedAssignee: Dispatch<SetStateAction<string>>;
-  selectedStatus: string;
-  setSelectedStatus: Dispatch<SetStateAction<string>>;
+  selectedLocations: string[];
+  setSelectedLocations: Dispatch<SetStateAction<string[]>>;
+  selectedAssignees: string[];
+  setSelectedAssignees: Dispatch<SetStateAction<string[]>>;
+  selectedStatuses: string[];
+  setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
   
   // Filter Options
   locationOptions: OptionType[];
   setLocationOptions: Dispatch<SetStateAction<OptionType[]>>;
   assigneeOptions: OptionType[];
   setAssigneeOptions: Dispatch<SetStateAction<OptionType[]>>;
+  statusOptions: OptionType[];
+  setStatusOptions: Dispatch<SetStateAction<OptionType[]>>;
   
   // Sorting
   sortConfig: SortConfig | null;
@@ -38,6 +40,14 @@ interface AppStateContextType {
   // Sheet Settings
   enabledSheets: string[];
   setEnabledSheets: Dispatch<SetStateAction<string[]>>;
+  
+  // Sync Settings
+  autoSync: boolean;
+  setAutoSync: Dispatch<SetStateAction<boolean>>;
+  manualSyncTrigger: number;
+  setManualSyncTrigger: Dispatch<SetStateAction<number>>;
+  isSyncing: boolean;
+  setIsSyncing: Dispatch<SetStateAction<boolean>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -47,28 +57,42 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [globalStateFilter, setGlobalStateFilter] = useState('');
   
-  const [selectedLocation, setSelectedLocation] = useState<string>('');
-  const [selectedAssignee, setSelectedAssignee] = useState<string>('');
-  const [selectedStatus, setSelectedStatus] = useState<string>('');
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   
   const [locationOptions, setLocationOptions] = useState<OptionType[]>([]);
   const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
+  const [statusOptions, setStatusOptions] = useState<OptionType[]>([]);
   
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'description', direction: 'asc' });
 
   const [enabledSheets, setEnabledSheets] = useState<string[]>(() => {
-    // Initialize from local storage or default to all sheets
     if (typeof window !== 'undefined') {
       const savedSheets = localStorage.getItem('ntblcp-enabled-sheets');
       return savedSheets ? JSON.parse(savedSheets) : [...TARGET_SHEETS];
     }
     return [...TARGET_SHEETS];
   });
+  
+  const [autoSync, setAutoSync] = useState(() => {
+    if (typeof window !== 'undefined') {
+        const savedSync = localStorage.getItem('ntblcp-autosync');
+        return savedSync ? JSON.parse(savedSync) : true;
+    }
+    return true;
+  });
 
-  // Persist enabled sheets to local storage
+  const [manualSyncTrigger, setManualSyncTrigger] = useState(0);
+  const [isSyncing, setIsSyncing] = useState(false);
+
   useEffect(() => {
     localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
   }, [enabledSheets]);
+  
+  useEffect(() => {
+    localStorage.setItem('ntblcp-autosync', JSON.stringify(autoSync));
+  }, [autoSync]);
 
   const value = {
     isOnline,
@@ -77,20 +101,28 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setSearchTerm,
     globalStateFilter,
     setGlobalStateFilter,
-    selectedLocation,
-    setSelectedLocation,
-    selectedAssignee,
-    setSelectedAssignee,
-    selectedStatus,
-    setSelectedStatus,
+    selectedLocations,
+    setSelectedLocations,
+    selectedAssignees,
+    setSelectedAssignees,
+    selectedStatuses,
+    setSelectedStatuses,
     locationOptions,
     setLocationOptions,
     assigneeOptions,
     setAssigneeOptions,
+    statusOptions,
+    setStatusOptions,
     sortConfig,
     setSortConfig,
     enabledSheets,
     setEnabledSheets,
+    autoSync,
+    setAutoSync,
+    manualSyncTrigger,
+    setManualSyncTrigger,
+    isSyncing,
+    setIsSyncing,
   };
 
   return (

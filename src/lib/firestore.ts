@@ -1,7 +1,7 @@
 
 'use client';
 
-import { doc, getDoc, setDoc, onSnapshot, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
+import { doc, getDoc, getDocs, setDoc, onSnapshot, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Asset, UserProfile } from '@/lib/types';
 import type { User } from 'firebase/auth';
@@ -36,12 +36,29 @@ export async function updateUserProfile(uid: string, data: Partial<UserProfile>)
 // --- Assets ---
 
 /**
+ * Fetches all asset documents from Firestore once.
+ * @returns A promise that resolves with an array of assets.
+ */
+export async function getAssets(): Promise<Asset[]> {
+  const assetsCollectionRef = collection(db, 'assets');
+  const q = query(assetsCollectionRef);
+  const querySnapshot = await getDocs(q);
+  const fetchedAssets: Asset[] = [];
+  querySnapshot.forEach((doc) => {
+    fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+  });
+  return fetchedAssets;
+}
+
+/**
  * Sets up a real-time listener for the assets collection.
  * @param callback The function to call with the array of assets whenever data changes.
+ * @param onError The function to call when the listener encounters an error.
  * @returns An unsubscribe function to detach the listener.
  */
 export function getAssetsListener(
   callback: (assets: Asset[]) => void,
+  onError: (error: Error) => void
 ) {
   const assetsCollectionRef = collection(db, 'assets');
   const q = query(assetsCollectionRef);
@@ -49,13 +66,12 @@ export function getAssetsListener(
   const unsubscribe = onSnapshot(q, (querySnapshot) => {
     const fetchedAssets: Asset[] = [];
     querySnapshot.forEach((doc) => {
-      // Combine the document ID with the document data to create the full Asset object
       fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
     });
     callback(fetchedAssets);
   }, (error) => {
-    console.error("Error fetching assets: ", error);
-    // You could add a notification here to inform the user
+    console.error("Error fetching assets in real-time: ", error);
+    onError(error);
   });
 
   return unsubscribe;
@@ -69,7 +85,7 @@ export function getAssetsListener(
  */
 export async function updateAsset(asset: Asset) {
   const assetRef = doc(db, 'assets', asset.id);
-  await setDoc(assetRef, asset, { merge: true });
+  await setDoc(assetRef, { ...asset, lastModified: new Date().toISOString() }, { merge: true });
 }
 
 /**
@@ -94,7 +110,8 @@ export async function batchSetAssets(assets: Asset[]) {
         const chunk = assets.slice(i, i + batchSize);
         chunk.forEach((asset) => {
             const docRef = doc(assetsCollectionRef, asset.id);
-            batch.set(docRef, asset);
+            // Ensure lastModified is set on batch writes
+            batch.set(docRef, { ...asset, lastModified: asset.lastModified || new Date().toISOString() });
         });
         await batch.commit();
     }

@@ -4,12 +4,6 @@ import type { Asset } from './types';
 import { TARGET_SHEETS, HEADER_DEFINITIONS } from './constants';
 import { v4 as uuidv4 } from 'uuid';
 
-/**
- * Checks if a given row is a header row based on expected header keywords.
- * @param rowData An array of strings representing a row.
- * @param sheetName The name of the sheet to get expected headers from constants.
- * @returns True if the row is likely a header, false otherwise.
- */
 function isHeaderRow(rowData: any[], sheetName: string): boolean {
     const expectedHeaders = HEADER_DEFINITIONS[sheetName];
     if (!expectedHeaders) return false;
@@ -17,7 +11,6 @@ function isHeaderRow(rowData: any[], sheetName: string): boolean {
     const rowStrings = rowData.map(cell => String(cell ?? '').trim().toLowerCase());
     const nonEmptyCells = rowStrings.filter(c => c).length;
 
-    // A header must have at least 3 non-empty cells to be considered.
     if (nonEmptyCells < 3) return false;
 
     let matchCount = 0;
@@ -29,26 +22,20 @@ function isHeaderRow(rowData: any[], sheetName: string): boolean {
         }
     }
 
-    // A row is considered a header if it has at least 3 direct matches or a high percentage of matches.
-    // This handles variations and ensures we don't misinterpret data as headers.
-    const hasKeyFields = ['s/n', 'description', 'serial'].reduce((acc, key) => {
-        return acc + (rowStrings.join(' ').toLowerCase().includes(key) ? 1 : 0);
-    }, 0) >= 2;
+    const hasKeyFields = ['description', 'serial', 'asset id', 'chasis', 'engine no'].some(key => 
+        rowStrings.join(' ').includes(key)
+    );
 
-    return matchCount >= 3 && hasKeyFields;
+    return matchCount >= 3 || hasKeyFields;
 }
 
 
-/**
- * Normalizes different header names to a consistent key.
- */
 function getColumnValue(row: any, ...possibleKeys: string[]): string {
     for (const key of possibleKeys) {
         const lowerKey = key.toLowerCase().replace(/\s+/g, ' ');
         for(const rowKey in row) {
             if(rowKey.toLowerCase().trim().replace(/\s+/g, ' ') === lowerKey) {
                 const value = row[rowKey];
-                // Handle Excel date serial numbers
                 if (typeof value === 'number' && value > 10000 && lowerKey.includes('date')) {
                   const date = XLSX.SSF.parse_date_code(value);
                   return new Date(date.y, date.m - 1, date.d).toLocaleDateString('en-CA');
@@ -60,155 +47,144 @@ function getColumnValue(row: any, ...possibleKeys: string[]): string {
     return '';
 }
 
-/**
- * Maps a row of data to a normalized Asset object.
- * @param row The raw data object for a single row.
- * @param category The category (sheet name) of the asset.
- * @returns A normalized Asset object, or null if essential data is missing.
- */
-function mapRowToAsset(row: any, category: string): Asset | null {
+function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset | null {
     const description = getColumnValue(row, 'Asset Description', 'DESCRIPTION');
+    const assetIdCode = getColumnValue(row, 'Asset ID Code', 'TAG NUMBERS');
+    const serialNumber = getColumnValue(row, 'Serial Number', 'ASSET SERIAL NUMBERS');
+    const chasisNo = getColumnValue(row, 'Chasis no');
+    const engineNo = getColumnValue(row, 'Engine no');
 
-    if (!description) {
-        return null; // Skip row if essential data (description) is missing
+    if (!description && !assetIdCode && !serialNumber && !chasisNo && !engineNo) {
+        return null;
     }
 
-    // For IHVN sheet, location can be in STATE or LOCATION column. Prioritize STATE.
     const location = category === 'IHVN-GF N-THRIP'
         ? getColumnValue(row, 'STATE', 'Location', 'LOCATION')
         : getColumnValue(row, 'Location', 'LOCATION', 'State');
 
-    const asset: Asset = {
-        id: uuidv4(),
+    const importedAssetData: Partial<Asset> = {
+        description: description || existingAsset?.description,
         category,
-        syncStatus: 'local',
-        verifiedStatus: 'Unverified',
-        description: description,
-        sn: getColumnValue(row, 'S/N'),
-        location: location,
-        lga: getColumnValue(row, 'LGA'),
-        assignee: getColumnValue(row, 'Assignee'),
-        assetIdCode: getColumnValue(row, 'Asset ID Code', 'TAG NUMBERS'),
-        assetClass: getColumnValue(row, 'Asset Class', 'CLASSIFICATION'),
-        manufacturer: getColumnValue(row, 'Manufacturer'),
-        modelNumber: getColumnValue(row, 'Model Number', 'MODEL NUMBERS'),
-        serialNumber: getColumnValue(row, 'Serial Number', 'ASSET SERIAL NUMBERS'),
-        supplier: getColumnValue(row, 'Supplier', 'Suppliers'),
-        dateReceived: getColumnValue(row, 'Date Purchased or Received', 'Date Purchased or  Received', 'YEAR OF PURCHASE'),
-        condition: getColumnValue(row, 'Condition'),
-        remarks: getColumnValue(row, 'Remarks', 'Comments'),
-        chasisNo: getColumnValue(row, 'Chasis no'),
-        engineNo: getColumnValue(row, 'Engine no'),
-        qty: getColumnValue(row, 'QTY'),
-        site: getColumnValue(row, 'SITE'),
-        costNgn: getColumnValue(row, 'COST (NGN)'),
-        priceNaira: getColumnValue(row, 'Purchase price (Naira)'),
-        priceUSD: getColumnValue(row, 'Purchase Price [USD)'), // Match typo in header
-        funder: getColumnValue(row, 'Funder'),
-        grant: getColumnValue(row, 'GRANT'),
-        usefulLifeYears: getColumnValue(row, 'Useful Life (Years)'),
-        imei: getColumnValue(row, 'IMEI (TABLETS & MOBILE PHONES)'),
-        grnNo: getColumnValue(row, 'Chq No / Goods Received Note No.'),
-        pvNo: getColumnValue(row, 'PV No'),
-        accumulatedDepreciation: {
-            ngn: getColumnValue(row, 'Accumulated Depreciation (NGN)'),
-            usd: getColumnValue(row, 'Accumulated Depreciation (USD)')
-        },
-        netBookValue: {
-            ngn: getColumnValue(row, 'Net Book Value (NGN)'),
-            usd: getColumnValue(row, 'Net Book Value (USD)')
-        }
+        sn: getColumnValue(row, 'S/N') || existingAsset?.sn,
+        location: location || existingAsset?.location,
+        lga: getColumnValue(row, 'LGA') || existingAsset?.lga,
+        assignee: getColumnValue(row, 'Assignee') || existingAsset?.assignee,
+        assetIdCode: assetIdCode || existingAsset?.assetIdCode,
+        assetClass: getColumnValue(row, 'Asset Class', 'CLASSIFICATION') || existingAsset?.assetClass,
+        manufacturer: getColumnValue(row, 'Manufacturer') || existingAsset?.manufacturer,
+        modelNumber: getColumnValue(row, 'Model Number', 'MODEL NUMBERS') || existingAsset?.modelNumber,
+        serialNumber: serialNumber || existingAsset?.serialNumber,
+        chasisNo: chasisNo || existingAsset?.chasisNo,
+        engineNo: engineNo || existingAsset?.engineNo,
+        supplier: getColumnValue(row, 'Supplier', 'Suppliers') || existingAsset?.supplier,
+        dateReceived: getColumnValue(row, 'Date Purchased or Received', 'Date Purchased or  Received', 'YEAR OF PURCHASE') || existingAsset?.dateReceived,
+        condition: getColumnValue(row, 'Condition') || existingAsset?.condition,
+        grant: getColumnValue(row, 'GRANT') || existingAsset?.grant,
+        costNgn: getColumnValue(row, 'COST (NGN)') || existingAsset?.costNgn,
     };
-    return asset;
+
+    if (existingAsset) {
+        return {
+            ...existingAsset,
+            ...importedAssetData,
+            lastModified: new Date().toISOString(),
+        };
+    } else {
+        return {
+            id: uuidv4(),
+            syncStatus: 'local',
+            verifiedStatus: 'Unverified',
+            ...importedAssetData,
+            lastModified: new Date().toISOString(),
+        } as Asset;
+    }
 }
 
-/**
- * Parses an entire Excel file, handling multiple sheets and dynamic/multiple header rows within sheets.
- */
-export async function parseExcelFile(file: File, enabledSheets: string[]): Promise<{ assetsBySheet: { [sheetName: string]: Asset[] }, errors: string[], skippedRows: number }> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      let assetsBySheet: { [sheetName: string]: Asset[] } = {};
-      let errors: string[] = [];
-      let totalSkipped = 0;
-
-      try {
-        const data = new Uint8Array(e.target?.result as ArrayBuffer);
-        const workbook = XLSX.read(data, { type: 'array' });
-
-        workbook.SheetNames.forEach(sheetName => {
-          const lowerCaseSheetName = sheetName.trim().toLowerCase();
-          const matchedSheetName = enabledSheets.find(target => lowerCaseSheetName.includes(target.toLowerCase()));
-
-          if (matchedSheetName) {
-            const worksheet = workbook.Sheets[sheetName];
-            if (!worksheet) {
-                errors.push(`Sheet "${sheetName}" is empty or could not be read.`);
-                return;
-            }
-
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+export async function parseExcelFile(
+    file: File, 
+    enabledSheets: string[], 
+    existingAssets: Asset[]
+): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
+    return new Promise((resolve) => {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            const newAssets: Asset[] = [];
+            const updatedAssets: Asset[] = [];
+            let errors: string[] = [];
+            let skipped = 0;
             
-            let sheetAssets: Asset[] = [];
-            let sheetSkipped = 0;
-            let currentHeaders: string[] | null = null;
-
-            for (const rowData of sheetData) {
-                // If row is completely empty, skip it.
-                if (!rowData || rowData.every(cell => cell === null)) continue;
-                
-                if (isHeaderRow(rowData, matchedSheetName)) {
-                    currentHeaders = rowData.map(cell => String(cell ?? '').trim());
-                    continue; // Header found, continue to next row for data
+            const existingAssetMap = new Map<string, Asset>();
+            existingAssets.forEach(asset => {
+                const key = asset.assetIdCode || asset.serialNumber;
+                if (key) {
+                    existingAssetMap.set(key, asset);
                 }
+            });
 
-                if (currentHeaders) {
-                    const rowObject: { [key: string]: any } = {};
-                    currentHeaders.forEach((header, index) => {
-                        if (header) { // only map columns with a header name
-                            rowObject[header] = rowData[index];
+            try {
+                const data = new Uint8Array(e.target?.result as ArrayBuffer);
+                const workbook = XLSX.read(data, { type: 'array' });
+
+                workbook.SheetNames.forEach(sheetName => {
+                    const lowerCaseSheetName = sheetName.trim().toLowerCase();
+                    const matchedSheetName = enabledSheets.find(target => lowerCaseSheetName.includes(target.toLowerCase()));
+
+                    if (matchedSheetName) {
+                        const worksheet = workbook.Sheets[sheetName];
+                        if (!worksheet) {
+                            errors.push(`Sheet "${sheetName}" is empty or could not be read.`);
+                            return;
                         }
-                    });
-                    
-                    const asset = mapRowToAsset(rowObject, matchedSheetName);
-                    if (asset) {
-                        sheetAssets.push(asset);
-                    } else {
-                        // Check if the row is not just empty/header-like before counting as skipped
-                        if (rowData.some(cell => cell !== null)) {
-                           sheetSkipped++;
+
+                        const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
+                        let currentHeaders: string[] | null = null;
+
+                        for (const rowData of sheetData) {
+                            if (!rowData || rowData.every(cell => cell === null)) continue;
+                            
+                            if (isHeaderRow(rowData, matchedSheetName)) {
+                                currentHeaders = rowData.map(cell => String(cell ?? '').trim());
+                                continue;
+                            }
+
+                            if (currentHeaders) {
+                                const rowObject: { [key: string]: any } = {};
+                                currentHeaders.forEach((header, index) => {
+                                    if (header) {
+                                        rowObject[header] = rowData[index];
+                                    }
+                                });
+                                
+                                const idKey = getColumnValue(rowObject, 'Asset ID Code', 'TAG NUMBERS') || getColumnValue(rowObject, 'Serial Number', 'ASSET SERIAL NUMBERS');
+                                const existingAsset = idKey ? existingAssetMap.get(idKey) : undefined;
+                                
+                                const asset = mapRowToAsset(rowObject, matchedSheetName, existingAsset);
+                                if (asset) {
+                                    if (existingAsset) {
+                                        updatedAssets.push(asset);
+                                    } else {
+                                        newAssets.push(asset);
+                                    }
+                                } else {
+                                    if (rowData.some(cell => cell !== null)) {
+                                       skipped++;
+                                    }
+                                }
+                            }
                         }
                     }
-                }
+                });
+                resolve({ assets: newAssets, updatedAssets, skipped, errors });
+            } catch (err) {
+                const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during parsing.";
+                resolve({ assets: [], updatedAssets: [], skipped, errors: [errorMessage] });
             }
-            
-            if (sheetAssets.length > 0) {
-                 assetsBySheet[matchedSheetName] = (assetsBySheet[matchedSheetName] || []).concat(sheetAssets);
-            }
-            if (sheetSkipped > 0) {
-                 totalSkipped += sheetSkipped;
-            }
-             if (sheetAssets.length === 0 && !Object.keys(assetsBySheet).includes(matchedSheetName)) {
-                // Only report error if we found NO assets for this sheet at all.
-                errors.push(`Could not find any valid header or data rows in sheet "${sheetName}".`);
-            }
-          }
-        });
-        resolve({ assetsBySheet, errors, skippedRows: totalSkipped });
-
-      } catch (err) {
-        console.error("Error parsing Excel file:", err);
-        const errorMessage = err instanceof Error ? err.message : "An unknown error occurred during parsing.";
-        resolve({ assetsBySheet: {}, errors: [errorMessage], skippedRows: totalSkipped });
-      }
-    };
-    reader.onerror = (err) => {
-      console.error("FileReader error:", err);
-      resolve({ assetsBySheet: {}, errors: ["Failed to read the file."], skippedRows: 0 });
-    };
-    reader.readAsArrayBuffer(file);
-  });
+        };
+        reader.onerror = (err) => {
+            resolve({ assets: [], updatedAssets: [], skipped: 0, errors: ["Failed to read the file."] });
+        };
+        reader.readAsArrayBuffer(file);
+    });
 }
 
 
@@ -261,9 +237,7 @@ function getNestedValue(obj: any, path: string): any {
     return path.split('.').reduce((o, k) => (o && typeof o === 'object' && o[k] !== undefined) ? o[k] : undefined, obj);
 }
 
-/**
- * Exports a list of assets to an Excel file, preserving original column structures.
- */
+
 export function exportToExcel(assets: Asset[], fileName: string): void {
   const workbook = XLSX.utils.book_new();
 
@@ -286,7 +260,7 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
               continue;
           }
 
-          const finalHeaders = [...headers, 'Verified Status', 'Verified Date'];
+          const finalHeaders = [...headers, 'Verified Status', 'Verified Date', 'Last Modified'];
 
           const dataRows = categoryAssets.map(asset => {
               const row: any[] = [];
@@ -301,15 +275,15 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
               });
               row.push(asset.verifiedStatus || 'Unverified');
               row.push(asset.verifiedDate || '');
+              row.push(asset.lastModified ? new Date(asset.lastModified).toLocaleString() : '');
               return row;
           });
 
           const dataWithHeaders = [finalHeaders, ...dataRows];
           const worksheet = XLSX.utils.aoa_to_sheet(dataWithHeaders);
           
-          // Auto-fit columns
           const cols = finalHeaders.map((header, i) => ({
-            wch: Math.max(...dataRows.map(r => r[i]?.toString().length), header.length) + 2
+            wch: Math.max(...dataRows.map(r => r[i]?.toString().length ?? 0), header.length) + 2
           }));
           worksheet['!cols'] = cols;
 
