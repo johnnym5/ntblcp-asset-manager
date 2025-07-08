@@ -1,5 +1,5 @@
 
-# NTBLCP Asset Assist
+# NTBLCP ASSET VERIFICATOR
 
 A full-featured, offline-first Asset Management Web App for NTBLCP, built with Next.js, Tailwind CSS, and a local-first architecture.
 

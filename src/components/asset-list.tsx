@@ -115,8 +115,9 @@ export default function AssetList() {
 
   const { 
     searchTerm, setSearchTerm,
-    isOnline, globalStateFilter, setGlobalStateFilter,
+    isOnline, setIsOnline, globalStateFilter, setGlobalStateFilter,
     selectedLocations, selectedAssignees, selectedStatuses,
+    setSelectedLocations, setSelectedAssignees, setSelectedStatuses,
     sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
     enabledSheets,
     autoSync, manualSyncTrigger, setIsSyncing,
@@ -127,28 +128,32 @@ export default function AssetList() {
   }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, globalStateFilter, view, currentCategory]);
 
   useEffect(() => {
-    if (searchTerm) {
+    if (selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0) {
       setView('dashboard');
     }
-  }, [searchTerm]);
+  }, [selectedLocations, selectedAssignees, selectedStatuses]);
+  
 
   const getOldestDuplicates = (assetsToFilter: Asset[]): Asset[] => {
     const uniqueAssetMap = new Map<string, Asset>();
-
+  
     assetsToFilter.forEach(asset => {
-        const key = asset.assetIdCode || asset.serialNumber || asset.description;
-        if (!key) return; // Skip assets without a key
-
-        const existingAsset = uniqueAssetMap.get(key);
-        if (!existingAsset) {
-            uniqueAssetMap.set(key, asset);
-        } else {
-            const existingTimestamp = existingAsset.lastModified ? new Date(existingAsset.lastModified).getTime() : 0;
-            const currentTimestamp = asset.lastModified ? new Date(asset.lastModified).getTime() : 0;
-            if (currentTimestamp > 0 && currentTimestamp < existingTimestamp) {
-                uniqueAssetMap.set(key, asset);
-            }
+      // Use a composite key if available, otherwise fallback to description
+      const key = asset.assetIdCode || asset.serialNumber || asset.description;
+      if (!key) return; // Skip assets without a key
+  
+      const existingAsset = uniqueAssetMap.get(key);
+      if (!existingAsset) {
+        uniqueAssetMap.set(key, asset);
+      } else {
+        const existingTimestamp = existingAsset.lastModified ? new Date(existingAsset.lastModified).getTime() : 0;
+        const currentTimestamp = asset.lastModified ? new Date(asset.lastModified).getTime() : 0;
+        
+        // If current asset is older than existing one, replace it
+        if (currentTimestamp > 0 && (existingTimestamp === 0 || currentTimestamp < existingTimestamp)) {
+          uniqueAssetMap.set(key, asset);
         }
+      }
     });
     return Array.from(uniqueAssetMap.values());
   };
@@ -162,8 +167,7 @@ export default function AssetList() {
         setAssets(uniqueAssets);
         
         if (source === 'remote') {
-            await clearLocalAssets();
-            await saveAssets(uniqueAssets);
+            await saveAssets(uniqueAssets); // Overwrite local with remote
         }
         setIsLoading(false);
     };
@@ -174,7 +178,7 @@ export default function AssetList() {
         addNotification({ title: 'Syncing...', description: 'Fetching latest data from server.' });
         unsubscribe = getAssetsListener(
             (fetchedAssets) => {
-                addNotification({ title: 'Data Updated', description: 'Received latest data from the server.' });
+                addNotification({ title: 'Data Synced', description: 'Received latest data from the server.' });
                 handleFetchedAssets(fetchedAssets, 'remote');
                 setIsSyncing(false);
             },
@@ -264,34 +268,6 @@ export default function AssetList() {
       });
     }
   }, [assets, globalStateFilter]);
-
-
-  const displayedAssetsForDashboard = useMemo(() => {
-    let assetsToDisplay = stateFilteredAssets;
-    if (searchTerm) {
-        const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
-        if (lowerCaseSearchTokens.length > 0) {
-            assetsToDisplay = assetsToDisplay.filter(asset => {
-                const assetHaystack = Object.values(asset)
-                    .map(value => (typeof value === 'object' && value !== null) ? Object.values(value).join(' ') : String(value))
-                    .join(' ').toLowerCase();
-                return lowerCaseSearchTokens.every(token => assetHaystack.includes(token));
-            });
-        }
-    }
-    return assetsToDisplay;
-  }, [stateFilteredAssets, searchTerm]);
-  
-  const assetsByCategory = useMemo(() => {
-    return displayedAssetsForDashboard.reduce((acc, asset) => {
-        const category = asset.category || 'Uncategorized';
-        if (!acc[category]) {
-            acc[category] = [];
-        }
-        acc[category].push(asset);
-        return acc;
-    }, {} as { [key: string]: Asset[] });
-  }, [displayedAssetsForDashboard]);
   
   useEffect(() => {
     const locations = new Set<string>();
@@ -330,23 +306,21 @@ export default function AssetList() {
     });
   };
 
-  const showUnifiedResults = useMemo(() => {
-    return selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
-  }, [selectedLocations, selectedAssignees, selectedStatuses]);
-
-
-  const unifiedResults = useMemo(() => {
-    if (!showUnifiedResults) return [];
-
+  const displayedAssets = useMemo(() => {
     let results = stateFilteredAssets;
-    
-    results = results.filter(asset => {
-        const locationMatch = selectedLocations.length === 0 || selectedLocations.includes(normalizeAssetLocation(asset.location));
-        const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
-        const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
-        return locationMatch && assigneeMatch && statusMatch;
-    });
-    
+
+    // Apply filters from filter sheet
+    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+    if (hasFilters) {
+        results = results.filter(asset => {
+            const locationMatch = selectedLocations.length === 0 || selectedLocations.includes(normalizeAssetLocation(asset.location));
+            const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
+            const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
+            return locationMatch && assigneeMatch && statusMatch;
+        });
+    }
+
+    // Apply search term
     if (searchTerm) {
         const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
         if (lowerCaseSearchTokens.length > 0) {
@@ -360,43 +334,24 @@ export default function AssetList() {
     }
     
     return sortAssets(results, sortConfig);
-  }, [showUnifiedResults, searchTerm, stateFilteredAssets, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
+  }, [stateFilteredAssets, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
 
+  const assetsByCategory = useMemo(() => {
+    return displayedAssets.reduce((acc, asset) => {
+        const category = asset.category || 'Uncategorized';
+        if (!acc[category]) {
+            acc[category] = [];
+        }
+        acc[category].push(asset);
+        return acc;
+    }, {} as { [key: string]: Asset[] });
+  }, [displayedAssets]);
 
   const categoryFilteredAssets = useMemo(() => {
-    let baseAssets: Asset[];
-    if (view === 'table' && currentCategory) {
-        baseAssets = assetsByCategory[currentCategory] || [];
-    } else {
-        return [];
-    }
+    if (!currentCategory) return [];
+    return assetsByCategory[currentCategory] || [];
+  }, [currentCategory, assetsByCategory]);
 
-    let assetsToFilter = baseAssets;
-    
-    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
-    if (hasFilters) {
-        assetsToFilter = assetsToFilter.filter(asset => {
-            const locationMatch = selectedLocations.length === 0 || selectedLocations.includes(normalizeAssetLocation(asset.location));
-            const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
-            const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
-            return locationMatch && assigneeMatch && statusMatch;
-        });
-    }
-
-    if (searchTerm) {
-        const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
-        if (lowerCaseSearchTokens.length > 0) {
-            assetsToFilter = assetsToFilter.filter(asset => {
-                const assetHaystack = Object.values(asset)
-                    .map(value => (typeof value === 'object' && value !== null) ? Object.values(value).join(' ') : String(value))
-                    .join(' ').toLowerCase();
-                return lowerCaseSearchTokens.every(token => assetHaystack.includes(token));
-            });
-        }
-    }
-    
-    return sortAssets(assetsToFilter, sortConfig);
-  }, [view, currentCategory, assetsByCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
 
   const handleAddAsset = () => {
     setSelectedAsset(undefined);
@@ -592,7 +547,7 @@ export default function AssetList() {
   };
   
   const handleExportClick = () => {
-    const assetsToExport = showUnifiedResults ? unifiedResults : (view === 'table' ? categoryFilteredAssets : displayedAssetsForDashboard);
+    const assetsToExport = view === 'table' ? categoryFilteredAssets : displayedAssets;
     if (assetsToExport.length === 0) {
       addNotification({ title: "No Data to Export", description: "There are no assets in the current view to export." });
       return;
@@ -600,7 +555,11 @@ export default function AssetList() {
     try {
       const isAdminUser = userProfile?.displayName?.trim().toLowerCase() === 'admin';
       const exportPrefix = isAdminUser ? 'admin' : userProfile?.state || 'assets';
-      const fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+      let fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+      
+      if(view === 'table' && currentCategory){
+          fileName = `${exportPrefix}-${currentCategory}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+      }
 
       exportToExcel(assetsToExport, fileName);
       addNotification({ title: "Export Successful" });
@@ -623,19 +582,19 @@ export default function AssetList() {
   };
   
   const handleClearAllAssets = async () => {
+    addNotification({ title: 'Clearing All Assets...', description: 'This may take a moment.' });
     if (isOnline) {
-        addNotification({ title: 'Clearing Cloud Assets...', description: 'This may take a moment.' });
         try {
             await batchDeleteAssets(assets.map(a => a.id));
             addNotification({ title: 'Cloud Assets Cleared', description: 'Your online asset database has been cleared.' });
         } catch (e) {
             addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
         }
-    } else {
-        await clearLocalAssets();
-        setAssets([]);
-        addNotification({ title: 'Local Assets Cleared', description: 'Your local asset list has been cleared.' });
-    }
+    } 
+    // Always clear local as well
+    await clearLocalAssets();
+    setAssets([]);
+    addNotification({ title: 'Local Assets Cleared', description: 'Your local asset list has been cleared.' });
     setIsClearAllDialogOpen(false);
   }
   
@@ -650,165 +609,20 @@ export default function AssetList() {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
-  // UNIFIED RESULTS VIEW (FILTERS ONLY)
-  if (showUnifiedResults) {
-    const results = unifiedResults;
-    const totalPages = Math.ceil(results.length / ITEMS_PER_PAGE);
-    const paginatedResults = results.slice(
-      (currentPage - 1) * ITEMS_PER_PAGE,
-      currentPage * ITEMS_PER_PAGE
-    );
-    const areAllResultsSelected = results.length > 0 && results.every(a => selectedAssetIds.includes(a.id));
-
-    const title = "Filter Results";
-
-    return (
-      <div className="flex flex-col h-full gap-4">
-          <div className="flex flex-wrap items-center gap-2">
-              <h2 className="text-2xl font-bold tracking-tight flex-1">
-                  {title}
-              </h2>
-              {selectedAssetIds.length > 0 ? (
-                  <div className="flex items-center gap-2">
-                      <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
-                       {selectedAssetIds.length === 1 && (
-                            <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)}>
-                                <Edit className="mr-2 h-4 w-4" /> Edit
-                            </Button>
-                        )}
-                        {selectedAssetIds.length > 0 && (
-                            <Button variant="outline" size="sm" onClick={handleBatchEdit}>
-                                <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
-                            </Button>
-                        )}
-                      <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting}>
-                          {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                          Delete
-                      </Button>
-                  </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <span className="text-sm text-muted-foreground">{results.length} assets found</span>
-                  <Button variant="outline" size="sm" onClick={handleClearSearchAndFilters}>
-                      <X className="mr-2 h-4 w-4" />
-                      Clear All
-                  </Button>
-                  <Button variant="outline" onClick={handleExportClick}>
-                      <FileDown className="mr-2 h-4 w-4" />
-                      Export Results
-                  </Button>
-                </div>
-              )}
-          </div>
-          
-            <Card className="flex-1 flex flex-col">
-              <CardContent className="p-0 flex-1 overflow-auto">
-                 {paginatedResults.length > 0 ? (
-                  <Table>
-                      <TableHeader>
-                        <TableRow>
-                            <TableHead className="w-[50px]">
-                                <Checkbox
-                                    checked={areAllResultsSelected}
-                                    onCheckedChange={(checked) => handleSelectAll(checked as boolean, results)}
-                                    aria-label="Select all results"
-                                />
-                            </TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Category</TableHead>
-                            <TableHead>Location</TableHead>
-                            <TableHead>Assignee</TableHead>
-                            <TableHead>Verified Status</TableHead>
-                            <TableHead className="w-[50px] text-right">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                          {paginatedResults.map(asset => (
-                              <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
-                                  <TableCell onClick={e => e.stopPropagation()}>
-                                      <Checkbox 
-                                          checked={selectedAssetIds.includes(asset.id)}
-                                          onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
-                                          aria-label={`Select asset ${asset.description}`}
-                                      />
-                                  </TableCell>
-                                  <TableCell className="font-medium">{asset.description}</TableCell>
-                                  <TableCell>{asset.category || 'N/A'}</TableCell>
-                                  <TableCell>{asset.location || 'N/A'}</TableCell>
-                                  <TableCell>{asset.assignee || 'N/A'}</TableCell>
-                                  <TableCell onClick={(e) => e.stopPropagation()}>
-                                    <Select
-                                      value={asset.verifiedStatus || "Unverified"}
-                                      onValueChange={async (status) => {
-                                        const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
-                                        await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate });
-                                        addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
-                                      }}
-                                    >
-                                      <SelectTrigger className="w-[150px] h-9 text-sm"><SelectValue placeholder="Select status" /></SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4" />Unverified</div></SelectItem>
-                                        <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4" />Verified</div></SelectItem>
-                                        <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4" />Discrepancy</div></SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </TableCell>
-                                  <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                                      <DropdownMenu>
-                                      <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                      <DropdownMenuContent align="end">
-                                          <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
-                                              <Edit className="mr-2 h-4 w-4" /> Edit
-                                          </DropdownMenuItem>
-                                          <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
-                                              <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                          </DropdownMenuItem>
-                                      </DropdownMenuContent>
-                                      </DropdownMenu>
-                                  </TableCell>
-                              </TableRow>
-                          ))}
-                      </TableBody>
-                  </Table>
-                  ) : (
-                    <div className="text-center py-24 text-muted-foreground">
-                        <FolderSearch className="mx-auto h-12 w-12" />
-                        <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
-                        <p className="mt-2 text-sm">Try adjusting your filter criteria.</p>
-                    </div>
-                )}
-              </CardContent>
-              <CardFooter className="border-t pt-4">
-                  <PaginationControls 
-                    currentPage={currentPage}
-                    totalPages={totalPages}
-                    onPageChange={setCurrentPage}
-                    itemsPerPage={ITEMS_PER_PAGE}
-                    totalItems={results.length}
-                  />
-              </CardFooter>
-            </Card>
-
-          <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} />
-          <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
-          <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}><AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle><AlertDialogDescription>This action cannot be undone. This will permanently delete the asset from your database.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
-      </div>
-    );
-  }
-
-  // DASHBOARD VIEW (NOW INCLUDES SEARCH RESULTS)
+  // DASHBOARD VIEW
   if (view === 'dashboard') {
-    const totalStateAssets = displayedAssetsForDashboard.length;
-    const verifiedStateAssets = displayedAssetsForDashboard.filter(asset => asset.verifiedStatus === 'Verified').length;
+    const totalStateAssets = displayedAssets.length;
+    const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
     const verificationPercentage = totalStateAssets > 0 ? (verifiedStateAssets / totalStateAssets) * 100 : 0;
     const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
+    const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
     
     return (
       <div className="flex flex-col h-full gap-4">
         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
         <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight flex-1">
-                {searchTerm ? `Results for "${searchTerm}"` : 'Asset Dashboard'}
+                {isFiltered ? `Filter Results` : 'Asset Dashboard'}
             </h2>
             <div className="flex flex-wrap items-center gap-2">
                 <Button variant="outline" onClick={handleImportClick} disabled={isImporting}>
@@ -817,22 +631,24 @@ export default function AssetList() {
                 </Button>
                 <Button variant="outline" onClick={handleExportClick}>
                     <FileDown className="mr-2 h-4 w-4" />
-                    Export All
+                    Export
                 </Button>
                 <Button onClick={handleAddAsset}>
                     <PlusCircle className="mr-2 h-4 w-4" />
                     Add Asset
                 </Button>
-                <Button variant="destructive" onClick={() => setIsClearAllDialogOpen(true)} disabled={assets.length === 0}>
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Clear All
-                </Button>
+                {isAdmin && 
+                    <Button variant="destructive" onClick={() => setIsClearAllDialogOpen(true)} disabled={assets.length === 0}>
+                        <Trash2 className="mr-2 h-4 w-4" />
+                        Clear All
+                    </Button>
+                }
             </div>
         </div>
         <Card>
              <CardHeader>
                 <CardTitle>
-                    {isAdmin && !searchTerm ? (
+                    {isAdmin && !isFiltered ? (
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
                         <Select
@@ -870,7 +686,7 @@ export default function AssetList() {
                     </div>
                     ) : (
                     <>
-                        {globalStateFilter && !searchTerm
+                        {globalStateFilter && !isFiltered
                         ? `Asset Verification Status for ${globalStateFilter}`
                         : `Overall Asset Verification Status`
                         }
@@ -882,7 +698,7 @@ export default function AssetList() {
                 <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
                 <p className="text-sm text-muted-foreground">
                     <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{totalStateAssets}</span> assets verified.
-                    {searchTerm && ` (across ${Object.keys(assetsByCategory).length} categories)`}
+                    {isFiltered && ` (across ${Object.keys(assetsByCategory).length} categories)`}
                 </p>
             </CardContent>
         </Card>
@@ -902,7 +718,7 @@ export default function AssetList() {
                             <CardContent className="flex-grow space-y-4">
                                 <div>
                                     <div className="text-2xl font-bold">{total}</div>
-                                    <p className="text-xs text-muted-foreground">{searchTerm ? 'Assets found' : 'Total assets'} in this category</p>
+                                    <p className="text-xs text-muted-foreground">{isFiltered ? 'Assets found' : 'Total assets'} in this category</p>
                                 </div>
                                 <div className="space-y-2">
                                     <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
@@ -941,7 +757,7 @@ export default function AssetList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete all {assets.length} assets from your {isOnline ? 'online database' : 'local storage'}. It is highly recommended to export your data first.
+                        This action cannot be undone. This will permanently delete all {assets.length} assets from your {isOnline ? 'online database and local storage' : 'local storage'}. It is highly recommended to export your data first.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -957,13 +773,11 @@ export default function AssetList() {
   }
 
   // TABLE VIEW
-  const filteredAssets = categoryFilteredAssets;
-  const totalCategoryPages = Math.ceil(filteredAssets.length / ITEMS_PER_PAGE);
-  const paginatedCategoryAssets = filteredAssets.slice(
+  const paginatedCategoryAssets = categoryFilteredAssets.slice(
     (currentPage - 1) * ITEMS_PER_PAGE,
     currentPage * ITEMS_PER_PAGE
   );
-  const areAllCategoryResultsSelected = filteredAssets.length > 0 && filteredAssets.every(a => selectedAssetIds.includes(a.id));
+  const areAllCategoryResultsSelected = categoryFilteredAssets.length > 0 && categoryFilteredAssets.every(a => selectedAssetIds.includes(a.id));
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -1014,7 +828,7 @@ export default function AssetList() {
                       <TableHead className="w-[50px]">
                           <Checkbox
                               checked={areAllCategoryResultsSelected}
-                              onCheckedChange={(checked) => handleSelectAll(checked as boolean, filteredAssets)}
+                              onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
                               aria-label="Select all in this category"
                           />
                       </TableHead>
@@ -1112,10 +926,10 @@ export default function AssetList() {
             <CardFooter className="border-t pt-4">
                <PaginationControls 
                     currentPage={currentPage}
-                    totalPages={totalCategoryPages}
+                    totalPages={Math.ceil(categoryFilteredAssets.length / ITEMS_PER_PAGE)}
                     onPageChange={setCurrentPage}
                     itemsPerPage={ITEMS_PER_PAGE}
-                    totalItems={filteredAssets.length}
+                    totalItems={categoryFilteredAssets.length}
                   />
             </CardFooter>
         </Card>

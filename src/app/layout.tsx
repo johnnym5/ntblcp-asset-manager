@@ -1,3 +1,4 @@
+
 import type {Metadata} from 'next';
 import './globals.css';
 import { ThemeProvider } from "@/components/theme-provider"
@@ -5,7 +6,7 @@ import { AuthProvider } from '@/contexts/auth-context';
 import { AppStateProvider } from '@/contexts/app-state-context';
 
 export const metadata: Metadata = {
-  title: 'NTBLCP Asset Manager',
+  title: 'NTBLCP ASSET VERIFICATOR',
   description: 'A full-featured, offline-first web app to manage assets efficiently for NTBLCP.',
 };
 
