@@ -84,7 +84,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     selectedLocations, selectedAssignees, selectedStatuses,
     locationOptions, assigneeOptions, statusOptions,
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses,
-    autoSync, setManualSyncTrigger, isSyncing,
+    setManualSyncTrigger, isSyncing,
     dataActions,
   } = useAppState();
 
@@ -147,6 +147,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length;
+  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
 
   return (
     <div className="flex flex-col w-full min-h-screen">
@@ -208,7 +209,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
-            {!autoSync && isOnline && (
+            {!isAdmin && isOnline && (
               <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>

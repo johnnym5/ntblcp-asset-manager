@@ -25,7 +25,7 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
-  const { enabledSheets, setEnabledSheets, autoSync, setAutoSync } = useAppState();
+  const { enabledSheets, setEnabledSheets } = useAppState();
 
   const handleToggleSheet = (sheetName: string, checked: boolean) => {
     setEnabledSheets(prev => {
@@ -59,23 +59,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
         </SheetHeader>
         <div className="flex-1 overflow-y-auto pr-2 py-4">
           <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-medium mb-4">Synchronization</h3>
-              <div className="flex items-center justify-between rounded-lg border p-3 shadow-sm">
-                <div className="space-y-0.5">
-                  <Label htmlFor="auto-sync-switch">Automatic Sync</Label>
-                  <p className="text-xs text-muted-foreground">
-                    When online, sync data in real-time.
-                  </p>
-                </div>
-                <Switch
-                  id="auto-sync-switch"
-                  checked={autoSync}
-                  onCheckedChange={setAutoSync}
-                />
-              </div>
-            </div>
-            <Separator />
             <div>
               <h3 className="text-lg font-medium mb-4">Enabled Excel Sheets</h3>
               <div className="flex items-center justify-between mb-4">

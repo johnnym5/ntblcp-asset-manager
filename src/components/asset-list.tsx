@@ -71,6 +71,8 @@ import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets 
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { UpdatedAssetsDialog } from "./updated-assets-dialog";
 import { cn } from "@/lib/utils";
+import { onSnapshot, query, collection } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 
 const ITEMS_PER_PAGE = 25;
@@ -138,12 +140,13 @@ export default function AssetList() {
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
     enabledSheets,
-    autoSync, manualSyncTrigger, isSyncing, setIsSyncing,
+    manualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
   } = useAppState();
 
   const isSyncingRef = useRef(isSyncing);
   isSyncingRef.current = isSyncing;
+  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
 
   useEffect(() => {
     setCurrentPage(1);
@@ -181,9 +184,10 @@ export default function AssetList() {
         await saveAssets(uniqueAssets);
         return;
       }
-
-      const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
-      if (isAdmin) {
+      
+      const isAdminUser = userProfile?.displayName?.toLowerCase().trim() === 'admin';
+      
+      if (isAdminUser) {
         const previousAssets = await getLocalAssetsFromDb();
         const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
         const changes: Asset[] = [];
@@ -204,7 +208,7 @@ export default function AssetList() {
           }
         }
 
-        if (changes.length > 0) {
+        if (changes.length > 0 && !isInitialLoad.current) {
           const changesByGroup = changes.reduce((acc, asset) => {
             const modifierIsAdmin = asset.lastModifiedBy?.toLowerCase().trim() === 'admin';
             const state = asset.lastModifiedByState;
@@ -243,7 +247,6 @@ export default function AssetList() {
       isInitialLoad.current = false;
   }, [userProfile]);
 
-  // Load initial data from local DB on first render for a fast startup.
   useEffect(() => {
     const loadInitialData = async () => {
         setIsLoading(true);
@@ -255,38 +258,63 @@ export default function AssetList() {
     loadInitialData();
   }, []);
 
-  // NEW: Handle all Firestore synchronization more carefully to avoid quota issues.
+  // Real-time listener for admins
   useEffect(() => {
-    const syncWithFirestore = async () => {
-      if (!isOnline || isSyncingRef.current) {
-        return;
-      }
-      setIsSyncing(true);
-      if (manualSyncTrigger > 0) {
-          addNotification({ title: 'Syncing with cloud...' });
-      }
-      try {
-        const fetchedAssets = await getAssets();
-        await handleFetchedAssets(fetchedAssets);
-        if (manualSyncTrigger > 0) {
-          addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
+    if (!isOnline || !isAdmin) return;
+    
+    setIsSyncing(true);
+    addNotification({ title: 'Real-time sync enabled for admin.' });
+    
+    const assetsCollectionRef = collection(db, 'assets');
+    const q = query(assetsCollectionRef);
+    
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedAssets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Asset));
+      handleFetchedAssets(fetchedAssets);
+      if (isSyncingRef.current) setIsSyncing(false);
+    }, (error) => {
+      console.error("Firestore real-time listener error:", error);
+      addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
+      setIsOnline(false);
+      setIsSyncing(false);
+    });
+
+    return () => {
+        unsubscribe();
+    };
+
+  }, [isOnline, isAdmin, handleFetchedAssets, setIsOnline, setIsSyncing]);
+
+
+  // Manual/Initial sync for non-admins
+  useEffect(() => {
+    const fetchAssetsOnce = async () => {
+        if (isSyncingRef.current) return;
+        setIsSyncing(true);
+        if (manualSyncTrigger > 0) addNotification({ title: 'Syncing with cloud...' });
+
+        try {
+            const fetchedAssets = await getAssets();
+            await handleFetchedAssets(fetchedAssets);
+            if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
+        } catch (error) {
+            addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
+            setIsOnline(false);
+        } finally {
+            setIsSyncing(false);
         }
-      } catch (error) {
-        addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
-        setIsOnline(false); // Go offline to prevent further errors
-      } finally {
-        setIsSyncing(false);
-      }
     };
     
-    const isFirstOnlineLoad = isInitialLoad.current && isOnline;
+    if (isAdmin || !isOnline) return;
 
-    if (isFirstOnlineLoad || manualSyncTrigger > 0) {
-      syncWithFirestore();
+    const isFirstOnlineLoad = isInitialLoad.current;
+    const isManualSync = manualSyncTrigger > 0;
+
+    if (isFirstOnlineLoad || isManualSync) {
+        fetchAssetsOnce();
     }
-  }, [isOnline, manualSyncTrigger, handleFetchedAssets, setIsOnline, setIsSyncing]);
-  // --- END DATA LOADING & SYNC ---
-
+  }, [isOnline, manualSyncTrigger, isAdmin, handleFetchedAssets, setIsOnline, setIsSyncing]);
+  
   useEffect(() => {
     setStatusOptions([
       { value: "Verified", label: "Verified" },
@@ -602,7 +630,6 @@ export default function AssetList() {
                 addNotification({ title: "Saving to Cloud...", description: `Importing ${newAssets.length} new and updating ${updatedAssets.length} existing assets.` });
                 await batchSetAssets(allChanges); // batchSetAssets will create or update
                 addNotification({ title: "Import Successful", description: "Successfully saved changes to the database." });
-                if(!autoSync) setGlobalStateFilter(f => f); // Trigger a re-fetch for manual sync
             } catch (e) {
                 addNotification({ title: "Import Error", description: "Could not save changes to the database.", variant: "destructive" });
             }
@@ -657,8 +684,6 @@ export default function AssetList() {
   const handleSelectSingle = (assetId: string, checked: boolean) => {
     setSelectedAssetIds(prev => checked ? [...prev, assetId] : prev.filter(id => id !== assetId));
   };
-  
-  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
 
   const handleClearAllAssets = useCallback(async () => {
     setIsClearAllDialogOpen(false);
@@ -1058,5 +1083,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    

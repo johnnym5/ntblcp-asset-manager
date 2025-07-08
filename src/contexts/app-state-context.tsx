@@ -55,8 +55,6 @@ interface AppStateContextType {
   setEnabledSheets: Dispatch<SetStateAction<string[]>>;
   
   // Sync Settings
-  autoSync: boolean;
-  setAutoSync: Dispatch<SetStateAction<boolean>>;
   manualSyncTrigger: number;
   setManualSyncTrigger: Dispatch<SetStateAction<number>>;
   isSyncing: boolean;
@@ -99,14 +97,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return [...TARGET_SHEETS];
   });
   
-  const [autoSync, setAutoSync] = useState(() => {
-    if (typeof window !== 'undefined') {
-        const savedSync = localStorage.getItem('ntblcp-autosync');
-        return savedSync ? JSON.parse(savedSync) : true;
-    }
-    return true;
-  });
-
   const [manualSyncTrigger, setManualSyncTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
@@ -115,10 +105,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
   }, [enabledSheets]);
   
-  useEffect(() => {
-    localStorage.setItem('ntblcp-autosync', JSON.stringify(autoSync));
-  }, [autoSync]);
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
@@ -150,8 +136,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setSortConfig,
     enabledSheets,
     setEnabledSheets,
-    autoSync,
-    setAutoSync,
     manualSyncTrigger,
     setManualSyncTrigger,
     isSyncing,
