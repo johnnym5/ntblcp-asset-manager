@@ -120,28 +120,20 @@ export default function AssetList() {
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses,
     sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
     enabledSheets,
-    autoSync, manualSyncTrigger, setIsSyncing,
+    autoSync, manualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
   } = useAppState();
 
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, globalStateFilter, view, currentCategory]);
-
-  useEffect(() => {
-    if (selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0) {
-      setView('dashboard');
-    }
-  }, [selectedLocations, selectedAssignees, selectedStatuses]);
   
-
   const getOldestDuplicates = (assetsToFilter: Asset[]): Asset[] => {
     const uniqueAssetMap = new Map<string, Asset>();
   
     assetsToFilter.forEach(asset => {
-      // Use a composite key if available, otherwise fallback to description
       const key = asset.assetIdCode || asset.serialNumber || asset.description;
-      if (!key) return; // Skip assets without a key
+      if (!key) return;
   
       const existingAsset = uniqueAssetMap.get(key);
       if (!existingAsset) {
@@ -150,7 +142,6 @@ export default function AssetList() {
         const existingTimestamp = existingAsset.lastModified ? new Date(existingAsset.lastModified).getTime() : 0;
         const currentTimestamp = asset.lastModified ? new Date(asset.lastModified).getTime() : 0;
         
-        // If current asset is older than existing one, replace it
         if (currentTimestamp > 0 && (existingTimestamp === 0 || currentTimestamp < existingTimestamp)) {
           uniqueAssetMap.set(key, asset);
         }
@@ -160,28 +151,39 @@ export default function AssetList() {
   };
 
 
+  // --- DATA LOADING & SYNC ---
+
+  // 1. Load initial data from local DB on first render for a fast startup.
+  useEffect(() => {
+    const loadInitialData = async () => {
+        setIsLoading(true);
+        const localAssets = await getLocalAssetsFromDb();
+        const uniqueAssets = getOldestDuplicates(localAssets);
+        setAssets(uniqueAssets);
+        setIsLoading(false);
+    };
+    loadInitialData();
+  }, []);
+
+  // 2. Handle synchronization based on online status and sync settings.
   useEffect(() => {
     let unsubscribe: (() => void) | undefined;
 
-    const handleFetchedAssets = async (fetchedAssets: Asset[], source: 'local' | 'remote') => {
+    const handleFetchedAssets = async (fetchedAssets: Asset[]) => {
         const uniqueAssets = getOldestDuplicates(fetchedAssets);
         setAssets(uniqueAssets);
-        
-        if (source === 'remote') {
-            await saveAssets(uniqueAssets); // Overwrite local with remote
-        }
-        setIsLoading(false);
+        await saveAssets(uniqueAssets); // Overwrite local with remote data
     };
 
     const syncAndListen = () => {
         if (!isOnline) return;
         setIsSyncing(true);
-        addNotification({ title: 'Syncing...', description: 'Fetching latest data from server.' });
+        addNotification({ title: 'Syncing...', description: 'Listening for real-time updates.' });
         unsubscribe = getAssetsListener(
             (fetchedAssets) => {
-                addNotification({ title: 'Data Synced', description: 'Received latest data from the server.' });
-                handleFetchedAssets(fetchedAssets, 'remote');
-                setIsSyncing(false);
+                handleFetchedAssets(fetchedAssets);
+                if(isSyncing) setIsSyncing(false); // Only update if it was syncing
+                addNotification({ title: 'Data Synced', description: 'Assets are up to date.' });
             },
             (error) => {
                 addNotification({ title: 'Sync Error', description: error.message, variant: 'destructive' });
@@ -197,7 +199,7 @@ export default function AssetList() {
         addNotification({ title: 'Manual Sync Started', description: 'Fetching latest data...' });
         try {
             const fetchedAssets = await getAssets();
-            await handleFetchedAssets(fetchedAssets, 'remote');
+            await handleFetchedAssets(fetchedAssets);
             addNotification({ title: 'Sync Complete', description: 'Your data is up to date.' });
         } catch (error) {
             addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
@@ -205,34 +207,23 @@ export default function AssetList() {
             setIsSyncing(false);
         }
     };
-
-    const loadLocalData = async () => {
-        setIsLoading(true);
-        const localAssets = await getLocalAssetsFromDb();
-        await handleFetchedAssets(localAssets, 'local');
-    };
-
+    
     if (isOnline) {
-        if (autoSync) {
-            syncAndListen();
-        } else {
-            if (manualSyncTrigger > 0) {
-                manualSync();
-            } else {
-                loadLocalData();
-            }
-        }
-    } else {
-        loadLocalData();
+      if (autoSync) {
+        syncAndListen();
+      } else if (manualSyncTrigger > 0) {
+        manualSync();
+      }
     }
 
     return () => {
-        if (unsubscribe) {
-            unsubscribe();
-        }
+      if (unsubscribe) {
+        unsubscribe();
+      }
     };
-  }, [isOnline, autoSync, manualSyncTrigger]);
+  }, [isOnline, autoSync, manualSyncTrigger, setIsOnline, setIsSyncing, isSyncing]);
 
+  // --- END DATA LOADING & SYNC ---
 
   useEffect(() => {
     setStatusOptions([
@@ -358,7 +349,7 @@ export default function AssetList() {
     setSelectedAsset(undefined);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  }, [setIsFormOpen, setIsFormReadOnly, setSelectedAsset]);
+  }, []);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -526,7 +517,7 @@ export default function AssetList() {
                 addNotification({ title: "Saving to Cloud...", description: `Importing ${newAssets.length} new and updating ${updatedAssets.length} existing assets.` });
                 await batchSetAssets(allChanges); // batchSetAssets will create or update
                 addNotification({ title: "Import Successful", description: "Successfully saved changes to the database." });
-                if(!autoSync) manualSyncTrigger > 0 && manualSync(); // Trigger a manual sync to get the latest state
+                if(!autoSync) setGlobalStateFilter(f => f); // Trigger a re-fetch for manual sync
             } catch (e) {
                 addNotification({ title: "Import Error", description: "Could not save changes to the database.", variant: "destructive" });
             }
@@ -617,13 +608,6 @@ export default function AssetList() {
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
-  const handleClearSearchAndFilters = () => {
-    setSearchTerm('');
-    setSelectedLocations([]);
-    setSelectedAssignees([]);
-    setSelectedStatuses([]);
-  };
-
   const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
 
   useEffect(() => {

@@ -63,7 +63,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
         isMounted = false;
     };
-  }, [setGlobalStateFilter]);
+  }, []);
 
   const updateProfile = async (data: { displayName: string; state: string }) => {
     setLoading(true);
