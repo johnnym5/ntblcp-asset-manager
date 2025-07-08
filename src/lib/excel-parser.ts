@@ -125,7 +125,7 @@ function mapRowToAsset(row: any, category: string): Asset | null {
 /**
  * Parses an entire Excel file, handling multiple sheets and dynamic/multiple header rows within sheets.
  */
-export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sheetName: string]: Asset[] }, errors: string[], skippedRows: number }> {
+export async function parseExcelFile(file: File, enabledSheets: string[]): Promise<{ assetsBySheet: { [sheetName: string]: Asset[] }, errors: string[], skippedRows: number }> {
   return new Promise((resolve) => {
     const reader = new FileReader();
     reader.onload = (e) => {
@@ -138,7 +138,8 @@ export async function parseExcelFile(file: File): Promise<{ assetsBySheet: { [sh
         const workbook = XLSX.read(data, { type: 'array' });
 
         workbook.SheetNames.forEach(sheetName => {
-          const matchedSheetName = TARGET_SHEETS.find(target => sheetName.trim().toLowerCase().includes(target.toLowerCase()));
+          const lowerCaseSheetName = sheetName.trim().toLowerCase();
+          const matchedSheetName = enabledSheets.find(target => lowerCaseSheetName.includes(target.toLowerCase()));
 
           if (matchedSheetName) {
             const worksheet = workbook.Sheets[sheetName];

@@ -117,7 +117,8 @@ export default function AssetList() {
     selectedLocation, setSelectedLocation,
     selectedAssignee, setSelectedAssignee,
     selectedStatus, setSelectedStatus,
-    sortConfig, setLocationOptions, setAssigneeOptions
+    sortConfig, setLocationOptions, setAssigneeOptions,
+    enabledSheets,
   } = useAppState();
 
   // Reset page number when filters or view change
@@ -441,7 +442,7 @@ export default function AssetList() {
     setIsImporting(true);
     addNotification({ title: "Parsing file...", description: "Please wait while we process your Excel file." });
     
-    const { assetsBySheet, errors, skippedRows } = await parseExcelFile(file);
+    const { assetsBySheet, errors, skippedRows } = await parseExcelFile(file, enabledSheets);
     
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skippedRows > 0) {

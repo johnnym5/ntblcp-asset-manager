@@ -1,7 +1,8 @@
 'use client';
 
-import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction } from 'react';
+import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
 import type { OptionType } from '@/components/multi-select-filter';
+import { TARGET_SHEETS } from '@/lib/constants';
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -33,6 +34,10 @@ interface AppStateContextType {
   // Sorting
   sortConfig: SortConfig | null;
   setSortConfig: Dispatch<SetStateAction<SortConfig | null>>;
+
+  // Sheet Settings
+  enabledSheets: string[];
+  setEnabledSheets: Dispatch<SetStateAction<string[]>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -50,6 +55,20 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
   
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'description', direction: 'asc' });
+
+  const [enabledSheets, setEnabledSheets] = useState<string[]>(() => {
+    // Initialize from local storage or default to all sheets
+    if (typeof window !== 'undefined') {
+      const savedSheets = localStorage.getItem('ntblcp-enabled-sheets');
+      return savedSheets ? JSON.parse(savedSheets) : [...TARGET_SHEETS];
+    }
+    return [...TARGET_SHEETS];
+  });
+
+  // Persist enabled sheets to local storage
+  useEffect(() => {
+    localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
+  }, [enabledSheets]);
 
   const value = {
     isOnline,
@@ -70,6 +89,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setAssigneeOptions,
     sortConfig,
     setSortConfig,
+    enabledSheets,
+    setEnabledSheets,
   };
 
   return (

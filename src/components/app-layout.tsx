@@ -73,6 +73,7 @@ import type { OptionType } from "./multi-select-filter";
 import type { Asset } from "@/lib/types";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
+import { SettingsSheet } from "./settings-sheet";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -94,6 +95,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
   const [locationPopoverOpen, setLocationPopoverOpen] = useState(false);
   const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   useEffect(() => {
     setSearchTerm(debouncedSearchTerm);
@@ -200,7 +202,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </SidebarMenuButton>
             </SidebarMenuItem>
             <SidebarMenuItem>
-              <SidebarMenuButton href="#">
+              <SidebarMenuButton onClick={() => setIsSettingsOpen(true)}>
                 <Settings />
                 Settings
               </SidebarMenuButton>
@@ -407,7 +409,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <User className="mr-2 h-4 w-4"/>
                     Profile
                   </DropdownMenuItem>
-                  <DropdownMenuItem>
+                  <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
                     <Settings className="mr-2 h-4 w-4"/>
                     Settings
                   </DropdownMenuItem>
@@ -423,6 +425,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </header>
         <main className="flex-1 flex flex-col p-4 md:p-6">{children}</main>
       </div>
+      <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
     </SidebarProvider>
   );
 }
