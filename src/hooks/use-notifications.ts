@@ -100,7 +100,7 @@ export function useNotifications() {
         listeners.splice(index, 1)
       }
     }
-  }, [state])
+  }, [])
   
   const unreadCount = React.useMemo(() => state.notifications.filter(n => !n.read).length, [state.notifications]);
 
