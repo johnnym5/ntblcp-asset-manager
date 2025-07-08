@@ -188,49 +188,62 @@ export default function AssetList() {
         return;
       }
 
-      // --- Change Detection Logic ---
-      const previousAssets = await getLocalAssetsFromDb();
-      const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
-      const changes: Asset[] = [];
+      // --- Admin-only Change Detection Logic ---
+      const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
+      if (isAdmin) {
+        const previousAssets = await getLocalAssetsFromDb();
+        const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
+        const changes: Asset[] = [];
 
-      for (const newAsset of uniqueAssets) {
-        if (newAsset.lastModifiedBy === userProfile?.displayName) {
-          continue; // Don't notify for user's own changes
-        }
-        const previousAsset = previousAssetsMap.get(newAsset.id);
-        if (!previousAsset) {
-          changes.push(newAsset); // It's a new asset created by someone else
-        } else {
-          const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
-          const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
-          if (newTimestamp > prevTimestamp + 5000) {
-            changes.push(newAsset); // It's an updated asset
+        for (const newAsset of uniqueAssets) {
+          // Admins should not be notified of their own changes
+          if (newAsset.lastModifiedBy === userProfile?.displayName) {
+            continue; 
+          }
+          const previousAsset = previousAssetsMap.get(newAsset.id);
+          if (!previousAsset) {
+            changes.push(newAsset); // New asset created by someone else
+          } else {
+            const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
+            const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
+            if (newTimestamp > prevTimestamp + 1000) { // Buffer to prevent self-notification flicker
+              changes.push(newAsset); // Updated asset
+            }
           }
         }
-      }
 
-      if (changes.length > 0) {
-        const changesByState = changes.reduce((acc, asset) => {
-          const state = asset.lastModifiedByState || 'An unknown location';
-          if (!acc[state]) {
-            acc[state] = [];
+        if (changes.length > 0) {
+          const changesByGroup = changes.reduce((acc, asset) => {
+            const modifierIsAdmin = asset.lastModifiedBy?.toLowerCase().trim() === 'admin';
+            const state = asset.lastModifiedByState;
+            // Group by 'Admin' if admin made the change, otherwise group by state.
+            const groupKey = modifierIsAdmin ? 'Admin' : (state || 'An unknown location');
+            
+            if (!acc[groupKey]) {
+              acc[groupKey] = [];
+            }
+            acc[groupKey].push(asset);
+            return acc;
+          }, {} as Record<string, Asset[]>);
+
+          for (const groupKey in changesByGroup) {
+            const updatedAssetsInGroup = changesByGroup[groupKey];
+            const count = updatedAssetsInGroup.length;
+            const modifierName = updatedAssetsInGroup[0].lastModifiedBy || 'A user';
+            
+            const title = groupKey === 'Admin' ? 'Update from Admin' : `Update from ${groupKey}`;
+            const description = `${modifierName} updated ${count} asset${count > 1 ? 's' : ''}.`;
+
+            addNotification({
+              title: title,
+              description: description,
+              action: (
+                <Button variant="link" size="sm" className="p-0 h-auto text-primary" onClick={() => setShowUpdatedAssets(updatedAssetsInGroup)}>
+                  View Changes
+                </Button>
+              ),
+            });
           }
-          acc[state].push(asset);
-          return acc;
-        }, {} as Record<string, Asset[]>);
-
-        for (const state in changesByState) {
-          const updatedAssetsFromState = changesByState[state];
-          const count = updatedAssetsFromState.length;
-          addNotification({
-            title: `Update from ${state}`,
-            description: `${updatedAssetsFromState[0].lastModifiedBy} updated ${count} asset${count > 1 ? 's' : ''}.`,
-            action: (
-              <Button variant="link" size="sm" className="p-0 h-auto text-primary" onClick={() => setShowUpdatedAssets(updatedAssetsFromState)}>
-                View Changes
-              </Button>
-            ),
-          });
         }
       }
 
