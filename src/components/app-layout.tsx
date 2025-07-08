@@ -4,16 +4,6 @@
 import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from 'next/navigation';
 import {
-  SidebarProvider,
-  Sidebar,
-  SidebarHeader,
-  SidebarContent,
-  SidebarMenu,
-  SidebarMenuItem,
-  SidebarMenuButton,
-  SidebarTrigger,
-} from "@/components/ui/sidebar";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -46,8 +36,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Boxes,
-  Home,
-  PanelLeft,
   Settings,
   LogOut,
   User,
@@ -74,6 +62,7 @@ import type { Asset } from "@/lib/types";
 import { useDebounce } from "@/hooks/use-debounce";
 import { cn } from "@/lib/utils";
 import { SettingsSheet } from "./settings-sheet";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -161,231 +150,218 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const activeFilterCount = [selectedLocation, selectedAssignee, selectedStatus].filter(Boolean).length;
 
   return (
-    <SidebarProvider>
-      <Sidebar>
-        <SidebarHeader>
-          <div className="flex items-center gap-2">
-            <Button variant="ghost" size="icon" className="h-9 w-9">
-              <Boxes className="h-5 w-5 text-primary" />
-            </Button>
-            <span className="text-lg font-semibold">Asset Assist</span>
-          </div>
-        </SidebarHeader>
-        <SidebarContent>
-          <SidebarMenu>
-            <SidebarMenuItem>
-              <div className="flex items-center justify-between w-full p-2 text-sm">
-                <Label htmlFor="online-mode-toggle" className="flex items-center gap-2">
-                  {isOnline ? <Cloud className="h-4 w-4 text-green-500" /> : <CloudOff className="h-4 w-4 text-red-500" />}
-                  {isOnline ? 'Online Mode' : 'Offline Mode'}
-                </Label>
-                <Switch
-                  id="online-mode-toggle"
-                  checked={isOnline}
-                  onCheckedChange={(online) => {
-                    setIsOnline(online);
-                    addNotification({
-                      title: `Mode Changed to ${online ? 'Online' : 'Offline'}`,
-                      description: online
-                        ? 'Application is now connected to the server.'
-                        : 'Application is running in offline mode.',
-                    });
-                  }}
-                  aria-label={`Switch to ${isOnline ? 'Offline' : 'Online'} mode`}
-                />
-              </div>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton href="/assets" >
-                <Home />
-                Assets
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-            <SidebarMenuItem>
-              <SidebarMenuButton onClick={() => setIsSettingsOpen(true)}>
-                <Settings />
-                Settings
-              </SidebarMenuButton>
-            </SidebarMenuItem>
-          </SidebarMenu>
-        </SidebarContent>
-      </Sidebar>
-      <div className="flex flex-col w-full">
-        <header className="flex h-14 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm sm:h-16 md:px-6">
-          <SidebarTrigger className="flex md:hidden">
-            <PanelLeft />
-            <span className="sr-only">Toggle Sidebar</span>
-          </SidebarTrigger>
-          <div className="flex-1">
-             {pathname === '/assets' && (
-                <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary max-w-lg">
-                    <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        type="search"
-                        placeholder="Search assets..."
-                        className="pl-10 pr-20 w-full h-full bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                        value={localSearchTerm}
-                        onChange={(e) => setLocalSearchTerm(e.target.value)}
-                    />
-                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Sort assets">
-                                    <ArrowUpDown className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                {sortableFields.map(field => (
-                                    <DropdownMenuItem key={field.key} onClick={() => handleSort(field.key)}>
-                                        {field.label}
-                                        {sortConfig?.key === field.key && (
-                                            <span className="ml-auto text-xs">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-                                        )}
-                                    </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+    <div className="flex flex-col w-full min-h-screen">
+      <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm sm:h-16 md:px-6">
+        
+        {/* Left Side */}
+        <div className="flex items-center gap-2">
+            <Boxes className="h-5 w-5 text-primary" />
+            <span className="text-lg font-semibold hidden sm:inline-block">Asset Assist</span>
+        </div>
 
-                        <Popover>
-                            <PopoverTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8 relative" aria-label="Filter assets">
-                                    <Filter className="h-4 w-4" />
-                                    {activeFilterCount > 0 && (
-                                        <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                                            {activeFilterCount}
-                                        </span>
-                                    )}
-                                </Button>
-                            </PopoverTrigger>
-                            <PopoverContent align="end" className="w-[300px] p-0">
-                                <div className="p-4 space-y-4">
-                                    <h4 className="font-medium leading-none">Filters</h4>
-                                    
-                                    <div className="space-y-2">
-                                        <Label>Location</Label>
-                                        <Popover open={locationPopoverOpen} onOpenChange={setLocationPopoverOpen}>
-                                          <PopoverTrigger asChild>
-                                            <Button
-                                              variant="outline"
-                                              role="combobox"
-                                              aria-expanded={locationPopoverOpen}
-                                              className="w-full justify-between"
-                                            >
-                                              {selectedLocation
-                                                ? locationOptions.find((option) => option.value === selectedLocation)?.label
-                                                : "All Locations"}
-                                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                            </Button>
-                                          </PopoverTrigger>
-                                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                            <Command>
-                                              <CommandInput placeholder="Search location..." />
-                                              <CommandList>
-                                                <ScrollArea className="h-[200px]">
-                                                  <CommandEmpty>No location found.</CommandEmpty>
-                                                  <CommandGroup>
-                                                    <CommandItem value="All Locations" onSelect={() => { setSelectedLocation(''); setLocationPopoverOpen(false); }}>
-                                                      <Check className={cn("mr-2 h-4 w-4", selectedLocation === '' ? "opacity-100" : "opacity-0")} />
-                                                      All Locations
-                                                    </CommandItem>
-                                                    {locationOptions.map((option) => (
-                                                      <CommandItem
-                                                        key={option.value}
-                                                        value={option.label}
-                                                        onSelect={(currentValue) => {
-                                                          const value = locationOptions.find(o => o.label.toLowerCase() === currentValue.toLowerCase())?.value || ''
-                                                          setSelectedLocation(value);
-                                                          setLocationPopoverOpen(false);
-                                                        }}
-                                                      >
-                                                        <Check className={cn("mr-2 h-4 w-4", selectedLocation === option.value ? "opacity-100" : "opacity-0")} />
-                                                        {option.label}
-                                                      </CommandItem>
-                                                    ))}
-                                                  </CommandGroup>
-                                                </ScrollArea>
-                                              </CommandList>
-                                            </Command>
-                                          </PopoverContent>
-                                        </Popover>
-                                    </div>
-                                    
-                                    <div className="space-y-2">
-                                        <Label>Assignee</Label>
-                                        <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
-                                          <PopoverTrigger asChild>
-                                            <Button
-                                              variant="outline"
-                                              role="combobox"
-                                              aria-expanded={assigneePopoverOpen}
-                                              className="w-full justify-between"
-                                            >
-                                              {selectedAssignee
-                                                ? assigneeOptions.find((option) => option.value === selectedAssignee)?.label
-                                                : "All Assignees"}
-                                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                                            </Button>
-                                          </PopoverTrigger>
-                                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                                            <Command>
-                                              <CommandInput placeholder="Search assignee..." />
-                                              <CommandList>
-                                                <ScrollArea className="h-[200px]">
-                                                  <CommandEmpty>No assignee found.</CommandEmpty>
-                                                  <CommandGroup>
-                                                    <CommandItem value="All Assignees" onSelect={() => { setSelectedAssignee(''); setAssigneePopoverOpen(false); }}>
-                                                      <Check className={cn("mr-2 h-4 w-4", selectedAssignee === '' ? "opacity-100" : "opacity-0")} />
-                                                      All Assignees
-                                                    </CommandItem>
-                                                    {assigneeOptions.map((option) => (
-                                                      <CommandItem
-                                                        key={option.value}
-                                                        value={option.label}
-                                                        onSelect={(currentValue) => {
-                                                          const value = assigneeOptions.find(o => o.label.toLowerCase() === currentValue.toLowerCase())?.value || ''
-                                                          setSelectedAssignee(value);
-                                                          setAssigneePopoverOpen(false);
-                                                        }}
-                                                      >
-                                                        <Check className={cn("mr-2 h-4 w-4", selectedAssignee === option.value ? "opacity-100" : "opacity-0")} />
-                                                        {option.label}
-                                                      </CommandItem>
-                                                    ))}
-                                                  </CommandGroup>
-                                                </ScrollArea>
-                                              </CommandList>
-                                            </Command>
-                                          </PopoverContent>
-                                        </Popover>
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <Label>Status</Label>
-                                        <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value === 'all' ? '' : value)}>
-                                            <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">All Statuses</SelectItem>
-                                                <SelectSeparator />
-                                                {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    
-                                    <Button variant="outline" className="w-full" onClick={handleClearFilters} disabled={activeFilterCount === 0}>
-                                        Clear All Filters
+        {/* Center */}
+        <div className="flex-1 flex justify-center px-4">
+            <div className="w-full max-w-lg">
+                {pathname === '/assets' && (
+                    <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+                        <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                        <Input
+                            type="search"
+                            placeholder="Search assets..."
+                            className="pl-10 pr-20 w-full h-full bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                            value={localSearchTerm}
+                            onChange={(e) => setLocalSearchTerm(e.target.value)}
+                        />
+                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Sort assets">
+                                        <ArrowUpDown className="h-4 w-4" />
                                     </Button>
-                                </div>
-                            </PopoverContent>
-                        </Popover>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                                    <DropdownMenuSeparator />
+                                    {sortableFields.map(field => (
+                                        <DropdownMenuItem key={field.key} onClick={() => handleSort(field.key)}>
+                                            {field.label}
+                                            {sortConfig?.key === field.key && (
+                                                <span className="ml-auto text-xs">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                            )}
+                                        </DropdownMenuItem>
+                                    ))}
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+
+                            <Popover>
+                                <PopoverTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 relative" aria-label="Filter assets">
+                                        <Filter className="h-4 w-4" />
+                                        {activeFilterCount > 0 && (
+                                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                                                {activeFilterCount}
+                                            </span>
+                                        )}
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent align="end" className="w-[300px] p-0">
+                                    <div className="p-4 space-y-4">
+                                        <h4 className="font-medium leading-none">Filters</h4>
+                                        
+                                        <div className="space-y-2">
+                                            <Label>Location</Label>
+                                            <Popover open={locationPopoverOpen} onOpenChange={setLocationPopoverOpen}>
+                                              <PopoverTrigger asChild>
+                                                <Button
+                                                  variant="outline"
+                                                  role="combobox"
+                                                  aria-expanded={locationPopoverOpen}
+                                                  className="w-full justify-between"
+                                                >
+                                                  {selectedLocation
+                                                    ? locationOptions.find((option) => option.value === selectedLocation)?.label
+                                                    : "All Locations"}
+                                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                </Button>
+                                              </PopoverTrigger>
+                                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                                <Command>
+                                                  <CommandInput placeholder="Search location..." />
+                                                  <CommandList>
+                                                    <ScrollArea className="h-[200px]">
+                                                      <CommandEmpty>No location found.</CommandEmpty>
+                                                      <CommandGroup>
+                                                        <CommandItem value="All Locations" onSelect={() => { setSelectedLocation(''); setLocationPopoverOpen(false); }}>
+                                                          <Check className={cn("mr-2 h-4 w-4", selectedLocation === '' ? "opacity-100" : "opacity-0")} />
+                                                          All Locations
+                                                        </CommandItem>
+                                                        {locationOptions.map((option) => (
+                                                          <CommandItem
+                                                            key={option.value}
+                                                            value={option.label}
+                                                            onSelect={(currentValue) => {
+                                                              const value = locationOptions.find(o => o.label.toLowerCase() === currentValue.toLowerCase())?.value || ''
+                                                              setSelectedLocation(value);
+                                                              setLocationPopoverOpen(false);
+                                                            }}
+                                                          >
+                                                            <Check className={cn("mr-2 h-4 w-4", selectedLocation === option.value ? "opacity-100" : "opacity-0")} />
+                                                            {option.label}
+                                                          </CommandItem>
+                                                        ))}
+                                                      </CommandGroup>
+                                                    </ScrollArea>
+                                                  </CommandList>
+                                                </Command>
+                                              </PopoverContent>
+                                            </Popover>
+                                        </div>
+                                        
+                                        <div className="space-y-2">
+                                            <Label>Assignee</Label>
+                                            <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
+                                              <PopoverTrigger asChild>
+                                                <Button
+                                                  variant="outline"
+                                                  role="combobox"
+                                                  aria-expanded={assigneePopoverOpen}
+                                                  className="w-full justify-between"
+                                                >
+                                                  {selectedAssignee
+                                                    ? assigneeOptions.find((option) => option.value === selectedAssignee)?.label
+                                                    : "All Assignees"}
+                                                  <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                                </Button>
+                                              </PopoverTrigger>
+                                              <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                                <Command>
+                                                  <CommandInput placeholder="Search assignee..." />
+                                                  <CommandList>
+                                                    <ScrollArea className="h-[200px]">
+                                                      <CommandEmpty>No assignee found.</CommandEmpty>
+                                                      <CommandGroup>
+                                                        <CommandItem value="All Assignees" onSelect={() => { setSelectedAssignee(''); setAssigneePopoverOpen(false); }}>
+                                                          <Check className={cn("mr-2 h-4 w-4", selectedAssignee === '' ? "opacity-100" : "opacity-0")} />
+                                                          All Assignees
+                                                        </CommandItem>
+                                                        {assigneeOptions.map((option) => (
+                                                          <CommandItem
+                                                            key={option.value}
+                                                            value={option.label}
+                                                            onSelect={(currentValue) => {
+                                                              const value = assigneeOptions.find(o => o.label.toLowerCase() === currentValue.toLowerCase())?.value || ''
+                                                              setSelectedAssignee(value);
+                                                              setAssigneePopoverOpen(false);
+                                                            }}
+                                                          >
+                                                            <Check className={cn("mr-2 h-4 w-4", selectedAssignee === option.value ? "opacity-100" : "opacity-0")} />
+                                                            {option.label}
+                                                          </CommandItem>
+                                                        ))}
+                                                      </CommandGroup>
+                                                    </ScrollArea>
+                                                  </CommandList>
+                                                </Command>
+                                              </PopoverContent>
+                                            </Popover>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label>Status</Label>
+                                            <Select value={selectedStatus} onValueChange={(value) => setSelectedStatus(value === 'all' ? '' : value)}>
+                                                <SelectTrigger><SelectValue placeholder="All Statuses" /></SelectTrigger>
+                                                <SelectContent>
+                                                    <SelectItem value="all">All Statuses</SelectItem>
+                                                    <SelectSeparator />
+                                                    {statusOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                        
+                                        <Button variant="outline" className="w-full" onClick={handleClearFilters} disabled={activeFilterCount === 0}>
+                                            Clear All Filters
+                                        </Button>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
+                        </div>
                     </div>
-                </div>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
+                )}
+            </div>
+        </div>
+
+        {/* Right Side */}
+        <div className="flex items-center gap-2 sm:gap-4">
+            <div className="flex items-center gap-2">
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Switch
+                                id="online-mode-toggle"
+                                checked={isOnline}
+                                onCheckedChange={(online) => {
+                                    setIsOnline(online);
+                                    addNotification({
+                                        title: `Mode Changed to ${online ? 'Online' : 'Offline'}`,
+                                        description: online
+                                            ? 'Application is now connected to the server.'
+                                            : 'Application is running in offline mode.',
+                                    });
+                                }}
+                                aria-label={`Switch to ${isOnline ? 'Offline' : 'Online'} mode`}
+                            />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{isOnline ? 'Go Offline' : 'Go Online'}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                {isOnline ? <Cloud className="h-5 w-5 text-green-500" /> : <CloudOff className="h-5 w-5 text-red-500" />}
+            </div>
+            
             <NotificationBell />
             <ThemeToggle />
+            
             {loading ? (
               <Skeleton className="h-10 w-10 rounded-full" />
             ) : (
@@ -421,11 +397,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </DropdownMenuContent>
               </DropdownMenu>
             )}
-          </div>
-        </header>
-        <main className="flex-1 flex flex-col p-4 md:p-6">{children}</main>
-      </div>
+        </div>
+      </header>
+      <main className="flex-1 flex flex-col p-4 md:p-6 bg-muted/40">{children}</main>
       <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
-    </SidebarProvider>
+    </div>
   );
 }
