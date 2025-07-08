@@ -10,6 +10,7 @@ export type Notification = {
   date: Date
   read: boolean
   variant?: "default" | "destructive"
+  action?: React.ReactNode
 }
 
 const actionTypes = {

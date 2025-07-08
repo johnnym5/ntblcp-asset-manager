@@ -58,6 +58,8 @@ export interface Asset {
   verifiedDate?: string;
   syncStatus?: 'synced' | 'local';
   lastModified?: string; // ISO 8601 date string
+  lastModifiedBy?: string; // displayName of user who last modified
+  lastModifiedByState?: string; // state of user who last modified
 
   // Financial data (optional)
   accumulatedDepreciation?: { ngn?: string; usd?: string };

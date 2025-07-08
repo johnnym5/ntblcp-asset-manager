@@ -63,6 +63,7 @@ export function NotificationBell() {
                       {notification.description}
                     </p>
                   )}
+                  {notification.action && <div className="mt-2">{notification.action}</div>}
                   <p className="text-xs text-muted-foreground/80 mt-2">
                     {formatDistanceToNow(notification.date, { addSuffix: true })}
                   </p>
