@@ -62,7 +62,7 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
-import { TARGET_SHEETS, NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS } from "@/lib/constants";
+import { TARGET_SHEETS, NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
@@ -165,6 +165,7 @@ export default function AssetList() {
     }
     
     const zones: Record<string, string[]> = NIGERIAN_ZONES;
+    const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
     const isZone = !!zones[globalStateFilter]; // Check if the filter is a zone name
 
     if (isZone) {
@@ -175,12 +176,20 @@ export default function AssetList() {
         return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
       });
     } else {
-      // The filter is a single state, handle variations
+      // The filter is a single state or special location.
       const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
+      const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
+
       return assets.filter(asset => {
         const assetLocation = (asset.location || "").toLowerCase().trim();
-        // Check if location starts with the state name for variations like "Edo State"
-        return assetLocation.startsWith(lowerCaseFilter);
+        
+        // Check if location matches the state/special location name
+        const matchesState = assetLocation.startsWith(lowerCaseFilter);
+        
+        // Check if location matches the capital city name (if it exists)
+        const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+        
+        return matchesState || matchesCapital;
       });
     }
 }, [assets, globalStateFilter]);
