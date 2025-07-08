@@ -71,6 +71,33 @@ import { getAssetsListener, batchSetAssets, deleteAsset, updateAsset, batchDelet
 
 const ITEMS_PER_PAGE = 25;
 
+// --- Local Storage Helpers ---
+const getLocalAssets = (): Asset[] => {
+  if (typeof window === 'undefined') return [];
+  try {
+    const localData = localStorage.getItem('ntblcp-assets');
+    return localData ? JSON.parse(localData) : [];
+  } catch (error) {
+    console.error("Failed to get local assets", error);
+    return [];
+  }
+};
+
+const saveLocalAssets = (assets: Asset[]) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem('ntblcp-assets', JSON.stringify(assets));
+  } catch (error) {
+    console.error("Failed to save local assets", error);
+    addNotification({
+      title: 'Storage Full',
+      description: 'Browser storage is full. Please export and clear data to prevent data loss.',
+      variant: 'destructive',
+    });
+  }
+};
+
+
 const normalizeAssetLocation = (location?: string): string => {
     if (!location) return '';
     const originalLocation = location.trim();
@@ -135,46 +162,47 @@ export default function AssetList() {
   }, [searchTerm]);
 
 
-  // --- FIRESTORE DATA LISTENER & MIGRATION ---
-  useEffect(() => {
-    const migrateData = async () => {
-      try {
-        const migrated = localStorage.getItem('migratedToFirestore');
-        if (migrated === 'true') return;
-
-        const localData = localStorage.getItem('ntblcp-assets');
-        if (localData) {
-          const localAssets: Asset[] = JSON.parse(localData);
-          if (localAssets.length > 0) {
-            addNotification({ title: 'Migrating Data', description: `Moving ${localAssets.length} local assets to Firestore...` });
-            await batchSetAssets(localAssets);
-            localStorage.setItem('migratedToFirestore', 'true');
-            localStorage.removeItem('ntblcp-assets'); // Clean up old data
-            addNotification({ title: 'Migration Complete', description: 'Your data is now stored online.' });
-          } else {
-             localStorage.setItem('migratedToFirestore', 'true');
-          }
-        }
-      } catch (error) {
-        console.error('Migration failed:', error);
-        addNotification({ title: 'Migration Failed', description: 'Could not move local data to Firestore.', variant: 'destructive' });
-      }
-    };
-
-    if (isOnline) {
-      migrateData();
-    }
-  }, [isOnline]);
-
+  // --- DATA LOADING & SYNC LOGIC ---
   useEffect(() => {
     setIsLoading(true);
-    const unsubscribe = getAssetsListener((fetchedAssets) => {
-      setAssets(fetchedAssets);
+    let unsubscribe: (() => void) | undefined;
+  
+    const syncAndListen = async () => {
+      addNotification({ title: 'Online Mode', description: 'Connecting to the database...' });
+      const localAssets = getLocalAssets();
+      if (localAssets.length > 0) {
+        addNotification({ title: 'Syncing...', description: `Uploading ${localAssets.length} offline records.` });
+        try {
+          await batchSetAssets(localAssets);
+          localStorage.removeItem('ntblcp-assets');
+          addNotification({ title: 'Sync Complete', description: 'Offline data saved to the cloud.' });
+        } catch (error) {
+          console.error('Sync failed:', error);
+          addNotification({ title: 'Sync Failed', description: 'Could not save offline changes. Data remains on this device.', variant: 'destructive' });
+        }
+      }
+      
+      // After sync attempt, listen for live updates
+      unsubscribe = getAssetsListener((fetchedAssets) => {
+        setAssets(fetchedAssets);
+        setIsLoading(false);
+      });
+    };
+  
+    if (isOnline) {
+      syncAndListen();
+    } else {
+      addNotification({ title: 'Offline Mode', description: 'Changes are being saved locally.' });
+      setAssets(getLocalAssets());
       setIsLoading(false);
-    });
-
-    return () => unsubscribe(); // Cleanup listener on unmount
-  }, []);
+    }
+  
+    return () => {
+      if (unsubscribe) {
+        unsubscribe();
+      }
+    };
+  }, [isOnline]);
 
 
 
@@ -371,15 +399,24 @@ export default function AssetList() {
   };
   
   const handleDeleteConfirm = async () => {
-    if (assetToDelete) {
-        addNotification({ title: "Deleting Asset...", description: `Removing "${assetToDelete.description}"` });
+    if (!assetToDelete) return;
+
+    if (isOnline) {
+        addNotification({ title: 'Deleting Asset...', description: `Removing "${assetToDelete.description}"` });
         try {
             await deleteAsset(assetToDelete.id);
-            addNotification({ title: "Asset Deleted", description: `Asset was successfully removed.`});
-        } catch(e) {
-            addNotification({ title: "Error", description: "Could not delete asset.", variant: "destructive" });
+            addNotification({ title: 'Asset Deleted', description: 'Asset was successfully removed.' });
+        } catch (e) {
+            addNotification({ title: 'Error', description: 'Could not delete asset from the cloud.', variant: 'destructive' });
         }
+    } else {
+        let currentAssets = getLocalAssets();
+        currentAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
+        saveLocalAssets(currentAssets);
+        setAssets(currentAssets);
+        addNotification({ title: 'Deleted Locally', description: 'Asset will be removed from cloud on next sync.' });
     }
+
     setAssetToDelete(null);
     setIsDeleteDialogOpen(false);
   }
@@ -387,15 +424,25 @@ export default function AssetList() {
   const handleBatchDelete = async () => {
     setIsBatchDeleting(true);
     const assetsToDeleteCount = selectedAssetIds.length;
-    addNotification({ title: "Deleting Assets...", description: `Removing ${assetsToDeleteCount} selected assets.` });
-    
-    try {
-        await batchDeleteAssets(selectedAssetIds);
-        addNotification({ title: "Assets Deleted", description: `Successfully removed ${assetsToDeleteCount} assets.`});
+
+    if (isOnline) {
+        addNotification({ title: 'Deleting Assets...', description: `Removing ${assetsToDeleteCount} selected assets.` });
+        try {
+            await batchDeleteAssets(selectedAssetIds);
+            addNotification({ title: 'Assets Deleted', description: `Successfully removed ${assetsToDeleteCount} assets.` });
+            setSelectedAssetIds([]);
+        } catch (e) {
+            addNotification({ title: 'Error', description: 'Could not delete all selected assets from the cloud.', variant: 'destructive' });
+        } finally {
+            setIsBatchDeleting(false);
+        }
+    } else {
+        let currentAssets = getLocalAssets();
+        currentAssets = currentAssets.filter(a => !selectedAssetIds.includes(a.id));
+        saveLocalAssets(currentAssets);
+        setAssets(currentAssets);
         setSelectedAssetIds([]);
-    } catch(e) {
-        addNotification({ title: "Error", description: "Could not delete all selected assets.", variant: "destructive" });
-    } finally {
+        addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted. Will sync on next connection.` });
         setIsBatchDeleting(false);
     }
   }
@@ -404,45 +451,78 @@ export default function AssetList() {
   
   const handleSaveBatchEdit = async (data: BatchUpdateData) => {
     const assetsToUpdateCount = selectedAssetIds.length;
-    addNotification({ title: "Batch Updating Assets...", description: `Applying changes to ${assetsToUpdateCount} assets.` });
-    
-    const updates: Promise<void>[] = [];
-    assets.forEach(asset => {
-        if (selectedAssetIds.includes(asset.id)) {
-            const updatedAsset = { ...asset, ...data };
-            if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
-                updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
-            } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
-                 updatedAsset.verifiedDate = '';
-            }
-            updates.push(updateAsset(updatedAsset));
+    addNotification({ title: 'Batch Updating...', description: `Applying changes to ${assetsToUpdateCount} assets.` });
+
+    const assetsToUpdate = assets.filter(asset => selectedAssetIds.includes(asset.id));
+    const updatedAssets = assetsToUpdate.map(asset => {
+        const updatedAsset = { ...asset, ...data };
+        if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
+            updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
+        } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
+            updatedAsset.verifiedDate = '';
         }
+        return updatedAsset;
     });
 
-    try {
-        await Promise.all(updates);
-        addNotification({ title: "Assets Updated", description: `Successfully updated ${assetsToUpdateCount} assets.`});
-        setSelectedAssetIds([]);
-    } catch(e) {
-        addNotification({ title: "Error", description: "Could not update all selected assets.", variant: "destructive" });
+    if (isOnline) {
+        try {
+            const updatePromises = updatedAssets.map(asset => updateAsset(asset));
+            await Promise.all(updatePromises);
+            addNotification({ title: 'Assets Updated', description: `Successfully updated ${assetsToUpdateCount} assets.` });
+        } catch (e) {
+            addNotification({ title: 'Error', description: 'Could not update all selected assets in the cloud.', variant: 'destructive' });
+        }
+    } else {
+        let currentAssets = getLocalAssets();
+        const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
+        currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+        saveLocalAssets(currentAssets);
+        setAssets(currentAssets);
+        addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets. Will sync on next connection.` });
     }
+    setSelectedAssetIds([]);
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    addNotification({ title: "Saving Asset...", description: "Syncing with the online database." });
-    try {
-        await updateAsset(assetToSave);
-        addNotification({ title: "Saved Successfully", description: "Asset changes have been saved." });
+    if (isOnline) {
+        addNotification({ title: 'Saving Asset...', description: 'Syncing with the online database.' });
+        try {
+            await updateAsset(assetToSave);
+            addNotification({ title: 'Saved Successfully', description: 'Asset changes have been saved.' });
+            setIsFormOpen(false);
+        } catch (e) {
+            addNotification({ title: 'Error Saving', description: 'Could not save asset to the database.', variant: 'destructive' });
+        }
+    } else {
+        const currentAssets = getLocalAssets();
+        const existingIndex = currentAssets.findIndex(a => a.id === assetToSave.id);
+        if (existingIndex > -1) {
+            currentAssets[existingIndex] = assetToSave;
+        } else {
+            currentAssets.unshift(assetToSave);
+        }
+        saveLocalAssets(currentAssets);
+        setAssets(currentAssets);
+        addNotification({ title: 'Saved Locally', description: 'Asset saved. Sync when you go online.' });
         setIsFormOpen(false);
-    } catch (e) {
-        addNotification({ title: "Error Saving", description: "Could not save asset to the database.", variant: "destructive" });
     }
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
     const asset = assets.find(a => a.id === assetId);
-    if(asset) {
-        await updateAsset({ ...asset, ...data });
+    if (!asset) return;
+    const updatedAsset = { ...asset, ...data };
+
+    if (isOnline) {
+        await updateAsset(updatedAsset);
+    } else {
+        const currentAssets = getLocalAssets();
+        const existingIndex = currentAssets.findIndex(a => a.id === assetId);
+        if (existingIndex > -1) {
+            currentAssets[existingIndex] = updatedAsset;
+            saveLocalAssets(currentAssets);
+            setAssets(currentAssets);
+        }
     }
   };
 
@@ -464,11 +544,20 @@ export default function AssetList() {
 
     const allNewAssets = Object.values(assetsBySheet).flat();
     if (allNewAssets.length > 0) {
-        try {
-            await batchSetAssets(allNewAssets);
-            addNotification({ title: "Import Successful", description: `Successfully imported and saved ${allNewAssets.length} new assets.` });
-        } catch (e) {
-            addNotification({ title: "Import Error", description: "Could not save new assets to the database.", variant: "destructive" });
+        if (isOnline) {
+            try {
+                addNotification({ title: "Saving to Cloud...", description: `Importing ${allNewAssets.length} new assets.` });
+                await batchSetAssets(allNewAssets);
+                addNotification({ title: "Import Successful", description: "Successfully saved new assets to the database." });
+            } catch (e) {
+                addNotification({ title: "Import Error", description: "Could not save new assets to the database.", variant: "destructive" });
+            }
+        } else {
+            const currentAssets = getLocalAssets();
+            const combinedAssets = [...allNewAssets, ...currentAssets];
+            saveLocalAssets(combinedAssets);
+            setAssets(combinedAssets);
+            addNotification({ title: 'Imported Locally', description: `${allNewAssets.length} new assets saved. Sync when you go online.` });
         }
     } else if (errors.length === 0) {
         addNotification({ title: "No Data Found", description: "No valid asset sheets were found in the file."});
@@ -510,15 +599,20 @@ export default function AssetList() {
   };
   
   const handleClearAllAssets = async () => {
-    addNotification({ title: "Clearing All Assets...", description: "This may take a moment." });
-    try {
-        await batchDeleteAssets(assets.map(a => a.id));
-        addNotification({ title: "All Assets Cleared", description: "Your online asset database has been cleared." });
-    } catch(e) {
-        addNotification({ title: "Error", description: "Could not clear all assets from the database.", variant: "destructive" });
-    } finally {
-        setIsClearAllDialogOpen(false);
+    if (isOnline) {
+        addNotification({ title: 'Clearing Cloud Assets...', description: 'This may take a moment.' });
+        try {
+            await batchDeleteAssets(assets.map(a => a.id));
+            addNotification({ title: 'Cloud Assets Cleared', description: 'Your online asset database has been cleared.' });
+        } catch (e) {
+            addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
+        }
+    } else {
+        saveLocalAssets([]);
+        setAssets([]);
+        addNotification({ title: 'Local Assets Cleared', description: 'Your local asset list has been cleared.' });
     }
+    setIsClearAllDialogOpen(false);
   }
   
   const handleClearSearchAndFilters = () => {
@@ -823,7 +917,7 @@ export default function AssetList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete all {assets.length} assets from your online database. It is highly recommended to export your data first.
+                        This action cannot be undone. This will permanently delete all {assets.length} assets from your {isOnline ? 'online database' : 'local storage'}. It is highly recommended to export your data first.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1021,7 +1115,7 @@ export default function AssetList() {
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
                         This action cannot be undone. This will permanently delete the asset
-                        from your database.
+                        from your {isOnline ? 'online database' : 'local storage'}.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1033,3 +1127,5 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
