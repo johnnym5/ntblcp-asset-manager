@@ -583,21 +583,37 @@ export default function AssetList() {
   };
   
   const handleClearAllAssets = useCallback(async () => {
-    addNotification({ title: 'Clearing All Assets...', description: 'This may take a moment.' });
+    const assetsToDelete = stateFilteredAssets;
+    const assetsToDeleteCount = assetsToDelete.length;
+    if (assetsToDeleteCount === 0) {
+      addNotification({ title: 'No Assets to Clear', description: 'There are no assets in the current view to clear.' });
+      setIsClearAllDialogOpen(false);
+      return;
+    }
+
+    addNotification({ title: 'Clearing Assets...', description: `This will remove ${assetsToDeleteCount} assets.` });
+
+    const idsToDelete = new Set(assetsToDelete.map((a) => a.id));
     if (isOnline) {
-        try {
-            await batchDeleteAssets(assets.map(a => a.id));
-            addNotification({ title: 'Cloud Assets Cleared', description: 'Your online asset database has been cleared.' });
-        } catch (e) {
-            addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
-        }
-    } 
-    // Always clear local as well
-    await clearLocalAssets();
-    setAssets([]);
-    addNotification({ title: 'Local Assets Cleared', description: 'Your local asset list has been cleared.' });
+      try {
+        await batchDeleteAssets(Array.from(idsToDelete));
+        addNotification({ title: 'Cloud Assets Cleared', description: `Successfully removed ${assetsToDeleteCount} assets from the database.` });
+      } catch (e) {
+        addNotification({ title: 'Error', description: 'Could not clear assets from the database.', variant: 'destructive' });
+        setIsClearAllDialogOpen(false);
+        return; // Stop if cloud operation fails
+      }
+    }
+
+    // Update local state and DB regardless of online status (for offline-first)
+    const allLocalAssets = await getLocalAssetsFromDb();
+    const remainingAssets = allLocalAssets.filter((a) => !idsToDelete.has(a.id));
+    await saveAssets(remainingAssets);
+    setAssets(remainingAssets);
+
+    addNotification({ title: 'Assets Cleared', description: `Removed ${assetsToDeleteCount} assets from your list.` });
     setIsClearAllDialogOpen(false);
-  }, [isOnline, assets]);
+  }, [isOnline, stateFilteredAssets]);
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
@@ -766,7 +782,9 @@ export default function AssetList() {
                 <AlertDialogHeader>
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete all {assets.length} assets from your {isOnline ? 'online database and local storage' : 'local storage'}. It is highly recommended to export your data first.
+                        This action cannot be undone. This will permanently delete all {stateFilteredAssets.length} assets
+                        {userProfile?.state ? ` for ${userProfile.state}` : ' in the current view'} from your {isOnline ? 'online database and local storage' : 'local storage'}.
+                         It is highly recommended to export your data first.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -842,7 +860,7 @@ export default function AssetList() {
                   <TableBody>
                       {paginatedCategoryAssets.length > 0 ? (
                       paginatedCategoryAssets.map((asset) => (
-                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) && "selected"} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id)} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
                           <TableCell onClick={e => e.stopPropagation()}>
                               <Checkbox 
                                   checked={selectedAssetIds.includes(asset.id)}

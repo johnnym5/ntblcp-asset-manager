@@ -295,19 +295,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             <PlusCircle className="mr-2 h-4 w-4" />
                             Add New Asset
                           </DropdownMenuItem>
-                          {dataActions.isAdmin && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:bg-destructive/20 focus:text-destructive"
-                                onClick={dataActions.onClearAll}
-                                disabled={!dataActions.hasAssets}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Clear All Assets
-                              </DropdownMenuItem>
-                            </>
-                          )}
+                          
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:bg-destructive/20 focus:text-destructive"
+                            onClick={dataActions.onClearAll}
+                            disabled={!dataActions.hasAssets}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Clear All Assets
+                          </DropdownMenuItem>
+                          
                         </DropdownMenuSubContent>
                       </DropdownMenuPortal>
                     </DropdownMenuSub>
