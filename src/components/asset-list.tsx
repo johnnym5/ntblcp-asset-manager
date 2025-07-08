@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo } from "react";
+import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -121,6 +121,7 @@ export default function AssetList() {
     sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
     enabledSheets,
     autoSync, manualSyncTrigger, setIsSyncing,
+    setDataActions,
   } = useAppState();
 
   useEffect(() => {
@@ -353,11 +354,11 @@ export default function AssetList() {
   }, [currentCategory, assetsByCategory]);
 
 
-  const handleAddAsset = () => {
+  const handleAddAsset = useCallback(() => {
     setSelectedAsset(undefined);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  };
+  }, [setIsFormOpen, setIsFormReadOnly, setSelectedAsset]);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -500,7 +501,7 @@ export default function AssetList() {
     }
   };
 
-  const handleImportClick = () => fileInputRef.current?.click();
+  const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -546,7 +547,7 @@ export default function AssetList() {
     setIsImporting(false);
   };
   
-  const handleExportClick = () => {
+  const handleExportClick = useCallback(() => {
     const assetsToExport = view === 'table' ? categoryFilteredAssets : displayedAssets;
     if (assetsToExport.length === 0) {
       addNotification({ title: "No Data to Export", description: "There are no assets in the current view to export." });
@@ -567,7 +568,7 @@ export default function AssetList() {
       console.error("Export Error:", error);
       addNotification({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
     }
-  };
+  }, [view, categoryFilteredAssets, displayedAssets, userProfile, currentCategory]);
   
   const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
     if (checked) {
@@ -581,7 +582,7 @@ export default function AssetList() {
     setSelectedAssetIds(prev => checked ? [...prev, assetId] : prev.filter(id => id !== assetId));
   };
   
-  const handleClearAllAssets = async () => {
+  const handleClearAllAssets = useCallback(async () => {
     addNotification({ title: 'Clearing All Assets...', description: 'This may take a moment.' });
     if (isOnline) {
         try {
@@ -596,7 +597,9 @@ export default function AssetList() {
     setAssets([]);
     addNotification({ title: 'Local Assets Cleared', description: 'Your local asset list has been cleared.' });
     setIsClearAllDialogOpen(false);
-  }
+  }, [isOnline, assets]);
+
+  const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
   const handleClearSearchAndFilters = () => {
     setSearchTerm('');
@@ -604,6 +607,33 @@ export default function AssetList() {
     setSelectedAssignees([]);
     setSelectedStatuses([]);
   };
+
+  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
+
+  useEffect(() => {
+    setDataActions({
+        onImport: handleImportClick,
+        onExport: handleExportClick,
+        onAddAsset: handleAddAsset,
+        onClearAll: handleClearAllClick,
+        isImporting: isImporting,
+        isAdmin: isAdmin,
+        hasAssets: assets.length > 0
+    });
+
+    return () => {
+        setDataActions({});
+    }
+  }, [
+      setDataActions, 
+      handleImportClick, 
+      handleExportClick, 
+      handleAddAsset, 
+      handleClearAllClick, 
+      isImporting, 
+      isAdmin, 
+      assets.length
+  ]);
 
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
@@ -614,7 +644,6 @@ export default function AssetList() {
     const totalStateAssets = displayedAssets.length;
     const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
     const verificationPercentage = totalStateAssets > 0 ? (verifiedStateAssets / totalStateAssets) * 100 : 0;
-    const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
     const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
     
     return (
@@ -624,26 +653,6 @@ export default function AssetList() {
             <h2 className="text-2xl font-bold tracking-tight flex-1">
                 {isFiltered ? `Filter Results` : 'Asset Dashboard'}
             </h2>
-            <div className="flex flex-wrap items-center gap-2">
-                <Button variant="outline" onClick={handleImportClick} disabled={isImporting}>
-                    {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <FileUp className="mr-2 h-4 w-4" />}
-                    Import
-                </Button>
-                <Button variant="outline" onClick={handleExportClick}>
-                    <FileDown className="mr-2 h-4 w-4" />
-                    Export
-                </Button>
-                <Button onClick={handleAddAsset}>
-                    <PlusCircle className="mr-2 h-4 w-4" />
-                    Add Asset
-                </Button>
-                {isAdmin && 
-                    <Button variant="destructive" onClick={() => setIsClearAllDialogOpen(true)} disabled={assets.length === 0}>
-                        <Trash2 className="mr-2 h-4 w-4" />
-                        Clear All
-                    </Button>
-                }
-            </div>
         </div>
         <Card>
              <CardHeader>
@@ -788,7 +797,7 @@ export default function AssetList() {
             <h2 className="text-2xl font-bold tracking-tight flex-1">
                 {currentCategory}
             </h2>
-            {selectedAssetIds.length > 0 ? (
+            {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
                      {selectedAssetIds.length === 1 && (
@@ -804,17 +813,6 @@ export default function AssetList() {
                     <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting}>
                         {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                         Delete
-                    </Button>
-                </div>
-            ) : (
-                <div className="flex flex-wrap items-center gap-2">
-                    <Button variant="outline" onClick={handleExportClick}>
-                        <FileDown className="mr-2 h-4 w-4" />
-                        Export
-                    </Button>
-                    <Button onClick={handleAddAsset}>
-                        <PlusCircle className="mr-2 h-4 w-4" />
-                        Add Asset
                     </Button>
                 </div>
             )}

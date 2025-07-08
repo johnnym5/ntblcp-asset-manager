@@ -9,6 +9,16 @@ export interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
+export interface DataActions {
+  onImport?: () => void;
+  onExport?: () => void;
+  onAddAsset?: () => void;
+  onClearAll?: () => void;
+  isImporting?: boolean;
+  isAdmin?: boolean;
+  hasAssets?: boolean;
+}
+
 interface AppStateContextType {
   isOnline: boolean;
   setIsOnline: Dispatch<SetStateAction<boolean>>;
@@ -48,6 +58,10 @@ interface AppStateContextType {
   setManualSyncTrigger: Dispatch<SetStateAction<number>>;
   isSyncing: boolean;
   setIsSyncing: Dispatch<SetStateAction<boolean>>;
+  
+  // Data Actions
+  dataActions: DataActions;
+  setDataActions: Dispatch<SetStateAction<DataActions>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -85,6 +99,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   const [manualSyncTrigger, setManualSyncTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [dataActions, setDataActions] = useState<DataActions>({});
 
   useEffect(() => {
     localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
@@ -123,6 +138,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setManualSyncTrigger,
     isSyncing,
     setIsSyncing,
+    dataActions,
+    setDataActions,
   };
 
   return (

@@ -10,6 +10,10 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
 import {
   Popover,
@@ -48,6 +52,11 @@ import {
   ChevronsUpDown,
   Loader2,
   RefreshCw,
+  Database,
+  FileDown,
+  FileUp,
+  PlusCircle,
+  Trash2,
 } from "lucide-react";
 import { addNotification } from "@/hooks/use-notifications";
 import { NotificationBell } from "./notification-bell";
@@ -75,7 +84,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     selectedLocations, selectedAssignees, selectedStatuses,
     locationOptions, assigneeOptions, statusOptions,
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses,
-    autoSync, setManualSyncTrigger, isSyncing
+    autoSync, setManualSyncTrigger, isSyncing,
+    dataActions,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -265,6 +275,43 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <User className="mr-2 h-4 w-4"/>
                     Profile
                   </DropdownMenuItem>
+                   {pathname === '/assets' && dataActions.onImport && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <Database className="mr-2 h-4 w-4" />
+                        Data Management
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting}>
+                            <FileUp className="mr-2 h-4 w-4" />
+                            Import from Excel
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={dataActions.onExport}>
+                            <FileDown className="mr-2 h-4 w-4" />
+                            Export to Excel
+                          </DropdownMenuItem>
+                           <DropdownMenuItem onClick={dataActions.onAddAsset}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add New Asset
+                          </DropdownMenuItem>
+                          {dataActions.isAdmin && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:bg-destructive/20 focus:text-destructive"
+                                onClick={dataActions.onClearAll}
+                                disabled={!dataActions.hasAssets}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Clear All Assets
+                              </DropdownMenuItem>
+                            </>
+                          )}
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                  )}
                   <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
                     <Settings className="mr-2 h-4 w-4"/>
                     Settings
