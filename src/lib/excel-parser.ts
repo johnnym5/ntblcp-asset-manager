@@ -55,18 +55,29 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
     const serialNumber = getColumnValue(row, 'Serial Number', 'ASSET SERIAL NUMBERS');
     const chasisNo = getColumnValue(row, 'Chasis no');
     const engineNo = getColumnValue(row, 'Engine no');
-    const location = category === 'IHVN-GF N-THRIP'
-        ? getColumnValue(row, 'STATE', 'Location', 'LOCATION')
-        : getColumnValue(row, 'Location', 'LOCATION', 'State');
-    const lga = getColumnValue(row, 'LGA');
+    const condition = getColumnValue(row, 'Condition');
+    const remarks = getColumnValue(row, 'Remarks', 'Comments');
     
     let assignee = getColumnValue(row, 'Assignee');
     if (assignee.toLowerCase() === 'yes' || assignee.toLowerCase() === 'no') {
         assignee = '';
     }
 
-    const condition = getColumnValue(row, 'Condition');
-    const remarks = getColumnValue(row, 'Remarks', 'Comments');
+    // Sheet-specific logic for ambiguous fields like location/site
+    let location = '';
+    let site = '';
+    let lga = '';
+    
+    if (category === 'IHVN-GF N-THRIP') {
+        location = getColumnValue(row, 'STATE'); // In this sheet, 'STATE' is the main location
+        site = getColumnValue(row, 'LOCATION', 'SITE'); // 'LOCATION' or 'SITE' columns are the facility/site
+        lga = getColumnValue(row, 'LGA'); // This sheet might not have LGA
+    } else {
+        // Default logic for all other sheets
+        location = getColumnValue(row, 'Location', 'LOCATION', 'State');
+        lga = getColumnValue(row, 'LGA');
+        // 'site' isn't a common field in other sheets, so we don't try to parse it from them.
+    }
 
     const importedAssetData: Partial<Asset> = {
         description: description || existingAsset?.description,
@@ -74,6 +85,7 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
         sn: getColumnValue(row, 'S/N') || existingAsset?.sn,
         location: location || existingAsset?.location,
         lga: lga || existingAsset?.lga,
+        site: site || existingAsset?.site, // Assign parsed site data
         assignee: assignee || existingAsset?.assignee,
         assetIdCode: assetIdCode || existingAsset?.assetIdCode,
         assetClass: getColumnValue(row, 'Asset Class', 'CLASSIFICATION') || existingAsset?.assetClass,
@@ -281,7 +293,13 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
               const row: any[] = [];
               headers.forEach(header => {
                   const cleanHeader = header.toLowerCase().trim().replace(/\s+/g, ' ');
-                  const assetKeyPath = headerToAssetKeyMap[cleanHeader];
+                  let assetKeyPath = headerToAssetKeyMap[cleanHeader];
+
+                  // Add specific override for IHVN sheet's 'LOCATION' column to prevent data duplication
+                  if (category === 'IHVN-GF N-THRIP' && cleanHeader === 'location') {
+                      assetKeyPath = 'site';
+                  }
+
                   if (assetKeyPath) {
                       row.push(getNestedValue(asset, assetKeyPath as string) ?? '');
                   } else {
