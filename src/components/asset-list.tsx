@@ -124,6 +124,9 @@ export default function AssetList() {
     setDataActions,
   } = useAppState();
 
+  const isSyncingRef = useRef(isSyncing);
+  isSyncingRef.current = isSyncing;
+
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, globalStateFilter, view, currentCategory]);
@@ -178,12 +181,14 @@ export default function AssetList() {
     const syncAndListen = () => {
         if (!isOnline) return;
         setIsSyncing(true);
-        addNotification({ title: 'Syncing...', description: 'Listening for real-time updates.' });
+        // Silently listen for real-time updates
         unsubscribe = getAssetsListener(
             (fetchedAssets) => {
                 handleFetchedAssets(fetchedAssets);
-                if(isSyncing) setIsSyncing(false); // Only update if it was syncing
-                addNotification({ title: 'Data Synced', description: 'Assets are up to date.' });
+                // Check ref to see if we were syncing, to avoid setting state unnecessarily
+                if (isSyncingRef.current) {
+                    setIsSyncing(false);
+                }
             },
             (error) => {
                 addNotification({ title: 'Sync Error', description: error.message, variant: 'destructive' });
@@ -214,14 +219,17 @@ export default function AssetList() {
       } else if (manualSyncTrigger > 0) {
         manualSync();
       }
+    } else {
+        if(isSyncing) setIsSyncing(false);
     }
+
 
     return () => {
       if (unsubscribe) {
         unsubscribe();
       }
     };
-  }, [isOnline, autoSync, manualSyncTrigger, setIsOnline, setIsSyncing, isSyncing]);
+  }, [isOnline, autoSync, manualSyncTrigger, setIsOnline, setIsSyncing]);
 
   // --- END DATA LOADING & SYNC ---
 
