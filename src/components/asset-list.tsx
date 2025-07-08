@@ -70,6 +70,7 @@ import { PaginationControls } from "./pagination-controls";
 import { getAssetsListener, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets, getAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { UpdatedAssetsDialog } from "./updated-assets-dialog";
+import { cn } from "@/lib/utils";
 
 
 const ITEMS_PER_PAGE = 25;
@@ -91,6 +92,19 @@ const normalizeAssetLocation = (location?: string): string => {
     }
     return originalLocation.replace(/\b\w/g, l => l.toUpperCase());
 };
+
+const getStatusClasses = (status?: 'Verified' | 'Unverified' | 'Discrepancy') => {
+    switch (status) {
+        case 'Verified':
+            return 'bg-green-100 text-green-800 border-green-200 dark:bg-green-900/50 dark:text-green-300 dark:border-green-800 hover:bg-green-200/60 dark:hover:bg-green-900/80 focus:ring-green-500';
+        case 'Unverified':
+            return 'bg-red-100 text-red-800 border-red-200 dark:bg-red-900/50 dark:text-red-300 dark:border-red-800 hover:bg-red-200/60 dark:hover:bg-red-900/80 focus:ring-red-500';
+        case 'Discrepancy':
+            return 'bg-yellow-100 text-yellow-800 border-yellow-200 dark:bg-yellow-900/50 dark:text-yellow-300 dark:border-yellow-800 hover:bg-yellow-200/60 dark:hover:bg-yellow-900/80 focus:ring-yellow-500';
+        default:
+            return '';
+    }
+}
 
 
 export default function AssetList() {
@@ -981,25 +995,25 @@ export default function AssetList() {
                                 });
                               }}
                             >
-                              <SelectTrigger className="w-[150px] h-9 text-sm">
+                              <SelectTrigger className={cn("w-[150px] h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
                                 <SelectValue placeholder="Select status" />
                               </SelectTrigger>
                               <SelectContent>
                                 <SelectItem value="Unverified">
                                   <div className="flex items-center">
-                                    <FileText className="mr-2 h-4 w-4" />
+                                    <FileText className="mr-2 h-4 w-4 text-red-600 dark:text-red-400" />
                                     Unverified
                                   </div>
                                 </SelectItem>
                                 <SelectItem value="Verified">
                                   <div className="flex items-center">
-                                    <Check className="mr-2 h-4 w-4" />
+                                    <Check className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
                                     Verified
                                   </div>
                                 </SelectItem>
                                 <SelectItem value="Discrepancy">
                                   <div className="flex items-center">
-                                    <AlertCircle className="mr-2 h-4 w-4" />
+                                    <AlertCircle className="mr-2 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
                                     Discrepancy
                                   </div>
                                 </SelectItem>
