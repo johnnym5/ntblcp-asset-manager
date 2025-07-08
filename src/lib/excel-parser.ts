@@ -53,22 +53,26 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
     const serialNumber = getColumnValue(row, 'Serial Number', 'ASSET SERIAL NUMBERS');
     const chasisNo = getColumnValue(row, 'Chasis no');
     const engineNo = getColumnValue(row, 'Engine no');
-
-    if (!description && !assetIdCode && !serialNumber && !chasisNo && !engineNo) {
-        return null;
-    }
-
     const location = category === 'IHVN-GF N-THRIP'
         ? getColumnValue(row, 'STATE', 'Location', 'LOCATION')
         : getColumnValue(row, 'Location', 'LOCATION', 'State');
+    const lga = getColumnValue(row, 'LGA');
+    const assignee = getColumnValue(row, 'Assignee');
+    const condition = getColumnValue(row, 'Condition');
+    const remarks = getColumnValue(row, 'Remarks', 'Comments');
+
+    // If all these key fields are empty, it's a blank or non-data row.
+    if (!description && !assetIdCode && !serialNumber && !chasisNo && !engineNo && !location && !lga && !assignee && !condition && !remarks) {
+        return null;
+    }
 
     const importedAssetData: Partial<Asset> = {
         description: description || existingAsset?.description,
         category,
         sn: getColumnValue(row, 'S/N') || existingAsset?.sn,
         location: location || existingAsset?.location,
-        lga: getColumnValue(row, 'LGA') || existingAsset?.lga,
-        assignee: getColumnValue(row, 'Assignee') || existingAsset?.assignee,
+        lga: lga || existingAsset?.lga,
+        assignee: assignee || existingAsset?.assignee,
         assetIdCode: assetIdCode || existingAsset?.assetIdCode,
         assetClass: getColumnValue(row, 'Asset Class', 'CLASSIFICATION') || existingAsset?.assetClass,
         manufacturer: getColumnValue(row, 'Manufacturer') || existingAsset?.manufacturer,
@@ -78,9 +82,10 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
         engineNo: engineNo || existingAsset?.engineNo,
         supplier: getColumnValue(row, 'Supplier', 'Suppliers') || existingAsset?.supplier,
         dateReceived: getColumnValue(row, 'Date Purchased or Received', 'Date Purchased or  Received', 'YEAR OF PURCHASE') || existingAsset?.dateReceived,
-        condition: getColumnValue(row, 'Condition') || existingAsset?.condition,
+        condition: condition || existingAsset?.condition,
         grant: getColumnValue(row, 'GRANT') || existingAsset?.grant,
         costNgn: getColumnValue(row, 'COST (NGN)') || existingAsset?.costNgn,
+        remarks: remarks || existingAsset?.remarks,
     };
 
     if (existingAsset) {
