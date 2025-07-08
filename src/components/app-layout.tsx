@@ -359,9 +359,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 {isOnline ? <Cloud className="h-5 w-5 text-green-500" /> : <CloudOff className="h-5 w-5 text-red-500" />}
             </div>
             
-            <NotificationBell />
-            <ThemeToggle />
-            
             {loading ? (
               <Skeleton className="h-10 w-10 rounded-full" />
             ) : (
@@ -389,6 +386,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <Settings className="mr-2 h-4 w-4"/>
                     Settings
                   </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <div className="flex items-center justify-around py-2">
+                     <div className="flex flex-col items-center gap-1">
+                        <ThemeToggle />
+                        <span className="text-xs text-muted-foreground">Theme</span>
+                     </div>
+                     <div className="flex flex-col items-center gap-1">
+                       <NotificationBell />
+                       <span className="text-xs text-muted-foreground">Notifications</span>
+                     </div>
+                  </div>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
