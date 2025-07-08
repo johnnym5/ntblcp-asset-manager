@@ -70,6 +70,25 @@ import { PaginationControls } from "./pagination-controls";
 
 const ITEMS_PER_PAGE = 25;
 
+const normalizeAssetLocation = (location?: string): string => {
+    if (!location) return '';
+    const originalLocation = location.trim();
+    if (!originalLocation) return '';
+
+    const lowerCaseLocation = originalLocation.toLowerCase();
+
+    const matchedState = NIGERIAN_STATES.find(state => lowerCaseLocation.includes(state.toLowerCase()));
+    if (matchedState) return matchedState;
+
+    for (const state in NIGERIAN_STATE_CAPITALS) {
+        if (lowerCaseLocation.includes(NIGERIAN_STATE_CAPITALS[state].toLowerCase())) {
+            return state;
+        }
+    }
+    return originalLocation.replace(/\b\w/g, l => l.toUpperCase());
+};
+
+
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFormReadOnly, setIsFormReadOnly] = useState(true);
@@ -224,11 +243,28 @@ export default function AssetList() {
   
   // --- Set Filter Options in Global Context ---
   useEffect(() => {
-    const locations = new Set(stateFilteredAssets.map(a => a.location).filter(Boolean));
-    setLocationOptions(Array.from(locations).map(l => ({ label: l!, value: l! })).sort((a,b) => a.label.localeCompare(b.label)));
+    const locations = new Set<string>();
+    stateFilteredAssets.forEach(asset => {
+      const normalized = normalizeAssetLocation(asset.location);
+      if (normalized) {
+        locations.add(normalized);
+      }
+    });
+    setLocationOptions(Array.from(locations).map(l => ({ label: l, value: l })).sort((a, b) => a.label.localeCompare(b.label)));
 
-    const assignees = new Set(stateFilteredAssets.map(a => a.assignee).filter(Boolean));
-    setAssigneeOptions(Array.from(assignees).map(a => ({ label: a!, value: a! })).sort((a,b) => a.label.localeCompare(b.label)));
+    const assigneeMap = new Map<string, string>();
+    stateFilteredAssets.forEach(asset => {
+      if (asset.assignee) {
+        const assigneeName = asset.assignee.trim();
+        if (assigneeName) {
+            const lowerCaseName = assigneeName.toLowerCase();
+            if (!assigneeMap.has(lowerCaseName)) {
+                assigneeMap.set(lowerCaseName, assigneeName);
+            }
+        }
+      }
+    });
+    setAssigneeOptions(Array.from(assigneeMap.values()).map(a => ({ label: a, value: a })).sort((a,b) => a.label.localeCompare(b.label)));
   }, [stateFilteredAssets, setLocationOptions, setAssigneeOptions]);
 
 
@@ -256,8 +292,8 @@ export default function AssetList() {
 
     // Apply filters
     results = results.filter(asset => {
-        const locationMatch = !selectedLocation || asset.location === selectedLocation;
-        const assigneeMatch = !selectedAssignee || asset.assignee === selectedAssignee;
+        const locationMatch = !selectedLocation || normalizeAssetLocation(asset.location) === selectedLocation;
+        const assigneeMatch = !selectedAssignee || (asset.assignee && asset.assignee.trim().toLowerCase() === selectedAssignee.toLowerCase());
         const statusMatch = !selectedStatus || asset.verifiedStatus === selectedStatus;
         return locationMatch && assigneeMatch && statusMatch;
     });
@@ -292,8 +328,8 @@ export default function AssetList() {
     const hasFilters = !!selectedLocation || !!selectedAssignee || !!selectedStatus;
     if (hasFilters) {
         assetsToFilter = assetsToFilter.filter(asset => {
-            const locationMatch = !selectedLocation || asset.location === selectedLocation;
-            const assigneeMatch = !selectedAssignee || asset.assignee === selectedAssignee;
+            const locationMatch = !selectedLocation || normalizeAssetLocation(asset.location) === selectedLocation;
+            const assigneeMatch = !selectedAssignee || (asset.assignee && asset.assignee.trim().toLowerCase() === selectedAssignee.toLowerCase());
             const statusMatch = !selectedStatus || asset.verifiedStatus === selectedStatus;
             return locationMatch && assigneeMatch && statusMatch;
         });

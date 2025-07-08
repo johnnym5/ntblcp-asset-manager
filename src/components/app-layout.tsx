@@ -34,6 +34,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Boxes,
@@ -47,6 +56,8 @@ import {
   CloudOff,
   Filter,
   ArrowUpDown,
+  Check,
+  ChevronsUpDown,
 } from "lucide-react";
 import { addNotification } from "@/hooks/use-notifications";
 import { NotificationBell } from "./notification-bell";
@@ -61,6 +72,7 @@ import { Switch } from "./ui/switch";
 import type { OptionType } from "./multi-select-filter";
 import type { Asset } from "@/lib/types";
 import { useDebounce } from "@/hooks/use-debounce";
+import { cn } from "@/lib/utils";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -80,6 +92,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
+  const [locationPopoverOpen, setLocationPopoverOpen] = useState(false);
+  const [assigneePopoverOpen, setAssigneePopoverOpen] = useState(false);
 
   useEffect(() => {
     setSearchTerm(debouncedSearchTerm);
@@ -249,26 +263,100 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                     
                                     <div className="space-y-2">
                                         <Label>Location</Label>
-                                        <Select value={selectedLocation} onValueChange={(value) => setSelectedLocation(value === 'all' ? '' : value)}>
-                                            <SelectTrigger><SelectValue placeholder="All Locations" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">All Locations</SelectItem>
-                                                <SelectSeparator />
-                                                {locationOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
+                                        <Popover open={locationPopoverOpen} onOpenChange={setLocationPopoverOpen}>
+                                          <PopoverTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              role="combobox"
+                                              aria-expanded={locationPopoverOpen}
+                                              className="w-full justify-between"
+                                            >
+                                              {selectedLocation
+                                                ? locationOptions.find((option) => option.value === selectedLocation)?.label
+                                                : "All Locations"}
+                                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                            <Command>
+                                              <CommandInput placeholder="Search location..." />
+                                              <CommandList>
+                                                <ScrollArea className="h-[200px]">
+                                                  <CommandEmpty>No location found.</CommandEmpty>
+                                                  <CommandGroup>
+                                                    <CommandItem value="All Locations" onSelect={() => { setSelectedLocation(''); setLocationPopoverOpen(false); }}>
+                                                      <Check className={cn("mr-2 h-4 w-4", selectedLocation === '' ? "opacity-100" : "opacity-0")} />
+                                                      All Locations
+                                                    </CommandItem>
+                                                    {locationOptions.map((option) => (
+                                                      <CommandItem
+                                                        key={option.value}
+                                                        value={option.label}
+                                                        onSelect={(currentValue) => {
+                                                          const value = locationOptions.find(o => o.label.toLowerCase() === currentValue.toLowerCase())?.value || ''
+                                                          setSelectedLocation(value);
+                                                          setLocationPopoverOpen(false);
+                                                        }}
+                                                      >
+                                                        <Check className={cn("mr-2 h-4 w-4", selectedLocation === option.value ? "opacity-100" : "opacity-0")} />
+                                                        {option.label}
+                                                      </CommandItem>
+                                                    ))}
+                                                  </CommandGroup>
+                                                </ScrollArea>
+                                              </CommandList>
+                                            </Command>
+                                          </PopoverContent>
+                                        </Popover>
                                     </div>
                                     
                                     <div className="space-y-2">
                                         <Label>Assignee</Label>
-                                        <Select value={selectedAssignee} onValueChange={(value) => setSelectedAssignee(value === 'all' ? '' : value)}>
-                                            <SelectTrigger><SelectValue placeholder="All Assignees" /></SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem value="all">All Assignees</SelectItem>
-                                                <SelectSeparator />
-                                                {assigneeOptions.map(o => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-                                            </SelectContent>
-                                        </Select>
+                                        <Popover open={assigneePopoverOpen} onOpenChange={setAssigneePopoverOpen}>
+                                          <PopoverTrigger asChild>
+                                            <Button
+                                              variant="outline"
+                                              role="combobox"
+                                              aria-expanded={assigneePopoverOpen}
+                                              className="w-full justify-between"
+                                            >
+                                              {selectedAssignee
+                                                ? assigneeOptions.find((option) => option.value === selectedAssignee)?.label
+                                                : "All Assignees"}
+                                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                                            </Button>
+                                          </PopoverTrigger>
+                                          <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
+                                            <Command>
+                                              <CommandInput placeholder="Search assignee..." />
+                                              <CommandList>
+                                                <ScrollArea className="h-[200px]">
+                                                  <CommandEmpty>No assignee found.</CommandEmpty>
+                                                  <CommandGroup>
+                                                    <CommandItem value="All Assignees" onSelect={() => { setSelectedAssignee(''); setAssigneePopoverOpen(false); }}>
+                                                      <Check className={cn("mr-2 h-4 w-4", selectedAssignee === '' ? "opacity-100" : "opacity-0")} />
+                                                      All Assignees
+                                                    </CommandItem>
+                                                    {assigneeOptions.map((option) => (
+                                                      <CommandItem
+                                                        key={option.value}
+                                                        value={option.label}
+                                                        onSelect={(currentValue) => {
+                                                          const value = assigneeOptions.find(o => o.label.toLowerCase() === currentValue.toLowerCase())?.value || ''
+                                                          setSelectedAssignee(value);
+                                                          setAssigneePopoverOpen(false);
+                                                        }}
+                                                      >
+                                                        <Check className={cn("mr-2 h-4 w-4", selectedAssignee === option.value ? "opacity-100" : "opacity-0")} />
+                                                        {option.label}
+                                                      </CommandItem>
+                                                    ))}
+                                                  </CommandGroup>
+                                                </ScrollArea>
+                                              </CommandList>
+                                            </Command>
+                                          </PopoverContent>
+                                        </Popover>
                                     </div>
 
                                     <div className="space-y-2">
