@@ -19,10 +19,13 @@ const actionTypes = {
   CLEAR_ALL: "CLEAR_ALL",
 } as const
 
+const NOTIFICATIONS_STORAGE_KEY = "ntblcp-notifications";
+
 let count = 0
+// A more robust ID generator for persistent notifications
 function genId() {
-  count = (count + 1) % Number.MAX_SAFE_INTEGER
-  return count.toString()
+  count = (count + 1) % 1000;
+  return `${new Date().getTime()}-${count}`;
 }
 
 type ActionType = typeof actionTypes
@@ -37,10 +40,42 @@ interface State {
 
 const listeners: Array<(state: State) => void> = []
 
-let memoryState: State = { notifications: [] }
+// Safely initialize state from localStorage
+let memoryState: State = (() => {
+    if (typeof window === 'undefined') {
+        return { notifications: [] };
+    }
+    try {
+        const stored = localStorage.getItem(NOTIFICATIONS_STORAGE_KEY);
+        if (stored) {
+            const parsedState = JSON.parse(stored);
+            // Revive date objects from string format
+            if (Array.isArray(parsedState.notifications)) {
+              parsedState.notifications = parsedState.notifications.map((n: any) => ({
+                  ...n,
+                  date: new Date(n.date)
+              }));
+            }
+            return parsedState;
+        }
+    } catch (e) {
+        console.error("Failed to load notifications from storage", e);
+    }
+    return { notifications: [] };
+})();
+
 
 function dispatch(action: Action) {
   memoryState = reducer(memoryState, action)
+  
+  if (typeof window !== 'undefined') {
+    try {
+        localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(memoryState));
+    } catch (e) {
+        console.error("Failed to save notifications to storage", e);
+    }
+  }
+
   listeners.forEach((listener) => {
     listener(memoryState)
   })
