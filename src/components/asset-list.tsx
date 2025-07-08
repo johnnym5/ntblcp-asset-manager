@@ -540,7 +540,6 @@ export default function AssetList() {
       lastModifiedByState: userProfile?.state,
     };
     if (isOnline) {
-        addNotification({ title: 'Saving Asset...', description: 'Syncing with the online database.' });
         try {
             await updateAsset(finalAsset);
             addNotification({ title: 'Saved Successfully', description: 'Asset changes have been saved.' });
@@ -1074,3 +1073,5 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
