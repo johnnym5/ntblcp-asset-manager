@@ -30,6 +30,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -57,6 +63,14 @@ const assetFormSchema = z.object({
   lga: z.string().optional(),
   assetIdCode: z.string().optional(),
   manufacturer: z.string().optional(),
+  // Advanced Fields
+  assetClass: z.string().optional(),
+  modelNumber: z.string().optional(),
+  supplier: z.string().optional(),
+  dateReceived: z.string().optional(),
+  grant: z.string().optional(),
+  chasisNo: z.string().optional(),
+  engineNo: z.string().optional(),
 });
 
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
@@ -98,6 +112,13 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     lga: '',
     assetIdCode: '',
     manufacturer: '',
+    assetClass: '',
+    modelNumber: '',
+    supplier: '',
+    dateReceived: '',
+    grant: '',
+    chasisNo: '',
+    engineNo: '',
   };
 
   const form = useForm<AssetFormValues>({
@@ -340,7 +361,40 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4 p-1"
               >
+                <FormField
+                  control={form.control}
+                  name="description"
+                  render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Asset Description</FormLabel>
+                    <FormControl><Textarea {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!!asset}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {TARGET_SHEETS.map(sheet => (
+                              <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
                    <FormField
                       control={form.control}
                       name="verifiedStatus"
@@ -363,54 +417,26 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                         </FormItem>
                       )}
                     />
-                    <FormField control={form.control} name="verifiedDate" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Verified Date</FormLabel>
-                            <FormControl><Input {...field} disabled /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
                 </div>
                 
-                <FormField
-                  control={form.control}
-                  name="category"
-                  render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Category</FormLabel>
-                      <Select onValueChange={field.onChange} value={field.value} disabled={!!asset}>
-                        <FormControl>
-                          <SelectTrigger>
-                            <SelectValue placeholder="Select a category for the asset" />
-                          </SelectTrigger>
-                        </FormControl>
-                        <SelectContent>
-                          {TARGET_SHEETS.map(sheet => (
-                            <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
-                
-                <FormField control={form.control} name="description" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Asset Description</FormLabel>
-                    <FormControl><Textarea {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="serialNumber" render={({ field }) => (
+                  <FormField control={form.control} name="assetIdCode" render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Asset ID Code</FormLabel>
+                          <FormControl><Input {...field} /></FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )} />
+                   <FormField control={form.control} name="serialNumber" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Serial/Chasis Number</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={form.control} name="location" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
@@ -418,7 +444,32 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                       <FormMessage />
                     </FormItem>
                   )} />
+                  <FormField control={form.control} name="lga" render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>LGA</FormLabel>
+                          <FormControl><Input {...field} /></FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )} />
                 </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <FormField control={form.control} name="assignee" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Assignee</FormLabel>
+                      <FormControl><Input {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                   <FormField control={form.control} name="manufacturer" render={({ field }) => (
+                      <FormItem>
+                          <FormLabel>Manufacturer</FormLabel>
+                          <FormControl><Input {...field} /></FormControl>
+                          <FormMessage />
+                      </FormItem>
+                  )} />
+                </div>
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={form.control} name="condition" render={({ field }) => (
                     <FormItem>
@@ -427,14 +478,15 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                       <FormMessage />
                     </FormItem>
                   )} />
-                  <FormField control={form.control} name="assignee" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Assignee</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
+                   <FormField control={form.control} name="verifiedDate" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Verified Date</FormLabel>
+                            <FormControl><Input {...field} disabled /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
                 </div>
+
                 <FormField control={form.control} name="remarks" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Remarks/Comments</FormLabel>
@@ -442,6 +494,39 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     <FormMessage />
                   </FormItem>
                 )} />
+
+                <Accordion type="single" collapsible className="w-full pt-4">
+                  <AccordionItem value="advanced">
+                    <AccordionTrigger>Advanced Information</AccordionTrigger>
+                    <AccordionContent className="pt-4 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <FormField control={form.control} name="assetClass" render={({ field }) => (
+                                <FormItem><FormLabel>Asset Class</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="modelNumber" render={({ field }) => (
+                                <FormItem><FormLabel>Model Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <FormField control={form.control} name="engineNo" render={({ field }) => (
+                                <FormItem><FormLabel>Engine Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                           <FormField control={form.control} name="chasisNo" render={({ field }) => (
+                                <FormItem><FormLabel>Chasis Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                        </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <FormField control={form.control} name="supplier" render={({ field }) => (
+                                <FormItem><FormLabel>Supplier</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="grant" render={({ field }) => (
+                                <FormItem><FormLabel>Grant</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                        </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+                
               </form>
             </Form>
           </div>

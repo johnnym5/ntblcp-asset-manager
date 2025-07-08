@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
@@ -34,6 +35,8 @@ interface AppStateContextType {
   setSelectedAssignees: Dispatch<SetStateAction<string[]>>;
   selectedStatuses: string[];
   setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
+  missingFieldFilter: string;
+  setMissingFieldFilter: Dispatch<SetStateAction<string>>;
   
   // Filter Options
   locationOptions: OptionType[];
@@ -74,6 +77,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [missingFieldFilter, setMissingFieldFilter] = useState('');
   
   const [locationOptions, setLocationOptions] = useState<OptionType[]>([]);
   const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
@@ -122,6 +126,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setSelectedAssignees,
     selectedStatuses,
     setSelectedStatuses,
+    missingFieldFilter,
+    setMissingFieldFilter,
     locationOptions,
     setLocationOptions,
     assigneeOptions,

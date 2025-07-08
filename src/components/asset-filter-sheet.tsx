@@ -20,11 +20,13 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { Check } from 'lucide-react';
+import { Check, Dot } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { Label } from './ui/label';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import type { Asset } from '@/lib/types';
 
 export interface OptionType {
   label: string;
@@ -46,7 +48,20 @@ interface AssetFilterSheetProps {
   statusOptions: OptionType[];
   selectedStatuses: string[];
   setSelectedStatuses: React.Dispatch<React.SetStateAction<string[]>>;
+
+  missingFieldFilter: string;
+  setMissingFieldFilter: React.Dispatch<React.SetStateAction<string>>;
 }
+
+const fieldsToFilter: { label: string, value: keyof Asset }[] = [
+    { label: 'Serial Number', value: 'serialNumber' },
+    { label: 'Location', value: 'location' },
+    { label: 'Assignee', value: 'assignee' },
+    { label: 'Condition', value: 'condition' },
+    { label: 'Asset ID Code', value: 'assetIdCode' },
+    { label: 'Manufacturer', value: 'manufacturer' },
+    { label: 'LGA', value: 'lga' },
+];
 
 const FilterSection = ({ title, options, selected, onChange }: {
   title: string;
@@ -115,15 +130,18 @@ export function AssetFilterSheet({
   statusOptions,
   selectedStatuses,
   setSelectedStatuses,
+  missingFieldFilter,
+  setMissingFieldFilter,
 }: AssetFilterSheetProps) {
   
   const handleClearAll = () => {
     setSelectedLocations([]);
     setSelectedAssignees([]);
     setSelectedStatuses([]);
+    setMissingFieldFilter('');
   };
 
-  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length;
+  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -155,6 +173,26 @@ export function AssetFilterSheet({
             selected={selectedStatuses}
             onChange={setSelectedStatuses}
           />
+          <Separator />
+           <div className="space-y-3">
+            <Label className="font-semibold">Find Assets with Missing Fields</Label>
+            <RadioGroup value={missingFieldFilter} onValueChange={setMissingFieldFilter}>
+              <ScrollArea className="h-[150px] rounded-md border p-2">
+                <div className="space-y-1">
+                 <div className="flex items-center space-x-2 p-1">
+                    <RadioGroupItem value="" id="missing-none" />
+                    <Label htmlFor="missing-none" className="font-normal cursor-pointer">None</Label>
+                  </div>
+                {fieldsToFilter.map((field) => (
+                  <div key={field.value} className="flex items-center space-x-2 p-1">
+                    <RadioGroupItem value={field.value} id={`missing-${field.value}`} />
+                    <Label htmlFor={`missing-${field.value}`} className="font-normal cursor-pointer">{field.label}</Label>
+                  </div>
+                ))}
+                </div>
+              </ScrollArea>
+            </RadioGroup>
+          </div>
         </div>
         <SheetFooter className="mt-auto pt-4 border-t">
            <Button variant="outline" onClick={handleClearAll} disabled={activeFilterCount === 0}>

@@ -120,8 +120,8 @@ export default function AssetList() {
   const { 
     searchTerm, setSearchTerm,
     isOnline, setIsOnline, globalStateFilter, setGlobalStateFilter,
-    selectedLocations, selectedAssignees, selectedStatuses,
-    setSelectedLocations, setSelectedAssignees, setSelectedStatuses,
+    selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
+    setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
     enabledSheets,
     autoSync, manualSyncTrigger, isSyncing, setIsSyncing,
@@ -133,7 +133,7 @@ export default function AssetList() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, globalStateFilter, view, currentCategory]);
+  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter, view, currentCategory]);
   
   const getOldestDuplicates = (assetsToFilter: Asset[]): Asset[] => {
     const uniqueAssetMap = new Map<string, Asset>();
@@ -379,13 +379,14 @@ export default function AssetList() {
     let results = stateFilteredAssets;
 
     // Apply filters from filter sheet
-    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     if (hasFilters) {
         results = results.filter(asset => {
             const locationMatch = selectedLocations.length === 0 || selectedLocations.includes(normalizeAssetLocation(asset.location));
             const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
             const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
-            return locationMatch && assigneeMatch && statusMatch;
+            const missingFieldMatch = !missingFieldFilter || !asset[missingFieldFilter as keyof Asset];
+            return locationMatch && assigneeMatch && statusMatch && missingFieldMatch;
         });
     }
 
@@ -403,7 +404,7 @@ export default function AssetList() {
     }
     
     return sortAssets(results, sortConfig);
-  }, [stateFilteredAssets, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, sortConfig]);
+  }, [stateFilteredAssets, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, sortConfig]);
 
   const assetsByCategory = useMemo(() => {
     return displayedAssets.reduce((acc, asset) => {
@@ -601,7 +602,7 @@ export default function AssetList() {
     
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
-        addNotification({ title: "Import Notice", description: `${skipped} rows were skipped due to missing required fields.` });
+        addNotification({ title: "Import Notice", description: `${skipped} rows with no asset description were skipped.` });
     }
 
     const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
@@ -752,7 +753,7 @@ export default function AssetList() {
     const totalStateAssets = displayedAssets.length;
     const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
     const verificationPercentage = totalStateAssets > 0 ? (verifiedStateAssets / totalStateAssets) * 100 : 0;
-    const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0;
+    const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     
     return (
       <div className="flex flex-col h-full gap-4">

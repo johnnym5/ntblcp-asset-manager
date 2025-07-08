@@ -11,7 +11,7 @@ function isHeaderRow(rowData: any[], sheetName: string): boolean {
     const rowStrings = rowData.map(cell => String(cell ?? '').trim().toLowerCase());
     const nonEmptyCells = rowStrings.filter(c => c).length;
 
-    if (nonEmptyCells < 3) return false;
+    if (nonEmptyCells < 2) return false;
 
     let matchCount = 0;
     const lowerCaseExpected = expectedHeaders.map(h => h.toLowerCase().trim());
@@ -21,7 +21,9 @@ function isHeaderRow(rowData: any[], sheetName: string): boolean {
             matchCount++;
         }
     }
-
+    
+    // Consider it a header if it has at least 3 matching known columns,
+    // or if it contains key identifying text.
     const hasKeyFields = ['description', 'serial', 'asset id', 'chasis', 'engine no'].some(key => 
         rowStrings.join(' ').includes(key)
     );
@@ -137,34 +139,44 @@ export async function parseExcelFile(
                         }
 
                         const sheetData: any[][] = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: null });
-                        let currentHeaders: string[] | null = null;
+                        
+                        const headerRowIndex = sheetData.findIndex(row => isHeaderRow(row, matchedSheetName));
 
-                        for (const rowData of sheetData) {
-                            if (!rowData || rowData.every(cell => cell === null || String(cell ?? '').trim() === '')) continue;
-                            
-                            if (isHeaderRow(rowData, matchedSheetName)) {
-                                currentHeaders = rowData.map(cell => String(cell ?? '').trim());
-                                continue;
+                        if (headerRowIndex === -1) {
+                            // Don't error out, but log it. Some sheets might just not be relevant.
+                            console.warn(`Could not find a valid header row in sheet "${sheetName}". Skipping sheet.`);
+                            return;
+                        }
+
+                        const headers = sheetData[headerRowIndex].map(cell => String(cell ?? '').trim());
+                        const dataRows = sheetData.slice(headerRowIndex + 1);
+
+                        for (const rowData of dataRows) {
+                            if (!rowData || rowData.every(cell => cell === null || String(cell ?? '').trim() === '')) {
+                                continue; // Skip completely empty rows
                             }
-
-                            if (currentHeaders) {
-                                const rowObject: { [key: string]: any } = {};
-                                currentHeaders.forEach((header, index) => {
-                                    if (header) {
-                                        rowObject[header] = rowData[index];
-                                    }
-                                });
-                                
-                                const idKey = getColumnValue(rowObject, 'Asset ID Code', 'TAG NUMBERS') || getColumnValue(rowObject, 'Serial Number', 'ASSET SERIAL NUMBERS');
-                                const existingAsset = idKey ? existingAssetMap.get(idKey) : undefined;
-                                
-                                const asset = mapRowToAsset(rowObject, matchedSheetName, existingAsset);
-                                
+                            
+                            const rowObject: { [key: string]: any } = {};
+                            headers.forEach((header, index) => {
+                                if (header) {
+                                    rowObject[header] = rowData[index];
+                                }
+                            });
+                            
+                            const idKey = getColumnValue(rowObject, 'Asset ID Code', 'TAG NUMBERS') || getColumnValue(rowObject, 'Serial Number', 'ASSET SERIAL NUMBERS');
+                            const existingAsset = idKey ? existingAssetMap.get(idKey) : undefined;
+                            
+                            const asset = mapRowToAsset(rowObject, matchedSheetName, existingAsset);
+                            
+                            // Any row with a description gets imported. This is the main identifier.
+                            if (asset.description) {
                                 if (existingAsset) {
                                     updatedAssets.push(asset);
                                 } else {
                                     newAssets.push(asset);
                                 }
+                            } else {
+                                skipped++;
                             }
                         }
                     }
@@ -216,10 +228,6 @@ const headerToAssetKeyMap: { [key: string]: keyof Asset | string } = {
     'comments': 'remarks',
     'grant': 'grant',
     'useful life (years)': 'usefulLifeYears',
-    'accumulated depreciation (ngn)': 'accumulatedDepreciation.ngn',
-    'net book value (ngn)': 'netBookValue.ngn',
-    'accumulated depreciation (usd)': 'accumulatedDepreciation.usd',
-    'net book value (usd)': 'netBookValue.usd',
     'imei (tablets & mobile phones)': 'imei',
     'chasis no': 'chasisNo',
     'engine no': 'engineNo',
