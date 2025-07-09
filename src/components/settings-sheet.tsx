@@ -25,7 +25,7 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
-  const { enabledSheets, setEnabledSheets } = useAppState();
+  const { enabledSheets, setEnabledSheets, lockAssetList, setLockAssetList } = useAppState();
 
   const handleToggleSheet = (sheetName: string, checked: boolean) => {
     setEnabledSheets(prev => {
@@ -59,6 +59,27 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
         </SheetHeader>
         <div className="flex-1 overflow-y-auto pr-2 py-4">
           <div className="space-y-6">
+            <div>
+              <h3 className="text-lg font-medium mb-4">Data Management</h3>
+              <div className="rounded-lg border p-3">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <Label htmlFor="lock-assets" className="text-sm">
+                      Lock Asset List
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Prevent new assets from being added via Excel import.
+                    </p>
+                  </div>
+                  <Switch
+                    id="lock-assets"
+                    checked={lockAssetList}
+                    onCheckedChange={setLockAssetList}
+                  />
+                </div>
+              </div>
+            </div>
+            <Separator/>
             <div>
               <h3 className="text-lg font-medium mb-4">Enabled Excel Sheets</h3>
               <div className="flex items-center justify-between mb-4">

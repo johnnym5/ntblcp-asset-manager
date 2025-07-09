@@ -209,7 +209,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
-            {!isAdmin && isOnline && (
+            {isOnline && (
               <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>

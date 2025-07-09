@@ -126,7 +126,8 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
 export async function parseExcelFile(
     file: File, 
     enabledSheets: string[], 
-    existingAssets: Asset[]
+    existingAssets: Asset[],
+    lockAssetList: boolean
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
     return new Promise((resolve) => {
         const reader = new FileReader();
@@ -183,21 +184,25 @@ export async function parseExcelFile(
                                 }
                             });
                             
-                            const idKey = getColumnValue(rowObject, 'Asset ID Code', 'TAG NUMBERS') || getColumnValue(rowObject, 'Serial Number', 'ASSET SERIAL NUMBERS');
-                            
-                            if (!idKey && !getColumnValue(rowObject, 'Asset Description', 'DESCRIPTION')) {
+                            const description = getColumnValue(rowObject, 'Asset Description', 'DESCRIPTION');
+                            if (!description) {
                                 skipped++;
                                 continue;
                             }
                             
+                            const idKey = getColumnValue(rowObject, 'Asset ID Code', 'TAG NUMBERS') || getColumnValue(rowObject, 'Serial Number', 'ASSET SERIAL NUMBERS');
                             const existingAsset = idKey ? existingAssetMap.get(idKey) : undefined;
                             
-                            const asset = mapRowToAsset(rowObject, matchedSheetName, existingAsset);
-                            
                             if (existingAsset) {
+                                const asset = mapRowToAsset(rowObject, matchedSheetName, existingAsset);
                                 updatedAssets.push(asset);
                             } else {
-                                newAssets.push(asset);
+                                if (lockAssetList) {
+                                    skipped++;
+                                } else {
+                                    const asset = mapRowToAsset(rowObject, matchedSheetName, undefined);
+                                    newAssets.push(asset);
+                                }
                             }
                         }
                     }

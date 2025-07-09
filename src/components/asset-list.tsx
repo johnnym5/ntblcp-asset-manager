@@ -139,7 +139,7 @@ export default function AssetList() {
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
-    enabledSheets,
+    enabledSheets, lockAssetList,
     manualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
   } = useAppState();
@@ -258,35 +258,7 @@ export default function AssetList() {
     loadInitialData();
   }, []);
 
-  // Real-time listener for admins
-  useEffect(() => {
-    if (!isOnline || !isAdmin) return;
-    
-    setIsSyncing(true);
-    addNotification({ title: 'Real-time sync enabled for admin.' });
-    
-    const assetsCollectionRef = collection(db, 'assets');
-    const q = query(assetsCollectionRef);
-    
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      const fetchedAssets = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Asset));
-      handleFetchedAssets(fetchedAssets);
-      if (isSyncingRef.current) setIsSyncing(false);
-    }, (error) => {
-      console.error("Firestore real-time listener error:", error);
-      addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
-      setIsOnline(false);
-      setIsSyncing(false);
-    });
-
-    return () => {
-        unsubscribe();
-    };
-
-  }, [isOnline, isAdmin, handleFetchedAssets, setIsOnline, setIsSyncing]);
-
-
-  // Manual/Initial sync for non-admins
+  // Manual sync for all users
   useEffect(() => {
     const fetchAssetsOnce = async () => {
         if (isSyncingRef.current) return;
@@ -305,15 +277,16 @@ export default function AssetList() {
         }
     };
     
-    if (isAdmin || !isOnline) return;
+    if (!isOnline) return;
 
+    // Trigger sync on first load when coming online, or on manual trigger
     const isFirstOnlineLoad = isInitialLoad.current;
     const isManualSync = manualSyncTrigger > 0;
 
     if (isFirstOnlineLoad || isManualSync) {
         fetchAssetsOnce();
     }
-  }, [isOnline, manualSyncTrigger, isAdmin, handleFetchedAssets, setIsOnline, setIsSyncing]);
+  }, [isOnline, manualSyncTrigger, handleFetchedAssets, setIsOnline, setIsSyncing]);
   
   useEffect(() => {
     setStatusOptions([
@@ -437,10 +410,14 @@ export default function AssetList() {
 
 
   const handleAddAsset = useCallback(() => {
+    if (lockAssetList) {
+      addNotification({ title: "Asset List Locked", description: "Adding new assets is disabled. This can be changed in settings by an admin.", variant: "destructive" });
+      return;
+    }
     setSelectedAsset(undefined);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  }, []);
+  }, [lockAssetList]);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -610,11 +587,14 @@ export default function AssetList() {
     
     let baseAssets = isOnline ? assets : await getLocalAssetsFromDb();
 
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, enabledSheets, baseAssets);
+    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, enabledSheets, baseAssets, lockAssetList);
     
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
-        addNotification({ title: "Import Notice", description: `${skipped} rows with no asset description were skipped.` });
+        const message = lockAssetList 
+          ? `${skipped} assets were skipped because they are not in the master list.`
+          : `${skipped} rows with no asset description were skipped.`;
+        addNotification({ title: "Import Notice", description: message });
     }
 
     const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
@@ -643,7 +623,7 @@ export default function AssetList() {
             addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
         }
     } else if (errors.length === 0) {
-        addNotification({ title: "No New Data", description: "No new or updated assets were found in the file."});
+        addNotification({ title: "No Changes Detected", description: "No new or updated assets were found in the file."});
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";

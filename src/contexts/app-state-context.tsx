@@ -53,6 +53,8 @@ interface AppStateContextType {
   // Sheet Settings
   enabledSheets: string[];
   setEnabledSheets: Dispatch<SetStateAction<string[]>>;
+  lockAssetList: boolean;
+  setLockAssetList: Dispatch<SetStateAction<boolean>>;
   
   // Sync Settings
   manualSyncTrigger: number;
@@ -97,6 +99,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return [...TARGET_SHEETS];
   });
   
+  const [lockAssetList, setLockAssetList] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const savedLock = localStorage.getItem('ntblcp-asset-lock');
+      return savedLock ? JSON.parse(savedLock) : false;
+    }
+    return false;
+  });
+
   const [manualSyncTrigger, setManualSyncTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
@@ -105,6 +115,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
   }, [enabledSheets]);
   
+  useEffect(() => {
+    localStorage.setItem('ntblcp-asset-lock', JSON.stringify(lockAssetList));
+  }, [lockAssetList]);
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
@@ -136,6 +150,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setSortConfig,
     enabledSheets,
     setEnabledSheets,
+    lockAssetList,
+    setLockAssetList,
     manualSyncTrigger,
     setManualSyncTrigger,
     isSyncing,
