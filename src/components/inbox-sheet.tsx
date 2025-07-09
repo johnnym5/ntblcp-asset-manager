@@ -17,19 +17,15 @@ interface InboxSheetProps {
 }
 
 export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
-  const { inboxMessages, setInboxMessages, setUnreadInboxCount } = useAppState();
+  const { inboxMessages, setInboxMessages } = useAppState();
   const [viewingAssets, setViewingAssets] = useState<Asset[] | null>(null);
 
   const handleOpen = (open: boolean) => {
-    if (open) {
-      setUnreadInboxCount(0);
-    }
     onOpenChange(open);
   };
 
   const handleClearAll = () => {
     setInboxMessages([]);
-    setUnreadInboxCount(0);
   };
 
   const handleDismissGroup = (groupId: string) => {

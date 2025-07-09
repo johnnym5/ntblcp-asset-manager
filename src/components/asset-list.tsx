@@ -144,7 +144,7 @@ export default function AssetList() {
     manualSyncTrigger, isSyncing, setIsSyncing,
     autoSyncEnabled,
     setDataActions,
-    setInboxMessages, setUnreadInboxCount,
+    setInboxMessages,
   } = useAppState();
 
   const isSyncingRef = useRef(isSyncing);
@@ -297,11 +297,8 @@ export default function AssetList() {
 
               return Array.from(messageMap.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
           });
-
-          const totalNewChanges = newInboxItems.reduce((acc, group) => acc + (group.changes?.length || 1), 0);
-          setUnreadInboxCount(prevCount => prevCount + totalNewChanges);
       }
-  }, [setInboxMessages, setUnreadInboxCount]);
+  }, [setInboxMessages]);
 
 
   // --- DATA LOADING & SYNC ---

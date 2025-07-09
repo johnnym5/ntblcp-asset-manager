@@ -1,7 +1,7 @@
 
 'use client';
 
-import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
+import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
 import type { InboxMessageGroup } from '@/lib/types';
@@ -74,7 +74,6 @@ interface AppStateContextType {
   inboxMessages: InboxMessageGroup[];
   setInboxMessages: Dispatch<SetStateAction<InboxMessageGroup[]>>;
   unreadInboxCount: number;
-  setUnreadInboxCount: Dispatch<SetStateAction<number>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -146,13 +145,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return [];
   });
 
-  const [unreadInboxCount, setUnreadInboxCount] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ntblcp-unread-inbox-count');
-      return saved ? parseInt(saved, 10) : 0;
-    }
-    return 0;
-  });
+  const unreadInboxCount = useMemo(() => {
+    return Array.isArray(inboxMessages) ? inboxMessages.length : 0;
+  }, [inboxMessages]);
 
 
   useEffect(() => {
@@ -188,11 +183,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [inboxMessages]);
     
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-unread-inbox-count', String(unreadInboxCount));
-    }
-  }, [unreadInboxCount]);
 
   const value = {
     isOnline,
@@ -232,7 +222,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     inboxMessages,
     setInboxMessages,
     unreadInboxCount,
-    setUnreadInboxCount,
   };
 
   return (
