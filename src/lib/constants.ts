@@ -83,7 +83,7 @@ export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)'
+    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
   'MOTORCYCLES-C19RM': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
@@ -97,21 +97,21 @@ export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)'
+    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
   'TB LAMP-C19RM': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)'
+    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
   'ECG monitors': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)'
+    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
   'IHVN-GF N-THRIP': [
     'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION',
@@ -123,7 +123,7 @@ export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)'
+    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
   'Vehicles-TB (IHVN)': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
@@ -137,6 +137,6 @@ export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)'
+    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ]
 };
