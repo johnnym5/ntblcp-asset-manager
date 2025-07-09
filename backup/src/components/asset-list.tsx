@@ -395,8 +395,12 @@ export default function AssetList() {
         setIsSyncing(false);
       }
     }, (error) => {
-      console.error("Firestore real-time listener error:", error);
-      addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
+      if ((error as any).code === 'permission-denied') {
+        addNotification({ title: "Permissions Error", description: "You don't have permission to view real-time asset updates. Contact an administrator.", variant: 'destructive' })
+      } else {
+        console.error("Firestore real-time listener error:", error);
+        addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
+      }
       setIsSyncing(false);
       setIsOnline(false);
     });
