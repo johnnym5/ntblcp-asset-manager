@@ -70,7 +70,13 @@ function dispatch(action: Action) {
   
   if (typeof window !== 'undefined') {
     try {
-        localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(memoryState));
+        // Create a serializable version of the state by omitting the 'action' property, 
+        // which can be a non-serializable React component.
+        const serializableState = {
+            ...memoryState,
+            notifications: memoryState.notifications.map(({ action, ...rest }) => rest),
+        };
+        localStorage.setItem(NOTIFICATIONS_STORAGE_KEY, JSON.stringify(serializableState));
     } catch (e) {
         console.error("Failed to save notifications to storage", e);
     }
