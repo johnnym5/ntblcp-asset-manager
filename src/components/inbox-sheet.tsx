@@ -29,6 +29,7 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
 
   const handleClearAll = () => {
     setInboxMessages([]);
+    setUnreadInboxCount(0);
   };
 
   const handleDismissGroup = (groupKey: string) => {
