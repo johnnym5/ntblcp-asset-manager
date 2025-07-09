@@ -1,7 +1,7 @@
 
 import * as XLSX from 'xlsx';
 import type { Asset } from './types';
-import { TARGET_SHEETS, HEADER_DEFINITIONS } from './constants';
+import { HEADER_DEFINITIONS } from './constants';
 import { v4 as uuidv4 } from 'uuid';
 
 function isHeaderRow(rowData: any[], sheetName: string): boolean {
@@ -180,27 +180,22 @@ export async function parseExcelFile(
                                 }
                             });
                             
+                            const idKey = getColumnValue(rowObject, 'Asset ID Code', 'TAG NUMBERS') || getColumnValue(rowObject, 'Serial Number', 'ASSET SERIAL NUMBERS');
+                            
                             // A row is considered valid if it has any data at all.
-                            const hasAnyData = Object.values(rowObject).some(val => val !== null && val !== '');
-
-                            if (!hasAnyData) {
+                            if (!idKey && !getColumnValue(rowObject, 'Asset Description', 'DESCRIPTION')) {
                                 skipped++;
                                 continue;
                             }
                             
-                            const idKey = getColumnValue(rowObject, 'Asset ID Code', 'TAG NUMBERS') || getColumnValue(rowObject, 'Serial Number', 'ASSET SERIAL NUMBERS');
                             const existingAsset = idKey ? existingAssetMap.get(idKey) : undefined;
                             
                             const asset = mapRowToAsset(rowObject, matchedSheetName, existingAsset);
                             
-                            if (asset.description || idKey) { // Import if it has a description or a key
-                                if (existingAsset) {
-                                    updatedAssets.push(asset);
-                                } else {
-                                    newAssets.push(asset);
-                                }
+                            if (existingAsset) {
+                                updatedAssets.push(asset);
                             } else {
-                                skipped++;
+                                newAssets.push(asset);
                             }
                         }
                     }
@@ -269,7 +264,7 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
   const workbook = XLSX.utils.book_new();
 
   const assetsByCategory = assets.reduce((acc, asset) => {
-      const category = asset.category;
+      const category = asset.category || "Uncategorized";
       if (!acc[category]) {
           acc[category] = [];
       }
@@ -280,6 +275,7 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
   for (const category in assetsByCategory) {
       if (Object.prototype.hasOwnProperty.call(assetsByCategory, category)) {
           const categoryAssets = assetsByCategory[category];
+          // Use the cleaned headers from constants for export
           const headers = HEADER_DEFINITIONS[category];
 
           if (!headers) {
@@ -290,37 +286,42 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
           const finalHeaders = [...headers, 'Verified Status', 'Verified Date', 'Last Modified'];
 
           const dataRows = categoryAssets.map(asset => {
-              const row: any[] = [];
-              headers.forEach(header => {
+              const row: any[] = headers.map(header => {
                   const cleanHeader = header.toLowerCase().trim().replace(/\s+/g, ' ');
                   let assetKeyPath = headerToAssetKeyMap[cleanHeader];
 
-                  // Add specific override for IHVN sheet's 'LOCATION' column to prevent data duplication
+                  // Specific override for IHVN sheet's 'LOCATION' column which corresponds to 'site' in our model
                   if (category === 'IHVN-GF N-THRIP' && cleanHeader === 'location') {
                       assetKeyPath = 'site';
                   }
 
                   if (assetKeyPath) {
-                      row.push(getNestedValue(asset, assetKeyPath as string) ?? '');
-                  } else {
-                      row.push('');
+                      const value = getNestedValue(asset, assetKeyPath as string);
+                      return value ?? '';
                   }
+                  return '';
               });
+              
+              // Append verification and metadata
               row.push(asset.verifiedStatus || 'Unverified');
               row.push(asset.verifiedDate || '');
               row.push(asset.lastModified ? new Date(asset.lastModified).toLocaleString() : '');
+              
               return row;
           });
 
           const dataWithHeaders = [finalHeaders, ...dataRows];
           const worksheet = XLSX.utils.aoa_to_sheet(dataWithHeaders);
           
+          // Auto-fit columns
           const cols = finalHeaders.map((header, i) => ({
             wch: Math.max(...dataRows.map(r => r[i]?.toString().length ?? 0), header.length) + 2
           }));
           worksheet['!cols'] = cols;
 
-          XLSX.utils.book_append_sheet(workbook, worksheet, category.substring(0, 31));
+          // Sanitize sheet name for Excel limitations
+          const safeSheetName = category.replace(/[\/\\?*\[\]]/g, '').substring(0, 31);
+          XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
       }
   }
 
