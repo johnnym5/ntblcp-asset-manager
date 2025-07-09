@@ -285,21 +285,25 @@ export default function AssetList() {
 
 
   // --- DATA LOADING & SYNC ---
-  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync = false) => {
       const localAssets = await getLocalAssetsFromDb();
-      
-      const mergedAssetMap = new Map<string, Asset>();
-      // Prioritize local assets first
-      localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
-      
-      // Then, overwrite with fetched assets ONLY if they are newer.
-      fetchedAssets.forEach(asset => {
-        const existing = mergedAssetMap.get(asset.id);
-        if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
-            mergedAssetMap.set(asset.id, { ...asset, syncStatus: 'synced' });
-        }
-      });
-      let mergedAssets = Array.from(mergedAssetMap.values());
+      let mergedAssets = [...localAssets];
+
+      if (isManualSync) {
+        const fetchedAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
+        const localOnlyNewAssets = localAssets.filter(la => !fetchedAssetsMap.has(la.id));
+        mergedAssets = [...fetchedAssets, ...localOnlyNewAssets];
+      } else {
+        const mergedAssetMap = new Map<string, Asset>();
+        localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
+        fetchedAssets.forEach(asset => {
+          const existing = mergedAssetMap.get(asset.id);
+          if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
+              mergedAssetMap.set(asset.id, { ...asset, syncStatus: 'synced' });
+          }
+        });
+        mergedAssets = Array.from(mergedAssetMap.values());
+      }
       
       const assetsToPush = mergedAssets.filter(a => a.syncStatus === 'local');
       if (isOnline && assetsToPush.length > 0) {
@@ -383,7 +387,7 @@ export default function AssetList() {
       querySnapshot.forEach((doc) => {
         fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
       });
-      await handleFetchedAssets(fetchedAssets);
+      await handleFetchedAssets(fetchedAssets, false);
       
       if (isSyncingRef.current) {
         setIsSyncing(false);
@@ -412,7 +416,7 @@ export default function AssetList() {
 
         try {
             const fetchedAssets = await getAssets();
-            await handleFetchedAssets(fetchedAssets);
+            await handleFetchedAssets(fetchedAssets, true);
             if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
             addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
@@ -718,6 +722,55 @@ export default function AssetList() {
 
   const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
 
+  const uploadInChunks = async (assetsToUpload: Asset[]) => {
+    const CHUNK_SIZE = 100;
+    const DELAY_BETWEEN_CHUNKS_MS = 2000;
+
+    const numChunks = Math.ceil(assetsToUpload.length / CHUNK_SIZE);
+    addNotification({ title: 'Background Sync Started', description: `Uploading ${assetsToUpload.length} assets in ${numChunks} chunks.` });
+
+    for (let i = 0; i < assetsToUpload.length; i += CHUNK_SIZE) {
+        const chunk = assetsToUpload.slice(i, i + CHUNK_SIZE);
+        const chunkNumber = (i / CHUNK_SIZE) + 1;
+        try {
+            setAssets(prevAssets => prevAssets.map(pa => {
+                const assetInChunk = chunk.find(c => c.id === pa.id);
+                return assetInChunk ? { ...pa, syncStatus: 'syncing' } : pa;
+            }));
+
+            await batchSetAssets(chunk.map(c => ({...c, syncStatus: 'synced'})));
+
+            setAssets(prevAssets => prevAssets.map(pa => {
+                const assetInChunk = chunk.find(c => c.id === pa.id);
+                return assetInChunk ? { ...pa, syncStatus: 'synced' } : pa;
+            }));
+            
+            const currentLocalAssets = await getLocalAssetsFromDb();
+            const chunkIds = new Set(chunk.map(c => c.id));
+            const updatedLocalAssets = currentLocalAssets.map(la => 
+                chunkIds.has(la.id) ? { ...la, syncStatus: 'synced' } : la
+            );
+            await saveAssets(updatedLocalAssets);
+
+            addNotification({ title: 'Sync Progress', description: `Chunk ${chunkNumber} of ${numChunks} uploaded successfully.` });
+        } catch (error) {
+            addNotification({ title: `Sync Error on Chunk ${chunkNumber}`, description: 'Some assets failed to sync. They will be retried later.', variant: 'destructive' });
+            
+            setAssets(prevAssets => prevAssets.map(pa => {
+                const assetInChunk = chunk.find(c => c.id === pa.id);
+                return assetInChunk ? { ...pa, syncStatus: 'local' } : pa;
+            }));
+            
+            break; 
+        }
+
+        if (chunkNumber < numChunks) {
+            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CHUNKS_MS));
+        }
+    }
+     addNotification({ title: 'Background Sync Finished' });
+  }
+
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -742,11 +795,12 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
+        syncStatus: 'local' as const,
     }));
 
     if (allChanges.length > 0) {
         const assetMap = new Map(baseAssets.map(a => [a.id, a]));
-        allChanges.forEach(a => assetMap.set(a.id, { ...a, syncStatus: isOnline ? 'synced' : 'local'}));
+        allChanges.forEach(a => assetMap.set(a.id, a));
         const combinedAssets = Array.from(assetMap.values());
         
         if(isAdmin) {
@@ -754,23 +808,12 @@ export default function AssetList() {
             updateInboxState(inboxUpdatesFromImport);
         }
 
-        if (isOnline) {
-            try {
-                addNotification({ title: "Saving to Cloud...", description: `Importing ${newAssets.length} new and updating ${updatedAssets.length} existing assets.` });
-                await batchSetAssets(allChanges.map(a => ({...a, syncStatus: 'synced'})));
-                addNotification({ title: "Import Successful", description: "Successfully saved changes to the database." });
-            } catch (e) {
-                addNotification({ title: "Import Error", description: "Could not save changes to the database. They have been saved locally.", variant: "destructive" });
-                if (e instanceof Error && (e.message.includes('resource-exhausted') || e.message.includes('Quota exceeded'))) {
-                    addNotification({ title: "Quota Exceeded", description: "Firestore write limit reached. Some assets were not saved to the cloud but are safe locally. They will sync later.", variant: "destructive" });
-                }
-            }
-        }
-        
         await saveAssets(combinedAssets);
         setAssets(combinedAssets);
-        if (!isOnline) {
-          addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
+        addNotification({ title: 'Import Complete', description: `${allChanges.length} changes saved locally. Sync to cloud will begin if online.` });
+        
+        if (isOnline) {
+            uploadInChunks(allChanges);
         }
 
     } else if (errors.length === 0) {
@@ -1228,5 +1271,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
