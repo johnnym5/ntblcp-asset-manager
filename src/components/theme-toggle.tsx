@@ -1,3 +1,4 @@
+
 "use client"
 
 import * as React from "react"
@@ -12,6 +13,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
+// This component is no longer used directly in the app-layout, but kept for potential future use.
 export function ThemeToggle() {
   const { setTheme } = useTheme()
 

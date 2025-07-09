@@ -16,6 +16,7 @@ import { Separator } from "@/components/ui/separator"
 import { useNotifications, markAllAsRead, clearAll } from "@/hooks/use-notifications"
 import { cn } from "@/lib/utils"
 
+// This component is no longer used directly in the app-layout, but kept for potential future use.
 export function NotificationBell() {
   const { notifications, unreadCount } = useNotifications();
   const [isOpen, setIsOpen] = React.useState(false);

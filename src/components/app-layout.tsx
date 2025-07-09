@@ -57,9 +57,16 @@ import {
   FileUp,
   PlusCircle,
   Trash2,
+  Inbox,
+  Bell,
+  Sun,
+  Moon,
+  CheckCheck
 } from "lucide-react";
-import { addNotification } from "@/hooks/use-notifications";
-import { NotificationBell } from "./notification-bell";
+import { addNotification, useNotifications, clearAll } from "@/hooks/use-notifications";
+import { formatDistanceToNow } from 'date-fns';
+import { cn } from "@/lib/utils";
+
 import { ThemeToggle } from "./theme-toggle";
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/auth-context";
@@ -68,11 +75,20 @@ import { useAppState } from "@/contexts/app-state-context";
 import { Input } from "./ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
 import { SettingsSheet } from "./settings-sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetClose,
+} from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
-import { InboxIcon } from "./inbox-icon";
 import { InboxSheet } from "./inbox-sheet";
+import { useTheme } from "next-themes";
+import { Separator } from "./ui/separator";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -89,6 +105,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setManualSyncTrigger, isSyncing,
     dataActions,
     autoSyncEnabled,
+    unreadInboxCount
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -96,6 +113,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  const { notifications, unreadCount, markAllAsRead } = useNotifications();
+  const { setTheme } = useTheme();
 
   useEffect(() => {
     setSearchTerm(debouncedSearchTerm);
@@ -149,6 +170,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (isSyncing) return;
     setManualSyncTrigger(c => c + 1);
   };
+
+  const handleNotificationsOpenChange = (open: boolean) => {
+    setIsNotificationsOpen(open);
+    if (open && unreadCount > 0) {
+      setTimeout(() => markAllAsRead(), 500);
+    }
+  }
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
   const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
@@ -269,7 +297,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </Avatar>
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
+                <DropdownMenuContent align="end" className="w-56">
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">{getUserName()}</p>
@@ -322,22 +350,49 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuSeparator />
-                  <div className="flex items-center justify-around py-2">
-                    {isAdmin && (
-                        <div className="flex flex-col items-center gap-1">
-                            <InboxIcon onClick={() => setIsInboxOpen(true)} />
-                            <span className="text-xs text-muted-foreground">Inbox</span>
-                        </div>
-                     )}
-                     <div className="flex flex-col items-center gap-1">
-                        <ThemeToggle />
-                        <span className="text-xs text-muted-foreground">Theme</span>
-                     </div>
-                     <div className="flex flex-col items-center gap-1">
-                       <NotificationBell />
-                       <span className="text-xs text-muted-foreground">Notifications</span>
-                     </div>
-                  </div>
+                  
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
+                      <Inbox className="mr-2 h-4 w-4" />
+                      <span>Inbox</span>
+                      {unreadInboxCount > 0 && (
+                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
+                          {unreadInboxCount}
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  )}
+
+                  <DropdownMenuItem onClick={() => handleNotificationsOpenChange(true)}>
+                    <Bell className="mr-2 h-4 w-4" />
+                    <span>Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <Sun className="mr-2 h-4 w-4" />
+                      <span>Theme</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem onClick={() => setTheme('light')}>
+                          Light
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setTheme('dark')}>
+                          Dark
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setTheme('system')}>
+                          System
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
+
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
@@ -366,6 +421,50 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         setMissingFieldFilter={setMissingFieldFilter}
       />
        <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
+       <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
+        <SheetContent className="w-full sm:max-w-sm p-0 flex flex-col">
+            <SheetHeader className="p-4">
+                <SheetTitle>Notifications</SheetTitle>
+            </SheetHeader>
+            <Separator />
+            <ScrollArea className="flex-1">
+              {notifications.length > 0 ? (
+                notifications.map((notification, index) => (
+                  <div key={notification.id}>
+                    <div className="p-4">
+                      <p className={cn("font-semibold mb-1", !notification.read && "text-foreground", notification.read && "text-muted-foreground")}>
+                        {notification.title}
+                      </p>
+                      {notification.description && (
+                        <p className={cn("text-sm", !notification.read && "text-muted-foreground", notification.read && "text-muted-foreground/70")}>
+                          {notification.description}
+                        </p>
+                      )}
+                      {notification.action && <div className="mt-2">{notification.action}</div>}
+                      <p className="text-xs text-muted-foreground/80 mt-2">
+                        {formatDistanceToNow(notification.date, { addSuffix: true })}
+                      </p>
+                    </div>
+                    {index < notifications.length - 1 && <Separator />}
+                  </div>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 text-center p-8 text-muted-foreground h-full">
+                  <CheckCheck className="h-8 w-8" />
+                  <p className="text-sm font-medium">You're all caught up!</p>
+                  <p className="text-xs">New notifications will appear here.</p>
+                </div>
+              )}
+            </ScrollArea>
+            <SheetFooter className="p-4 border-t">
+              {notifications.length > 0 && (
+                <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => clearAll()}>
+                  Clear all
+                </Button>
+              )}
+            </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }

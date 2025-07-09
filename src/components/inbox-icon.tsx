@@ -4,6 +4,7 @@ import { Inbox } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useAppState } from "@/contexts/app-state-context"
 
+// This component is no longer used directly in the app-layout, but kept for potential future use.
 interface InboxIconProps {
   onClick: () => void;
 }

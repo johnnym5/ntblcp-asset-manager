@@ -28,6 +28,17 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
   const handleClearAll = () => {
     setInboxMessages({});
   };
+  
+  const handleViewDetails = (assets: Asset[]) => {
+      setViewingAssets(assets);
+      // Remove the viewed group from the inbox
+      const groupKey = assets[0]?.lastModifiedByState || 'Admin';
+      setInboxMessages(prev => {
+          const newMessages = { ...prev };
+          delete newMessages[groupKey];
+          return newMessages;
+      });
+  }
 
   const messageGroups = Object.entries(inboxMessages);
 
@@ -56,7 +67,7 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
                       <p className="text-sm text-muted-foreground mb-4">
                         Last updated by {assets[0]?.lastModifiedBy || 'a user'} on {assets[0]?.lastModified ? new Date(assets[0].lastModified).toLocaleDateString() : 'an unknown date'}.
                       </p>
-                      <Button onClick={() => setViewingAssets(assets)}>View Details</Button>
+                      <Button onClick={() => handleViewDetails(assets)}>View Details</Button>
                     </CardContent>
                   </Card>
                 ))}
