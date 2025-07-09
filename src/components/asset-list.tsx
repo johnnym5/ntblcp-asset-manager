@@ -43,6 +43,8 @@ import {
   ClipboardEdit,
   FolderSearch,
   X,
+  LogIn,
+  LogOut,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -60,7 +62,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Progress } from "@/components/ui/progress";
 
 import { AssetForm } from "./asset-form";
-import type { Asset, AssetChange, InboxMessageGroup } from "@/lib/types";
+import type { Asset, AssetChange, InboxMessageGroup, ActivityLog } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
@@ -68,10 +70,10 @@ import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets } from "@/lib/firestore";
+import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets, getActivityLogs } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
-import { onSnapshot, query, collection } from "firebase/firestore";
+import { onSnapshot, query, collection, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 
@@ -200,20 +202,24 @@ export default function AssetList() {
             const groupKey = newAsset.lastModifiedBy || 'System';
             if (!changesByGroup[groupKey]) {
                 changesByGroup[groupKey] = {
+                    id: groupKey,
+                    type: 'asset',
                     updatedBy: groupKey,
-                    updatedAt: newAsset.lastModified || new Date().toISOString(),
+                    updatedByState: newAsset.lastModifiedByState,
+                    timestamp: newAsset.lastModified || new Date().toISOString(),
                     changes: [],
                     updatedAssets: []
                 };
             }
-            changesByGroup[groupKey].changes.push({
+            changesByGroup[groupKey].changes!.push({
                 assetId: newAsset.id,
                 assetDescription: newAsset.description || 'Untitled Asset',
                 field: 'Asset',
                 from: 'N/A',
                 to: 'Newly Added',
+                category: newAsset.category,
             });
-            changesByGroup[groupKey].updatedAssets.push(newAsset);
+            changesByGroup[groupKey].updatedAssets!.push(newAsset);
             continue;
       }
       
@@ -232,6 +238,7 @@ export default function AssetList() {
                     field: userFriendlyFieldNames[key],
                     from: String(oldValue || 'empty'),
                     to: String(newValue || 'empty'),
+                    category: newAsset.category,
                 });
             }
         });
@@ -240,20 +247,23 @@ export default function AssetList() {
             const groupKey = newAsset.lastModifiedBy || 'System';
             if (!changesByGroup[groupKey]) {
                 changesByGroup[groupKey] = {
+                    id: groupKey,
+                    type: 'asset',
                     updatedBy: groupKey,
-                    updatedAt: newAsset.lastModified || new Date().toISOString(),
+                    updatedByState: newAsset.lastModifiedByState,
+                    timestamp: newAsset.lastModified || new Date().toISOString(),
                     changes: [],
                     updatedAssets: []
                 };
             }
-            changesByGroup[groupKey].changes.push(...detailedChanges);
+            changesByGroup[groupKey].changes!.push(...detailedChanges);
             // Ensure the asset is only added once per group
-            if (!changesByGroup[groupKey].updatedAssets.some(a => a.id === newAsset.id)) {
-                changesByGroup[groupKey].updatedAssets.push(newAsset);
+            if (!changesByGroup[groupKey].updatedAssets!.some(a => a.id === newAsset.id)) {
+                changesByGroup[groupKey].updatedAssets!.push(newAsset);
             }
 
-            if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].updatedAt)) {
-                changesByGroup[groupKey].updatedAt = newAsset.lastModified!;
+            if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].timestamp)) {
+                changesByGroup[groupKey].timestamp = newAsset.lastModified!;
             }
         }
       }
@@ -264,24 +274,31 @@ export default function AssetList() {
   const updateInboxState = useCallback((newInboxItems: InboxMessageGroup[]) => {
       if (newInboxItems.length > 0) {
           setInboxMessages(prevMessages => {
-              const existingGroups = new Map(prevMessages.map(g => [g.updatedBy, g]));
+              const messageMap = new Map(prevMessages.map(g => [g.id, g]));
+              
               newInboxItems.forEach(newGroup => {
-                  const existingGroup = existingGroups.get(newGroup.updatedBy);
-                  if (existingGroup) {
-                      existingGroup.changes.push(...newGroup.changes);
-                      const updatedAssetsMap = new Map(existingGroup.updatedAssets.map(a => [a.id, a]));
-                      newGroup.updatedAssets.forEach(a => updatedAssetsMap.set(a.id, a));
-                      existingGroup.updatedAssets = Array.from(updatedAssetsMap.values());
-                      if (new Date(newGroup.updatedAt) > new Date(existingGroup.updatedAt)) {
-                          existingGroup.updatedAt = newGroup.updatedAt;
+                  if (newGroup.type === 'activity') {
+                      messageMap.set(newGroup.id, newGroup);
+                  } else { // type === 'asset'
+                      const existingGroup = messageMap.get(newGroup.id) as InboxMessageGroup | undefined;
+                      if (existingGroup && existingGroup.type === 'asset') {
+                          existingGroup.changes!.push(...(newGroup.changes || []));
+                          const updatedAssetsMap = new Map(existingGroup.updatedAssets!.map(a => [a.id, a]));
+                          (newGroup.updatedAssets || []).forEach(a => updatedAssetsMap.set(a.id, a));
+                          existingGroup.updatedAssets = Array.from(updatedAssetsMap.values());
+                          if (new Date(newGroup.timestamp) > new Date(existingGroup.timestamp)) {
+                              existingGroup.timestamp = newGroup.timestamp;
+                          }
+                      } else {
+                          messageMap.set(newGroup.id, newGroup);
                       }
-                  } else {
-                      existingGroups.set(newGroup.updatedBy, newGroup);
                   }
               });
-              return Array.from(existingGroups.values()).sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+
+              return Array.from(messageMap.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
           });
-          const totalNewChanges = newInboxItems.reduce((acc, group) => acc + group.changes.length, 0);
+
+          const totalNewChanges = newInboxItems.reduce((acc, group) => acc + (group.changes?.length || 1), 0);
           setUnreadInboxCount(prevCount => prevCount + totalNewChanges);
       }
   }, [setInboxMessages, setUnreadInboxCount]);
@@ -331,11 +348,13 @@ export default function AssetList() {
       }
       
       const finalAssetsForState = Array.from(finalAssetsMap.values());
-      const newInboxItems = generateInboxUpdates(localAssets, finalAssetsForState)
-        .filter(group => group.updatedBy !== userProfile?.displayName);
+      const newInboxItems = generateInboxUpdates(localAssets, finalAssetsForState);
       
       if(newInboxItems.length > 0 && !isInitialLoad.current) {
-        updateInboxState(newInboxItems);
+        const nonSelfUpdates = newInboxItems.filter(group => group.updatedBy !== userProfile?.displayName);
+        if (nonSelfUpdates.length > 0) {
+          updateInboxState(nonSelfUpdates);
+        }
       }
       
       const finalUniqueAssets = getNewestDuplicate(finalAssetsForState);
@@ -389,40 +408,74 @@ export default function AssetList() {
     loadInitialData();
   }, []);
 
-  // Real-time listener for Admins with Auto-Sync
+  // Real-time listeners
   useEffect(() => {
-    if (!isOnline || !isAdmin || !autoSyncEnabled) {
+    if (!isOnline || !isAdmin) {
       return;
     }
 
-    addNotification({ title: 'Real-time Sync Active', description: 'Asset list will update automatically.' });
-    setIsSyncing(true);
+    const setupListeners = () => {
+        let unsubAssets: () => void;
+        let unsubActivity: () => void;
 
-    const q = query(collection(db, 'assets'));
-    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-      const fetchedAssets: Asset[] = [];
-      querySnapshot.forEach((doc) => {
-        fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
-      });
-      await handleSafeMergeAndSync(fetchedAssets);
-      
-      if (isSyncingRef.current) {
-        setIsSyncing(false);
-      }
-    }, (error) => {
-      console.error("Firestore real-time listener error:", error);
-      addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
-      setIsSyncing(false);
-      setIsOnline(false);
-    });
+        if (autoSyncEnabled) {
+            addNotification({ title: 'Real-time Sync Active', description: 'Asset list will update automatically.' });
+            setIsSyncing(true);
 
-    return () => {
-      unsubscribe();
-      if (isSyncingRef.current) {
-        setIsSyncing(false);
-      }
+            const assetsQuery = query(collection(db, 'assets'));
+            unsubAssets = onSnapshot(assetsQuery, async (querySnapshot) => {
+                const fetchedAssets: Asset[] = [];
+                querySnapshot.forEach((doc) => {
+                    fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+                });
+                await handleSafeMergeAndSync(fetchedAssets);
+                if (isSyncingRef.current) setIsSyncing(false);
+            }, (error) => {
+                console.error("Firestore assets listener error:", error);
+                addNotification({ title: 'Sync Error', description: 'Lost connection to the asset database.', variant: 'destructive' });
+                if (isSyncingRef.current) setIsSyncing(false);
+                setIsOnline(false);
+            });
+        }
+
+        const activityQuery = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(20));
+        unsubActivity = onSnapshot(activityQuery, (snapshot) => {
+            const newActivities: InboxMessageGroup[] = [];
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === "added") {
+                    const log = { id: change.doc.id, ...change.doc.data() } as ActivityLog;
+                    newActivities.push({
+                        id: log.id,
+                        type: 'activity',
+                        updatedBy: log.userName,
+                        timestamp: log.timestamp,
+                        activityMessage: `${log.userName} ${log.activity === 'login' ? 'logged into' : 'logged out from'} ${log.userState || 'the app'} at ${new Date(log.timestamp).toLocaleString()}`
+                    });
+                }
+            });
+            if (newActivities.length > 0 && !isInitialLoad.current) {
+                updateInboxState(newActivities);
+            }
+        }, (error) => {
+            console.error("Firestore activity log listener error:", error);
+            if (error.code === 'permission-denied') {
+                addNotification({ title: 'Admin Feature', description: 'Activity log access is for admins only.', variant: 'destructive' });
+            } else {
+                addNotification({ title: 'Sync Error', description: 'Lost connection to activity logs.', variant: 'destructive' });
+            }
+        });
+
+        return () => {
+            if (unsubAssets) unsubAssets();
+            if (unsubActivity) unsubActivity();
+            if (isSyncingRef.current) setIsSyncing(false);
+        };
     };
-  }, [isOnline, isAdmin, autoSyncEnabled, handleSafeMergeAndSync, setIsOnline, setIsSyncing]);
+
+    const cleanup = setupListeners();
+    return cleanup;
+}, [isOnline, isAdmin, autoSyncEnabled, handleSafeMergeAndSync, setIsOnline, setIsSyncing, updateInboxState]);
+
 
   // Manual sync for all users (or admins with auto-sync off)
   useEffect(() => {
@@ -1287,7 +1340,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
-
-    
