@@ -285,27 +285,21 @@ export default function AssetList() {
 
 
   // --- DATA LOADING & SYNC ---
-  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync = false) => {
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
       const localAssets = await getLocalAssetsFromDb();
-      let mergedAssets = [...localAssets];
-
-      if (isManualSync) {
-        // For manual sync, cloud is the source of truth, but we keep local-only new items.
-        const fetchedAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
-        const localOnlyNewAssets = localAssets.filter(la => !fetchedAssetsMap.has(la.id));
-        mergedAssets = [...fetchedAssets, ...localOnlyNewAssets];
-      } else {
-        // For listeners, merge based on timestamp.
-        const mergedAssetMap = new Map<string, Asset>();
-        localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
-        fetchedAssets.forEach(asset => {
-          const existing = mergedAssetMap.get(asset.id);
-          if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
-              mergedAssetMap.set(asset.id, { ...asset, syncStatus: 'synced' });
-          }
-        });
-        mergedAssets = Array.from(mergedAssetMap.values());
-      }
+      
+      const mergedAssetMap = new Map<string, Asset>();
+      // Prioritize local assets first
+      localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
+      
+      // Then, overwrite with fetched assets ONLY if they are newer.
+      fetchedAssets.forEach(asset => {
+        const existing = mergedAssetMap.get(asset.id);
+        if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
+            mergedAssetMap.set(asset.id, { ...asset, syncStatus: 'synced' });
+        }
+      });
+      let mergedAssets = Array.from(mergedAssetMap.values());
       
       const assetsToPush = mergedAssets.filter(a => a.syncStatus === 'local');
       if (isOnline && assetsToPush.length > 0) {
@@ -389,7 +383,7 @@ export default function AssetList() {
       querySnapshot.forEach((doc) => {
         fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
       });
-      await handleFetchedAssets(fetchedAssets, false);
+      await handleFetchedAssets(fetchedAssets);
       
       if (isSyncingRef.current) {
         setIsSyncing(false);
@@ -418,8 +412,7 @@ export default function AssetList() {
 
         try {
             const fetchedAssets = await getAssets();
-            await clearLocalAssets(); // Clear local to ensure cloud is source of truth for sync
-            await handleFetchedAssets(fetchedAssets, true);
+            await handleFetchedAssets(fetchedAssets);
             if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
             addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
@@ -767,13 +760,19 @@ export default function AssetList() {
                 await batchSetAssets(allChanges.map(a => ({...a, syncStatus: 'synced'})));
                 addNotification({ title: "Import Successful", description: "Successfully saved changes to the database." });
             } catch (e) {
-                addNotification({ title: "Import Error", description: "Could not save changes to the database.", variant: "destructive" });
+                addNotification({ title: "Import Error", description: "Could not save changes to the database. They have been saved locally.", variant: "destructive" });
+                if (e instanceof Error && (e.message.includes('resource-exhausted') || e.message.includes('Quota exceeded'))) {
+                    addNotification({ title: "Quota Exceeded", description: "Firestore write limit reached. Some assets were not saved to the cloud but are safe locally. They will sync later.", variant: "destructive" });
+                }
             }
-        } else {
-            await saveAssets(combinedAssets);
-            setAssets(combinedAssets);
-            addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
         }
+        
+        await saveAssets(combinedAssets);
+        setAssets(combinedAssets);
+        if (!isOnline) {
+          addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
+        }
+
     } else if (errors.length === 0) {
         addNotification({ title: "No Changes Detected", description: "No new or updated assets were found in the file."});
     }
