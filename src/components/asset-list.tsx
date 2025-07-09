@@ -173,18 +173,121 @@ export default function AssetList() {
     return Array.from(uniqueAssetMap.values());
   };
 
+  // --- INBOX LOGIC ---
+  const generateInboxUpdates = useCallback((previousAssets: Asset[], newAssets: Asset[], currentUserProfile: typeof userProfile): InboxMessageGroup[] => {
+      if (!isAdmin) {
+          return [];
+      }
+
+      const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
+      const changesByGroup: Record<string, InboxMessageGroup> = {};
+
+      const userFriendlyFieldNames: Record<string, string> = {
+          verifiedStatus: 'Status',
+          location: 'Location',
+          assignee: 'Assignee',
+          condition: 'Condition',
+          remarks: 'Remarks',
+          description: 'Description',
+          serialNumber: 'Serial Number',
+      };
+
+      for (const newAsset of newAssets) {
+        const previousAsset = previousAssetsMap.get(newAsset.id);
+
+        if (!previousAsset) {
+              const groupKey = newAsset.lastModifiedBy || 'An unknown user';
+              if (!changesByGroup[groupKey]) {
+                  changesByGroup[groupKey] = {
+                      updatedBy: groupKey,
+                      updatedAt: newAsset.lastModified || new Date().toISOString(),
+                      changes: [],
+                      updatedAssets: []
+                  };
+              }
+              changesByGroup[groupKey].changes.push({
+                  assetId: newAsset.id,
+                  assetDescription: newAsset.description || 'Untitled Asset',
+                  field: 'Asset',
+                  from: 'N/A',
+                  to: 'Newly Added',
+              });
+              changesByGroup[groupKey].updatedAssets.push(newAsset);
+              continue;
+        }
+        
+        const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
+        const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
+
+        if (newTimestamp > prevTimestamp + 1000) { 
+          const detailedChanges: AssetChange[] = [];
+          Object.keys(userFriendlyFieldNames).forEach(key => {
+              const oldValue = previousAsset[key as keyof Asset] as any;
+              const newValue = newAsset[key as keyof Asset] as any;
+              if (String(oldValue || '').trim() !== String(newValue || '').trim()) {
+                  detailedChanges.push({
+                      assetId: newAsset.id,
+                      assetDescription: newAsset.description || 'Untitled Asset',
+                      field: userFriendlyFieldNames[key],
+                      from: String(oldValue || 'empty'),
+                      to: String(newValue || 'empty'),
+                  });
+              }
+          });
+
+          if (detailedChanges.length > 0) {
+              const groupKey = newAsset.lastModifiedBy || 'An unknown user';
+              if (!changesByGroup[groupKey]) {
+                  changesByGroup[groupKey] = {
+                      updatedBy: groupKey,
+                      updatedAt: newAsset.lastModified || new Date().toISOString(),
+                      changes: [],
+                      updatedAssets: []
+                  };
+              }
+              changesByGroup[groupKey].changes.push(...detailedChanges);
+              changesByGroup[groupKey].updatedAssets.push(newAsset);
+
+              if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].updatedAt)) {
+                  changesByGroup[groupKey].updatedAt = newAsset.lastModified!;
+              }
+          }
+        }
+      }
+      return Object.values(changesByGroup);
+  }, [isAdmin]);
+
+  const updateInboxState = useCallback((newInboxItems: InboxMessageGroup[]) => {
+      if (newInboxItems.length > 0) {
+          setInboxMessages(prevMessages => {
+              const existingGroups = new Map(prevMessages.map(g => [g.updatedBy, g]));
+              newInboxItems.forEach(newGroup => {
+                  const existingGroup = existingGroups.get(newGroup.updatedBy);
+                  if (existingGroup) {
+                      existingGroup.changes.push(...newGroup.changes);
+                      const updatedAssetsMap = new Map(existingGroup.updatedAssets.map(a => [a.id, a]));
+                      newGroup.updatedAssets.forEach(a => updatedAssetsMap.set(a.id, a));
+                      existingGroup.updatedAssets = Array.from(updatedAssetsMap.values());
+                      if (new Date(newGroup.updatedAt) > new Date(existingGroup.updatedAt)) {
+                          existingGroup.updatedAt = newGroup.updatedAt;
+                      }
+                  } else {
+                      existingGroups.set(newGroup.updatedBy, newGroup);
+                  }
+              });
+              return Array.from(existingGroups.values()).sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+          });
+          const totalNewChanges = newInboxItems.reduce((acc, group) => acc + group.changes.length, 0);
+          setUnreadInboxCount(prevCount => prevCount + totalNewChanges);
+      }
+  }, [setInboxMessages, setUnreadInboxCount]);
+
 
   // --- DATA LOADING & SYNC ---
   const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
-      // This function now merges the fetched assets with local assets instead of overwriting.
-      
       const localAssets = await getLocalAssetsFromDb();
       const mergedAssetMap = new Map<string, Asset>();
-
-      // Prioritize local assets first
       localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
-
-      // Merge fetched assets, overwriting only if the fetched asset is newer.
       fetchedAssets.forEach(asset => {
         const existing = mergedAssetMap.get(asset.id);
         if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
@@ -203,95 +306,18 @@ export default function AssetList() {
             addNotification({title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive'});
         }
       }
-
-      // The inbox logic should compare the new merged list with the old local list.
-      if (userProfile?.displayName?.toLowerCase().trim() === 'admin') {
-        const previousAssetsMap = new Map(localAssets.map(a => [a.id, a]));
-        const changesByGroup: Record<string, InboxMessageGroup> = {};
-
-        const userFriendlyFieldNames: Record<string, string> = {
-            verifiedStatus: 'Status',
-            location: 'Location',
-            assignee: 'Assignee',
-            condition: 'Condition',
-            remarks: 'Remarks',
-            description: 'Description',
-            serialNumber: 'Serial Number',
-        };
-
-        for (const newAsset of mergedAssets) {
-          if (newAsset.lastModifiedBy === userProfile?.displayName) {
-            continue; 
-          }
-          const previousAsset = previousAssetsMap.get(newAsset.id);
-          if (previousAsset) {
-            const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
-            const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
-            if (newTimestamp > prevTimestamp + 1000) { 
-              const detailedChanges: AssetChange[] = [];
-              Object.keys(userFriendlyFieldNames).forEach(key => {
-                  const oldValue = previousAsset[key as keyof Asset] as any;
-                  const newValue = newAsset[key as keyof Asset] as any;
-                  if (String(oldValue || '').trim() !== String(newValue || '').trim()) {
-                      detailedChanges.push({
-                          assetId: newAsset.id,
-                          assetDescription: newAsset.description || 'Untitled Asset',
-                          field: userFriendlyFieldNames[key],
-                          from: String(oldValue || 'empty'),
-                          to: String(newValue || 'empty'),
-                      });
-                  }
-              });
-
-              if (detailedChanges.length > 0) {
-                  const groupKey = newAsset.lastModifiedBy || 'An unknown user';
-                  if (!changesByGroup[groupKey]) {
-                      changesByGroup[groupKey] = {
-                          updatedBy: groupKey,
-                          updatedAt: newAsset.lastModified || new Date().toISOString(),
-                          changes: [],
-                          updatedAssets: []
-                      };
-                  }
-                  changesByGroup[groupKey].changes.push(...detailedChanges);
-                  changesByGroup[groupKey].updatedAssets.push(newAsset);
-
-                  if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].updatedAt)) {
-                      changesByGroup[groupKey].updatedAt = newAsset.lastModified!;
-                  }
-              }
-            }
-          }
-        }
-
-        const newInboxItems = Object.values(changesByGroup);
-        if (newInboxItems.length > 0 && !isInitialLoad.current) {
-            setInboxMessages(prevMessages => {
-                const existingGroups = new Map(prevMessages.map(g => [g.updatedBy, g]));
-                newInboxItems.forEach(newGroup => {
-                    const existingGroup = existingGroups.get(newGroup.updatedBy);
-                    if (existingGroup) {
-                        existingGroup.changes.push(...newGroup.changes);
-                        existingGroup.updatedAssets.push(...newGroup.updatedAssets);
-                        if (new Date(newGroup.updatedAt) > new Date(existingGroup.updatedAt)) {
-                            existingGroup.updatedAt = newGroup.updatedAt;
-                        }
-                    } else {
-                        existingGroups.set(newGroup.updatedBy, newGroup);
-                    }
-                });
-                return Array.from(existingGroups.values()).sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
-            });
-            const totalNewChanges = newInboxItems.reduce((acc, group) => acc + group.changes.length, 0);
-            setUnreadInboxCount(prevCount => prevCount + totalNewChanges);
-        }
+      
+      const newInboxItems = generateInboxUpdates(localAssets, mergedAssets, userProfile)
+        .filter(group => group.updatedBy !== userProfile?.displayName);
+      if(newInboxItems.length > 0 && !isInitialLoad.current) {
+        updateInboxState(newInboxItems);
       }
       
       const finalAssets = getNewestDuplicate(mergedAssets);
       setAssets(finalAssets);
       await saveAssets(finalAssets);
       isInitialLoad.current = false;
-  }, [userProfile, setInboxMessages, setUnreadInboxCount, isOnline]);
+  }, [userProfile, generateInboxUpdates, updateInboxState, isOnline, isInitialLoad]);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -348,6 +374,8 @@ export default function AssetList() {
 
         try {
             const fetchedAssets = await getAssets();
+            // Before saving, clear local data to ensure a clean slate from the server
+            await clearLocalAssets();
             await handleFetchedAssets(fetchedAssets);
             if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
@@ -360,12 +388,10 @@ export default function AssetList() {
     
     if (!isOnline) return;
 
-    // If admin has auto-sync on, the listener handles everything.
     if (isAdmin && autoSyncEnabled) {
         return;
     }
 
-    // Trigger sync on first load when coming online, or on manual trigger
     const isFirstOnlineLoad = isInitialLoad.current;
     const isManualSync = manualSyncTrigger > 0;
 
@@ -689,7 +715,7 @@ export default function AssetList() {
     setIsImporting(true);
     addNotification({ title: "Parsing file...", description: "Please wait while we process your Excel file." });
     
-    let baseAssets = isOnline ? assets : await getLocalAssetsFromDb();
+    const baseAssets = await getLocalAssetsFromDb();
 
     const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, enabledSheets, baseAssets, lockAssetList);
     
@@ -697,7 +723,7 @@ export default function AssetList() {
     if (skipped > 0) {
         const message = lockAssetList 
           ? `${skipped} assets were skipped because they are not in the master list.`
-          : `${skipped} rows with no asset description were skipped.`;
+          : `${skipped} assets were skipped due to missing data.`;
         addNotification({ title: "Import Notice", description: message });
     }
 
@@ -709,19 +735,24 @@ export default function AssetList() {
     }));
 
     if (allChanges.length > 0) {
+        const assetMap = new Map(baseAssets.map(a => [a.id, a]));
+        allChanges.forEach(a => assetMap.set(a.id, { ...a, syncStatus: isOnline ? 'synced' : 'local'}));
+        const combinedAssets = Array.from(assetMap.values());
+        
+        if(isAdmin) {
+            const inboxUpdatesFromImport = generateInboxUpdates(baseAssets, combinedAssets, userProfile);
+            updateInboxState(inboxUpdatesFromImport);
+        }
+
         if (isOnline) {
             try {
                 addNotification({ title: "Saving to Cloud...", description: `Importing ${newAssets.length} new and updating ${updatedAssets.length} existing assets.` });
-                await batchSetAssets(allChanges); // batchSetAssets will create or update
+                await batchSetAssets(allChanges.map(a => ({...a, syncStatus: 'synced'})));
                 addNotification({ title: "Import Successful", description: "Successfully saved changes to the database." });
             } catch (e) {
                 addNotification({ title: "Import Error", description: "Could not save changes to the database.", variant: "destructive" });
             }
         } else {
-            const currentAssets = await getLocalAssetsFromDb();
-            const assetMap = new Map(currentAssets.map(a => [a.id, a]));
-            allChanges.forEach(a => assetMap.set(a.id, a));
-            const combinedAssets = Array.from(assetMap.values());
             await saveAssets(combinedAssets);
             setAssets(combinedAssets);
             addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
