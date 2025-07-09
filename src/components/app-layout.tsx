@@ -71,6 +71,8 @@ import { SettingsSheet } from "./settings-sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
+import { InboxIcon } from "./inbox-icon";
+import { InboxSheet } from "./inbox-sheet";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -92,6 +94,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
 
   useEffect(() => {
     setSearchTerm(debouncedSearchTerm);
@@ -319,6 +322,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   )}
                   <DropdownMenuSeparator />
                   <div className="flex items-center justify-around py-2">
+                    {isAdmin && (
+                        <div className="flex flex-col items-center gap-1">
+                            <InboxIcon onClick={() => setIsInboxOpen(true)} />
+                            <span className="text-xs text-muted-foreground">Inbox</span>
+                        </div>
+                     )}
                      <div className="flex flex-col items-center gap-1">
                         <ThemeToggle />
                         <span className="text-xs text-muted-foreground">Theme</span>
@@ -355,6 +364,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         missingFieldFilter={missingFieldFilter}
         setMissingFieldFilter={setMissingFieldFilter}
       />
+       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
     </div>
   );
 }

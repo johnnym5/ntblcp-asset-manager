@@ -4,6 +4,8 @@
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
+import type { Asset } from '@/lib/types';
+
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -65,6 +67,12 @@ interface AppStateContextType {
   // Data Actions
   dataActions: DataActions;
   setDataActions: Dispatch<SetStateAction<DataActions>>;
+
+  // Inbox
+  inboxMessages: Record<string, Asset[]>;
+  setInboxMessages: Dispatch<SetStateAction<Record<string, Asset[]>>>;
+  unreadInboxCount: number;
+  setUnreadInboxCount: Dispatch<SetStateAction<number>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -111,6 +119,22 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
 
+  const [inboxMessages, setInboxMessages] = useState<Record<string, Asset[]>>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ntblcp-inbox-messages');
+      return saved ? JSON.parse(saved) : {};
+    }
+    return {};
+  });
+
+  const [unreadInboxCount, setUnreadInboxCount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ntblcp-unread-inbox-count');
+      return saved ? parseInt(saved, 10) : 0;
+    }
+    return 0;
+  });
+
   useEffect(() => {
     localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
   }, [enabledSheets]);
@@ -124,6 +148,18 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
     }
   }, [isOnline]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ntblcp-inbox-messages', JSON.stringify(inboxMessages));
+    }
+  }, [inboxMessages]);
+    
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ntblcp-unread-inbox-count', String(unreadInboxCount));
+    }
+  }, [unreadInboxCount]);
 
   const value = {
     isOnline,
@@ -158,6 +194,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setIsSyncing,
     dataActions,
     setDataActions,
+    inboxMessages,
+    setInboxMessages,
+    unreadInboxCount,
+    setUnreadInboxCount,
   };
 
   return (

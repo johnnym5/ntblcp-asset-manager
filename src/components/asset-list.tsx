@@ -69,7 +69,6 @@ import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-for
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
-import { UpdatedAssetsDialog } from "./updated-assets-dialog";
 import { cn } from "@/lib/utils";
 import { onSnapshot, query, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -129,9 +128,7 @@ export default function AssetList() {
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   
-  const [showUpdatedAssets, setShowUpdatedAssets] = useState<Asset[] | null>(null);
   const isInitialLoad = useRef(true);
-
 
   const { 
     searchTerm, setSearchTerm,
@@ -142,6 +139,7 @@ export default function AssetList() {
     enabledSheets, lockAssetList,
     manualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
+    setInboxMessages, setUnreadInboxCount,
   } = useAppState();
 
   const isSyncingRef = useRef(isSyncing);
@@ -221,31 +219,34 @@ export default function AssetList() {
             return acc;
           }, {} as Record<string, Asset[]>);
 
-          for (const groupKey in changesByGroup) {
-            const updatedAssetsInGroup = changesByGroup[groupKey];
-            const count = updatedAssetsInGroup.length;
-            const modifierName = updatedAssetsInGroup[0].lastModifiedBy || 'A user';
-            
-            const title = groupKey === 'Admin' ? 'Update from Admin' : `Update from ${groupKey}`;
-            const description = `${modifierName} updated ${count} asset${count > 1 ? 's' : ''}.`;
-
-            addNotification({
-              title: title,
-              description: description,
-              action: (
-                <Button variant="link" size="sm" className="p-0 h-auto text-primary" onClick={() => setShowUpdatedAssets(updatedAssetsInGroup)}>
-                  View Changes
-                </Button>
-              ),
-            });
-          }
+          setInboxMessages(prevMessages => {
+              const newMessages = { ...prevMessages };
+              for (const groupKey in changesByGroup) {
+                  const existingGroupAssets = newMessages[groupKey] || [];
+                  const combinedAssets = [...changesByGroup[groupKey], ...existingGroupAssets];
+                  
+                  const uniqueAssetsMap = new Map<string, Asset>();
+                  for (const asset of combinedAssets) {
+                      const existing = uniqueAssetsMap.get(asset.id);
+                      if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
+                          uniqueAssetsMap.set(asset.id, asset);
+                      }
+                  }
+                  
+                  newMessages[groupKey] = Array.from(uniqueAssetsMap.values())
+                      .sort((a, b) => new Date(b.lastModified!).getTime() - new Date(a.lastModified!).getTime());
+              }
+              return newMessages;
+          });
+          
+          setUnreadInboxCount(prevCount => prevCount + changes.length);
         }
       }
 
       setAssets(uniqueAssets);
       await saveAssets(uniqueAssets);
       isInitialLoad.current = false;
-  }, [userProfile]);
+  }, [userProfile, setInboxMessages, setUnreadInboxCount]);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -875,7 +876,6 @@ export default function AssetList() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-        <UpdatedAssetsDialog assets={showUpdatedAssets} onOpenChange={() => setShowUpdatedAssets(null)} />
       </div>
     )
   }
@@ -1059,7 +1059,6 @@ export default function AssetList() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-        <UpdatedAssetsDialog assets={showUpdatedAssets} onOpenChange={() => setShowUpdatedAssets(null)} />
     </div>
   );
 }
