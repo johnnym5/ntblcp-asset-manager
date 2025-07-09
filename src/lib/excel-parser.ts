@@ -28,6 +28,7 @@ const COLUMN_TO_ASSET_FIELD_MAP: ColumnToFieldMap = {
     'SUPPLIER': 'supplier',
     'SUPPLIERS': 'supplier',
     'DATE PURCHASED OR RECEIVED': 'dateReceived',
+    'DATE PURCHASED OR  RECEIVED': 'dateReceived', // Handles extra space variant
     'YEAR OF PURCHASE': 'dateReceived',
     'CHQ NO / GOODS RECEIVED NOTE NO.': 'grnNo',
     'PV NO': 'pvNo',
@@ -51,12 +52,14 @@ const COLUMN_TO_ASSET_FIELD_MAP: ColumnToFieldMap = {
 // --- Helper Functions ---
 
 /**
- * Normalizes a header string by converting to uppercase and trimming whitespace.
+ * Normalizes a header string for reliable matching.
  * @param header The header string to normalize.
  * @returns The normalized header string.
  */
 const normalizeHeader = (header: any): string => {
-  return String(header || '').trim().toUpperCase().replace(/\s+/g, ' ');
+    // Convert to string, trim whitespace, convert to uppercase, and replace multiple spaces/tabs with a single space.
+    // This also handles non-breaking spaces (\u00A0).
+    return String(header || '').trim().toUpperCase().replace(/[\s\u00A0]+/g, ' ');
 };
 
 /**
@@ -78,6 +81,7 @@ const findHeaderRowIndex = (sheetData: any[][], headersToFind: string[]): number
   if (!headersToFind || headersToFind.length === 0) return -1;
   const normalizedHeadersToFind = new Set(headersToFind.map(normalizeHeader));
   
+  // Search only the first 20 rows for performance.
   for (let i = 0; i < Math.min(sheetData.length, 20); i++) {
     const row = sheetData[i];
     if (!Array.isArray(row)) continue;
@@ -92,6 +96,32 @@ const findHeaderRowIndex = (sheetData: any[][], headersToFind: string[]): number
   }
   return -1;
 };
+
+/**
+ * Checks if there are any meaningful differences between an existing asset and imported data.
+ * @param existing The asset from the local database.
+ * @param imported The partial asset data from the Excel file.
+ * @returns True if there is at least one change, false otherwise.
+ */
+const hasChanges = (existing: Asset, imported: Partial<Asset>): boolean => {
+    // We only care about fields present in the imported object
+    for (const key in imported) {
+        if (Object.prototype.hasOwnProperty.call(imported, key)) {
+            const typedKey = key as keyof Asset;
+            // Normalize values for comparison: treat null, undefined, and empty strings as the same.
+            const existingValue = String(existing[typedKey] ?? '').trim();
+            const importedValue = String(imported[typedKey] ?? '').trim();
+            
+            if (existingValue !== importedValue) {
+                // If we find a single difference, we can stop and return true.
+                return true;
+            }
+        }
+    }
+    // If we get through the whole loop without finding differences, they are the same.
+    return false;
+};
+
 
 // --- Core Parsing Logic ---
 
@@ -112,7 +142,7 @@ export async function parseExcelFile(
 
         const existingAssetByIdentifiers = new Map<string, Asset>();
         existingAssets.forEach(asset => {
-             const key = `${asset.assetIdCode || ''}-${asset.serialNumber || ''}`.toLowerCase();
+             const key = `${(asset.assetIdCode || '').trim()}-${(asset.serialNumber || '').trim()}`.toLowerCase();
             if (key !== '-') {
                 existingAssetByIdentifiers.set(key, asset);
             }
@@ -136,7 +166,7 @@ export async function parseExcelFile(
             let headerRowIndex;
             // Apply special rule for NTBLCP-TB-FAR sheet
             if (canonicalSheetName === 'NTBLCP-TB-FAR') {
-                headerRowIndex = 6; // 7th row
+                headerRowIndex = 6; // 7th row (0-indexed)
             } else {
                 headerRowIndex = findHeaderRowIndex(sheetData, HEADER_DEFINITIONS[canonicalSheetName] || []);
             }
@@ -152,7 +182,6 @@ export async function parseExcelFile(
             for (const row of dataRows) {
                 // This check prevents crashes from empty/malformed rows
                 if (!Array.isArray(row) || row.every(cell => cell === null || String(cell).trim() === '')) {
-                    skipped++;
                     continue; 
                 }
 
@@ -162,10 +191,10 @@ export async function parseExcelFile(
                 headerRow.forEach((header, index) => {
                     const field = COLUMN_TO_ASSET_FIELD_MAP[header];
                     // Only process if the field exists, a value exists in the cell,
-                    // and this specific asset field hasn't been filled yet.
+                    // and this specific asset field hasn't been filled yet by a preceeding column with the same name.
                     if (field && !populatedFields.has(field) && row[index] !== null && String(row[index]).trim() !== '') {
                         assetObject[field] = String(row[index]);
-                        populatedFields.add(field); // Mark this field as populated for the current row.
+                        populatedFields.add(field);
                     }
                 });
 
@@ -182,9 +211,12 @@ export async function parseExcelFile(
                 const existingAsset = (key !== '-') ? existingAssetByIdentifiers.get(key) : undefined;
 
                 if (existingAsset) {
-                    // Update existing asset
-                    const updatedAsset = { ...existingAsset, ...assetObject, syncStatus: 'local' as const };
-                    updatedAssets.push(updatedAsset);
+                    // Compare the imported data with the existing asset data
+                    if (hasChanges(existingAsset, assetObject)) {
+                        const updatedAsset = { ...existingAsset, ...assetObject, syncStatus: 'local' as const };
+                        updatedAssets.push(updatedAsset);
+                    }
+                    // If no changes, we do nothing and the asset is effectively skipped from the update/new lists.
                 } else {
                     // Add new asset, if not locked
                     if (!lockAssetList) {
