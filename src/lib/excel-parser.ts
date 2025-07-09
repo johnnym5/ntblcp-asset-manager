@@ -1,4 +1,3 @@
-
 import * as XLSX from 'xlsx';
 import type { Asset } from './types';
 import { v4 as uuidv4 } from 'uuid';
@@ -123,10 +122,16 @@ export async function parseExcelFile(
                 errors.push(`No header definition found for sheet: ${sheetName}. Skipping.`);
                 continue;
             }
+            
+            let headerRowIndex;
+            if (sheetName === 'NTBLCP-TB-FAR') {
+                headerRowIndex = 6; // The 7th row is index 6
+            } else {
+                headerRowIndex = findHeaderRowIndex(sheetData, headersForSheet);
+            }
 
-            const headerRowIndex = findHeaderRowIndex(sheetData, headersForSheet);
 
-            if (headerRowIndex === -1) {
+            if (headerRowIndex === -1 || headerRowIndex >= sheetData.length) {
                 errors.push(`Could not find a valid header row in sheet: ${sheetName}. Skipping.`);
                 continue;
             }
@@ -145,15 +150,14 @@ export async function parseExcelFile(
                     const field = COLUMN_TO_ASSET_FIELD_MAP[header];
                     // If the field in our asset object is not yet filled with a value, fill it.
                     // This gives precedence to the first non-empty column with a given header.
-                    if (field && !(assetData as any)[field]) {
-                        const rawValue = row[index];
-                        (assetData as any)[field] = rawValue !== null && rawValue !== undefined ? String(rawValue) : '';
+                    if (field && !(assetData as any)[field] && row[index] !== null) {
+                        (assetData as any)[field] = String(row[index]);
                     }
                 });
 
                 // Skip row only if it contains no actual data beyond the category.
-                const hasData = Object.entries(assetData).some(([key, value]) => key !== 'category' && value);
-                if (!hasData) {
+                const hasData = Object.values(assetData).some(value => !!value);
+                if (!hasData || Object.keys(assetData).length <= 1) {
                     skipped++;
                     continue;
                 }
@@ -232,15 +236,8 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
                 const normalizedHeader = normalizeHeader(header);
                 const fieldName = COLUMN_TO_ASSET_FIELD_MAP[normalizedHeader];
                 
-                // Add verified status and date to the end of the row
-                const finalAsset: Asset & { "Verified Status"?: string, "Verified Date"?: string } = {
-                    ...asset,
-                    "Verified Status": asset.verifiedStatus,
-                    "Verified Date": asset.verifiedDate
-                }
-
                 if (fieldName) {
-                    row[header] = finalAsset[fieldName] || '';
+                    row[header] = asset[fieldName] || '';
                 }
             }
             // Manually add verified status and date at the end
