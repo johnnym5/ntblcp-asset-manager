@@ -2,10 +2,51 @@
 import * as XLSX from 'xlsx';
 import type { Asset } from './types';
 import { v4 as uuidv4 } from 'uuid';
-import { HEADER_DEFINITIONS, TARGET_SHEETS, COLUMN_TO_ASSET_FIELD_MAP } from './constants';
+import { HEADER_DEFINITIONS, TARGET_SHEETS } from './constants';
 
 // --- Type Definitions ---
 type ColumnToFieldMap = { [key: string]: keyof Asset };
+
+// This mapping connects normalized header names (uppercase, spaces for dashes) to the Asset interface fields.
+const COLUMN_TO_ASSET_FIELD_MAP: ColumnToFieldMap = {
+    'S/N': 'sn',
+    'DESCRIPTION': 'description',
+    'ASSET DESCRIPTION': 'description',
+    'LOCATION': 'location',
+    'STATE': 'location',
+    'LGA': 'lga',
+    'ASSIGNEE': 'assignee',
+    'ASSET ID CODE': 'assetIdCode',
+    'TAG NUMBERS': 'assetIdCode',
+    'ASSET CLASS': 'assetClass',
+    'CLASSIFICATION': 'assetClass',
+    'MANUFACTURER': 'manufacturer',
+    'MODEL NUMBER': 'modelNumber',
+    'MODEL NUMBERS': 'modelNumber',
+    'SERIAL NUMBER': 'serialNumber',
+    'ASSET SERIAL NUMBERS': 'serialNumber',
+    'SUPPLIER': 'supplier',
+    'SUPPLIERS': 'supplier',
+    'DATE PURCHASED OR RECEIVED': 'dateReceived',
+    'YEAR OF PURCHASE': 'dateReceived',
+    'CHQ NO / GOODS RECEIVED NOTE NO.': 'grnNo',
+    'PV NO': 'pvNo',
+    'PURCHASE PRICE (NAIRA)': 'costNgn',
+    'COST (NGN)': 'costNgn',
+    'PURCHASE PRICE [USD)': 'costUsd',
+    'FUNDER': 'funder',
+    'CONDITION': 'condition',
+    'REMARKS': 'remarks',
+    'COMMENTS': 'remarks',
+    'GRANT': 'grant',
+    'USEFUL LIFE (YEARS)': 'usefulLifeYears',
+    'CHASIS NO': 'chasisNo',
+    'ENGINE NO': 'engineNo',
+    'QTY': 'qty',
+    'SITE': 'site',
+    'IMEI (TABLETS & MOBILE PHONES)': 'imei',
+};
+
 
 // --- Helper Functions ---
 
@@ -34,7 +75,9 @@ const normalizeSheetNameForComparison = (name: string): string => {
  * @returns The index of the header row, or -1 if not found.
  */
 const findHeaderRowIndex = (sheetData: any[][], headersToFind: string[]): number => {
+  if (!headersToFind || headersToFind.length === 0) return -1;
   const normalizedHeadersToFind = new Set(headersToFind.map(normalizeHeader));
+  
   for (let i = 0; i < Math.min(sheetData.length, 20); i++) {
     const row = sheetData[i];
     if (!Array.isArray(row)) continue;
@@ -70,15 +113,14 @@ export async function parseExcelFile(
         const existingAssetByIdentifiers = new Map<string, Asset>();
         existingAssets.forEach(asset => {
              const key = `${asset.assetIdCode || ''}-${asset.serialNumber || ''}`.toLowerCase();
-            if (asset.assetIdCode || asset.serialNumber) {
+            if (key !== '-') {
                 existingAssetByIdentifiers.set(key, asset);
             }
         });
 
         for (const workbookSheetName of workbook.SheetNames) {
-            // Apply the new, more robust normalization for comparison
             const normalizedWorkbookSheetNameForComparison = normalizeSheetNameForComparison(workbookSheetName);
-
+            
             const canonicalSheetName = TARGET_SHEETS.find(
                 s => normalizeSheetNameForComparison(s) === normalizedWorkbookSheetNameForComparison
             );
@@ -88,19 +130,15 @@ export async function parseExcelFile(
             }
 
             const sheet = workbook.Sheets[workbookSheetName];
+            // Read sheet as an array of arrays for robust parsing
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-            const headersForSheet = HEADER_DEFINITIONS[canonicalSheetName];
-
-            if (!headersForSheet) {
-                errors.push(`No header definition found for sheet: ${canonicalSheetName}. Skipping.`);
-                continue;
-            }
             
             let headerRowIndex;
+            // Apply special rule for NTBLCP-TB-FAR sheet
             if (canonicalSheetName === 'NTBLCP-TB-FAR') {
-                headerRowIndex = 6; // The 7th row is index 6
+                headerRowIndex = 6; // 7th row
             } else {
-                headerRowIndex = findHeaderRowIndex(sheetData, headersForSheet);
+                headerRowIndex = findHeaderRowIndex(sheetData, HEADER_DEFINITIONS[canonicalSheetName] || []);
             }
 
             if (headerRowIndex === -1 || headerRowIndex >= sheetData.length) {
@@ -112,13 +150,13 @@ export async function parseExcelFile(
             const dataRows = sheetData.slice(headerRowIndex + 1);
 
             for (const row of dataRows) {
+                // This check prevents crashes from empty/malformed rows
                 if (!Array.isArray(row) || row.every(cell => cell === null || String(cell).trim() === '')) {
-                    continue; // Skip truly empty rows
+                    skipped++;
+                    continue; 
                 }
 
-                const assetData: Partial<Asset> = { category: canonicalSheetName };
-
-                // Use a set to track which asset fields have already been populated to avoid overwriting with blank duplicated columns.
+                const assetObject: Partial<Asset> = { category: canonicalSheetName };
                 const populatedFields = new Set<keyof Asset>();
 
                 headerRow.forEach((header, index) => {
@@ -126,33 +164,33 @@ export async function parseExcelFile(
                     // Only process if the field exists, a value exists in the cell,
                     // and this specific asset field hasn't been filled yet.
                     if (field && !populatedFields.has(field) && row[index] !== null && String(row[index]).trim() !== '') {
-                        assetData[field] = String(row[index]);
+                        assetObject[field] = String(row[index]);
                         populatedFields.add(field); // Mark this field as populated for the current row.
                     }
                 });
 
-                // Skip if no actual asset data was extracted.
-                if (Object.keys(assetData).length <= 1) { // <=1 because 'category' is always present
+                // Skip if no actual asset data was extracted (only category is present).
+                if (Object.keys(assetObject).length <= 1) {
                     skipped++;
                     continue;
                 }
                 
-                const assetIdCode = (assetData.assetIdCode || '').trim();
-                const serialNumber = (assetData.serialNumber || '').trim();
+                const assetIdCode = (assetObject.assetIdCode || '').trim();
+                const serialNumber = (assetObject.serialNumber || '').trim();
 
                 const key = `${assetIdCode}-${serialNumber}`.toLowerCase();
-                const existingAsset = (assetIdCode || serialNumber) ? existingAssetByIdentifiers.get(key) : undefined;
+                const existingAsset = (key !== '-') ? existingAssetByIdentifiers.get(key) : undefined;
 
                 if (existingAsset) {
                     // Update existing asset
-                    const updatedAsset = { ...existingAsset, ...assetData, syncStatus: 'local' as const };
+                    const updatedAsset = { ...existingAsset, ...assetObject, syncStatus: 'local' as const };
                     updatedAssets.push(updatedAsset);
                 } else {
                     // Add new asset, if not locked
                     if (!lockAssetList) {
                         const newAsset: Asset = {
                             id: uuidv4(),
-                            ...assetData,
+                            ...assetObject,
                             verifiedStatus: 'Unverified',
                             syncStatus: 'local',
                         } as Asset;
@@ -201,10 +239,12 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
             const row: { [key: string]: any } = {};
             for (const header of exportHeaders) {
                 const normalizedHeader = normalizeHeader(header);
-                const fieldName = COLUMN_TO_ASSET_FIELD_MAP[normalizedHeader];
-                
-                if (fieldName) {
-                    row[header] = asset[fieldName] || '';
+                // Find the first field name that maps to this header
+                const fieldName = Object.keys(COLUMN_TO_ASSET_FIELD_MAP).find(key => normalizeHeader(key) === normalizedHeader);
+                const assetField = fieldName ? COLUMN_TO_ASSET_FIELD_MAP[fieldName] : undefined;
+
+                if (assetField) {
+                    row[header] = asset[assetField] || '';
                 }
             }
             // Manually add verified status and date at the end
