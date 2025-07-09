@@ -14,7 +14,7 @@ export interface Asset {
   // Location & Assignment
   location?: string; // From "Location" or "STATE"
   lga?: string;
-  site?: string; // From "SITE" or IHVN's "LOCATION"
+  site?: string; // From "SITE" (IHVN specific)
   assignee?: string;
 
   // Details
@@ -50,4 +50,15 @@ export interface Asset {
   lastModified?: string; // ISO 8601 date string
   lastModifiedBy?: string; // displayName of user who last modified
   lastModifiedByState?: string; // state of user who last modified
+}
+
+
+export interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL?: string | null;
+  role: 'admin' | 'user';
+  // You can add other fields like 'state' or 'zone' if needed
+  state?: string;
 }
