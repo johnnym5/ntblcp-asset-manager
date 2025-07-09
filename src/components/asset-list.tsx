@@ -138,6 +138,7 @@ export default function AssetList() {
     sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
     enabledSheets, lockAssetList,
     manualSyncTrigger, isSyncing, setIsSyncing,
+    autoSyncEnabled,
     setDataActions,
     setInboxMessages, setUnreadInboxCount,
   } = useAppState();
@@ -259,7 +260,44 @@ export default function AssetList() {
     loadInitialData();
   }, []);
 
-  // Manual sync for all users
+  // Real-time listener for Admins with Auto-Sync
+  useEffect(() => {
+    if (!isOnline || !isAdmin || !autoSyncEnabled) {
+      return;
+    }
+
+    addNotification({ title: 'Real-time Sync Active', description: 'Asset list will update automatically.' });
+    setIsSyncing(true);
+
+    const q = query(collection(db, 'assets'));
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+      const fetchedAssets: Asset[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+      });
+      await handleFetchedAssets(fetchedAssets);
+      
+      // isInitialLoad logic inside handleFetchedAssets handles inbox notifications
+      
+      if (isSyncingRef.current) {
+        setIsSyncing(false);
+      }
+    }, (error) => {
+      console.error("Firestore real-time listener error:", error);
+      addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
+      setIsSyncing(false);
+      setIsOnline(false);
+    });
+
+    return () => {
+      unsubscribe();
+      if (isSyncingRef.current) {
+        setIsSyncing(false);
+      }
+    };
+  }, [isOnline, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
+
+  // Manual sync for all users (or admins with auto-sync off)
   useEffect(() => {
     const fetchAssetsOnce = async () => {
         if (isSyncingRef.current) return;
@@ -280,6 +318,11 @@ export default function AssetList() {
     
     if (!isOnline) return;
 
+    // If admin has auto-sync on, the listener handles everything.
+    if (isAdmin && autoSyncEnabled) {
+        return;
+    }
+
     // Trigger sync on first load when coming online, or on manual trigger
     const isFirstOnlineLoad = isInitialLoad.current;
     const isManualSync = manualSyncTrigger > 0;
@@ -287,7 +330,7 @@ export default function AssetList() {
     if (isFirstOnlineLoad || isManualSync) {
         fetchAssetsOnce();
     }
-  }, [isOnline, manualSyncTrigger, handleFetchedAssets, setIsOnline, setIsSyncing]);
+  }, [isOnline, manualSyncTrigger, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
   
   useEffect(() => {
     setStatusOptions([

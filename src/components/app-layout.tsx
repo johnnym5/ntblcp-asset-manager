@@ -88,6 +88,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     setManualSyncTrigger, isSyncing,
     dataActions,
+    autoSyncEnabled,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -212,7 +213,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
-            {isOnline && (
+            {isOnline && (!isAdmin || !autoSyncEnabled) && (
               <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>

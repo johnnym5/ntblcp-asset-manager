@@ -25,7 +25,11 @@ interface SettingsSheetProps {
 }
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
-  const { enabledSheets, setEnabledSheets, lockAssetList, setLockAssetList } = useAppState();
+  const { 
+    enabledSheets, setEnabledSheets, 
+    lockAssetList, setLockAssetList,
+    autoSyncEnabled, setAutoSyncEnabled 
+  } = useAppState();
 
   const handleToggleSheet = (sheetName: string, checked: boolean) => {
     setEnabledSheets(prev => {
@@ -61,8 +65,8 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           <div className="space-y-6">
             <div>
               <h3 className="text-lg font-medium mb-4">Data Management</h3>
-              <div className="rounded-lg border p-3">
-                <div className="flex items-center justify-between">
+              <div className="rounded-lg border p-3 space-y-4 divide-y">
+                <div className="flex items-center justify-between pt-1">
                   <div className="space-y-1">
                     <Label htmlFor="lock-assets" className="text-sm">
                       Lock Asset List
@@ -75,6 +79,21 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                     id="lock-assets"
                     checked={lockAssetList}
                     onCheckedChange={setLockAssetList}
+                  />
+                </div>
+                <div className="flex items-center justify-between pt-4">
+                  <div className="space-y-1">
+                    <Label htmlFor="autosync-assets" className="text-sm">
+                      Enable Automatic Sync
+                    </Label>
+                    <p className="text-xs text-muted-foreground">
+                      Automatically sync with the cloud in real-time.
+                    </p>
+                  </div>
+                  <Switch
+                    id="autosync-assets"
+                    checked={autoSyncEnabled}
+                    onCheckedChange={setAutoSyncEnabled}
                   />
                 </div>
               </div>

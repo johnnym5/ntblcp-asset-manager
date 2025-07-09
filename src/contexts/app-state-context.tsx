@@ -59,6 +59,8 @@ interface AppStateContextType {
   setLockAssetList: Dispatch<SetStateAction<boolean>>;
   
   // Sync Settings
+  autoSyncEnabled: boolean;
+  setAutoSyncEnabled: Dispatch<SetStateAction<boolean>>;
   manualSyncTrigger: number;
   setManualSyncTrigger: Dispatch<SetStateAction<number>>;
   isSyncing: boolean;
@@ -115,6 +117,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return false;
   });
 
+  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ntblcp-autosync-enabled');
+      return saved ? JSON.parse(saved) : false;
+    }
+    return false;
+  });
+
   const [manualSyncTrigger, setManualSyncTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
@@ -142,6 +152,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     localStorage.setItem('ntblcp-asset-lock', JSON.stringify(lockAssetList));
   }, [lockAssetList]);
+
+  useEffect(() => {
+    localStorage.setItem('ntblcp-autosync-enabled', JSON.stringify(autoSyncEnabled));
+  }, [autoSyncEnabled]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -188,6 +202,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setEnabledSheets,
     lockAssetList,
     setLockAssetList,
+    autoSyncEnabled,
+    setAutoSyncEnabled,
     manualSyncTrigger,
     setManualSyncTrigger,
     isSyncing,
