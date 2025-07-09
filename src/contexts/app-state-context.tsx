@@ -135,7 +135,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       if (saved) {
         try {
           const parsed = JSON.parse(saved);
-          // Defensively check if the parsed data is an array.
           if (Array.isArray(parsed)) {
             return parsed;
           }
@@ -144,7 +143,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       }
     }
-    // Return an empty array if anything goes wrong or if nothing is saved.
     return [];
   });
 
@@ -158,15 +156,21 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
-    localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
+    }
   }, [enabledSheets]);
   
   useEffect(() => {
-    localStorage.setItem('ntblcp-asset-lock', JSON.stringify(lockAssetList));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ntblcp-asset-lock', JSON.stringify(lockAssetList));
+    }
   }, [lockAssetList]);
 
   useEffect(() => {
-    localStorage.setItem('ntblcp-autosync-enabled', JSON.stringify(autoSyncEnabled));
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ntblcp-autosync-enabled', JSON.stringify(autoSyncEnabled));
+    }
   }, [autoSyncEnabled]);
 
   useEffect(() => {
@@ -177,6 +181,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
+      // Ensure we are saving a valid array to prevent corruption.
       if (Array.isArray(inboxMessages)) {
         localStorage.setItem('ntblcp-inbox-messages', JSON.stringify(inboxMessages));
       }
