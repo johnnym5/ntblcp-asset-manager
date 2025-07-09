@@ -77,4 +77,66 @@ export const SPECIAL_LOCATIONS = ["FCMS", "FCT", "NTBLCP"];
 // This defines a clean, unique, and comprehensive set of headers for each sheet.
 // The parser will use this to find the header row, and the exporter will use this to generate the file.
 // This structure ensures data aligns correctly under its proper header.
-export const HEADER_DEFINITIONS: { [key: string]: string[] } = {};
+export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
+  'NTBLCP-TB-FAR': [
+    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
+    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
+    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
+    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
+    'Remarks', 'GRANT', 'Useful Life (Years)'
+  ],
+  'MOTORCYCLES-C19RM': [
+    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
+    'Asset Class', 'Manufacturer', 'Chasis no', 'Engine no', 'Suppliers',
+    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
+    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
+    'Remarks', 'GRANT', 'Useful Life (Years)'
+  ],
+  'PDX-C19RM': [
+    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
+    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
+    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
+    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
+    'Remarks', 'GRANT', 'Useful Life (Years)'
+  ],
+  'TB LAMP-C19RM': [
+    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
+    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
+    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
+    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
+    'Remarks', 'GRANT', 'Useful Life (Years)'
+  ],
+  'ECG monitors': [
+    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
+    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
+    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
+    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
+    'Remarks', 'GRANT', 'Useful Life (Years)'
+  ],
+  'IHVN-GF N-THRIP': [
+    'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION',
+    'ASSET SERIAL NUMBERS', 'MODEL NUMBERS', 'QTY', 'LOCATION', 'SITE',
+    'YEAR OF PURCHASE', 'COST (NGN)', 'GRANT'
+  ],
+  'TRUENAT-C19RM': [
+    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
+    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
+    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
+    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
+    'Remarks', 'GRANT', 'Useful Life (Years)'
+  ],
+  'Vehicles-TB (IHVN)': [
+    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
+    'Asset Class', 'Manufacturer', 'Engine no', 'Chasis no', 'Suppliers',
+    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
+    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
+    'GRANT', 'Useful Life (Years)'
+  ],
+  'GeneXpert machines-TB': [
+    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
+    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
+    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
+    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
+    'Remarks', 'GRANT', 'Useful Life (Years)'
+  ]
+};

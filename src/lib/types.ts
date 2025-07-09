@@ -1,56 +1,48 @@
 
 import type { Timestamp } from 'firebase/firestore';
 
-export interface UserProfile {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL?: string | null;
-  role: 'admin' | 'user';
-  state?: string; // e.g., 'Lagos'
-}
-
 export interface Asset {
   id: string;
-  category: string; // The name of the sheet it came from
+  category: string;
   
-  // Normalized fields from various sheets
+  // Core fields
   sn?: string;
   description?: string;
   serialNumber?: string;
-  location?: string;
-  lga?: string;
-  assignee?: string;
-  condition?: string;
+  assetIdCode?: string; // From "Asset ID Code" or "TAG NUMBERS"
   
-  assetIdCode?: string;
-  assetClass?: string;
-  manufacturer?: string;
-  modelNumber?: string;
-  supplier?: string;
-  dateReceived?: string | Timestamp;
-  grnNo?: string;
-  pvNo?: string;
-  costNgn?: string;
-  costUsd?: string;
-  funder?: string;
-  remarks?: string;
-  grant?: string;
-  usefulLifeYears?: string;
-  imei?: string;
-  comments?: string;
+  // Location & Assignment
+  location?: string; // From "Location" or "STATE"
+  lga?: string;
+  site?: string; // From "SITE" or IHVN's "LOCATION"
+  assignee?: string;
 
-  // Vehicle/Motorcycle specific
+  // Details
+  assetClass?: string; // From "Asset Class" or "CLASSIFICATION"
+  manufacturer?: string;
+  modelNumber?: string; // From "Model Number" or "MODEL NUMBERS"
+  condition?: string;
+  remarks?: string; // From "Remarks" or "Comments"
+  
+  // Vehicle Specific
   chasisNo?: string;
   engineNo?: string;
-
-  // IHVN specific
-  tagNumbers?: string;
-  classification?: string;
-  qty?: string;
-  site?: string;
-  state?: string;
   
+  // Purchase & Financial Info
+  supplier?: string; // From "Supplier" or "Suppliers"
+  dateReceived?: string | Timestamp; // From "Date Purchased or Received" or "YEAR OF PURCHASE"
+  grnNo?: string; // From "Chq No / Goods Received Note No."
+  pvNo?: string; // From "PV No"
+  costNgn?: string; // From "Purchase price (Naira)" or "COST (NGN)"
+  costUsd?: string; // From "Purchase Price [USD)"
+  funder?: string;
+  grant?: string;
+  usefulLifeYears?: string;
+
+  // Other specific fields
+  qty?: string;
+  imei?: string;
+
   // Status fields
   verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy';
   verifiedDate?: string;
@@ -58,11 +50,4 @@ export interface Asset {
   lastModified?: string; // ISO 8601 date string
   lastModifiedBy?: string; // displayName of user who last modified
   lastModifiedByState?: string; // state of user who last modified
-
-  // Financial data (optional) - Not currently used in logic but reserved
-  priceNaira?: string; // alias for costNgn
-  priceUSD?: string; // alias for costUsd
-  accumulatedDepreciation?: { ngn?: string; usd?: string };
-  netBookValue?: { ngn?: string; usd?: string };
-  valuesByYear?: Record<string, { ngn?: string; usd?: string }>;
 }

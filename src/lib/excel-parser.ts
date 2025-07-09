@@ -223,12 +223,46 @@ export async function parseExcelFile(
 
 // This map is the crucial link between the headers in the Excel file and the fields in our Asset object.
 // It handles various spellings and names for the same piece of data.
-const headerToAssetKeyMap: { [key: string]: keyof Asset | string } = {};
-
-function getNestedValue(obj: any, path: string): any {
-    if (!path || typeof path !== 'string') return undefined;
-    return path.split('.').reduce((o, k) => (o && typeof o === 'object' && o[k] !== undefined) ? o[k] : undefined, obj);
-}
+const headerToAssetKeyMap: { [key: string]: keyof Asset } = {
+    's/n': 'sn',
+    'location': 'location',
+    'state': 'location',
+    'lga': 'lga',
+    'assignee': 'assignee',
+    'asset description': 'description',
+    'description': 'description',
+    'asset id code': 'assetIdCode',
+    'tag numbers': 'assetIdCode',
+    'asset class': 'assetClass',
+    'classification': 'assetClass',
+    'manufacturer': 'manufacturer',
+    'model number': 'modelNumber',
+    'model numbers': 'modelNumber',
+    'serial number': 'serialNumber',
+    'asset serial numbers': 'serialNumber',
+    'supplier': 'supplier',
+    'suppliers': 'supplier',
+    'date purchased or received': 'dateReceived',
+    'date purchased or  received': 'dateReceived',
+    'year of purchase': 'dateReceived',
+    'chq no / goods received note no.': 'grnNo',
+    'pv no': 'pvNo',
+    'purchase price (naira)': 'costNgn',
+    'cost (ngn)': 'costNgn',
+    'purchase price [usd)': 'costUsd',
+    'purchase price (usd)': 'costUsd',
+    'funder': 'funder',
+    'condition': 'condition',
+    'remarks': 'remarks',
+    'comments': 'remarks',
+    'grant': 'grant',
+    'useful life (years)': 'usefulLifeYears',
+    'chasis no': 'chasisNo',
+    'engine no': 'engineNo',
+    'qty': 'qty',
+    'site': 'site',
+    'imei (tablets & mobile phones)': 'imei',
+};
 
 
 export function exportToExcel(assets: Asset[], fileName: string): void {
@@ -244,33 +278,28 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
   }, {} as Record<string, Asset[]>);
 
   for (const category in assetsByCategory) {
-      if (Object.prototype.hasOwnProperty.call(assetsByCategory, category)) {
+      if (Object.prototype.hasOwnProperty.call(assetsByCategory, category) && HEADER_DEFINITIONS[category]) {
           const categoryAssets = assetsByCategory[category];
-          // Use the cleaned, definitive headers from constants for export
+          // Use the definitive headers from constants for export
           const headers = HEADER_DEFINITIONS[category];
-
-          if (!headers) {
-              console.warn(`No header definition for category: ${category}. Skipping.`);
-              continue;
-          }
 
           const finalHeaders = [...headers, 'Verified Status', 'Verified Date', 'Last Modified'];
 
           const dataRows = categoryAssets.map(asset => {
               const row: any[] = headers.map(header => {
                   const cleanHeader = header.toLowerCase().trim().replace(/\s+/g, ' ');
-                  let assetKeyPath = headerToAssetKeyMap[cleanHeader];
-
-                  // Specific override for IHVN sheet's 'Location' column which corresponds to 'site' in our model.
-                  // The main location is in 'State'.
+                  
+                  // Special case for IHVN sheet where "LOCATION" column maps to `site` field
                   if (category === 'IHVN-GF N-THRIP' && cleanHeader === 'location') {
-                      assetKeyPath = 'site';
+                      return asset['site'] ?? '';
                   }
 
-                  if (assetKeyPath) {
-                      const value = getNestedValue(asset, assetKeyPath as string);
+                  const assetKey = headerToAssetKeyMap[cleanHeader];
+                  if (assetKey) {
+                      const value = asset[assetKey as keyof Asset];
                       return value ?? '';
                   }
+                  
                   // For headers not in our map (like financial data), return empty string.
                   return '';
               });
@@ -288,7 +317,7 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
           
           // Auto-fit columns
           const cols = finalHeaders.map((header, i) => ({
-            wch: Math.max(...dataRows.map(r => r[i]?.toString().length ?? 0), header.length) + 2
+            wch: Math.max(...dataRows.map(r => String(r[i] ?? '').length), header.length) + 2
           }));
           worksheet['!cols'] = cols;
 
