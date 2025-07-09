@@ -774,7 +774,7 @@ export default function AssetList() {
         return "This action cannot be undone. This will permanently delete all asset records from your local device storage.";
     }
     // Online case is always admin, since button is disabled for others
-    return `You are in Admin Mode. This action cannot be undone. This will permanently delete ALL asset records from the central database, resetting the application for ALL users.`;
+    return `You are in Admin Mode. This action cannot be undone. This will permanently delete ALL asset records from both the central database and your local device, resetting the application for ALL users.`;
   }, [isOnline]);
 
   if (isLoading) {
