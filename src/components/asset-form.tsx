@@ -319,6 +319,18 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     <p className="text-xs font-semibold text-muted-foreground">Assignee</p>
                     <p>{asset.assignee || 'N/A'}</p>
                 </div>
+                {(asset.category === 'MOTORCYCLES-C19RM' || asset.category === 'Vehicles-TB (IHVN)') && (
+                    <>
+                        <div className="space-y-1">
+                            <p className="text-xs font-semibold text-muted-foreground">Chasis Number</p>
+                            <p>{asset.chasisNo || 'N/A'}</p>
+                        </div>
+                        <div className="space-y-1">
+                            <p className="text-xs font-semibold text-muted-foreground">Engine Number</p>
+                            <p>{asset.engineNo || 'N/A'}</p>
+                        </div>
+                    </>
+                )}
             </div>
             
             <div className="space-y-4 border-t pt-6">
