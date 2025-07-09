@@ -143,7 +143,9 @@ export async function parseExcelFile(
 
                 headerRow.forEach((header, index) => {
                     const field = COLUMN_TO_ASSET_FIELD_MAP[header];
-                    if (field) {
+                    // If the field in our asset object is not yet filled with a value, fill it.
+                    // This gives precedence to the first non-empty column with a given header.
+                    if (field && !(assetData as any)[field]) {
                         const rawValue = row[index];
                         (assetData as any)[field] = rawValue !== null && rawValue !== undefined ? String(rawValue) : '';
                     }
@@ -223,7 +225,7 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
             continue;
         }
 
-        const headers = HEADER_DEFINITIONS[category];
+        const headers = [...HEADER_DEFINITIONS[category]];
         const sheetData = assetsByCategory[category].map(asset => {
             const row: any = {};
             for (const header of headers) {
@@ -239,12 +241,11 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
 
                 if (fieldName) {
                     row[header] = finalAsset[fieldName] || '';
-                } else if (header === "Verified Status") {
-                    row[header] = finalAsset.verifiedStatus || 'Unverified';
-                } else if (header === "Verified Date") {
-                    row[header] = finalAsset.verifiedDate || '';
                 }
             }
+            // Manually add verified status and date at the end
+            row["Verified Status"] = asset.verifiedStatus || 'Unverified';
+            row["Verified Date"] = asset.verifiedDate || '';
             return row;
         });
 
