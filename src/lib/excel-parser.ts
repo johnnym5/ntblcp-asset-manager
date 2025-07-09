@@ -2,54 +2,10 @@
 import * as XLSX from 'xlsx';
 import type { Asset } from './types';
 import { v4 as uuidv4 } from 'uuid';
-import { HEADER_DEFINITIONS, TARGET_SHEETS } from './constants';
+import { HEADER_DEFINITIONS, TARGET_SHEETS, COLUMN_TO_ASSET_FIELD_MAP } from './constants';
 
 // --- Type Definitions ---
 type ColumnToFieldMap = { [key: string]: keyof Asset };
-
-// --- Constants ---
-
-// This map handles variations in column names across different sheets,
-// mapping them to a single, canonical field in our Asset type.
-const COLUMN_TO_ASSET_FIELD_MAP: ColumnToFieldMap = {
-  'S/N': 'sn',
-  'LOCATION': 'location', // Used in IHVN
-  'STATE': 'location',     // Used in IHVN
-  'LGA': 'lga',
-  'ASSIGNEE': 'assignee',
-  'ASSET DESCRIPTION': 'description',
-  'DESCRIPTION': 'description', // Used in IHVN
-  'ASSET ID CODE': 'assetIdCode',
-  'TAG NUMBERS': 'assetIdCode', // Used in IHVN
-  'ASSET CLASS': 'assetClass',
-  'CLASSIFICATION': 'assetClass', // Used in IHVN
-  'MANUFACTURER': 'manufacturer',
-  'MODEL NUMBER': 'modelNumber',
-  'MODEL NUMBERS': 'modelNumber', // Used in IHVN
-  'SERIAL NUMBER': 'serialNumber',
-  'ASSET SERIAL NUMBERS': 'serialNumber', // Used in IHVN
-  'SUPPLIER': 'supplier',
-  'SUPPLIERS': 'supplier',
-  'DATE PURCHASED OR RECEIVED': 'dateReceived',
-  'YEAR OF PURCHASE': 'dateReceived', // Used in IHVN
-  'CHQ NO / GOODS RECEIVED NOTE NO.': 'grnNo',
-  'PV NO': 'pvNo',
-  'PURCHASE PRICE (NAIRA)': 'costNgn',
-  'COST (NGN)': 'costNgn', // Used in IHVN
-  'PURCHASE PRICE [USD)': 'costUsd',
-  'FUNDER': 'funder',
-  'CONDITION': 'condition',
-  'REMARKS': 'remarks',
-  'COMMENTS': 'remarks',
-  'GRANT': 'grant',
-  'USEFUL LIFE (YEARS)': 'usefulLifeYears',
-  'QTY': 'qty',
-  'IMEI (TABLETS & MOBILE PHONES)': 'imei',
-  'CHASIS NO': 'chasisNo',
-  'ENGINE NO': 'engineNo',
-  'SITE': 'site'
-};
-
 
 // --- Helper Functions ---
 
@@ -60,6 +16,15 @@ const COLUMN_TO_ASSET_FIELD_MAP: ColumnToFieldMap = {
  */
 const normalizeHeader = (header: any): string => {
   return String(header || '').trim().toUpperCase().replace(/\s+/g, ' ');
+};
+
+/**
+ * Normalizes a sheet name for robust matching by making it lowercase and removing non-alphanumeric characters.
+ * @param name The sheet name to normalize.
+ * @returns The normalized sheet name.
+ */
+const normalizeSheetNameForComparison = (name: string): string => {
+    return (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
 };
 
 /**
@@ -102,14 +67,6 @@ export async function parseExcelFile(
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array' });
 
-        const existingAssetMap = new Map<string, Asset>();
-        existingAssets.forEach(asset => {
-            const key = asset.id; // Use internal ID for reliable mapping
-            if (key) {
-                existingAssetMap.set(key, asset);
-            }
-        });
-        
         const existingAssetByIdentifiers = new Map<string, Asset>();
         existingAssets.forEach(asset => {
              const key = `${asset.assetIdCode || ''}-${asset.serialNumber || ''}`.toLowerCase();
@@ -119,10 +76,11 @@ export async function parseExcelFile(
         });
 
         for (const workbookSheetName of workbook.SheetNames) {
-            const normalizedWorkbookSheetName = workbookSheetName.trim();
+            // Apply the new, more robust normalization for comparison
+            const normalizedWorkbookSheetNameForComparison = normalizeSheetNameForComparison(workbookSheetName);
 
             const canonicalSheetName = TARGET_SHEETS.find(
-                s => s.toLowerCase() === normalizedWorkbookSheetName.toLowerCase()
+                s => normalizeSheetNameForComparison(s) === normalizedWorkbookSheetNameForComparison
             );
 
             if (!canonicalSheetName || !enabledSheets.includes(canonicalSheetName)) {
@@ -149,7 +107,7 @@ export async function parseExcelFile(
                 errors.push(`Could not find a valid header row in sheet: ${canonicalSheetName}. Skipping.`);
                 continue;
             }
-
+            
             const headerRow = sheetData[headerRowIndex].map(normalizeHeader);
             const dataRows = sheetData.slice(headerRowIndex + 1);
 
@@ -160,17 +118,21 @@ export async function parseExcelFile(
 
                 const assetData: Partial<Asset> = { category: canonicalSheetName };
 
+                // Use a set to track which asset fields have already been populated to avoid overwriting with blank duplicated columns.
+                const populatedFields = new Set<keyof Asset>();
+
                 headerRow.forEach((header, index) => {
                     const field = COLUMN_TO_ASSET_FIELD_MAP[header];
-                    if (field && row[index] !== null && String(row[index]).trim() !== '') {
-                        // Take the first non-empty value for a given field
-                        if (!assetData[field]) {
-                            assetData[field] = String(row[index]);
-                        }
+                    // Only process if the field exists, a value exists in the cell,
+                    // and this specific asset field hasn't been filled yet.
+                    if (field && !populatedFields.has(field) && row[index] !== null && String(row[index]).trim() !== '') {
+                        assetData[field] = String(row[index]);
+                        populatedFields.add(field); // Mark this field as populated for the current row.
                     }
                 });
 
-                if (Object.keys(assetData).length <= 1) {
+                // Skip if no actual asset data was extracted.
+                if (Object.keys(assetData).length <= 1) { // <=1 because 'category' is always present
                     skipped++;
                     continue;
                 }
@@ -227,15 +189,17 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
     }, {} as Record<string, Asset[]>);
     
     for (const category in assetsByCategory) {
-        if (!HEADER_DEFINITIONS[category]) {
+        const canonicalSheetName = TARGET_SHEETS.find(s => s === category);
+        if (!canonicalSheetName || !HEADER_DEFINITIONS[canonicalSheetName]) {
             console.warn(`No header definition for category ${category}, skipping export for this sheet.`);
             continue;
         }
 
-        const headers = [...HEADER_DEFINITIONS[category]];
+        const exportHeaders = [...HEADER_DEFINITIONS[canonicalSheetName]];
+        
         const sheetData = assetsByCategory[category].map(asset => {
-            const row: any = {};
-            for (const header of headers) {
+            const row: { [key: string]: any } = {};
+            for (const header of exportHeaders) {
                 const normalizedHeader = normalizeHeader(header);
                 const fieldName = COLUMN_TO_ASSET_FIELD_MAP[normalizedHeader];
                 
@@ -249,12 +213,16 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
             return row;
         });
 
-        // Add "Verified Status" and "Verified Date" to headers if not present
-        if (!headers.includes("Verified Status")) headers.push("Verified Status");
-        if (!headers.includes("Verified Date")) headers.push("Verified Date");
+        // Add "Verified Status" and "Verified Date" to headers for export
+        if (!exportHeaders.includes("Verified Status")) {
+          exportHeaders.push("Verified Status");
+        }
+        if (!exportHeaders.includes("Verified Date")) {
+          exportHeaders.push("Verified Date");
+        }
 
-        const worksheet = XLSX.utils.json_to_sheet(sheetData, { header: headers });
-        const safeSheetName = category.replace(/[\/\\?*\[\]]/g, '-').substring(0, 31);
+        const worksheet = XLSX.utils.json_to_sheet(sheetData, { header: exportHeaders });
+        const safeSheetName = canonicalSheetName.replace(/[\/\\?*\[\]]/g, '-').substring(0, 31);
         XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
     }
 
