@@ -62,3 +62,20 @@ export interface UserProfile {
   // You can add other fields like 'state' or 'zone' if needed
   state?: string;
 }
+
+// New types for detailed inbox
+export interface AssetChange {
+  field: string; // User-friendly field name
+  from: string;
+  to: string;
+  assetId: string;
+  assetDescription: string;
+}
+
+export interface InboxMessageGroup {
+  updatedBy: string;
+  updatedAt: string; // ISO String of the latest change in the group
+  changes: AssetChange[];
+  // Keep track of the full assets that were updated in this group
+  updatedAssets: Asset[]; 
+}

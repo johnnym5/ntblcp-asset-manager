@@ -56,10 +56,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 
 import { AssetForm } from "./asset-form";
-import type { Asset } from "@/lib/types";
+import type { Asset, AssetChange, InboxMessageGroup } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
@@ -155,15 +156,12 @@ export default function AssetList() {
     const uniqueAssetMap = new Map<string, Asset>();
   
     assetsToFilter.forEach(asset => {
-      // Always use the internal unique ID as the key to prevent accidental data loss.
       const key = asset.id;
   
       const existingAsset = uniqueAssetMap.get(key);
       if (!existingAsset) {
         uniqueAssetMap.set(key, asset);
       } else {
-        // If two records have the same ID (e.g., a local and a cloud version),
-        // keep the one that was modified more recently.
         const existingTimestamp = existingAsset.lastModified ? new Date(existingAsset.lastModified).getTime() : 0;
         const currentTimestamp = asset.lastModified ? new Date(asset.lastModified).getTime() : 0;
         
@@ -191,7 +189,17 @@ export default function AssetList() {
       if (isAdminUser) {
         const previousAssets = await getLocalAssetsFromDb();
         const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
-        const changes: Asset[] = [];
+        const changesByGroup: Record<string, InboxMessageGroup> = {};
+
+        const userFriendlyFieldNames: Record<string, string> = {
+            verifiedStatus: 'Status',
+            location: 'Location',
+            assignee: 'Assignee',
+            condition: 'Condition',
+            remarks: 'Remarks',
+            description: 'Description',
+            serialNumber: 'Serial Number',
+        };
 
         for (const newAsset of uniqueAssets) {
           if (newAsset.lastModifiedBy === userProfile?.displayName) {
@@ -199,48 +207,67 @@ export default function AssetList() {
           }
           const previousAsset = previousAssetsMap.get(newAsset.id);
           if (!previousAsset) {
-            changes.push(newAsset); 
+             // For now, only track updates, not new creations, to avoid inbox clutter.
           } else {
             const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
             const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
             if (newTimestamp > prevTimestamp + 1000) { 
-              changes.push(newAsset);
+              const detailedChanges: AssetChange[] = [];
+              Object.keys(userFriendlyFieldNames).forEach(key => {
+                  const oldValue = previousAsset[key as keyof Asset] as any;
+                  const newValue = newAsset[key as keyof Asset] as any;
+                  if (String(oldValue || '').trim() !== String(newValue || '').trim()) {
+                      detailedChanges.push({
+                          assetId: newAsset.id,
+                          assetDescription: newAsset.description || 'Untitled Asset',
+                          field: userFriendlyFieldNames[key],
+                          from: String(oldValue || 'empty'),
+                          to: String(newValue || 'empty'),
+                      });
+                  }
+              });
+
+              if (detailedChanges.length > 0) {
+                  const groupKey = newAsset.lastModifiedBy || 'An unknown user';
+                  if (!changesByGroup[groupKey]) {
+                      changesByGroup[groupKey] = {
+                          updatedBy: groupKey,
+                          updatedAt: newAsset.lastModified || new Date().toISOString(),
+                          changes: [],
+                          updatedAssets: []
+                      };
+                  }
+                  changesByGroup[groupKey].changes.push(...detailedChanges);
+                  changesByGroup[groupKey].updatedAssets.push(newAsset);
+
+                  if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].updatedAt)) {
+                      changesByGroup[groupKey].updatedAt = newAsset.lastModified!;
+                  }
+              }
             }
           }
         }
 
-        if (changes.length > 0 && !isInitialLoad.current) {
-          const changesByGroup = changes.reduce((acc, asset) => {
-            const groupKey = asset.lastModifiedBy || 'An unknown user';
-            
-            if (!acc[groupKey]) {
-              acc[groupKey] = [];
-            }
-            acc[groupKey].push(asset);
-            return acc;
-          }, {} as Record<string, Asset[]>);
-
-          setInboxMessages(prevMessages => {
-              const newMessages = { ...prevMessages };
-              for (const groupKey in changesByGroup) {
-                  const existingGroupAssets = newMessages[groupKey] || [];
-                  const combinedAssets = [...changesByGroup[groupKey], ...existingGroupAssets];
-                  
-                  const uniqueAssetsMap = new Map<string, Asset>();
-                  for (const asset of combinedAssets) {
-                      const existing = uniqueAssetsMap.get(asset.id);
-                      if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
-                          uniqueAssetsMap.set(asset.id, asset);
-                      }
-                  }
-                  
-                  newMessages[groupKey] = Array.from(uniqueAssetsMap.values())
-                      .sort((a, b) => new Date(b.lastModified!).getTime() - new Date(a.lastModified!).getTime());
-              }
-              return newMessages;
-          });
-          
-          setUnreadInboxCount(prevCount => prevCount + changes.length);
+        const newInboxItems = Object.values(changesByGroup);
+        if (newInboxItems.length > 0 && !isInitialLoad.current) {
+            setInboxMessages(prevMessages => {
+                const existingGroups = new Map(prevMessages.map(g => [g.updatedBy, g]));
+                newInboxItems.forEach(newGroup => {
+                    const existingGroup = existingGroups.get(newGroup.updatedBy);
+                    if (existingGroup) {
+                        existingGroup.changes.push(...newGroup.changes);
+                        existingGroup.updatedAssets.push(...newGroup.updatedAssets);
+                        if (new Date(newGroup.updatedAt) > new Date(existingGroup.updatedAt)) {
+                            existingGroup.updatedAt = newGroup.updatedAt;
+                        }
+                    } else {
+                        existingGroups.set(newGroup.updatedBy, newGroup);
+                    }
+                });
+                return Array.from(existingGroups.values()).sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+            });
+            const totalNewChanges = newInboxItems.reduce((acc, group) => acc + group.changes.length, 0);
+            setUnreadInboxCount(prevCount => prevCount + totalNewChanges);
         }
       }
 
@@ -306,6 +333,8 @@ export default function AssetList() {
 
         try {
             const fetchedAssets = await getAssets();
+            // When we get fresh data, we want it to be the new source of truth locally.
+            await clearLocalAssets();
             await handleFetchedAssets(fetchedAssets);
             if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
@@ -544,6 +573,9 @@ export default function AssetList() {
         } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
             updatedAsset.verifiedDate = '';
         }
+        if (!isOnline) {
+          updatedAsset.syncStatus = 'local';
+        }
         return updatedAsset;
     });
 
@@ -574,6 +606,7 @@ export default function AssetList() {
       lastModifiedByState: userProfile?.state,
     };
     if (isOnline) {
+        finalAsset.syncStatus = 'synced';
         try {
             await updateAsset(finalAsset);
             addNotification({ title: 'Saved Successfully', description: 'Asset changes have been saved.' });
@@ -582,6 +615,7 @@ export default function AssetList() {
             addNotification({ title: 'Error Saving', description: 'Could not save asset to the database.', variant: 'destructive' });
         }
     } else {
+        finalAsset.syncStatus = 'local';
         const currentAssets = await getLocalAssetsFromDb();
         const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
         if (existingIndex > -1) {
@@ -608,8 +642,10 @@ export default function AssetList() {
     };
 
     if (isOnline) {
+        updatedAsset.syncStatus = 'synced';
         await updateAsset(updatedAsset);
     } else {
+        updatedAsset.syncStatus = 'local';
         const currentAssets = await getLocalAssetsFromDb();
         const existingIndex = currentAssets.findIndex(a => a.id === assetId);
         if (existingIndex > -1) {
@@ -993,7 +1029,21 @@ export default function AssetList() {
                               />
                           </TableCell>
                           <TableCell>{asset.sn || 'N/A'}</TableCell>
-                          <TableCell className="font-medium">{asset.description}</TableCell>
+                          <TableCell className="font-medium">
+                            <div className="flex items-center gap-2">
+                                <span>{asset.description}</span>
+                                {asset.syncStatus === 'local' && (
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger>
+                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                            </TooltipTrigger>
+                                            <TooltipContent><p>Awaiting sync</p></TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                )}
+                            </div>
+                          </TableCell>
                           <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
                           <TableCell>{asset.assignee || 'N/A'}</TableCell>
                           <TableCell onClick={(e) => e.stopPropagation()}>

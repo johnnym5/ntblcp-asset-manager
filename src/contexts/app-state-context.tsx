@@ -4,7 +4,7 @@
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
-import type { Asset } from '@/lib/types';
+import type { InboxMessageGroup } from '@/lib/types';
 
 
 export interface SortConfig {
@@ -71,8 +71,8 @@ interface AppStateContextType {
   setDataActions: Dispatch<SetStateAction<DataActions>>;
 
   // Inbox
-  inboxMessages: Record<string, Asset[]>;
-  setInboxMessages: Dispatch<SetStateAction<Record<string, Asset[]>>>;
+  inboxMessages: InboxMessageGroup[];
+  setInboxMessages: Dispatch<SetStateAction<InboxMessageGroup[]>>;
   unreadInboxCount: number;
   setUnreadInboxCount: Dispatch<SetStateAction<number>>;
 }
@@ -129,12 +129,16 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
 
-  const [inboxMessages, setInboxMessages] = useState<Record<string, Asset[]>>(() => {
+  const [inboxMessages, setInboxMessages] = useState<InboxMessageGroup[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('ntblcp-inbox-messages');
-      return saved ? JSON.parse(saved) : {};
+      try {
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        return [];
+      }
     }
-    return {};
+    return [];
   });
 
   const [unreadInboxCount, setUnreadInboxCount] = useState<number>(() => {
