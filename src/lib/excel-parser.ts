@@ -62,10 +62,7 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
     const condition = getColumnValue(row, 'Condition');
     const remarks = getColumnValue(row, 'Remarks', 'Comments');
     
-    let assignee = getColumnValue(row, 'Assignee');
-    if (assignee.toLowerCase() === 'yes' || assignee.toLowerCase() === 'no') {
-        assignee = '';
-    }
+    const assignee = getColumnValue(row, 'Assignee');
 
     // Sheet-specific logic for ambiguous fields like location/site
     let location = '';
