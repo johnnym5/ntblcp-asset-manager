@@ -155,23 +155,18 @@ export default function AssetList() {
     const uniqueAssetMap = new Map<string, Asset>();
   
     assetsToFilter.forEach(asset => {
-      // Prioritize Asset ID, then Serial Number as the unique key.
-      const key = asset.assetIdCode || asset.serialNumber;
-      
-      // If no strong key, treat as unique to avoid incorrect merging.
-      if (!key) {
-        uniqueAssetMap.set(asset.id, asset);
-        return;
-      }
+      // Always use the internal unique ID as the key to prevent accidental data loss.
+      const key = asset.id;
   
       const existingAsset = uniqueAssetMap.get(key);
       if (!existingAsset) {
         uniqueAssetMap.set(key, asset);
       } else {
+        // If two records have the same ID (e.g., a local and a cloud version),
+        // keep the one that was modified more recently.
         const existingTimestamp = existingAsset.lastModified ? new Date(existingAsset.lastModified).getTime() : 0;
         const currentTimestamp = asset.lastModified ? new Date(asset.lastModified).getTime() : 0;
         
-        // Keep the asset with the most recent timestamp.
         if (currentTimestamp > existingTimestamp) {
           uniqueAssetMap.set(key, asset);
         }
