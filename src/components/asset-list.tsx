@@ -427,9 +427,13 @@ export default function AssetList() {
                 });
                 await handleSafeMergeAndSync(fetchedAssets);
                 if (isSyncingRef.current) setIsSyncing(false);
-            }, (error) => {
-                console.error("Firestore assets listener error:", error);
-                addNotification({ title: 'Sync Error', description: 'Lost connection to the asset database.', variant: 'destructive' });
+            }, (error: any) => {
+                if (error.code === 'permission-denied') {
+                    addNotification({ title: 'Permissions Error', description: 'Cannot sync assets due to insufficient permissions.', variant: 'destructive' });
+                } else {
+                    console.error("Firestore assets listener error:", error);
+                    addNotification({ title: 'Sync Error', description: 'Lost connection to the asset database.', variant: 'destructive' });
+                }
                 if (isSyncingRef.current) setIsSyncing(false);
                 setIsOnline(false);
             });
@@ -453,11 +457,11 @@ export default function AssetList() {
             if (newActivities.length > 0 && !isInitialLoad.current) {
                 updateInboxState(newActivities);
             }
-        }, (error) => {
-            console.error("Firestore activity log listener error:", error);
+        }, (error: any) => {
             if (error.code === 'permission-denied') {
-                addNotification({ title: 'Admin Feature', description: 'Activity log access is for admins only.', variant: 'destructive' });
+                addNotification({ title: 'Admin Feature', description: 'Activity log access requires admin permissions.', variant: 'destructive' });
             } else {
+                console.error("Firestore activity log listener error:", error);
                 addNotification({ title: 'Sync Error', description: 'Lost connection to activity logs.', variant: 'destructive' });
             }
         });
@@ -1337,3 +1341,5 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
