@@ -223,44 +223,7 @@ export async function parseExcelFile(
 
 // This map is the crucial link between the headers in the Excel file and the fields in our Asset object.
 // It handles various spellings and names for the same piece of data.
-const headerToAssetKeyMap: { [key: string]: keyof Asset | string } = {
-    's/n': 'sn',
-    'location': 'location',
-    'state': 'location',
-    'lga': 'lga',
-    'assignee': 'assignee',
-    'asset description': 'description',
-    'description': 'description',
-    'asset id code': 'assetIdCode',
-    'tag numbers': 'assetIdCode',
-    'asset class': 'assetClass',
-    'classification': 'assetClass',
-    'manufacturer': 'manufacturer',
-    'model number': 'modelNumber',
-    'model numbers': 'modelNumber',
-    'serial number': 'serialNumber',
-    'asset serial numbers': 'serialNumber',
-    'supplier': 'supplier',
-    'suppliers': 'supplier',
-    'date purchased or received': 'dateReceived',
-    'date purchased or  received': 'dateReceived',
-    'year of purchase': 'dateReceived',
-    'chq no / goods received note no.': 'grnNo',
-    'pv no': 'pvNo',
-    'purchase price (naira)': 'costNgn',
-    'cost (ngn)': 'costNgn',
-    'purchase price (usd)': 'costUsd',
-    'purchase price [usd)': 'costUsd',
-    'funder': 'funder',
-    'condition': 'condition',
-    'remarks': 'remarks',
-    'comments': 'remarks',
-    'grant': 'grant',
-    'chasis no': 'chasisNo',
-    'engine no': 'engineNo',
-    'qty': 'qty',
-    'site': 'site'
-};
+const headerToAssetKeyMap: { [key: string]: keyof Asset | string } = {};
 
 function getNestedValue(obj: any, path: string): any {
     if (!path || typeof path !== 'string') return undefined;
