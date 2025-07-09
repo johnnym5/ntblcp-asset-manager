@@ -280,16 +280,32 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
           <div className="flex-1 space-y-6 overflow-y-auto pr-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
                 <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">S/N</p>
+                    <p>{asset.sn || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
                     <p className="text-xs font-semibold text-muted-foreground">Asset ID</p>
                     <p>{asset.assetIdCode || 'N/A'}</p>
+                </div>
+                <div className="col-span-1 md:col-span-2 space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">Asset Description</p>
+                    <p>{asset.description || 'N/A'}</p>
                 </div>
                 <div className="space-y-1">
                     <p className="text-xs font-semibold text-muted-foreground">Serial Number</p>
                     <p>{asset.serialNumber || 'N/A'}</p>
                 </div>
+                 <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">Model Number</p>
+                    <p>{asset.modelNumber || 'N/A'}</p>
+                </div>
                 <div className="space-y-1">
                     <p className="text-xs font-semibold text-muted-foreground">Manufacturer</p>
                     <p>{asset.manufacturer || 'N/A'}</p>
+                </div>
+                <div className="space-y-1">
+                    <p className="text-xs font-semibold text-muted-foreground">Asset Class</p>
+                    <p>{asset.assetClass || 'N/A'}</p>
                 </div>
                 <div className="space-y-1">
                     <p className="text-xs font-semibold text-muted-foreground">Location</p>
@@ -299,30 +315,32 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     <p className="text-xs font-semibold text-muted-foreground">LGA</p>
                     <p>{asset.lga || 'N/A'}</p>
                 </div>
-                <div className="space-y-1">
+                 <div className="space-y-1">
                     <p className="text-xs font-semibold text-muted-foreground">Assignee</p>
                     <p>{asset.assignee || 'N/A'}</p>
                 </div>
             </div>
-            <div className="space-y-1 text-sm">
-                <p className="text-xs font-semibold text-muted-foreground">Asset Description</p>
-                <p>{asset.description || 'N/A'}</p>
-            </div>
             
             <div className="space-y-4 border-t pt-6">
-                 <div className="space-y-2">
-                    <Label htmlFor="quick-view-status">Verified Status</Label>
-                    <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
-                        <SelectTrigger id="quick-view-status">
-                            <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
-                            <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                            <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="space-y-2">
+                        <Label htmlFor="quick-view-status">Verified Status</Label>
+                        <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
+                            <SelectTrigger id="quick-view-status">
+                                <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
+                                <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                                <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                     <div className="space-y-2">
+                        <Label>Verified Date</Label>
+                        <p className="text-sm pt-2 text-muted-foreground">{asset.verifiedDate || 'N/A'}</p>
+                    </div>
+                 </div>
                 <div className="space-y-2">
                     <Label htmlFor="quick-view-remarks">Remarks/Comments</Label>
                     <Textarea id="quick-view-remarks" value={quickViewRemarks} onChange={(e) => setQuickViewRemarks(e.target.value)} rows={5} />
