@@ -61,9 +61,10 @@ import {
   Bell,
   Sun,
   Moon,
-  CheckCheck
+  CheckCheck,
+  X,
 } from "lucide-react";
-import { addNotification, useNotifications, clearAll } from "@/hooks/use-notifications";
+import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
 
@@ -431,12 +432,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {notifications.length > 0 ? (
                 notifications.map((notification, index) => (
                   <div key={notification.id}>
-                    <div className="p-4">
-                      <p className={cn("font-semibold mb-1", !notification.read && "text-foreground", notification.read && "text-muted-foreground")}>
+                    <div className="relative group p-4">
+                      <p className={cn("font-semibold mb-1 pr-8", !notification.read && "text-foreground", notification.read && "text-muted-foreground")}>
                         {notification.title}
                       </p>
                       {notification.description && (
-                        <p className={cn("text-sm", !notification.read && "text-muted-foreground", notification.read && "text-muted-foreground/70")}>
+                        <p className={cn("text-sm pr-8", !notification.read && "text-muted-foreground", notification.read && "text-muted-foreground/70")}>
                           {notification.description}
                         </p>
                       )}
@@ -444,6 +445,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <p className="text-xs text-muted-foreground/80 mt-2">
                         {formatDistanceToNow(notification.date, { addSuffix: true })}
                       </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-3 right-3 h-6 w-6 text-muted-foreground opacity-0 group-hover:opacity-100"
+                        onClick={() => removeNotification(notification.id)}
+                        aria-label="Dismiss notification"
+                      >
+                          <X className="h-4 w-4" />
+                      </Button>
                     </div>
                     {index < notifications.length - 1 && <Separator />}
                   </div>

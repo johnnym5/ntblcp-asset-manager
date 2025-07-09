@@ -8,7 +8,7 @@ import type { Asset } from '@/lib/types';
 import { UpdatedAssetsDialog } from './updated-assets-dialog';
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Inbox } from 'lucide-react';
+import { Inbox, X } from 'lucide-react';
 
 interface InboxSheetProps {
   isOpen: boolean;
@@ -28,16 +28,18 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
   const handleClearAll = () => {
     setInboxMessages({});
   };
+
+  const handleDismissGroup = (groupKey: string) => {
+    setInboxMessages(prev => {
+        const newMessages = { ...prev };
+        delete newMessages[groupKey];
+        return newMessages;
+    });
+  }
   
-  const handleViewDetails = (assets: Asset[]) => {
+  const handleViewDetails = (groupKey: string, assets: Asset[]) => {
       setViewingAssets(assets);
-      // Remove the viewed group from the inbox
-      const groupKey = assets[0]?.lastModifiedByState || 'Admin';
-      setInboxMessages(prev => {
-          const newMessages = { ...prev };
-          delete newMessages[groupKey];
-          return newMessages;
-      });
+      handleDismissGroup(groupKey);
   }
 
   const messageGroups = Object.entries(inboxMessages);
@@ -56,9 +58,9 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
             {messageGroups.length > 0 ? (
               <div className="space-y-4">
                 {messageGroups.map(([groupKey, assets]) => (
-                  <Card key={groupKey}>
+                  <Card key={groupKey} className="relative group">
                     <CardHeader>
-                      <CardTitle className="text-base flex items-center justify-between">
+                      <CardTitle className="text-base flex items-center justify-between pr-8">
                         <span>Updates from {groupKey}</span>
                         <span className="text-sm font-normal text-muted-foreground">{assets.length} asset{assets.length > 1 ? 's' : ''}</span>
                       </CardTitle>
@@ -67,8 +69,17 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
                       <p className="text-sm text-muted-foreground mb-4">
                         Last updated by {assets[0]?.lastModifiedBy || 'a user'} on {assets[0]?.lastModified ? new Date(assets[0].lastModified).toLocaleDateString() : 'an unknown date'}.
                       </p>
-                      <Button onClick={() => handleViewDetails(assets)}>View Details</Button>
+                      <Button onClick={() => handleViewDetails(groupKey, assets)}>View Details</Button>
                     </CardContent>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="absolute top-3 right-3 h-7 w-7 text-muted-foreground opacity-0 group-hover:opacity-100"
+                      onClick={() => handleDismissGroup(groupKey)}
+                      aria-label="Dismiss message"
+                    >
+                        <X className="h-4 w-4" />
+                    </Button>
                   </Card>
                 ))}
               </div>

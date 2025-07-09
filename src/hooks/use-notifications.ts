@@ -17,6 +17,7 @@ const actionTypes = {
   ADD_NOTIFICATION: "ADD_NOTIFICATION",
   MARK_ALL_AS_READ: "MARK_ALL_AS_READ",
   CLEAR_ALL: "CLEAR_ALL",
+  REMOVE_NOTIFICATION: "REMOVE_NOTIFICATION",
 } as const
 
 const NOTIFICATIONS_STORAGE_KEY = "ntblcp-notifications";
@@ -33,6 +34,7 @@ type Action =
   | { type: ActionType["ADD_NOTIFICATION"]; notification: Notification }
   | { type: ActionType["MARK_ALL_AS_READ"] }
   | { type: ActionType["CLEAR_ALL"] }
+  | { type: ActionType["REMOVE_NOTIFICATION"]; id: string }
 
 interface State {
   notifications: Notification[]
@@ -104,6 +106,11 @@ const reducer = (state: State, action: Action): State => {
         ...state,
         notifications: [],
       }
+    case "REMOVE_NOTIFICATION":
+      return {
+        ...state,
+        notifications: state.notifications.filter((n) => n.id !== action.id),
+      }
     default:
         return state;
   }
@@ -120,6 +127,10 @@ export function addNotification(props: Omit<Notification, "id" | "date" | "read"
       read: false,
     },
   })
+}
+
+export function removeNotification(id: string) {
+  dispatch({ type: "REMOVE_NOTIFICATION", id });
 }
 
 export function markAllAsRead() {
