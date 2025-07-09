@@ -139,16 +139,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   const [unreadInboxCount, setUnreadInboxCount] = useState<number>(() => {
     if (typeof window !== 'undefined') {
-      try {
-        const saved = localStorage.getItem('ntblcp-unread-inbox-count');
-        const count = saved ? parseInt(saved, 10) : 0;
-        const messages = localStorage.getItem('ntblcp-inbox-messages');
-        const messageData = messages ? JSON.parse(messages) : {};
-        const totalInMessages = Object.values(messageData).reduce((acc: number, val: any) => acc + (Array.isArray(val) ? val.length : 0), 0);
-        return Math.max(count, totalInMessages > 0 ? 1 : 0); // Ensure at least 1 if messages exist
-      } catch (e) {
-        return 0;
-      }
+      const saved = localStorage.getItem('ntblcp-unread-inbox-count');
+      return saved ? parseInt(saved, 10) : 0;
     }
     return 0;
   });
@@ -175,15 +167,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('ntblcp-inbox-messages', JSON.stringify(inboxMessages));
-      const totalInMessages = Object.values(inboxMessages).reduce((acc, val) => acc + val.length, 0);
-      if (totalInMessages === 0) {
-        setUnreadInboxCount(0);
-      } else {
-        // When messages change, if there are any, reflect this in the count
-        if (unreadInboxCount === 0 && totalInMessages > 0) {
-            setUnreadInboxCount(1); // Set to 1 to show a badge, not a specific count
-        }
-      }
     }
   }, [inboxMessages]);
     

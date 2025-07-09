@@ -211,9 +211,7 @@ export default function AssetList() {
 
         if (changes.length > 0 && !isInitialLoad.current) {
           const changesByGroup = changes.reduce((acc, asset) => {
-            const modifierIsAdmin = asset.lastModifiedBy?.toLowerCase().trim() === 'admin';
-            const state = asset.lastModifiedByState;
-            const groupKey = modifierIsAdmin ? 'Admin' : (state || 'An unknown location');
+            const groupKey = asset.lastModifiedBy || 'An unknown user';
             
             if (!acc[groupKey]) {
               acc[groupKey] = [];
