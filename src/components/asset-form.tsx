@@ -349,8 +349,8 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                         </Select>
                     </div>
                      <div className="space-y-2">
-                        <Label>Verified Date</Label>
-                        <p className="text-sm pt-2 text-muted-foreground">{asset.verifiedDate || 'N/A'}</p>
+                        <Label>Last Modified</Label>
+                        <p className="text-sm pt-2 text-muted-foreground">{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p>
                     </div>
                  </div>
                 <div className="space-y-2">
@@ -547,13 +547,10 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                            <FormField control={form.control} name="dateReceived" render={({ field }) => (
                                 <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                             )} />
-                           <FormField control={form.control} name="verifiedDate" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Verified Date</FormLabel>
-                                    <FormControl><Input {...field} disabled /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
+                           <div className="space-y-2">
+                                <Label>Last Modified</Label>
+                                <p className="text-sm text-muted-foreground h-10 flex items-center">{asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p>
+                           </div>
                         </div>
                     </AccordionContent>
                   </AccordionItem>

@@ -151,12 +151,18 @@ export default function AssetList() {
     setCurrentPage(1);
   }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter, view, currentCategory]);
   
-  const getOldestDuplicates = (assetsToFilter: Asset[]): Asset[] => {
+  const getNewestDuplicate = (assetsToFilter: Asset[]): Asset[] => {
     const uniqueAssetMap = new Map<string, Asset>();
   
     assetsToFilter.forEach(asset => {
-      const key = asset.assetIdCode || asset.serialNumber || asset.description;
-      if (!key) return;
+      // Prioritize Asset ID, then Serial Number as the unique key.
+      const key = asset.assetIdCode || asset.serialNumber;
+      
+      // If no strong key, treat as unique to avoid incorrect merging.
+      if (!key) {
+        uniqueAssetMap.set(asset.id, asset);
+        return;
+      }
   
       const existingAsset = uniqueAssetMap.get(key);
       if (!existingAsset) {
@@ -165,7 +171,8 @@ export default function AssetList() {
         const existingTimestamp = existingAsset.lastModified ? new Date(existingAsset.lastModified).getTime() : 0;
         const currentTimestamp = asset.lastModified ? new Date(asset.lastModified).getTime() : 0;
         
-        if (currentTimestamp > 0 && (existingTimestamp === 0 || currentTimestamp < existingTimestamp)) {
+        // Keep the asset with the most recent timestamp.
+        if (currentTimestamp > existingTimestamp) {
           uniqueAssetMap.set(key, asset);
         }
       }
@@ -176,7 +183,7 @@ export default function AssetList() {
 
   // --- DATA LOADING & SYNC ---
   const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
-      const uniqueAssets = getOldestDuplicates(fetchedAssets);
+      const uniqueAssets = getNewestDuplicate(fetchedAssets);
 
       if (!userProfile) {
         setAssets(uniqueAssets);
@@ -253,7 +260,7 @@ export default function AssetList() {
     const loadInitialData = async () => {
         setIsLoading(true);
         const localAssets = await getLocalAssetsFromDb();
-        const uniqueAssets = getOldestDuplicates(localAssets);
+        const uniqueAssets = getNewestDuplicate(localAssets);
         setAssets(uniqueAssets);
         setIsLoading(false);
     };
@@ -977,7 +984,7 @@ export default function AssetList() {
                       <TableHead>Asset ID</TableHead>
                       <TableHead>Assignee</TableHead>
                       <TableHead>Verified Status</TableHead>
-                      <TableHead>Verified Date</TableHead>
+                      <TableHead>Last Modified</TableHead>
                       <TableHead className="w-[50px] text-right">Actions</TableHead>
                       </TableRow>
                   </TableHeader>
@@ -1039,7 +1046,7 @@ export default function AssetList() {
                               </SelectContent>
                             </Select>
                           </TableCell>
-                          <TableCell>{asset.verifiedDate || 'N/A'}</TableCell>
+                          <TableCell>{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</TableCell>
                           <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                               <DropdownMenu>
                               <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
