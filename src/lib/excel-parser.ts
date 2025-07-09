@@ -136,25 +136,22 @@ export async function parseExcelFile(
 
             for (const row of dataRows) {
                 if (!Array.isArray(row) || row.every(cell => cell === null)) {
-                    continue; // Skip empty rows
+                    continue; // Skip truly empty rows
                 }
 
                 const assetData: Partial<Asset> = { category: sheetName };
-                let descriptionValue = '';
 
                 headerRow.forEach((header, index) => {
                     const field = COLUMN_TO_ASSET_FIELD_MAP[header];
                     if (field) {
                         const rawValue = row[index];
-                        // Import data as-is, converting null/undefined to empty string for consistency
                         (assetData as any)[field] = rawValue !== null && rawValue !== undefined ? String(rawValue) : '';
-                        if (field === 'description') {
-                           descriptionValue = String(rawValue || '').trim();
-                        }
                     }
                 });
 
-                if (!descriptionValue) {
+                // Skip row only if it contains no actual data beyond the category.
+                const hasData = Object.entries(assetData).some(([key, value]) => key !== 'category' && value);
+                if (!hasData) {
                     skipped++;
                     continue;
                 }
