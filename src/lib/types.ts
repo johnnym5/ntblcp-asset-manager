@@ -31,8 +31,8 @@ export interface Asset {
   dateReceived?: string | Timestamp;
   grnNo?: string;
   pvNo?: string;
-  priceNaira?: string;
-  priceUSD?: string;
+  costNgn?: string;
+  costUsd?: string;
   funder?: string;
   remarks?: string;
   grant?: string;
@@ -49,8 +49,6 @@ export interface Asset {
   classification?: string;
   qty?: string;
   site?: string;
-  yearOfPurchase?: string;
-  costNgn?: string;
   state?: string;
   
   // Status fields
@@ -61,7 +59,9 @@ export interface Asset {
   lastModifiedBy?: string; // displayName of user who last modified
   lastModifiedByState?: string; // state of user who last modified
 
-  // Financial data (optional)
+  // Financial data (optional) - Not currently used in logic but reserved
+  priceNaira?: string; // alias for costNgn
+  priceUSD?: string; // alias for costUsd
   accumulatedDepreciation?: { ngn?: string; usd?: string };
   netBookValue?: { ngn?: string; usd?: string };
   valuesByYear?: Record<string, { ngn?: string; usd?: string }>;

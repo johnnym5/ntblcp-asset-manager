@@ -34,13 +34,17 @@ function isHeaderRow(rowData: any[], sheetName: string): boolean {
 
 function getColumnValue(row: any, ...possibleKeys: string[]): string {
     for (const key of possibleKeys) {
-        const lowerKey = key.toLowerCase().replace(/\s+/g, ' ');
+        const lowerKey = key.toLowerCase().trim().replace(/\s+/g, ' ');
         for(const rowKey in row) {
-            if(rowKey.toLowerCase().trim().replace(/\s+/g, ' ') === lowerKey) {
+            const lowerRowKey = rowKey.toLowerCase().trim().replace(/\s+/g, ' ');
+            if(lowerRowKey === lowerKey) {
                 const value = row[rowKey];
-                if (typeof value === 'number' && value > 10000 && lowerKey.includes('date')) {
-                  const date = XLSX.SSF.parse_date_code(value);
-                  return new Date(date.y, date.m - 1, date.d).toLocaleDateString('en-CA');
+                if (typeof value === 'number' && (lowerKey.includes('date') || lowerKey.includes('year'))) {
+                  // Handle Excel date serial numbers
+                  if (value > 20000) { // Arbitrary number to distinguish from simple years
+                    const date = XLSX.SSF.parse_date_code(value);
+                    return new Date(date.y, date.m - 1, date.d).toLocaleDateString('en-CA');
+                  }
                 }
                 return String(value ?? '');
             }
@@ -71,12 +75,11 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
     if (category === 'IHVN-GF N-THRIP') {
         location = getColumnValue(row, 'STATE'); // In this sheet, 'STATE' is the main location
         site = getColumnValue(row, 'LOCATION', 'SITE'); // 'LOCATION' or 'SITE' columns are the facility/site
-        lga = getColumnValue(row, 'LGA'); // This sheet might not have LGA
+        lga = getColumnValue(row, 'LGA');
     } else {
         // Default logic for all other sheets
         location = getColumnValue(row, 'Location', 'LOCATION', 'State');
         lga = getColumnValue(row, 'LGA');
-        // 'site' isn't a common field in other sheets, so we don't try to parse it from them.
     }
 
     const importedAssetData: Partial<Asset> = {
@@ -85,7 +88,7 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
         sn: getColumnValue(row, 'S/N') || existingAsset?.sn,
         location: location || existingAsset?.location,
         lga: lga || existingAsset?.lga,
-        site: site || existingAsset?.site, // Assign parsed site data
+        site: site || existingAsset?.site,
         assignee: assignee || existingAsset?.assignee,
         assetIdCode: assetIdCode || existingAsset?.assetIdCode,
         assetClass: getColumnValue(row, 'Asset Class', 'CLASSIFICATION') || existingAsset?.assetClass,
@@ -98,7 +101,8 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
         dateReceived: getColumnValue(row, 'Date Purchased or Received', 'Date Purchased or  Received', 'YEAR OF PURCHASE') || existingAsset?.dateReceived,
         condition: condition || existingAsset?.condition,
         grant: getColumnValue(row, 'GRANT') || existingAsset?.grant,
-        costNgn: getColumnValue(row, 'COST (NGN)') || existingAsset?.costNgn,
+        costNgn: getColumnValue(row, 'Purchase price (Naira)', 'cost (ngn)') || existingAsset?.costNgn,
+        costUsd: getColumnValue(row, 'Purchase Price (USD)', 'Purchase Price [USD)') || existingAsset?.costUsd,
         remarks: remarks || existingAsset?.remarks,
     };
 
@@ -160,7 +164,6 @@ export async function parseExcelFile(
                         const headerRowIndex = sheetData.findIndex(row => isHeaderRow(row, matchedSheetName));
 
                         if (headerRowIndex === -1) {
-                            // Don't error out, but log it. Some sheets might just not be relevant.
                             console.warn(`Could not find a valid header row in sheet "${sheetName}". Skipping sheet.`);
                             return;
                         }
@@ -182,7 +185,6 @@ export async function parseExcelFile(
                             
                             const idKey = getColumnValue(rowObject, 'Asset ID Code', 'TAG NUMBERS') || getColumnValue(rowObject, 'Serial Number', 'ASSET SERIAL NUMBERS');
                             
-                            // A row is considered valid if it has any data at all.
                             if (!idKey && !getColumnValue(rowObject, 'Asset Description', 'DESCRIPTION')) {
                                 skipped++;
                                 continue;
@@ -214,6 +216,8 @@ export async function parseExcelFile(
 }
 
 
+// This map is the crucial link between the headers in the Excel file and the fields in our Asset object.
+// It handles various spellings and names for the same piece of data.
 const headerToAssetKeyMap: { [key: string]: keyof Asset | string } = {
     's/n': 'sn',
     'location': 'location',
@@ -238,16 +242,15 @@ const headerToAssetKeyMap: { [key: string]: keyof Asset | string } = {
     'year of purchase': 'dateReceived',
     'chq no / goods received note no.': 'grnNo',
     'pv no': 'pvNo',
-    'purchase price (naira)': 'priceNaira',
+    'purchase price (naira)': 'costNgn',
     'cost (ngn)': 'costNgn',
-    'purchase price [usd)': 'priceUSD',
+    'purchase price (usd)': 'costUsd',
+    'purchase price [usd)': 'costUsd',
     'funder': 'funder',
     'condition': 'condition',
     'remarks': 'remarks',
     'comments': 'remarks',
     'grant': 'grant',
-    'useful life (years)': 'usefulLifeYears',
-    'imei (tablets & mobile phones)': 'imei',
     'chasis no': 'chasisNo',
     'engine no': 'engineNo',
     'qty': 'qty',
@@ -275,7 +278,7 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
   for (const category in assetsByCategory) {
       if (Object.prototype.hasOwnProperty.call(assetsByCategory, category)) {
           const categoryAssets = assetsByCategory[category];
-          // Use the cleaned headers from constants for export
+          // Use the cleaned, definitive headers from constants for export
           const headers = HEADER_DEFINITIONS[category];
 
           if (!headers) {
@@ -290,7 +293,8 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
                   const cleanHeader = header.toLowerCase().trim().replace(/\s+/g, ' ');
                   let assetKeyPath = headerToAssetKeyMap[cleanHeader];
 
-                  // Specific override for IHVN sheet's 'LOCATION' column which corresponds to 'site' in our model
+                  // Specific override for IHVN sheet's 'Location' column which corresponds to 'site' in our model.
+                  // The main location is in 'State'.
                   if (category === 'IHVN-GF N-THRIP' && cleanHeader === 'location') {
                       assetKeyPath = 'site';
                   }
@@ -299,6 +303,7 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
                       const value = getNestedValue(asset, assetKeyPath as string);
                       return value ?? '';
                   }
+                  // For headers not in our map (like financial data), return empty string.
                   return '';
               });
               
