@@ -132,12 +132,19 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [inboxMessages, setInboxMessages] = useState<InboxMessageGroup[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('ntblcp-inbox-messages');
-      try {
-        return saved ? JSON.parse(saved) : [];
-      } catch (e) {
-        return [];
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          // Defensively check if the parsed data is an array.
+          if (Array.isArray(parsed)) {
+            return parsed;
+          }
+        } catch (e) {
+          console.error("Failed to parse inbox messages from storage, resetting.", e);
+        }
       }
     }
+    // Return an empty array if anything goes wrong or if nothing is saved.
     return [];
   });
 
@@ -170,7 +177,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-inbox-messages', JSON.stringify(inboxMessages));
+      if (Array.isArray(inboxMessages)) {
+        localStorage.setItem('ntblcp-inbox-messages', JSON.stringify(inboxMessages));
+      }
     }
   }, [inboxMessages]);
     
