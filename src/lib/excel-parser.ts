@@ -1,7 +1,8 @@
+
 import * as XLSX from 'xlsx';
 import type { Asset } from './types';
 import { v4 as uuidv4 } from 'uuid';
-import { HEADER_DEFINITIONS } from './constants';
+import { HEADER_DEFINITIONS, TARGET_SHEETS } from './constants';
 
 // --- Type Definitions ---
 type ColumnToFieldMap = { [key: string]: keyof Asset };
@@ -103,36 +104,49 @@ export async function parseExcelFile(
 
         const existingAssetMap = new Map<string, Asset>();
         existingAssets.forEach(asset => {
-            const key = `${asset.assetIdCode || ''}-${asset.serialNumber || ''}`.toLowerCase();
-            if (asset.assetIdCode || asset.serialNumber) {
+            const key = asset.id; // Use internal ID for reliable mapping
+            if (key) {
                 existingAssetMap.set(key, asset);
             }
         });
+        
+        const existingAssetByIdentifiers = new Map<string, Asset>();
+        existingAssets.forEach(asset => {
+             const key = `${asset.assetIdCode || ''}-${asset.serialNumber || ''}`.toLowerCase();
+            if (asset.assetIdCode || asset.serialNumber) {
+                existingAssetByIdentifiers.set(key, asset);
+            }
+        });
 
-        for (const sheetName of workbook.SheetNames) {
-            if (!enabledSheets.includes(sheetName)) {
+        for (const workbookSheetName of workbook.SheetNames) {
+            const normalizedWorkbookSheetName = workbookSheetName.trim();
+
+            const canonicalSheetName = TARGET_SHEETS.find(
+                s => s.toLowerCase() === normalizedWorkbookSheetName.toLowerCase()
+            );
+
+            if (!canonicalSheetName || !enabledSheets.includes(canonicalSheetName)) {
                 continue;
             }
 
-            const sheet = workbook.Sheets[sheetName];
+            const sheet = workbook.Sheets[workbookSheetName];
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-            const headersForSheet = HEADER_DEFINITIONS[sheetName];
+            const headersForSheet = HEADER_DEFINITIONS[canonicalSheetName];
 
             if (!headersForSheet) {
-                errors.push(`No header definition found for sheet: ${sheetName}. Skipping.`);
+                errors.push(`No header definition found for sheet: ${canonicalSheetName}. Skipping.`);
                 continue;
             }
             
             let headerRowIndex;
-            if (sheetName === 'NTBLCP-TB-FAR') {
+            if (canonicalSheetName === 'NTBLCP-TB-FAR') {
                 headerRowIndex = 6; // The 7th row is index 6
             } else {
                 headerRowIndex = findHeaderRowIndex(sheetData, headersForSheet);
             }
 
-
             if (headerRowIndex === -1 || headerRowIndex >= sheetData.length) {
-                errors.push(`Could not find a valid header row in sheet: ${sheetName}. Skipping.`);
+                errors.push(`Could not find a valid header row in sheet: ${canonicalSheetName}. Skipping.`);
                 continue;
             }
 
@@ -140,24 +154,23 @@ export async function parseExcelFile(
             const dataRows = sheetData.slice(headerRowIndex + 1);
 
             for (const row of dataRows) {
-                if (!Array.isArray(row) || row.every(cell => cell === null)) {
+                if (!Array.isArray(row) || row.every(cell => cell === null || String(cell).trim() === '')) {
                     continue; // Skip truly empty rows
                 }
 
-                const assetData: Partial<Asset> = { category: sheetName };
+                const assetData: Partial<Asset> = { category: canonicalSheetName };
 
                 headerRow.forEach((header, index) => {
                     const field = COLUMN_TO_ASSET_FIELD_MAP[header];
-                    // If the field in our asset object is not yet filled with a value, fill it.
-                    // This gives precedence to the first non-empty column with a given header.
-                    if (field && !(assetData as any)[field] && row[index] !== null) {
-                        (assetData as any)[field] = String(row[index]);
+                    if (field && row[index] !== null && String(row[index]).trim() !== '') {
+                        // Take the first non-empty value for a given field
+                        if (!assetData[field]) {
+                            assetData[field] = String(row[index]);
+                        }
                     }
                 });
 
-                // Skip row only if it contains no actual data beyond the category.
-                const hasData = Object.values(assetData).some(value => !!value);
-                if (!hasData || Object.keys(assetData).length <= 1) {
+                if (Object.keys(assetData).length <= 1) {
                     skipped++;
                     continue;
                 }
@@ -166,7 +179,7 @@ export async function parseExcelFile(
                 const serialNumber = (assetData.serialNumber || '').trim();
 
                 const key = `${assetIdCode}-${serialNumber}`.toLowerCase();
-                const existingAsset = (assetIdCode || serialNumber) ? existingAssetMap.get(key) : undefined;
+                const existingAsset = (assetIdCode || serialNumber) ? existingAssetByIdentifiers.get(key) : undefined;
 
                 if (existingAsset) {
                     // Update existing asset
@@ -212,16 +225,6 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
         acc[category].push(asset);
         return acc;
     }, {} as Record<string, Asset[]>);
-
-    // Create a reverse map for exporting
-    const fieldToColumnMap: { [key in keyof Asset]?: string[] } = {};
-    for (const column in COLUMN_TO_ASSET_FIELD_MAP) {
-        const field = COLUMN_TO_ASSET_FIELD_MAP[column];
-        if (!fieldToColumnMap[field]) {
-            fieldToColumnMap[field] = [];
-        }
-        fieldToColumnMap[field]!.push(column);
-    }
     
     for (const category in assetsByCategory) {
         if (!HEADER_DEFINITIONS[category]) {
