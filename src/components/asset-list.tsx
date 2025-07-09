@@ -175,87 +175,90 @@ export default function AssetList() {
   };
 
   // --- INBOX LOGIC ---
-  const generateInboxUpdates = useCallback((previousAssets: Asset[], newAssets: Asset[], currentUserProfile: typeof userProfile): InboxMessageGroup[] => {
-      if (!isAdmin && !currentUserProfile) {
-          return [];
+  const generateInboxUpdates = useCallback((previousAssets: Asset[], newAssets: Asset[]): InboxMessageGroup[] => {
+    if (!isAdmin) {
+        return [];
+    }
+
+    const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
+    const changesByGroup: Record<string, InboxMessageGroup> = {};
+
+    const userFriendlyFieldNames: Record<string, string> = {
+        verifiedStatus: 'Status',
+        location: 'Location',
+        assignee: 'Assignee',
+        condition: 'Condition',
+        remarks: 'Remarks',
+        description: 'Description',
+        serialNumber: 'Serial Number',
+    };
+
+    for (const newAsset of newAssets) {
+      const previousAsset = previousAssetsMap.get(newAsset.id);
+
+      if (!previousAsset) { // This is a new asset
+            const groupKey = newAsset.lastModifiedBy || 'System';
+            if (!changesByGroup[groupKey]) {
+                changesByGroup[groupKey] = {
+                    updatedBy: groupKey,
+                    updatedAt: newAsset.lastModified || new Date().toISOString(),
+                    changes: [],
+                    updatedAssets: []
+                };
+            }
+            changesByGroup[groupKey].changes.push({
+                assetId: newAsset.id,
+                assetDescription: newAsset.description || 'Untitled Asset',
+                field: 'Asset',
+                from: 'N/A',
+                to: 'Newly Added',
+            });
+            changesByGroup[groupKey].updatedAssets.push(newAsset);
+            continue;
       }
+      
+      const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
+      const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
 
-      const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
-      const changesByGroup: Record<string, InboxMessageGroup> = {};
+      if (newTimestamp > prevTimestamp) { // Asset was updated
+        const detailedChanges: AssetChange[] = [];
+        Object.keys(userFriendlyFieldNames).forEach(key => {
+            const oldValue = previousAsset[key as keyof Asset] as any;
+            const newValue = newAsset[key as keyof Asset] as any;
+            if (String(oldValue || '').trim() !== String(newValue || '').trim()) {
+                detailedChanges.push({
+                    assetId: newAsset.id,
+                    assetDescription: newAsset.description || 'Untitled Asset',
+                    field: userFriendlyFieldNames[key],
+                    from: String(oldValue || 'empty'),
+                    to: String(newValue || 'empty'),
+                });
+            }
+        });
 
-      const userFriendlyFieldNames: Record<string, string> = {
-          verifiedStatus: 'Status',
-          location: 'Location',
-          assignee: 'Assignee',
-          condition: 'Condition',
-          remarks: 'Remarks',
-          description: 'Description',
-          serialNumber: 'Serial Number',
-      };
+        if (detailedChanges.length > 0) {
+            const groupKey = newAsset.lastModifiedBy || 'System';
+            if (!changesByGroup[groupKey]) {
+                changesByGroup[groupKey] = {
+                    updatedBy: groupKey,
+                    updatedAt: newAsset.lastModified || new Date().toISOString(),
+                    changes: [],
+                    updatedAssets: []
+                };
+            }
+            changesByGroup[groupKey].changes.push(...detailedChanges);
+            // Ensure the asset is only added once per group
+            if (!changesByGroup[groupKey].updatedAssets.some(a => a.id === newAsset.id)) {
+                changesByGroup[groupKey].updatedAssets.push(newAsset);
+            }
 
-      for (const newAsset of newAssets) {
-        const previousAsset = previousAssetsMap.get(newAsset.id);
-
-        if (!previousAsset) {
-              const groupKey = newAsset.lastModifiedBy || (currentUserProfile?.displayName || 'Current User');
-              if (!changesByGroup[groupKey]) {
-                  changesByGroup[groupKey] = {
-                      updatedBy: groupKey,
-                      updatedAt: newAsset.lastModified || new Date().toISOString(),
-                      changes: [],
-                      updatedAssets: []
-                  };
-              }
-              changesByGroup[groupKey].changes.push({
-                  assetId: newAsset.id,
-                  assetDescription: newAsset.description || 'Untitled Asset',
-                  field: 'Asset',
-                  from: 'N/A',
-                  to: 'Newly Added',
-              });
-              changesByGroup[groupKey].updatedAssets.push(newAsset);
-              continue;
-        }
-        
-        const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
-        const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
-
-        if (newTimestamp > prevTimestamp + 1000) { 
-          const detailedChanges: AssetChange[] = [];
-          Object.keys(userFriendlyFieldNames).forEach(key => {
-              const oldValue = previousAsset[key as keyof Asset] as any;
-              const newValue = newAsset[key as keyof Asset] as any;
-              if (String(oldValue || '').trim() !== String(newValue || '').trim()) {
-                  detailedChanges.push({
-                      assetId: newAsset.id,
-                      assetDescription: newAsset.description || 'Untitled Asset',
-                      field: userFriendlyFieldNames[key],
-                      from: String(oldValue || 'empty'),
-                      to: String(newValue || 'empty'),
-                  });
-              }
-          });
-
-          if (detailedChanges.length > 0) {
-              const groupKey = newAsset.lastModifiedBy || (currentUserProfile?.displayName || 'Current User');
-              if (!changesByGroup[groupKey]) {
-                  changesByGroup[groupKey] = {
-                      updatedBy: groupKey,
-                      updatedAt: newAsset.lastModified || new Date().toISOString(),
-                      changes: [],
-                      updatedAssets: []
-                  };
-              }
-              changesByGroup[groupKey].changes.push(...detailedChanges);
-              changesByGroup[groupKey].updatedAssets.push(newAsset);
-
-              if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].updatedAt)) {
-                  changesByGroup[groupKey].updatedAt = newAsset.lastModified!;
-              }
-          }
+            if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].updatedAt)) {
+                changesByGroup[groupKey].updatedAt = newAsset.lastModified!;
+            }
         }
       }
-      return Object.values(changesByGroup);
+    }
+    return Object.values(changesByGroup);
   }, [isAdmin]);
 
   const updateInboxState = useCallback((newInboxItems: InboxMessageGroup[]) => {
@@ -328,7 +331,7 @@ export default function AssetList() {
       }
       
       const finalAssetsForState = Array.from(finalAssetsMap.values());
-      const newInboxItems = generateInboxUpdates(localAssets, finalAssetsForState, userProfile)
+      const newInboxItems = generateInboxUpdates(localAssets, finalAssetsForState)
         .filter(group => group.updatedBy !== userProfile?.displayName);
       
       if(newInboxItems.length > 0 && !isInitialLoad.current) {
@@ -817,7 +820,7 @@ export default function AssetList() {
         const combinedAssets = Array.from(assetMap.values());
         
         if(isAdmin) {
-            const inboxUpdatesFromImport = generateInboxUpdates(baseAssets, combinedAssets, userProfile);
+            const inboxUpdatesFromImport = generateInboxUpdates(baseAssets, combinedAssets);
             updateInboxState(inboxUpdatesFromImport);
         }
 
@@ -1284,5 +1287,7 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
 
     

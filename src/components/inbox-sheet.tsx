@@ -71,13 +71,13 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
                           {group.changes.map((change, index) => (
                               <div key={index} className="p-2 rounded-md bg-muted/50">
                                   <p className="font-semibold">{change.assetDescription}</p>
-                                  <div className="flex items-center text-muted-foreground">
+                                  <div className="flex items-center text-muted-foreground flex-wrap">
                                     <span>{change.field} changed:</span>
-                                    <em className="ml-2 not-italic bg-red-100 dark:bg-red-900/50 px-1 rounded-sm text-red-800 dark:text-red-300 max-w-[100px] truncate">
+                                    <em className="ml-2 not-italic bg-red-100 dark:bg-red-900/50 px-1 rounded-sm text-red-800 dark:text-red-300">
                                       {change.from}
                                     </em>
                                     <ArrowRight className="h-3 w-3 mx-1" />
-                                    <em className="not-italic bg-green-100 dark:bg-green-900/50 px-1 rounded-sm text-green-800 dark:text-green-300 max-w-[100px] truncate">
+                                    <em className="not-italic bg-green-100 dark:bg-green-900/50 px-1 rounded-sm text-green-800 dark:text-green-300">
                                       {change.to}
                                     </em>
                                   </div>
@@ -121,3 +121,5 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
     </>
   );
 }
+
+    
