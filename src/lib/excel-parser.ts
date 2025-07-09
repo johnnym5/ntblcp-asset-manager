@@ -55,26 +55,17 @@ function getColumnValue(row: any, ...possibleKeys: string[]): string {
 
 function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset {
     const description = getColumnValue(row, 'Asset Description', 'DESCRIPTION');
-    const assetIdCode = getColumnValue(row, 'Asset ID Code', 'TAG NUMBERS');
-    const serialNumber = getColumnValue(row, 'Serial Number', 'ASSET SERIAL NUMBERS');
-    const chasisNo = getColumnValue(row, 'Chasis no');
-    const engineNo = getColumnValue(row, 'Engine no');
-    const condition = getColumnValue(row, 'Condition');
-    const remarks = getColumnValue(row, 'Remarks', 'Comments');
     
-    const assignee = getColumnValue(row, 'Assignee');
-
     // Sheet-specific logic for ambiguous fields like location/site
     let location = '';
     let site = '';
     let lga = '';
     
     if (category === 'IHVN-GF N-THRIP') {
-        location = getColumnValue(row, 'STATE'); // In this sheet, 'STATE' is the main location
-        site = getColumnValue(row, 'LOCATION', 'SITE'); // 'LOCATION' or 'SITE' columns are the facility/site
+        location = getColumnValue(row, 'STATE');
+        site = getColumnValue(row, 'LOCATION', 'SITE');
         lga = getColumnValue(row, 'LGA');
     } else {
-        // Default logic for all other sheets
         location = getColumnValue(row, 'Location', 'LOCATION', 'State');
         lga = getColumnValue(row, 'LGA');
     }
@@ -86,21 +77,26 @@ function mapRowToAsset(row: any, category: string, existingAsset?: Asset): Asset
         location: location || existingAsset?.location,
         lga: lga || existingAsset?.lga,
         site: site || existingAsset?.site,
-        assignee: assignee || existingAsset?.assignee,
-        assetIdCode: assetIdCode || existingAsset?.assetIdCode,
+        
+        // Raw import for these fields. No fallback to existing value.
+        // This ensures the data from the Excel sheet is always treated as the source of truth for these fields.
+        assignee: getColumnValue(row, 'Assignee'),
+        assetIdCode: getColumnValue(row, 'Asset ID Code', 'TAG NUMBERS'),
+        manufacturer: getColumnValue(row, 'Manufacturer'),
+        modelNumber: getColumnValue(row, 'Model Number', 'MODEL NUMBERS'),
+        serialNumber: getColumnValue(row, 'Serial Number', 'ASSET SERIAL NUMBERS'),
+        
+        // Other fields can keep the fallback logic for now
         assetClass: getColumnValue(row, 'Asset Class', 'CLASSIFICATION') || existingAsset?.assetClass,
-        manufacturer: getColumnValue(row, 'Manufacturer') || existingAsset?.manufacturer,
-        modelNumber: getColumnValue(row, 'Model Number', 'MODEL NUMBERS') || existingAsset?.modelNumber,
-        serialNumber: serialNumber || existingAsset?.serialNumber,
-        chasisNo: chasisNo || existingAsset?.chasisNo,
-        engineNo: engineNo || existingAsset?.engineNo,
+        chasisNo: getColumnValue(row, 'Chasis no') || existingAsset?.chasisNo,
+        engineNo: getColumnValue(row, 'Engine no') || existingAsset?.engineNo,
         supplier: getColumnValue(row, 'Supplier', 'Suppliers') || existingAsset?.supplier,
         dateReceived: getColumnValue(row, 'Date Purchased or Received', 'Date Purchased or  Received', 'YEAR OF PURCHASE') || existingAsset?.dateReceived,
-        condition: condition || existingAsset?.condition,
+        condition: getColumnValue(row, 'Condition') || existingAsset?.condition,
         grant: getColumnValue(row, 'GRANT') || existingAsset?.grant,
         costNgn: getColumnValue(row, 'Purchase price (Naira)', 'cost (ngn)') || existingAsset?.costNgn,
         costUsd: getColumnValue(row, 'Purchase Price (USD)', 'Purchase Price [USD)') || existingAsset?.costUsd,
-        remarks: remarks || existingAsset?.remarks,
+        remarks: getColumnValue(row, 'Remarks', 'Comments') || existingAsset?.remarks,
     };
 
     if (existingAsset) {
