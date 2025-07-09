@@ -46,7 +46,7 @@ export interface Asset {
   // Status fields
   verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy';
   verifiedDate?: string;
-  syncStatus?: 'synced' | 'local';
+  syncStatus?: 'synced' | 'local' | 'syncing';
   lastModified?: string; // ISO 8601 date string
   lastModifiedBy?: string; // displayName of user who last modified
   lastModifiedByState?: string; // state of user who last modified
@@ -79,3 +79,5 @@ export interface InboxMessageGroup {
   // Keep track of the full assets that were updated in this group
   updatedAssets: Asset[]; 
 }
+
+    

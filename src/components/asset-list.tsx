@@ -130,6 +130,7 @@ export default function AssetList() {
   const [currentPage, setCurrentPage] = useState(1);
   
   const isInitialLoad = useRef(true);
+  const syncQueueRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const { 
     searchTerm, setSearchTerm,
@@ -284,20 +285,29 @@ export default function AssetList() {
 
 
   // --- DATA LOADING & SYNC ---
-  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync = false) => {
       const localAssets = await getLocalAssetsFromDb();
-      const mergedAssetMap = new Map<string, Asset>();
-      localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
-      fetchedAssets.forEach(asset => {
-        const existing = mergedAssetMap.get(asset.id);
-        if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
-            mergedAssetMap.set(asset.id, asset);
-        }
-      });
-      
-      const mergedAssets = Array.from(mergedAssetMap.values());
-      const assetsToPush = mergedAssets.filter(a => a.syncStatus === 'local');
+      let mergedAssets = [...localAssets];
 
+      if (isManualSync) {
+        // For manual sync, cloud is the source of truth, but we keep local-only new items.
+        const fetchedAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
+        const localOnlyNewAssets = localAssets.filter(la => !fetchedAssetsMap.has(la.id));
+        mergedAssets = [...fetchedAssets, ...localOnlyNewAssets];
+      } else {
+        // For listeners, merge based on timestamp.
+        const mergedAssetMap = new Map<string, Asset>();
+        localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
+        fetchedAssets.forEach(asset => {
+          const existing = mergedAssetMap.get(asset.id);
+          if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
+              mergedAssetMap.set(asset.id, { ...asset, syncStatus: 'synced' });
+          }
+        });
+        mergedAssets = Array.from(mergedAssetMap.values());
+      }
+      
+      const assetsToPush = mergedAssets.filter(a => a.syncStatus === 'local');
       if (isOnline && assetsToPush.length > 0) {
         addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
         try {
@@ -317,7 +327,41 @@ export default function AssetList() {
       setAssets(finalAssets);
       await saveAssets(finalAssets);
       isInitialLoad.current = false;
-  }, [userProfile, generateInboxUpdates, updateInboxState, isOnline, isInitialLoad]);
+  }, [userProfile, generateInboxUpdates, updateInboxState, isOnline]);
+
+  const scheduleSync = useCallback((assetToSync: Asset) => {
+      if (!isOnline) return;
+
+      const existingTimer = syncQueueRef.current.get(assetToSync.id);
+      if (existingTimer) {
+          clearTimeout(existingTimer);
+      }
+
+      const newTimer = setTimeout(async () => {
+          try {
+              setAssets(prev => prev.map(a => a.id === assetToSync.id ? { ...a, syncStatus: 'syncing' } : a));
+              
+              await updateAsset({ ...assetToSync, syncStatus: 'synced' });
+
+              setAssets(prev => prev.map(a => a.id === assetToSync.id ? { ...a, syncStatus: 'synced' } : a));
+              const currentAssets = await getLocalAssetsFromDb();
+              const assetIndex = currentAssets.findIndex(a => a.id === assetToSync.id);
+              if(assetIndex > -1){
+                  currentAssets[assetIndex].syncStatus = 'synced';
+                  await saveAssets(currentAssets);
+              }
+
+              addNotification({ title: 'Asset Synced', description: `Changes for "${assetToSync.description || 'asset'}" saved to cloud.` });
+          } catch (error) {
+              addNotification({ title: 'Sync Failed', description: `Could not sync "${assetToSync.description || 'asset'}".`, variant: 'destructive' });
+              setAssets(prev => prev.map(a => a.id === assetToSync.id ? { ...a, syncStatus: 'local' } : a));
+          } finally {
+              syncQueueRef.current.delete(assetToSync.id);
+          }
+      }, 5000);
+
+      syncQueueRef.current.set(assetToSync.id, newTimer);
+  }, [isOnline]);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -345,7 +389,7 @@ export default function AssetList() {
       querySnapshot.forEach((doc) => {
         fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
       });
-      await handleFetchedAssets(fetchedAssets);
+      await handleFetchedAssets(fetchedAssets, false);
       
       if (isSyncingRef.current) {
         setIsSyncing(false);
@@ -374,9 +418,8 @@ export default function AssetList() {
 
         try {
             const fetchedAssets = await getAssets();
-            // Before saving, clear local data to ensure a clean slate from the server
-            await clearLocalAssets();
-            await handleFetchedAssets(fetchedAssets);
+            await clearLocalAssets(); // Clear local to ensure cloud is source of truth for sync
+            await handleFetchedAssets(fetchedAssets, true);
             if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
             addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
@@ -387,15 +430,9 @@ export default function AssetList() {
     };
     
     if (!isOnline) return;
+    if (isAdmin && autoSyncEnabled) return;
 
-    if (isAdmin && autoSyncEnabled) {
-        return;
-    }
-
-    const isFirstOnlineLoad = isInitialLoad.current;
-    const isManualSync = manualSyncTrigger > 0;
-
-    if (isFirstOnlineLoad || isManualSync) {
+    if (manualSyncTrigger > 0) {
         fetchAssetsOnce();
     }
   }, [isOnline, manualSyncTrigger, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
@@ -617,35 +654,26 @@ export default function AssetList() {
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName,
             lastModifiedByState: userProfile?.state,
+            syncStatus: 'local',
         };
         if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
             updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
         } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
             updatedAsset.verifiedDate = '';
         }
-        if (!isOnline) {
-          updatedAsset.syncStatus = 'local';
-        }
         return updatedAsset;
     });
 
-    if (isOnline) {
-        try {
-            const updatePromises = updatedAssets.map(asset => updateAsset(asset));
-            await Promise.all(updatePromises);
-            addNotification({ title: 'Assets Updated', description: `Successfully updated ${assetsToUpdateCount} assets.` });
-        } catch (e) {
-            addNotification({ title: 'Error', description: 'Could not update all selected assets in the cloud.', variant: 'destructive' });
-        }
-    } else {
-        let currentAssets = await getLocalAssetsFromDb();
-        const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
-        currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
-        await saveAssets(currentAssets);
-        setAssets(currentAssets);
-        addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets. Will sync on next connection.` });
-    }
+    let currentAssets = await getLocalAssetsFromDb();
+    const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
+    currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+    await saveAssets(currentAssets);
+    setAssets(currentAssets);
+    addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets. Sync will start for each.` });
+    
     setSelectedAssetIds([]);
+
+    updatedAssets.forEach(asset => scheduleSync(asset));
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
@@ -654,30 +682,22 @@ export default function AssetList() {
       lastModified: new Date().toISOString(),
       lastModifiedBy: userProfile?.displayName,
       lastModifiedByState: userProfile?.state,
+      syncStatus: 'local',
     };
-    if (isOnline) {
-        finalAsset.syncStatus = 'synced';
-        try {
-            await updateAsset(finalAsset);
-            addNotification({ title: 'Saved Successfully', description: 'Asset changes have been saved.' });
-            setIsFormOpen(false);
-        } catch (e) {
-            addNotification({ title: 'Error Saving', description: 'Could not save asset to the database.', variant: 'destructive' });
-        }
+    
+    const currentAssets = await getLocalAssetsFromDb();
+    const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
+    if (existingIndex > -1) {
+        currentAssets[existingIndex] = finalAsset;
     } else {
-        finalAsset.syncStatus = 'local';
-        const currentAssets = await getLocalAssetsFromDb();
-        const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
-        if (existingIndex > -1) {
-            currentAssets[existingIndex] = finalAsset;
-        } else {
-            currentAssets.unshift(finalAsset);
-        }
-        await saveAssets(currentAssets);
-        setAssets(currentAssets);
-        addNotification({ title: 'Saved Locally', description: 'Asset saved. Sync when you go online.' });
-        setIsFormOpen(false);
+        currentAssets.unshift(finalAsset);
     }
+    await saveAssets(currentAssets);
+    setAssets(currentAssets);
+    addNotification({ title: 'Saved Locally', description: 'Changes saved. Sync will start shortly.' });
+    setIsFormOpen(false);
+
+    scheduleSync(finalAsset);
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
@@ -689,21 +709,18 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
+        syncStatus: 'local',
     };
 
-    if (isOnline) {
-        updatedAsset.syncStatus = 'synced';
-        await updateAsset(updatedAsset);
-    } else {
-        updatedAsset.syncStatus = 'local';
-        const currentAssets = await getLocalAssetsFromDb();
-        const existingIndex = currentAssets.findIndex(a => a.id === assetId);
-        if (existingIndex > -1) {
-            currentAssets[existingIndex] = updatedAsset;
-            await saveAssets(currentAssets);
-            setAssets(currentAssets);
-        }
+    const currentAssets = await getLocalAssetsFromDb();
+    const existingIndex = currentAssets.findIndex(a => a.id === assetId);
+    if (existingIndex > -1) {
+        currentAssets[existingIndex] = updatedAsset;
+        await saveAssets(currentAssets);
+        setAssets(currentAssets);
     }
+    
+    scheduleSync(updatedAsset);
   };
 
   const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
@@ -1087,13 +1104,15 @@ export default function AssetList() {
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
                                 <span>{asset.description}</span>
-                                {asset.syncStatus === 'local' && (
+                                {(asset.syncStatus === 'local' || asset.syncStatus === 'syncing') && (
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger>
                                                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                             </TooltipTrigger>
-                                            <TooltipContent><p>Awaiting sync</p></TooltipContent>
+                                            <TooltipContent>
+                                                <p>{asset.syncStatus === 'syncing' ? 'Syncing...' : 'Awaiting sync'}</p>
+                                            </TooltipContent>
                                         </Tooltip>
                                     </TooltipProvider>
                                 )}
@@ -1210,3 +1229,5 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
