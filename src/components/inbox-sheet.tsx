@@ -38,8 +38,7 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
   const handleViewDetails = (group: InboxMessageGroup) => {
       // The full updated assets are now stored in the group itself
       setViewingAssets(group.updatedAssets);
-      // Dismiss the group from the inbox after viewing
-      handleDismissGroup(group.updatedBy);
+      // Viewing details should not dismiss the group. The user can dismiss it manually.
   };
 
   return (
@@ -121,5 +120,3 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
     </>
   );
 }
-
-    
