@@ -176,19 +176,37 @@ export default function AssetList() {
 
   // --- DATA LOADING & SYNC ---
   const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
-      const uniqueAssets = getNewestDuplicate(fetchedAssets);
+      // This function now merges the fetched assets with local assets instead of overwriting.
+      
+      const localAssets = await getLocalAssetsFromDb();
+      const mergedAssetMap = new Map<string, Asset>();
 
-      if (!userProfile) {
-        setAssets(uniqueAssets);
-        await saveAssets(uniqueAssets);
-        return;
+      // Prioritize local assets first
+      localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
+
+      // Merge fetched assets, overwriting only if the fetched asset is newer.
+      fetchedAssets.forEach(asset => {
+        const existing = mergedAssetMap.get(asset.id);
+        if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
+            mergedAssetMap.set(asset.id, asset);
+        }
+      });
+      
+      const mergedAssets = Array.from(mergedAssetMap.values());
+      const assetsToPush = mergedAssets.filter(a => a.syncStatus === 'local');
+
+      if (isOnline && assetsToPush.length > 0) {
+        addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
+        try {
+            await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
+        } catch(e) {
+            addNotification({title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive'});
+        }
       }
-      
-      const isAdminUser = userProfile?.displayName?.toLowerCase().trim() === 'admin';
-      
-      if (isAdminUser) {
-        const previousAssets = await getLocalAssetsFromDb();
-        const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
+
+      // The inbox logic should compare the new merged list with the old local list.
+      if (userProfile?.displayName?.toLowerCase().trim() === 'admin') {
+        const previousAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         const changesByGroup: Record<string, InboxMessageGroup> = {};
 
         const userFriendlyFieldNames: Record<string, string> = {
@@ -201,14 +219,12 @@ export default function AssetList() {
             serialNumber: 'Serial Number',
         };
 
-        for (const newAsset of uniqueAssets) {
+        for (const newAsset of mergedAssets) {
           if (newAsset.lastModifiedBy === userProfile?.displayName) {
             continue; 
           }
           const previousAsset = previousAssetsMap.get(newAsset.id);
-          if (!previousAsset) {
-             // For now, only track updates, not new creations, to avoid inbox clutter.
-          } else {
+          if (previousAsset) {
             const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
             const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
             if (newTimestamp > prevTimestamp + 1000) { 
@@ -270,11 +286,12 @@ export default function AssetList() {
             setUnreadInboxCount(prevCount => prevCount + totalNewChanges);
         }
       }
-
-      setAssets(uniqueAssets);
-      await saveAssets(uniqueAssets);
+      
+      const finalAssets = getNewestDuplicate(mergedAssets);
+      setAssets(finalAssets);
+      await saveAssets(finalAssets);
       isInitialLoad.current = false;
-  }, [userProfile, setInboxMessages, setUnreadInboxCount]);
+  }, [userProfile, setInboxMessages, setUnreadInboxCount, isOnline]);
 
   useEffect(() => {
     const loadInitialData = async () => {
@@ -304,8 +321,6 @@ export default function AssetList() {
       });
       await handleFetchedAssets(fetchedAssets);
       
-      // isInitialLoad logic inside handleFetchedAssets handles inbox notifications
-      
       if (isSyncingRef.current) {
         setIsSyncing(false);
       }
@@ -333,8 +348,6 @@ export default function AssetList() {
 
         try {
             const fetchedAssets = await getAssets();
-            // When we get fresh data, we want it to be the new source of truth locally.
-            await clearLocalAssets();
             await handleFetchedAssets(fetchedAssets);
             if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
@@ -507,6 +520,12 @@ export default function AssetList() {
   const handleDeleteConfirm = async () => {
     if (!assetToDelete) return;
 
+    if (lockAssetList) {
+        addNotification({ title: "Deletion Disabled", description: "The asset list is locked and cannot be modified.", variant: "destructive" });
+        setIsDeleteDialogOpen(false);
+        return;
+    }
+
     if (isOnline) {
         addNotification({ title: 'Deleting Asset...', description: `Removing "${assetToDelete.description}"` });
         try {
@@ -528,6 +547,11 @@ export default function AssetList() {
   }
 
   const handleBatchDelete = async () => {
+    if (lockAssetList) {
+        addNotification({ title: "Deletion Disabled", description: "The asset list is locked and cannot be modified.", variant: "destructive" });
+        return;
+    }
+    
     setIsBatchDeleting(true);
     const assetsToDeleteCount = selectedAssetIds.length;
 
