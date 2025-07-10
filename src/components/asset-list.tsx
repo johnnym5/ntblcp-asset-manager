@@ -43,8 +43,7 @@ import {
   ClipboardEdit,
   FolderSearch,
   X,
-  LogIn,
-  LogOut,
+  ChevronsUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -58,11 +57,21 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 
 import { AssetForm } from "./asset-form";
-import type { Asset, AssetChange, InboxMessageGroup, ActivityLog } from "@/lib/types";
+import type { Asset, AssetChange, InboxMessageGroup } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
@@ -70,10 +79,10 @@ import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets, getActivityLogs, addActivityLog } from "@/lib/firestore";
+import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
-import { onSnapshot, query, collection, orderBy, limit } from "firebase/firestore";
+import { onSnapshot, query, collection } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 
@@ -119,7 +128,7 @@ export default function AssetList() {
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { userProfile, updateProfile } = useAuth();
+  const { userProfile } = useAuth();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
@@ -130,6 +139,8 @@ export default function AssetList() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [locationSearch, setLocationSearch] = useState("");
+  const [isLocationPopoverOpen, setIsLocationPopoverOpen] = useState(false);
   
   const isInitialLoad = useRef(true);
   const syncQueueRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -144,7 +155,7 @@ export default function AssetList() {
     manualSyncTrigger, isSyncing, setIsSyncing,
     autoSyncEnabled,
     setDataActions,
-    setInboxMessages,
+    setInboxMessages, setUnreadInboxCount,
   } = useAppState();
 
   const isSyncingRef = useRef(isSyncing);
@@ -177,186 +188,157 @@ export default function AssetList() {
   };
 
   // --- INBOX LOGIC ---
-  const generateInboxUpdates = useCallback((previousAssets: Asset[], newAssets: Asset[]): InboxMessageGroup[] => {
-    if (!isAdmin) {
-        return [];
-    }
-
-    const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
-    const changesByGroup: Record<string, InboxMessageGroup> = {};
-
-    const userFriendlyFieldNames: Record<string, string> = {
-        verifiedStatus: 'Status',
-        location: 'Location',
-        assignee: 'Assignee',
-        condition: 'Condition',
-        remarks: 'Remarks',
-        description: 'Description',
-        serialNumber: 'Serial Number',
-    };
-
-    for (const newAsset of newAssets) {
-      const previousAsset = previousAssetsMap.get(newAsset.id);
-
-      if (!previousAsset) { // This is a new asset
-            const groupKey = newAsset.lastModifiedBy || 'System';
-            if (!changesByGroup[groupKey]) {
-                changesByGroup[groupKey] = {
-                    id: groupKey,
-                    type: 'asset',
-                    updatedBy: groupKey,
-                    updatedByState: newAsset.lastModifiedByState,
-                    timestamp: newAsset.lastModified || new Date().toISOString(),
-                    changes: [],
-                    updatedAssets: []
-                };
-            }
-            changesByGroup[groupKey].changes!.push({
-                assetId: newAsset.id,
-                assetDescription: newAsset.description || 'Untitled Asset',
-                field: 'Asset',
-                from: 'N/A',
-                to: 'Newly Added',
-                category: newAsset.category,
-            });
-            changesByGroup[groupKey].updatedAssets!.push(newAsset);
-            continue;
+  const generateInboxUpdates = useCallback((previousAssets: Asset[], newAssets: Asset[], currentUserProfile: typeof userProfile): InboxMessageGroup[] => {
+      if (!isAdmin) {
+          return [];
       }
-      
-      const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
-      const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
 
-      if (newTimestamp > prevTimestamp) { // Asset was updated
-        const detailedChanges: AssetChange[] = [];
-        Object.keys(userFriendlyFieldNames).forEach(key => {
-            const oldValue = previousAsset[key as keyof Asset] as any;
-            const newValue = newAsset[key as keyof Asset] as any;
-            if (String(oldValue || '').trim() !== String(newValue || '').trim()) {
-                detailedChanges.push({
-                    assetId: newAsset.id,
-                    assetDescription: newAsset.description || 'Untitled Asset',
-                    field: userFriendlyFieldNames[key],
-                    from: String(oldValue || 'empty'),
-                    to: String(newValue || 'empty'),
-                    category: newAsset.category,
-                });
-            }
-        });
+      const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
+      const changesByGroup: Record<string, InboxMessageGroup> = {};
 
-        if (detailedChanges.length > 0) {
-            const groupKey = newAsset.lastModifiedBy || 'System';
-            if (!changesByGroup[groupKey]) {
-                changesByGroup[groupKey] = {
-                    id: groupKey,
-                    type: 'asset',
-                    updatedBy: groupKey,
-                    updatedByState: newAsset.lastModifiedByState,
-                    timestamp: newAsset.lastModified || new Date().toISOString(),
-                    changes: [],
-                    updatedAssets: []
-                };
-            }
-            changesByGroup[groupKey].changes!.push(...detailedChanges);
-            // Ensure the asset is only added once per group
-            if (!changesByGroup[groupKey].updatedAssets!.some(a => a.id === newAsset.id)) {
-                changesByGroup[groupKey].updatedAssets!.push(newAsset);
-            }
+      const userFriendlyFieldNames: Record<string, string> = {
+          verifiedStatus: 'Status',
+          location: 'Location',
+          assignee: 'Assignee',
+          condition: 'Condition',
+          remarks: 'Remarks',
+          description: 'Description',
+          serialNumber: 'Serial Number',
+      };
 
-            if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].timestamp)) {
-                changesByGroup[groupKey].timestamp = newAsset.lastModified!;
-            }
+      for (const newAsset of newAssets) {
+        const previousAsset = previousAssetsMap.get(newAsset.id);
+
+        if (!previousAsset) {
+              const groupKey = newAsset.lastModifiedBy || 'An unknown user';
+              if (!changesByGroup[groupKey]) {
+                  changesByGroup[groupKey] = {
+                      updatedBy: groupKey,
+                      updatedAt: newAsset.lastModified || new Date().toISOString(),
+                      changes: [],
+                      updatedAssets: []
+                  };
+              }
+              changesByGroup[groupKey].changes.push({
+                  assetId: newAsset.id,
+                  assetDescription: newAsset.description || 'Untitled Asset',
+                  field: 'Asset',
+                  from: 'N/A',
+                  to: 'Newly Added',
+              });
+              changesByGroup[groupKey].updatedAssets.push(newAsset);
+              continue;
+        }
+        
+        const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
+        const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
+
+        if (newTimestamp > prevTimestamp + 1000) { 
+          const detailedChanges: AssetChange[] = [];
+          Object.keys(userFriendlyFieldNames).forEach(key => {
+              const oldValue = previousAsset[key as keyof Asset] as any;
+              const newValue = newAsset[key as keyof Asset] as any;
+              if (String(oldValue || '').trim() !== String(newValue || '').trim()) {
+                  detailedChanges.push({
+                      assetId: newAsset.id,
+                      assetDescription: newAsset.description || 'Untitled Asset',
+                      field: userFriendlyFieldNames[key],
+                      from: String(oldValue || 'empty'),
+                      to: String(newValue || 'empty'),
+                  });
+              }
+          });
+
+          if (detailedChanges.length > 0) {
+              const groupKey = newAsset.lastModifiedBy || 'An unknown user';
+              if (!changesByGroup[groupKey]) {
+                  changesByGroup[groupKey] = {
+                      updatedBy: groupKey,
+                      updatedAt: newAsset.lastModified || new Date().toISOString(),
+                      changes: [],
+                      updatedAssets: []
+                  };
+              }
+              changesByGroup[groupKey].changes.push(...detailedChanges);
+              changesByGroup[groupKey].updatedAssets.push(newAsset);
+
+              if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].updatedAt)) {
+                  changesByGroup[groupKey].updatedAt = newAsset.lastModified!;
+              }
+          }
         }
       }
-    }
-    return Object.values(changesByGroup);
+      return Object.values(changesByGroup);
   }, [isAdmin]);
 
   const updateInboxState = useCallback((newInboxItems: InboxMessageGroup[]) => {
       if (newInboxItems.length > 0) {
           setInboxMessages(prevMessages => {
-              const messageMap = new Map(prevMessages.map(g => [g.id, g]));
-              
+              const existingGroups = new Map(prevMessages.map(g => [g.updatedBy, g]));
               newInboxItems.forEach(newGroup => {
-                  if (newGroup.type === 'activity') {
-                      messageMap.set(newGroup.id, newGroup);
-                  } else { // type === 'asset'
-                      const existingGroup = messageMap.get(newGroup.id) as InboxMessageGroup | undefined;
-                      if (existingGroup && existingGroup.type === 'asset') {
-                          existingGroup.changes!.push(...(newGroup.changes || []));
-                          const updatedAssetsMap = new Map(existingGroup.updatedAssets!.map(a => [a.id, a]));
-                          (newGroup.updatedAssets || []).forEach(a => updatedAssetsMap.set(a.id, a));
-                          existingGroup.updatedAssets = Array.from(updatedAssetsMap.values());
-                          if (new Date(newGroup.timestamp) > new Date(existingGroup.timestamp)) {
-                              existingGroup.timestamp = newGroup.timestamp;
-                          }
-                      } else {
-                          messageMap.set(newGroup.id, newGroup);
+                  const existingGroup = existingGroups.get(newGroup.updatedBy);
+                  if (existingGroup) {
+                      existingGroup.changes.push(...newGroup.changes);
+                      const updatedAssetsMap = new Map(existingGroup.updatedAssets.map(a => [a.id, a]));
+                      newGroup.updatedAssets.forEach(a => updatedAssetsMap.set(a.id, a));
+                      existingGroup.updatedAssets = Array.from(updatedAssetsMap.values());
+                      if (new Date(newGroup.updatedAt) > new Date(existingGroup.updatedAt)) {
+                          existingGroup.updatedAt = newGroup.updatedAt;
                       }
+                  } else {
+                      existingGroups.set(newGroup.updatedBy, newGroup);
                   }
               });
-
-              return Array.from(messageMap.values()).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+              return Array.from(existingGroups.values()).sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
           });
+          const totalNewChanges = newInboxItems.reduce((acc, group) => acc + group.changes.length, 0);
+          setUnreadInboxCount(prevCount => prevCount + totalNewChanges);
       }
-  }, [setInboxMessages]);
+  }, [setInboxMessages, setUnreadInboxCount]);
 
 
   // --- DATA LOADING & SYNC ---
-  const handleSafeMergeAndSync = useCallback(async (fetchedAssets: Asset[]) => {
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync = false) => {
       const localAssets = await getLocalAssetsFromDb();
-      const finalAssetsMap = new Map(localAssets.map(a => [a.id, a]));
+      let mergedAssets = [...localAssets];
 
-      // Merge fetched assets, preferring the one with the latest timestamp
-      fetchedAssets.forEach(cloudAsset => {
-          const localAsset = finalAssetsMap.get(cloudAsset.id);
-          const cloudTimestamp = new Date(cloudAsset.lastModified || 0).getTime();
-          const localTimestamp = localAsset ? new Date(localAsset.lastModified || 0).getTime() : 0;
-          
-          if (!localAsset || cloudTimestamp > localTimestamp) {
-              finalAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
+      if (isManualSync) {
+        // For manual sync, cloud is the source of truth, but we keep local-only new items.
+        const fetchedAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
+        const localOnlyNewAssets = localAssets.filter(la => !fetchedAssetsMap.has(la.id));
+        mergedAssets = [...fetchedAssets, ...localOnlyNewAssets];
+      } else {
+        // For listeners, merge based on timestamp.
+        const mergedAssetMap = new Map<string, Asset>();
+        localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
+        fetchedAssets.forEach(asset => {
+          const existing = mergedAssetMap.get(asset.id);
+          if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
+              mergedAssetMap.set(asset.id, { ...asset, syncStatus: 'synced' });
           }
-      });
+        });
+        mergedAssets = Array.from(mergedAssetMap.values());
+      }
       
-      const mergedAssets = Array.from(finalAssetsMap.values());
-
-      // Identify assets that need to be pushed to the cloud
-      const assetsToPush = mergedAssets.filter(asset => {
-        const cloudAsset = fetchedAssets.find(fa => fa.id === asset.id);
-        if (!cloudAsset) return true; // It's a new asset
-        const cloudTimestamp = new Date(cloudAsset.lastModified || 0).getTime();
-        const localTimestamp = new Date(asset.lastModified || 0).getTime();
-        return localTimestamp > cloudTimestamp; // It's a modified asset
-      });
-      
+      const assetsToPush = mergedAssets.filter(a => a.syncStatus === 'local');
       if (isOnline && assetsToPush.length > 0) {
         addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
         try {
             await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
-             // After successful push, update the local status to 'synced'
-            assetsToPush.forEach(asset => {
-                const existing = finalAssetsMap.get(asset.id);
-                if (existing) {
-                    finalAssetsMap.set(asset.id, { ...existing, syncStatus: 'synced' });
-                }
-            });
         } catch(e) {
             addNotification({title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive'});
         }
       }
       
-      const finalAssetsForState = Array.from(finalAssetsMap.values());
-      const newInboxItems = generateInboxUpdates(localAssets, finalAssetsForState);
-      
+      const newInboxItems = generateInboxUpdates(localAssets, mergedAssets, userProfile)
+        .filter(group => group.updatedBy !== userProfile?.displayName);
       if(newInboxItems.length > 0 && !isInitialLoad.current) {
-        const nonSelfUpdates = newInboxItems.filter(group => group.updatedBy !== userProfile?.displayName);
-        if (nonSelfUpdates.length > 0) {
-          updateInboxState(nonSelfUpdates);
-        }
+        updateInboxState(newInboxItems);
       }
       
-      const finalUniqueAssets = getNewestDuplicate(finalAssetsForState);
-      setAssets(finalUniqueAssets);
-      await saveAssets(finalUniqueAssets);
+      const finalAssets = getNewestDuplicate(mergedAssets);
+      setAssets(finalAssets);
+      await saveAssets(finalAssets);
       isInitialLoad.current = false;
   }, [userProfile, generateInboxUpdates, updateInboxState, isOnline]);
 
@@ -405,80 +387,44 @@ export default function AssetList() {
     loadInitialData();
   }, []);
 
-  // Real-time listeners
+  // Real-time listener for Admins with Auto-Sync
   useEffect(() => {
-    if (!isOnline || !isAdmin) {
+    if (!isOnline || !isAdmin || !autoSyncEnabled) {
       return;
     }
 
-    const setupListeners = () => {
-        let unsubAssets: () => void;
-        let unsubActivity: () => void;
+    addNotification({ title: 'Real-time Sync Active', description: 'Asset list will update automatically.' });
+    setIsSyncing(true);
 
-        if (autoSyncEnabled) {
-            addNotification({ title: 'Real-time Sync Active', description: 'Asset list will update automatically.' });
-            setIsSyncing(true);
+    const q = query(collection(db, 'assets'));
+    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+      const fetchedAssets: Asset[] = [];
+      querySnapshot.forEach((doc) => {
+        fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+      });
+      await handleFetchedAssets(fetchedAssets, false);
+      
+      if (isSyncingRef.current) {
+        setIsSyncing(false);
+      }
+    }, (error) => {
+      if ((error as any).code === 'permission-denied') {
+        addNotification({ title: "Permissions Error", description: "You don't have permission to view real-time asset updates. Contact an administrator.", variant: 'destructive' })
+      } else {
+        console.error("Firestore real-time listener error:", error);
+        addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
+      }
+      setIsSyncing(false);
+      setIsOnline(false);
+    });
 
-            const assetsQuery = query(collection(db, 'assets'));
-            unsubAssets = onSnapshot(assetsQuery, async (querySnapshot) => {
-                const fetchedAssets: Asset[] = [];
-                querySnapshot.forEach((doc) => {
-                    fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
-                });
-                await handleSafeMergeAndSync(fetchedAssets);
-                if (isSyncingRef.current) setIsSyncing(false);
-            }, (error: any) => {
-                if (error.code === 'permission-denied') {
-                    addNotification({ title: 'Permissions Error', description: 'Cannot sync assets due to insufficient permissions.', variant: 'destructive' });
-                } else {
-                    console.error("Firestore assets listener error:", error);
-                    addNotification({ title: 'Sync Error', description: 'Lost connection to the asset database.', variant: 'destructive' });
-                }
-                if (isSyncingRef.current) setIsSyncing(false);
-                setIsOnline(false);
-            });
-        }
-
-        const activityQuery = query(collection(db, 'activity_logs'), orderBy('timestamp', 'desc'), limit(20));
-        unsubActivity = onSnapshot(activityQuery, (snapshot) => {
-            const newActivities: InboxMessageGroup[] = [];
-            snapshot.docChanges().forEach((change) => {
-                if (change.type === "added") {
-                    const log = { id: change.doc.id, ...change.doc.data() } as ActivityLog;
-                    newActivities.push({
-                        id: log.id,
-                        type: 'activity',
-                        updatedBy: log.userName,
-                        timestamp: log.timestamp,
-                        activityMessage: `${log.userName} ${log.activity === 'login' ? 'logged into' : 'logged out from'} ${log.userState || 'the app'} at ${new Date(log.timestamp).toLocaleString()}`
-                    });
-                }
-            });
-            if (newActivities.length > 0 && !isInitialLoad.current) {
-                updateInboxState(newActivities);
-            }
-        }, (error: any) => {
-            if (error.code === 'permission-denied') {
-                // This is not a fatal error, just a feature unavailability.
-                // It can be uncommented if explicit notification is desired.
-                // addNotification({ title: 'Admin Feature', description: 'Activity log access requires admin permissions.'});
-            } else {
-                console.error("Firestore activity log listener error:", error);
-                addNotification({ title: 'Sync Error', description: 'Lost connection to activity logs.', variant: 'destructive' });
-            }
-        });
-
-        return () => {
-            if (unsubAssets) unsubAssets();
-            if (unsubActivity) unsubActivity();
-            if (isSyncingRef.current) setIsSyncing(false);
-        };
+    return () => {
+      unsubscribe();
+      if (isSyncingRef.current) {
+        setIsSyncing(false);
+      }
     };
-
-    const cleanup = setupListeners();
-    return cleanup;
-}, [isOnline, isAdmin, autoSyncEnabled, handleSafeMergeAndSync, setIsOnline, setIsSyncing, updateInboxState]);
-
+  }, [isOnline, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
 
   // Manual sync for all users (or admins with auto-sync off)
   useEffect(() => {
@@ -489,7 +435,8 @@ export default function AssetList() {
 
         try {
             const fetchedAssets = await getAssets();
-            await handleSafeMergeAndSync(fetchedAssets);
+            await clearLocalAssets(); // Clear local to ensure cloud is source of truth for sync
+            await handleFetchedAssets(fetchedAssets, true);
             if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
             addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
@@ -505,7 +452,7 @@ export default function AssetList() {
     if (manualSyncTrigger > 0) {
         fetchAssetsOnce();
     }
-  }, [isOnline, manualSyncTrigger, isAdmin, autoSyncEnabled, handleSafeMergeAndSync, setIsOnline, setIsSyncing]);
+  }, [isOnline, manualSyncTrigger, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
   
   useEffect(() => {
     setStatusOptions([
@@ -514,8 +461,7 @@ export default function AssetList() {
       { value: "Discrepancy", label: "Discrepancy" },
     ]);
   }, [setStatusOptions]);
-
-  // This is the new filtering step based on enabled sheets.
+  
   const globallyFilteredAssets = useMemo(() => {
     return assets.filter(asset => enabledSheets.includes(asset.category));
   }, [assets, enabledSheets]);
@@ -668,7 +614,7 @@ export default function AssetList() {
         addNotification({ title: 'Deleting Asset...', description: `Removing "${assetToDelete.description}"` });
         try {
             await deleteAsset(assetToDelete.id);
-            addNotification({ title: 'Asset Deleted', description: 'Asset was successfully removed from the cloud.' });
+            addNotification({ title: 'Asset Deleted', description: 'Asset was successfully removed.' });
         } catch (e) {
             addNotification({ title: 'Error', description: 'Could not delete asset from the cloud.', variant: 'destructive' });
         }
@@ -694,10 +640,11 @@ export default function AssetList() {
     const assetsToDeleteCount = selectedAssetIds.length;
 
     if (isOnline) {
-        addNotification({ title: 'Deleting Assets...', description: `Removing ${assetsToDeleteCount} selected assets from the cloud.` });
+        addNotification({ title: 'Deleting Assets...', description: `Removing ${assetsToDeleteCount} selected assets.` });
         try {
             await batchDeleteAssets(selectedAssetIds);
             addNotification({ title: 'Assets Deleted', description: `Successfully removed ${assetsToDeleteCount} assets.` });
+            setSelectedAssetIds([]);
         } catch (e) {
             addNotification({ title: 'Error', description: 'Could not delete all selected assets from the cloud.', variant: 'destructive' });
         } finally {
@@ -708,10 +655,10 @@ export default function AssetList() {
         currentAssets = currentAssets.filter(a => !selectedAssetIds.includes(a.id));
         await saveAssets(currentAssets);
         setAssets(currentAssets);
+        setSelectedAssetIds([]);
         addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted. Will sync on next connection.` });
         setIsBatchDeleting(false);
     }
-    setSelectedAssetIds([]);
   }
 
   const handleBatchEdit = () => setIsBatchEditOpen(true);
@@ -799,55 +746,6 @@ export default function AssetList() {
 
   const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
 
-  const uploadInChunks = async (assetsToUpload: Asset[]) => {
-    const CHUNK_SIZE = 100;
-    const DELAY_BETWEEN_CHUNKS_MS = 2000;
-
-    const numChunks = Math.ceil(assetsToUpload.length / CHUNK_SIZE);
-    addNotification({ title: 'Background Sync Started', description: `Uploading ${assetsToUpload.length} assets in ${numChunks} chunks.` });
-
-    for (let i = 0; i < assetsToUpload.length; i += CHUNK_SIZE) {
-        const chunk = assetsToUpload.slice(i, i + CHUNK_SIZE);
-        const chunkNumber = (i / CHUNK_SIZE) + 1;
-        try {
-            setAssets(prevAssets => prevAssets.map(pa => {
-                const assetInChunk = chunk.find(c => c.id === pa.id);
-                return assetInChunk ? { ...pa, syncStatus: 'syncing' } : pa;
-            }));
-
-            await batchSetAssets(chunk.map(c => ({...c, syncStatus: 'synced'})));
-
-            setAssets(prevAssets => prevAssets.map(pa => {
-                const assetInChunk = chunk.find(c => c.id === pa.id);
-                return assetInChunk ? { ...pa, syncStatus: 'synced' } : pa;
-            }));
-            
-            const currentLocalAssets = await getLocalAssetsFromDb();
-            const chunkIds = new Set(chunk.map(c => c.id));
-            const updatedLocalAssets = currentLocalAssets.map(la => 
-                chunkIds.has(la.id) ? { ...la, syncStatus: 'synced' } : la
-            );
-            await saveAssets(updatedLocalAssets);
-
-            addNotification({ title: 'Sync Progress', description: `Chunk ${chunkNumber} of ${numChunks} uploaded successfully.` });
-        } catch (error) {
-            addNotification({ title: `Sync Error on Chunk ${chunkNumber}`, description: 'Some assets failed to sync. They will be retried later.', variant: 'destructive' });
-            
-            setAssets(prevAssets => prevAssets.map(pa => {
-                const assetInChunk = chunk.find(c => c.id === pa.id);
-                return assetInChunk ? { ...pa, syncStatus: 'local' } : pa;
-            }));
-            
-            break; 
-        }
-
-        if (chunkNumber < numChunks) {
-            await new Promise(resolve => setTimeout(resolve, DELAY_BETWEEN_CHUNKS_MS));
-        }
-    }
-     addNotification({ title: 'Background Sync Finished' });
-  }
-
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file) return;
@@ -872,27 +770,31 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
-        syncStatus: 'local' as const,
     }));
 
     if (allChanges.length > 0) {
         const assetMap = new Map(baseAssets.map(a => [a.id, a]));
-        allChanges.forEach(a => assetMap.set(a.id, a));
+        allChanges.forEach(a => assetMap.set(a.id, { ...a, syncStatus: isOnline ? 'synced' : 'local'}));
         const combinedAssets = Array.from(assetMap.values());
         
         if(isAdmin) {
-            const inboxUpdatesFromImport = generateInboxUpdates(baseAssets, combinedAssets);
+            const inboxUpdatesFromImport = generateInboxUpdates(baseAssets, combinedAssets, userProfile);
             updateInboxState(inboxUpdatesFromImport);
         }
 
-        await saveAssets(combinedAssets);
-        setAssets(combinedAssets);
-        addNotification({ title: 'Import Complete', description: `${allChanges.length} changes saved locally. Sync to cloud will begin if online.` });
-        
         if (isOnline) {
-            uploadInChunks(allChanges);
+            try {
+                addNotification({ title: "Saving to Cloud...", description: `Importing ${newAssets.length} new and updating ${updatedAssets.length} existing assets.` });
+                await batchSetAssets(allChanges.map(a => ({...a, syncStatus: 'synced'})));
+                addNotification({ title: "Import Successful", description: "Successfully saved changes to the database." });
+            } catch (e) {
+                addNotification({ title: "Import Error", description: "Could not save changes to the database.", variant: "destructive" });
+            }
+        } else {
+            await saveAssets(combinedAssets);
+            setAssets(combinedAssets);
+            addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
         }
-
     } else if (errors.length === 0) {
         addNotification({ title: "No Changes Detected", description: "No new or updated assets were found in the file."});
     }
@@ -1004,6 +906,49 @@ export default function AssetList() {
     return `You are in Admin Mode. This action cannot be undone. This will permanently delete ALL asset records from both the central database and your local device, resetting the application for ALL users.`;
   }, [isOnline]);
 
+  const locationOptionsWithCounts = useMemo(() => {
+    const allLocations = [...SPECIAL_LOCATIONS, ...ZONE_NAMES, ...NIGERIAN_STATES];
+    
+    return allLocations.map(loc => {
+      const isZone = NIGERIAN_ZONES[loc];
+      let relevantAssets: Asset[];
+
+      if (isZone) {
+        const lowerCaseZone = loc.toLowerCase();
+        relevantAssets = globallyFilteredAssets.filter(asset => {
+          const assetLocation = (asset.location || "").toLowerCase().trim();
+          return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
+        });
+      } else {
+        const capitalCity = NIGERIAN_STATE_CAPITALS[loc]?.toLowerCase().trim();
+        const lowerCaseFilter = loc.toLowerCase().trim();
+        relevantAssets = globallyFilteredAssets.filter(asset => {
+          const assetLocation = (asset.location || "").toLowerCase().trim();
+          const matchesState = assetLocation.startsWith(lowerCaseFilter);
+          const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+          return matchesState || matchesCapital;
+        });
+      }
+      
+      const total = relevantAssets.length;
+      const verified = relevantAssets.filter(a => a.verifiedStatus === 'Verified').length;
+      return {
+        name: loc,
+        total,
+        verified
+      };
+    });
+  }, [globallyFilteredAssets]);
+
+  const filteredLocationOptions = useMemo(() => {
+    if (!locationSearch) {
+      return locationOptionsWithCounts;
+    }
+    return locationOptionsWithCounts.filter(loc =>
+      loc.name.toLowerCase().includes(locationSearch.toLowerCase())
+    );
+  }, [locationOptionsWithCounts, locationSearch]);
+
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -1029,38 +974,89 @@ export default function AssetList() {
                     {isAdmin && !isFiltered ? (
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
-                        <Select
-                            value={globalStateFilter || 'all'}
-                            onValueChange={(value) => setGlobalStateFilter(value === 'all' ? '' : value)}
-                        >
-                        <SelectTrigger className="w-full sm:w-[280px]">
-                            <SelectValue placeholder="Select a location..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">Overall (All Assets)</SelectItem>
-                            <SelectSeparator />
-                            <SelectGroup>
-                                <SelectLabel>Special Locations</SelectLabel>
-                                {SPECIAL_LOCATIONS.map((loc) => (
-                                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                                ))}
-                            </SelectGroup>
-                            <SelectSeparator />
-                            <SelectGroup>
-                                <SelectLabel>Geopolitical Zones</SelectLabel>
-                                {ZONE_NAMES.map((zone) => (
-                                    <SelectItem key={zone} value={zone}>{zone}</SelectItem>
-                                ))}
-                            </SelectGroup>
-                            <SelectSeparator />
-                            <SelectGroup>
-                                <SelectLabel>States</SelectLabel>
-                                {NIGERIAN_STATES.map((state) => (
-                                    <SelectItem key={state} value={state}>{state}</SelectItem>
-                                ))}
-                            </SelectGroup>
-                        </SelectContent>
-                        </Select>
+                        
+                        <Popover open={isLocationPopoverOpen} onOpenChange={setIsLocationPopoverOpen}>
+                          <PopoverTrigger asChild>
+                            <Button
+                              variant="outline"
+                              role="combobox"
+                              aria-expanded={isLocationPopoverOpen}
+                              className="w-full sm:w-[350px] justify-between"
+                            >
+                              {globalStateFilter || "Overall (All Assets)"}
+                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-full sm:w-[350px] p-0">
+                            <Command>
+                              <CommandInput placeholder="Search location..." onValueChange={setLocationSearch} />
+                              <CommandEmpty>No location found.</CommandEmpty>
+                              <CommandList>
+                                <ScrollArea className="h-[300px]">
+                                  <CommandItem
+                                      key="all"
+                                      value="Overall (All Assets)"
+                                      onSelect={() => {
+                                        setGlobalStateFilter('');
+                                        setIsLocationPopoverOpen(false);
+                                      }}
+                                    >
+                                      <Check className={cn("mr-2 h-4 w-4", !globalStateFilter ? "opacity-100" : "opacity-0")} />
+                                      Overall (All Assets)
+                                  </CommandItem>
+                                  <CommandGroup heading="Special Locations">
+                                    {filteredLocationOptions.filter(l => SPECIAL_LOCATIONS.includes(l.name)).map((loc) => (
+                                      <CommandItem
+                                        key={loc.name}
+                                        value={loc.name}
+                                        onSelect={(currentValue) => {
+                                          setGlobalStateFilter(currentValue === globalStateFilter ? "" : currentValue);
+                                          setIsLocationPopoverOpen(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", globalStateFilter === loc.name ? "opacity-100" : "opacity-0")} />
+                                        <span>{loc.name}</span>
+                                        <span className="ml-auto text-xs text-muted-foreground">{loc.verified} of {loc.total}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                  <CommandGroup heading="Geopolitical Zones">
+                                    {filteredLocationOptions.filter(l => ZONE_NAMES.includes(l.name)).map((loc) => (
+                                      <CommandItem
+                                        key={loc.name}
+                                        value={loc.name}
+                                        onSelect={(currentValue) => {
+                                          setGlobalStateFilter(currentValue === globalStateFilter ? "" : currentValue);
+                                          setIsLocationPopoverOpen(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", globalStateFilter === loc.name ? "opacity-100" : "opacity-0")} />
+                                        <span>{loc.name}</span>
+                                        <span className="ml-auto text-xs text-muted-foreground">{loc.verified} of {loc.total}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                  <CommandGroup heading="States">
+                                    {filteredLocationOptions.filter(l => NIGERIAN_STATES.includes(l.name)).map((loc) => (
+                                      <CommandItem
+                                        key={loc.name}
+                                        value={loc.name}
+                                        onSelect={(currentValue) => {
+                                          setGlobalStateFilter(currentValue === globalStateFilter ? "" : currentValue);
+                                          setIsLocationPopoverOpen(false);
+                                        }}
+                                      >
+                                        <Check className={cn("mr-2 h-4 w-4", globalStateFilter === loc.name ? "opacity-100" : "opacity-0")} />
+                                        <span>{loc.name}</span>
+                                        <span className="ml-auto text-xs text-muted-foreground">{loc.verified} of {loc.total}</span>
+                                      </CommandItem>
+                                    ))}
+                                  </CommandGroup>
+                                </ScrollArea>
+                              </CommandList>
+                            </Command>
+                          </PopoverContent>
+                        </Popover>
                     </div>
                     ) : (
                     <>
@@ -1211,7 +1207,7 @@ export default function AssetList() {
                   <TableBody>
                       {paginatedCategoryAssets.length > 0 ? (
                       paginatedCategoryAssets.map((asset) => (
-                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id)} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
                           <TableCell onClick={e => e.stopPropagation()}>
                               <Checkbox 
                                   checked={selectedAssetIds.includes(asset.id)}
@@ -1348,3 +1344,7 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
+
+    
