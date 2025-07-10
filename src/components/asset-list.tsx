@@ -70,7 +70,7 @@ import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets, getActivityLogs } from "@/lib/firestore";
+import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets, getActivityLogs, addActivityLog } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
 import { onSnapshot, query, collection, orderBy, limit } from "firebase/firestore";
@@ -119,7 +119,7 @@ export default function AssetList() {
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { userProfile } = useAuth();
+  const { userProfile, updateProfile } = useAuth();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
@@ -459,7 +459,9 @@ export default function AssetList() {
             }
         }, (error: any) => {
             if (error.code === 'permission-denied') {
-                addNotification({ title: 'Admin Feature', description: 'Activity log access requires admin permissions.', variant: 'destructive' });
+                // This is not a fatal error, just a feature unavailability.
+                // It can be uncommented if explicit notification is desired.
+                // addNotification({ title: 'Admin Feature', description: 'Activity log access requires admin permissions.'});
             } else {
                 console.error("Firestore activity log listener error:", error);
                 addNotification({ title: 'Sync Error', description: 'Lost connection to activity logs.', variant: 'destructive' });
@@ -513,9 +515,14 @@ export default function AssetList() {
     ]);
   }, [setStatusOptions]);
 
+  // This is the new filtering step based on enabled sheets.
+  const globallyFilteredAssets = useMemo(() => {
+    return assets.filter(asset => enabledSheets.includes(asset.category));
+  }, [assets, enabledSheets]);
+
   const stateFilteredAssets = useMemo(() => {
     if (!globalStateFilter) {
-      return assets; // Admin view or no filter set
+      return globallyFilteredAssets; // Admin view or no filter set
     }
     
     const zones: Record<string, string[]> = NIGERIAN_ZONES;
@@ -524,7 +531,7 @@ export default function AssetList() {
 
     if (isZone) {
       const lowerCaseZone = globalStateFilter.toLowerCase();
-      return assets.filter(asset => {
+      return globallyFilteredAssets.filter(asset => {
         const assetLocation = (asset.location || "").toLowerCase().trim();
         return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
       });
@@ -532,14 +539,14 @@ export default function AssetList() {
       const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
       const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
 
-      return assets.filter(asset => {
+      return globallyFilteredAssets.filter(asset => {
         const assetLocation = (asset.location || "").toLowerCase().trim();
         const matchesState = assetLocation.startsWith(lowerCaseFilter);
         const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
         return matchesState || matchesCapital;
       });
     }
-  }, [assets, globalStateFilter]);
+  }, [globallyFilteredAssets, globalStateFilter]);
   
   useEffect(() => {
     const locations = new Set<string>();
@@ -1341,5 +1348,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
