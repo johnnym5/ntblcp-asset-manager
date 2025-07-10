@@ -130,7 +130,7 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
           <ScrollArea className="flex-1 px-6 py-4">
             {inboxMessages.length > 0 ? (
               <div className="space-y-4">
-                {inboxMessages.map(renderMessageGroup)}
+                {inboxMessages.map((group) => renderMessageGroup(group))}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground">
