@@ -17,10 +17,13 @@ interface InboxSheetProps {
 }
 
 export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
-  const { inboxMessages, setInboxMessages } = useAppState();
+  const { inboxMessages, setInboxMessages, setUnreadInboxCount } = useAppState();
   const [viewingAssets, setViewingAssets] = useState<Asset[] | null>(null);
 
   const handleOpen = (open: boolean) => {
+    if (open) {
+      setUnreadInboxCount(0);
+    }
     onOpenChange(open);
   };
 
@@ -40,13 +43,16 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
 
   const renderMessageGroup = (group: InboxMessageGroup) => {
     if (group.type === 'activity') {
-      const isLogin = group.activityMessage?.includes('logged into');
+      const isLogin = group.activityMessage?.includes('logged in');
       return (
         <Card key={group.id} className="relative group">
           <CardContent className="p-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
               {isLogin ? <LogIn className="h-5 w-5 text-green-500" /> : <LogOut className="h-5 w-5 text-red-500" />}
-              <p className="text-sm">{group.activityMessage}</p>
+              <div className="flex flex-col">
+                <p className="text-sm">{group.activityMessage}</p>
+                <p className="text-xs text-muted-foreground">{new Date(group.timestamp).toLocaleString()}</p>
+              </div>
             </div>
             <Button
               variant="ghost"
@@ -84,11 +90,11 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
                       </div>
                       <div className="flex items-center text-muted-foreground flex-wrap mt-1">
                         <span>{change.field} changed:</span>
-                        <em className="ml-2 not-italic bg-red-100 dark:bg-red-900/50 px-1 rounded-sm text-red-800 dark:text-red-300">
+                        <em className="ml-2 not-italic bg-red-100 dark:bg-red-900/50 px-1 py-0.5 rounded-sm text-red-800 dark:text-red-300 max-w-[100px] truncate">
                           {change.from}
                         </em>
                         <ArrowRight className="h-3 w-3 mx-1" />
-                        <em className="not-italic bg-green-100 dark:bg-green-900/50 px-1 rounded-sm text-green-800 dark:text-green-300">
+                        <em className="not-italic bg-green-100 dark:bg-green-900/50 px-1 py-0.5 rounded-sm text-green-800 dark:text-green-300 max-w-[100px] truncate">
                           {change.to}
                         </em>
                       </div>

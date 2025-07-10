@@ -75,7 +75,6 @@ export interface AssetChange {
 
 export interface ActivityLog {
     id: string;
-    userId: string;
     userName: string;
     userState: string;
     activity: 'login' | 'logout';

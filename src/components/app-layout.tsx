@@ -68,7 +68,6 @@ import { addNotification, useNotifications, clearAll, removeNotification } from 
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
 
-import { ThemeToggle } from "./theme-toggle";
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { Skeleton } from "./ui/skeleton";
@@ -309,7 +308,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <User className="mr-2 h-4 w-4"/>
                     Profile
                   </DropdownMenuItem>
-                   {pathname === '/assets' && dataActions.onImport && (
+                   {pathname === '/assets' && dataActions.onImport && isAdmin && (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
                         <Database className="mr-2 h-4 w-4" />

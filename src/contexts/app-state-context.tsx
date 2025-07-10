@@ -74,6 +74,7 @@ interface AppStateContextType {
   inboxMessages: InboxMessageGroup[];
   setInboxMessages: Dispatch<SetStateAction<InboxMessageGroup[]>>;
   unreadInboxCount: number;
+  setUnreadInboxCount: Dispatch<SetStateAction<number>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -131,41 +132,34 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [inboxMessages, setInboxMessages] = useState<InboxMessageGroup[]>(() => {
     if (typeof window !== 'undefined') {
       const saved = localStorage.getItem('ntblcp-inbox-messages');
-      if (saved) {
-        try {
-          const parsed = JSON.parse(saved);
-          if (Array.isArray(parsed)) {
-            return parsed;
-          }
-        } catch (e) {
-          console.error("Failed to parse inbox messages from storage, resetting.", e);
-        }
+      try {
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        return [];
       }
     }
     return [];
   });
 
-  const unreadInboxCount = useMemo(() => {
-    return Array.isArray(inboxMessages) ? inboxMessages.length : 0;
-  }, [inboxMessages]);
+  const [unreadInboxCount, setUnreadInboxCount] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('ntblcp-unread-inbox-count');
+      return saved ? parseInt(saved, 10) : 0;
+    }
+    return 0;
+  });
 
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
-    }
+    localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
   }, [enabledSheets]);
   
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-asset-lock', JSON.stringify(lockAssetList));
-    }
+    localStorage.setItem('ntblcp-asset-lock', JSON.stringify(lockAssetList));
   }, [lockAssetList]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-autosync-enabled', JSON.stringify(autoSyncEnabled));
-    }
+    localStorage.setItem('ntblcp-autosync-enabled', JSON.stringify(autoSyncEnabled));
   }, [autoSyncEnabled]);
 
   useEffect(() => {
@@ -176,13 +170,15 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
-      // Ensure we are saving a valid array to prevent corruption.
-      if (Array.isArray(inboxMessages)) {
-        localStorage.setItem('ntblcp-inbox-messages', JSON.stringify(inboxMessages));
-      }
+      localStorage.setItem('ntblcp-inbox-messages', JSON.stringify(inboxMessages));
     }
   }, [inboxMessages]);
     
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ntblcp-unread-inbox-count', String(unreadInboxCount));
+    }
+  }, [unreadInboxCount]);
 
   const value = {
     isOnline,
@@ -222,6 +218,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     inboxMessages,
     setInboxMessages,
     unreadInboxCount,
+    setUnreadInboxCount,
   };
 
   return (
