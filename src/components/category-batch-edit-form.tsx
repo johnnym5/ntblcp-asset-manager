@@ -21,7 +21,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Switch } from '@/components/ui/switch';
 import { AlertCircle, Check, FileText, Loader2, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
