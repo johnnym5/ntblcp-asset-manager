@@ -43,6 +43,7 @@ import {
   ClipboardEdit,
   FolderSearch,
   X,
+  CloudOff,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -68,7 +69,7 @@ import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets } from "@/lib/firestore";
+import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
 import { onSnapshot, query, collection } from "firebase/firestore";
@@ -132,7 +133,7 @@ export default function AssetList() {
   const isInitialLoad = useRef(true);
 
   const { 
-    searchTerm, setSearchTerm,
+    searchTerm,
     isOnline, setIsOnline, globalStateFilter, setGlobalStateFilter,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
@@ -283,39 +284,32 @@ export default function AssetList() {
 
 
   // --- DATA LOADING & SYNC ---
-  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync = false) => {
-      const localAssets = await getLocalAssetsFromDb();
-      let mergedAssets = [...localAssets];
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
+    const localAssets = await getLocalAssetsFromDb();
+    const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
+    
+    fetchedAssets.forEach(asset => {
+        const existing = localAssetsMap.get(asset.id);
+        if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
+            localAssetsMap.set(asset.id, { ...asset, syncStatus: 'synced' });
+        }
+    });
 
-      if (isManualSync) {
-        // For manual sync, cloud is the source of truth, but we keep local-only new items.
-        const fetchedAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
-        const localOnlyNewAssets = localAssets.filter(la => !fetchedAssetsMap.has(la.id));
-        mergedAssets = [...fetchedAssets, ...localOnlyNewAssets];
-      } else {
-        // For listeners, merge based on timestamp.
-        const mergedAssetMap = new Map<string, Asset>();
-        localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
-        fetchedAssets.forEach(asset => {
-          const existing = mergedAssetMap.get(asset.id);
-          if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
-              mergedAssetMap.set(asset.id, { ...asset, syncStatus: 'synced' });
-          }
-        });
-        mergedAssets = Array.from(mergedAssetMap.values());
-      }
+    const mergedAssets = Array.from(localAssetsMap.values());
       
+    if (isAdmin) {
       const newInboxItems = generateInboxUpdates(localAssets, mergedAssets, userProfile)
         .filter(group => group.updatedBy !== userProfile?.displayName);
       if(newInboxItems.length > 0 && !isInitialLoad.current) {
         updateInboxState(newInboxItems);
       }
+    }
       
-      const finalAssets = getNewestDuplicate(mergedAssets);
-      setAssets(finalAssets);
-      await saveAssets(finalAssets);
-      isInitialLoad.current = false;
-  }, [userProfile, generateInboxUpdates, updateInboxState, isOnline]);
+    const finalAssets = getNewestDuplicate(mergedAssets);
+    setAssets(finalAssets);
+    await saveAssets(finalAssets);
+    isInitialLoad.current = false;
+  }, [userProfile, isAdmin, generateInboxUpdates, updateInboxState]);
   
   useEffect(() => {
     const loadInitialData = async () => {
@@ -343,21 +337,18 @@ export default function AssetList() {
         querySnapshot.forEach((doc) => {
             fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
         });
-
-        const localAssets = await getLocalAssetsFromDb();
-        const hasChanges = fetchedAssets.length !== localAssets.length || 
-            querySnapshot.docChanges().some(change => change.type !== 'added' || !localAssets.find(a => a.id === change.doc.id));
-
-        if (hasChanges && !isInitialLoad.current) {
+        
+        if (querySnapshot.docChanges().length > 0 && !isInitialLoad.current) {
             addNotification({ title: 'Real-time Sync', description: 'Asset data has been updated.' });
         }
-        await handleFetchedAssets(fetchedAssets, false);
+
+        await handleFetchedAssets(fetchedAssets);
         setIsSyncing(false);
     }, (error) => {
-      if ((error as any).code === 'permission-denied') {
-        addNotification({ title: "Permissions Error", description: "You don't have permission to view real-time asset updates. Check your Firestore rules.", variant: 'destructive' })
+      const errorMessage = (error as any).message || 'An unknown error occurred.';
+      if ((error as any).code === 'permission-denied' || errorMessage.includes('insufficient permissions')) {
+        addNotification({ title: "Permissions Error", description: "You don't have permission to view real-time asset updates. Please check your Firestore security rules.", variant: 'destructive' })
       } else {
-        console.error("Firestore real-time listener error:", error);
         addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
       }
       setIsSyncing(false);
