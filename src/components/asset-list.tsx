@@ -135,7 +135,6 @@ export default function AssetList() {
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   
   const isInitialLoad = useRef(true);
-  const syncQueueRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const { 
     searchTerm, setSearchTerm,
@@ -307,104 +306,53 @@ export default function AssetList() {
 
   // --- DATA LOADING & SYNC ---
   const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
-      const localAssets = await getLocalAssetsFromDb();
-      let mergedAssets = [...localAssets];
+    let localAssets = await getLocalAssetsFromDb();
+    const finalAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
-      // Smart merge: cloud data is the base, but local un-synced changes are preserved if newer.
-      const cloudAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
-      const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
-
-      // Create a final map to hold the definitive version of each asset.
-      const finalAssetMap = new Map<string, Asset>();
-
-      // 1. Add all cloud assets to the final map.
-      cloudAssetsMap.forEach((asset, id) => {
-          finalAssetMap.set(id, {...asset, syncStatus: 'synced'});
-      });
-
-      // 2. Go through local assets and decide if they should override the cloud version.
-      localAssetsMap.forEach((localAsset, id) => {
-          const cloudAsset = cloudAssetsMap.get(id);
-          // If local asset is not in the cloud, or it was modified locally and is newer, it takes precedence.
-          if (!cloudAsset || (localAsset.syncStatus === 'local' && new Date(localAsset.lastModified || 0) > new Date(cloudAsset.lastModified || 0))) {
-              finalAssetMap.set(id, localAsset);
-          }
-      });
-
-      mergedAssets = Array.from(finalAssetMap.values());
-      
-      const assetsToPush = mergedAssets.filter(a => a.syncStatus === 'local');
-      if (isOnline && assetsToPush.length > 0) {
-        addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
-        try {
-            await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
-        } catch(e) {
-            addNotification({title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive'});
+    fetchedAssets.forEach(cloudAsset => {
+        const localAsset = finalAssetsMap.get(cloudAsset.id);
+        if (!localAsset || new Date(cloudAsset.lastModified || 0) > new Date(localAsset.lastModified || 0)) {
+            finalAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
         }
-      }
-      
-      const newInboxItems = generateInboxUpdates(localAssets, mergedAssets, userProfile)
+    });
+
+    const finalAssets = Array.from(finalAssetsMap.values());
+    const newInboxItems = generateInboxUpdates(localAssets, finalAssets, userProfile)
         .filter(group => group.updatedBy !== userProfile?.displayName);
-      if(newInboxItems.length > 0 && !isInitialLoad.current) {
+    if (newInboxItems.length > 0 && !isInitialLoad.current) {
         updateInboxState(newInboxItems);
-      }
-      
-      const finalAssets = getNewestDuplicate(mergedAssets);
-      setAssets(finalAssets);
-      await saveAssets(finalAssets);
-      isInitialLoad.current = false;
-  }, [userProfile, generateInboxUpdates, updateInboxState, isOnline]);
+    }
+    
+    await saveAssets(finalAssets);
+    setAssets(finalAssets);
+    isInitialLoad.current = false;
+  }, [userProfile, generateInboxUpdates, updateInboxState]);
 
-  const scheduleSync = useCallback((assetToSync: Asset) => {
-      if (!isOnline || autoSyncEnabled) return; // Only schedule if online and auto-sync is OFF
-
-      const existingTimer = syncQueueRef.current.get(assetToSync.id);
-      if (existingTimer) {
-          clearTimeout(existingTimer);
-      }
-
-      const newTimer = setTimeout(async () => {
-          try {
-              setAssets(prev => prev.map(a => a.id === assetToSync.id ? { ...a, syncStatus: 'syncing' } : a));
-              
-              await updateAsset({ ...assetToSync, syncStatus: 'synced' });
-
-              setAssets(prev => prev.map(a => a.id === assetToSync.id ? { ...a, syncStatus: 'synced' } : a));
-              const currentAssets = await getLocalAssetsFromDb();
-              const assetIndex = currentAssets.findIndex(a => a.id === assetToSync.id);
-              if(assetIndex > -1){
-                  currentAssets[assetIndex].syncStatus = 'synced';
-                  await saveAssets(currentAssets);
-              }
-
-              addNotification({ title: 'Asset Synced', description: `Changes for "${assetToSync.description || 'asset'}" saved to cloud.` });
-          } catch (error) {
-              addNotification({ title: 'Sync Failed', description: `Could not sync "${assetToSync.description || 'asset'}".`, variant: 'destructive' });
-              setAssets(prev => prev.map(a => a.id === assetToSync.id ? { ...a, syncStatus: 'local' } : a));
-          } finally {
-              syncQueueRef.current.delete(assetToSync.id);
-          }
-      }, 5000);
-
-      syncQueueRef.current.set(assetToSync.id, newTimer);
-  }, [isOnline, autoSyncEnabled]);
-
-  useEffect(() => {
-    const loadInitialData = async () => {
-        setIsLoading(true);
-        const localAssets = await getLocalAssetsFromDb();
-        const uniqueAssets = getNewestDuplicate(localAssets);
-        setAssets(uniqueAssets);
-        setIsLoading(false);
-    };
-    loadInitialData();
-  }, []);
 
   // Real-time listener for Admins with Auto-Sync
   useEffect(() => {
     if (!isOnline || !isAdmin || !autoSyncEnabled) {
       return;
     }
+    
+    // Auto-sync local changes first
+    const syncLocalChanges = async () => {
+      const localAssets = await getLocalAssetsFromDb();
+      const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
+      if (assetsToPush.length > 0) {
+        addNotification({ title: 'Auto-Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
+        try {
+          await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
+          const updatedLocalAssets = localAssets.map(a => assetsToPush.find(p => p.id === a.id) ? {...a, syncStatus: 'synced'} : a);
+          await saveAssets(updatedLocalAssets);
+          setAssets(updatedLocalAssets);
+        } catch (e) {
+          addNotification({title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive'});
+        }
+      }
+    };
+    
+    syncLocalChanges();
 
     addNotification({ title: 'Real-time Sync Active', description: 'Asset list will update automatically.' });
     setIsSyncing(true);
@@ -447,8 +395,18 @@ export default function AssetList() {
         if (manualSyncTrigger > 0) addNotification({ title: 'Syncing with cloud...' });
 
         try {
+            // First, push any local changes up to the cloud.
+            const localAssets = await getLocalAssetsFromDb();
+            const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
+            if(assetsToPush.length > 0) {
+                addNotification({ title: 'Uploading Local Changes', description: `Syncing ${assetsToPush.length} assets.` });
+                await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
+            }
+
+            // Then, fetch all assets from the cloud and merge.
             const fetchedAssets = await getAssets();
             await handleFetchedAssets(fetchedAssets);
+
             if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
             addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
@@ -458,14 +416,23 @@ export default function AssetList() {
         }
     };
     
-    if (!isOnline) return;
+    if (manualSyncTrigger === 0 || !isOnline) return;
     if (isAdmin && autoSyncEnabled) return;
 
-    if (manualSyncTrigger > 0) {
-        fetchAssetsOnce();
-    }
-  }, [isOnline, manualSyncTrigger, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
+    fetchAssetsOnce();
+  }, [manualSyncTrigger, isOnline, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
   
+  useEffect(() => {
+    const loadInitialData = async () => {
+        setIsLoading(true);
+        const localAssets = await getLocalAssetsFromDb();
+        const uniqueAssets = getNewestDuplicate(localAssets);
+        setAssets(uniqueAssets);
+        setIsLoading(false);
+    };
+    loadInitialData();
+  }, []);
+
   useEffect(() => {
     setStatusOptions([
       { value: "Verified", label: "Verified" },
@@ -703,8 +670,6 @@ export default function AssetList() {
       batchSetAssets(updatedAssets.map(a => ({...a, syncStatus: 'synced'})))
         .then(() => addNotification({ title: "Batch Sync Complete", description: "All batch changes have been saved to the cloud."}))
         .catch(() => addNotification({ title: "Batch Sync Failed", description: "Could not save all batch changes to the cloud.", variant: 'destructive'}));
-    } else {
-      updatedAssets.forEach(asset => scheduleSync(asset));
     }
   };
 
@@ -729,7 +694,9 @@ export default function AssetList() {
     addNotification({ title: 'Saved Locally', description: 'Changes saved. Sync will start shortly.' });
     setIsFormOpen(false);
 
-    scheduleSync(finalAsset);
+    if (isOnline && autoSyncEnabled) {
+      updateAsset(finalAsset).catch(() => addNotification({ title: 'Sync Failed', description: 'Could not sync asset.', variant: 'destructive'}));
+    }
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
@@ -752,7 +719,9 @@ export default function AssetList() {
         setAssets(currentAssets);
     }
     
-    scheduleSync(updatedAsset);
+    if (isOnline && autoSyncEnabled) {
+        updateAsset(updatedAsset).catch(() => addNotification({ title: 'Sync Failed', description: 'Could not sync asset.', variant: 'destructive'}));
+    }
   };
 
   const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
@@ -781,11 +750,12 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
+        syncStatus: 'local' as const
     }));
 
     if (allChanges.length > 0) {
         const assetMap = new Map(baseAssets.map(a => [a.id, a]));
-        allChanges.forEach(a => assetMap.set(a.id, { ...a, syncStatus: 'local'}));
+        allChanges.forEach(a => assetMap.set(a.id, a));
         const combinedAssets = Array.from(assetMap.values());
         
         await saveAssets(combinedAssets);
@@ -962,8 +932,6 @@ export default function AssetList() {
           batchSetAssets(updatedAssets.map(a => ({...a, syncStatus: 'synced'})))
             .then(() => addNotification({ title: "Batch Sync Complete", description: "All category changes saved to cloud."}))
             .catch(() => addNotification({ title: "Batch Sync Failed", description: "Could not save category changes.", variant: 'destructive'}));
-        } else {
-          updatedAssets.forEach(asset => scheduleSync(asset));
         }
     }
     
