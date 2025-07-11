@@ -176,96 +176,99 @@ export default function AssetList() {
 
   // --- INBOX LOGIC ---
   const generateInboxUpdates = useCallback((previousAssets: Asset[], newAssets: Asset[], currentUserProfile: typeof userProfile): InboxMessageGroup[] => {
-      if (!isAdmin) {
-          return [];
-      }
+    if (!isAdmin) {
+        return [];
+    }
 
-      const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
-      const changesByGroup: Record<string, InboxMessageGroup> = {};
+    const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
+    const changesByGroup: Record<string, InboxMessageGroup> = {};
 
-      const userFriendlyFieldNames: Record<string, string> = {
-          verifiedStatus: 'Status',
-          location: 'Location',
-          assignee: 'Assignee',
-          condition: 'Condition',
-          remarks: 'Remarks',
-          description: 'Description',
-          serialNumber: 'Serial Number',
-      };
+    const userFriendlyFieldNames: Record<string, string> = {
+        verifiedStatus: 'Status',
+        location: 'Location',
+        assignee: 'Assignee',
+        condition: 'Condition',
+        remarks: 'Remarks',
+        description: 'Description',
+        serialNumber: 'Serial Number',
+    };
 
-      for (const newAsset of newAssets) {
+    const getGroupId = (asset: Asset) => `${asset.lastModifiedBy || 'Unknown'}-${asset.lastModifiedByState || 'N/A'}`;
+
+    for (const newAsset of newAssets) {
         const previousAsset = previousAssetsMap.get(newAsset.id);
-        const updatedBy = newAsset.lastModifiedBy || 'An unknown user';
-        const timestamp = newAsset.lastModified || new Date().toISOString();
-        const groupId = `${updatedBy}-${timestamp}`;
+        const groupId = getGroupId(newAsset);
 
         if (!previousAsset) {
-              if (!changesByGroup[groupId]) {
-                  changesByGroup[groupId] = {
-                      id: groupId,
-                      type: 'asset',
-                      updatedBy: updatedBy,
-                      updatedByState: newAsset.lastModifiedByState,
-                      timestamp: timestamp,
-                      changes: [],
-                      updatedAssets: []
-                  };
-              }
-              changesByGroup[groupId].changes.push({
-                  assetId: newAsset.id,
-                  assetDescription: newAsset.description || 'Untitled Asset',
-                  field: 'Asset',
-                  from: 'N/A',
-                  to: 'Newly Added',
-                  category: newAsset.category,
-              });
-              changesByGroup[groupId].updatedAssets.push(newAsset);
-              continue;
+            const timestamp = newAsset.lastModified || new Date().toISOString();
+            if (!changesByGroup[groupId]) {
+                changesByGroup[groupId] = {
+                    id: groupId + '-' + timestamp,
+                    type: 'asset',
+                    updatedBy: newAsset.lastModifiedBy || 'Unknown',
+                    updatedByState: newAsset.lastModifiedByState,
+                    timestamp: timestamp,
+                    changes: [],
+                    updatedAssets: []
+                };
+            }
+            changesByGroup[groupId].changes.push({
+                assetId: newAsset.id,
+                assetDescription: newAsset.description || 'Untitled Asset',
+                field: 'Asset',
+                from: 'N/A',
+                to: 'Newly Added',
+                category: newAsset.category,
+            });
+            changesByGroup[groupId].updatedAssets!.push(newAsset);
+            continue;
         }
-        
+
         const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
         const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
 
-        if (newTimestamp > prevTimestamp + 1000) { 
-          const detailedChanges: AssetChange[] = [];
-          Object.keys(userFriendlyFieldNames).forEach(key => {
-              const oldValue = previousAsset[key as keyof Asset] as any;
-              const newValue = newAsset[key as keyof Asset] as any;
-              if (String(oldValue || '').trim() !== String(newValue || '').trim()) {
-                  detailedChanges.push({
-                      assetId: newAsset.id,
-                      assetDescription: newAsset.description || 'Untitled Asset',
-                      field: userFriendlyFieldNames[key],
-                      from: String(oldValue || 'empty'),
-                      to: String(newValue || 'empty'),
-                      category: newAsset.category,
-                  });
-              }
-          });
+        if (newTimestamp > prevTimestamp + 1000) { // +1s threshold
+            const detailedChanges: AssetChange[] = [];
+            Object.keys(userFriendlyFieldNames).forEach(key => {
+                const oldValue = previousAsset[key as keyof Asset] as any;
+                const newValue = newAsset[key as keyof Asset] as any;
+                if (String(oldValue || '').trim() !== String(newValue || '').trim()) {
+                    detailedChanges.push({
+                        assetId: newAsset.id,
+                        assetDescription: newAsset.description || 'Untitled Asset',
+                        field: userFriendlyFieldNames[key],
+                        from: String(oldValue || 'empty'),
+                        to: String(newValue || 'empty'),
+                        category: newAsset.category,
+                    });
+                }
+            });
 
-          if (detailedChanges.length > 0) {
-              if (!changesByGroup[groupId]) {
-                  changesByGroup[groupId] = {
-                      id: groupId,
-                      type: 'asset',
-                      updatedBy: updatedBy,
-                      updatedByState: newAsset.lastModifiedByState,
-                      timestamp: timestamp,
-                      changes: [],
-                      updatedAssets: []
-                  };
-              }
-              changesByGroup[groupId].changes.push(...detailedChanges);
-              changesByGroup[groupId].updatedAssets.push(newAsset);
+            if (detailedChanges.length > 0) {
+                const timestamp = newAsset.lastModified || new Date().toISOString();
+                 if (!changesByGroup[groupId]) {
+                    changesByGroup[groupId] = {
+                        id: groupId + '-' + timestamp,
+                        type: 'asset',
+                        updatedBy: newAsset.lastModifiedBy || 'Unknown',
+                        updatedByState: newAsset.lastModifiedByState,
+                        timestamp: timestamp,
+                        changes: [],
+                        updatedAssets: []
+                    };
+                }
+                changesByGroup[groupId].changes!.push(...detailedChanges);
+                changesByGroup[groupId].updatedAssets!.push(newAsset);
 
-              if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupId].timestamp)) {
-                  changesByGroup[groupId].timestamp = newAsset.lastModified!;
-              }
-          }
+                // Update timestamp to the latest change in the group
+                if (new Date(timestamp) > new Date(changesByGroup[groupId].timestamp)) {
+                    changesByGroup[groupId].timestamp = timestamp;
+                }
+            }
         }
-      }
-      return Object.values(changesByGroup);
-  }, [isAdmin]);
+    }
+    return Object.values(changesByGroup);
+}, [isAdmin]);
 
   const updateInboxState = useCallback((newInboxItems: InboxMessageGroup[]) => {
       if (newInboxItems.length > 0) {
@@ -379,14 +382,21 @@ export default function AssetList() {
 
     const q = query(collection(db, 'assets'));
     const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-      setIsSyncing(true);
-      const fetchedAssets: Asset[] = [];
-      querySnapshot.forEach((doc) => {
-        fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
-      });
-      addNotification({ title: 'Real-time Sync Active', description: 'Asset data is up-to-date.' });
-      await handleFetchedAssets(fetchedAssets, false);
-      setIsSyncing(false);
+        setIsSyncing(true);
+        const fetchedAssets: Asset[] = [];
+        querySnapshot.forEach((doc) => {
+            fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+        });
+
+        const localAssets = await getLocalAssetsFromDb();
+        const hasChanges = fetchedAssets.length !== localAssets.length || 
+            querySnapshot.docChanges().some(change => change.type !== 'added' || !localAssets.find(a => a.id === change.doc.id));
+
+        if (hasChanges && !isInitialLoad.current) {
+            addNotification({ title: 'Real-time Sync', description: 'Asset data has been updated.' });
+        }
+        await handleFetchedAssets(fetchedAssets, false);
+        setIsSyncing(false);
     }, (error) => {
       if ((error as any).code === 'permission-denied') {
         addNotification({ title: "Permissions Error", description: "You don't have permission to view real-time asset updates. Check your Firestore rules.", variant: 'destructive' })
@@ -891,6 +901,50 @@ export default function AssetList() {
     return `You are in Admin Mode. This action cannot be undone. This will permanently delete ALL asset records from both the central database and your local device, resetting the application for ALL users.`;
   }, [isOnline]);
 
+    const locationCounts = useMemo(() => {
+    if (!isAdmin) return {};
+
+    const counts: { [key: string]: { total: number; verified: number } } = {};
+
+    const allLocations = [...NIGERIAN_STATES, ...ZONE_NAMES, ...SPECIAL_LOCATIONS];
+
+    allLocations.forEach(loc => {
+      counts[loc] = { total: 0, verified: 0 };
+    });
+
+    globallyFilteredAssets.forEach(asset => {
+      const isVerified = asset.verifiedStatus === 'Verified';
+
+      // Count for States
+      const assetState = NIGERIAN_STATES.find(state => (asset.location || '').toLowerCase().includes(state.toLowerCase()));
+      if (assetState) {
+        if (!counts[assetState]) counts[assetState] = { total: 0, verified: 0 };
+        counts[assetState].total++;
+        if (isVerified) counts[assetState].verified++;
+      }
+
+      // Count for Zones
+      for (const zone in NIGERIAN_ZONES) {
+        if ((asset.location || '').toLowerCase().includes(zone.toLowerCase())) {
+          if (!counts[zone]) counts[zone] = { total: 0, verified: 0 };
+          counts[zone].total++;
+          if (isVerified) counts[zone].verified++;
+        }
+      }
+
+      // Count for Special Locations
+      const assetSpecialLoc = SPECIAL_LOCATIONS.find(loc => (asset.location || '').toLowerCase().includes(loc.toLowerCase()));
+      if (assetSpecialLoc) {
+        if (!counts[assetSpecialLoc]) counts[assetSpecialLoc] = { total: 0, verified: 0 };
+        counts[assetSpecialLoc].total++;
+        if (isVerified) counts[assetSpecialLoc].verified++;
+      }
+    });
+
+    return counts;
+  }, [isAdmin, globallyFilteredAssets]);
+
+
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -902,6 +956,10 @@ export default function AssetList() {
     const verificationPercentage = totalStateAssets > 0 ? (verifiedStateAssets / totalStateAssets) * 100 : 0;
     const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     
+    const overallTotal = globallyFilteredAssets.length;
+    const overallVerified = globallyFilteredAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
+
+
     return (
       <div className="flex flex-col h-full gap-4">
         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
@@ -920,30 +978,50 @@ export default function AssetList() {
                             value={globalStateFilter || 'all'}
                             onValueChange={(value) => setGlobalStateFilter(value === 'all' ? '' : value)}
                         >
-                        <SelectTrigger className="w-full sm:w-[280px]">
+                        <SelectTrigger className="w-full sm:w-auto min-w-[280px]">
                             <SelectValue placeholder="Select a location..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Overall (All Assets)</SelectItem>
+                            <SelectItem value="all">
+                                <div>
+                                    <p>Overall (All Assets)</p>
+                                    <p className="text-xs text-muted-foreground">{overallVerified} of {overallTotal} verified</p>
+                                </div>
+                            </SelectItem>
                             <SelectSeparator />
                             <SelectGroup>
                                 <SelectLabel>Special Locations</SelectLabel>
                                 {SPECIAL_LOCATIONS.map((loc) => (
-                                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                                    <SelectItem key={loc} value={loc}>
+                                        <div>
+                                            <p>{loc}</p>
+                                            <p className="text-xs text-muted-foreground">{(locationCounts[loc]?.verified || 0)} of {(locationCounts[loc]?.total || 0)} verified</p>
+                                        </div>
+                                    </SelectItem>
                                 ))}
                             </SelectGroup>
                             <SelectSeparator />
                             <SelectGroup>
                                 <SelectLabel>Geopolitical Zones</SelectLabel>
                                 {ZONE_NAMES.map((zone) => (
-                                    <SelectItem key={zone} value={zone}>{zone}</SelectItem>
+                                    <SelectItem key={zone} value={zone}>
+                                        <div>
+                                            <p>{zone}</p>
+                                            <p className="text-xs text-muted-foreground">{(locationCounts[zone]?.verified || 0)} of {(locationCounts[zone]?.total || 0)} verified</p>
+                                        </div>
+                                    </SelectItem>
                                 ))}
                             </SelectGroup>
                             <SelectSeparator />
                             <SelectGroup>
                                 <SelectLabel>States</SelectLabel>
                                 {NIGERIAN_STATES.map((state) => (
-                                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                                    <SelectItem key={state} value={state}>
+                                       <div>
+                                            <p>{state}</p>
+                                            <p className="text-xs text-muted-foreground">{(locationCounts[state]?.verified || 0)} of {(locationCounts[state]?.total || 0)} verified</p>
+                                        </div>
+                                    </SelectItem>
                                 ))}
                             </SelectGroup>
                         </SelectContent>
