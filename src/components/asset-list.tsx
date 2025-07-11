@@ -72,7 +72,7 @@ import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
-import { onSnapshot, query, collection } from "firebase/firestore";
+import { onSnapshot, query, collection, Unsubscribe } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 
@@ -129,6 +129,7 @@ export default function AssetList() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   
   const isInitialLoad = useRef(true);
 
@@ -136,13 +137,13 @@ export default function AssetList() {
     searchTerm,
     isOnline, setIsOnline, globalStateFilter, setGlobalStateFilter,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
-    setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
-    sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
+    sortConfig,
     enabledSheets, lockAssetList,
     manualSyncTrigger, isSyncing, setIsSyncing,
     autoSyncEnabled,
     setDataActions,
     setInboxMessages, setUnreadInboxCount,
+    setLocationOptions, setAssigneeOptions, setStatusOptions
   } = useAppState();
 
   const isSyncingRef = useRef(isSyncing);
@@ -151,7 +152,8 @@ export default function AssetList() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter, view, currentCategory]);
+    setSelectedCategories([]);
+  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter, view]);
   
   const getNewestDuplicate = (assetsToFilter: Asset[]): Asset[] => {
     const uniqueAssetMap = new Map<string, Asset>();
@@ -174,142 +176,42 @@ export default function AssetList() {
     return Array.from(uniqueAssetMap.values());
   };
 
-  // --- INBOX LOGIC ---
-  const generateInboxUpdates = useCallback((previousAssets: Asset[], newAssets: Asset[], currentUserProfile: typeof userProfile): InboxMessageGroup[] => {
-    if (!isAdmin) {
-        return [];
-    }
-
-    const previousAssetsMap = new Map(previousAssets.map(a => [a.id, a]));
-    const changesByGroup: Record<string, InboxMessageGroup> = {};
-
-    const userFriendlyFieldNames: Record<string, string> = {
-        verifiedStatus: 'Status',
-        location: 'Location',
-        assignee: 'Assignee',
-        condition: 'Condition',
-        remarks: 'Remarks',
-        description: 'Description',
-        serialNumber: 'Serial Number',
-    };
-
-    const getGroupId = (asset: Asset) => `${asset.lastModifiedBy || 'Unknown'}-${asset.lastModifiedByState || 'N/A'}`;
-
-    for (const newAsset of newAssets) {
-        const previousAsset = previousAssetsMap.get(newAsset.id);
-        const groupId = getGroupId(newAsset);
-
-        if (!previousAsset) {
-            const timestamp = newAsset.lastModified || new Date().toISOString();
-            if (!changesByGroup[groupId]) {
-                changesByGroup[groupId] = {
-                    id: groupId + '-' + timestamp,
-                    type: 'asset',
-                    updatedBy: newAsset.lastModifiedBy || 'Unknown',
-                    updatedByState: newAsset.lastModifiedByState,
-                    timestamp: timestamp,
-                    changes: [],
-                    updatedAssets: []
-                };
-            }
-            changesByGroup[groupId].changes.push({
-                assetId: newAsset.id,
-                assetDescription: newAsset.description || 'Untitled Asset',
-                field: 'Asset',
-                from: 'N/A',
-                to: 'Newly Added',
-                category: newAsset.category,
-            });
-            changesByGroup[groupId].updatedAssets!.push(newAsset);
-            continue;
-        }
-
-        const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
-        const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
-
-        if (newTimestamp > prevTimestamp + 1000) { // +1s threshold
-            const detailedChanges: AssetChange[] = [];
-            Object.keys(userFriendlyFieldNames).forEach(key => {
-                const oldValue = previousAsset[key as keyof Asset] as any;
-                const newValue = newAsset[key as keyof Asset] as any;
-                if (String(oldValue || '').trim() !== String(newValue || '').trim()) {
-                    detailedChanges.push({
-                        assetId: newAsset.id,
-                        assetDescription: newAsset.description || 'Untitled Asset',
-                        field: userFriendlyFieldNames[key],
-                        from: String(oldValue || 'empty'),
-                        to: String(newValue || 'empty'),
-                        category: newAsset.category,
-                    });
-                }
-            });
-
-            if (detailedChanges.length > 0) {
-                const timestamp = newAsset.lastModified || new Date().toISOString();
-                 if (!changesByGroup[groupId]) {
-                    changesByGroup[groupId] = {
-                        id: groupId + '-' + timestamp,
-                        type: 'asset',
-                        updatedBy: newAsset.lastModifiedBy || 'Unknown',
-                        updatedByState: newAsset.lastModifiedByState,
-                        timestamp: timestamp,
-                        changes: [],
-                        updatedAssets: []
-                    };
-                }
-                changesByGroup[groupId].changes!.push(...detailedChanges);
-                changesByGroup[groupId].updatedAssets!.push(newAsset);
-
-                // Update timestamp to the latest change in the group
-                if (new Date(timestamp) > new Date(changesByGroup[groupId].timestamp)) {
-                    changesByGroup[groupId].timestamp = timestamp;
-                }
-            }
-        }
-    }
-    return Object.values(changesByGroup);
-}, [isAdmin]);
-
-  const updateInboxState = useCallback((newInboxItems: InboxMessageGroup[]) => {
-      if (newInboxItems.length > 0) {
-          setInboxMessages(prevMessages => {
-              const allMessages = [...prevMessages, ...newInboxItems];
-              const uniqueMessages = Array.from(new Map(allMessages.map(m => [m.id, m])).values());
-              return uniqueMessages.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-          });
-          
-          setUnreadInboxCount(prevCount => prevCount + newInboxItems.length);
-      }
-  }, [setInboxMessages, setUnreadInboxCount]);
-
-
-  // --- DATA LOADING & SYNC ---
-  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync = false) => {
     const localAssets = await getLocalAssetsFromDb();
-    const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
-    
-    fetchedAssets.forEach(asset => {
-        const existing = localAssetsMap.get(asset.id);
-        if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
-            localAssetsMap.set(asset.id, { ...asset, syncStatus: 'synced' });
-        }
-    });
+    let mergedAssets = [...localAssets];
 
-    const mergedAssets = Array.from(localAssetsMap.values());
-      
-    if (isAdmin) {
-      const newInboxItems = generateInboxUpdates(localAssets, mergedAssets, userProfile)
-        .filter(group => group.updatedBy !== userProfile?.displayName);
-      if(newInboxItems.length > 0 && !isInitialLoad.current) {
-        updateInboxState(newInboxItems);
+    if (isManualSync) {
+      const fetchedAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
+      const localOnlyNewAssets = localAssets.filter(la => !fetchedAssetsMap.has(la.id));
+      mergedAssets = [...fetchedAssets, ...localOnlyNewAssets];
+    } else {
+      const mergedAssetMap = new Map<string, Asset>();
+      localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
+      fetchedAssets.forEach(asset => {
+        const existing = mergedAssetMap.get(asset.id);
+        if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
+            mergedAssetMap.set(asset.id, { ...asset, syncStatus: 'synced' });
+        }
+      });
+      mergedAssets = Array.from(mergedAssetMap.values());
+    }
+    
+    const assetsToPush = mergedAssets.filter(a => a.syncStatus === 'local');
+    if (isOnline && assetsToPush.length > 0) {
+      addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
+      try {
+          await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
+      } catch(e) {
+          addNotification({title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive'});
       }
     }
-      
+    
     const finalAssets = getNewestDuplicate(mergedAssets);
     setAssets(finalAssets);
     await saveAssets(finalAssets);
     isInitialLoad.current = false;
-  }, [userProfile, isAdmin, generateInboxUpdates, updateInboxState]);
+}, [isOnline]);
+
   
   useEffect(() => {
     const loadInitialData = async () => {
@@ -324,93 +226,100 @@ export default function AssetList() {
 
   // Real-time listener for Admins with Auto-Sync
   useEffect(() => {
-    if (!isOnline || !isAdmin || !autoSyncEnabled) {
-      return;
-    }
-    
-    setIsSyncing(true);
-
-    const q = query(collection(db, 'assets'));
-    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-        setIsSyncing(true);
+    let unsubscribe: Unsubscribe | null = null;
+    if (isOnline && isAdmin && autoSyncEnabled) {
+      setIsSyncing(true);
+  
+      const q = query(collection(db, 'assets'));
+      unsubscribe = onSnapshot(q, async (querySnapshot) => {
+        if (!isInitialLoad.current) {
+          const hasChanges = querySnapshot.docChanges().length > 0;
+          if (hasChanges) {
+            addNotification({ title: 'Real-time Sync', description: 'Asset data has been updated from the cloud.' });
+          }
+        }
+  
         const fetchedAssets: Asset[] = [];
         querySnapshot.forEach((doc) => {
-            fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+          fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
         });
+        await handleFetchedAssets(fetchedAssets, false);
         
-        if (querySnapshot.docChanges().length > 0 && !isInitialLoad.current) {
-            addNotification({ title: 'Real-time Sync', description: 'Asset data has been updated.' });
+        if (isSyncingRef.current) {
+          setIsSyncing(false);
         }
-
-        await handleFetchedAssets(fetchedAssets);
+      }, (error) => {
+        const errorMessage = (error as any).message || 'An unknown error occurred.';
+        if ((error as any).code === 'permission-denied' || errorMessage.includes('insufficient permissions')) {
+          addNotification({ title: "Permissions Error", description: "You don't have permission to read asset data. Please check Firestore rules.", variant: 'destructive' })
+        } else if ((error as any).code === 'resource-exhausted') {
+            addNotification({ title: 'Sync Paused', description: 'Cloud read quota exceeded. Syncing is paused.', variant: 'destructive' });
+        } else {
+          addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
+        }
         setIsSyncing(false);
-    }, (error) => {
-      const errorMessage = (error as any).message || 'An unknown error occurred.';
-      if ((error as any).code === 'permission-denied' || errorMessage.includes('insufficient permissions')) {
-        addNotification({ title: "Permissions Error", description: "You don't have permission to view real-time asset updates. Please check your Firestore security rules.", variant: 'destructive' })
-      } else {
-        addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
-      }
-      setIsSyncing(false);
-      setIsOnline(false);
-    });
-
+        setIsOnline(false);
+      });
+    }
+  
     return () => {
-      unsubscribe();
+      if (unsubscribe) {
+        unsubscribe();
+      }
       if (isSyncingRef.current) {
         setIsSyncing(false);
       }
     };
   }, [isOnline, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
+  
 
   // Manual sync for all users (or admins with auto-sync off)
   useEffect(() => {
     const pushLocalChanges = async () => {
-        if (isSyncingRef.current) return;
-        setIsSyncing(true);
-        addNotification({ title: 'Syncing local changes...' });
+      if (isSyncingRef.current) return;
+      setIsSyncing(true);
+      
+      try {
+        const localAssets = await getLocalAssetsFromDb();
+        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
         
-        try {
-            const localAssets = await getLocalAssetsFromDb();
-            const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
-            
-            if (assetsToPush.length === 0) {
-                addNotification({ title: 'No Changes to Sync', description: 'Your local data is already up to date.' });
-                setIsSyncing(false);
-                return;
-            }
-
-            addNotification({ title: 'Syncing with Cloud', description: `Uploading ${assetsToPush.length} changed assets.` });
-            await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
-
-            const updatedLocalAssets = localAssets.map(a => 
-                assetsToPush.find(p => p.id === a.id) ? { ...a, syncStatus: 'synced' } : a
-            );
-            
-            await saveAssets(updatedLocalAssets);
-            setAssets(updatedLocalAssets);
-            
-            addNotification({ title: 'Sync Complete', description: 'Your local changes have been saved to the cloud.' });
-        } catch (error) {
-            const errorMessage = (error as Error).message;
-            if (errorMessage.includes('permission-denied') || errorMessage.includes('insufficient permissions')) {
-                addNotification({ title: 'Permissions Error', description: 'You do not have permission to write to the asset database. Please check your Firestore security rules.', variant: 'destructive' });
-            } else {
-                addNotification({ title: 'Sync Failed', description: errorMessage, variant: 'destructive' });
-            }
-            setIsOnline(false); // Go offline if sync fails to prevent further issues
-        } finally {
-            setIsSyncing(false);
+        if (assetsToPush.length === 0) {
+          addNotification({ title: 'No Changes to Sync', description: 'Your local data is already up to date.' });
+          setIsSyncing(false);
+          return;
         }
+
+        addNotification({ title: 'Syncing with Cloud', description: `Uploading ${assetsToPush.length} changed assets.` });
+        await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
+
+        const updatedLocalAssets = localAssets.map(a => 
+            assetsToPush.find(p => p.id === a.id) ? { ...a, syncStatus: 'synced' as const } : a
+        );
+        
+        await saveAssets(updatedLocalAssets);
+        setAssets(updatedLocalAssets);
+        
+        addNotification({ title: 'Sync Complete', description: 'Your local changes have been saved to the cloud.' });
+      } catch (error) {
+        const errorMessage = (error as Error).message;
+        if (errorMessage.includes('permission-denied') || errorMessage.includes('insufficient permissions')) {
+          addNotification({ title: 'Permissions Error', description: 'You do not have permission to write to the database. Check Firestore rules.', variant: 'destructive' });
+        } else {
+          addNotification({ title: 'Sync Failed', description: errorMessage, variant: 'destructive' });
+        }
+        setIsOnline(false); // Go offline if sync fails to prevent further issues
+      } finally {
+        setIsSyncing(false);
+      }
     };
     
-    if (!isOnline) return;
-    if (isAdmin && autoSyncEnabled) return; // Admins with auto-sync on don't need this manual push
-
-    if (manualSyncTrigger > 0) {
+    if (manualSyncTrigger > 0 && isOnline) {
+      if (!(isAdmin && autoSyncEnabled)) {
         pushLocalChanges();
+      }
     }
-  }, [isOnline, manualSyncTrigger, isAdmin, autoSyncEnabled, setIsOnline, setIsSyncing]);
+  }, [manualSyncTrigger, isOnline, isAdmin, autoSyncEnabled, setIsOnline, setIsSyncing]);
+
   
   useEffect(() => {
     setStatusOptions([
@@ -430,24 +339,22 @@ export default function AssetList() {
     }
     
     const zones: Record<string, string[]> = NIGERIAN_ZONES;
-    const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
     const isZone = !!zones[globalStateFilter]; // Check if the filter is a zone name
 
     if (isZone) {
-      const lowerCaseZone = globalStateFilter.toLowerCase();
+      const statesInZone = new Set(zones[globalStateFilter].map(s => s.toLowerCase()));
       return globallyFilteredAssets.filter(asset => {
-        const assetLocation = (asset.location || "").toLowerCase().trim();
-        return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
+        const assetLocation = (asset.location || "").trim().toLowerCase();
+        for (const state of statesInZone) {
+            if (assetLocation.includes(state)) return true;
+        }
+        return false;
       });
     } else {
       const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-      const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
-
       return globallyFilteredAssets.filter(asset => {
-        const assetLocation = (asset.location || "").toLowerCase().trim();
-        const matchesState = assetLocation.startsWith(lowerCaseFilter);
-        const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-        return matchesState || matchesCapital;
+        const assetLocation = (asset.location || "").trim().toLowerCase();
+        return assetLocation.includes(lowerCaseFilter);
       });
     }
   }, [globallyFilteredAssets, globalStateFilter]);
@@ -587,31 +494,32 @@ export default function AssetList() {
     setIsDeleteDialogOpen(false);
   }
 
-  const handleBatchDelete = async () => {
+  const handleBatchDelete = async (idsToDelete: string[]) => {
     if (lockAssetList) {
         addNotification({ title: "Deletion Disabled", description: "The asset list is locked and cannot be modified.", variant: "destructive" });
         return;
     }
     
     setIsBatchDeleting(true);
-    const assetsToDeleteCount = selectedAssetIds.length;
+    const assetsToDeleteCount = idsToDelete.length;
     
     // Update locally first for snappy UI
     let currentAssets = await getLocalAssetsFromDb();
-    currentAssets = currentAssets.filter(a => !selectedAssetIds.includes(a.id));
+    currentAssets = currentAssets.filter(a => !idsToDelete.includes(a.id));
     await saveAssets(currentAssets);
     setAssets(currentAssets);
     addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted. Will sync on next connection.` });
 
     if (isOnline) {
         try {
-            await batchDeleteAssets(selectedAssetIds);
+            await batchDeleteAssets(idsToDelete);
         } catch (e) {
             addNotification({ title: 'Error', description: 'Could not delete all selected assets from the cloud. They remain deleted locally.', variant: 'destructive' });
         }
     }
     
     setSelectedAssetIds([]);
+    setSelectedCategories([]);
     setIsBatchDeleting(false);
   }
 
@@ -732,10 +640,6 @@ export default function AssetList() {
 
         addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
 
-        if(isAdmin) {
-            const inboxUpdatesFromImport = generateInboxUpdates(baseAssets, combinedAssets, userProfile);
-            updateInboxState(inboxUpdatesFromImport);
-        }
     } else if (errors.length === 0) {
         addNotification({ title: "No Changes Detected", description: "No new or updated assets were found in the file."});
     }
@@ -745,27 +649,37 @@ export default function AssetList() {
   };
   
   const handleExportClick = useCallback(() => {
-    const assetsToExport = view === 'table' ? categoryFilteredAssets : displayedAssets;
+    let assetsToExport: Asset[];
+    let exportPrefix: string;
+
+    const isAdminUser = userProfile?.displayName?.trim().toLowerCase() === 'admin';
+    const basePrefix = isAdminUser ? 'admin' : userProfile?.state || 'assets';
+    
+    if (view === 'dashboard' && selectedCategories.length > 0) {
+      assetsToExport = assets.filter(a => selectedCategories.includes(a.category));
+      exportPrefix = `${basePrefix}-${selectedCategories.join('_')}`;
+    } else if (view === 'table' && currentCategory) {
+      assetsToExport = categoryFilteredAssets;
+      exportPrefix = `${basePrefix}-${currentCategory}`;
+    } else {
+      assetsToExport = displayedAssets;
+      exportPrefix = basePrefix;
+    }
+  
     if (assetsToExport.length === 0) {
       addNotification({ title: "No Data to Export", description: "There are no assets in the current view to export." });
       return;
     }
+    
     try {
-      const isAdminUser = userProfile?.displayName?.trim().toLowerCase() === 'admin';
-      const exportPrefix = isAdminUser ? 'admin' : userProfile?.state || 'assets';
-      let fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-      
-      if(view === 'table' && currentCategory){
-          fileName = `${exportPrefix}-${currentCategory}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-      }
-
+      const fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
       exportToExcel(assetsToExport, fileName);
       addNotification({ title: "Export Successful" });
     } catch(error) {
       console.error("Export Error:", error);
       addNotification({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
     }
-  }, [view, categoryFilteredAssets, displayedAssets, userProfile, currentCategory]);
+  }, [view, categoryFilteredAssets, displayedAssets, userProfile, currentCategory, selectedCategories, assets]);
   
   const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
     if (checked) {
@@ -788,6 +702,7 @@ export default function AssetList() {
         await clearLocalAssets();
         setAssets([]);
         setSelectedAssetIds([]);
+        setSelectedCategories([]);
         addNotification({ title: 'Local Data Cleared', description: 'All assets have been removed from this device.' });
         return;
     }
@@ -805,6 +720,7 @@ export default function AssetList() {
             await clearLocalAssets();
             setAssets([]);
             setSelectedAssetIds([]);
+            setSelectedCategories([]);
             addNotification({ title: 'All Assets Cleared', description: 'The application is now in a clean state.' });
         } catch (e) {
             addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
@@ -860,28 +776,26 @@ export default function AssetList() {
 
     globallyFilteredAssets.forEach(asset => {
       const isVerified = asset.verifiedStatus === 'Verified';
+      const assetLocationLower = (asset.location || '').toLowerCase();
 
       // Count for States
-      const assetState = NIGERIAN_STATES.find(state => (asset.location || '').toLowerCase().includes(state.toLowerCase()));
+      const assetState = NIGERIAN_STATES.find(state => assetLocationLower.includes(state.toLowerCase()));
       if (assetState) {
-        if (!counts[assetState]) counts[assetState] = { total: 0, verified: 0 };
         counts[assetState].total++;
         if (isVerified) counts[assetState].verified++;
       }
 
       // Count for Zones
       for (const zone in NIGERIAN_ZONES) {
-        if ((asset.location || '').toLowerCase().includes(zone.toLowerCase())) {
-          if (!counts[zone]) counts[zone] = { total: 0, verified: 0 };
+        if (assetLocationLower.includes(zone.toLowerCase())) {
           counts[zone].total++;
           if (isVerified) counts[zone].verified++;
         }
       }
 
       // Count for Special Locations
-      const assetSpecialLoc = SPECIAL_LOCATIONS.find(loc => (asset.location || '').toLowerCase().includes(loc.toLowerCase()));
+      const assetSpecialLoc = SPECIAL_LOCATIONS.find(loc => assetLocationLower.includes(loc.toLowerCase()));
       if (assetSpecialLoc) {
-        if (!counts[assetSpecialLoc]) counts[assetSpecialLoc] = { total: 0, verified: 0 };
         counts[assetSpecialLoc].total++;
         if (isVerified) counts[assetSpecialLoc].verified++;
       }
@@ -889,6 +803,19 @@ export default function AssetList() {
 
     return counts;
   }, [isAdmin, globallyFilteredAssets]);
+
+  const handleSelectCategory = (category: string, checked: boolean) => {
+    setSelectedCategories(prev => {
+        const newSelection = checked ? [...prev, category] : prev.filter(c => c !== category);
+        return newSelection;
+    });
+  };
+
+  const handleBatchDeleteCategories = () => {
+    if (selectedCategories.length === 0) return;
+    const idsToDelete = assets.filter(a => selectedCategories.includes(a.category)).map(a => a.id);
+    handleBatchDelete(idsToDelete);
+  };
 
 
   if (isLoading) {
@@ -911,8 +838,19 @@ export default function AssetList() {
         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
         <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight flex-1">
-                {isFiltered ? `Filter Results` : 'Asset Dashboard'}
+                {isFiltered ? `Filter Results` : (selectedCategories.length > 0 ? `${selectedCategories.length} Categories Selected` : 'Asset Dashboard')}
             </h2>
+             {selectedCategories.length > 0 && (
+                <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={handleExportClick} disabled={isBatchDeleting}>
+                        <FileDown className="mr-2 h-4 w-4" /> Export
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={handleBatchDeleteCategories} disabled={isBatchDeleting}>
+                        {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                        Delete
+                    </Button>
+                </div>
+            )}
         </div>
         <Card>
              <CardHeader>
@@ -997,12 +935,27 @@ export default function AssetList() {
                     const total = categoryAssets.length;
                     const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
                     const percentage = total > 0 ? (verified / total) * 100 : 0;
+                    const isSelected = selectedCategories.includes(category);
                     
                     return (
-                        <Card key={category} className="hover:shadow-md transition-shadow flex flex-col">
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <Card 
+                            key={category} 
+                            className={cn(
+                                "hover:shadow-md transition-shadow flex flex-col cursor-pointer",
+                                isSelected && "ring-2 ring-primary"
+                            )}
+                            onClick={() => handleSelectCategory(category, !isSelected)}
+                        >
+                            <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                                 <CardTitle className="text-sm font-medium">{category}</CardTitle>
-                                <Folder className="h-4 w-4 text-muted-foreground" />
+                                <Checkbox 
+                                    checked={isSelected}
+                                    onCheckedChange={(checked) => {
+                                        handleSelectCategory(category, checked as boolean);
+                                    }}
+                                    onClick={(e) => e.stopPropagation()}
+                                    aria-label={`Select category ${category}`}
+                                />
                             </CardHeader>
                             <CardContent className="flex-grow space-y-4">
                                 <div>
@@ -1015,7 +968,7 @@ export default function AssetList() {
                                 </div>
                             </CardContent>
                             <CardFooter className="pt-0 pb-4">
-                              <Button variant="link" className="p-0 h-auto" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
+                              <Button variant="link" className="p-0 h-auto" onClick={(e) => { e.stopPropagation(); setView('table'); setCurrentCategory(category); }}>View Assets</Button>
                             </CardFooter>
                         </Card>
                     );
@@ -1090,7 +1043,7 @@ export default function AssetList() {
                             <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                         </Button>
                     )}
-                    <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting}>
+                    <Button variant="destructive" size="sm" onClick={() => handleBatchDelete(selectedAssetIds)} disabled={isBatchDeleting}>
                         {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                         Delete
                     </Button>
@@ -1122,7 +1075,7 @@ export default function AssetList() {
                   <TableBody>
                       {paginatedCategoryAssets.length > 0 ? (
                       paginatedCategoryAssets.map((asset) => (
-                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id)} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) ? "selected" : ""} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
                           <TableCell onClick={e => e.stopPropagation()}>
                               <Checkbox 
                                   checked={selectedAssetIds.includes(asset.id)}
@@ -1262,3 +1215,4 @@ export default function AssetList() {
     </div>
   );
 }
+
