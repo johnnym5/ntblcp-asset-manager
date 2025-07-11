@@ -139,8 +139,6 @@ export default function AssetList() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [locationSearch, setLocationSearch] = useState("");
-  const [isLocationPopoverOpen, setIsLocationPopoverOpen] = useState(false);
   
   const isInitialLoad = useRef(true);
   const syncQueueRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
@@ -208,25 +206,30 @@ export default function AssetList() {
 
       for (const newAsset of newAssets) {
         const previousAsset = previousAssetsMap.get(newAsset.id);
+        const groupKey = newAsset.lastModifiedBy || 'An unknown user';
+        const groupId = `${groupKey}-${newAsset.lastModified}`;
 
         if (!previousAsset) {
-              const groupKey = newAsset.lastModifiedBy || 'An unknown user';
-              if (!changesByGroup[groupKey]) {
-                  changesByGroup[groupKey] = {
+              if (!changesByGroup[groupId]) {
+                  changesByGroup[groupId] = {
+                      id: groupId,
+                      type: 'asset',
                       updatedBy: groupKey,
-                      updatedAt: newAsset.lastModified || new Date().toISOString(),
+                      updatedByState: newAsset.lastModifiedByState,
+                      timestamp: newAsset.lastModified || new Date().toISOString(),
                       changes: [],
                       updatedAssets: []
                   };
               }
-              changesByGroup[groupKey].changes.push({
+              changesByGroup[groupId].changes.push({
                   assetId: newAsset.id,
                   assetDescription: newAsset.description || 'Untitled Asset',
                   field: 'Asset',
                   from: 'N/A',
                   to: 'Newly Added',
+                  category: newAsset.category,
               });
-              changesByGroup[groupKey].updatedAssets.push(newAsset);
+              changesByGroup[groupId].updatedAssets.push(newAsset);
               continue;
         }
         
@@ -245,25 +248,28 @@ export default function AssetList() {
                       field: userFriendlyFieldNames[key],
                       from: String(oldValue || 'empty'),
                       to: String(newValue || 'empty'),
+                      category: newAsset.category,
                   });
               }
           });
 
           if (detailedChanges.length > 0) {
-              const groupKey = newAsset.lastModifiedBy || 'An unknown user';
-              if (!changesByGroup[groupKey]) {
-                  changesByGroup[groupKey] = {
+              if (!changesByGroup[groupId]) {
+                  changesByGroup[groupId] = {
+                      id: groupId,
+                      type: 'asset',
                       updatedBy: groupKey,
-                      updatedAt: newAsset.lastModified || new Date().toISOString(),
+                      updatedByState: newAsset.lastModifiedByState,
+                      timestamp: newAsset.lastModified || new Date().toISOString(),
                       changes: [],
                       updatedAssets: []
                   };
               }
-              changesByGroup[groupKey].changes.push(...detailedChanges);
-              changesByGroup[groupKey].updatedAssets.push(newAsset);
+              changesByGroup[groupId].changes.push(...detailedChanges);
+              changesByGroup[groupId].updatedAssets.push(newAsset);
 
-              if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].updatedAt)) {
-                  changesByGroup[groupKey].updatedAt = newAsset.lastModified!;
+              if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupId].timestamp)) {
+                  changesByGroup[groupId].timestamp = newAsset.lastModified!;
               }
           }
         }
@@ -274,25 +280,12 @@ export default function AssetList() {
   const updateInboxState = useCallback((newInboxItems: InboxMessageGroup[]) => {
       if (newInboxItems.length > 0) {
           setInboxMessages(prevMessages => {
-              const existingGroups = new Map(prevMessages.map(g => [g.updatedBy, g]));
-              newInboxItems.forEach(newGroup => {
-                  const existingGroup = existingGroups.get(newGroup.updatedBy);
-                  if (existingGroup) {
-                      existingGroup.changes.push(...newGroup.changes);
-                      const updatedAssetsMap = new Map(existingGroup.updatedAssets.map(a => [a.id, a]));
-                      newGroup.updatedAssets.forEach(a => updatedAssetsMap.set(a.id, a));
-                      existingGroup.updatedAssets = Array.from(updatedAssetsMap.values());
-                      if (new Date(newGroup.updatedAt) > new Date(existingGroup.updatedAt)) {
-                          existingGroup.updatedAt = newGroup.updatedAt;
-                      }
-                  } else {
-                      existingGroups.set(newGroup.updatedBy, newGroup);
-                  }
-              });
-              return Array.from(existingGroups.values()).sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+              const allMessages = [...prevMessages, ...newInboxItems];
+              const uniqueMessages = Array.from(new Map(allMessages.map(m => [m.id, m])).values());
+              return uniqueMessages.sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
           });
-          const totalNewChanges = newInboxItems.reduce((acc, group) => acc + group.changes.length, 0);
-          setUnreadInboxCount(prevCount => prevCount + totalNewChanges);
+          
+          setUnreadInboxCount(prevCount => prevCount + newInboxItems.length);
       }
   }, [setInboxMessages, setUnreadInboxCount]);
 
@@ -364,7 +357,6 @@ export default function AssetList() {
                   await saveAssets(currentAssets);
               }
 
-              addNotification({ title: 'Asset Synced', description: `Changes for "${assetToSync.description || 'asset'}" saved to cloud.` });
           } catch (error) {
               addNotification({ title: 'Sync Failed', description: `Could not sync "${assetToSync.description || 'asset'}".`, variant: 'destructive' });
               setAssets(prev => prev.map(a => a.id === assetToSync.id ? { ...a, syncStatus: 'local' } : a));
@@ -392,24 +384,22 @@ export default function AssetList() {
     if (!isOnline || !isAdmin || !autoSyncEnabled) {
       return;
     }
-
-    addNotification({ title: 'Real-time Sync Active', description: 'Asset list will update automatically.' });
+    
     setIsSyncing(true);
 
     const q = query(collection(db, 'assets'));
     const unsubscribe = onSnapshot(q, async (querySnapshot) => {
+      setIsSyncing(true);
       const fetchedAssets: Asset[] = [];
       querySnapshot.forEach((doc) => {
         fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
       });
+      addNotification({ title: 'Real-time Sync Active', description: 'Asset data is up-to-date.' });
       await handleFetchedAssets(fetchedAssets, false);
-      
-      if (isSyncingRef.current) {
-        setIsSyncing(false);
-      }
+      setIsSyncing(false);
     }, (error) => {
       if ((error as any).code === 'permission-denied') {
-        addNotification({ title: "Permissions Error", description: "You don't have permission to view real-time asset updates. Contact an administrator.", variant: 'destructive' })
+        addNotification({ title: "Permissions Error", description: "You don't have permission to view real-time asset updates. Check your Firestore rules.", variant: 'destructive' })
       } else {
         console.error("Firestore real-time listener error:", error);
         addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
@@ -439,7 +429,12 @@ export default function AssetList() {
             await handleFetchedAssets(fetchedAssets, true);
             if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
-            addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
+            const errorMessage = (error as Error).message;
+            if (errorMessage.includes('permission-denied') || errorMessage.includes('insufficient permissions')) {
+                addNotification({ title: 'Permissions Error', description: 'You do not have permission to read the asset data. Please check your Firestore security rules.', variant: 'destructive' });
+            } else {
+                addNotification({ title: 'Sync Failed', description: errorMessage, variant: 'destructive' });
+            }
             setIsOnline(false);
         } finally {
             setIsSyncing(false);
@@ -906,49 +901,6 @@ export default function AssetList() {
     return `You are in Admin Mode. This action cannot be undone. This will permanently delete ALL asset records from both the central database and your local device, resetting the application for ALL users.`;
   }, [isOnline]);
 
-  const locationOptionsWithCounts = useMemo(() => {
-    const allLocations = [...SPECIAL_LOCATIONS, ...ZONE_NAMES, ...NIGERIAN_STATES];
-    
-    return allLocations.map(loc => {
-      const isZone = NIGERIAN_ZONES[loc];
-      let relevantAssets: Asset[];
-
-      if (isZone) {
-        const lowerCaseZone = loc.toLowerCase();
-        relevantAssets = globallyFilteredAssets.filter(asset => {
-          const assetLocation = (asset.location || "").toLowerCase().trim();
-          return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
-        });
-      } else {
-        const capitalCity = NIGERIAN_STATE_CAPITALS[loc]?.toLowerCase().trim();
-        const lowerCaseFilter = loc.toLowerCase().trim();
-        relevantAssets = globallyFilteredAssets.filter(asset => {
-          const assetLocation = (asset.location || "").toLowerCase().trim();
-          const matchesState = assetLocation.startsWith(lowerCaseFilter);
-          const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-          return matchesState || matchesCapital;
-        });
-      }
-      
-      const total = relevantAssets.length;
-      const verified = relevantAssets.filter(a => a.verifiedStatus === 'Verified').length;
-      return {
-        name: loc,
-        total,
-        verified
-      };
-    });
-  }, [globallyFilteredAssets]);
-
-  const filteredLocationOptions = useMemo(() => {
-    if (!locationSearch) {
-      return locationOptionsWithCounts;
-    }
-    return locationOptionsWithCounts.filter(loc =>
-      loc.name.toLowerCase().includes(locationSearch.toLowerCase())
-    );
-  }, [locationOptionsWithCounts, locationSearch]);
-
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -974,89 +926,38 @@ export default function AssetList() {
                     {isAdmin && !isFiltered ? (
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
-                        
-                        <Popover open={isLocationPopoverOpen} onOpenChange={setIsLocationPopoverOpen}>
-                          <PopoverTrigger asChild>
-                            <Button
-                              variant="outline"
-                              role="combobox"
-                              aria-expanded={isLocationPopoverOpen}
-                              className="w-full sm:w-[350px] justify-between"
-                            >
-                              {globalStateFilter || "Overall (All Assets)"}
-                              <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-full sm:w-[350px] p-0">
-                            <Command>
-                              <CommandInput placeholder="Search location..." onValueChange={setLocationSearch} />
-                              <CommandEmpty>No location found.</CommandEmpty>
-                              <CommandList>
-                                <ScrollArea className="h-[300px]">
-                                  <CommandItem
-                                      key="all"
-                                      value="Overall (All Assets)"
-                                      onSelect={() => {
-                                        setGlobalStateFilter('');
-                                        setIsLocationPopoverOpen(false);
-                                      }}
-                                    >
-                                      <Check className={cn("mr-2 h-4 w-4", !globalStateFilter ? "opacity-100" : "opacity-0")} />
-                                      Overall (All Assets)
-                                  </CommandItem>
-                                  <CommandGroup heading="Special Locations">
-                                    {filteredLocationOptions.filter(l => SPECIAL_LOCATIONS.includes(l.name)).map((loc) => (
-                                      <CommandItem
-                                        key={loc.name}
-                                        value={loc.name}
-                                        onSelect={(currentValue) => {
-                                          setGlobalStateFilter(currentValue === globalStateFilter ? "" : currentValue);
-                                          setIsLocationPopoverOpen(false);
-                                        }}
-                                      >
-                                        <Check className={cn("mr-2 h-4 w-4", globalStateFilter === loc.name ? "opacity-100" : "opacity-0")} />
-                                        <span>{loc.name}</span>
-                                        <span className="ml-auto text-xs text-muted-foreground">{loc.verified} of {loc.total}</span>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                  <CommandGroup heading="Geopolitical Zones">
-                                    {filteredLocationOptions.filter(l => ZONE_NAMES.includes(l.name)).map((loc) => (
-                                      <CommandItem
-                                        key={loc.name}
-                                        value={loc.name}
-                                        onSelect={(currentValue) => {
-                                          setGlobalStateFilter(currentValue === globalStateFilter ? "" : currentValue);
-                                          setIsLocationPopoverOpen(false);
-                                        }}
-                                      >
-                                        <Check className={cn("mr-2 h-4 w-4", globalStateFilter === loc.name ? "opacity-100" : "opacity-0")} />
-                                        <span>{loc.name}</span>
-                                        <span className="ml-auto text-xs text-muted-foreground">{loc.verified} of {loc.total}</span>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                  <CommandGroup heading="States">
-                                    {filteredLocationOptions.filter(l => NIGERIAN_STATES.includes(l.name)).map((loc) => (
-                                      <CommandItem
-                                        key={loc.name}
-                                        value={loc.name}
-                                        onSelect={(currentValue) => {
-                                          setGlobalStateFilter(currentValue === globalStateFilter ? "" : currentValue);
-                                          setIsLocationPopoverOpen(false);
-                                        }}
-                                      >
-                                        <Check className={cn("mr-2 h-4 w-4", globalStateFilter === loc.name ? "opacity-100" : "opacity-0")} />
-                                        <span>{loc.name}</span>
-                                        <span className="ml-auto text-xs text-muted-foreground">{loc.verified} of {loc.total}</span>
-                                      </CommandItem>
-                                    ))}
-                                  </CommandGroup>
-                                </ScrollArea>
-                              </CommandList>
-                            </Command>
-                          </PopoverContent>
-                        </Popover>
+                        <Select
+                            value={globalStateFilter || 'all'}
+                            onValueChange={(value) => setGlobalStateFilter(value === 'all' ? '' : value)}
+                        >
+                        <SelectTrigger className="w-full sm:w-[280px]">
+                            <SelectValue placeholder="Select a location..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="all">Overall (All Assets)</SelectItem>
+                            <SelectSeparator />
+                            <SelectGroup>
+                                <SelectLabel>Special Locations</SelectLabel>
+                                {SPECIAL_LOCATIONS.map((loc) => (
+                                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                                ))}
+                            </SelectGroup>
+                            <SelectSeparator />
+                            <SelectGroup>
+                                <SelectLabel>Geopolitical Zones</SelectLabel>
+                                {ZONE_NAMES.map((zone) => (
+                                    <SelectItem key={zone} value={zone}>{zone}</SelectItem>
+                                ))}
+                            </SelectGroup>
+                            <SelectSeparator />
+                            <SelectGroup>
+                                <SelectLabel>States</SelectLabel>
+                                {NIGERIAN_STATES.map((state) => (
+                                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                                ))}
+                            </SelectGroup>
+                        </SelectContent>
+                        </Select>
                     </div>
                     ) : (
                     <>
