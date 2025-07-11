@@ -144,7 +144,7 @@ export default function AssetList() {
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
     enabledSheets, setEnabledSheets, lockAssetList,
-    manualSyncTrigger, isSyncing, setIsSyncing,
+    manualSyncTrigger, setManualSyncTrigger, isSyncing, setIsSyncing,
     autoSyncEnabled,
     setDataActions,
     setInboxMessages, setUnreadInboxCount,
@@ -215,8 +215,10 @@ export default function AssetList() {
               const groupKey = newAsset.lastModifiedBy || 'An unknown user';
               if (!changesByGroup[groupKey]) {
                   changesByGroup[groupKey] = {
+                      id: groupKey,
+                      type: 'asset',
                       updatedBy: groupKey,
-                      updatedAt: newAsset.lastModified || new Date().toISOString(),
+                      timestamp: newAsset.lastModified || new Date().toISOString(),
                       changes: [],
                       updatedAssets: []
                   };
@@ -255,8 +257,10 @@ export default function AssetList() {
               const groupKey = newAsset.lastModifiedBy || 'An unknown user';
               if (!changesByGroup[groupKey]) {
                   changesByGroup[groupKey] = {
+                      id: groupKey,
+                      type: 'asset',
                       updatedBy: groupKey,
-                      updatedAt: newAsset.lastModified || new Date().toISOString(),
+                      timestamp: newAsset.lastModified || new Date().toISOString(),
                       changes: [],
                       updatedAssets: []
                   };
@@ -266,8 +270,8 @@ export default function AssetList() {
                   changesByGroup[groupKey].updatedAssets.push(newAsset);
               }
 
-              if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].updatedAt)) {
-                  changesByGroup[groupKey].updatedAt = newAsset.lastModified!;
+              if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].timestamp)) {
+                  changesByGroup[groupKey].timestamp = newAsset.lastModified!;
               }
           }
         }
@@ -278,24 +282,24 @@ export default function AssetList() {
   const updateInboxState = useCallback((newInboxItems: InboxMessageGroup[]) => {
       if (newInboxItems.length > 0) {
           setInboxMessages(prevMessages => {
-              const existingGroups = new Map(prevMessages.map(g => [g.updatedBy, g]));
+              const existingGroups = new Map(prevMessages.map(g => [g.id, g]));
               newInboxItems.forEach(newGroup => {
-                  const existingGroup = existingGroups.get(newGroup.updatedBy);
-                  if (existingGroup) {
-                      existingGroup.changes.push(...newGroup.changes);
+                  const existingGroup = existingGroups.get(newGroup.id);
+                  if (existingGroup && existingGroup.type === 'asset' && newGroup.type === 'asset') {
+                      existingGroup.changes.push(...(newGroup.changes || []));
                       const updatedAssetsMap = new Map(existingGroup.updatedAssets.map(a => [a.id, a]));
-                      newGroup.updatedAssets.forEach(a => updatedAssetsMap.set(a.id, a));
+                      (newGroup.updatedAssets || []).forEach(a => updatedAssetsMap.set(a.id, a));
                       existingGroup.updatedAssets = Array.from(updatedAssetsMap.values());
-                      if (new Date(newGroup.updatedAt) > new Date(existingGroup.updatedAt)) {
-                          existingGroup.updatedAt = newGroup.updatedAt;
+                      if (new Date(newGroup.timestamp) > new Date(existingGroup.timestamp)) {
+                          existingGroup.timestamp = newGroup.timestamp;
                       }
                   } else {
-                      existingGroups.set(newGroup.updatedBy, newGroup);
+                      existingGroups.set(newGroup.id, newGroup);
                   }
               });
-              return Array.from(existingGroups.values()).sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+              return Array.from(existingGroups.values()).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
           });
-          const totalNewChanges = newInboxItems.reduce((acc, group) => acc + group.changes.length, 0);
+          const totalNewChanges = newInboxItems.reduce((acc, group) => acc + (group.changes?.length || 0), 0);
           setUnreadInboxCount(prevCount => prevCount + totalNewChanges);
       }
   }, [setInboxMessages, setUnreadInboxCount]);
@@ -303,52 +307,52 @@ export default function AssetList() {
 
   // --- DATA LOADING & SYNC ---
   const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
-    const localAssets = await getLocalAssetsFromDb();
-    const mergedAssetMap = new Map(localAssets.map(a => [a.id, a]));
+      const localAssets = await getLocalAssetsFromDb();
+      let mergedAssets = [...localAssets];
 
-    const assetsToUpload: Asset[] = [];
+      // Smart merge: cloud data is the base, but local un-synced changes are preserved if newer.
+      const cloudAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
+      const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
-    // Prioritize local changes for upload
-    localAssets.forEach(localAsset => {
-      if (localAsset.syncStatus === 'local') {
-        const cloudAsset = mergedAssetMap.get(localAsset.id);
-        // Upload if local is newer than cloud, or if cloud doesn't have it
-        if (!cloudAsset || new Date(localAsset.lastModified || 0) > new Date(cloudAsset.lastModified || 0)) {
-          assetsToUpload.push({ ...localAsset, syncStatus: 'synced' });
+      // Create a final map to hold the definitive version of each asset.
+      const finalAssetMap = new Map<string, Asset>();
+
+      // 1. Add all cloud assets to the final map.
+      cloudAssetsMap.forEach((asset, id) => {
+          finalAssetMap.set(id, {...asset, syncStatus: 'synced'});
+      });
+
+      // 2. Go through local assets and decide if they should override the cloud version.
+      localAssetsMap.forEach((localAsset, id) => {
+          const cloudAsset = cloudAssetsMap.get(id);
+          // If local asset is not in the cloud, or it was modified locally and is newer, it takes precedence.
+          if (!cloudAsset || (localAsset.syncStatus === 'local' && new Date(localAsset.lastModified || 0) > new Date(cloudAsset.lastModified || 0))) {
+              finalAssetMap.set(id, localAsset);
+          }
+      });
+
+      mergedAssets = Array.from(finalAssetMap.values());
+      
+      const assetsToPush = mergedAssets.filter(a => a.syncStatus === 'local');
+      if (isOnline && assetsToPush.length > 0) {
+        addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
+        try {
+            await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
+        } catch(e) {
+            addNotification({title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive'});
         }
       }
-    });
-
-    if (isOnline && assetsToUpload.length > 0) {
-      addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToUpload.length} pending assets.` });
-      try {
-        await batchSetAssets(assetsToUpload);
-        // Update the map with the newly synced assets to prevent re-downloading them
-        assetsToUpload.forEach(asset => mergedAssetMap.set(asset.id, asset));
-      } catch (e) {
-        addNotification({ title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive' });
+      
+      const newInboxItems = generateInboxUpdates(localAssets, mergedAssets, userProfile)
+        .filter(group => group.updatedBy !== userProfile?.displayName);
+      if(newInboxItems.length > 0 && !isInitialLoad.current) {
+        updateInboxState(newInboxItems);
       }
-    }
-
-    // Merge cloud data into local data, respecting newer versions
-    fetchedAssets.forEach(cloudAsset => {
-      const existingAsset = mergedAssetMap.get(cloudAsset.id);
-      if (!existingAsset || new Date(cloudAsset.lastModified || 0) > new Date(existingAsset.lastModified || 0)) {
-        mergedAssetMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
-      }
-    });
-    
-    const finalAssets = getNewestDuplicate(Array.from(mergedAssetMap.values()));
-    
-    const newInboxItems = generateInboxUpdates(localAssets, finalAssets, userProfile)
-      .filter(group => group.updatedBy !== userProfile?.displayName);
-    if(newInboxItems.length > 0 && !isInitialLoad.current) {
-      updateInboxState(newInboxItems);
-    }
-
-    setAssets(finalAssets);
-    await saveAssets(finalAssets);
-    isInitialLoad.current = false;
+      
+      const finalAssets = getNewestDuplicate(mergedAssets);
+      setAssets(finalAssets);
+      await saveAssets(finalAssets);
+      isInitialLoad.current = false;
   }, [userProfile, generateInboxUpdates, updateInboxState, isOnline]);
 
   const scheduleSync = useCallback((assetToSync: Asset) => {
