@@ -302,59 +302,53 @@ export default function AssetList() {
 
 
   // --- DATA LOADING & SYNC ---
-  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync = false) => {
-      const localAssets = await getLocalAssetsFromDb();
-      let mergedAssets = [...localAssets];
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
+    const localAssets = await getLocalAssetsFromDb();
+    const mergedAssetMap = new Map(localAssets.map(a => [a.id, a]));
 
-      if (isOnline) {
-        const localAssetMap = new Map(localAssets.map(a => [a.id, a]));
-        const cloudAssetMap = new Map(fetchedAssets.map(a => [a.id, a]));
-        const assetsToUpload: Asset[] = [];
+    const assetsToUpload: Asset[] = [];
 
-        // Identify local changes to upload
-        localAssets.forEach(localAsset => {
-          if (localAsset.syncStatus === 'local') {
-            const cloudAsset = cloudAssetMap.get(localAsset.id);
-            if (!cloudAsset || new Date(localAsset.lastModified || 0) > new Date(cloudAsset.lastModified || 0)) {
-              assetsToUpload.push({ ...localAsset, syncStatus: 'synced' });
-            }
-          }
-        });
-        
-        if (assetsToUpload.length > 0) {
-          addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToUpload.length} pending assets.` });
-          try {
-            await batchSetAssets(assetsToUpload);
-            assetsToUpload.forEach(asset => cloudAssetMap.set(asset.id, asset));
-          } catch(e) {
-            addNotification({title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive'});
-          }
+    // Prioritize local changes for upload
+    localAssets.forEach(localAsset => {
+      if (localAsset.syncStatus === 'local') {
+        const cloudAsset = mergedAssetMap.get(localAsset.id);
+        // Upload if local is newer than cloud, or if cloud doesn't have it
+        if (!cloudAsset || new Date(localAsset.lastModified || 0) > new Date(cloudAsset.lastModified || 0)) {
+          assetsToUpload.push({ ...localAsset, syncStatus: 'synced' });
         }
-        
-        // Merge cloud data into local data
-        fetchedAssets.forEach(cloudAsset => {
-            const localAsset = localAssetMap.get(cloudAsset.id);
-            if (!localAsset || (new Date(cloudAsset.lastModified || 0) > new Date(localAsset.lastModified || 0))) {
-                localAssetMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
-            }
-        });
-        mergedAssets = Array.from(localAssetMap.values());
+      }
+    });
 
-      } else {
-        // When offline, we just trust the local assets. This function might be called by a listener before it's torn down.
-        mergedAssets = localAssets;
+    if (isOnline && assetsToUpload.length > 0) {
+      addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToUpload.length} pending assets.` });
+      try {
+        await batchSetAssets(assetsToUpload);
+        // Update the map with the newly synced assets to prevent re-downloading them
+        assetsToUpload.forEach(asset => mergedAssetMap.set(asset.id, asset));
+      } catch (e) {
+        addNotification({ title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive' });
       }
-      
-      const newInboxItems = generateInboxUpdates(localAssets, mergedAssets, userProfile)
-        .filter(group => group.updatedBy !== userProfile?.displayName);
-      if(newInboxItems.length > 0 && !isInitialLoad.current) {
-        updateInboxState(newInboxItems);
+    }
+
+    // Merge cloud data into local data, respecting newer versions
+    fetchedAssets.forEach(cloudAsset => {
+      const existingAsset = mergedAssetMap.get(cloudAsset.id);
+      if (!existingAsset || new Date(cloudAsset.lastModified || 0) > new Date(existingAsset.lastModified || 0)) {
+        mergedAssetMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
       }
-      
-      const finalAssets = getNewestDuplicate(mergedAssets);
-      setAssets(finalAssets);
-      await saveAssets(finalAssets);
-      isInitialLoad.current = false;
+    });
+    
+    const finalAssets = getNewestDuplicate(Array.from(mergedAssetMap.values()));
+    
+    const newInboxItems = generateInboxUpdates(localAssets, finalAssets, userProfile)
+      .filter(group => group.updatedBy !== userProfile?.displayName);
+    if(newInboxItems.length > 0 && !isInitialLoad.current) {
+      updateInboxState(newInboxItems);
+    }
+
+    setAssets(finalAssets);
+    await saveAssets(finalAssets);
+    isInitialLoad.current = false;
   }, [userProfile, generateInboxUpdates, updateInboxState, isOnline]);
 
   const scheduleSync = useCallback((assetToSync: Asset) => {
@@ -417,7 +411,7 @@ export default function AssetList() {
       querySnapshot.forEach((doc) => {
         fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
       });
-      await handleFetchedAssets(fetchedAssets, false);
+      await handleFetchedAssets(fetchedAssets);
       
       if (isSyncingRef.current) {
         setIsSyncing(false);
@@ -450,7 +444,7 @@ export default function AssetList() {
 
         try {
             const fetchedAssets = await getAssets();
-            await handleFetchedAssets(fetchedAssets, true);
+            await handleFetchedAssets(fetchedAssets);
             if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
             addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
