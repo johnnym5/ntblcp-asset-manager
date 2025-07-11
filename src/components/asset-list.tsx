@@ -43,7 +43,6 @@ import {
   ClipboardEdit,
   FolderSearch,
   X,
-  ChevronsUpDown,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -57,16 +56,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 
@@ -206,17 +195,18 @@ export default function AssetList() {
 
       for (const newAsset of newAssets) {
         const previousAsset = previousAssetsMap.get(newAsset.id);
-        const groupKey = newAsset.lastModifiedBy || 'An unknown user';
-        const groupId = `${groupKey}-${newAsset.lastModified}`;
+        const updatedBy = newAsset.lastModifiedBy || 'An unknown user';
+        const timestamp = newAsset.lastModified || new Date().toISOString();
+        const groupId = `${updatedBy}-${timestamp}`;
 
         if (!previousAsset) {
               if (!changesByGroup[groupId]) {
                   changesByGroup[groupId] = {
                       id: groupId,
                       type: 'asset',
-                      updatedBy: groupKey,
+                      updatedBy: updatedBy,
                       updatedByState: newAsset.lastModifiedByState,
-                      timestamp: newAsset.lastModified || new Date().toISOString(),
+                      timestamp: timestamp,
                       changes: [],
                       updatedAssets: []
                   };
@@ -258,9 +248,9 @@ export default function AssetList() {
                   changesByGroup[groupId] = {
                       id: groupId,
                       type: 'asset',
-                      updatedBy: groupKey,
+                      updatedBy: updatedBy,
                       updatedByState: newAsset.lastModifiedByState,
-                      timestamp: newAsset.lastModified || new Date().toISOString(),
+                      timestamp: timestamp,
                       changes: [],
                       updatedAssets: []
                   };
@@ -456,11 +446,11 @@ export default function AssetList() {
       { value: "Discrepancy", label: "Discrepancy" },
     ]);
   }, [setStatusOptions]);
-  
+
   const globallyFilteredAssets = useMemo(() => {
     return assets.filter(asset => enabledSheets.includes(asset.category));
   }, [assets, enabledSheets]);
-
+  
   const stateFilteredAssets = useMemo(() => {
     if (!globalStateFilter) {
       return globallyFilteredAssets; // Admin view or no filter set
@@ -1245,7 +1235,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
-
-    

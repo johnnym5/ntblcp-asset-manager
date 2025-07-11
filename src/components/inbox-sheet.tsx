@@ -81,7 +81,7 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
         <CardContent className="space-y-4">
             <div className="space-y-2 text-sm max-h-48 overflow-y-auto pr-2">
               {(group.changes || []).map((change, index) => (
-                  <div key={index} className="p-2 rounded-md bg-muted/50">
+                  <div key={change.assetId + change.field + index} className="p-2 rounded-md bg-muted/50">
                       <div className="flex justify-between items-start gap-2">
                           <p className="font-semibold">{change.assetDescription}</p>
                           {change.category && (
