@@ -1,10 +1,9 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow public read/write access for development without authentication.
-    // This removes the `if request.auth != null;` check.
-    match /{document=**} {
+    // WARNING: These are open rules for development. 
+    // For a production app, you should secure these rules.
+    match /assets/{assetId} {
       allow read, write: if true;
     }
   }
