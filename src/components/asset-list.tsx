@@ -29,9 +29,7 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   FileDown,
-  FileUp,
   MoreHorizontal,
-  PlusCircle,
   Loader2,
   Trash2,
   ArrowLeft,
@@ -42,7 +40,6 @@ import {
   FileText,
   ClipboardEdit,
   FolderSearch,
-  X,
   CloudOff,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -59,9 +56,8 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
-
 import { AssetForm } from "./asset-form";
-import type { Asset, AssetChange, InboxMessageGroup } from "@/lib/types";
+import type { Asset } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
@@ -72,8 +68,8 @@ import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
-import { onSnapshot, query, collection, Unsubscribe } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import type { Unsubscribe } from "firebase/firestore";
+import { CategoryBatchEditForm } from "./category-batch-edit-form";
 
 
 const ITEMS_PER_PAGE = 25;
@@ -130,6 +126,7 @@ export default function AssetList() {
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   
   const isInitialLoad = useRef(true);
 
@@ -142,8 +139,8 @@ export default function AssetList() {
     manualSyncTrigger, isSyncing, setIsSyncing,
     autoSyncEnabled,
     setDataActions,
-    setInboxMessages, setUnreadInboxCount,
-    setLocationOptions, setAssigneeOptions, setStatusOptions
+    setLocationOptions, setAssigneeOptions, setStatusOptions,
+    setEnabledSheets,
   } = useAppState();
 
   const isSyncingRef = useRef(isSyncing);
@@ -223,103 +220,6 @@ export default function AssetList() {
     };
     loadInitialData();
   }, []);
-
-  // Real-time listener for Admins with Auto-Sync
-  useEffect(() => {
-    let unsubscribe: Unsubscribe | null = null;
-    if (isOnline && isAdmin && autoSyncEnabled) {
-      setIsSyncing(true);
-  
-      const q = query(collection(db, 'assets'));
-      unsubscribe = onSnapshot(q, async (querySnapshot) => {
-        if (!isInitialLoad.current) {
-          const hasChanges = querySnapshot.docChanges().length > 0;
-          if (hasChanges) {
-            addNotification({ title: 'Real-time Sync', description: 'Asset data has been updated from the cloud.' });
-          }
-        }
-  
-        const fetchedAssets: Asset[] = [];
-        querySnapshot.forEach((doc) => {
-          fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
-        });
-        await handleFetchedAssets(fetchedAssets, false);
-        
-        if (isSyncingRef.current) {
-          setIsSyncing(false);
-        }
-      }, (error) => {
-        const errorMessage = (error as any).message || 'An unknown error occurred.';
-        if ((error as any).code === 'permission-denied' || errorMessage.includes('insufficient permissions')) {
-          addNotification({ title: "Permissions Error", description: "You don't have permission to read asset data. Please check Firestore rules.", variant: 'destructive' })
-        } else if ((error as any).code === 'resource-exhausted') {
-            addNotification({ title: 'Sync Paused', description: 'Cloud read quota exceeded. Syncing is paused.', variant: 'destructive' });
-        } else {
-          addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
-        }
-        setIsSyncing(false);
-        setIsOnline(false);
-      });
-    }
-  
-    return () => {
-      if (unsubscribe) {
-        unsubscribe();
-      }
-      if (isSyncingRef.current) {
-        setIsSyncing(false);
-      }
-    };
-  }, [isOnline, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
-  
-
-  // Manual sync for all users (or admins with auto-sync off)
-  useEffect(() => {
-    const pushLocalChanges = async () => {
-      if (isSyncingRef.current) return;
-      setIsSyncing(true);
-      
-      try {
-        const localAssets = await getLocalAssetsFromDb();
-        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
-        
-        if (assetsToPush.length === 0) {
-          addNotification({ title: 'No Changes to Sync', description: 'Your local data is already up to date.' });
-          setIsSyncing(false);
-          return;
-        }
-
-        addNotification({ title: 'Syncing with Cloud', description: `Uploading ${assetsToPush.length} changed assets.` });
-        await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
-
-        const updatedLocalAssets = localAssets.map(a => 
-            assetsToPush.find(p => p.id === a.id) ? { ...a, syncStatus: 'synced' as const } : a
-        );
-        
-        await saveAssets(updatedLocalAssets);
-        setAssets(updatedLocalAssets);
-        
-        addNotification({ title: 'Sync Complete', description: 'Your local changes have been saved to the cloud.' });
-      } catch (error) {
-        const errorMessage = (error as Error).message;
-        if (errorMessage.includes('permission-denied') || errorMessage.includes('insufficient permissions')) {
-          addNotification({ title: 'Permissions Error', description: 'You do not have permission to write to the database. Check Firestore rules.', variant: 'destructive' });
-        } else {
-          addNotification({ title: 'Sync Failed', description: errorMessage, variant: 'destructive' });
-        }
-        setIsOnline(false); // Go offline if sync fails to prevent further issues
-      } finally {
-        setIsSyncing(false);
-      }
-    };
-    
-    if (manualSyncTrigger > 0 && isOnline) {
-      if (!(isAdmin && autoSyncEnabled)) {
-        pushLocalChanges();
-      }
-    }
-  }, [manualSyncTrigger, isOnline, isAdmin, autoSyncEnabled, setIsOnline, setIsSyncing]);
-
   
   useEffect(() => {
     setStatusOptions([
@@ -521,7 +421,7 @@ export default function AssetList() {
     setSelectedAssetIds([]);
     setSelectedCategories([]);
     setIsBatchDeleting(false);
-  }
+  };
 
   const handleBatchEdit = () => setIsBatchEditOpen(true);
   
@@ -816,6 +716,52 @@ export default function AssetList() {
     const idsToDelete = assets.filter(a => selectedCategories.includes(a.category)).map(a => a.id);
     handleBatchDelete(idsToDelete);
   };
+  
+  const handleBatchEditCategories = async (data: { status?: 'Verified' | 'Unverified' | 'Discrepancy'; hide?: boolean }) => {
+    const assetsToUpdate = assets.filter(asset => selectedCategories.includes(asset.category));
+    
+    if (data.status) {
+      const updatedAssets = assetsToUpdate.map(asset => {
+        const updatedAsset = { 
+          ...asset, 
+          verifiedStatus: data.status,
+          lastModified: new Date().toISOString(),
+          lastModifiedBy: userProfile?.displayName,
+          lastModifiedByState: userProfile?.state,
+          syncStatus: 'local' as const,
+        };
+        if (data.status === 'Verified' && !asset.verifiedDate) {
+          updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
+        } else if (data.status && data.status !== 'Verified') {
+          updatedAsset.verifiedDate = '';
+        }
+        return updatedAsset;
+      });
+  
+      let currentAssets = await getLocalAssetsFromDb();
+      const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
+      currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+      await saveAssets(currentAssets);
+      setAssets(currentAssets);
+      addNotification({ title: 'Updated Locally', description: `Updated status for ${updatedAssets.length} assets.` });
+    }
+
+    if (data.hide && isAdmin) {
+        setEnabledSheets(prev => prev.filter(sheet => !selectedCategories.includes(sheet)));
+        addNotification({ title: 'Sheets Hidden', description: `${selectedCategories.length} categories are now hidden.` });
+    }
+
+    setIsCategoryBatchEditOpen(false);
+    setSelectedCategories([]);
+  };
+
+  const handleSelectAllCategories = (checked: boolean) => {
+    if (checked) {
+      setSelectedCategories(Object.keys(assetsByCategory));
+    } else {
+      setSelectedCategories([]);
+    }
+  };
 
 
   if (isLoading) {
@@ -842,6 +788,9 @@ export default function AssetList() {
             </h2>
              {selectedCategories.length > 0 && (
                 <div className="flex items-center gap-2">
+                    <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)}>
+                        <Edit className="mr-2 h-4 w-4" /> Edit
+                    </Button>
                     <Button variant="outline" size="sm" onClick={handleExportClick} disabled={isBatchDeleting}>
                         <FileDown className="mr-2 h-4 w-4" /> Export
                     </Button>
@@ -856,8 +805,15 @@ export default function AssetList() {
              <CardHeader>
                 <CardTitle>
                     {isAdmin && !isFiltered ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
+                         <div className="flex items-center gap-2">
+                            <Checkbox 
+                                id="select-all-categories" 
+                                checked={Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length}
+                                onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)}
+                            />
+                            <label htmlFor="select-all-categories" className="text-lg font-semibold tracking-tight cursor-pointer">Asset Verification Status for</label>
+                        </div>
                         <Select
                             value={globalStateFilter || 'all'}
                             onValueChange={(value) => setGlobalStateFilter(value === 'all' ? '' : value)}
@@ -994,6 +950,12 @@ export default function AssetList() {
           isReadOnly={isFormReadOnly} 
         />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
+        <CategoryBatchEditForm
+          isOpen={isCategoryBatchEditOpen}
+          onOpenChange={setIsCategoryBatchEditOpen}
+          selectedCategoryCount={selectedCategories.length}
+          onSave={handleBatchEditCategories}
+        />
         <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -1215,4 +1177,3 @@ export default function AssetList() {
     </div>
   );
 }
-
