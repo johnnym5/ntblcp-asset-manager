@@ -393,7 +393,7 @@ export default function AssetList() {
         }
 
         // 4. Merge all data (local & cloud) ensuring we have the latest of everything
-        const allLocalAssetsMap = new Map(localAssets.map(a => [a.id, a]));
+        let allLocalAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         
         // Update local map with newly synced assets from push
         finalAssetsToPush.forEach(pushedAsset => {
@@ -408,7 +408,31 @@ export default function AssetList() {
           }
         });
 
-        const mergedAssets = Array.from(allLocalAssetsMap.values());
+        let mergedAssets = Array.from(allLocalAssetsMap.values());
+        
+        // **NEW: Filter assets for non-admins before saving locally**
+        if (!isAdmin && userProfile?.state) {
+          const userLocation = userProfile.state;
+          const zones: Record<string, string[]> = NIGERIAN_ZONES;
+          const isZone = !!zones[userLocation];
+
+          mergedAssets = mergedAssets.filter(asset => {
+              const assetLocation = (asset.location || "").toLowerCase().trim();
+              if (isZone) {
+                  return assetLocation.includes(userLocation.toLowerCase()) && assetLocation.includes("zonal store");
+              } else {
+                  return assetLocation.startsWith(userLocation.toLowerCase());
+              }
+          });
+          // Also clear out any assets in the map that don't match
+          allLocalAssetsMap.forEach((asset, id) => {
+              if (!mergedAssets.some(a => a.id === id)) {
+                  allLocalAssetsMap.delete(id);
+              }
+          });
+        }
+
+
         const finalAssets = getNewestDuplicate(mergedAssets);
 
         setAssets(finalAssets);
@@ -423,7 +447,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, setIsSyncing, setIsOnline]);
+  }, [isOnline, setIsSyncing, setIsOnline, isAdmin, userProfile]);
 
 
   // Effect for handling manual sync trigger
@@ -1368,5 +1392,6 @@ export default function AssetList() {
     </div>
   );
 }
+
 
 
