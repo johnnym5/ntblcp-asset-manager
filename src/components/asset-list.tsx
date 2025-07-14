@@ -118,7 +118,7 @@ const getStatusClasses = (status?: 'Verified' | 'Unverified' | 'Discrepancy') =>
  * @returns True if there are changes, false otherwise.
  */
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
-    const keys = Object.keys(a) as (keyof Asset)[];
+    const keys = Object.keys(b) as (keyof Asset)[];
     for (const key of keys) {
         // We don't care about these metadata fields for change detection
         if (key === 'id' || key === 'syncStatus' || key === 'lastModified' || key === 'lastModifiedBy' || key === 'lastModifiedByState') {
@@ -232,13 +232,14 @@ export default function AssetList() {
       for (const newAsset of newAssets) {
         const previousAsset = previousAssetsMap.get(newAsset.id);
 
-        if (!previousAsset) {
-              const groupKey = newAsset.lastModifiedBy || 'An unknown user';
+        if (!previousAsset && newAsset.lastModifiedBy) {
+              const groupKey = newAsset.lastModifiedBy;
               if (!changesByGroup[groupKey]) {
                   changesByGroup[groupKey] = {
                       id: groupKey,
                       type: 'asset',
                       updatedBy: groupKey,
+                      updatedByState: newAsset.lastModifiedByState,
                       timestamp: newAsset.lastModified || new Date().toISOString(),
                       changes: [],
                       updatedAssets: []
@@ -247,6 +248,7 @@ export default function AssetList() {
               changesByGroup[groupKey].changes.push({
                   assetId: newAsset.id,
                   assetDescription: newAsset.description || 'Untitled Asset',
+                  category: newAsset.category,
                   field: 'Asset',
                   from: 'N/A',
                   to: 'Newly Added',
@@ -256,9 +258,9 @@ export default function AssetList() {
         }
         
         const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
-        const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
+        const prevTimestamp = previousAsset?.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
 
-        if (newTimestamp > prevTimestamp + 1000) { 
+        if (previousAsset && newTimestamp > prevTimestamp + 1000 && newAsset.lastModifiedBy) { 
           const detailedChanges: AssetChange[] = [];
           Object.keys(userFriendlyFieldNames).forEach(key => {
               const oldValue = previousAsset[key as keyof Asset] as any;
@@ -267,6 +269,7 @@ export default function AssetList() {
                   detailedChanges.push({
                       assetId: newAsset.id,
                       assetDescription: newAsset.description || 'Untitled Asset',
+                      category: newAsset.category,
                       field: userFriendlyFieldNames[key],
                       from: String(oldValue || 'empty'),
                       to: String(newValue || 'empty'),
@@ -275,12 +278,13 @@ export default function AssetList() {
           });
 
           if (detailedChanges.length > 0) {
-              const groupKey = newAsset.lastModifiedBy || 'An unknown user';
+              const groupKey = newAsset.lastModifiedBy;
               if (!changesByGroup[groupKey]) {
                   changesByGroup[groupKey] = {
                       id: groupKey,
                       type: 'asset',
                       updatedBy: groupKey,
+                      updatedByState: newAsset.lastModifiedByState,
                       timestamp: newAsset.lastModified || new Date().toISOString(),
                       changes: [],
                       updatedAssets: []
@@ -327,56 +331,61 @@ export default function AssetList() {
 
 
   // --- DATA LOADING & SYNC ---
-  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync = false) => {
-      const localAssets = await getLocalAssetsFromDb();
-      
-      const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
-      const fetchedAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
+    let localAssets = await getLocalAssetsFromDb();
+    const originalLocalAssets = [...localAssets]; // Keep a copy for inbox generation
+    const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
-      // Merge logic: Cloud is source of truth, but local-only new items are preserved.
-      fetchedAssets.forEach(cloudAsset => {
-        const localAsset = localAssetsMap.get(cloudAsset.id);
-        if (!localAsset || new Date(cloudAsset.lastModified || 0) > new Date(localAsset.lastModified || 0)) {
-            localAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
-        }
-      });
-      
-      const mergedAssets = Array.from(localAssetsMap.values());
-      const newInboxItems = generateInboxUpdates(localAssets, mergedAssets, userProfile)
+    // Merge logic: Cloud assets update local assets if they are newer.
+    fetchedAssets.forEach(cloudAsset => {
+      const localAsset = localAssetsMap.get(cloudAsset.id);
+      if (!localAsset || new Date(cloudAsset.lastModified || 0) > new Date(localAsset.lastModified || 0)) {
+        localAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
+      }
+    });
+
+    const mergedAssets = Array.from(localAssetsMap.values());
+    
+    if (isAdmin) {
+      const newInboxItems = generateInboxUpdates(originalLocalAssets, mergedAssets, userProfile)
         .filter(group => group.updatedBy !== userProfile?.displayName);
       
-      if(newInboxItems.length > 0 && !isInitialLoad.current) {
+      if (newInboxItems.length > 0 && !isInitialLoad.current) {
         updateInboxState(newInboxItems);
       }
-      
-      const finalAssets = getNewestDuplicate(mergedAssets);
-      setAssets(finalAssets);
-      await saveAssets(finalAssets);
-      isInitialLoad.current = false;
-  }, [userProfile, generateInboxUpdates, updateInboxState, isOnline]);
+    }
+    
+    const finalAssets = getNewestDuplicate(mergedAssets);
+    setAssets(finalAssets);
+    await saveAssets(finalAssets);
+    isInitialLoad.current = false;
+  }, [userProfile, generateInboxUpdates, updateInboxState, isAdmin]);
 
   const syncLocalChanges = useCallback(async () => {
-    if (!isOnline) return [];
+    if (!isOnline) return;
     
-    const localAssets = await getLocalAssetsFromDb();
+    let localAssets = await getLocalAssetsFromDb();
     const assetsToPush = localAssets.filter(asset => asset.syncStatus === 'local');
     
     if (assetsToPush.length > 0) {
       addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
       try {
-        await batchSetAssets(assetsToPush);
+        await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
         // After successful push, update local assets' status
-        const updatedLocalAssets = localAssets.map(asset => 
-          assetsToPush.find(p => p.id === asset.id) ? { ...asset, syncStatus: 'synced' as const } : asset
-        );
+        const localAssetsMap = new Map(localAssets.map(asset => [asset.id, asset]));
+        assetsToPush.forEach(asset => {
+            const existing = localAssetsMap.get(asset.id);
+            if(existing) {
+                localAssetsMap.set(asset.id, {...existing, syncStatus: 'synced'});
+            }
+        });
+        const updatedLocalAssets = Array.from(localAssetsMap.values());
         await saveAssets(updatedLocalAssets);
-        return updatedLocalAssets; // Return the updated list for state update
+        setAssets(updatedLocalAssets);
       } catch (e) {
         addNotification({ title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive' });
-        return localAssets; // Return original list on error
       }
     }
-    return localAssets; // No changes to push
   }, [isOnline]);
 
   useEffect(() => {
@@ -390,79 +399,40 @@ export default function AssetList() {
     loadInitialData();
   }, []);
 
-  // Real-time listener for Admins with Auto-Sync
-  useEffect(() => {
-    if (!isOnline || !isAdmin || !autoSyncEnabled) {
-      return;
-    }
 
-    addNotification({ title: 'Real-time Sync Active', description: 'Asset list will update automatically.' });
-    
+  // Combined Sync Effect
+  useEffect(() => {
+    if (!isOnline || isSyncingRef.current) return;
+
     const performSync = async () => {
-      setIsSyncing(true);
-      await syncLocalChanges();
-      
-      const q = query(collection(db, 'assets'));
-      const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-        const fetchedAssets: Asset[] = [];
-        querySnapshot.forEach((doc) => {
-          fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
-        });
-        await handleFetchedAssets(fetchedAssets, false);
-        
-        if (isSyncingRef.current) {
-          setIsSyncing(false);
-        }
-      }, (error) => {
-        if ((error as any).code === 'permission-denied') {
-          addNotification({ title: "Permissions Error", description: "You don't have permission to view real-time asset updates. Contact an administrator.", variant: 'destructive' })
-        } else {
-          console.error("Firestore real-time listener error:", error);
-          addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
-        }
-        setIsSyncing(false);
-        setIsOnline(false);
-      });
-      return unsubscribe;
-    }
-
-    const unsubscribePromise = performSync();
-    
-    return () => {
-      unsubscribePromise.then(unsubscribe => unsubscribe && unsubscribe());
-      if (isSyncingRef.current) {
-        setIsSyncing(false);
-      }
-    };
-  }, [isOnline, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing, syncLocalChanges]);
-
-  // Manual sync for all users (or admins with auto-sync off)
-  useEffect(() => {
-    const fetchAssetsOnce = async () => {
-        if (isSyncingRef.current) return;
         setIsSyncing(true);
-        if (manualSyncTrigger > 0) addNotification({ title: 'Syncing with cloud...' });
+        addNotification({ title: 'Syncing with cloud...' });
 
         try {
+            // Step 1: Push local changes first to avoid being overwritten.
             await syncLocalChanges();
+            
+            // Step 2: Fetch all assets from the cloud.
             const fetchedAssets = await getAssets();
-            await handleFetchedAssets(fetchedAssets, true);
-            if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
+            
+            // Step 3: Merge cloud assets into local store.
+            await handleFetchedAssets(fetchedAssets);
+            
+            addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
             addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
-            setIsOnline(false);
+            setIsOnline(false); // Go offline on major failure
         } finally {
             setIsSyncing(false);
         }
     };
     
-    if (!isOnline) return;
-    if (isAdmin && autoSyncEnabled) return;
-
+    // Trigger sync on manual request or when toggled online.
     if (manualSyncTrigger > 0) {
-        fetchAssetsOnce();
+        performSync();
     }
-  }, [isOnline, manualSyncTrigger, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing, syncLocalChanges]);
+    
+  }, [isOnline, manualSyncTrigger, handleFetchedAssets, syncLocalChanges, setIsOnline, setIsSyncing]);
   
   useEffect(() => {
     setStatusOptions([
@@ -699,12 +669,11 @@ export default function AssetList() {
   };
 
   const handleSaveAsset = async (assetToSave: AssetFormValues) => {
-    const originalAsset = assets.find(a => a.id === selectedAsset?.id);
+    const originalAsset = assets.find(a => a.id === assetToSave.id);
 
     // If it's a new asset or if details have changed for an existing asset
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
       const finalAsset: Asset = {
-        id: selectedAsset?.id || uuidv4(),
         ...originalAsset,
         ...assetToSave,
         lastModified: new Date().toISOString(),
@@ -993,6 +962,28 @@ export default function AssetList() {
     return `You are in Admin Mode. This action cannot be undone. This will permanently delete ALL asset records from both the central database and your local device, resetting the application for ALL users.`;
   }, [isOnline]);
 
+  const LocationSelectorProgress = () => {
+    const total = stateFilteredAssets.length;
+    if (total === 0) {
+      return <span>{globalStateFilter || 'Overall (All Assets)'}</span>;
+    }
+    const verified = stateFilteredAssets.filter(a => a.verifiedStatus === 'Verified').length;
+    const percentage = (verified / total) * 100;
+
+    return (
+      <div className="w-full h-full flex items-center relative">
+        <div 
+          className="absolute top-0 left-0 h-full bg-primary/20" 
+          style={{ width: `${percentage}%` }}
+        />
+        <span className="relative z-10 truncate">
+          {globalStateFilter || 'Overall (All Assets)'}: {verified} of {total} verified
+        </span>
+      </div>
+    );
+  };
+
+
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -1038,8 +1029,8 @@ export default function AssetList() {
                             value={globalStateFilter || 'all'}
                             onValueChange={(value) => setGlobalStateFilter(value === 'all' ? '' : value)}
                         >
-                        <SelectTrigger className="w-full sm:w-[280px]">
-                            <SelectValue placeholder="Select a location..." />
+                        <SelectTrigger className="w-full sm:w-[320px] relative">
+                          <LocationSelectorProgress />
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Overall (All Assets)</SelectItem>
