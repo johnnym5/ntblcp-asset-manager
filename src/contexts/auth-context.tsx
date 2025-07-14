@@ -6,11 +6,14 @@ import { useAppState } from './app-state-context';
 import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
+import { listenForAssetChanges } from '@/lib/firestore';
+import type { Asset } from '@/lib/types';
+import { getLocalAssets, saveAssets } from '@/lib/idb';
+import { NIGERIAN_STATES } from '@/lib/constants';
 
-// Using a simplified profile for local-only use
 interface LocalUserProfile {
   displayName: string;
-  state: string; // state can be '' for admin
+  state: string; 
 }
 
 interface AuthContextType {
@@ -31,7 +34,7 @@ const AuthContext = createContext<AuthContextType>({
 
 const logActivity = async (profile: LocalUserProfile, activity: 'login' | 'logout') => {
   if (!profile || !profile.displayName || profile.displayName.toLowerCase().trim() === 'admin') {
-    return; // Don't log for admin or if profile is incomplete
+    return;
   }
   try {
     const activityLog = {
@@ -52,7 +55,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
-  const { setGlobalStateFilter, isOnline, setManualSyncTrigger } = useAppState();
+  const { 
+    setGlobalStateFilter, 
+    isOnline, 
+    setManualSyncTrigger,
+    setAssets,
+    autoSyncEnabled
+  } = useAppState();
 
   useEffect(() => {
     let isMounted = true;
@@ -87,16 +96,54 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [setGlobalStateFilter]);
 
+  useEffect(() => {
+    if (!isOnline || !userProfile || !autoSyncEnabled) {
+      return;
+    }
+  
+    const isAdmin = userProfile.displayName.toLowerCase().trim() === 'admin';
+  
+    const handleCloudUpdate = async (cloudAssets: Asset[]) => {
+      let localAssets = await getLocalAssets();
+      const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
+  
+      cloudAssets.forEach(cloudAsset => {
+        const localAsset = localAssetsMap.get(cloudAsset.id);
+        if (!localAsset || new Date(cloudAsset.lastModified || 0) > new Date(localAsset.lastModified || 0)) {
+          localAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
+        }
+      });
+      
+      let finalAssets = Array.from(localAssetsMap.values());
+
+      if (!isAdmin) {
+        finalAssets = finalAssets.filter(asset => {
+            const assetLocation = asset.location || '';
+            const userState = userProfile.state || '';
+            return assetLocation.toLowerCase().includes(userState.toLowerCase());
+        });
+      }
+
+      setAssets(finalAssets);
+      await saveAssets(finalAssets);
+    };
+  
+    const unsubscribe = listenForAssetChanges(handleCloudUpdate);
+  
+    return () => unsubscribe();
+  
+  }, [isOnline, userProfile, autoSyncEnabled, setAssets]);
+
   const updateProfile = async (data: { displayName: string; state: string }) => {
     setLoading(true);
     const newProfile: LocalUserProfile = {
       displayName: data.displayName,
-      state: data.state, // state will be '' for admin
+      state: data.state,
     };
     try {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
-      setGlobalStateFilter(data.state || ''); // Set filter to state, or empty for admin
+      setGlobalStateFilter(data.state || '');
       setProfileSetupComplete(true);
       if (isOnline) {
         await logActivity(newProfile, 'login');
@@ -111,12 +158,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     try {
       if (isOnline && userProfile) {
-        // Log activity first
         await logActivity(userProfile, 'logout');
-        // Then trigger the sync to ensure the log is uploaded
-        setManualSyncTrigger(c => c + 1); 
+        setManualSyncTrigger(c => c + 1);
       }
-      // Finally, clear local data
       localStorage.removeItem('ntblcp-user-profile');
       setUserProfile(null);
       setProfileSetupComplete(false);

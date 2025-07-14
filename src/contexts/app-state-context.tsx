@@ -4,7 +4,7 @@
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
-import type { InboxMessageGroup } from '@/lib/types';
+import type { Asset, InboxMessageGroup } from '@/lib/types';
 
 
 export interface SortConfig {
@@ -23,6 +23,8 @@ export interface DataActions {
 }
 
 interface AppStateContextType {
+  assets: Asset[];
+  setAssets: Dispatch<SetStateAction<Asset[]>>;
   isOnline: boolean;
   setIsOnline: Dispatch<SetStateAction<boolean>>;
   searchTerm: string;
@@ -80,6 +82,7 @@ interface AppStateContextType {
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [isOnline, setIsOnline] = useState(() => {
     if (typeof window !== 'undefined') {
       const savedStatus = localStorage.getItem('ntblcp-online-status');
@@ -153,6 +156,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   }, [isOnline]);
 
   const value = {
+    assets,
+    setAssets,
     isOnline,
     setIsOnline,
     searchTerm,
