@@ -70,12 +70,24 @@ export interface AssetChange {
   to: string;
   assetId: string;
   assetDescription: string;
+  category?: string; // The category (sheet name) of the asset
+}
+
+export interface ActivityLog {
+    id: string;
+    userName: string;
+    userState: string;
+    activity: 'login' | 'logout';
+    timestamp: string; // ISO 8601 date string
 }
 
 export interface InboxMessageGroup {
+  id: string; // Can be user ID for asset updates, or log ID for activity
+  type: 'asset' | 'activity';
   updatedBy: string;
-  updatedAt: string; // ISO String of the latest change in the group
-  changes: AssetChange[];
-  // Keep track of the full assets that were updated in this group
-  updatedAssets: Asset[]; 
+  updatedByState?: string;
+  timestamp: string; // ISO String of the event
+  changes?: AssetChange[];
+  updatedAssets?: Asset[];
+  activityMessage?: string;
 }

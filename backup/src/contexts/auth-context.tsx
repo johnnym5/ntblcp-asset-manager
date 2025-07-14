@@ -3,6 +3,9 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAppState } from './app-state-context';
+import { db } from '@/lib/firebase';
+import { doc, setDoc } from 'firebase/firestore';
+import { v4 as uuidv4 } from 'uuid';
 
 // Using a simplified profile for local-only use
 interface LocalUserProfile {
@@ -15,7 +18,7 @@ interface AuthContextType {
   loading: boolean;
   profileSetupComplete: boolean;
   updateProfile: (data: { displayName: string; state: string }) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -23,14 +26,33 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   profileSetupComplete: false,
   updateProfile: async () => {},
-  logout: () => {},
+  logout: async () => {},
 });
+
+const logActivity = async (profile: LocalUserProfile, activity: 'login' | 'logout') => {
+  if (!profile || !profile.displayName || profile.displayName.toLowerCase().trim() === 'admin') {
+    return; // Don't log for admin or if profile is incomplete
+  }
+  try {
+    const activityLog = {
+      id: uuidv4(),
+      userName: profile.displayName,
+      userState: profile.state,
+      activity: activity,
+      timestamp: new Date().toISOString(),
+    };
+    await setDoc(doc(db, "activity", activityLog.id), activityLog);
+  } catch(error) {
+    console.error("Failed to log user activity:", error);
+  }
+};
+
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
-  const { setGlobalStateFilter } = useAppState();
+  const { setGlobalStateFilter, isOnline, setManualSyncTrigger } = useAppState();
 
   useEffect(() => {
     let isMounted = true;
@@ -63,7 +85,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
         isMounted = false;
     };
-  }, []);
+  }, [setGlobalStateFilter]);
 
   const updateProfile = async (data: { displayName: string; state: string }) => {
     setLoading(true);
@@ -76,6 +98,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setUserProfile(newProfile);
       setGlobalStateFilter(data.state || ''); // Set filter to state, or empty for admin
       setProfileSetupComplete(true);
+      if (isOnline) {
+        await logActivity(newProfile, 'login');
+      }
     } catch(e) {
       console.error("Failed to save user profile to local storage", e);
     } finally {
@@ -83,8 +108,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
     try {
+      if (isOnline && userProfile) {
+        await logActivity(userProfile, 'logout');
+        setManualSyncTrigger(c => c + 1); // Trigger a final sync on logout
+      }
       localStorage.removeItem('ntblcp-user-profile');
       setUserProfile(null);
       setProfileSetupComplete(false);

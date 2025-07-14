@@ -1,7 +1,7 @@
 
 'use client';
 
-import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
+import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
 import type { InboxMessageGroup } from '@/lib/types';
@@ -129,25 +129,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
 
-  const [inboxMessages, setInboxMessages] = useState<InboxMessageGroup[]>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ntblcp-inbox-messages');
-      try {
-        return saved ? JSON.parse(saved) : [];
-      } catch (e) {
-        return [];
-      }
-    }
-    return [];
-  });
-
-  const [unreadInboxCount, setUnreadInboxCount] = useState<number>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ntblcp-unread-inbox-count');
-      return saved ? parseInt(saved, 10) : 0;
-    }
-    return 0;
-  });
+  const [inboxMessages, setInboxMessages] = useState<InboxMessageGroup[]>([]);
+  const [unreadInboxCount, setUnreadInboxCount] = useState<number>(0);
 
 
   useEffect(() => {
@@ -167,18 +150,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
     }
   }, [isOnline]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-inbox-messages', JSON.stringify(inboxMessages));
-    }
-  }, [inboxMessages]);
-    
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-unread-inbox-count', String(unreadInboxCount));
-    }
-  }, [unreadInboxCount]);
 
   const value = {
     isOnline,

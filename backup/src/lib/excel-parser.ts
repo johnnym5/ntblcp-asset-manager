@@ -58,8 +58,8 @@ const COLUMN_TO_ASSET_FIELD_MAP: ColumnToFieldMap = {
  */
 const normalizeHeader = (header: any): string => {
     // Convert to string, trim whitespace, convert to uppercase, and replace multiple spaces/tabs with a single space.
-    // This also handles non-breaking spaces (\u00A0).
-    return String(header || '').trim().toUpperCase().replace(/[\s\u00A0]+/g, ' ');
+    // This also handles non-breaking spaces (\\u00A0).
+    return String(header || '').trim().toUpperCase().replace(/[\\s\\u00A0]+/g, ' ');
 };
 
 /**
@@ -99,26 +99,56 @@ const findHeaderRowIndex = (sheetData: any[][], headersToFind: string[]): number
 
 /**
  * Checks if there are any meaningful differences between an existing asset and imported data.
+ * This function is robust against different data types (e.g. dates vs strings).
  * @param existing The asset from the local database.
  * @param imported The partial asset data from the Excel file.
  * @returns True if there is at least one change, false otherwise.
  */
 const hasChanges = (existing: Asset, imported: Partial<Asset>): boolean => {
-    // We only care about fields present in the imported object
     for (const key in imported) {
         if (Object.prototype.hasOwnProperty.call(imported, key)) {
             const typedKey = key as keyof Asset;
-            // Normalize values for comparison: treat null, undefined, and empty strings as the same.
-            const existingValue = String(existing[typedKey] ?? '').trim();
-            const importedValue = String(imported[typedKey] ?? '').trim();
             
-            if (existingValue !== importedValue) {
-                // If we find a single difference, we can stop and return true.
+            const existingValueRaw = existing[typedKey];
+            const importedValueRaw = imported[typedKey];
+
+            // If both values are considered "empty", treat them as the same and continue.
+            const isExistingEmpty = existingValueRaw === null || existingValueRaw === undefined || String(existingValueRaw).trim() === '';
+            const isImportedEmpty = importedValueRaw === null || importedValueRaw === undefined || String(importedValueRaw).trim() === '';
+            if (isExistingEmpty && isImportedEmpty) {
+                continue;
+            }
+            
+            // Special handling for date fields to make comparison robust
+            if (typedKey === 'dateReceived' && (existingValueRaw || importedValueRaw)) {
+                 try {
+                    // Create Date objects, handling Firestore Timestamps and various date formats
+                    const d1 = existingValueRaw ? new Date(existingValueRaw.toDate ? existingValueRaw.toDate() : existingValueRaw) : null;
+                    const d2 = importedValueRaw ? new Date(importedValueRaw) : null;
+                    
+                    // If either is an invalid date, we can't compare them as dates. Fall through to string comparison.
+                    if ((d1 && isNaN(d1.getTime())) || (d2 && isNaN(d2.getTime()))) {
+                       // Fall through to string comparison below
+                    } else {
+                        const d1String = d1 ? d1.toISOString().split('T')[0] : null;
+                        const d2String = d2 ? d2.toISOString().split('T')[0] : null;
+                        
+                        if (d1String !== d2String) {
+                            return true;
+                        }
+                        continue; // Dates are the same, skip to next field
+                    }
+                } catch(e) {
+                    // Fall through to string comparison if date parsing fails
+                }
+            }
+
+            // Fallback to simple string comparison for all other fields
+            if (String(existingValueRaw ?? '').trim() !== String(importedValueRaw ?? '').trim()) {
                 return true;
             }
         }
     }
-    // If we get through the whole loop without finding differences, they are the same.
     return false;
 };
 
@@ -138,7 +168,8 @@ export async function parseExcelFile(
 
     try {
         const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array' });
+        // Use cellDates:true to automatically convert Excel dates to JS Date objects.
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
 
         const existingAssetByIdentifiers = new Map<string, Asset>();
         existingAssets.forEach(asset => {
@@ -190,10 +221,11 @@ export async function parseExcelFile(
 
                 headerRow.forEach((header, index) => {
                     const field = COLUMN_TO_ASSET_FIELD_MAP[header];
+                    const cellValue = row[index];
                     // Only process if the field exists, a value exists in the cell,
                     // and this specific asset field hasn't been filled yet by a preceeding column with the same name.
-                    if (field && !populatedFields.has(field) && row[index] !== null && String(row[index]).trim() !== '') {
-                        assetObject[field] = String(row[index]);
+                    if (field && !populatedFields.has(field) && cellValue !== null && String(cellValue).trim() !== '') {
+                        assetObject[field] = cellValue;
                         populatedFields.add(field);
                     }
                 });
@@ -213,7 +245,7 @@ export async function parseExcelFile(
                 if (existingAsset) {
                     // Compare the imported data with the existing asset data
                     if (hasChanges(existingAsset, assetObject)) {
-                        const updatedAsset = { ...existingAsset, ...assetObject, syncStatus: 'local' as const };
+                        const updatedAsset = { ...existingAsset, ...assetObject };
                         updatedAssets.push(updatedAsset);
                     }
                     // If no changes, we do nothing and the asset is effectively skipped from the update/new lists.
@@ -224,7 +256,6 @@ export async function parseExcelFile(
                             id: uuidv4(),
                             ...assetObject,
                             verifiedStatus: 'Unverified',
-                            syncStatus: 'local',
                         } as Asset;
                         newAssets.push(newAsset);
                     } else {
@@ -294,7 +325,7 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
         }
 
         const worksheet = XLSX.utils.json_to_sheet(sheetData, { header: exportHeaders });
-        const safeSheetName = canonicalSheetName.replace(/[\/\\?*\[\]]/g, '-').substring(0, 31);
+        const safeSheetName = canonicalSheetName.replace(/[\\/?*[\]]/g, '-').substring(0, 31);
         XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
     }
 

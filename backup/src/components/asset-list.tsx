@@ -43,9 +43,11 @@ import {
   ClipboardEdit,
   FolderSearch,
   X,
+  CloudOff,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -59,7 +61,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 
-import { AssetForm } from "./asset-form";
+import { AssetForm, type AssetFormValues } from "./asset-form";
 import type { Asset, AssetChange, InboxMessageGroup } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
@@ -67,12 +69,11 @@ import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIA
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
+import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
-import { onSnapshot, query, collection } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 
 const ITEMS_PER_PAGE = 25;
@@ -92,7 +93,7 @@ const normalizeAssetLocation = (location?: string): string => {
             return state;
         }
     }
-    return originalLocation.replace(/\b\w/g, l => l.toUpperCase());
+    return originalLocation.replace(/\\b\\w/g, l => l.toUpperCase());
 };
 
 const getStatusClasses = (status?: 'Verified' | 'Unverified' | 'Discrepancy') => {
@@ -107,6 +108,28 @@ const getStatusClasses = (status?: 'Verified' | 'Unverified' | 'Discrepancy') =>
             return '';
     }
 }
+
+/**
+ * Compares two asset-like objects to see if any relevant fields have changed.
+ * @param a The first object.
+ * @param b The second object.
+ * @returns True if there are changes, false otherwise.
+ */
+const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
+    const keysToCheck = Object.keys(b) as (keyof Asset)[];
+    for (const key of keysToCheck) {
+        // We don't care about these metadata fields for change detection
+        if (key === 'id' || key === 'syncStatus' || key === 'lastModified' || key === 'lastModifiedBy' || key === 'lastModifiedByState') {
+            continue;
+        }
+        const valA = String(a[key] ?? '').trim();
+        const valB = String(b[key] ?? '').trim();
+        if (valA !== valB) {
+            return true;
+        }
+    }
+    return false;
+};
 
 
 export default function AssetList() {
@@ -128,9 +151,10 @@ export default function AssetList() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
+  const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   
   const isInitialLoad = useRef(true);
-  const syncQueueRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
 
   const { 
     searchTerm, setSearchTerm,
@@ -138,8 +162,8 @@ export default function AssetList() {
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
-    enabledSheets, lockAssetList,
-    manualSyncTrigger, isSyncing, setIsSyncing,
+    enabledSheets, setEnabledSheets, lockAssetList,
+    manualSyncTrigger, setManualSyncTrigger, isSyncing, setIsSyncing,
     autoSyncEnabled,
     setDataActions,
     setInboxMessages, setUnreadInboxCount,
@@ -151,8 +175,18 @@ export default function AssetList() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter, view, currentCategory]);
+    // Clear category selection when filters change
+    setSelectedCategories([]);
+  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter]);
   
+  useEffect(() => {
+    if (view === 'dashboard') {
+        setSelectedAssetIds([]);
+    } else {
+        setSelectedCategories([]);
+    }
+  }, [view]);
+
   const getNewestDuplicate = (assetsToFilter: Asset[]): Asset[] => {
     const uniqueAssetMap = new Map<string, Asset>();
   
@@ -196,12 +230,15 @@ export default function AssetList() {
       for (const newAsset of newAssets) {
         const previousAsset = previousAssetsMap.get(newAsset.id);
 
-        if (!previousAsset) {
-              const groupKey = newAsset.lastModifiedBy || 'An unknown user';
+        if (!previousAsset && newAsset.lastModifiedBy) {
+              const groupKey = newAsset.lastModifiedBy;
               if (!changesByGroup[groupKey]) {
                   changesByGroup[groupKey] = {
+                      id: groupKey,
+                      type: 'asset',
                       updatedBy: groupKey,
-                      updatedAt: newAsset.lastModified || new Date().toISOString(),
+                      updatedByState: newAsset.lastModifiedByState,
+                      timestamp: newAsset.lastModified || new Date().toISOString(),
                       changes: [],
                       updatedAssets: []
                   };
@@ -209,6 +246,7 @@ export default function AssetList() {
               changesByGroup[groupKey].changes.push({
                   assetId: newAsset.id,
                   assetDescription: newAsset.description || 'Untitled Asset',
+                  category: newAsset.category,
                   field: 'Asset',
                   from: 'N/A',
                   to: 'Newly Added',
@@ -218,9 +256,9 @@ export default function AssetList() {
         }
         
         const newTimestamp = newAsset.lastModified ? new Date(newAsset.lastModified).getTime() : 0;
-        const prevTimestamp = previousAsset.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
+        const prevTimestamp = previousAsset?.lastModified ? new Date(previousAsset.lastModified).getTime() : 0;
 
-        if (newTimestamp > prevTimestamp + 1000) { 
+        if (previousAsset && newTimestamp > prevTimestamp + 1000 && newAsset.lastModifiedBy) { 
           const detailedChanges: AssetChange[] = [];
           Object.keys(userFriendlyFieldNames).forEach(key => {
               const oldValue = previousAsset[key as keyof Asset] as any;
@@ -229,6 +267,7 @@ export default function AssetList() {
                   detailedChanges.push({
                       assetId: newAsset.id,
                       assetDescription: newAsset.description || 'Untitled Asset',
+                      category: newAsset.category,
                       field: userFriendlyFieldNames[key],
                       from: String(oldValue || 'empty'),
                       to: String(newValue || 'empty'),
@@ -237,20 +276,25 @@ export default function AssetList() {
           });
 
           if (detailedChanges.length > 0) {
-              const groupKey = newAsset.lastModifiedBy || 'An unknown user';
+              const groupKey = newAsset.lastModifiedBy;
               if (!changesByGroup[groupKey]) {
                   changesByGroup[groupKey] = {
+                      id: groupKey,
+                      type: 'asset',
                       updatedBy: groupKey,
-                      updatedAt: newAsset.lastModified || new Date().toISOString(),
+                      updatedByState: newAsset.lastModifiedByState,
+                      timestamp: newAsset.lastModified || new Date().toISOString(),
                       changes: [],
                       updatedAssets: []
                   };
               }
               changesByGroup[groupKey].changes.push(...detailedChanges);
-              changesByGroup[groupKey].updatedAssets.push(newAsset);
+              if (!changesByGroup[groupKey].updatedAssets.some(a => a.id === newAsset.id)) {
+                  changesByGroup[groupKey].updatedAssets.push(newAsset);
+              }
 
-              if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].updatedAt)) {
-                  changesByGroup[groupKey].updatedAt = newAsset.lastModified!;
+              if (new Date(newAsset.lastModified || 0) > new Date(changesByGroup[groupKey].timestamp)) {
+                  changesByGroup[groupKey].timestamp = newAsset.lastModified!;
               }
           }
         }
@@ -261,106 +305,85 @@ export default function AssetList() {
   const updateInboxState = useCallback((newInboxItems: InboxMessageGroup[]) => {
       if (newInboxItems.length > 0) {
           setInboxMessages(prevMessages => {
-              const existingGroups = new Map(prevMessages.map(g => [g.updatedBy, g]));
+              const existingGroups = new Map(prevMessages.map(g => [g.id, g]));
               newInboxItems.forEach(newGroup => {
-                  const existingGroup = existingGroups.get(newGroup.updatedBy);
-                  if (existingGroup) {
-                      existingGroup.changes.push(...newGroup.changes);
+                  const existingGroup = existingGroups.get(newGroup.id);
+                  if (existingGroup && existingGroup.type === 'asset' && newGroup.type === 'asset') {
+                      existingGroup.changes.push(...(newGroup.changes || []));
                       const updatedAssetsMap = new Map(existingGroup.updatedAssets.map(a => [a.id, a]));
-                      newGroup.updatedAssets.forEach(a => updatedAssetsMap.set(a.id, a));
+                      (newGroup.updatedAssets || []).forEach(a => updatedAssetsMap.set(a.id, a));
                       existingGroup.updatedAssets = Array.from(updatedAssetsMap.values());
-                      if (new Date(newGroup.updatedAt) > new Date(existingGroup.updatedAt)) {
-                          existingGroup.updatedAt = newGroup.updatedAt;
+                      if (new Date(newGroup.timestamp) > new Date(existingGroup.timestamp)) {
+                          existingGroup.timestamp = newGroup.timestamp;
                       }
                   } else {
-                      existingGroups.set(newGroup.updatedBy, newGroup);
+                      existingGroups.set(newGroup.id, newGroup);
                   }
               });
-              return Array.from(existingGroups.values()).sort((a,b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+              return Array.from(existingGroups.values()).sort((a,b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
           });
-          const totalNewChanges = newInboxItems.reduce((acc, group) => acc + group.changes.length, 0);
+          const totalNewChanges = newInboxItems.reduce((acc, group) => acc + (group.changes?.length || 0), 0);
           setUnreadInboxCount(prevCount => prevCount + totalNewChanges);
       }
   }, [setInboxMessages, setUnreadInboxCount]);
 
 
   // --- DATA LOADING & SYNC ---
-  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync = false) => {
-      const localAssets = await getLocalAssetsFromDb();
-      let mergedAssets = [...localAssets];
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
+    let localAssets = await getLocalAssetsFromDb();
+    const originalLocalAssets = [...localAssets]; // Keep a copy for inbox generation
+    const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
-      if (isManualSync) {
-        // For manual sync, cloud is the source of truth, but we keep local-only new items.
-        const fetchedAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
-        const localOnlyNewAssets = localAssets.filter(la => !fetchedAssetsMap.has(la.id));
-        mergedAssets = [...fetchedAssets, ...localOnlyNewAssets];
-      } else {
-        // For listeners, merge based on timestamp.
-        const mergedAssetMap = new Map<string, Asset>();
-        localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
-        fetchedAssets.forEach(asset => {
-          const existing = mergedAssetMap.get(asset.id);
-          if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
-              mergedAssetMap.set(asset.id, { ...asset, syncStatus: 'synced' });
-          }
-        });
-        mergedAssets = Array.from(mergedAssetMap.values());
+    // Merge logic: Cloud assets update local assets if they are newer.
+    fetchedAssets.forEach(cloudAsset => {
+      const localAsset = localAssetsMap.get(cloudAsset.id);
+      if (!localAsset || new Date(cloudAsset.lastModified || 0) > new Date(localAsset.lastModified || 0)) {
+        localAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
       }
-      
-      const assetsToPush = mergedAssets.filter(a => a.syncStatus === 'local');
-      if (isOnline && assetsToPush.length > 0) {
-        addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
-        try {
-            await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
-        } catch(e) {
-            addNotification({title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive'});
-        }
-      }
-      
-      const newInboxItems = generateInboxUpdates(localAssets, mergedAssets, userProfile)
+    });
+
+    const mergedAssets = Array.from(localAssetsMap.values());
+    
+    if (isAdmin) {
+      const newInboxItems = generateInboxUpdates(originalLocalAssets, mergedAssets, userProfile)
         .filter(group => group.updatedBy !== userProfile?.displayName);
-      if(newInboxItems.length > 0 && !isInitialLoad.current) {
+      
+      if (newInboxItems.length > 0 && !isInitialLoad.current) {
         updateInboxState(newInboxItems);
       }
-      
-      const finalAssets = getNewestDuplicate(mergedAssets);
-      setAssets(finalAssets);
-      await saveAssets(finalAssets);
-      isInitialLoad.current = false;
-  }, [userProfile, generateInboxUpdates, updateInboxState, isOnline]);
+    }
+    
+    const finalAssets = getNewestDuplicate(mergedAssets);
+    setAssets(finalAssets);
+    await saveAssets(finalAssets);
+    isInitialLoad.current = false;
+  }, [userProfile, generateInboxUpdates, updateInboxState, isAdmin]);
 
-  const scheduleSync = useCallback((assetToSync: Asset) => {
-      if (!isOnline) return;
-
-      const existingTimer = syncQueueRef.current.get(assetToSync.id);
-      if (existingTimer) {
-          clearTimeout(existingTimer);
+  const syncLocalChanges = useCallback(async () => {
+    if (!isOnline) return;
+    
+    let localAssets = await getLocalAssetsFromDb();
+    const assetsToPush = localAssets.filter(asset => asset.syncStatus === 'local');
+    
+    if (assetsToPush.length > 0) {
+      addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
+      try {
+        await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
+        // After successful push, update local assets' status
+        const localAssetsMap = new Map(localAssets.map(asset => [asset.id, asset]));
+        assetsToPush.forEach(asset => {
+            const existing = localAssetsMap.get(asset.id);
+            if(existing) {
+                localAssetsMap.set(asset.id, {...existing, syncStatus: 'synced'});
+            }
+        });
+        const updatedLocalAssets = Array.from(localAssetsMap.values());
+        await saveAssets(updatedLocalAssets);
+        setAssets(updatedLocalAssets);
+      } catch (e) {
+        addNotification({ title: 'Sync Error', description: 'Failed to upload some local changes.', variant: 'destructive' });
       }
-
-      const newTimer = setTimeout(async () => {
-          try {
-              setAssets(prev => prev.map(a => a.id === assetToSync.id ? { ...a, syncStatus: 'syncing' } : a));
-              
-              await updateAsset({ ...assetToSync, syncStatus: 'synced' });
-
-              setAssets(prev => prev.map(a => a.id === assetToSync.id ? { ...a, syncStatus: 'synced' } : a));
-              const currentAssets = await getLocalAssetsFromDb();
-              const assetIndex = currentAssets.findIndex(a => a.id === assetToSync.id);
-              if(assetIndex > -1){
-                  currentAssets[assetIndex].syncStatus = 'synced';
-                  await saveAssets(currentAssets);
-              }
-
-              addNotification({ title: 'Asset Synced', description: `Changes for "${assetToSync.description || 'asset'}" saved to cloud.` });
-          } catch (error) {
-              addNotification({ title: 'Sync Failed', description: `Could not sync "${assetToSync.description || 'asset'}".`, variant: 'destructive' });
-              setAssets(prev => prev.map(a => a.id === assetToSync.id ? { ...a, syncStatus: 'local' } : a));
-          } finally {
-              syncQueueRef.current.delete(assetToSync.id);
-          }
-      }, 5000);
-
-      syncQueueRef.current.set(assetToSync.id, newTimer);
+    }
   }, [isOnline]);
 
   useEffect(() => {
@@ -374,72 +397,40 @@ export default function AssetList() {
     loadInitialData();
   }, []);
 
-  // Real-time listener for Admins with Auto-Sync
+
+  // Combined Sync Effect
   useEffect(() => {
-    if (!isOnline || !isAdmin || !autoSyncEnabled) {
-      return;
-    }
+    if (!isOnline || isSyncingRef.current) return;
 
-    addNotification({ title: 'Real-time Sync Active', description: 'Asset list will update automatically.' });
-    setIsSyncing(true);
-
-    const q = query(collection(db, 'assets'));
-    const unsubscribe = onSnapshot(q, async (querySnapshot) => {
-      const fetchedAssets: Asset[] = [];
-      querySnapshot.forEach((doc) => {
-        fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
-      });
-      await handleFetchedAssets(fetchedAssets, false);
-      
-      if (isSyncingRef.current) {
-        setIsSyncing(false);
-      }
-    }, (error) => {
-      if ((error as any).code === 'permission-denied') {
-        addNotification({ title: "Permissions Error", description: "You don't have permission to view real-time asset updates. Contact an administrator.", variant: 'destructive' })
-      } else {
-        console.error("Firestore real-time listener error:", error);
-        addNotification({ title: 'Sync Error', description: 'Lost connection to the database.', variant: 'destructive' });
-      }
-      setIsSyncing(false);
-      setIsOnline(false);
-    });
-
-    return () => {
-      unsubscribe();
-      if (isSyncingRef.current) {
-        setIsSyncing(false);
-      }
-    };
-  }, [isOnline, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
-
-  // Manual sync for all users (or admins with auto-sync off)
-  useEffect(() => {
-    const fetchAssetsOnce = async () => {
-        if (isSyncingRef.current) return;
+    const performSync = async () => {
         setIsSyncing(true);
-        if (manualSyncTrigger > 0) addNotification({ title: 'Syncing with cloud...' });
+        addNotification({ title: 'Syncing with cloud...' });
 
         try {
+            // Step 1: Push local changes first to avoid being overwritten.
+            await syncLocalChanges();
+            
+            // Step 2: Fetch all assets from the cloud.
             const fetchedAssets = await getAssets();
-            await clearLocalAssets(); // Clear local to ensure cloud is source of truth for sync
-            await handleFetchedAssets(fetchedAssets, true);
-            if (manualSyncTrigger > 0) addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
+            
+            // Step 3: Merge cloud assets into local store.
+            await handleFetchedAssets(fetchedAssets);
+            
+            addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
             addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
-            setIsOnline(false);
+            setIsOnline(false); // Go offline on major failure
         } finally {
             setIsSyncing(false);
         }
     };
     
-    if (!isOnline) return;
-    if (isAdmin && autoSyncEnabled) return;
-
+    // Trigger sync on manual request or when toggled online.
     if (manualSyncTrigger > 0) {
-        fetchAssetsOnce();
+        performSync();
     }
-  }, [isOnline, manualSyncTrigger, isAdmin, autoSyncEnabled, handleFetchedAssets, setIsOnline, setIsSyncing]);
+    
+  }, [isOnline, manualSyncTrigger, handleFetchedAssets, syncLocalChanges, setIsOnline, setIsSyncing]);
   
   useEffect(() => {
     setStatusOptions([
@@ -515,7 +506,7 @@ export default function AssetList() {
   };
 
   const displayedAssets = useMemo(() => {
-    let results = stateFilteredAssets;
+    let results = stateFilteredAssets.filter(asset => enabledSheets.includes(asset.category));
 
     // Apply filters from filter sheet
     const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
@@ -543,7 +534,7 @@ export default function AssetList() {
     }
     
     return sortAssets(results, sortConfig);
-  }, [stateFilteredAssets, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, sortConfig]);
+  }, [stateFilteredAssets, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, sortConfig, enabledSheets]);
 
   const assetsByCategory = useMemo(() => {
     return displayedAssets.reduce((acc, asset) => {
@@ -593,20 +584,20 @@ export default function AssetList() {
         return;
     }
 
+    // This logic handles both online and offline deletion correctly now
+    const currentAssets = await getLocalAssetsFromDb();
+    const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
+    await saveAssets(updatedAssets);
+    setAssets(updatedAssets);
+    addNotification({ title: 'Deleted Locally', description: `Asset "${assetToDelete.description}" removed. It will be deleted from the cloud on the next sync.` });
+
     if (isOnline) {
-        addNotification({ title: 'Deleting Asset...', description: `Removing "${assetToDelete.description}"` });
-        try {
-            await deleteAsset(assetToDelete.id);
-            addNotification({ title: 'Asset Deleted', description: 'Asset was successfully removed.' });
-        } catch (e) {
-            addNotification({ title: 'Error', description: 'Could not delete asset from the cloud.', variant: 'destructive' });
-        }
-    } else {
-        const currentAssets = await getLocalAssetsFromDb();
-        const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
-        await saveAssets(updatedAssets);
-        setAssets(updatedAssets);
-        addNotification({ title: 'Deleted Locally', description: 'Asset will be removed from cloud on next sync.' });
+      try {
+        await deleteAsset(assetToDelete.id);
+        addNotification({ title: 'Deleted from Cloud', description: 'Asset also removed from the central database.' });
+      } catch (e) {
+        addNotification({ title: 'Cloud Deletion Failed', description: 'Could not delete from cloud. It will be re-attempted on the next full sync.', variant: 'destructive'});
+      }
     }
 
     setAssetToDelete(null);
@@ -621,27 +612,24 @@ export default function AssetList() {
     
     setIsBatchDeleting(true);
     const assetsToDeleteCount = selectedAssetIds.length;
+    
+    let currentAssets = await getLocalAssetsFromDb();
+    currentAssets = currentAssets.filter(a => !selectedAssetIds.includes(a.id));
+    await saveAssets(currentAssets);
+    setAssets(currentAssets);
+    addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted. They will be removed from the cloud on next sync.` });
 
     if (isOnline) {
-        addNotification({ title: 'Deleting Assets...', description: `Removing ${assetsToDeleteCount} selected assets.` });
         try {
             await batchDeleteAssets(selectedAssetIds);
-            addNotification({ title: 'Assets Deleted', description: `Successfully removed ${assetsToDeleteCount} assets.` });
-            setSelectedAssetIds([]);
+            addNotification({ title: 'Assets Deleted', description: `Successfully removed ${assetsToDeleteCount} assets from the cloud.` });
         } catch (e) {
             addNotification({ title: 'Error', description: 'Could not delete all selected assets from the cloud.', variant: 'destructive' });
-        } finally {
-            setIsBatchDeleting(false);
         }
-    } else {
-        let currentAssets = await getLocalAssetsFromDb();
-        currentAssets = currentAssets.filter(a => !selectedAssetIds.includes(a.id));
-        await saveAssets(currentAssets);
-        setAssets(currentAssets);
-        setSelectedAssetIds([]);
-        addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted. Will sync on next connection.` });
-        setIsBatchDeleting(false);
     }
+
+    setSelectedAssetIds([]);
+    setIsBatchDeleting(false);
   }
 
   const handleBatchEdit = () => setIsBatchEditOpen(true);
@@ -673,40 +661,50 @@ export default function AssetList() {
     currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
     await saveAssets(currentAssets);
     setAssets(currentAssets);
-    addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets. Sync will start for each.` });
+    addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets. They will be synced on the next connection.` });
     
     setSelectedAssetIds([]);
-
-    updatedAssets.forEach(asset => scheduleSync(asset));
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    const finalAsset: Asset = { 
-      ...assetToSave, 
-      lastModified: new Date().toISOString(),
-      lastModifiedBy: userProfile?.displayName,
-      lastModifiedByState: userProfile?.state,
-      syncStatus: 'local',
-    };
-    
-    const currentAssets = await getLocalAssetsFromDb();
-    const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
-    if (existingIndex > -1) {
-        currentAssets[existingIndex] = finalAsset;
-    } else {
-        currentAssets.unshift(finalAsset);
-    }
-    await saveAssets(currentAssets);
-    setAssets(currentAssets);
-    addNotification({ title: 'Saved Locally', description: 'Changes saved. Sync will start shortly.' });
-    setIsFormOpen(false);
+    const originalAsset = assets.find(a => a.id === assetToSave.id);
 
-    scheduleSync(finalAsset);
+    // If it's a new asset or if details have changed for an existing asset
+    if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
+      const finalAsset: Asset = {
+        ...assetToSave,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: userProfile?.displayName,
+        lastModifiedByState: userProfile?.state,
+        syncStatus: 'local',
+      };
+      
+      const currentAssets = await getLocalAssetsFromDb();
+      const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
+      if (existingIndex > -1) {
+          currentAssets[existingIndex] = finalAsset;
+      } else {
+          currentAssets.unshift(finalAsset);
+      }
+      await saveAssets(currentAssets);
+      setAssets(currentAssets);
+      addNotification({ title: 'Saved Locally', description: 'Changes will be synced on the next connection.' });
+    } else {
+        addNotification({ title: 'No Changes Detected', description: 'The asset was not saved as no changes were made.' });
+    }
+    
+    setIsFormOpen(false);
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
     const asset = assets.find(a => a.id === assetId);
     if (!asset) return;
+
+    // Check if there are actual changes
+    if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus) {
+        return; // No changes, do nothing.
+    }
+
     const updatedAsset: Asset = { 
         ...asset, 
         ...data, 
@@ -723,8 +721,6 @@ export default function AssetList() {
         await saveAssets(currentAssets);
         setAssets(currentAssets);
     }
-    
-    scheduleSync(updatedAsset);
   };
 
   const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
@@ -753,30 +749,21 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
+        syncStatus: 'local' as const
     }));
 
     if (allChanges.length > 0) {
         const assetMap = new Map(baseAssets.map(a => [a.id, a]));
-        allChanges.forEach(a => assetMap.set(a.id, { ...a, syncStatus: isOnline ? 'synced' : 'local'}));
+        allChanges.forEach(a => assetMap.set(a.id, a));
         const combinedAssets = Array.from(assetMap.values());
+        
+        await saveAssets(combinedAssets);
+        setAssets(combinedAssets);
+        addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
         
         if(isAdmin) {
             const inboxUpdatesFromImport = generateInboxUpdates(baseAssets, combinedAssets, userProfile);
             updateInboxState(inboxUpdatesFromImport);
-        }
-
-        if (isOnline) {
-            try {
-                addNotification({ title: "Saving to Cloud...", description: `Importing ${newAssets.length} new and updating ${updatedAssets.length} existing assets.` });
-                await batchSetAssets(allChanges.map(a => ({...a, syncStatus: 'synced'})));
-                addNotification({ title: "Import Successful", description: "Successfully saved changes to the database." });
-            } catch (e) {
-                addNotification({ title: "Import Error", description: "Could not save changes to the database.", variant: "destructive" });
-            }
-        } else {
-            await saveAssets(combinedAssets);
-            setAssets(combinedAssets);
-            addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
         }
     } else if (errors.length === 0) {
         addNotification({ title: "No Changes Detected", description: "No new or updated assets were found in the file."});
@@ -786,10 +773,12 @@ export default function AssetList() {
     setIsImporting(false);
   };
   
-  const handleExportClick = useCallback(() => {
-    const assetsToExport = view === 'table' ? categoryFilteredAssets : displayedAssets;
+  const handleExportClick = useCallback((categoriesToExport?: string[]) => {
+    const categories = categoriesToExport && categoriesToExport.length > 0 ? categoriesToExport : Object.keys(assetsByCategory);
+    const assetsToExport = displayedAssets.filter(asset => categories.includes(asset.category));
+
     if (assetsToExport.length === 0) {
-      addNotification({ title: "No Data to Export", description: "There are no assets in the current view to export." });
+      addNotification({ title: "No Data to Export", description: "There are no assets in the selected categories to export." });
       return;
     }
     try {
@@ -797,8 +786,8 @@ export default function AssetList() {
       const exportPrefix = isAdminUser ? 'admin' : userProfile?.state || 'assets';
       let fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
       
-      if(view === 'table' && currentCategory){
-          fileName = `${exportPrefix}-${currentCategory}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
+      if(categoriesToExport && categoriesToExport.length > 0){
+          fileName = `${exportPrefix}-${categoriesToExport.join('&')}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
       }
 
       exportToExcel(assetsToExport, fileName);
@@ -807,7 +796,7 @@ export default function AssetList() {
       console.error("Export Error:", error);
       addNotification({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
     }
-  }, [view, categoryFilteredAssets, displayedAssets, userProfile, currentCategory]);
+  }, [displayedAssets, userProfile, assetsByCategory]);
   
   const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
     if (checked) {
@@ -816,25 +805,32 @@ export default function AssetList() {
       setSelectedAssetIds([]);
     }
   };
+  
+  const handleSelectAllCategories = (checked: boolean) => {
+      if (checked) {
+          setSelectedCategories(Object.keys(assetsByCategory));
+      } else {
+          setSelectedCategories([]);
+      }
+  }
 
   const handleSelectSingle = (assetId: string, checked: boolean) => {
     setSelectedAssetIds(prev => checked ? [...prev, assetId] : prev.filter(id => id !== assetId));
+  };
+  
+  const handleSelectCategory = (category: string, checked: boolean) => {
+    setSelectedCategories(prev => checked ? [...prev, category] : prev.filter(c => c !== category));
   };
 
   const handleClearAllAssets = useCallback(async () => {
     setIsClearAllDialogOpen(false);
     
-    // Offline Mode: Clear local storage only
-    if (!isOnline) {
-        addNotification({ title: 'Clearing Local Assets...', description: 'Removing all assets from your device.' });
-        await clearLocalAssets();
-        setAssets([]);
-        setSelectedAssetIds([]);
-        addNotification({ title: 'Local Data Cleared', description: 'All assets have been removed from this device.' });
-        return;
-    }
-
-    // Online Mode: Admin clears everything
+    addNotification({ title: 'Clearing Local Assets...', description: 'Removing all assets from your device.' });
+    await clearLocalAssets();
+    setAssets([]);
+    setSelectedAssetIds([]);
+    addNotification({ title: 'Local Data Cleared', description: 'All assets have been removed from this device.' });
+    
     if (isOnline && isAdmin) {
         addNotification({ title: 'Clearing Database...', description: `This will remove all assets.` });
         try {
@@ -843,10 +839,6 @@ export default function AssetList() {
                 const idsToDelete = allAssetsInCloud.map((a) => a.id);
                 await batchDeleteAssets(idsToDelete);
             }
-            // Also clear locally to ensure consistency
-            await clearLocalAssets();
-            setAssets([]);
-            setSelectedAssetIds([]);
             addNotification({ title: 'All Assets Cleared', description: 'The application is now in a clean state.' });
         } catch (e) {
             addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
@@ -859,7 +851,7 @@ export default function AssetList() {
   useEffect(() => {
     setDataActions({
         onImport: handleImportClick,
-        onExport: handleExportClick,
+        onExport: () => handleExportClick(),
         onAddAsset: handleAddAsset,
         onClearAll: handleClearAllClick,
         isImporting: isImporting,
@@ -880,12 +872,90 @@ export default function AssetList() {
       isAdmin, 
       assets.length
   ]);
+  
+  const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
+    let assetsToUpdate: Asset[] = [];
+    selectedCategories.forEach(category => {
+        assetsToUpdate.push(...(assetsByCategory[category] || []));
+    });
+
+    if (data.hide && isAdmin) {
+        setEnabledSheets(prev => prev.filter(sheet => !selectedCategories.includes(sheet)));
+        addNotification({ title: 'Sheets Hidden', description: `${selectedCategories.length} categories have been hidden from view.`});
+        setSelectedCategories([]);
+    }
+
+    if (data.status) {
+        const assetsToUpdateCount = assetsToUpdate.length;
+        addNotification({ title: 'Batch Updating Categories...', description: `Applying status to ${assetsToUpdateCount} assets.` });
+
+        const updatedAssets = assetsToUpdate.map(asset => {
+            const updatedAsset: Asset = { 
+                ...asset, 
+                verifiedStatus: data.status,
+                lastModified: new Date().toISOString(),
+                lastModifiedBy: userProfile?.displayName,
+                lastModifiedByState: userProfile?.state,
+                syncStatus: 'local',
+            };
+            if (data.status === 'Verified' && !asset.verifiedDate) {
+                updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
+            } else if (data.status !== 'Verified') {
+                updatedAsset.verifiedDate = '';
+            }
+            return updatedAsset;
+        });
+        
+        let currentAssets = await getLocalAssetsFromDb();
+        const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
+        currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+        await saveAssets(currentAssets);
+        setAssets(currentAssets);
+        addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets.` });
+    }
+    
+    setSelectedCategories([]);
+  };
+
+  const handleDeleteSelectedCategories = async () => {
+    let idsToDelete: string[] = [];
+    selectedCategories.forEach(category => {
+      const assetIds = (assetsByCategory[category] || []).map(a => a.id);
+      idsToDelete.push(...assetIds);
+    });
+
+    if (idsToDelete.length === 0) return;
+
+    if (lockAssetList) {
+        addNotification({ title: "Deletion Disabled", description: "The asset list is locked.", variant: "destructive" });
+        return;
+    }
+    
+    setIsBatchDeleting(true);
+    
+    let currentAssets = await getLocalAssetsFromDb();
+    currentAssets = currentAssets.filter(a => !idsToDelete.includes(a.id));
+    await saveAssets(currentAssets);
+    setAssets(currentAssets);
+    addNotification({ title: 'Deleted Locally', description: `${idsToDelete.length} assets in selected categories deleted.` });
+
+    if (isOnline) {
+        try {
+            await batchDeleteAssets(idsToDelete);
+            addNotification({ title: 'Categories Deleted', description: `Successfully removed ${idsToDelete.length} assets from the cloud.` });
+        } catch (e) {
+            addNotification({ title: 'Error', description: 'Could not delete all assets in categories from cloud.', variant: 'destructive' });
+        }
+    }
+
+    setSelectedCategories([]);
+    setIsBatchDeleting(false);
+  }
 
   const clearAllDialogDescription = useMemo(() => {
     if (!isOnline) {
         return "This action cannot be undone. This will permanently delete all asset records from your local device storage.";
     }
-    // Online case is always admin, since button is disabled for others
     return `You are in Admin Mode. This action cannot be undone. This will permanently delete ALL asset records from both the central database and your local device, resetting the application for ALL users.`;
   }, [isOnline]);
 
@@ -899,6 +969,7 @@ export default function AssetList() {
     const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
     const verificationPercentage = totalStateAssets > 0 ? (verifiedStateAssets / totalStateAssets) * 100 : 0;
     const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
+    const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
     
     return (
       <div className="flex flex-col h-full gap-4">
@@ -907,9 +978,24 @@ export default function AssetList() {
             <h2 className="text-2xl font-bold tracking-tight flex-1">
                 {isFiltered ? `Filter Results` : 'Asset Dashboard'}
             </h2>
+            {selectedCategories.length > 0 && (
+                 <div className="flex items-center gap-2">
+                    <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
+                    <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)}>
+                        <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
+                    </Button>
+                    <Button variant="outline" size="sm" onClick={() => handleExportClick(selectedCategories)}>
+                        <FileDown className="mr-2 h-4 w-4" /> Export
+                    </Button>
+                    <Button variant="destructive" size="sm" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting}>
+                        {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                        Delete
+                    </Button>
+                </div>
+            )}
         </div>
         <Card>
-             <CardHeader>
+             <CardHeader className="flex-row items-center justify-between">
                 <CardTitle>
                     {isAdmin && !isFiltered ? (
                     <div className="flex flex-wrap items-center gap-2">
@@ -956,6 +1042,15 @@ export default function AssetList() {
                     </>
                     )}
                 </CardTitle>
+                <div className="flex items-center space-x-2">
+                    <Label htmlFor="select-all-categories" className="text-sm font-medium">Select All</Label>
+                    <Checkbox
+                        id="select-all-categories"
+                        checked={areAllCategoriesSelected}
+                        onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)}
+                        aria-label="Select all categories"
+                    />
+                </div>
             </CardHeader>
              <CardContent className="pt-2 space-y-2">
                 <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
@@ -971,12 +1066,17 @@ export default function AssetList() {
                     const total = categoryAssets.length;
                     const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
                     const percentage = total > 0 ? (verified / total) * 100 : 0;
+                    const isSelected = selectedCategories.includes(category);
                     
                     return (
-                        <Card key={category} className="hover:shadow-md transition-shadow flex flex-col">
+                        <Card key={category} className={cn("hover:shadow-md transition-shadow flex flex-col", isSelected && "ring-2 ring-primary")}>
                             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium">{category}</CardTitle>
-                                <Folder className="h-4 w-4 text-muted-foreground" />
+                                <CardTitle className="text-sm font-medium pr-2">{category}</CardTitle>
+                                <Checkbox
+                                  checked={isSelected}
+                                  onCheckedChange={(checked) => handleSelectCategory(category, checked as boolean)}
+                                  aria-label={`Select category ${category}`}
+                                />
                             </CardHeader>
                             <CardContent className="flex-grow space-y-4">
                                 <div>
@@ -1015,6 +1115,7 @@ export default function AssetList() {
           isReadOnly={isFormReadOnly} 
         />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
+        <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
         <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -1096,7 +1197,7 @@ export default function AssetList() {
                   <TableBody>
                       {paginatedCategoryAssets.length > 0 ? (
                       paginatedCategoryAssets.map((asset) => (
-                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id)} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
                           <TableCell onClick={e => e.stopPropagation()}>
                               <Checkbox 
                                   checked={selectedAssetIds.includes(asset.id)}
@@ -1108,14 +1209,26 @@ export default function AssetList() {
                           <TableCell className="font-medium">
                             <div className="flex items-center gap-2">
                                 <span>{asset.description}</span>
-                                {(asset.syncStatus === 'local' || asset.syncStatus === 'syncing') && (
+                                {asset.syncStatus === 'local' && (
+                                    <TooltipProvider>
+                                        <Tooltip>
+                                            <TooltipTrigger>
+                                                <CloudOff className="h-4 w-4 text-blue-500" />
+                                            </TooltipTrigger>
+                                            <TooltipContent>
+                                                <p>Local changes not synced</p>
+                                            </TooltipContent>
+                                        </Tooltip>
+                                    </TooltipProvider>
+                                )}
+                                {asset.syncStatus === 'syncing' && (
                                     <TooltipProvider>
                                         <Tooltip>
                                             <TooltipTrigger>
                                                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                <p>{asset.syncStatus === 'syncing' ? 'Syncing...' : 'Awaiting sync'}</p>
+                                                <p>Syncing...</p>
                                             </TooltipContent>
                                         </Tooltip>
                                     </TooltipProvider>
@@ -1135,6 +1248,7 @@ export default function AssetList() {
                                 await handleQuickSaveAsset(asset.id, {
                                   verifiedStatus: status as any,
                                   verifiedDate,
+                                  remarks: asset.remarks
                                 });
                                 addNotification({
                                   title: "Status Updated",
@@ -1221,7 +1335,7 @@ export default function AssetList() {
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
                         This action cannot be undone. This will permanently delete the asset
-                        from your {isOnline ? 'online database' : 'local storage'}.
+                        from your {isOnline ? 'online database and ' : ''}local storage.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
@@ -1233,5 +1347,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    

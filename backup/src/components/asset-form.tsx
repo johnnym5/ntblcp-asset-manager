@@ -5,7 +5,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { v4 as uuidv4 } from 'uuid';
 import {
   Sheet,
   SheetContent,
@@ -253,7 +252,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
             id: asset?.id || uuidv4(),
             ...asset,
             ...data,
-            syncStatus: 'local',
         };
         await onSave(assetToSave);
         onOpenChange(false);

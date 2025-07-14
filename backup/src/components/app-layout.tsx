@@ -68,7 +68,6 @@ import { addNotification, useNotifications, clearAll, removeNotification } from 
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from "@/lib/utils";
 
-import { ThemeToggle } from "./theme-toggle";
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/auth-context";
 import { Skeleton } from "./ui/skeleton";
@@ -129,8 +128,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [searchTerm]);
   
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await logout();
     addNotification({
       title: 'Session Ended',
       description: 'You have been logged out.',
@@ -242,18 +241,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
-            {isOnline && (!isAdmin || !autoSyncEnabled) && (
-              <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                         <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing}>
-                           {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Sync Now</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            <TooltipProvider>
+              <Tooltip>
+                  <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing}>
+                          {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
+                      </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Sync Now</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             <TooltipProvider>
                 <Tooltip>
@@ -270,6 +267,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                         ? 'Application is now connecting to the server.'
                                         : 'Application is running in offline mode.',
                                 });
+                                if (newIsOnline) {
+                                  setManualSyncTrigger(c => c + 1);
+                                }
                             }}
                             aria-label={`Switch to ${isOnline ? 'Offline' : 'Online'} mode`}
                         >
@@ -309,7 +309,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <User className="mr-2 h-4 w-4"/>
                     Profile
                   </DropdownMenuItem>
-                   {pathname === '/assets' && dataActions.onImport && (
+                   {pathname === '/assets' && dataActions.onImport && isAdmin && (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
                         <Database className="mr-2 h-4 w-4" />
