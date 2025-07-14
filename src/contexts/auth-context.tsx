@@ -7,9 +7,10 @@ import { db } from '@/lib/firebase';
 import { doc, setDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { listenForAssetChanges } from '@/lib/firestore';
-import type { Asset } from '@/lib/types';
-import { getLocalAssets, saveAssets } from '@/lib/idb';
+import type { Asset, InboxMessageGroup } from '@/lib/types';
+import { getLocalAssets, saveAssets, clearAssets } from '@/lib/idb';
 import { NIGERIAN_STATES } from '@/lib/constants';
+import { addNotification } from '@/hooks/use-notifications';
 
 interface LocalUserProfile {
   displayName: string;
@@ -21,7 +22,7 @@ interface AuthContextType {
   loading: boolean;
   profileSetupComplete: boolean;
   updateProfile: (data: { displayName: string; state: string }) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -29,20 +30,28 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   profileSetupComplete: false,
   updateProfile: async () => {},
-  logout: async () => {},
+  logout: () => {},
 });
 
 const logActivity = async (profile: LocalUserProfile, activity: 'login' | 'logout') => {
-  if (!profile || !profile.displayName || profile.displayName.toLowerCase().trim() === 'admin') {
-    return;
+  if (!profile || !profile.displayName) return;
+
+  const isAdmin = profile.displayName.toLowerCase().trim() === 'admin';
+  let message = '';
+  if (activity === 'login') {
+    message = isAdmin ? `${profile.displayName} logged in.` : `${profile.displayName} entered ${profile.state}.`;
+  } else {
+    message = `${profile.displayName} logged out.`;
   }
+
   try {
-    const activityLog = {
+    const activityLog: InboxMessageGroup = {
       id: uuidv4(),
-      userName: profile.displayName,
-      userState: profile.state,
-      activity: activity,
+      type: 'activity',
+      updatedBy: profile.displayName,
+      updatedByState: profile.state,
       timestamp: new Date().toISOString(),
+      activityMessage: message,
     };
     await setDoc(doc(db, "activity", activityLog.id), activityLog);
   } catch(error) {
@@ -57,10 +66,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const { 
     setGlobalStateFilter, 
-    isOnline, 
-    setManualSyncTrigger,
-    setAssets,
-    autoSyncEnabled
+    isOnline,
+    autoSyncEnabled,
+    setAssets, 
+    setInboxMessages, 
+    setUnreadInboxCount
   } = useAppState();
 
   useEffect(() => {
@@ -103,36 +113,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
     const isAdmin = userProfile.displayName.toLowerCase().trim() === 'admin';
   
-    const handleCloudUpdate = async (cloudAssets: Asset[]) => {
-      let localAssets = await getLocalAssets();
+    const handleCloudUpdate = async (cloudUpdates: Asset[]) => {
+      if (cloudUpdates.length === 0) return;
+
+      const localAssets = await getLocalAssets();
       const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
-  
-      cloudAssets.forEach(cloudAsset => {
+      
+      const changes: Asset[] = [];
+      cloudUpdates.forEach(cloudAsset => {
         const localAsset = localAssetsMap.get(cloudAsset.id);
         if (!localAsset || new Date(cloudAsset.lastModified || 0) > new Date(localAsset.lastModified || 0)) {
-          localAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
+           localAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
+           changes.push(cloudAsset);
         }
       });
-      
-      let finalAssets = Array.from(localAssetsMap.values());
 
-      if (!isAdmin) {
-        finalAssets = finalAssets.filter(asset => {
-            const assetLocation = asset.location || '';
-            const userState = userProfile.state || '';
-            return assetLocation.toLowerCase().includes(userState.toLowerCase());
-        });
+      if (changes.length > 0) {
+        let finalAssets = Array.from(localAssetsMap.values());
+        if (!isAdmin) {
+          const userStateLower = (userProfile.state || '').toLowerCase();
+          finalAssets = finalAssets.filter(asset => (asset.location || '').toLowerCase().includes(userStateLower));
+        }
+        setAssets(finalAssets);
+        await saveAssets(finalAssets);
+
+        if(isAdmin) {
+           addNotification({ title: 'Live Update', description: `${changes.length} asset(s) were just updated.`});
+        }
       }
-
-      setAssets(finalAssets);
-      await saveAssets(finalAssets);
     };
   
-    const unsubscribe = listenForAssetChanges(handleCloudUpdate);
+    const unsubscribe = listenForAssetChanges(handleCloudUpdate, userProfile);
   
     return () => unsubscribe();
   
-  }, [isOnline, userProfile, autoSyncEnabled, setAssets]);
+  }, [isOnline, userProfile, autoSyncEnabled, setAssets, setInboxMessages, setUnreadInboxCount]);
 
   const updateProfile = async (data: { displayName: string; state: string }) => {
     setLoading(true);
@@ -156,18 +171,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    try {
-      if (isOnline && userProfile) {
-        await logActivity(userProfile, 'logout');
-        setManualSyncTrigger(c => c + 1);
-      }
-      localStorage.removeItem('ntblcp-user-profile');
-      setUserProfile(null);
-      setProfileSetupComplete(false);
-      setGlobalStateFilter('');
-    } catch (e) {
-      console.error("Failed to clear user profile from local storage", e);
+    if (isOnline && userProfile) {
+      await logActivity(userProfile, 'logout');
     }
+    localStorage.removeItem('ntblcp-user-profile');
+    setUserProfile(null);
+    setProfileSetupComplete(false);
+    setGlobalStateFilter('');
+    await clearAssets();
+    setAssets([]); 
   };
 
   const value = { userProfile, loading, profileSetupComplete, updateProfile, logout };

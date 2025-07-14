@@ -1,9 +1,9 @@
 
 'use client';
 
-import { doc, getDoc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, onSnapshot } from 'firebase/firestore';
+import { doc, getDoc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, onSnapshot, where, Timestamp } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Asset, UserProfile } from '@/lib/types';
+import type { Asset, UserProfile, InboxMessageGroup } from '@/lib/types';
 import type { User } from 'firebase/auth';
 
 // --- User Profile ---
@@ -40,9 +40,16 @@ export async function updateUserProfile(uid: string, data: Partial<UserProfile>)
  * @param callback The function to call with the updated assets when changes occur.
  * @returns An unsubscribe function to detach the listener.
  */
-export function listenForAssetChanges(callback: (assets: Asset[]) => void): () => void {
+export function listenForAssetChanges(
+  callback: (assets: Asset[]) => void, 
+  userProfile: { displayName: string; state: string } | null
+): () => void {
   const assetsCollectionRef = collection(db, 'assets');
-  const q = query(assetsCollectionRef);
+  let q = query(assetsCollectionRef);
+  
+  if (userProfile && userProfile.displayName.toLowerCase().trim() !== 'admin' && userProfile.state) {
+     q = query(assetsCollectionRef, where("location", ">=", userProfile.state), where("location", "<=", userProfile.state + '\uf8ff'));
+  }
   
   const unsubscribe = onSnapshot(q, (querySnapshot) => {
     const fetchedAssets: Asset[] = [];
@@ -52,7 +59,6 @@ export function listenForAssetChanges(callback: (assets: Asset[]) => void): () =
     callback(fetchedAssets);
   }, (error) => {
     console.error("Error listening for asset changes:", error);
-    // Optionally, you could have a more robust error handling callback
   });
 
   return unsubscribe;
