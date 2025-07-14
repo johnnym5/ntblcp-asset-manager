@@ -29,20 +29,16 @@ import {
 import { Button } from "@/components/ui/button";
 import {
   FileDown,
-  FileUp,
   MoreHorizontal,
-  PlusCircle,
   Loader2,
   Trash2,
   ArrowLeft,
-  Folder,
   Edit,
   AlertCircle,
   Check,
   FileText,
   ClipboardEdit,
   FolderSearch,
-  X,
   CloudOff,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -71,11 +67,9 @@ import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, updateAsset, batchDeleteAssets } from "@/lib/firestore";
+import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
-import { onSnapshot, query, collection } from "firebase/firestore";
-import { db } from "@/lib/firebase";
 
 
 const ITEMS_PER_PAGE = 25;
@@ -159,16 +153,14 @@ export default function AssetList() {
   const isInitialLoad = useRef(true);
 
   const { 
-    searchTerm, setSearchTerm,
     isOnline, setIsOnline, globalStateFilter, setGlobalStateFilter,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
-    setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
-    sortConfig, setLocationOptions, setAssigneeOptions, setStatusOptions,
+    setLocationOptions, setAssigneeOptions, setStatusOptions,
     enabledSheets, setEnabledSheets, lockAssetList,
-    manualSyncTrigger, setManualSyncTrigger, isSyncing, setIsSyncing,
-    autoSyncEnabled,
+    manualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
     setInboxMessages, setUnreadInboxCount,
+    sortConfig,
   } = useAppState();
 
   const isSyncingRef = useRef(isSyncing);
@@ -177,9 +169,8 @@ export default function AssetList() {
 
   useEffect(() => {
     setCurrentPage(1);
-    // Clear category selection when filters change
     setSelectedCategories([]);
-  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter]);
+  }, [globalStateFilter, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter]);
   
   useEffect(() => {
     if (view === 'dashboard') {
@@ -333,10 +324,9 @@ export default function AssetList() {
   // --- DATA LOADING & SYNC ---
   const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
     let localAssets = await getLocalAssetsFromDb();
-    const originalLocalAssets = [...localAssets]; // Keep a copy for inbox generation
+    const originalLocalAssets = [...localAssets]; 
     const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
-    // Merge logic: Cloud assets update local assets if they are newer.
     fetchedAssets.forEach(cloudAsset => {
       const localAsset = localAssetsMap.get(cloudAsset.id);
       if (!localAsset || new Date(cloudAsset.lastModified || 0) > new Date(localAsset.lastModified || 0)) {
@@ -371,7 +361,6 @@ export default function AssetList() {
       addNotification({ title: 'Syncing Local Changes', description: `Uploading ${assetsToPush.length} pending assets.` });
       try {
         await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
-        // After successful push, update local assets' status
         const localAssetsMap = new Map(localAssets.map(asset => [asset.id, asset]));
         assetsToPush.forEach(asset => {
             const existing = localAssetsMap.get(asset.id);
@@ -399,8 +388,6 @@ export default function AssetList() {
     loadInitialData();
   }, []);
 
-
-  // Combined Sync Effect
   useEffect(() => {
     if (!isOnline || isSyncingRef.current) return;
 
@@ -409,25 +396,19 @@ export default function AssetList() {
         addNotification({ title: 'Syncing with cloud...' });
 
         try {
-            // Step 1: Push local changes first to avoid being overwritten.
             await syncLocalChanges();
-            
-            // Step 2: Fetch all assets from the cloud.
             const fetchedAssets = await getAssets();
-            
-            // Step 3: Merge cloud assets into local store.
             await handleFetchedAssets(fetchedAssets);
             
             addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
         } catch (error) {
             addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
-            setIsOnline(false); // Go offline on major failure
+            setIsOnline(false); 
         } finally {
             setIsSyncing(false);
         }
     };
     
-    // Trigger sync on manual request or when toggled online.
     if (manualSyncTrigger > 0) {
         performSync();
     }
@@ -444,12 +425,12 @@ export default function AssetList() {
 
   const stateFilteredAssets = useMemo(() => {
     if (!globalStateFilter) {
-      return assets; // Admin view or no filter set
+      return assets;
     }
     
     const zones: Record<string, string[]> = NIGERIAN_ZONES;
     const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
-    const isZone = !!zones[globalStateFilter]; // Check if the filter is a zone name
+    const isZone = !!zones[globalStateFilter];
 
     if (isZone) {
       const lowerCaseZone = globalStateFilter.toLowerCase();
@@ -495,7 +476,7 @@ export default function AssetList() {
     setAssigneeOptions(Array.from(assigneeMap.values()).map(a => ({ label: a, value: a })).sort((a,b) => a.label.localeCompare(b.label)));
   }, [stateFilteredAssets, setLocationOptions, setAssigneeOptions]);
 
-
+  const {searchTerm} = useAppState();
   const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
     if (!config) return assetsToSort;
     return [...assetsToSort].sort((a, b) => {
@@ -510,7 +491,6 @@ export default function AssetList() {
   const displayedAssets = useMemo(() => {
     let results = stateFilteredAssets.filter(asset => enabledSheets.includes(asset.category));
 
-    // Apply filters from filter sheet
     const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     if (hasFilters) {
         results = results.filter(asset => {
@@ -522,7 +502,6 @@ export default function AssetList() {
         });
     }
 
-    // Apply search term
     if (searchTerm) {
         const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
         if (lowerCaseSearchTokens.length > 0) {
@@ -586,7 +565,6 @@ export default function AssetList() {
         return;
     }
 
-    // This logic handles both online and offline deletion correctly now
     const currentAssets = await getLocalAssetsFromDb();
     const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
     await saveAssets(updatedAssets);
@@ -671,10 +649,9 @@ export default function AssetList() {
   const handleSaveAsset = async (assetToSave: AssetFormValues) => {
     const originalAsset = assets.find(a => a.id === assetToSave.id);
 
-    // If it's a new asset or if details have changed for an existing asset
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
       const finalAsset: Asset = {
-        ...originalAsset,
+        ...(originalAsset || {}),
         ...assetToSave,
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
@@ -703,9 +680,8 @@ export default function AssetList() {
     const asset = assets.find(a => a.id === assetId);
     if (!asset) return;
 
-    // Check if there are actual changes
     if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus) {
-        return; // No changes, do nothing.
+        return;
     }
 
     const updatedAsset: Asset = { 
@@ -752,7 +728,6 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
-        syncStatus: 'local' as const
     }));
 
     if (allChanges.length > 0) {
@@ -964,7 +939,7 @@ export default function AssetList() {
 
   const LocationSelectorProgress = () => {
     const total = stateFilteredAssets.length;
-    if (total === 0) {
+    if (total === 0 || !globalStateFilter) {
       return <span>{globalStateFilter || 'Overall (All Assets)'}</span>;
     }
     const verified = stateFilteredAssets.filter(a => a.verifiedStatus === 'Verified').length;
@@ -976,8 +951,8 @@ export default function AssetList() {
           className="absolute top-0 left-0 h-full bg-primary/20" 
           style={{ width: `${percentage}%` }}
         />
-        <span className="relative z-10 truncate">
-          {globalStateFilter || 'Overall (All Assets)'}: {verified} of {total} verified
+        <span className="relative z-10 truncate pl-2">
+          {globalStateFilter}: {verified} of {total} verified
         </span>
       </div>
     );
@@ -1030,7 +1005,7 @@ export default function AssetList() {
                             onValueChange={(value) => setGlobalStateFilter(value === 'all' ? '' : value)}
                         >
                         <SelectTrigger className="w-full sm:w-[320px] relative">
-                          <LocationSelectorProgress />
+                          {globalStateFilter ? <LocationSelectorProgress /> : <SelectValue placeholder="Select a location..." />}
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value="all">Overall (All Assets)</SelectItem>
