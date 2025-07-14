@@ -61,7 +61,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 
-import { AssetForm } from "./asset-form";
+import { AssetForm, type AssetFormValues } from "./asset-form";
 import type { Asset, AssetChange, InboxMessageGroup } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
@@ -110,6 +110,28 @@ const getStatusClasses = (status?: 'Verified' | 'Unverified' | 'Discrepancy') =>
             return '';
     }
 }
+
+/**
+ * Compares two asset-like objects to see if any relevant fields have changed.
+ * @param a The first object.
+ * @param b The second object.
+ * @returns True if there are changes, false otherwise.
+ */
+const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
+    const keys = Object.keys(a) as (keyof Asset)[];
+    for (const key of keys) {
+        // We don't care about these metadata fields for change detection
+        if (key === 'id' || key === 'syncStatus' || key === 'lastModified' || key === 'lastModifiedBy' || key === 'lastModifiedByState') {
+            continue;
+        }
+        const valA = String(a[key] ?? '').trim();
+        const valB = String(b[key] ?? '').trim();
+        if (valA !== valB) {
+            return true;
+        }
+    }
+    return false;
+};
 
 
 export default function AssetList() {
@@ -307,28 +329,22 @@ export default function AssetList() {
   // --- DATA LOADING & SYNC ---
   const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync = false) => {
       const localAssets = await getLocalAssetsFromDb();
-      let mergedAssets = [...localAssets];
-
-      if (isManualSync) {
-        // For manual sync, cloud is the source of truth, but we keep local-only new items.
-        const fetchedAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
-        const localOnlyNewAssets = localAssets.filter(la => !fetchedAssetsMap.has(la.id));
-        mergedAssets = [...fetchedAssets, ...localOnlyNewAssets];
-      } else {
-        // For listeners, merge based on timestamp.
-        const mergedAssetMap = new Map<string, Asset>();
-        localAssets.forEach(asset => mergedAssetMap.set(asset.id, asset));
-        fetchedAssets.forEach(asset => {
-          const existing = mergedAssetMap.get(asset.id);
-          if (!existing || new Date(asset.lastModified || 0) > new Date(existing.lastModified || 0)) {
-              mergedAssetMap.set(asset.id, { ...asset, syncStatus: 'synced' });
-          }
-        });
-        mergedAssets = Array.from(mergedAssetMap.values());
-      }
       
+      const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
+      const fetchedAssetsMap = new Map(fetchedAssets.map(a => [a.id, a]));
+
+      // Merge logic: Cloud is source of truth, but local-only new items are preserved.
+      fetchedAssets.forEach(cloudAsset => {
+        const localAsset = localAssetsMap.get(cloudAsset.id);
+        if (!localAsset || new Date(cloudAsset.lastModified || 0) > new Date(localAsset.lastModified || 0)) {
+            localAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
+        }
+      });
+      
+      const mergedAssets = Array.from(localAssetsMap.values());
       const newInboxItems = generateInboxUpdates(localAssets, mergedAssets, userProfile)
         .filter(group => group.updatedBy !== userProfile?.displayName);
+      
       if(newInboxItems.length > 0 && !isInitialLoad.current) {
         updateInboxState(newInboxItems);
       }
@@ -682,31 +698,47 @@ export default function AssetList() {
     setSelectedAssetIds([]);
   };
 
-  const handleSaveAsset = async (assetToSave: Asset) => {
-    const finalAsset: Asset = { 
-      ...assetToSave, 
-      lastModified: new Date().toISOString(),
-      lastModifiedBy: userProfile?.displayName,
-      lastModifiedByState: userProfile?.state,
-      syncStatus: 'local',
-    };
-    
-    const currentAssets = await getLocalAssetsFromDb();
-    const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
-    if (existingIndex > -1) {
-        currentAssets[existingIndex] = finalAsset;
+  const handleSaveAsset = async (assetToSave: AssetFormValues) => {
+    const originalAsset = assets.find(a => a.id === selectedAsset?.id);
+
+    // If it's a new asset or if details have changed for an existing asset
+    if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
+      const finalAsset: Asset = {
+        id: selectedAsset?.id || uuidv4(),
+        ...originalAsset,
+        ...assetToSave,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: userProfile?.displayName,
+        lastModifiedByState: userProfile?.state,
+        syncStatus: 'local',
+      };
+      
+      const currentAssets = await getLocalAssetsFromDb();
+      const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
+      if (existingIndex > -1) {
+          currentAssets[existingIndex] = finalAsset;
+      } else {
+          currentAssets.unshift(finalAsset);
+      }
+      await saveAssets(currentAssets);
+      setAssets(currentAssets);
+      addNotification({ title: 'Saved Locally', description: 'Changes will be synced on the next connection.' });
     } else {
-        currentAssets.unshift(finalAsset);
+        addNotification({ title: 'No Changes Detected', description: 'The asset was not saved as no changes were made.' });
     }
-    await saveAssets(currentAssets);
-    setAssets(currentAssets);
-    addNotification({ title: 'Saved Locally', description: 'Changes will be synced on the next connection.' });
+    
     setIsFormOpen(false);
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
     const asset = assets.find(a => a.id === assetId);
     if (!asset) return;
+
+    // Check if there are actual changes
+    if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus) {
+        return; // No changes, do nothing.
+    }
+
     const updatedAsset: Asset = { 
         ...asset, 
         ...data, 
@@ -1250,6 +1282,7 @@ export default function AssetList() {
                                 await handleQuickSaveAsset(asset.id, {
                                   verifiedStatus: status as any,
                                   verifiedDate,
+                                  remarks: asset.remarks
                                 });
                                 addNotification({
                                   title: "Status Updated",
@@ -1348,4 +1381,3 @@ export default function AssetList() {
     </div>
   );
 }
-

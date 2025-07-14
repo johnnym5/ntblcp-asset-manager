@@ -51,6 +51,7 @@ import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Label } from "./ui/label";
 
 const assetFormSchema = z.object({
+  id: z.string(),
   category: z.string({ required_error: "Please select a category." }),
   description: z.string().min(1, "Description is required."),
   serialNumber: z.string().optional(),
@@ -79,7 +80,7 @@ interface AssetFormProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   asset?: Asset;
-  onSave: (assetToSave: Asset) => Promise<void>;
+  onSave: (assetToSave: AssetFormValues) => Promise<void>;
   onQuickSave: (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy'; verifiedDate?: string; }) => Promise<void>;
   isReadOnly: boolean;
 }
@@ -99,7 +100,8 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   const { userProfile } = useAuth();
   const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
   
-  const defaultValues = {
+  const defaultValues: AssetFormValues = {
+    id: uuidv4(),
     category: '',
     description: '',
     serialNumber: '',
@@ -123,7 +125,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
 
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
-    defaultValues: asset ? { ...asset, verifiedStatus: asset.verifiedStatus || 'Unverified' } : defaultValues,
+    defaultValues: asset ? { ...defaultValues, ...asset, verifiedStatus: asset.verifiedStatus || 'Unverified' } : defaultValues,
     mode: 'onChange',
   });
   
@@ -249,14 +251,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   const onSubmit = async (data: AssetFormValues) => {
     setIsSaving(true);
     try {
-        const assetToSave: Asset = {
-            id: asset?.id || uuidv4(),
-            ...asset,
-            ...data,
-            syncStatus: 'local',
-        };
-        await onSave(assetToSave);
-        onOpenChange(false);
+        await onSave(data);
     } catch (e) {
         // Error toast is handled by the caller
     } finally {
