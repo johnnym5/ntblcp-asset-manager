@@ -1,0 +1,66 @@
+
+{
+  "indexes": [
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "category",
+      "order": "ASCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "location",
+      "order": "ASCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "assignee",
+      "order": "ASCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "verifiedStatus",
+      "order": "ASCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "lastModified",
+      "order": "DESCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "description",
+      "order": "ASCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "serialNumber",
+      "order": "ASCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "assetIdCode",
+      "order": "ASCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "condition",
+      "order": "ASCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "manufacturer",
+      "order": "ASCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "lga",
+      "order": "ASCENDING"
+    },
+    {
+      "collectionGroup": "assets",
+      "fieldPath": "verifiedDate",
+      "order": "ASCENDING"
+    }
+  ],
+  "fieldOverrides": []
+}
