@@ -323,7 +323,7 @@ export default function AssetList() {
 
 
   // --- DATA LOADING & SYNC ---
-  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[]) => {
+  const handleFetchedAssets = useCallback(async (fetchedAssets: Asset[], isManualSync: boolean = false) => {
     let localAssets = await getLocalAssetsFromDb();
     const originalLocalAssets = [...localAssets]; 
     const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
@@ -341,8 +341,12 @@ export default function AssetList() {
       const newInboxItems = generateInboxUpdates(originalLocalAssets, mergedAssets, userProfile)
         .filter(group => group.updatedBy !== userProfile?.displayName);
       
-      if (newInboxItems.length > 0 && !isInitialLoad.current) {
-        updateInboxState(newInboxItems);
+      // Always generate inbox updates on manual sync
+      // Otherwise, only generate on subsequent automatic syncs, not initial load.
+      if (isManualSync || !isInitialLoad.current) {
+          if (newInboxItems.length > 0) {
+            updateInboxState(newInboxItems);
+          }
       }
     }
     
@@ -365,7 +369,7 @@ export default function AssetList() {
     loadInitialData();
   }, []);
 
-  const performSync = useCallback(async () => {
+  const performSync = useCallback(async (isManual: boolean = false) => {
     if (isSyncingRef.current || !isOnline) return;
 
     setIsSyncing(true);
@@ -399,9 +403,12 @@ export default function AssetList() {
         finalAssetsToPush.forEach(pushedAsset => {
           allLocalAssetsMap.set(pushedAsset.id, {...pushedAsset, syncStatus: 'synced'});
         });
+        
+        // Get the latest version of all assets (cloud and local)
+        const allCloudAssets = await getAssets();
 
         // Merge cloud assets into the local map
-        cloudAssets.forEach(cloudAsset => {
+        allCloudAssets.forEach(cloudAsset => {
           const localAsset = allLocalAssetsMap.get(cloudAsset.id);
           if (!localAsset || new Date(cloudAsset.lastModified || 0) > new Date(localAsset.lastModified || 0)) {
             allLocalAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
@@ -410,7 +417,7 @@ export default function AssetList() {
 
         let mergedAssets = Array.from(allLocalAssetsMap.values());
         
-        // **NEW: Filter assets for non-admins before saving locally**
+        // Filter assets for non-admins before saving locally
         if (!isAdmin && userProfile?.state) {
           const userLocation = userProfile.state;
           const zones: Record<string, string[]> = NIGERIAN_ZONES;
@@ -437,6 +444,16 @@ export default function AssetList() {
 
         setAssets(finalAssets);
         await saveAssets(finalAssets);
+        
+        // Generate inbox updates after saving
+        if (isAdmin) {
+          const inboxItems = generateInboxUpdates(localAssets, finalAssets, userProfile)
+            .filter(group => group.updatedBy !== userProfile?.displayName);
+          if (inboxItems.length > 0) {
+            updateInboxState(inboxItems);
+          }
+        }
+
 
         addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
 
@@ -447,13 +464,13 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, setIsSyncing, setIsOnline, isAdmin, userProfile]);
+  }, [isOnline, setIsSyncing, setIsOnline, isAdmin, userProfile, generateInboxUpdates, updateInboxState]);
 
 
   // Effect for handling manual sync trigger
   useEffect(() => {
     if (manualSyncTrigger > 0) {
-      performSync();
+      performSync(true);
     }
   }, [manualSyncTrigger, performSync]);
   
@@ -461,7 +478,7 @@ export default function AssetList() {
   useEffect(() => {
       if (isAdmin && autoSyncEnabled && isOnline) {
           const intervalId = setInterval(() => {
-              performSync();
+              performSync(false);
           }, 30000); // Sync every 30 seconds
 
           return () => clearInterval(intervalId);
@@ -1392,6 +1409,7 @@ export default function AssetList() {
     </div>
   );
 }
+
 
 
 
