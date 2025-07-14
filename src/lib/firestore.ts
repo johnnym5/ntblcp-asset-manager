@@ -1,7 +1,7 @@
 
 'use client';
 
-import { doc, getDoc, getDocs, setDoc, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
+import { doc, getDoc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Asset, UserProfile } from '@/lib/types';
 import type { User } from 'firebase/auth';
@@ -34,6 +34,30 @@ export async function updateUserProfile(uid: string, data: Partial<UserProfile>)
 }
 
 // --- Assets ---
+
+/**
+ * Sets up a real-time listener for the assets collection.
+ * @param callback The function to call with the updated assets when changes occur.
+ * @returns An unsubscribe function to detach the listener.
+ */
+export function listenForAssetChanges(callback: (assets: Asset[]) => void): () => void {
+  const assetsCollectionRef = collection(db, 'assets');
+  const q = query(assetsCollectionRef);
+  
+  const unsubscribe = onSnapshot(q, (querySnapshot) => {
+    const fetchedAssets: Asset[] = [];
+    querySnapshot.forEach((doc) => {
+      fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+    });
+    callback(fetchedAssets);
+  }, (error) => {
+    console.error("Error listening for asset changes:", error);
+    // Optionally, you could have a more robust error handling callback
+  });
+
+  return unsubscribe;
+}
+
 
 /**
  * Fetches all asset documents from Firestore once.
