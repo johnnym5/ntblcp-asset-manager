@@ -112,9 +112,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [lockAssetList, setLockAssetList] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const savedLock = localStorage.getItem('ntblcp-asset-lock');
-      return savedLock ? JSON.parse(savedLock) : false;
+      // Default to true (locked) unless explicitly set to false by an admin.
+      return savedLock ? JSON.parse(savedLock) : true;
     }
-    return false;
+    return true;
   });
 
   const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(() => {

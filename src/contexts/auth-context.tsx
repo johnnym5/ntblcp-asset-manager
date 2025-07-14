@@ -18,7 +18,7 @@ interface AuthContextType {
   loading: boolean;
   profileSetupComplete: boolean;
   updateProfile: (data: { displayName: string; state: string }) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({
@@ -26,7 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   profileSetupComplete: false,
   updateProfile: async () => {},
-  logout: () => {},
+  logout: async () => {},
 });
 
 const logActivity = async (profile: LocalUserProfile, activity: 'login' | 'logout') => {
@@ -52,7 +52,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
-  const { setGlobalStateFilter, isOnline } = useAppState();
+  const { setGlobalStateFilter, isOnline, setManualSyncTrigger } = useAppState();
 
   useEffect(() => {
     let isMounted = true;
@@ -111,8 +111,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     try {
       if (isOnline && userProfile) {
+        // Log activity first
         await logActivity(userProfile, 'logout');
+        // Then trigger the sync to ensure the log is uploaded
+        setManualSyncTrigger(c => c + 1); 
       }
+      // Finally, clear local data
       localStorage.removeItem('ntblcp-user-profile');
       setUserProfile(null);
       setProfileSetupComplete(false);
