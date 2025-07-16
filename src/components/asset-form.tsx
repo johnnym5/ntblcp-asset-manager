@@ -85,6 +85,14 @@ interface AssetFormProps {
   isReadOnly: boolean;
 }
 
+const ReadOnlyField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="space-y-1">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="text-sm">{value || <span className="text-muted-foreground/70">N/A</span>}</p>
+    </div>
+);
+
+
 export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, isReadOnly }: AssetFormProps) {
   // --- State for Quick View ---
   const [quickViewRemarks, setQuickViewRemarks] = useState('');
@@ -273,65 +281,62 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 space-y-6 overflow-y-auto pr-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">S/N</p>
-                    <p>{asset.sn || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Asset ID</p>
-                    <p>{asset.assetIdCode || 'N/A'}</p>
-                </div>
-                <div className="col-span-1 md:col-span-2 space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Asset Description</p>
-                    <p>{asset.description || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Serial Number</p>
-                    <p>{asset.serialNumber || 'N/A'}</p>
-                </div>
-                 <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Model Number</p>
-                    <p>{asset.modelNumber || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Manufacturer</p>
-                    <p>{asset.manufacturer || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Asset Class</p>
-                    <p>{asset.assetClass || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Location</p>
-                    <p>{asset.location || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">LGA</p>
-                    <p>{asset.lga || 'N/A'}</p>
-                </div>
-                 <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Assignee</p>
-                    <p>{asset.assignee || 'N/A'}</p>
-                </div>
-                {(asset.category === 'MOTORCYCLES-C19RM' || asset.category === 'Vehicles-TB (IHVN)') && (
-                    <>
-                        <div className="space-y-1">
-                            <p className="text-xs font-semibold text-muted-foreground">Chasis Number</p>
-                            <p>{asset.chasisNo || 'N/A'}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-xs font-semibold text-muted-foreground">Engine Number</p>
-                            <p>{asset.engineNo || 'N/A'}</p>
-                        </div>
-                    </>
-                )}
-            </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <ReadOnlyField label="Category" value={asset.category} />
+                  <ReadOnlyField label="Asset Description" value={asset.description} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
+                  <ReadOnlyField label="Location" value={asset.location} />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <ReadOnlyField label="Condition" value={asset.condition} />
+                  <ReadOnlyField label="Verified Status" value={asset.verifiedStatus} />
+              </div>
+
+               <div className="space-y-1">
+                  <p className="text-xs font-medium text-muted-foreground">Remarks/Comments</p>
+                  <p className="text-sm p-3 bg-muted rounded-md min-h-24 whitespace-pre-wrap">{asset.remarks || <span className="text-muted-foreground/70">N/A</span>}</p>
+              </div>
+
+              <Accordion type="single" collapsible className="w-full pt-4">
+                  <AccordionItem value="advanced">
+                      <AccordionTrigger>Advanced Information</AccordionTrigger>
+                      <AccordionContent className="pt-4 space-y-4">
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <ReadOnlyField label="Assignee" value={asset.assignee} />
+                              <ReadOnlyField label="LGA" value={asset.lga} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
+                              <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <ReadOnlyField label="Asset Class" value={asset.assetClass} />
+                              <ReadOnlyField label="Model Number" value={asset.modelNumber} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <ReadOnlyField label="Engine Number" value={asset.engineNo} />
+                              <ReadOnlyField label="Chasis Number" value={asset.chasisNo} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <ReadOnlyField label="Supplier" value={asset.supplier} />
+                              <ReadOnlyField label="Grant" value={asset.grant} />
+                          </div>
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              <ReadOnlyField label="Date Received" value={asset.dateReceived} />
+                               <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
+                          </div>
+                      </AccordionContent>
+                  </AccordionItem>
+              </Accordion>
             
             <div className="space-y-4 border-t pt-6">
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                 <div className="grid grid-cols-1">
                     <div className="space-y-2">
-                        <Label htmlFor="quick-view-status">Verified Status</Label>
+                        <Label htmlFor="quick-view-status">Update Verified Status</Label>
                         <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
                             <SelectTrigger id="quick-view-status">
                                 <SelectValue placeholder="Select status" />
@@ -343,13 +348,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                             </SelectContent>
                         </Select>
                     </div>
-                     <div className="space-y-2">
-                        <Label>Last Modified</Label>
-                        <p className="text-sm pt-2 text-muted-foreground">{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p>
-                    </div>
                  </div>
                 <div className="space-y-2">
-                    <Label htmlFor="quick-view-remarks">Remarks/Comments</Label>
+                    <Label htmlFor="quick-view-remarks">Update Remarks/Comments</Label>
                     <Textarea id="quick-view-remarks" value={quickViewRemarks} onChange={(e) => setQuickViewRemarks(e.target.value)} rows={5} />
                 </div>
                 <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
