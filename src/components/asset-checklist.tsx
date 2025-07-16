@@ -3,7 +3,7 @@
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle2, XCircle, FileText, User, ShieldQuestion, ListTree } from 'lucide-react';
+import { CheckCircle2, XCircle, FileText, User, ShieldQuestion, ListTree, Hash, MapPin, Building, Tag } from 'lucide-react';
 import type { AssetFormValues } from './asset-form';
 
 interface AssetChecklistProps {
@@ -28,13 +28,18 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
   const requiredItems = [
     { label: 'Category', completed: !!values.category, icon: <ListTree className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Asset Description', completed: !!values.description, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
-    { label: 'Serial Number', completed: !!values.serialNumber, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
-    { label: 'Location', completed: !!values.location, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Serial Number', completed: !!values.serialNumber, icon: <Hash className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Location', completed: !!values.location, icon: <MapPin className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Condition', completed: !!values.condition, icon: <ShieldQuestion className="h-4 w-4 text-muted-foreground" /> },
   ];
 
-  const optionalItems = [
+  const importantItems = [
+    { label: 'Asset ID Code', completed: !!values.assetIdCode, icon: <Tag className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'LGA', completed: !!values.lga, icon: <MapPin className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Assignee', completed: !!values.assignee, icon: <User className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Manufacturer', completed: !!values.manufacturer, icon: <Building className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Model Number', completed: !!values.modelNumber, icon: <Hash className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Asset Class', completed: !!values.assetClass, icon: <ListTree className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Remarks/Notes', completed: !!values.remarks, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
   ];
 
@@ -53,9 +58,9 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
           </div>
         </div>
         <div>
-          <h4 className="font-medium mb-2">Optional Fields</h4>
+          <h4 className="font-medium mb-2">Important Fields</h4>
           <div className="space-y-2">
-            {optionalItems.map((item) => (
+            {importantItems.map((item) => (
               <ChecklistItem key={item.label} label={item.label} isCompleted={item.completed} icon={item.icon} />
             ))}
           </div>
