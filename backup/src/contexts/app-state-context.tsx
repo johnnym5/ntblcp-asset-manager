@@ -4,7 +4,7 @@
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
-import type { InboxMessageGroup } from '@/lib/types';
+import type { Asset, InboxMessageGroup, OnlineUser } from '@/lib/types';
 
 
 export interface SortConfig {
@@ -23,6 +23,8 @@ export interface DataActions {
 }
 
 interface AppStateContextType {
+  assets: Asset[];
+  setAssets: Dispatch<SetStateAction<Asset[]>>;
   isOnline: boolean;
   setIsOnline: Dispatch<SetStateAction<boolean>>;
   searchTerm: string;
@@ -70,16 +72,17 @@ interface AppStateContextType {
   dataActions: DataActions;
   setDataActions: Dispatch<SetStateAction<DataActions>>;
 
-  // Inbox
-  inboxMessages: InboxMessageGroup[];
-  setInboxMessages: Dispatch<SetStateAction<InboxMessageGroup[]>>;
-  unreadInboxCount: number;
-  setUnreadInboxCount: Dispatch<SetStateAction<number>>;
+  // Online status
+  onlineUsers: OnlineUser[];
+  setOnlineUsers: Dispatch<SetStateAction<OnlineUser[]>>;
+  userHistory: InboxMessageGroup[];
+  setUserHistory: Dispatch<SetStateAction<InboxMessageGroup[]>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
+  const [assets, setAssets] = useState<Asset[]>([]);
   const [isOnline, setIsOnline] = useState(() => {
     if (typeof window !== 'undefined') {
       const savedStatus = localStorage.getItem('ntblcp-online-status');
@@ -112,9 +115,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [lockAssetList, setLockAssetList] = useState<boolean>(() => {
     if (typeof window !== 'undefined') {
       const savedLock = localStorage.getItem('ntblcp-asset-lock');
-      return savedLock ? JSON.parse(savedLock) : false;
+      // Default to true (locked) unless explicitly set to false by an admin.
+      return savedLock ? JSON.parse(savedLock) : true;
     }
-    return false;
+    return true;
   });
 
   const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(() => {
@@ -129,8 +133,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
 
-  const [inboxMessages, setInboxMessages] = useState<InboxMessageGroup[]>([]);
-  const [unreadInboxCount, setUnreadInboxCount] = useState<number>(0);
+  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
+  const [userHistory, setUserHistory] = useState<InboxMessageGroup[]>([]);
 
 
   useEffect(() => {
@@ -152,6 +156,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   }, [isOnline]);
 
   const value = {
+    assets,
+    setAssets,
     isOnline,
     setIsOnline,
     searchTerm,
@@ -186,10 +192,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setIsSyncing,
     dataActions,
     setDataActions,
-    inboxMessages,
-    setInboxMessages,
-    unreadInboxCount,
-    setUnreadInboxCount,
+    onlineUsers,
+    setOnlineUsers,
+    userHistory,
+    setUserHistory,
   };
 
   return (

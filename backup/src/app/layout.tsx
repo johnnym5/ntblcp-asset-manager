@@ -4,6 +4,7 @@ import './globals.css';
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from '@/contexts/auth-context';
 import { AppStateProvider } from '@/contexts/app-state-context';
+import { Toaster } from '@/components/ui/toaster';
 
 export const metadata: Metadata = {
   title: 'NTBLCP ASSET VERIFICATOR',

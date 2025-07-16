@@ -91,3 +91,11 @@ export interface InboxMessageGroup {
   updatedAssets?: Asset[];
   activityMessage?: string;
 }
+
+export interface OnlineUser {
+    id: string;
+    displayName: string;
+    state: string;
+    online: boolean;
+    timestamp: string;
+}

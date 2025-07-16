@@ -83,6 +83,14 @@ interface AssetFormProps {
   isReadOnly: boolean;
 }
 
+const ReadOnlyField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="space-y-1">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="text-sm">{value || <span className="text-muted-foreground/70">N/A</span>}</p>
+    </div>
+);
+
+
 export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, isReadOnly }: AssetFormProps) {
   // --- State for Quick View ---
   const [quickViewRemarks, setQuickViewRemarks] = useState('');
@@ -272,66 +280,33 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
           <SheetHeader>
             <SheetTitle>Asset Quick View</SheetTitle>
             <SheetDescription>
-              Viewing asset details. Comments and status can be updated here.
+              Viewing asset details. You can update the status and remarks below.
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 space-y-6 overflow-y-auto pr-6 py-4">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-sm">
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">S/N</p>
-                    <p>{asset.sn || 'N/A'}</p>
+            <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="S/N" value={asset.sn} />
+                    <ReadOnlyField label="Location" value={asset.location} />
                 </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Asset ID</p>
-                    <p>{asset.assetIdCode || 'N/A'}</p>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="LGA" value={asset.lga} />
+                    <ReadOnlyField label="Assignee" value={asset.assignee} />
                 </div>
-                <div className="col-span-1 md:col-span-2 space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Asset Description</p>
-                    <p>{asset.description || 'N/A'}</p>
+                <ReadOnlyField label="Asset Description" value={asset.description} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
+                    <ReadOnlyField label="Asset Class" value={asset.assetClass} />
                 </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Serial Number</p>
-                    <p>{asset.serialNumber || 'N/A'}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
+                    <ReadOnlyField label="Model Number" value={asset.modelNumber} />
                 </div>
-                 <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Model Number</p>
-                    <p>{asset.modelNumber || 'N/A'}</p>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
+                    <ReadOnlyField label="Condition" value={asset.condition} />
                 </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Manufacturer</p>
-                    <p>{asset.manufacturer || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Asset Class</p>
-                    <p>{asset.assetClass || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Location</p>
-                    <p>{asset.location || 'N/A'}</p>
-                </div>
-                <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">LGA</p>
-                    <p>{asset.lga || 'N/A'}</p>
-                </div>
-                 <div className="space-y-1">
-                    <p className="text-xs font-semibold text-muted-foreground">Assignee</p>
-                    <p>{asset.assignee || 'N/A'}</p>
-                </div>
-                {(asset.category === 'MOTORCYCLES-C19RM' || asset.category === 'Vehicles-TB (IHVN)') && (
-                    <>
-                        <div className="space-y-1">
-                            <p className="text-xs font-semibold text-muted-foreground">Chasis Number</p>
-                            <p>{asset.chasisNo || 'N/A'}</p>
-                        </div>
-                        <div className="space-y-1">
-                            <p className="text-xs font-semibold text-muted-foreground">Engine Number</p>
-                            <p>{asset.engineNo || 'N/A'}</p>
-                        </div>
-                    </>
-                )}
-            </div>
-            
-            <div className="space-y-4 border-t pt-6">
+                
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div className="space-y-2">
                         <Label htmlFor="quick-view-status">Verified Status</Label>
@@ -346,10 +321,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                             </SelectContent>
                         </Select>
                     </div>
-                     <div className="space-y-2">
-                        <Label>Last Modified</Label>
-                        <p className="text-sm pt-2 text-muted-foreground">{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p>
-                    </div>
+                     <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
                  </div>
                 <div className="space-y-2">
                     <Label htmlFor="quick-view-remarks">Remarks/Comments</Label>
@@ -360,6 +332,26 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     Save Comments & Status
                 </Button>
             </div>
+            
+            <Accordion type="single" collapsible className="w-full pt-4">
+                <AccordionItem value="advanced">
+                    <AccordionTrigger>Advanced Information</AccordionTrigger>
+                    <AccordionContent className="pt-4 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Engine Number" value={asset.engineNo} />
+                            <ReadOnlyField label="Chasis Number" value={asset.chasisNo} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Supplier" value={asset.supplier} />
+                            <ReadOnlyField label="Grant" value={asset.grant} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Date Received" value={asset.dateReceived ? String(asset.dateReceived) : 'N/A'} />
+                            <ReadOnlyField label="Verified Date" value={asset.verifiedDate || 'N/A'} />
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
           </div>
           <SheetFooter className="mt-auto pt-4 border-t">
             <SheetClose asChild>
@@ -389,90 +381,33 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4 p-1"
               >
+                {/* --- BASIC DETAILS --- */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!!asset}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {TARGET_SHEETS.map(sheet => (
-                              <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Asset Description</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                  )} />
+                    <FormField control={form.control} name="sn" render={({ field }) => ( <FormItem> <FormLabel>S/N</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="location" render={({ field }) => ( <FormItem> <FormLabel>Location</FormLabel> <FormControl><Input {...field} disabled={!isAdmin} /></FormControl> <FormMessage /> </FormItem> )}/>
+                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="lga" render={({ field }) => ( <FormItem> <FormLabel>LGA</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="assignee" render={({ field }) => ( <FormItem> <FormLabel>Assignee</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                </div>
+                <FormField control={form.control} name="description" render={({ field }) => ( <FormItem> <FormLabel>Asset Description</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="assetIdCode" render={({ field }) => ( <FormItem> <FormLabel>Asset ID Code</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="assetClass" render={({ field }) => ( <FormItem> <FormLabel>Asset Class</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="manufacturer" render={({ field }) => ( <FormItem> <FormLabel>Manufacturer</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="modelNumber" render={({ field }) => ( <FormItem> <FormLabel>Model Number</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="serialNumber" render={({ field }) => ( <FormItem> <FormLabel>Serial Number</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                    <FormField control={form.control} name="condition" render={({ field }) => ( <FormItem> <FormLabel>Condition</FormLabel> <FormControl><Input {...field} /></FormControl> <FormMessage /> </FormItem> )}/>
+                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="verifiedStatus" render={({ field }) => ( <FormItem> <FormLabel>Verified Status</FormLabel> <Select onValueChange={field.onChange} value={field.value}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select status" /> </SelectTrigger> </FormControl> <SelectContent> <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem> <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem> <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem> </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
+                    <div className="space-y-2"> <Label>Last Modified</Label> <p className="text-sm text-muted-foreground h-10 flex items-center">{asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p> </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="serialNumber" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Serial Number</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="location" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <FormField control={form.control} name="condition" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Condition</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField
-                      control={form.control}
-                      name="verifiedStatus"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Verified Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
-                              <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                              <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                </div>
-                
                 <FormField control={form.control} name="remarks" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Remarks/Comments</FormLabel>
@@ -481,50 +416,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                   </FormItem>
                 )} />
 
+                {/* --- ADVANCED DETAILS --- */}
                 <Accordion type="single" collapsible className="w-full pt-4">
                   <AccordionItem value="advanced">
                     <AccordionTrigger>Advanced Information</AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="assignee" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Assignee</FormLabel>
-                                <FormControl><Input {...field} /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={form.control} name="lga" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>LGA</FormLabel>
-                                    <FormControl><Input {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="assetIdCode" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Asset ID Code</FormLabel>
-                                    <FormControl><Input {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="manufacturer" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Manufacturer</FormLabel>
-                                    <FormControl><Input {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="assetClass" render={({ field }) => (
-                                <FormItem><FormLabel>Asset Class</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={form.control} name="modelNumber" render={({ field }) => (
-                                <FormItem><FormLabel>Model Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                        </div>
+                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                         <FormField control={form.control} name="category" render={({ field }) => ( <FormItem> <FormLabel>Category</FormLabel> <Select onValueChange={field.onChange} value={field.value} disabled={!!asset}> <FormControl> <SelectTrigger> <SelectValue placeholder="Select a category" /> </SelectTrigger> </FormControl> <SelectContent> {TARGET_SHEETS.map(sheet => ( <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem> ))} </SelectContent> </Select> <FormMessage /> </FormItem> )}/>
+                       </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <FormField control={form.control} name="engineNo" render={({ field }) => (
                                 <FormItem><FormLabel>Engine Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -545,10 +444,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                            <FormField control={form.control} name="dateReceived" render={({ field }) => (
                                 <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                             )} />
-                           <div className="space-y-2">
-                                <Label>Last Modified</Label>
-                                <p className="text-sm text-muted-foreground h-10 flex items-center">{asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p>
-                           </div>
                         </div>
                     </AccordionContent>
                   </AccordionItem>

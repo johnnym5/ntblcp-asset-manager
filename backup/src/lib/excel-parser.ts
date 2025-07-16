@@ -59,7 +59,7 @@ const COLUMN_TO_ASSET_FIELD_MAP: ColumnToFieldMap = {
 const normalizeHeader = (header: any): string => {
     // Convert to string, trim whitespace, convert to uppercase, and replace multiple spaces/tabs with a single space.
     // This also handles non-breaking spaces (\\u00A0).
-    return String(header || '').trim().toUpperCase().replace(/[\\s\\u00A0]+/g, ' ');
+    return String(header || '').trim().toUpperCase().replace(/[\s\u00A0]+/g, ' ');
 };
 
 /**
@@ -168,7 +168,6 @@ export async function parseExcelFile(
 
     try {
         const buffer = await file.arrayBuffer();
-        // Use cellDates:true to automatically convert Excel dates to JS Date objects.
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
 
         const existingAssetByIdentifiers = new Map<string, Asset>();
@@ -191,13 +190,11 @@ export async function parseExcelFile(
             }
 
             const sheet = workbook.Sheets[workbookSheetName];
-            // Read sheet as an array of arrays for robust parsing
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
             
             let headerRowIndex;
-            // Apply special rule for NTBLCP-TB-FAR sheet
             if (canonicalSheetName === 'NTBLCP-TB-FAR') {
-                headerRowIndex = 6; // 7th row (0-indexed)
+                headerRowIndex = 6;
             } else {
                 headerRowIndex = findHeaderRowIndex(sheetData, HEADER_DEFINITIONS[canonicalSheetName] || []);
             }
@@ -211,7 +208,6 @@ export async function parseExcelFile(
             const dataRows = sheetData.slice(headerRowIndex + 1);
 
             for (const row of dataRows) {
-                // This check prevents crashes from empty/malformed rows
                 if (!Array.isArray(row) || row.every(cell => cell === null || String(cell).trim() === '')) {
                     continue; 
                 }
@@ -222,15 +218,12 @@ export async function parseExcelFile(
                 headerRow.forEach((header, index) => {
                     const field = COLUMN_TO_ASSET_FIELD_MAP[header];
                     const cellValue = row[index];
-                    // Only process if the field exists, a value exists in the cell,
-                    // and this specific asset field hasn't been filled yet by a preceeding column with the same name.
                     if (field && !populatedFields.has(field) && cellValue !== null && String(cellValue).trim() !== '') {
                         assetObject[field] = cellValue;
                         populatedFields.add(field);
                     }
                 });
 
-                // Skip if no actual asset data was extracted (only category is present).
                 if (Object.keys(assetObject).length <= 1) {
                     skipped++;
                     continue;
@@ -243,19 +236,17 @@ export async function parseExcelFile(
                 const existingAsset = (key !== '-') ? existingAssetByIdentifiers.get(key) : undefined;
 
                 if (existingAsset) {
-                    // Compare the imported data with the existing asset data
                     if (hasChanges(existingAsset, assetObject)) {
-                        const updatedAsset = { ...existingAsset, ...assetObject };
+                        const updatedAsset = { ...existingAsset, ...assetObject, syncStatus: 'local' as const };
                         updatedAssets.push(updatedAsset);
                     }
-                    // If no changes, we do nothing and the asset is effectively skipped from the update/new lists.
                 } else {
-                    // Add new asset, if not locked
                     if (!lockAssetList) {
                         const newAsset: Asset = {
                             id: uuidv4(),
                             ...assetObject,
                             verifiedStatus: 'Unverified',
+                            syncStatus: 'local',
                         } as Asset;
                         newAssets.push(newAsset);
                     } else {
@@ -302,7 +293,6 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
             const row: { [key: string]: any } = {};
             for (const header of exportHeaders) {
                 const normalizedHeader = normalizeHeader(header);
-                // Find the first field name that maps to this header
                 const fieldName = Object.keys(COLUMN_TO_ASSET_FIELD_MAP).find(key => normalizeHeader(key) === normalizedHeader);
                 const assetField = fieldName ? COLUMN_TO_ASSET_FIELD_MAP[fieldName] : undefined;
 
@@ -310,13 +300,11 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
                     row[header] = asset[assetField] || '';
                 }
             }
-            // Manually add verified status and date at the end
             row["Verified Status"] = asset.verifiedStatus || 'Unverified';
             row["Verified Date"] = asset.verifiedDate || '';
             return row;
         });
 
-        // Add "Verified Status" and "Verified Date" to headers for export
         if (!exportHeaders.includes("Verified Status")) {
           exportHeaders.push("Verified Status");
         }

@@ -36,7 +36,6 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Boxes,
@@ -57,12 +56,12 @@ import {
   FileUp,
   PlusCircle,
   Trash2,
-  Inbox,
   Bell,
   Sun,
   Moon,
   CheckCheck,
   X,
+  Users,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -86,9 +85,9 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
-import { InboxSheet } from "./inbox-sheet";
 import { useTheme } from "next-themes";
 import { Separator } from "./ui/separator";
+import { OnlineUsersSheet } from "./online-users-sheet";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -104,15 +103,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     setManualSyncTrigger, isSyncing,
     dataActions,
-    autoSyncEnabled,
-    unreadInboxCount
+    onlineUsers,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-  const [isInboxOpen, setIsInboxOpen] = useState(false);
+  const [isOnlineUsersSheetOpen, setIsOnlineUsersSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
@@ -128,8 +126,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [searchTerm]);
   
-  const handleLogout = async () => {
-    await logout();
+  const handleLogout = () => {
+    logout();
     addNotification({
       title: 'Session Ended',
       description: 'You have been logged out.',
@@ -305,10 +303,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4"/>
-                    Profile
-                  </DropdownMenuItem>
+                  
                    {pathname === '/assets' && dataActions.onImport && isAdmin && (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
@@ -353,12 +348,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuSeparator />
                   
                   {isAdmin && (
-                    <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
-                      <Inbox className="mr-2 h-4 w-4" />
-                      <span>Inbox</span>
-                      {unreadInboxCount > 0 && (
-                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
-                          {unreadInboxCount}
+                     <DropdownMenuItem onClick={() => setIsOnlineUsersSheetOpen(true)}>
+                      <Users className="mr-2 h-4 w-4" />
+                      <span>Online Users</span>
+                      {onlineUsers.length > 0 && (
+                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white">
+                          {onlineUsers.length}
                         </span>
                       )}
                     </DropdownMenuItem>
@@ -421,7 +416,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         missingFieldFilter={missingFieldFilter}
         setMissingFieldFilter={setMissingFieldFilter}
       />
-       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
+       <OnlineUsersSheet isOpen={isOnlineUsersSheetOpen} onOpenChange={setIsOnlineUsersSheetOpen} />
        <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
         <SheetContent className="w-full sm:max-w-sm p-0 flex flex-col">
             <SheetHeader className="p-4">
