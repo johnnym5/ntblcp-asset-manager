@@ -5,7 +5,6 @@ import React, { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
-import { v4 as uuidv4 } from 'uuid';
 import {
   Sheet,
   SheetContent,
@@ -51,7 +50,6 @@ import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 import { Label } from "./ui/label";
 
 const assetFormSchema = z.object({
-  id: z.string(),
   category: z.string({ required_error: "Please select a category." }),
   description: z.string().min(1, "Description is required."),
   serialNumber: z.string().optional(),
@@ -80,7 +78,7 @@ interface AssetFormProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   asset?: Asset;
-  onSave: (assetToSave: AssetFormValues) => Promise<void>;
+  onSave: (assetToSave: Asset) => Promise<void>;
   onQuickSave: (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy'; verifiedDate?: string; }) => Promise<void>;
   isReadOnly: boolean;
 }
@@ -108,8 +106,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   const { userProfile } = useAuth();
   const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
   
-  const defaultValues: AssetFormValues = {
-    id: uuidv4(),
+  const defaultValues = {
     category: '',
     description: '',
     serialNumber: '',
@@ -133,7 +130,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
 
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
-    defaultValues: asset ? { ...defaultValues, ...asset, verifiedStatus: asset.verifiedStatus || 'Unverified' } : defaultValues,
+    defaultValues: asset ? { ...asset, verifiedStatus: asset.verifiedStatus || 'Unverified' } : defaultValues,
     mode: 'onChange',
   });
   
@@ -259,7 +256,13 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   const onSubmit = async (data: AssetFormValues) => {
     setIsSaving(true);
     try {
-        await onSave(data);
+        const assetToSave: Asset = {
+            id: asset?.id || uuidv4(),
+            ...asset,
+            ...data,
+        };
+        await onSave(assetToSave);
+        onOpenChange(false);
     } catch (e) {
         // Error toast is handled by the caller
     } finally {
@@ -281,62 +284,35 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 space-y-6 overflow-y-auto pr-6 py-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ReadOnlyField label="Category" value={asset.category} />
-                  <ReadOnlyField label="Asset Description" value={asset.description} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
-                  <ReadOnlyField label="Location" value={asset.location} />
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <ReadOnlyField label="Condition" value={asset.condition} />
-                  <ReadOnlyField label="Verified Status" value={asset.verifiedStatus} />
-              </div>
-
-               <div className="space-y-1">
-                  <p className="text-xs font-medium text-muted-foreground">Remarks/Comments</p>
-                  <p className="text-sm p-3 bg-muted rounded-md min-h-24 whitespace-pre-wrap">{asset.remarks || <span className="text-muted-foreground/70">N/A</span>}</p>
-              </div>
-
-              <Accordion type="single" collapsible className="w-full pt-4">
-                  <AccordionItem value="advanced">
-                      <AccordionTrigger>Advanced Information</AccordionTrigger>
-                      <AccordionContent className="pt-4 space-y-4">
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <ReadOnlyField label="Assignee" value={asset.assignee} />
-                              <ReadOnlyField label="LGA" value={asset.lga} />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
-                              <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <ReadOnlyField label="Asset Class" value={asset.assetClass} />
-                              <ReadOnlyField label="Model Number" value={asset.modelNumber} />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <ReadOnlyField label="Engine Number" value={asset.engineNo} />
-                              <ReadOnlyField label="Chasis Number" value={asset.chasisNo} />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <ReadOnlyField label="Supplier" value={asset.supplier} />
-                              <ReadOnlyField label="Grant" value={asset.grant} />
-                          </div>
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              <ReadOnlyField label="Date Received" value={asset.dateReceived} />
-                               <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
-                          </div>
-                      </AccordionContent>
-                  </AccordionItem>
-              </Accordion>
-            
-            <div className="space-y-4 border-t pt-6">
-                 <div className="grid grid-cols-1">
-                    <div className="space-y-2">
-                        <Label htmlFor="quick-view-status">Update Verified Status</Label>
+            <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="S/N" value={asset.sn} />
+                    <ReadOnlyField label="Location" value={asset.location} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="LGA" value={asset.lga} />
+                    <ReadOnlyField label="Assignee" value={asset.assignee} />
+                </div>
+                <ReadOnlyField label="Asset Description" value={asset.description} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
+                    <ReadOnlyField label="Asset Class" value={asset.assetClass} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
+                    <ReadOnlyField label="Model Number" value={asset.modelNumber} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
+                    <ReadOnlyField label="Condition" value={asset.condition} />
+                </div>
+                <div className="space-y-2">
+                    <Label>Remarks/Comments</Label>
+                    <p className="text-sm p-3 bg-muted rounded-md min-h-24 whitespace-pre-wrap">{asset.remarks || <span className="text-muted-foreground/70">N/A</span>}</p>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                     <div className="space-y-2">
+                        <Label htmlFor="quick-view-status">Verified Status</Label>
                         <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
                             <SelectTrigger id="quick-view-status">
                                 <SelectValue placeholder="Select status" />
@@ -348,16 +324,33 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                             </SelectContent>
                         </Select>
                     </div>
+                     <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
                  </div>
-                <div className="space-y-2">
-                    <Label htmlFor="quick-view-remarks">Update Remarks/Comments</Label>
-                    <Textarea id="quick-view-remarks" value={quickViewRemarks} onChange={(e) => setQuickViewRemarks(e.target.value)} rows={5} />
-                </div>
                 <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
                     {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Save Comments & Status
                 </Button>
             </div>
+            
+            <Accordion type="single" collapsible className="w-full pt-4">
+                <AccordionItem value="advanced">
+                    <AccordionTrigger>Advanced Information</AccordionTrigger>
+                    <AccordionContent className="pt-4 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Engine Number" value={asset.engineNo} />
+                            <ReadOnlyField label="Chasis Number" value={asset.chasisNo} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Supplier" value={asset.supplier} />
+                            <ReadOnlyField label="Grant" value={asset.grant} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Date Received" value={asset.dateReceived ? String(asset.dateReceived) : 'N/A'} />
+                            <ReadOnlyField label="Verified Date" value={asset.verifiedDate || 'N/A'} />
+                        </div>
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
           </div>
           <SheetFooter className="mt-auto pt-4 border-t">
             <SheetClose asChild>
@@ -387,6 +380,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4 p-1"
               >
+                {/* --- BASIC DETAILS --- */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -421,15 +415,24 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                       </FormItem>
                   )} />
                 </div>
-
+                
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="serialNumber" render={({ field }) => (
+                   <FormField control={form.control} name="serialNumber" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Serial Number</FormLabel>
                       <FormControl><Input {...field} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
+                  <FormField control={form.control} name="assetIdCode" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Asset ID Code</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField control={form.control} name="location" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
@@ -437,17 +440,49 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                       <FormMessage />
                     </FormItem>
                   )} />
+                   <FormField control={form.control} name="lga" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>LGA</FormLabel>
+                            <FormControl><Input {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <FormField control={form.control} name="assignee" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assignee</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="condition" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Condition</FormLabel>
+                          <FormControl><Input {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                    )} />
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <FormField control={form.control} name="condition" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Condition</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="manufacturer" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Manufacturer</FormLabel>
+                            <FormControl><Input {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                    <FormField control={form.control} name="modelNumber" render={({ field }) => (
+                        <FormItem><FormLabel>Model Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                </div>
+                
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="assetClass" render={({ field }) => (
+                        <FormItem><FormLabel>Asset Class</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField
                       control={form.control}
                       name="verifiedStatus"
                       render={({ field }) => (
@@ -470,7 +505,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                       )}
                     />
                 </div>
-                
+
                 <FormField control={form.control} name="remarks" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Remarks/Comments</FormLabel>
@@ -479,50 +514,17 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                   </FormItem>
                 )} />
 
+                <div className="space-y-2">
+                    <Label>Last Modified</Label>
+                    <p className="text-sm text-muted-foreground h-10 flex items-center">{asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p>
+                </div>
+
+
+                {/* --- ADVANCED DETAILS --- */}
                 <Accordion type="single" collapsible className="w-full pt-4">
                   <AccordionItem value="advanced">
                     <AccordionTrigger>Advanced Information</AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="assignee" render={({ field }) => (
-                              <FormItem>
-                                <FormLabel>Assignee</FormLabel>
-                                <FormControl><Input {...field} /></FormControl>
-                                <FormMessage />
-                              </FormItem>
-                            )} />
-                            <FormField control={form.control} name="lga" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>LGA</FormLabel>
-                                    <FormControl><Input {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="assetIdCode" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Asset ID Code</FormLabel>
-                                    <FormControl><Input {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                            <FormField control={form.control} name="manufacturer" render={({ field }) => (
-                                <FormItem>
-                                    <FormLabel>Manufacturer</FormLabel>
-                                    <FormControl><Input {...field} /></FormControl>
-                                    <FormMessage />
-                                </FormItem>
-                            )} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <FormField control={form.control} name="assetClass" render={({ field }) => (
-                                <FormItem><FormLabel>Asset Class</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={form.control} name="modelNumber" render={({ field }) => (
-                                <FormItem><FormLabel>Model Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <FormField control={form.control} name="engineNo" render={({ field }) => (
                                 <FormItem><FormLabel>Engine Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
@@ -543,10 +545,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                            <FormField control={form.control} name="dateReceived" render={({ field }) => (
                                 <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                             )} />
-                           <div className="space-y-2">
-                                <Label>Last Modified</Label>
-                                <p className="text-sm text-muted-foreground h-10 flex items-center">{asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p>
-                           </div>
                         </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -617,3 +615,4 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     </Sheet>
   );
 }
+
