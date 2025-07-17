@@ -1,10 +1,62 @@
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: These are open rules for development. 
-    // For a production app, you should secure these rules.
+    // Helper function to check if a user is authenticated
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Helper function to check if the incoming data is from the user who last modified it
+    function isOwner(userId) {
+      return request.auth.uid == userId;
+    }
+    
+    // Helper function to check if the user is an admin
+    function isAdmin() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+
+    // Rules for the 'assets' collection
     match /assets/{assetId} {
-      allow read, write: if true;
+      // Allow anyone who is signed in to read assets.
+      allow read: if isSignedIn();
+
+      // Allow write (create, update, delete) under specific conditions
+      allow write: if isSignedIn() && (
+        // Allow creation of a new document
+        resource == null ||
+        // Allow if the incoming data is newer than existing data
+        request.resource.data.lastModified > resource.data.lastModified ||
+        // Allow if the user is an admin
+        isAdmin()
+      );
+    }
+
+    // Rules for the 'users' collection
+    match /users/{userId} {
+      // Allow users to read and update their own profile
+      allow read, update: if isOwner(userId);
+      // Allow admins to read any user profile
+      allow get: if isAdmin();
+      // Allow anyone to create their user profile document
+      allow create: if isSignedIn();
+    }
+    
+    // Rules for user presence collection
+    match /user-status/{userId} {
+        // Anyone can see who is online
+        allow read: if isSignedIn();
+        // Only the user themselves can write their own status or delete it (on logout)
+        allow write, delete: if isOwner(userId);
+    }
+    
+    // Rules for activity log
+    match /activity/{logId} {
+        // Only admins can read the full activity log
+        allow read: if isAdmin();
+        // Any signed-in user can create a new activity log (e.g., on login/logout)
+        allow create: if isSignedIn();
     }
   }
 }
