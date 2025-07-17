@@ -60,7 +60,7 @@ import { Progress } from "@/components/ui/progress";
 import { AssetForm, type AssetFormValues } from "./asset-form";
 import type { Asset, AssetChange, InboxMessageGroup } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
-import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
+import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
@@ -125,21 +125,6 @@ const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean 
         }
     }
     return false;
-};
-
-/**
- * Replaces undefined values with null in an object, which is compatible with Firestore.
- * @param obj The object to sanitize.
- * @returns A new object with undefined values replaced by null.
- */
-const sanitizeForFirestore = <T extends object>(obj: T): T => {
-    const sanitizedObj = { ...obj };
-    for (const key in sanitizedObj) {
-        if (sanitizedObj[key] === undefined) {
-            sanitizedObj[key] = null as any;
-        }
-    }
-    return sanitizedObj;
 };
 
 
@@ -711,7 +696,7 @@ export default function AssetList() {
             } else if (data.status !== 'Verified') {
                 updatedAsset.verifiedDate = '';
             }
-            return updatedAsset;
+            return sanitizeForFirestore(updatedAsset);
         });
         
         let currentAssets = await getLocalAssetsFromDb();

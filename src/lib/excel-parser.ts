@@ -52,6 +52,22 @@ const COLUMN_TO_ASSET_FIELD_MAP: ColumnToFieldMap = {
 // --- Helper Functions ---
 
 /**
+ * Replaces undefined values with null in an object, which is compatible with Firestore.
+ * @param obj The object to sanitize.
+ * @returns A new object with undefined values replaced by null.
+ */
+export const sanitizeForFirestore = <T extends object>(obj: T): T => {
+    const sanitizedObj = { ...obj };
+    for (const key in sanitizedObj) {
+        if (sanitizedObj[key] === undefined) {
+            (sanitizedObj as any)[key] = null;
+        }
+    }
+    return sanitizedObj;
+};
+
+
+/**
  * Normalizes a header string for reliable matching.
  * @param header The header string to normalize.
  * @returns The normalized header string.
