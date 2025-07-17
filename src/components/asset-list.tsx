@@ -127,6 +127,21 @@ const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean 
     return false;
 };
 
+/**
+ * Replaces undefined values with null in an object, which is compatible with Firestore.
+ * @param obj The object to sanitize.
+ * @returns A new object with undefined values replaced by null.
+ */
+const sanitizeForFirestore = <T extends object>(obj: T): T => {
+    const sanitizedObj = { ...obj };
+    for (const key in sanitizedObj) {
+        if (sanitizedObj[key] === undefined) {
+            sanitizedObj[key] = null as any;
+        }
+    }
+    return sanitizedObj;
+};
+
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -450,7 +465,7 @@ export default function AssetList() {
         } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
             updatedAsset.verifiedDate = '';
         }
-        return updatedAsset;
+        return sanitizeForFirestore(updatedAsset);
     });
 
     let currentAssets = await getLocalAssetsFromDb();
@@ -468,13 +483,13 @@ export default function AssetList() {
 
     // If it's a new asset or if details have changed for an existing asset
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
-      const finalAsset: Asset = {
+      const finalAsset: Asset = sanitizeForFirestore({
         ...assetToSave,
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
         syncStatus: 'local',
-      };
+      });
       
       const currentAssets = await getLocalAssetsFromDb();
       const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
@@ -502,14 +517,14 @@ export default function AssetList() {
         return; // No changes, do nothing.
     }
 
-    const updatedAsset: Asset = { 
+    const updatedAsset: Asset = sanitizeForFirestore({ 
         ...asset, 
         ...data, 
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
         syncStatus: 'local',
-    };
+    });
 
     const currentAssets = await getLocalAssetsFromDb();
     const existingIndex = currentAssets.findIndex(a => a.id === assetId);
@@ -1140,4 +1155,3 @@ export default function AssetList() {
     </div>
   );
 }
-
