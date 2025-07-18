@@ -57,12 +57,12 @@ import {
   FileUp,
   PlusCircle,
   Trash2,
-  Inbox,
   Bell,
   Sun,
   Moon,
   CheckCheck,
   X,
+  Users,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -86,7 +86,6 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
-import { InboxSheet } from "./inbox-sheet";
 import { useTheme } from "next-themes";
 import { Separator } from "./ui/separator";
 
@@ -104,15 +103,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     setManualSyncTrigger, isSyncing,
     dataActions,
-    autoSyncEnabled,
-    unreadInboxCount
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-  const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
@@ -241,18 +237,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
-            {isOnline && (!isAdmin || !autoSyncEnabled) && (
-              <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                         <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing}>
-                           {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Sync Now</p></TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
+            <TooltipProvider>
+              <Tooltip>
+                  <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing}>
+                          {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
+                      </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Sync Now</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             <TooltipProvider>
                 <Tooltip>
@@ -269,6 +263,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                         ? 'Application is now connecting to the server.'
                                         : 'Application is running in offline mode.',
                                 });
+                                if (newIsOnline) {
+                                  setManualSyncTrigger(c => c + 1);
+                                }
                             }}
                             aria-label={`Switch to ${isOnline ? 'Offline' : 'Online'} mode`}
                         >
@@ -304,10 +301,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <User className="mr-2 h-4 w-4"/>
-                    Profile
-                  </DropdownMenuItem>
+                  
                    {pathname === '/assets' && dataActions.onImport && isAdmin && (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
@@ -351,18 +345,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   )}
                   <DropdownMenuSeparator />
                   
-                  {isAdmin && (
-                    <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
-                      <Inbox className="mr-2 h-4 w-4" />
-                      <span>Inbox</span>
-                      {unreadInboxCount > 0 && (
-                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
-                          {unreadInboxCount}
-                        </span>
-                      )}
-                    </DropdownMenuItem>
-                  )}
-
                   <DropdownMenuItem onClick={() => handleNotificationsOpenChange(true)}>
                     <Bell className="mr-2 h-4 w-4" />
                     <span>Notifications</span>
@@ -420,7 +402,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         missingFieldFilter={missingFieldFilter}
         setMissingFieldFilter={setMissingFieldFilter}
       />
-       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
        <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
         <SheetContent className="w-full sm:max-w-sm p-0 flex flex-col">
             <SheetHeader className="p-4">
