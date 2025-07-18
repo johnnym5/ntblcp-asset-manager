@@ -33,7 +33,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const { 
-    setGlobalStateFilter, 
     setAssets, 
     setInboxMessages,
     setUnreadInboxCount,
@@ -49,7 +48,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           if (profile.displayName) {
              if (isMounted) {
                 setUserProfile(profile);
-                setGlobalStateFilter(profile.state || '');
                 setProfileSetupComplete(true);
              }
           } else {
@@ -70,7 +68,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     return () => {
         isMounted = false;
     };
-  }, [setGlobalStateFilter]);
+  }, []);
 
   const updateProfile = async (data: { displayName: string; state: string }) => {
     setLoading(true);
@@ -82,7 +80,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
-      setGlobalStateFilter(data.state || '');
       setProfileSetupComplete(true);
     } catch(e) {
       console.error("Failed to save user profile", e);
@@ -95,7 +92,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
     setProfileSetupComplete(false);
-    setGlobalStateFilter('');
     await clearAssets();
     setAssets([]); 
     setInboxMessages([]);

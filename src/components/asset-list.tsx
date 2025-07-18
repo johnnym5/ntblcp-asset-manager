@@ -152,12 +152,12 @@ export default function AssetList() {
   const {
     assets, setAssets, isOnline, setIsOnline, globalStateFilter, setGlobalStateFilter,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
-    setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     locationOptions, setLocationOptions, assigneeOptions, setAssigneeOptions, statusOptions, setStatusOptions,
     sortConfig, setSortConfig, enabledSheets, setEnabledSheets, lockAssetList,
     manualSyncTrigger, setManualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
     searchTerm,
+    autoSyncEnabled,
   } = useAppState();
 
   const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
@@ -189,7 +189,8 @@ export default function AssetList() {
 
   // Combined Sync Effect
   useEffect(() => {
-    if (!isOnline || manualSyncTrigger === 0) return;
+    // Sync runs if it's a manual trigger, OR if auto-sync is on.
+    if (!isOnline || (!autoSyncEnabled && manualSyncTrigger === 0)) return;
 
     const performSync = async () => {
         setIsSyncing(true);
@@ -227,7 +228,7 @@ export default function AssetList() {
     
     performSync();
     
-  }, [isOnline, manualSyncTrigger, isAdmin, userProfile?.state, setIsOnline, setIsSyncing, setAssets]);
+  }, [isOnline, manualSyncTrigger, autoSyncEnabled, isAdmin, userProfile?.state, setIsOnline, setIsSyncing, setAssets]);
   
   useEffect(() => {
     setStatusOptions([
@@ -1141,3 +1142,4 @@ export default function AssetList() {
     </div>
   );
 }
+
