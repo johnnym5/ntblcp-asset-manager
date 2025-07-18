@@ -72,11 +72,11 @@ interface AppStateContextType {
   dataActions: DataActions;
   setDataActions: Dispatch<SetStateAction<DataActions>>;
 
-  // Online status
-  onlineUsers: OnlineUser[];
-  setOnlineUsers: Dispatch<SetStateAction<OnlineUser[]>>;
-  userHistory: InboxMessageGroup[];
-  setUserHistory: Dispatch<SetStateAction<InboxMessageGroup[]>>;
+  // Inbox
+  inboxMessages: InboxMessageGroup[];
+  setInboxMessages: Dispatch<SetStateAction<InboxMessageGroup[]>>;
+  unreadInboxCount: number;
+  setUnreadInboxCount: Dispatch<SetStateAction<number>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -132,9 +132,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [manualSyncTrigger, setManualSyncTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
-
-  const [onlineUsers, setOnlineUsers] = useState<OnlineUser[]>([]);
-  const [userHistory, setUserHistory] = useState<InboxMessageGroup[]>([]);
+  
+  const [inboxMessages, setInboxMessages] = useState<InboxMessageGroup[]>([]);
+  const [unreadInboxCount, setUnreadInboxCount] = useState(0);
 
 
   useEffect(() => {
@@ -192,10 +192,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setIsSyncing,
     dataActions,
     setDataActions,
-    onlineUsers,
-    setOnlineUsers,
-    userHistory,
-    setUserHistory,
+    inboxMessages,
+    setInboxMessages,
+    unreadInboxCount,
+    setUnreadInboxCount,
   };
 
   return (
