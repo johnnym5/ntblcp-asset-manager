@@ -1,10 +1,13 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // WARNING: These are open rules for development. 
-    // For a production app, you should secure these rules.
-    match /assets/{assetId} {
-      allow read, write: if true;
+    // Allow read/write access to all collections for any authenticated user.
+    // This is a permissive rule for development. For production, you should
+    // implement more granular security rules.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
     }
   }
 }
