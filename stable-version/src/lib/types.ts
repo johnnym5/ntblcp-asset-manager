@@ -51,14 +51,3 @@ export interface Asset {
   lastModifiedBy?: string; // displayName of user who last modified
   lastModifiedByState?: string; // state of user who last modified
 }
-
-
-export interface UserProfile {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL?: string | null;
-  role: 'admin' | 'user';
-  // You can add other fields like 'state' or 'zone' if needed
-  state?: string;
-}

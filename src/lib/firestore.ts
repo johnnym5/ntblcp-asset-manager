@@ -1,37 +1,10 @@
 
 'use client';
 
-import { doc, getDoc, getDocs, setDoc, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
+import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Asset, UserProfile } from '@/lib/types';
+import type { Asset } from '@/lib/types';
 import type { User } from 'firebase/auth';
-
-// --- User Profile ---
-export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const docRef = doc(db, 'users', uid);
-  const docSnap = await getDoc(docRef);
-  if (docSnap.exists()) {
-    return docSnap.data() as UserProfile;
-  }
-  return null;
-}
-
-export async function createUserProfile(user: User): Promise<UserProfile> {
-  const newUserProfile: UserProfile = {
-    uid: user.uid,
-    email: user.email,
-    displayName: user.displayName,
-    photoURL: user.photoURL,
-    role: 'user', // Default role
-  };
-  await setDoc(doc(db, 'users', user.uid), newUserProfile);
-  return newUserProfile;
-}
-
-export async function updateUserProfile(uid: string, data: Partial<UserProfile>) {
-  const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, data, { merge: true });
-}
 
 // --- Assets ---
 
