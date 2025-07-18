@@ -54,6 +54,7 @@ interface AssetFilterSheetProps {
 }
 
 const fieldsToFilter: { label: string, value: keyof Asset }[] = [
+    { label: 'S/N', value: 'sn' },
     { label: 'Serial Number', value: 'serialNumber' },
     { label: 'Location', value: 'location' },
     { label: 'Assignee', value: 'assignee' },

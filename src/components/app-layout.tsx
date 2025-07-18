@@ -150,6 +150,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const sortableFields: { key: keyof Asset, label: string }[] = [
+      { key: 'sn', label: 'S/N' },
       { key: 'description', label: 'Description' },
       { key: 'category', label: 'Category' },
       { key: 'location', label: 'Location' },
