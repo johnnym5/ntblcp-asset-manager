@@ -4,7 +4,7 @@
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
-import type { Asset, InboxMessageGroup } from '@/lib/types';
+import type { Asset } from '@/lib/types';
 
 
 export interface SortConfig {
@@ -72,9 +72,7 @@ interface AppStateContextType {
   dataActions: DataActions;
   setDataActions: Dispatch<SetStateAction<DataActions>>;
 
-  // Inbox
-  inboxMessages: InboxMessageGroup[];
-  setInboxMessages: Dispatch<SetStateAction<InboxMessageGroup[]>>;
+  // Inbox count for UI display
   unreadInboxCount: number;
   setUnreadInboxCount: Dispatch<SetStateAction<number>>;
 }
@@ -133,7 +131,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
   
-  const [inboxMessages, setInboxMessages] = useState<InboxMessageGroup[]>([]);
   const [unreadInboxCount, setUnreadInboxCount] = useState(0);
 
 
@@ -192,8 +189,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setIsSyncing,
     dataActions,
     setDataActions,
-    inboxMessages,
-    setInboxMessages,
     unreadInboxCount,
     setUnreadInboxCount,
   };

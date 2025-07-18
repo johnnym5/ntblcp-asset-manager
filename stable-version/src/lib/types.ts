@@ -62,20 +62,3 @@ export interface UserProfile {
   // You can add other fields like 'state' or 'zone' if needed
   state?: string;
 }
-
-// New types for detailed inbox
-export interface AssetChange {
-  field: string; // User-friendly field name
-  from: string;
-  to: string;
-  assetId: string;
-  assetDescription: string;
-  category?: string; // The category (sheet name) of the asset
-}
-
-
-export interface InboxMessageGroup {
-  id: string; 
-  asset: Asset;
-  timestamp: string; // ISO String of the event
-}
