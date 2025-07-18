@@ -36,6 +36,7 @@ import {
   CommandItem,
   CommandList,
 } from "@/components/ui/command";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Boxes,
@@ -62,6 +63,7 @@ import {
   CheckCheck,
   X,
   Users,
+  Inbox,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -87,7 +89,7 @@ import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
 import { useTheme } from "next-themes";
 import { Separator } from "./ui/separator";
-import { OnlineUsersSheet } from "./online-users-sheet";
+import { InboxSheet } from "./inbox-sheet";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -103,15 +105,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     setManualSyncTrigger, isSyncing,
     dataActions,
-    onlineUsers,
+    unreadInboxCount
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
-  const [isOnlineUsersSheetOpen, setIsOnlineUsersSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
   const { setTheme } = useTheme();
@@ -132,7 +134,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       title: 'Session Ended',
       description: 'You have been logged out.',
     });
-    router.refresh();
+    router.push('/');
   };
 
   const getInitials = (name: string | null | undefined) => {
@@ -348,12 +350,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuSeparator />
                   
                   {isAdmin && (
-                     <DropdownMenuItem onClick={() => setIsOnlineUsersSheetOpen(true)}>
-                      <Users className="mr-2 h-4 w-4" />
-                      <span>Online Users</span>
-                      {onlineUsers.length > 0 && (
+                     <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
+                      <Inbox className="mr-2 h-4 w-4" />
+                      <span>Inbox</span>
+                      {unreadInboxCount > 0 && (
                         <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white">
-                          {onlineUsers.length}
+                          {unreadInboxCount}
                         </span>
                       )}
                     </DropdownMenuItem>
@@ -416,7 +418,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         missingFieldFilter={missingFieldFilter}
         setMissingFieldFilter={setMissingFieldFilter}
       />
-       <OnlineUsersSheet isOpen={isOnlineUsersSheetOpen} onOpenChange={setIsOnlineUsersSheetOpen} />
+       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
        <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
         <SheetContent className="w-full sm:max-w-sm p-0 flex flex-col">
             <SheetHeader className="p-4">
