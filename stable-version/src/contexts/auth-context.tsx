@@ -5,10 +5,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
 import { clearAssets } from '@/lib/idb';
-import type { UserProfile } from '@/lib/types';
-import { addNotification } from '@/hooks/use-notifications';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, deleteDoc, collection, onSnapshot } from 'firebase/firestore';
+import { auth, db } from '@/lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
 
 
 interface LocalUserProfile {
@@ -21,6 +19,7 @@ interface AuthContextType {
   userProfile: LocalUserProfile | null;
   loading: boolean;
   profileSetupComplete: boolean;
+  authInitialized: boolean;
   updateProfile: (data: { displayName: string; state: string }) => Promise<void>;
   logout: () => void;
 }
@@ -29,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   userProfile: null,
   loading: true,
   profileSetupComplete: false,
+  authInitialized: false,
   updateProfile: async () => {},
   logout: () => {},
 });
@@ -37,40 +37,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
+  const [authInitialized, setAuthInitialized] = useState(false);
+  
   const { 
     setAssets, 
   } = useAppState();
 
   useEffect(() => {
-    let isMounted = true;
-    const loadProfile = () => {
-      try {
-        const savedProfile = localStorage.getItem('ntblcp-user-profile');
-        if (savedProfile) {
-          const profile: LocalUserProfile = JSON.parse(savedProfile);
-          if (profile.displayName) {
-             if (isMounted) {
-                setUserProfile(profile);
-                setProfileSetupComplete(true);
-             }
-          } else {
-            localStorage.removeItem('ntblcp-user-profile');
-          }
-        }
-      } catch (e) {
-        console.error("Failed to load user profile from local storage", e);
-      } finally {
-        if (isMounted) {
+    const unsubscribe = onAuthStateChanged(auth, (user) => {
+        try {
+            const savedProfile = localStorage.getItem('ntblcp-user-profile');
+            if (savedProfile) {
+                const profile: LocalUserProfile = JSON.parse(savedProfile);
+                if (profile.displayName) {
+                    setUserProfile(profile);
+                    setProfileSetupComplete(true);
+                } else {
+                    localStorage.removeItem('ntblcp-user-profile');
+                }
+            }
+        } catch (e) {
+            console.error("Failed to load user profile from local storage", e);
+        } finally {
             setLoading(false);
+            setAuthInitialized(true);
         }
-      }
-    };
-    
-    loadProfile();
+    });
 
-    return () => {
-        isMounted = false;
-    };
+    return () => unsubscribe();
   }, []);
 
   const updateProfile = async (data: { displayName: string; state: string }) => {
@@ -97,9 +91,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfileSetupComplete(false);
     await clearAssets();
     setAssets([]); 
+    await auth.signOut();
   };
 
-  const value = { userProfile, loading, profileSetupComplete, updateProfile, logout };
+  const value = { userProfile, loading, profileSetupComplete, updateProfile, logout, authInitialized };
 
   return (
     <AuthContext.Provider value={value}>

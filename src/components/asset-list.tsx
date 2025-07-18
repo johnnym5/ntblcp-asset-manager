@@ -171,7 +171,7 @@ export default function AssetList() {
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { userProfile } = useAuth();
+  const { userProfile, authInitialized } = useAuth();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
@@ -213,7 +213,7 @@ export default function AssetList() {
 
   // --- DATA LOADING & SYNC ---
   const performSync = useCallback(async () => {
-    if (!isOnline) return;
+    if (!isOnline || !authInitialized) return;
 
     setIsSyncing(true);
     addNotification({ title: 'Syncing with cloud...' });
@@ -248,7 +248,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, isAdmin, userProfile?.state, setIsOnline, setAssets, setIsSyncing]);
+  }, [isOnline, authInitialized, isAdmin, userProfile?.state, setIsOnline, setAssets, setIsSyncing]);
   
   // Initial data load effect
   useEffect(() => {
@@ -258,21 +258,23 @@ export default function AssetList() {
         setAssets(localAssets);
         setIsLoading(false);
 
-        // After loading local data, trigger a sync if online
-        if (isOnline) {
+        // After loading local data, trigger a sync if online and auth is ready
+        if (isOnline && authInitialized) {
           await performSync();
         }
     };
-    loadInitialData();
-  }, []); // This empty dependency array ensures it runs only once on mount.
+    if(authInitialized) {
+        loadInitialData();
+    }
+  }, [authInitialized]); // This now waits for auth to be initialized.
   
   // Effect for manual or auto-sync triggers
   useEffect(() => {
     // We don't want to run this on the initial manualSyncTrigger value
-    if (manualSyncTrigger > 0 || (isOnline && autoSyncEnabled)) {
+    if ((manualSyncTrigger > 0 || (isOnline && autoSyncEnabled)) && authInitialized) {
         performSync();
     }
-  }, [manualSyncTrigger, isOnline, autoSyncEnabled, performSync]);
+  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync]);
   
   
   useEffect(() => {
@@ -1189,6 +1191,7 @@ export default function AssetList() {
     </div>
   );
 }
+
 
 
 
