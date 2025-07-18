@@ -23,7 +23,6 @@ This application is designed to solve the critical challenge of managing and ver
     *   **Batch Editing**: Select multiple assets and apply changes (like updating location or status) to all of them in a single action.
 *   **Insightful Dashboard**:
     *   The main dashboard provides a high-level overview of asset verification progress with clear, visual progress bars for both the overall status and individual asset categories.
-*   **AI-Ready Backend**: Includes pre-built Genkit flows for AI-powered OCR to extract data from asset labels, laying the groundwork for future scanner integration.
 *   **User Activity Logging**: For admin users, the inbox shows a real-time feed of user logins and logouts, providing valuable oversight.
 
 ### How It Works (Use Cases & Impact)
