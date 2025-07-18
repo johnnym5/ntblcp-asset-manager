@@ -58,7 +58,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Progress } from "@/components/ui/progress";
 
 import { AssetForm, type AssetFormValues } from "./asset-form";
-import type { Asset, AssetChange, InboxMessageGroup } from "@/lib/types";
+import type { Asset } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
 import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
@@ -242,6 +242,7 @@ export default function AssetList() {
         
         addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
     } catch (error) {
+        console.error("Sync failed:", error);
         addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
         setIsOnline(false); // Go offline on major failure
     } finally {
@@ -263,14 +264,15 @@ export default function AssetList() {
         }
     };
     loadInitialData();
-  }, []); // Runs only once on component mount
+  }, []); // This empty dependency array ensures it runs only once on mount.
   
-  // Effect for manual or auto-sync triggers after initial load
+  // Effect for manual or auto-sync triggers
   useEffect(() => {
-    if (manualSyncTrigger > 0 || (autoSyncEnabled && isOnline)) {
-      performSync();
+    // We don't want to run this on the initial manualSyncTrigger value
+    if (manualSyncTrigger > 0 || (isOnline && autoSyncEnabled)) {
+        performSync();
     }
-  }, [manualSyncTrigger, autoSyncEnabled, isOnline, performSync]);
+  }, [manualSyncTrigger, isOnline, autoSyncEnabled, performSync]);
   
   
   useEffect(() => {
@@ -1187,5 +1189,6 @@ export default function AssetList() {
     </div>
   );
 }
+
 
 
