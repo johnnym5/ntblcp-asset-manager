@@ -3,12 +3,8 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAppState } from './app-state-context';
-import { db } from '@/lib/firebase';
-import { doc, setDoc, onSnapshot, collection, deleteDoc } from 'firebase/firestore';
 import { v4 as uuidv4 } from 'uuid';
 import { clearAssets } from '@/lib/idb';
-import type { OnlineUser, InboxMessageGroup } from '@/lib/types';
-import { addNotification } from '@/hooks/use-notifications';
 
 interface LocalUserProfile {
   id: string; // Unique ID for this user session
@@ -38,8 +34,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const { 
     setGlobalStateFilter, 
-    isOnline,
     setAssets, 
+    setInboxMessages,
+    setUnreadInboxCount,
   } = useAppState();
 
   useEffect(() => {
@@ -95,15 +92,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    if (isOnline && userProfile) {
-        await deleteDoc(doc(db, 'user-status', userProfile.id));
-    }
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
     setProfileSetupComplete(false);
     setGlobalStateFilter('');
     await clearAssets();
     setAssets([]); 
+    setInboxMessages([]);
+    setUnreadInboxCount(0);
   };
 
   const value = { userProfile, loading, profileSetupComplete, updateProfile, logout };

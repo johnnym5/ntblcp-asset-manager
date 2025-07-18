@@ -4,7 +4,7 @@
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
-import type { Asset, InboxMessageGroup, OnlineUser } from '@/lib/types';
+import type { Asset, InboxMessageGroup } from '@/lib/types';
 
 
 export interface SortConfig {
