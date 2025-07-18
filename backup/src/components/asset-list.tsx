@@ -60,7 +60,7 @@ import { Progress } from "@/components/ui/progress";
 import { AssetForm, type AssetFormValues } from "./asset-form";
 import type { Asset, AssetChange, InboxMessageGroup } from "@/lib/types";
 import { addNotification } from "@/hooks/use-notifications";
-import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
+import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
@@ -127,6 +127,42 @@ const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean 
     return false;
 };
 
+const StateProgress: React.FC<{ state: string, allAssets: Asset[] }> = ({ state, allAssets }) => {
+  const stateAssets = useMemo(() => {
+    const lowerCaseState = state.toLowerCase();
+    const capitalCity = NIGERIAN_STATE_CAPITALS[state]?.toLowerCase().trim();
+    return allAssets.filter(asset => {
+      const assetLocation = (asset.location || "").toLowerCase().trim();
+      const matchesState = assetLocation.startsWith(lowerCaseState);
+      const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+      return matchesState || matchesCapital;
+    });
+  }, [state, allAssets]);
+
+  const total = stateAssets.length;
+  if (total === 0) {
+    return (
+      <div className="flex justify-between items-center w-full">
+        <span>{state}</span>
+        <span className="text-xs text-muted-foreground">0 assets</span>
+      </div>
+    );
+  }
+
+  const verified = stateAssets.filter(a => a.verifiedStatus === 'Verified').length;
+  const percentage = (verified / total) * 100;
+
+  return (
+    <div className="flex flex-col w-full gap-1">
+      <div className="flex justify-between items-center w-full text-sm">
+        <span>{state}</span>
+        <span className="text-xs font-mono">{verified} / {total} verified</span>
+      </div>
+      <Progress value={percentage} className="h-1.5" />
+    </div>
+  );
+};
+
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -152,12 +188,12 @@ export default function AssetList() {
   const {
     assets, setAssets, isOnline, setIsOnline, globalStateFilter, setGlobalStateFilter,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
-    setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     locationOptions, setLocationOptions, assigneeOptions, setAssigneeOptions, statusOptions, setStatusOptions,
     sortConfig, setSortConfig, enabledSheets, setEnabledSheets, lockAssetList,
     manualSyncTrigger, setManualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
     searchTerm,
+    autoSyncEnabled,
   } = useAppState();
 
   const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
@@ -176,58 +212,66 @@ export default function AssetList() {
   }, [view]);
 
   // --- DATA LOADING & SYNC ---
+  const performSync = useCallback(async () => {
+    if (!isOnline) return;
+
+    setIsSyncing(true);
+    addNotification({ title: 'Syncing with cloud...' });
+
+    try {
+        const cloudAssets = await getAssets();
+        const localAssets = await getLocalAssetsFromDb();
+        const assetsToPush = localAssets.filter(asset => asset.syncStatus === 'local');
+
+        if (assetsToPush.length > 0) {
+          await batchSetAssets(assetsToPush);
+        }
+        
+        let finalAssets: Asset[];
+        if (isAdmin) {
+            finalAssets = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' }));
+        } else {
+            const userStateLower = (userProfile?.state || '').toLowerCase();
+            finalAssets = cloudAssets
+                .filter(asset => (asset.location || '').toLowerCase().includes(userStateLower))
+                .map(asset => ({ ...asset, syncStatus: 'synced' }));
+        }
+
+        await saveAssets(finalAssets);
+        setAssets(finalAssets);
+        
+        addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
+    } catch (error) {
+        addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
+        setIsOnline(false); // Go offline on major failure
+    } finally {
+        setIsSyncing(false);
+    }
+  }, [isOnline, isAdmin, userProfile?.state, setIsOnline, setAssets, setIsSyncing]);
+  
+  // Initial data load effect
   useEffect(() => {
     const loadInitialData = async () => {
         setIsLoading(true);
         const localAssets = await getLocalAssetsFromDb();
         setAssets(localAssets);
         setIsLoading(false);
-    };
-    loadInitialData();
-  }, [setAssets]);
 
-
-  // Combined Sync Effect
-  useEffect(() => {
-    if (!isOnline || manualSyncTrigger === 0) return;
-
-    const performSync = async () => {
-        setIsSyncing(true);
-        addNotification({ title: 'Syncing with cloud...' });
-
-        try {
-            const cloudAssets = await getAssets();
-            const localAssets = await getLocalAssetsFromDb();
-            const assetsToPush = localAssets.filter(asset => asset.syncStatus === 'local');
-
-            if (assetsToPush.length > 0) {
-              await batchSetAssets(assetsToPush);
-            }
-            
-            let finalAssets: Asset[];
-            if (isAdmin) {
-                finalAssets = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' }));
-            } else {
-                finalAssets = cloudAssets
-                    .filter(asset => (asset.location || '').toLowerCase().includes((userProfile?.state || '').toLowerCase()))
-                    .map(asset => ({ ...asset, syncStatus: 'synced' }));
-            }
-
-            await saveAssets(finalAssets);
-            setAssets(finalAssets);
-            
-            addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
-        } catch (error) {
-            addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
-            setIsOnline(false); // Go offline on major failure
-        } finally {
-            setIsSyncing(false);
+        // After loading local data, trigger a sync if online
+        if (isOnline) {
+          await performSync();
         }
     };
-    
-    performSync();
-    
-  }, [isOnline, manualSyncTrigger, isAdmin, userProfile?.state, setIsOnline, setIsSyncing, setAssets]);
+    loadInitialData();
+  }, []); // Runs only once on component mount
+  
+  // Effect for manual or auto-sync triggers after initial load
+  useEffect(() => {
+    if (manualSyncTrigger > 0 || (autoSyncEnabled && isOnline)) {
+      performSync();
+    }
+  }, [manualSyncTrigger, autoSyncEnabled, isOnline, performSync]);
+  
   
   useEffect(() => {
     setStatusOptions([
@@ -450,7 +494,7 @@ export default function AssetList() {
         } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
             updatedAsset.verifiedDate = '';
         }
-        return updatedAsset;
+        return sanitizeForFirestore(updatedAsset);
     });
 
     let currentAssets = await getLocalAssetsFromDb();
@@ -468,13 +512,13 @@ export default function AssetList() {
 
     // If it's a new asset or if details have changed for an existing asset
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
-      const finalAsset: Asset = {
+      const finalAsset: Asset = sanitizeForFirestore({
         ...assetToSave,
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
         syncStatus: 'local',
-      };
+      });
       
       const currentAssets = await getLocalAssetsFromDb();
       const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
@@ -502,14 +546,14 @@ export default function AssetList() {
         return; // No changes, do nothing.
     }
 
-    const updatedAsset: Asset = { 
+    const updatedAsset: Asset = sanitizeForFirestore({ 
         ...asset, 
         ...data, 
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
         syncStatus: 'local',
-    };
+    });
 
     const currentAssets = await getLocalAssetsFromDb();
     const existingIndex = currentAssets.findIndex(a => a.id === assetId);
@@ -696,7 +740,7 @@ export default function AssetList() {
             } else if (data.status !== 'Verified') {
                 updatedAsset.verifiedDate = '';
             }
-            return updatedAsset;
+            return sanitizeForFirestore(updatedAsset);
         });
         
         let currentAssets = await getLocalAssetsFromDb();
@@ -758,9 +802,10 @@ export default function AssetList() {
 
   // DASHBOARD VIEW
   if (view === 'dashboard') {
-    const totalStateAssets = displayedAssets.length;
+    const totalAssetsInScope = stateFilteredAssets.length;
+    const currentlyDisplayedAssets = displayedAssets.length;
     const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
-    const verificationPercentage = totalStateAssets > 0 ? (verifiedStateAssets / totalStateAssets) * 100 : 0;
+    const verificationPercentage = currentlyDisplayedAssets > 0 ? (verifiedStateAssets / currentlyDisplayedAssets) * 100 : 0;
     const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
     
@@ -820,7 +865,9 @@ export default function AssetList() {
                             <SelectGroup>
                                 <SelectLabel>States</SelectLabel>
                                 {NIGERIAN_STATES.map((state) => (
-                                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                                    <SelectItem key={state} value={state}>
+                                      <StateProgress state={state} allAssets={assets} />
+                                    </SelectItem>
                                 ))}
                             </SelectGroup>
                         </SelectContent>
@@ -848,8 +895,8 @@ export default function AssetList() {
              <CardContent className="pt-2 space-y-2">
                 <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
                 <p className="text-sm text-muted-foreground">
-                    <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{totalStateAssets}</span> assets verified.
-                    {isFiltered && ` (across ${Object.keys(assetsByCategory).length} categories)`}
+                  <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{currentlyDisplayedAssets}</span> assets verified.
+                  {isFiltered && ` (Showing from a total of ${totalAssetsInScope})`}
                 </p>
             </CardContent>
         </Card>
@@ -1140,3 +1187,5 @@ export default function AssetList() {
     </div>
   );
 }
+
+
