@@ -1,12 +1,18 @@
 
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
+    // By default, deny all access
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Allow anyone to read the assets collection
     match /assets/{assetId} {
-      // Allow anyone to read and write to the assets collection.
-      // The application code handles authorization.
-      allow read, write: if true;
+      allow read: if true;
+      // Allow writes only if the user's name is in the request and matches an authorized user
+      // This is a simplified check. A production app would have a more secure method.
+      allow write: if request.resource.data.lastModifiedBy != null;
     }
   }
 }

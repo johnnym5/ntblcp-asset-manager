@@ -59,7 +59,7 @@ import { Progress } from "@/components/ui/progress";
 
 import { AssetForm, type AssetFormValues } from "./asset-form";
 import type { Asset } from "@/lib/types";
-import { addNotification } from "@/hooks/use-notifications";
+import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
@@ -70,6 +70,7 @@ import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
+import { addNotification } from "@/hooks/use-notifications";
 
 
 const ITEMS_PER_PAGE = 25;
@@ -172,6 +173,7 @@ export default function AssetList() {
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const { userProfile, authInitialized } = useAuth();
+  const { toast } = useToast();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
@@ -196,7 +198,8 @@ export default function AssetList() {
     autoSyncEnabled,
   } = useAppState();
 
-  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
+  const isAdmin = userProfile?.isAdmin || false;
+  const isGuest = !userProfile; // A user is a guest if there is no profile
 
   useEffect(() => {
     setCurrentPage(1);
@@ -213,7 +216,7 @@ export default function AssetList() {
 
   // --- DATA LOADING & SYNC ---
   const performSync = useCallback(async () => {
-    if (!isOnline || !authInitialized) return;
+    if (!isOnline) return;
 
     setIsSyncing(true);
     addNotification({ title: 'Syncing with cloud...' });
@@ -224,31 +227,37 @@ export default function AssetList() {
         const assetsToPush = localAssets.filter(asset => asset.syncStatus === 'local');
 
         if (assetsToPush.length > 0) {
-          await batchSetAssets(assetsToPush);
+          if (isGuest) {
+            toast({
+              title: "Sync Blocked",
+              description: "You are in guest mode. Changes cannot be saved to the cloud.",
+              variant: "destructive",
+            });
+          } else {
+            await batchSetAssets(assetsToPush);
+          }
         }
         
-        let finalAssets: Asset[];
-        if (isAdmin) {
-            finalAssets = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' }));
-        } else {
-            const userStateLower = (userProfile?.state || '').toLowerCase();
-            finalAssets = cloudAssets
-                .filter(asset => (asset.location || '').toLowerCase().includes(userStateLower))
-                .map(asset => ({ ...asset, syncStatus: 'synced' }));
-        }
-
+        let finalAssets: Asset[] = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' }));
+        
         await saveAssets(finalAssets);
         setAssets(finalAssets);
         
         addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
     } catch (error) {
         console.error("Sync failed:", error);
-        addNotification({ title: 'Sync Failed', description: (error as Error).message, variant: 'destructive' });
+        toast({
+          title: "Sync Failed",
+          description: (error as Error).message.includes('permission-denied')
+            ? 'Permission denied. Your name may not be authorized for this action.'
+            : (error as Error).message,
+          variant: 'destructive'
+        });
         setIsOnline(false); // Go offline on major failure
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, authInitialized, isAdmin, userProfile?.state, setIsOnline, setAssets, setIsSyncing]);
+  }, [isOnline, isGuest, toast, setIsOnline, setAssets, setIsSyncing]);
   
   // Initial data load effect
   useEffect(() => {
@@ -258,23 +267,20 @@ export default function AssetList() {
         setAssets(localAssets);
         setIsLoading(false);
 
-        // After loading local data, trigger a sync if online and auth is ready
-        if (isOnline && authInitialized) {
+        // After loading local data, trigger a sync if online
+        if (isOnline) {
           await performSync();
         }
     };
-    if(authInitialized) {
-        loadInitialData();
-    }
-  }, [authInitialized]); // This now waits for auth to be initialized.
+    loadInitialData();
+  }, []); 
   
   // Effect for manual or auto-sync triggers
   useEffect(() => {
-    // We don't want to run this on the initial manualSyncTrigger value
-    if ((manualSyncTrigger > 0 || (isOnline && autoSyncEnabled)) && authInitialized) {
+    if ((manualSyncTrigger > 0 || (isOnline && autoSyncEnabled))) {
         performSync();
     }
-  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync]);
+  }, [manualSyncTrigger, isOnline, autoSyncEnabled, performSync]);
   
   
   useEffect(() => {
@@ -399,6 +405,10 @@ export default function AssetList() {
 
 
   const handleAddAsset = useCallback(() => {
+    if (isGuest) {
+      toast({ title: "Guest Mode", description: "You cannot add assets as a guest.", variant: "destructive" });
+      return;
+    }
     if (lockAssetList) {
       addNotification({ title: "Asset List Locked", description: "Adding new assets is disabled. This can be changed in settings by an admin.", variant: "destructive" });
       return;
@@ -406,22 +416,26 @@ export default function AssetList() {
     setSelectedAsset(undefined);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  }, [lockAssetList]);
+  }, [lockAssetList, isGuest, toast]);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
-    setIsFormReadOnly(true);
+    setIsFormReadOnly(isGuest); // Read-only for guests
     setIsFormOpen(true);
   };
 
   const handleEditAsset = (asset: Asset) => {
+    if (isGuest) {
+      toast({ title: "Guest Mode", description: "You cannot edit assets as a guest.", variant: "destructive" });
+      return;
+    }
     setSelectedAsset(asset);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
   };
   
   const handleDeleteConfirm = async () => {
-    if (!assetToDelete) return;
+    if (!assetToDelete || isGuest) return;
 
     if (lockAssetList) {
         addNotification({ title: "Deletion Disabled", description: "The asset list is locked and cannot be modified.", variant: "destructive" });
@@ -429,19 +443,18 @@ export default function AssetList() {
         return;
     }
 
-    // This logic handles both online and offline deletion correctly now
     const currentAssets = await getLocalAssetsFromDb();
     const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
     await saveAssets(updatedAssets);
     setAssets(updatedAssets);
-    addNotification({ title: 'Deleted Locally', description: `Asset "${assetToDelete.description}" removed. It will be deleted from the cloud on the next sync.` });
+    addNotification({ title: 'Deleted Locally', description: `Asset "${assetToDelete.description}" removed.` });
 
     if (isOnline) {
       try {
         await deleteAsset(assetToDelete.id);
         addNotification({ title: 'Deleted from Cloud', description: 'Asset also removed from the central database.' });
       } catch (e) {
-        addNotification({ title: 'Cloud Deletion Failed', description: 'Could not delete from cloud. It will be re-attempted on the next full sync.', variant: 'destructive'});
+        addNotification({ title: 'Cloud Deletion Failed', description: 'Could not delete from cloud.', variant: 'destructive'});
       }
     }
 
@@ -450,8 +463,9 @@ export default function AssetList() {
   }
 
   const handleBatchDelete = async () => {
+    if (isGuest) return;
     if (lockAssetList) {
-        addNotification({ title: "Deletion Disabled", description: "The asset list is locked and cannot be modified.", variant: "destructive" });
+        addNotification({ title: "Deletion Disabled", description: "The asset list is locked.", variant: "destructive" });
         return;
     }
     
@@ -462,7 +476,7 @@ export default function AssetList() {
     currentAssets = currentAssets.filter(a => !selectedAssetIds.includes(a.id));
     await saveAssets(currentAssets);
     setAssets(currentAssets);
-    addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted. They will be removed from the cloud on next sync.` });
+    addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted.` });
 
     if (isOnline) {
         try {
@@ -477,9 +491,16 @@ export default function AssetList() {
     setIsBatchDeleting(false);
   }
 
-  const handleBatchEdit = () => setIsBatchEditOpen(true);
+  const handleBatchEdit = () => {
+    if (isGuest) {
+      toast({ title: "Guest Mode", description: "You cannot batch edit as a guest.", variant: "destructive" });
+      return;
+    }
+    setIsBatchEditOpen(true);
+  }
   
   const handleSaveBatchEdit = async (data: BatchUpdateData) => {
+    if (isGuest) return;
     const assetsToUpdateCount = selectedAssetIds.length;
     addNotification({ title: 'Batch Updating...', description: `Applying changes to ${assetsToUpdateCount} assets.` });
 
@@ -506,15 +527,15 @@ export default function AssetList() {
     currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
     await saveAssets(currentAssets);
     setAssets(currentAssets);
-    addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets. They will be synced on the next connection.` });
+    addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets.` });
     
     setSelectedAssetIds([]);
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
+    if (isGuest) return;
     const originalAsset = assets.find(a => a.id === assetToSave.id);
 
-    // If it's a new asset or if details have changed for an existing asset
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
       const finalAsset: Asset = sanitizeForFirestore({
         ...assetToSave,
@@ -533,21 +554,21 @@ export default function AssetList() {
       }
       await saveAssets(currentAssets);
       setAssets(currentAssets);
-      addNotification({ title: 'Saved Locally', description: 'Changes will be synced on the next connection.' });
+      addNotification({ title: 'Saved Locally', description: 'Changes will be synced with the cloud.' });
     } else {
-        addNotification({ title: 'No Changes Detected', description: 'The asset was not saved as no changes were made.' });
+        addNotification({ title: 'No Changes Detected', description: 'The asset was not saved.' });
     }
     
     setIsFormOpen(false);
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
+    if(isGuest) return;
     const asset = assets.find(a => a.id === assetId);
     if (!asset) return;
 
-    // Check if there are actual changes
     if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus) {
-        return; // No changes, do nothing.
+        return;
     }
 
     const updatedAsset: Asset = sanitizeForFirestore({ 
@@ -568,14 +589,21 @@ export default function AssetList() {
     }
   };
 
-  const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
+  const handleImportClick = useCallback(() => {
+    if (isGuest) {
+      toast({ title: "Guest Mode", description: "You cannot import data as a guest.", variant: "destructive" });
+      return;
+    }
+    fileInputRef.current?.click()
+  }, [isGuest, toast]);
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (isGuest) return;
     const file = event.target.files?.[0];
     if (!file) return;
 
     setIsImporting(true);
-    addNotification({ title: "Parsing file...", description: "Please wait while we process your Excel file." });
+    addNotification({ title: "Parsing file...", description: "Please wait..." });
     
     const baseAssets = await getLocalAssetsFromDb();
 
@@ -604,10 +632,10 @@ export default function AssetList() {
         
         await saveAssets(combinedAssets);
         setAssets(combinedAssets);
-        addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved. Sync when you go online.` });
+        addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved.` });
         
     } else if (errors.length === 0) {
-        addNotification({ title: "No Changes Detected", description: "No new or updated assets were found in the file."});
+        addNotification({ title: "No Changes Detected", description: "No new or updated assets were found."});
     }
 
     if (fileInputRef.current) fileInputRef.current.value = "";
@@ -619,12 +647,11 @@ export default function AssetList() {
     const assetsToExport = displayedAssets.filter(asset => categories.includes(asset.category));
 
     if (assetsToExport.length === 0) {
-      addNotification({ title: "No Data to Export", description: "There are no assets in the selected categories to export." });
+      addNotification({ title: "No Data to Export", description: "There are no assets in the selected categories." });
       return;
     }
     try {
-      const isAdminUser = userProfile?.displayName?.trim().toLowerCase() === 'admin';
-      const exportPrefix = isAdminUser ? 'admin' : userProfile?.state || 'assets';
+      const exportPrefix = userProfile?.state || 'guest-export';
       let fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
       
       if(categoriesToExport && categoriesToExport.length > 0){
@@ -664,13 +691,14 @@ export default function AssetList() {
   };
 
   const handleClearAllAssets = useCallback(async () => {
+    if (isGuest) return;
     setIsClearAllDialogOpen(false);
     
-    addNotification({ title: 'Clearing Local Assets...', description: 'Removing all assets from your device.' });
+    addNotification({ title: 'Clearing Local Assets...', description: 'Removing all assets from this device.' });
     await clearLocalAssets();
     setAssets([]);
     setSelectedAssetIds([]);
-    addNotification({ title: 'Local Data Cleared', description: 'All assets have been removed from this device.' });
+    addNotification({ title: 'Local Data Cleared', description: 'All assets removed from this device.' });
     
     if (isOnline && isAdmin) {
         addNotification({ title: 'Clearing Database...', description: `This will remove all assets.` });
@@ -685,9 +713,15 @@ export default function AssetList() {
             addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
         }
     }
-  }, [isOnline, isAdmin, setAssets]);
+  }, [isOnline, isAdmin, setAssets, isGuest]);
 
-  const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
+  const handleClearAllClick = useCallback(() => {
+    if (isGuest) {
+      toast({ title: "Guest Mode", description: "You cannot clear assets as a guest.", variant: "destructive" });
+      return;
+    }
+    setIsClearAllDialogOpen(true)
+  }, [isGuest, toast]);
   
   useEffect(() => {
     setDataActions({
@@ -715,6 +749,7 @@ export default function AssetList() {
   ]);
   
   const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
+    if (isGuest) return;
     let assetsToUpdate: Asset[] = [];
     selectedCategories.forEach(category => {
         assetsToUpdate.push(...(assetsByCategory[category] || []));
@@ -759,6 +794,7 @@ export default function AssetList() {
   };
 
   const handleDeleteSelectedCategories = async () => {
+    if (isGuest) return;
     let idsToDelete: string[] = [];
     selectedCategories.forEach(category => {
       const assetIds = (assetsByCategory[category] || []).map(a => a.id);
@@ -778,14 +814,14 @@ export default function AssetList() {
     currentAssets = currentAssets.filter(a => !idsToDelete.includes(a.id));
     await saveAssets(currentAssets);
     setAssets(currentAssets);
-    addNotification({ title: 'Deleted Locally', description: `${idsToDelete.length} assets in selected categories deleted.` });
+    addNotification({ title: 'Deleted Locally', description: `${idsToDelete.length} assets deleted.` });
 
     if (isOnline) {
         try {
             await batchDeleteAssets(idsToDelete);
-            addNotification({ title: 'Categories Deleted', description: `Successfully removed ${idsToDelete.length} assets from the cloud.` });
+            addNotification({ title: 'Categories Deleted', description: `Successfully removed ${idsToDelete.length} assets.` });
         } catch (e) {
-            addNotification({ title: 'Error', description: 'Could not delete all assets in categories from cloud.', variant: 'destructive' });
+            addNotification({ title: 'Error', description: 'Could not delete all assets from cloud.', variant: 'destructive' });
         }
     }
 
@@ -797,7 +833,7 @@ export default function AssetList() {
     if (!isOnline) {
         return "This action cannot be undone. This will permanently delete all asset records from your local device storage.";
     }
-    return `You are in Admin Mode. This action cannot be undone. This will permanently delete ALL asset records from both the central database and your local device, resetting the application for ALL users.`;
+    return `You are in Admin Mode. This will permanently delete ALL asset records from both the central database and your local device.`;
   }, [isOnline]);
 
   if (isLoading) {
@@ -823,7 +859,7 @@ export default function AssetList() {
             {selectedCategories.length > 0 && (
                  <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
-                    <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)}>
+                    <Button variant="outline" size="sm" onClick={handleBatchEdit}>
                         <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => handleExportClick(selectedCategories)}>
@@ -893,6 +929,7 @@ export default function AssetList() {
                         checked={areAllCategoriesSelected}
                         onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)}
                         aria-label="Select all categories"
+                        disabled={isGuest}
                     />
                 </div>
             </CardHeader>
@@ -920,6 +957,7 @@ export default function AssetList() {
                                   checked={isSelected}
                                   onCheckedChange={(checked) => handleSelectCategory(category, checked as boolean)}
                                   aria-label={`Select category ${category}`}
+                                  disabled={isGuest}
                                 />
                             </CardHeader>
                             <CardContent className="flex-grow space-y-4">
@@ -1027,6 +1065,7 @@ export default function AssetList() {
                               checked={areAllCategoryResultsSelected}
                               onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
                               aria-label="Select all in this category"
+                              disabled={isGuest}
                           />
                       </TableHead>
                       <TableHead>S/N</TableHead>
@@ -1047,6 +1086,7 @@ export default function AssetList() {
                                   checked={selectedAssetIds.includes(asset.id)}
                                   onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
                                   aria-label={`Select asset ${asset.description}`}
+                                  disabled={isGuest}
                               />
                           </TableCell>
                           <TableCell>{asset.sn || 'N/A'}</TableCell>
@@ -1084,17 +1124,14 @@ export default function AssetList() {
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <Select
                               value={asset.verifiedStatus || "Unverified"}
+                              disabled={isGuest}
                               onValueChange={async (status) => {
-                                const verifiedDate =
-                                  status === "Verified"
-                                    ? new Date().toLocaleDateString("en-CA")
-                                    : "";
                                 await handleQuickSaveAsset(asset.id, {
                                   verifiedStatus: status as any,
-                                  verifiedDate,
+                                  verifiedDate: status === "Verified" ? new Date().toLocaleDateString("en-CA") : "",
                                   remarks: asset.remarks
                                 });
-                                addNotification({
+                                toast({
                                   title: "Status Updated",
                                   description: `Asset status changed to ${status}.`,
                                 });
@@ -1128,7 +1165,7 @@ export default function AssetList() {
                           <TableCell>{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</TableCell>
                           <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                               <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
                                       <Edit className="mr-2 h-4 w-4" />
@@ -1191,7 +1228,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-
-
-
