@@ -4,9 +4,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
-import { clearAssets } from '@/lib/idb';
-import { auth, db } from '@/lib/firebase';
-import { onAuthStateChanged } from 'firebase/auth';
 import { AUTHORIZED_USERS } from '@/lib/authorized-users';
 
 
@@ -46,31 +43,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   } = useAppState();
 
   useEffect(() => {
-    // This app doesn't use Firebase Auth for users, but we still need to wait for the SDK to be ready.
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-        try {
-            const savedProfile = localStorage.getItem('ntblcp-user-profile');
-            if (savedProfile) {
-                const profile: LocalUserProfile = JSON.parse(savedProfile);
-                const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === profile.displayName.toLowerCase());
-                
-                if (authorizedUser) {
-                    setUserProfile(profile);
-                    setProfileSetupComplete(true);
-                } else {
-                    // The saved user is no longer authorized. Clear the profile.
-                    localStorage.removeItem('ntblcp-user-profile');
-                }
+    // This app no longer uses Firebase Auth. We just check for a local profile.
+    try {
+        const savedProfile = localStorage.getItem('ntblcp-user-profile');
+        if (savedProfile) {
+            const profile: LocalUserProfile = JSON.parse(savedProfile);
+            const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === profile.displayName.toLowerCase());
+            
+            if (authorizedUser) {
+                setUserProfile(profile);
+                setProfileSetupComplete(true);
+            } else {
+                // The saved user is no longer authorized. Clear the profile.
+                localStorage.removeItem('ntblcp-user-profile');
             }
-        } catch (e) {
-            console.error("Failed to load user profile from local storage", e);
-        } finally {
-            setLoading(false);
-            setAuthInitialized(true);
         }
-    });
-
-    return () => unsubscribe();
+    } catch (e) {
+        console.error("Failed to load user profile from local storage", e);
+    } finally {
+        setLoading(false);
+        setAuthInitialized(true); // We are "initialized" as soon as we check local storage.
+    }
   }, []);
 
   const updateProfile = async (data: { displayName: string; state: string; }) => {

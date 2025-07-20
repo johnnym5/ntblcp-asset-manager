@@ -1,10 +1,11 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // This rule allows any client to read and write to the assets collection.
-    // The application logic is now responsible for filtering data based on the logged-in user's state.
     match /assets/{assetId} {
+      // Allow anyone to read and write to the assets collection.
+      // The application code handles authorization.
       allow read, write: if true;
     }
   }

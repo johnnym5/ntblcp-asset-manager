@@ -44,8 +44,10 @@ export default function UserProfileSetup({ isOpen, onSubmit }: UserProfileSetupP
     const user = AUTHORIZED_USERS.find(u => u.loginName === displayName.trim().toLowerCase());
     if (user) {
       setFoundUser(user);
-      if (user.states.length === 1) {
+      if (user.states.length === 1 && user.states[0] !== 'All') {
         setSelectedState(user.states[0]);
+      } else if (user.loginName === 'admin') {
+        setSelectedState('All');
       } else {
         setSelectedState(''); // Reset if user has multiple states to choose from
       }
@@ -85,7 +87,7 @@ export default function UserProfileSetup({ isOpen, onSubmit }: UserProfileSetupP
             <Label htmlFor="displayName">Full Name</Label>
             <Input 
               id="displayName" 
-              placeholder="E.g., John Doe"
+              placeholder="E.g., John Doe or 'admin'"
               value={displayName} 
               onChange={(e) => setDisplayName(e.target.value)}
             />
@@ -93,7 +95,7 @@ export default function UserProfileSetup({ isOpen, onSubmit }: UserProfileSetupP
           {foundUser && (
             <div className="space-y-2">
               <Label htmlFor="state">Assigned Location</Label>
-              <Select onValueChange={setSelectedState} value={selectedState}>
+              <Select onValueChange={setSelectedState} value={selectedState} disabled={foundUser.states[0] === 'All'}>
                 <SelectTrigger id="state">
                   <SelectValue placeholder="Select a location..." />
                 </SelectTrigger>

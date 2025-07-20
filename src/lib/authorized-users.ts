@@ -8,6 +8,7 @@ export interface AuthorizedUser {
 
 // Note: loginName should be lowercase for case-insensitive matching.
 export const AUTHORIZED_USERS: AuthorizedUser[] = [
+  { displayName: "Admin", loginName: "admin", states: ["All"], isAdmin: true },
   { displayName: "Ann Okagbue", loginName: "ann okagbue", states: ["NTBLCP-PMU"], isAdmin: true },
   { displayName: "Emeka OAGF", loginName: "emeka oagf", states: ["Benue", "Akwa Ibom"], isAdmin: false },
   { displayName: "Steve", loginName: "steve", states: ["Kogi", "Kano"], isAdmin: true },
