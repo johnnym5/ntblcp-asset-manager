@@ -130,11 +130,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const handleLogout = () => {
     logout();
-    addNotification({
-      title: 'Session Ended',
-      description: 'You have been logged out.',
-    });
-    router.push('/');
   };
 
   const getInitials = (name: string | null | undefined) => {
@@ -180,7 +175,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
-  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
+  const isAdmin = userProfile?.isAdmin || false;
 
   return (
     <div className="flex flex-col w-full min-h-screen">
@@ -303,6 +298,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">{getUserName()}</p>
+                      <p className="text-xs text-muted-foreground">{userProfile?.state}</p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />

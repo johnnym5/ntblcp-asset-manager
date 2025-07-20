@@ -13,56 +13,71 @@ import {
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
-  SelectLabel,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS } from '@/lib/constants';
 import { Loader2 } from 'lucide-react';
+import { AUTHORIZED_USERS, type AuthorizedUser } from '@/lib/authorized-users';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { AlertCircle } from 'lucide-react';
 
 interface UserProfileSetupProps {
   isOpen: boolean;
-  onSubmit: (data: { displayName: string; state: string }) => Promise<void>;
+  onSubmit: (data: { displayName: string; state: string; }) => Promise<void>;
   defaultDisplayName?: string | null;
 }
 
-export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName }: UserProfileSetupProps) {
+export default function UserProfileSetup({ isOpen, onSubmit }: UserProfileSetupProps) {
   const [displayName, setDisplayName] = useState('');
   const [selectedState, setSelectedState] = useState<string>('');
   const [isSaving, setIsSaving] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
 
   useEffect(() => {
-    const isAdminUser = displayName.trim().toLowerCase() === 'admin';
-    setIsAdmin(isAdminUser);
-    if (isAdminUser) {
-      setSelectedState(''); // Admin doesn't need a state
+    setError(null);
+    const user = AUTHORIZED_USERS.find(u => u.loginName === displayName.trim().toLowerCase());
+    if (user) {
+      setFoundUser(user);
+      if (user.states.length === 1) {
+        setSelectedState(user.states[0]);
+      } else {
+        setSelectedState(''); // Reset if user has multiple states to choose from
+      }
+    } else {
+      setFoundUser(null);
+      setSelectedState('');
     }
   }, [displayName]);
 
 
   const handleConfirm = async () => {
-    if ((isAdmin && displayName) || (displayName && selectedState)) {
-      setIsSaving(true);
-      await onSubmit({ displayName, state: isAdmin ? '' : selectedState });
-      // The parent component will handle closing the dialog on success
-      setIsSaving(false);
+    if (!foundUser || !selectedState) {
+        setError("Please provide a valid name and select a location.");
+        return;
     }
+    
+    setError(null);
+    setIsSaving(true);
+    await onSubmit({ displayName: foundUser.loginName, state: selectedState });
+    // The parent component will handle closing the dialog on success
+    setIsSaving(false);
   };
+  
+  const isConfirmDisabled = isSaving || !foundUser || !selectedState;
 
   return (
     <AlertDialog open={isOpen}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Complete Your Profile</AlertDialogTitle>
+          <AlertDialogTitle>User Login</AlertDialogTitle>
           <AlertDialogDescription>
-            Please provide your name and assigned location.
+            Please enter your name to access your assigned assets.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <div className="py-4 space-y-4">
@@ -70,11 +85,12 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
             <Label htmlFor="displayName">Full Name</Label>
             <Input 
               id="displayName" 
+              placeholder="E.g., John Doe"
               value={displayName} 
               onChange={(e) => setDisplayName(e.target.value)}
             />
           </div>
-          {!isAdmin && (
+          {foundUser && (
             <div className="space-y-2">
               <Label htmlFor="state">Assigned Location</Label>
               <Select onValueChange={setSelectedState} value={selectedState}>
@@ -82,39 +98,27 @@ export default function UserProfileSetup({ isOpen, onSubmit, defaultDisplayName 
                   <SelectValue placeholder="Select a location..." />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>Special Locations</SelectLabel>
-                    {SPECIAL_LOCATIONS.map((loc) => (
-                      <SelectItem key={loc} value={loc}>
-                        {loc}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectSeparator />
-                  <SelectGroup>
-                    <SelectLabel>Geopolitical Zones</SelectLabel>
-                    {ZONE_NAMES.map((zone) => (
-                      <SelectItem key={zone} value={zone}>
-                        {zone}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectSeparator />
-                  <SelectGroup>
-                    <SelectLabel>States</SelectLabel>
-                    {NIGERIAN_STATES.map((state) => (
+                    {foundUser.states.map((state) => (
                       <SelectItem key={state} value={state}>
                         {state}
                       </SelectItem>
                     ))}
-                  </SelectGroup>
                 </SelectContent>
               </Select>
             </div>
           )}
+          {error && (
+             <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Login Error</AlertTitle>
+                <AlertDescription>
+                    {error}
+                </AlertDescription>
+            </Alert>
+          )}
         </div>
         <AlertDialogFooter>
-          <Button onClick={handleConfirm} disabled={isSaving || !displayName || (!isAdmin && !selectedState)}>
+          <Button onClick={handleConfirm} disabled={isConfirmDisabled}>
             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirm and Continue
           </Button>
