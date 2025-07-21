@@ -5,6 +5,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useAppState } from './app-state-context';
 import { AUTHORIZED_USERS } from '@/lib/authorized-users';
 import type { AuthorizedUser } from '@/lib/authorized-users';
+import { clearAssets as clearLocalAssets, getLocalAssets } from '@/lib/idb';
+
 
 export interface UserProfile extends AuthorizedUser {
   state: string; // The specific state the user is currently logged into.
@@ -15,7 +17,7 @@ interface AuthContextType {
   loading: boolean;
   profileSetupComplete: boolean;
   authInitialized: boolean;
-  login: (profile: { displayName: string; state: string; role: 'admin' | 'user' }) => void;
+  login: (profile: { displayName: string, state: string, role: 'admin' | 'user' }) => void;
   logout: () => void;
 }
 
@@ -74,7 +76,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfileSetupComplete(true);
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await clearLocalAssets();
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
     setProfileSetupComplete(false);

@@ -175,8 +175,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
-  const isAdmin = userProfile?.role === 'admin';
-  const isGuest = userProfile?.role === 'guest';
+  const isAdmin = userProfile?.isAdmin || false;
 
   return (
     <div className="flex flex-col w-full min-h-screen">
@@ -304,8 +303,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                  {pathname === '/assets' && !isGuest && (
-                    <DropdownMenuSub>
+                   <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
                         <Database className="mr-2 h-4 w-4" />
                         Data Management
@@ -327,23 +325,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             Add New Asset
                           </DropdownMenuItem>
                           
-                          {isAdmin && (
-                            <>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:bg-destructive/20 focus:text-destructive"
-                                onClick={dataActions.onClearAll}
-                                disabled={!dataActions.hasAssets}
-                              >
-                                <Trash2 className="mr-2 h-4 w-4" />
-                                Clear All Assets
-                              </DropdownMenuItem>
-                            </>
-                          )}
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:bg-destructive/20 focus:text-destructive"
+                            onClick={dataActions.onClearAll}
+                            disabled={!dataActions.hasAssets}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Clear All Assets
+                          </DropdownMenuItem>
+                          
                         </DropdownMenuSubContent>
                       </DropdownMenuPortal>
                     </DropdownMenuSub>
-                  )}
+
                   {isAdmin && (
                     <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
                       <Settings className="mr-2 h-4 w-4"/>
