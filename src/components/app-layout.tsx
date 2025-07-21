@@ -15,11 +15,8 @@ import {
   DropdownMenuSubTrigger,
   DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -28,29 +25,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Boxes,
   Settings,
   LogOut,
-  User,
   Search,
   Cloud,
   CloudOff,
   Filter,
   ArrowUpDown,
-  Check,
-  ChevronsUpDown,
-  Loader2,
   RefreshCw,
   Database,
   FileDown,
@@ -62,8 +46,8 @@ import {
   Moon,
   CheckCheck,
   X,
-  Users,
   Inbox,
+  HardDrive,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -98,6 +82,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { 
     isOnline, setIsOnline, 
+    dataSource, setDataSource,
     searchTerm, setSearchTerm, 
     sortConfig, setSortConfig,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
@@ -163,7 +148,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
   
   const handleManualSync = () => {
-    if (isSyncing) return;
+    if (isSyncing || !isOnline) return;
     setManualSyncTrigger(c => c + 1);
   };
 
@@ -184,7 +169,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Left Side */}
         <div className="flex items-center gap-2">
             <Boxes className="h-5 w-5 text-primary" />
-            <span className="text-lg font-semibold hidden sm:inline-block">NTBLCP ASSET VERIFICATOR</span>
+            <span className="text-lg font-semibold hidden sm:inline-block">Asset Assist</span>
         </div>
 
         {/* Center */}
@@ -237,49 +222,42 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
+             <div className="flex items-center space-x-2">
+                <TooltipProvider>
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                         <HardDrive className={cn("h-5 w-5", dataSource === 'local' && "text-primary")} />
+                      </TooltipTrigger>
+                      <TooltipContent><p>Local Data</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                <Switch
+                  id="data-source-switch"
+                  checked={dataSource === 'cloud'}
+                  onCheckedChange={(checked) => setDataSource(checked ? 'cloud' : 'local')}
+                  disabled={!isOnline}
+                />
+                <TooltipProvider>
+                   <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Cloud className={cn("h-5 w-5", dataSource === 'cloud' && "text-primary", !isOnline && "text-muted-foreground/50")} />
+                      </TooltipTrigger>
+                      <TooltipContent><p>Cloud Data</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+            </div>
+            
+            <Separator orientation="vertical" className="h-6" />
+
             <TooltipProvider>
               <Tooltip>
                   <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing}>
-                          {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
+                        <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing || !isOnline}>
+                          {isSyncing ? <div className="animate-spin"><RefreshCw className="h-5 w-5" /></div> : <RefreshCw className="h-5 w-5" />}
                       </Button>
                   </TooltipTrigger>
                   <TooltipContent><p>Sync Now</p></TooltipContent>
               </Tooltip>
-            </TooltipProvider>
-
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                                const newIsOnline = !isOnline;
-                                setIsOnline(newIsOnline);
-                                addNotification({
-                                    title: `Mode Changed to ${newIsOnline ? 'Online' : 'Offline'}`,
-                                    description: newIsOnline
-                                        ? 'Application is now connecting to the server.'
-                                        : 'Application is running in offline mode.',
-                                });
-                                if (newIsOnline) {
-                                  setManualSyncTrigger(c => c + 1);
-                                }
-                            }}
-                            aria-label={`Switch to ${isOnline ? 'Offline' : 'Online'} mode`}
-                        >
-                            {isOnline ? (
-                                <Cloud className="h-5 w-5 text-green-500" />
-                            ) : (
-                                <CloudOff className="h-5 w-5 text-red-500" />
-                            )}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>{isOnline ? 'Go Offline' : 'Go Online'}</p>
-                    </TooltipContent>
-                </Tooltip>
             </TooltipProvider>
             
             {loading ? (
@@ -303,14 +281,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                   <DropdownMenuSub>
+                    <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
                         <Database className="mr-2 h-4 w-4" />
                         Data Management
                       </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
-                          {isAdmin && (
+                           {isAdmin && (
                             <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting}>
                               <FileUp className="mr-2 h-4 w-4" />
                               Import from Excel
@@ -338,7 +316,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         </DropdownMenuSubContent>
                       </DropdownMenuPortal>
                     </DropdownMenuSub>
-
                   {isAdmin && (
                     <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
                       <Settings className="mr-2 h-4 w-4"/>

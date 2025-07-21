@@ -188,9 +188,10 @@ export default function AssetList() {
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   
   const {
-    assets, setAssets, isOnline, setIsOnline, globalStateFilter, setGlobalStateFilter,
+    assets, setAssets, isOnline, setIsOnline, dataSource, 
+    globalStateFilter, setGlobalStateFilter,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
-    locationOptions, setLocationOptions, assigneeOptions, setAssigneeOptions, statusOptions, setStatusOptions,
+    setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
     sortConfig, setSortConfig, enabledSheets, setEnabledSheets, lockAssetList,
     manualSyncTrigger, setManualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
@@ -198,8 +199,7 @@ export default function AssetList() {
     autoSyncEnabled,
   } = useAppState();
 
-  const isAdmin = userProfile?.role === 'admin';
-  const isGuest = userProfile?.role === 'guest';
+  const isAdmin = userProfile?.isAdmin || false;
 
   useEffect(() => {
     setCurrentPage(1);
@@ -214,6 +214,7 @@ export default function AssetList() {
     }
   }, [view]);
 
+  // --- DATA LOADING & SYNC ---
   const performSync = useCallback(async () => {
     if (!isOnline || !authInitialized) return;
 
@@ -224,20 +225,14 @@ export default function AssetList() {
         const cloudAssets = await getAssets();
         const localAssets = await getLocalAssetsFromDb();
         const assetsToPush = localAssets.filter(asset => asset.syncStatus === 'local');
-
+        
         if (assetsToPush.length > 0) {
-          if (isGuest) {
-            toast({
-              title: "Guest Mode",
-              description: "Changes cannot be saved to the cloud.",
-              variant: "destructive",
-            });
-          } else {
-            await batchSetAssets(assetsToPush);
-          }
+          await batchSetAssets(assetsToPush);
+          addNotification({ title: 'Local changes pushed', description: `${assetsToPush.length} assets updated in the cloud.`});
         }
         
-        const finalAssets: Asset[] = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' }));
+        // This is a simple sync, it replaces local with cloud data
+        const finalAssets = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' as const }));
         
         await saveAssets(finalAssets);
         setAssets(finalAssets);
@@ -250,11 +245,11 @@ export default function AssetList() {
           description: (error as Error).message,
           variant: 'destructive'
         });
-        setIsOnline(false); // Go offline on major failure
+        setIsOnline(false);
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, isGuest, toast, setIsOnline, setAssets, setIsSyncing, authInitialized]);
+  }, [isOnline, authInitialized, toast, setIsOnline, setAssets, setIsSyncing]);
   
   useEffect(() => {
     const loadInitialData = async () => {
@@ -263,7 +258,7 @@ export default function AssetList() {
         setAssets(localAssets);
         setIsLoading(false);
 
-        if (isOnline) {
+        if (isOnline && authInitialized) {
           await performSync();
         }
     };
@@ -271,13 +266,13 @@ export default function AssetList() {
     if (authInitialized) {
         loadInitialData();
     }
-  }, [authInitialized]); 
+  }, [authInitialized, performSync, setAssets, isOnline]);
   
   useEffect(() => {
-    if ((manualSyncTrigger > 0 || autoSyncEnabled) && isOnline && authInitialized) {
+    if ((manualSyncTrigger > 0 || (autoSyncEnabled && dataSource === 'cloud')) && isOnline && authInitialized) {
         performSync();
     }
-  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync]);
+  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync, dataSource]);
   
   useEffect(() => {
     setStatusOptions([
@@ -316,29 +311,26 @@ export default function AssetList() {
   }, [assets, globalStateFilter, isAdmin]);
   
   useEffect(() => {
-    const locations = new Set<string>();
-    assets.forEach(asset => {
+    const locations = new Map<string, number>();
+    stateFilteredAssets.forEach(asset => {
       const normalized = normalizeAssetLocation(asset.location);
       if (normalized) {
-        locations.add(normalized);
+        locations.set(normalized, (locations.get(normalized) || 0) + 1);
       }
     });
-    setLocationOptions(Array.from(locations).map(l => ({ label: l, value: l })).sort((a, b) => a.label.localeCompare(b.label)));
+    setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })).sort((a, b) => a.label.localeCompare(b.label)));
 
-    const assigneeMap = new Map<string, string>();
-    assets.forEach(asset => {
+    const assigneeMap = new Map<string, number>();
+    stateFilteredAssets.forEach(asset => {
       if (asset.assignee) {
         const assigneeName = asset.assignee.trim();
         if (assigneeName) {
-            const lowerCaseName = assigneeName.toLowerCase();
-            if (!assigneeMap.has(lowerCaseName)) {
-                assigneeMap.set(lowerCaseName, assigneeName);
-            }
+            assigneeMap.set(assigneeName, (assigneeMap.get(assigneeName) || 0) + 1);
         }
       }
     });
-    setAssigneeOptions(Array.from(assigneeMap.values()).map(a => ({ label: a, value: a })).sort((a,b) => a.label.localeCompare(b.label)));
-  }, [assets, setLocationOptions, setAssigneeOptions]);
+    setAssigneeOptions(Array.from(assigneeMap.entries()).map(([a, count]) => ({ label: a, value: a, count })).sort((a,b) => a.label.localeCompare(b.label)));
+  }, [stateFilteredAssets, setLocationOptions, setAssigneeOptions]);
 
 
   const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
@@ -399,39 +391,31 @@ export default function AssetList() {
 
 
   const handleAddAsset = useCallback(() => {
-    if (isGuest) {
-      toast({ title: "Guest Mode", description: "You cannot add assets.", variant: "destructive" });
-      return;
-    }
-    if (lockAssetList) {
-      addNotification({ title: "Asset List Locked", description: "Adding new assets is disabled.", variant: "destructive" });
+    if (lockAssetList && isAdmin) {
+      addNotification({ title: "Asset List Locked", description: "Adding new assets is disabled. This can be changed in settings.", variant: "destructive" });
       return;
     }
     setSelectedAsset(undefined);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  }, [lockAssetList, isGuest, toast]);
+  }, [lockAssetList, isAdmin]);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
-    setIsFormReadOnly(isGuest); 
+    setIsFormReadOnly(true);
     setIsFormOpen(true);
   };
 
   const handleEditAsset = (asset: Asset) => {
-    if (isGuest) {
-      toast({ title: "Guest Mode", description: "You cannot edit assets.", variant: "destructive" });
-      return;
-    }
     setSelectedAsset(asset);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
   };
   
   const handleDeleteConfirm = async () => {
-    if (!assetToDelete || isGuest) return;
+    if (!assetToDelete) return;
 
-    if (lockAssetList) {
+    if (lockAssetList && isAdmin) {
         addNotification({ title: "Deletion Disabled", description: "The asset list is locked.", variant: "destructive" });
         setIsDeleteDialogOpen(false);
         return;
@@ -457,8 +441,7 @@ export default function AssetList() {
   }
 
   const handleBatchDelete = async () => {
-    if (isGuest) return;
-    if (lockAssetList) {
+    if (lockAssetList && isAdmin) {
         addNotification({ title: "Deletion Disabled", description: "The asset list is locked.", variant: "destructive" });
         return;
     }
@@ -485,16 +468,9 @@ export default function AssetList() {
     setIsBatchDeleting(false);
   }
 
-  const handleBatchEdit = () => {
-    if (isGuest) {
-      toast({ title: "Guest Mode", description: "You cannot batch edit.", variant: "destructive" });
-      return;
-    }
-    setIsBatchEditOpen(true);
-  }
+  const handleBatchEdit = () => setIsBatchEditOpen(true);
   
   const handleSaveBatchEdit = async (data: BatchUpdateData) => {
-    if (isGuest) return;
     const assetsToUpdateCount = selectedAssetIds.length;
     addNotification({ title: 'Batch Updating...', description: `Applying changes to ${assetsToUpdateCount} assets.` });
 
@@ -527,7 +503,6 @@ export default function AssetList() {
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    if (isGuest) return;
     const originalAsset = assets.find(a => a.id === assetToSave.id);
 
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
@@ -557,7 +532,6 @@ export default function AssetList() {
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
-    if(isGuest) return;
     const asset = assets.find(a => a.id === assetId);
     if (!asset) return;
 
@@ -583,16 +557,9 @@ export default function AssetList() {
     }
   };
 
-  const handleImportClick = useCallback(() => {
-    if (isGuest) {
-      toast({ title: "Guest Mode", description: "You cannot import data.", variant: "destructive" });
-      return;
-    }
-    fileInputRef.current?.click()
-  }, [isGuest, toast]);
+  const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (isGuest) return;
     const file = event.target.files?.[0];
     if (!file) return;
 
@@ -645,7 +612,7 @@ export default function AssetList() {
       return;
     }
     try {
-      const exportPrefix = userProfile?.state || 'guest-export';
+      const exportPrefix = userProfile?.state || 'user-export';
       let fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
       
       if(categoriesToExport && categoriesToExport.length > 0){
@@ -685,10 +652,9 @@ export default function AssetList() {
   };
 
   const handleClearAllAssets = useCallback(async () => {
-    if (isGuest) return;
     setIsClearAllDialogOpen(false);
     
-    addNotification({ title: 'Clearing Local Assets...', description: 'Removing all assets from this device.' });
+    addNotification({ title: 'Clearing Local Assets...', description: 'Removing all assets from your device.' });
     await clearLocalAssets();
     setAssets([]);
     setSelectedAssetIds([]);
@@ -707,15 +673,9 @@ export default function AssetList() {
             addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
         }
     }
-  }, [isOnline, isAdmin, setAssets, isGuest]);
+  }, [isOnline, isAdmin, setAssets]);
 
-  const handleClearAllClick = useCallback(() => {
-    if (isGuest) {
-      toast({ title: "Guest Mode", description: "You cannot clear assets.", variant: "destructive" });
-      return;
-    }
-    setIsClearAllDialogOpen(true)
-  }, [isGuest, toast]);
+  const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
   useEffect(() => {
     setDataActions({
@@ -743,7 +703,6 @@ export default function AssetList() {
   ]);
   
   const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
-    if (isGuest) return;
     let assetsToUpdate: Asset[] = [];
     selectedCategories.forEach(category => {
         assetsToUpdate.push(...(assetsByCategory[category] || []));
@@ -788,7 +747,6 @@ export default function AssetList() {
   };
 
   const handleDeleteSelectedCategories = async () => {
-    if (isGuest) return;
     let idsToDelete: string[] = [];
     selectedCategories.forEach(category => {
       const assetIds = (assetsByCategory[category] || []).map(a => a.id);
@@ -797,7 +755,7 @@ export default function AssetList() {
 
     if (idsToDelete.length === 0) return;
 
-    if (lockAssetList) {
+    if (lockAssetList && isAdmin) {
         addNotification({ title: "Deletion Disabled", description: "The asset list is locked.", variant: "destructive" });
         return;
     }
@@ -824,11 +782,12 @@ export default function AssetList() {
   }
 
   const clearAllDialogDescription = useMemo(() => {
-    if (!isOnline) {
-        return "This action cannot be undone. This will permanently delete all asset records from your local device storage.";
+    let message = "This will permanently delete all asset records from your local device storage.";
+    if (isAdmin) {
+      message += " As an admin, if you are online, this will ALSO delete all assets from the cloud database, which cannot be undone."
     }
-    return `You are in Admin Mode. This will permanently delete ALL asset records from both the central database and your local device.`;
-  }, [isOnline]);
+    return message;
+  }, [isAdmin, isOnline]);
 
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
@@ -850,7 +809,7 @@ export default function AssetList() {
             <h2 className="text-2xl font-bold tracking-tight flex-1">
                 {isFiltered ? `Filter Results` : 'Asset Dashboard'}
             </h2>
-            {selectedCategories.length > 0 && !isGuest && (
+            {selectedCategories.length > 0 && (
                  <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
                     <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)}>
@@ -869,46 +828,46 @@ export default function AssetList() {
         <Card>
              <CardHeader className="flex-row items-center justify-between">
                 <CardTitle>
-                    {isAdmin ? (
-                        <div className="flex flex-wrap items-center gap-2">
-                            <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
-                            <Select
-                                value={globalStateFilter || 'All'}
-                                onValueChange={(value) => setGlobalStateFilter(value)}
-                            >
-                            <SelectTrigger className="w-full sm:w-[280px]">
-                                <SelectValue placeholder="Select a location..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="All">Overall (All Assets)</SelectItem>
-                                <SelectSeparator />
-                                <SelectGroup>
-                                    <SelectLabel>Special Locations</SelectLabel>
-                                    {SPECIAL_LOCATIONS.map((loc) => (
-                                        <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                                    ))}
-                                </SelectGroup>
-                                <SelectSeparator />
-                                <SelectGroup>
-                                    <SelectLabel>Geopolitical Zones</SelectLabel>
-                                    {ZONE_NAMES.map((zone) => (
-                                        <SelectItem key={zone} value={zone}>{zone}</SelectItem>
-                                    ))}
-                                </SelectGroup>
-                                <SelectSeparator />
-                                <SelectGroup>
-                                    <SelectLabel>States</SelectLabel>
-                                    {NIGERIAN_STATES.map((state) => (
-                                        <SelectItem key={state} value={state}>
-                                          <StateProgress state={state} allAssets={assets} />
-                                        </SelectItem>
-                                    ))}
-                                </SelectGroup>
-                            </SelectContent>
-                            </Select>
-                        </div>
+                    {isAdmin && !isFiltered ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
+                        <Select
+                            value={globalStateFilter || 'All'}
+                            onValueChange={(value) => setGlobalStateFilter(value)}
+                        >
+                        <SelectTrigger className="w-full sm:w-[280px]">
+                            <SelectValue placeholder="Select a location..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="All">Overall (All Assets)</SelectItem>
+                            <SelectSeparator />
+                            <SelectGroup>
+                                <SelectLabel>Special Locations</SelectLabel>
+                                {SPECIAL_LOCATIONS.map((loc) => (
+                                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                                ))}
+                            </SelectGroup>
+                            <SelectSeparator />
+                            <SelectGroup>
+                                <SelectLabel>Geopolitical Zones</SelectLabel>
+                                {ZONE_NAMES.map((zone) => (
+                                    <SelectItem key={zone} value={zone}>{zone}</SelectItem>
+                                ))}
+                            </SelectGroup>
+                            <SelectSeparator />
+                            <SelectGroup>
+                                <SelectLabel>States</SelectLabel>
+                                {NIGERIAN_STATES.map((state) => (
+                                    <SelectItem key={state} value={state}>
+                                      <StateProgress state={state} allAssets={assets} />
+                                    </SelectItem>
+                                ))}
+                            </SelectGroup>
+                        </SelectContent>
+                        </Select>
+                    </div>
                     ) : (
-                        `Asset Verification Status for ${globalStateFilter}`
+                    `Asset Verification Status for ${globalStateFilter || "All Assets"}`
                     )}
                 </CardTitle>
                 <div className="flex items-center space-x-2">
@@ -918,7 +877,6 @@ export default function AssetList() {
                         checked={areAllCategoriesSelected}
                         onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)}
                         aria-label="Select all categories"
-                        disabled={isGuest}
                     />
                 </div>
             </CardHeader>
@@ -946,7 +904,6 @@ export default function AssetList() {
                                   checked={isSelected}
                                   onCheckedChange={(checked) => handleSelectCategory(category, checked as boolean)}
                                   aria-label={`Select category ${category}`}
-                                  disabled={isGuest}
                                 />
                             </CardHeader>
                             <CardContent className="flex-grow space-y-4">
@@ -1023,7 +980,7 @@ export default function AssetList() {
             <h2 className="text-2xl font-bold tracking-tight flex-1">
                 {currentCategory}
             </h2>
-            {selectedAssetIds.length > 0 && !isGuest && (
+            {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
                      {selectedAssetIds.length === 1 && (
@@ -1054,7 +1011,6 @@ export default function AssetList() {
                               checked={areAllCategoryResultsSelected}
                               onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
                               aria-label="Select all in this category"
-                              disabled={isGuest}
                           />
                       </TableHead>
                       <TableHead>S/N</TableHead>
@@ -1075,7 +1031,6 @@ export default function AssetList() {
                                   checked={selectedAssetIds.includes(asset.id)}
                                   onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
                                   aria-label={`Select asset ${asset.description}`}
-                                  disabled={isGuest}
                               />
                           </TableCell>
                           <TableCell>{asset.sn || 'N/A'}</TableCell>
@@ -1113,7 +1068,6 @@ export default function AssetList() {
                           <TableCell onClick={(e) => e.stopPropagation()}>
                             <Select
                               value={asset.verifiedStatus || "Unverified"}
-                              disabled={isGuest}
                               onValueChange={async (status) => {
                                 await handleQuickSaveAsset(asset.id, {
                                   verifiedStatus: status as any,
@@ -1154,7 +1108,7 @@ export default function AssetList() {
                           <TableCell>{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</TableCell>
                           <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                               <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
                                       <Edit className="mr-2 h-4 w-4" />

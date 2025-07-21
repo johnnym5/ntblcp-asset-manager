@@ -22,11 +22,15 @@ export interface DataActions {
   hasAssets?: boolean;
 }
 
+export type DataSource = 'cloud' | 'local';
+
 interface AppStateContextType {
   assets: Asset[];
   setAssets: Dispatch<SetStateAction<Asset[]>>;
   isOnline: boolean;
   setIsOnline: Dispatch<SetStateAction<boolean>>;
+  dataSource: DataSource;
+  setDataSource: Dispatch<SetStateAction<DataSource>>;
   searchTerm: string;
   setSearchTerm: Dispatch<SetStateAction<string>>;
   globalStateFilter: string;
@@ -90,6 +94,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     }
     return false;
   });
+  const [dataSource, setDataSource] = useState<DataSource>('local');
   const [searchTerm, setSearchTerm] = useState('');
   const [globalStateFilter, setGlobalStateFilter] = useState('');
   
@@ -152,6 +157,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
+      if (!isOnline) {
+        setDataSource('local');
+      }
     }
   }, [isOnline]);
 
@@ -160,6 +168,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setAssets,
     isOnline,
     setIsOnline,
+    dataSource,
+    setDataSource,
     searchTerm,
     setSearchTerm,
     globalStateFilter,
