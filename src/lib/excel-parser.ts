@@ -188,7 +188,7 @@ export async function parseExcelFile(
 
         const existingAssetByIdentifiers = new Map<string, Asset>();
         existingAssets.forEach(asset => {
-             const key = `${(asset.assetIdCode || '').trim()}-${(asset.serialNumber || '').trim()}`.toLowerCase();
+             const key = `${String(asset.assetIdCode || '').trim()}-${String(asset.serialNumber || '').trim()}`.toLowerCase();
             if (key !== '-') {
                 existingAssetByIdentifiers.set(key, asset);
             }
@@ -235,8 +235,8 @@ export async function parseExcelFile(
                     }
                 });
 
-                // More flexible check: import if there's at least a description or serial number.
-                if (!assetObject.description && !assetObject.serialNumber) {
+                // If the only populated field is 'category', it's an empty row for our purposes.
+                if (Object.keys(assetObject).length <= 1) {
                     skipped++;
                     continue;
                 }
