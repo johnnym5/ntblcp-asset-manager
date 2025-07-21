@@ -4,7 +4,6 @@ import React from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
-import type { Asset } from '@/lib/types';
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Inbox, User, MapPin, Clock } from 'lucide-react';
