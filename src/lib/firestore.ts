@@ -10,27 +10,30 @@ import type { User } from 'firebase/auth';
 
 export async function createUserProfile(user: User, additionalData: Partial<UserProfile> = {}) {
   const userRef = doc(db, 'users', user.uid);
+  
+  // Start with default values
+  let role: 'admin' | 'user' | 'guest' = 'user';
+  let displayName = user.displayName || 'New User';
+  let state = 'All';
+
+  // Override with specific logic
+  if (user.isAnonymous) {
+    role = 'guest';
+    displayName = 'Guest User';
+  } else if (user.email && ['jegbase@hotmail.com', 'jegbase@gmail.com'].includes(user.email.toLowerCase())) {
+    role = 'admin';
+  }
+
   const profile: UserProfile = {
     uid: user.uid,
-    email: user.email || '',
-    displayName: user.displayName || 'Guest User',
-    role: 'user', // Default to user
-    state: 'All', // Default to all, can be changed by admin
+    email: user.email || null,
+    displayName,
+    role,
+    state,
     ...additionalData,
   };
 
-  // Assign admin role based on email for specified users
-  if (['jegbase@hotmail.com', 'jegbase@gmail.com'].includes(profile.email.toLowerCase())) {
-    profile.role = 'admin';
-  }
-  
-  // Anonymous users are always guests
-  if (user.isAnonymous) {
-      profile.role = 'guest';
-      profile.displayName = 'Guest User';
-  }
-
-  await setDoc(userRef, profile, { merge: true });
+  await setDoc(userRef, profile);
   return profile;
 }
 
