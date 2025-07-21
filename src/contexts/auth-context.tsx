@@ -80,12 +80,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   };
 
   const logout = async () => {
-    await clearLocalAssets();
+    // We don't clear assets on logout anymore to preserve the master list.
+    // await clearLocalAssets();
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
     setProfileSetupComplete(false);
     setGlobalStateFilter('');
-    setAssets([]); 
+    setAssets([]); // Just clear the in-memory state, not the DB
     window.location.reload(); 
   };
 

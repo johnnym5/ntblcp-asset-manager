@@ -96,7 +96,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
   const isAdmin = userProfile?.isAdmin || false;
-  const isGuest = userProfile?.isGuest || false;
   
   const defaultValues = {
     category: '',
@@ -157,7 +156,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
 
 
   const handleQuickSaveClick = async () => {
-    if (!asset || isGuest) return;
+    if (!asset) return;
     setIsQuickSaving(true);
     try {
       const verifiedDate = quickViewStatus === 'Verified' ? new Date().toLocaleDateString('en-CA') : '';
@@ -175,7 +174,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   }
 
   const onSubmit = async (data: AssetFormValues) => {
-    if (isGuest) return;
     setIsSaving(true);
     try {
         const assetToSave: Asset = {
@@ -200,7 +198,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
           <SheetHeader>
             <SheetTitle>Asset Quick View</SheetTitle>
             <SheetDescription>
-              {isGuest ? 'Viewing asset details.' : 'Viewing asset details. Comments and status can be updated here.'}
+              Viewing asset details. Comments and status can be updated here.
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 space-y-6 overflow-y-auto pr-6 py-4">
@@ -227,13 +225,18 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     <ReadOnlyField label="Condition" value={asset.condition} />
                 </div>
                 <div className="space-y-2">
-                    <Label>Remarks/Comments</Label>
-                    <p className="text-sm p-3 bg-muted rounded-md min-h-24 whitespace-pre-wrap">{asset.remarks || <span className="text-muted-foreground/70">N/A</span>}</p>
+                    <Label htmlFor="quick-view-remarks">Remarks/Comments</Label>
+                    <Textarea
+                      id="quick-view-remarks"
+                      value={quickViewRemarks}
+                      onChange={(e) => setQuickViewRemarks(e.target.value)}
+                      className="min-h-24"
+                    />
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div className="space-y-2">
                         <Label htmlFor="quick-view-status">Verified Status</Label>
-                        <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus} disabled={isGuest}>
+                        <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
                             <SelectTrigger id="quick-view-status">
                                 <SelectValue placeholder="Select status" />
                             </SelectTrigger>
@@ -246,12 +249,10 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     </div>
                      <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
                  </div>
-                 {!isGuest && (
-                    <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
-                        {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Save Comments & Status
-                    </Button>
-                 )}
+                <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
+                    {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Comments & Status
+                </Button>
             </div>
             
             <Accordion type="single" collapsible className="w-full pt-4">
@@ -480,7 +481,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
           <SheetClose asChild>
             <Button variant="outline">Close</Button>
           </SheetClose>
-          <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid || isGuest}>
+          <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
           </Button>

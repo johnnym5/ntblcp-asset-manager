@@ -51,3 +51,43 @@ export interface Asset {
   lastModifiedBy?: string; // displayName of user who last modified
   lastModifiedByState?: string; // state of user who last modified
 }
+
+
+export interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL?: string | null;
+  role: 'admin' | 'user' | 'guest';
+  // You can add other fields like 'state' or 'zone' if needed
+  state?: string;
+}
+
+// New types for detailed inbox
+export interface AssetChange {
+  field: string; // User-friendly field name
+  from: string;
+  to: string;
+  assetId: string;
+  assetDescription: string;
+  category?: string; // The category (sheet name) of the asset
+}
+
+export interface ActivityLog {
+    id: string;
+    userName: string;
+    userState: string;
+    activity: 'login' | 'logout';
+    timestamp: string; // ISO 8601 date string
+}
+
+export interface InboxMessageGroup {
+  id: string; // Can be user ID for asset updates, or log ID for activity
+  type: 'asset' | 'activity';
+  updatedBy: string;
+  updatedByState?: string;
+  timestamp: string; // ISO String of the event
+  changes?: AssetChange[];
+  updatedAssets?: Asset[];
+  activityMessage?: string;
+}

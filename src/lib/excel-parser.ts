@@ -326,15 +326,16 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
             }
             row["Verified Status"] = asset.verifiedStatus || 'Unverified';
             row["Verified Date"] = asset.verifiedDate || '';
+            row["Last Modified By"] = asset.lastModifiedBy || '';
+            row["Last Modified Date"] = asset.lastModified ? new Date(asset.lastModified).toLocaleString() : '';
             return row;
         });
 
-        if (!exportHeaders.includes("Verified Status")) {
-          exportHeaders.push("Verified Status");
-        }
-        if (!exportHeaders.includes("Verified Date")) {
-          exportHeaders.push("Verified Date");
-        }
+        // Add verification and modification headers if they don't exist
+        if (!exportHeaders.includes("Verified Status")) exportHeaders.push("Verified Status");
+        if (!exportHeaders.includes("Verified Date")) exportHeaders.push("Verified Date");
+        if (!exportHeaders.includes("Last Modified By")) exportHeaders.push("Last Modified By");
+        if (!exportHeaders.includes("Last Modified Date")) exportHeaders.push("Last Modified Date");
         
         const worksheet = XLSX.utils.json_to_sheet(sheetData, { header: exportHeaders, skipHeader: false });
         const safeSheetName = canonicalSheetName.replace(/[\\/?*[\]]/g, '-').substring(0, 31);

@@ -72,7 +72,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                       Lock Asset List
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Prevent new assets from being added via Excel import.
+                      Prevent adding or deleting assets. Only updates are allowed.
                     </p>
                   </div>
                   <Switch
@@ -87,7 +87,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                       Enable Automatic Sync
                     </Label>
                     <p className="text-xs text-muted-foreground">
-                      Automatically sync with the cloud in real-time.
+                      Automatically sync with the cloud when online.
                     </p>
                   </div>
                   <Switch
