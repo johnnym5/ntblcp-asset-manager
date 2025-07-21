@@ -1,5 +1,7 @@
+
 // Import the necessary functions from the Firebase SDKs.
 import { initializeApp, getApps, getApp } from "firebase/app";
+import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 
@@ -19,9 +21,10 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Get references to the Firebase services we'll use.
+const auth = getAuth(app);
 const db = getFirestore(app);
 const storage = getStorage(app);
 
 
 // Export the initialized services for use throughout the app.
-export { app, db, storage };
+export { app, auth, db, storage };

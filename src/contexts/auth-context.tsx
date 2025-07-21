@@ -5,7 +5,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useAppState } from './app-state-context';
 import { AUTHORIZED_USERS } from '@/lib/authorized-users';
 import type { AuthorizedUser } from '@/lib/authorized-users';
-import { clearAssets as clearLocalAssets, getLocalAssets } from '@/lib/idb';
+import { clearAssets as clearLocalAssets } from '@/lib/idb';
+import { ensureAnonymousSession } from '@/lib/auth';
 
 
 export interface UserProfile extends AuthorizedUser {
@@ -39,11 +40,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { setAssets, setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    try {
+    const initializeAuth = async () => {
+      try {
+        // Step 1: Ensure we have an anonymous Firebase session for Firestore access.
+        await ensureAnonymousSession();
+
+        // Step 2: Check for a locally saved user profile for the UI.
         const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
         if (savedProfileJson) {
             const savedProfile: UserProfile = JSON.parse(savedProfileJson);
-            // Verify the saved user is still in the authorized list
             const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === savedProfile.loginName);
             if (authorizedUser) {
                 setUserProfile(savedProfile);
@@ -53,12 +58,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 localStorage.removeItem('ntblcp-user-profile');
             }
         }
-    } catch (e) {
-        console.error("Failed to load user profile", e);
-    } finally {
-        setLoading(false);
-        setAuthInitialized(true);
-    }
+      } catch (error) {
+          console.error("Firebase authentication failed:", error);
+          // Handle auth error, maybe show a message to the user
+      } finally {
+          setLoading(false);
+          setAuthInitialized(true);
+      }
+    };
+    
+    initializeAuth();
   }, [setGlobalStateFilter]);
 
   const login = (profile: { displayName: string, state: string, role: 'admin' | 'user' }) => {
