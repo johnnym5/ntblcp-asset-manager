@@ -71,7 +71,7 @@ export const NIGERIAN_ZONES: Record<string, string[]> = {
 
 export const ZONE_NAMES = Object.keys(NIGERIAN_ZONES);
 
-export const SPECIAL_LOCATIONS = ["FCMS", "FCT", "NTBLCP"];
+export const SPECIAL_LOCATIONS = ["FCMS", "NTBLCP"];
 
 
 // This defines a clean, unique, and comprehensive set of headers for each sheet.
