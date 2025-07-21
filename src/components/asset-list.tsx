@@ -163,7 +163,7 @@ const StateProgress: React.FC<{ state: string, allAssets: Asset[] }> = ({ state,
     <div className="flex flex-col w-full gap-1">
       <div className="flex justify-between items-center w-full text-sm">
         <span>{state}</span>
-        <span className="text-xs font-mono">{verified} / {total} verified</span>
+        <span className="text-xs font-mono">{verified}/{total} verified</span>
       </div>
       <Progress value={percentage} className="h-1.5" />
     </div>
@@ -1283,4 +1283,3 @@ export default function AssetList() {
     </div>
   );
 }
-
