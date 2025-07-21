@@ -87,13 +87,7 @@ const AppStateContext = createContext<AppStateContextType | undefined>(undefined
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [isOnline, setIsOnline] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedStatus = localStorage.getItem('ntblcp-online-status');
-      return savedStatus ? JSON.parse(savedStatus) : false;
-    }
-    return false;
-  });
+  const [isOnline, setIsOnline] = useState(() => typeof navigator !== 'undefined' ? navigator.onLine : false);
   const [dataSource, setDataSource] = useState<DataSource>('local');
   const [searchTerm, setSearchTerm] = useState('');
   const [globalStateFilter, setGlobalStateFilter] = useState('');
@@ -155,11 +149,23 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   }, [autoSyncEnabled]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
-      if (!isOnline) {
+    // This effect now only handles browser-based online/offline events.
+    // The manual toggle is handled directly in the UI component.
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!isOnline) {
         setDataSource('local');
-      }
     }
   }, [isOnline]);
 

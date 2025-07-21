@@ -289,7 +289,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
-                           {isAdmin && (
+                           {(isAdmin || !isOnline) && (
                             <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting}>
                               <FileUp className="mr-2 h-4 w-4" />
                               Import from Excel
