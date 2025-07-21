@@ -278,10 +278,14 @@ export default function AssetList() {
   }, [authInitialized, performSync, setAssets, isOnline, isGuest]);
   
   useEffect(() => {
-    if ((manualSyncTrigger > 0 || (autoSyncEnabled && dataSource === 'cloud')) && isOnline && authInitialized && !isGuest) {
+    if (!isOnline) return;
+
+    if (manualSyncTrigger > 0 || autoSyncEnabled) {
+      if (authInitialized && !isGuest) {
         performSync();
+      }
     }
-  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync, dataSource, isGuest]);
+  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync, isGuest]);
   
   useEffect(() => {
     setStatusOptions([
@@ -917,7 +921,7 @@ export default function AssetList() {
                         onValueChange={(value) => setGlobalStateFilter(value)}
                     >
                     <SelectTrigger className="w-full sm:w-[280px]">
-                        <SelectValue placeholder="Select a location to filter..." />
+                      <SelectValue placeholder="Select a location to filter..." />
                     </SelectTrigger>
                     <SelectContent>
                         <SelectItem value="All">Overall (All Assets)</SelectItem>
