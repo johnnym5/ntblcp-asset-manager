@@ -236,7 +236,7 @@ export async function parseExcelFile(
                 });
 
                 if (!hasAnyData) {
-                    continue; // Skip completely empty rows
+                    continue;
                 }
                 
                 const assetIdCode = String(assetObject.assetIdCode || '').trim();
@@ -323,7 +323,6 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
           exportHeaders.push("Verified Date");
         }
 
-        const worksheet = XLSX.utils.json_to_sheet(sheetData, { header: exportHeaders });
         const safeSheetName = canonicalSheetName.replace(/[\\/?*[\]]/g, '-').substring(0, 31);
         XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
     }
