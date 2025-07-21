@@ -175,7 +175,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
-  const isAdmin = userProfile?.isAdmin || false;
+  const isAdmin = userProfile?.role === 'admin';
 
   return (
     <div className="flex flex-col w-full min-h-screen">

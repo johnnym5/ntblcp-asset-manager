@@ -172,7 +172,7 @@ export default function AssetList() {
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { user, userProfile, authInitialized } = useAuth();
+  const { userProfile } = useAuth();
   const { toast } = useToast();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
@@ -199,7 +199,7 @@ export default function AssetList() {
   } = useAppState();
 
   const isAdmin = userProfile?.role === 'admin';
-  const isGuest = !userProfile || userProfile.role === 'guest';
+  const isGuest = userProfile?.role === 'guest';
 
   useEffect(() => {
     setCurrentPage(1);
@@ -229,8 +229,8 @@ export default function AssetList() {
         if (assetsToPush.length > 0) {
           if (isGuest) {
             toast({
-              title: "Sync Blocked",
-              description: "You are in guest mode. Changes cannot be saved to the cloud.",
+              title: "Guest Mode",
+              description: "Changes cannot be saved to the cloud.",
               variant: "destructive",
             });
           } else {
@@ -238,7 +238,7 @@ export default function AssetList() {
           }
         }
         
-        let finalAssets: Asset[] = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' }));
+        const finalAssets: Asset[] = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' }));
         
         await saveAssets(finalAssets);
         setAssets(finalAssets);
@@ -248,9 +248,7 @@ export default function AssetList() {
         console.error("Sync failed:", error);
         toast({
           title: "Sync Failed",
-          description: (error as Error).message.includes('permission-denied')
-            ? 'Permission denied. Your role may not be authorized for this action.'
-            : (error as Error).message,
+          description: (error as Error).message,
           variant: 'destructive'
         });
         setIsOnline(false); // Go offline on major failure
@@ -267,7 +265,6 @@ export default function AssetList() {
         setAssets(localAssets);
         setIsLoading(false);
 
-        // After loading local data, trigger a sync if online
         if (isOnline) {
           await performSync();
         }
@@ -321,7 +318,7 @@ export default function AssetList() {
   
   useEffect(() => {
     const locations = new Set<string>();
-    assets.forEach(asset => { // Use all assets to populate location options
+    assets.forEach(asset => {
       const normalized = normalizeAssetLocation(asset.location);
       if (normalized) {
         locations.add(normalized);
@@ -330,7 +327,7 @@ export default function AssetList() {
     setLocationOptions(Array.from(locations).map(l => ({ label: l, value: l })).sort((a, b) => a.label.localeCompare(b.label)));
 
     const assigneeMap = new Map<string, string>();
-    assets.forEach(asset => { // Use all assets for assignee options
+    assets.forEach(asset => {
       if (asset.assignee) {
         const assigneeName = asset.assignee.trim();
         if (assigneeName) {
@@ -359,7 +356,6 @@ export default function AssetList() {
   const displayedAssets = useMemo(() => {
     let results = stateFilteredAssets.filter(asset => enabledSheets.includes(asset.category));
 
-    // Apply filters from filter sheet
     const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     if (hasFilters) {
         results = results.filter(asset => {
@@ -371,7 +367,6 @@ export default function AssetList() {
         });
     }
 
-    // Apply search term
     if (searchTerm) {
         const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
         if (lowerCaseSearchTokens.length > 0) {
@@ -406,11 +401,11 @@ export default function AssetList() {
 
   const handleAddAsset = useCallback(() => {
     if (isGuest) {
-      toast({ title: "Guest Mode", description: "You cannot add assets as a guest.", variant: "destructive" });
+      toast({ title: "Guest Mode", description: "You cannot add assets.", variant: "destructive" });
       return;
     }
     if (lockAssetList) {
-      addNotification({ title: "Asset List Locked", description: "Adding new assets is disabled. This can be changed in settings by an admin.", variant: "destructive" });
+      addNotification({ title: "Asset List Locked", description: "Adding new assets is disabled.", variant: "destructive" });
       return;
     }
     setSelectedAsset(undefined);
@@ -420,13 +415,13 @@ export default function AssetList() {
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
-    setIsFormReadOnly(isGuest); // Read-only for guests
+    setIsFormReadOnly(isGuest); 
     setIsFormOpen(true);
   };
 
   const handleEditAsset = (asset: Asset) => {
     if (isGuest) {
-      toast({ title: "Guest Mode", description: "You cannot edit assets as a guest.", variant: "destructive" });
+      toast({ title: "Guest Mode", description: "You cannot edit assets.", variant: "destructive" });
       return;
     }
     setSelectedAsset(asset);
@@ -438,7 +433,7 @@ export default function AssetList() {
     if (!assetToDelete || isGuest) return;
 
     if (lockAssetList) {
-        addNotification({ title: "Deletion Disabled", description: "The asset list is locked and cannot be modified.", variant: "destructive" });
+        addNotification({ title: "Deletion Disabled", description: "The asset list is locked.", variant: "destructive" });
         setIsDeleteDialogOpen(false);
         return;
     }
@@ -493,7 +488,7 @@ export default function AssetList() {
 
   const handleBatchEdit = () => {
     if (isGuest) {
-      toast({ title: "Guest Mode", description: "You cannot batch edit as a guest.", variant: "destructive" });
+      toast({ title: "Guest Mode", description: "You cannot batch edit.", variant: "destructive" });
       return;
     }
     setIsBatchEditOpen(true);
@@ -591,7 +586,7 @@ export default function AssetList() {
 
   const handleImportClick = useCallback(() => {
     if (isGuest) {
-      toast({ title: "Guest Mode", description: "You cannot import data as a guest.", variant: "destructive" });
+      toast({ title: "Guest Mode", description: "You cannot import data.", variant: "destructive" });
       return;
     }
     fileInputRef.current?.click()
@@ -717,7 +712,7 @@ export default function AssetList() {
 
   const handleClearAllClick = useCallback(() => {
     if (isGuest) {
-      toast({ title: "Guest Mode", description: "You cannot clear assets as a guest.", variant: "destructive" });
+      toast({ title: "Guest Mode", description: "You cannot clear assets.", variant: "destructive" });
       return;
     }
     setIsClearAllDialogOpen(true)
@@ -878,14 +873,14 @@ export default function AssetList() {
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
                         <Select
-                            value={globalStateFilter || 'all'}
-                            onValueChange={(value) => setGlobalStateFilter(value === 'all' ? '' : value)}
+                            value={globalStateFilter || 'All'}
+                            onValueChange={(value) => setGlobalStateFilter(value)}
                         >
                         <SelectTrigger className="w-full sm:w-[280px]">
                             <SelectValue placeholder="Select a location..." />
                         </SelectTrigger>
                         <SelectContent>
-                            <SelectItem value="all">Overall (All Assets)</SelectItem>
+                            <SelectItem value="All">Overall (All Assets)</SelectItem>
                             <SelectSeparator />
                             <SelectGroup>
                                 <SelectLabel>Special Locations</SelectLabel>
@@ -1219,3 +1214,4 @@ export default function AssetList() {
     </div>
   );
 }
+

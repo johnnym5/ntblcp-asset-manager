@@ -2,71 +2,69 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
-import { onAuthStateChanged, type User } from 'firebase/auth';
-import { auth } from '@/lib/firebase';
-import { createUserProfile, getUserProfile } from '@/lib/firestore';
-import type { UserProfile } from '@/lib/types';
 import { useAppState } from './app-state-context';
 
+export interface LocalUserProfile {
+  id: string;
+  displayName: string;
+  state: string; 
+  role: 'admin' | 'user' | 'guest';
+}
+
 interface AuthContextType {
-  user: User | null;
-  userProfile: UserProfile | null;
+  userProfile: LocalUserProfile | null;
   loading: boolean;
-  authInitialized: boolean;
-  logout: () => Promise<void>;
+  profileSetupComplete: boolean;
+  login: (profile: Omit<LocalUserProfile, 'id'>) => void;
+  logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
-  user: null,
   userProfile: null,
   loading: true,
-  authInitialized: false,
-  logout: async () => {},
+  profileSetupComplete: false,
+  login: () => {},
+  logout: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [authInitialized, setAuthInitialized] = useState(false);
   
   const { setAssets } = useAppState();
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true); // Start loading whenever auth state might change.
-      if (firebaseUser) {
-        let profile = await getUserProfile(firebaseUser.uid);
-        
-        if (!profile) {
-          // If profile doesn't exist, create it. This happens on first sign-up.
-          profile = await createUserProfile(firebaseUser);
-        }
-        setUserProfile(profile);
-        setUser(firebaseUser);
-      } else {
-        setUser(null);
-        setUserProfile(null);
+    try {
+      const savedProfile = localStorage.getItem('ntblcp-user-profile');
+      if (savedProfile) {
+        setUserProfile(JSON.parse(savedProfile));
       }
-      // Mark initialization as complete and stop loading.
-      setAuthInitialized(true);
+    } catch (e) {
+      console.error("Failed to load user profile", e);
+      localStorage.removeItem('ntblcp-user-profile');
+    } finally {
       setLoading(false);
-    });
-
-    return () => unsubscribe();
+    }
   }, []);
 
-
-  const logout = async () => {
-    setLoading(true);
-    await auth.signOut();
-    setUser(null);
-    setUserProfile(null);
-    setAssets([]); 
-    window.location.href = '/';
+  const login = (profile: Omit<LocalUserProfile, 'id'>) => {
+    const newProfile: LocalUserProfile = {
+      id: `${profile.displayName}-${Date.now()}`,
+      ...profile,
+    };
+    localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
+    setUserProfile(newProfile);
   };
 
-  const value = { user, userProfile, loading, logout, authInitialized };
+  const logout = () => {
+    localStorage.removeItem('ntblcp-user-profile');
+    setUserProfile(null);
+    setAssets([]);
+    window.location.href = '/'; 
+  };
+
+  const profileSetupComplete = !!userProfile;
+  const value = { userProfile, loading, profileSetupComplete, login, logout };
 
   return (
     <AuthContext.Provider value={value}>
