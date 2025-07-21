@@ -11,6 +11,11 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -41,8 +46,9 @@ import {
   FolderSearch,
   CloudOff,
   CloudUpload,
+  ChevronDown,
 } from "lucide-react";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -186,6 +192,7 @@ export default function AssetList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
+  const [openCollapsibleRow, setOpenCollapsibleRow] = useState<string | null>(null);
   
   const {
     assets, setAssets, isOnline, setIsOnline, dataSource, 
@@ -205,6 +212,7 @@ export default function AssetList() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedCategories([]);
+    setOpenCollapsibleRow(null);
   }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter]);
   
   useEffect(() => {
@@ -283,37 +291,44 @@ export default function AssetList() {
     ]);
   }, [setStatusOptions]);
 
-  const stateFilteredAssets = useMemo(() => {
-    if (isAdmin || !globalStateFilter || globalStateFilter === 'All') {
-      return assets;
-    }
-    
-    const zones: Record<string, string[]> = NIGERIAN_ZONES;
-    const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
-    const isZone = !!zones[globalStateFilter];
+  const allAssetsForFiltering = useMemo(() => {
+    if (isAdmin && globalStateFilter && globalStateFilter !== 'All') {
+        const zones: Record<string, string[]> = NIGERIAN_ZONES;
+        const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
+        const isZone = !!zones[globalStateFilter];
 
-    if (isZone) {
-      const lowerCaseZone = globalStateFilter.toLowerCase();
-      return assets.filter(asset => {
-        const assetLocation = (asset.location || "").toLowerCase().trim();
-        return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
-      });
-    } else {
-      const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-      const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
-
-      return assets.filter(asset => {
-        const assetLocation = (asset.location || "").toLowerCase().trim();
-        const matchesState = assetLocation.startsWith(lowerCaseFilter);
-        const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-        return matchesState || matchesCapital;
-      });
+        if (isZone) {
+            const lowerCaseZone = globalStateFilter.toLowerCase();
+            return assets.filter(asset => {
+                const assetLocation = (asset.location || "").toLowerCase().trim();
+                return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
+            });
+        } else {
+            const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
+            const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
+            return assets.filter(asset => {
+                const assetLocation = (asset.location || "").toLowerCase().trim();
+                const matchesState = assetLocation.startsWith(lowerCaseFilter);
+                const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+                return matchesState || matchesCapital;
+            });
+        }
+    } else if (!isAdmin && userProfile?.state) {
+        const lowerCaseFilter = userProfile.state.toLowerCase().trim();
+        const capitalCity = NIGERIAN_STATE_CAPITALS[userProfile.state]?.toLowerCase().trim();
+        return assets.filter(asset => {
+            const assetLocation = (asset.location || "").toLowerCase().trim();
+            const matchesState = assetLocation.startsWith(lowerCaseFilter);
+            const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+            return matchesState || matchesCapital;
+        });
     }
-  }, [assets, globalStateFilter, isAdmin]);
+    return assets;
+  }, [assets, globalStateFilter, isAdmin, userProfile?.state]);
   
   useEffect(() => {
     const locations = new Map<string, number>();
-    stateFilteredAssets.forEach(asset => {
+    allAssetsForFiltering.forEach(asset => {
       const normalized = normalizeAssetLocation(asset.location);
       if (normalized) {
         locations.set(normalized, (locations.get(normalized) || 0) + 1);
@@ -322,7 +337,7 @@ export default function AssetList() {
     setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })).sort((a, b) => (b.count || 0) - (a.count || 0)));
 
     const assigneeMap = new Map<string, number>();
-    stateFilteredAssets.forEach(asset => {
+    allAssetsForFiltering.forEach(asset => {
       if (asset.assignee) {
         const assigneeName = asset.assignee.trim();
         if (assigneeName) {
@@ -331,7 +346,7 @@ export default function AssetList() {
       }
     });
     setAssigneeOptions(Array.from(assigneeMap.entries()).map(([a, count]) => ({ label: a, value: a, count })).sort((a,b) => a.label.localeCompare(b.label)));
-  }, [stateFilteredAssets, setLocationOptions, setAssigneeOptions]);
+  }, [allAssetsForFiltering, setLocationOptions, setAssigneeOptions]);
 
 
   const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
@@ -346,7 +361,7 @@ export default function AssetList() {
   };
 
   const displayedAssets = useMemo(() => {
-    let results = stateFilteredAssets.filter(asset => enabledSheets.includes(asset.category));
+    let results = allAssetsForFiltering.filter(asset => enabledSheets.includes(asset.category));
 
     const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     if (hasFilters) {
@@ -372,7 +387,7 @@ export default function AssetList() {
     }
     
     return sortAssets(results, sortConfig);
-  }, [stateFilteredAssets, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, sortConfig, enabledSheets]);
+  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, sortConfig, enabledSheets]);
 
   const assetsByCategory = useMemo(() => {
     return displayedAssets.reduce((acc, asset) => {
@@ -403,7 +418,7 @@ export default function AssetList() {
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
-    setIsFormReadOnly(isGuest);
+    setIsFormReadOnly(true);
     setIsFormOpen(true);
   };
 
@@ -839,7 +854,7 @@ export default function AssetList() {
 
   // DASHBOARD VIEW
   if (view === 'dashboard') {
-    const totalAssetsInScope = stateFilteredAssets.length;
+    const totalAssetsInScope = allAssetsForFiltering.length;
     const currentlyDisplayedAssets = displayedAssets.length;
     const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
     const verificationPercentage = currentlyDisplayedAssets > 0 ? (verifiedStateAssets / currentlyDisplayedAssets) * 100 : 0;
@@ -874,51 +889,55 @@ export default function AssetList() {
             )}
         </div>
         <Card>
-             <CardHeader className="flex-row items-center justify-between">
-                <CardTitle>
-                    {isAdmin && !isFiltered ? (
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
-                        <Select
-                            value={globalStateFilter || 'All'}
-                            onValueChange={(value) => setGlobalStateFilter(value)}
-                        >
-                        <SelectTrigger className="w-full sm:w-[280px]">
-                            <SelectValue placeholder="Select a location..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="All">Overall (All Assets)</SelectItem>
-                            <SelectSeparator />
-                            <SelectGroup>
-                                <SelectLabel>Special Locations</SelectLabel>
-                                {SPECIAL_LOCATIONS.map((loc) => (
-                                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                                ))}
-                            </SelectGroup>
-                            <SelectSeparator />
-                            <SelectGroup>
-                                <SelectLabel>Geopolitical Zones</SelectLabel>
-                                {ZONE_NAMES.map((zone) => (
-                                    <SelectItem key={zone} value={zone}>{zone}</SelectItem>
-                                ))}
-                            </SelectGroup>
-                            <SelectSeparator />
-                            <SelectGroup>
-                                <SelectLabel>States</SelectLabel>
-                                {NIGERIAN_STATES.map((state) => (
-                                    <SelectItem key={state} value={state}>
-                                      <StateProgress state={state} allAssets={assets} />
-                                    </SelectItem>
-                                ))}
-                            </SelectGroup>
-                        </SelectContent>
-                        </Select>
-                    </div>
-                    ) : (
-                    `Asset Verification Status for ${globalStateFilter || "All Assets"}`
-                    )}
-                </CardTitle>
-                <div className="flex items-center space-x-2">
+             <CardHeader className="flex-row items-start justify-between">
+                <div>
+                  <CardTitle>Verification Status</CardTitle>
+                  <CardDescription>
+                      {isAdmin && !isFiltered
+                        ? `Viewing: ${globalStateFilter || 'All Assets'}`
+                        : `Viewing: ${userProfile?.state || 'All Assets'}`
+                      }
+                  </CardDescription>
+                </div>
+                
+                <div className="flex items-center gap-4">
+                  {isAdmin && !isFiltered && (
+                    <Select
+                        value={globalStateFilter || 'All'}
+                        onValueChange={(value) => setGlobalStateFilter(value)}
+                    >
+                    <SelectTrigger className="w-full sm:w-[280px]">
+                        <SelectValue placeholder="Select a location to filter..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="All">Overall (All Assets)</SelectItem>
+                        <SelectSeparator />
+                        <SelectGroup>
+                            <SelectLabel>Special Locations</SelectLabel>
+                            {SPECIAL_LOCATIONS.map((loc) => (
+                                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                            ))}
+                        </SelectGroup>
+                        <SelectSeparator />
+                        <SelectGroup>
+                            <SelectLabel>Geopolitical Zones</SelectLabel>
+                            {ZONE_NAMES.map((zone) => (
+                                <SelectItem key={zone} value={zone}>{zone}</SelectItem>
+                            ))}
+                        </SelectGroup>
+                        <SelectSeparator />
+                        <SelectGroup>
+                            <SelectLabel>States</SelectLabel>
+                            {NIGERIAN_STATES.map((state) => (
+                                <SelectItem key={state} value={state}>
+                                  <StateProgress state={state} allAssets={assets} />
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                    </SelectContent>
+                    </Select>
+                  )}
+                  <div className="flex items-center space-x-2">
                     <Label htmlFor="select-all-categories" className="text-sm font-medium">Select All</Label>
                     <Checkbox
                         id="select-all-categories"
@@ -927,6 +946,7 @@ export default function AssetList() {
                         aria-label="Select all categories"
                         disabled={isGuest}
                     />
+                  </div>
                 </div>
             </CardHeader>
              <CardContent className="pt-2 space-y-2">
@@ -1074,111 +1094,146 @@ export default function AssetList() {
                       <TableHead>Assignee</TableHead>
                       <TableHead>Verified Status</TableHead>
                       <TableHead>Last Modified</TableHead>
-                      <TableHead className="w-[50px] text-right">Actions</TableHead>
+                      <TableHead className="w-[100px] text-right">Actions</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
                       {paginatedCategoryAssets.length > 0 ? (
                       paginatedCategoryAssets.map((asset) => (
-                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
-                          <TableCell onClick={e => e.stopPropagation()}>
-                              <Checkbox 
-                                  checked={selectedAssetIds.includes(asset.id)}
-                                  onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
-                                  aria-label={`Select asset ${asset.description}`}
-                                  disabled={isGuest}
-                              />
-                          </TableCell>
-                          <TableCell>{asset.sn || 'N/A'}</TableCell>
-                          <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
-                                <span>{asset.description}</span>
-                                {asset.syncStatus === 'local' && (
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <CloudOff className="h-4 w-4 text-blue-500" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Local changes not synced</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                )}
-                                {asset.syncStatus === 'syncing' && (
-                                    <TooltipProvider>
-                                        <Tooltip>
-                                            <TooltipTrigger>
-                                                <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                            </TooltipTrigger>
-                                            <TooltipContent>
-                                                <p>Syncing...</p>
-                                            </TooltipContent>
-                                        </Tooltip>
-                                    </TooltipProvider>
-                                )}
-                            </div>
-                          </TableCell>
-                          <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
-                          <TableCell>{asset.assignee || 'N/A'}</TableCell>
-                          <TableCell onClick={(e) => e.stopPropagation()}>
-                            <Select
-                              value={asset.verifiedStatus || "Unverified"}
-                              onValueChange={async (status) => {
-                                await handleQuickSaveAsset(asset.id, {
-                                  verifiedStatus: status as any,
-                                  verifiedDate: status === "Verified" ? new Date().toLocaleDateString("en-CA") : "",
-                                  remarks: asset.remarks
-                                });
-                                toast({
-                                  title: "Status Updated",
-                                  description: `Asset status changed to ${status}.`,
-                                });
-                              }}
-                              disabled={isGuest}
-                            >
-                              <SelectTrigger className={cn("w-[150px] h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="Unverified">
-                                  <div className="flex items-center">
-                                    <FileText className="mr-2 h-4 w-4 text-red-600 dark:text-red-400" />
-                                    Unverified
+                          <Collapsible asChild key={asset.id} open={openCollapsibleRow === asset.id} onOpenChange={() => setOpenCollapsibleRow(prev => prev === asset.id ? null : asset.id)}>
+                            <>
+                            <CollapsibleTrigger asChild>
+                              <TableRow data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''} className="cursor-pointer">
+                                <TableCell onClick={e => e.stopPropagation()}>
+                                    <Checkbox 
+                                        checked={selectedAssetIds.includes(asset.id)}
+                                        onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
+                                        aria-label={`Select asset ${asset.description}`}
+                                        disabled={isGuest}
+                                    />
+                                </TableCell>
+                                <TableCell>{asset.sn || 'N/A'}</TableCell>
+                                <TableCell className="font-medium">
+                                  <div className="flex items-center gap-2">
+                                      <span>{asset.description}</span>
+                                      {asset.syncStatus === 'local' && (
+                                          <TooltipProvider>
+                                              <Tooltip>
+                                                  <TooltipTrigger>
+                                                      <CloudOff className="h-4 w-4 text-blue-500" />
+                                                  </TooltipTrigger>
+                                                  <TooltipContent>
+                                                      <p>Local changes not synced</p>
+                                                  </TooltipContent>
+                                              </Tooltip>
+                                          </TooltipProvider>
+                                      )}
+                                      {asset.syncStatus === 'syncing' && (
+                                          <TooltipProvider>
+                                              <Tooltip>
+                                                  <TooltipTrigger>
+                                                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                  </TooltipTrigger>
+                                                  <TooltipContent>
+                                                      <p>Syncing...</p>
+                                                  </TooltipContent>
+                                              </Tooltip>
+                                          </TooltipProvider>
+                                      )}
                                   </div>
-                                </SelectItem>
-                                <SelectItem value="Verified">
-                                  <div className="flex items-center">
-                                    <Check className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
-                                    Verified
+                                </TableCell>
+                                <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
+                                <TableCell>{asset.assignee || 'N/A'}</TableCell>
+                                <TableCell onClick={(e) => e.stopPropagation()}>
+                                  <Select
+                                    value={asset.verifiedStatus || "Unverified"}
+                                    onValueChange={async (status) => {
+                                      await handleQuickSaveAsset(asset.id, {
+                                        verifiedStatus: status as any,
+                                        verifiedDate: status === "Verified" ? new Date().toLocaleDateString("en-CA") : "",
+                                        remarks: asset.remarks
+                                      });
+                                      toast({
+                                        title: "Status Updated",
+                                        description: `Asset status changed to ${status}.`,
+                                      });
+                                    }}
+                                    disabled={isGuest}
+                                  >
+                                    <SelectTrigger className={cn("w-[150px] h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                      <SelectValue placeholder="Select status" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="Unverified">
+                                        <div className="flex items-center">
+                                          <FileText className="mr-2 h-4 w-4 text-red-600 dark:text-red-400" />
+                                          Unverified
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="Verified">
+                                        <div className="flex items-center">
+                                          <Check className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
+                                          Verified
+                                        </div>
+                                      </SelectItem>
+                                      <SelectItem value="Discrepancy">
+                                        <div className="flex items-center">
+                                          <AlertCircle className="mr-2 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                          Discrepancy
+                                        </div>
+                                      </SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </TableCell>
+                                <TableCell>{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</TableCell>
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
+                                    <Button variant="ghost" size="icon" className={cn("h-8 w-8 transition-transform", openCollapsibleRow === asset.id && "rotate-180")}>
+                                      <ChevronDown className="h-4 w-4" />
+                                    </Button>
+                                    <DropdownMenu>
+                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            Edit Full Details
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                    </DropdownMenu>
                                   </div>
-                                </SelectItem>
-                                <SelectItem value="Discrepancy">
-                                  <div className="flex items-center">
-                                    <AlertCircle className="mr-2 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                                    Discrepancy
-                                  </div>
-                                </SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </TableCell>
-                          <TableCell>{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</TableCell>
-                          <TableCell className="text-right" onClick={e => e.stopPropagation()}>
-                              <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                  <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
-                                      <Edit className="mr-2 h-4 w-4" />
-                                      Edit
-                                  </DropdownMenuItem>
-                                  <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
-                                      <Trash2 className="mr-2 h-4 w-4" />
-                                      Delete
-                                  </DropdownMenuItem>
-                              </DropdownMenuContent>
-                              </DropdownMenu>
-                          </TableCell>
-                          </TableRow>
+                                </TableCell>
+                              </TableRow>
+                            </CollapsibleTrigger>
+                            <CollapsibleContent asChild>
+                                <tr className="bg-muted/50 hover:bg-muted/50">
+                                    <TableCell colSpan={8}>
+                                        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                                            <div className="space-y-2">
+                                                <p className="font-semibold">Location</p>
+                                                <p className="text-muted-foreground">{asset.location || 'N/A'}</p>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <p className="font-semibold">LGA</p>
+                                                <p className="text-muted-foreground">{asset.lga || 'N/A'}</p>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <p className="font-semibold">Condition</p>
+                                                <p className="text-muted-foreground">{asset.condition || 'N/A'}</p>
+                                            </div>
+                                            <div className="col-span-full space-y-2">
+                                                <p className="font-semibold">Remarks</p>
+                                                <p className="text-muted-foreground whitespace-pre-wrap">{asset.remarks || 'No remarks.'}</p>
+                                            </div>
+                                        </div>
+                                    </TableCell>
+                                </tr>
+                            </CollapsibleContent>
+                            </>
+                          </Collapsible>
                       ))
                       ) : (
                           <TableRow><TableCell colSpan={8} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
@@ -1228,3 +1283,4 @@ export default function AssetList() {
     </div>
   );
 }
+

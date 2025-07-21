@@ -41,12 +41,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        setAuthInitialized(true);
-
         const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
         if (savedProfileJson) {
             const savedProfile: UserProfile = JSON.parse(savedProfileJson);
-            const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === savedProfile.loginName);
+            const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === savedProfile.loginName.toLowerCase());
             if (authorizedUser) {
                 setUserProfile(savedProfile);
                 setGlobalStateFilter(savedProfile.state);
@@ -58,6 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       } catch (error) {
           console.error("Auth initialization failed:", error);
       } finally {
+          setAuthInitialized(true);
           setLoading(false);
       }
     };
@@ -66,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [setGlobalStateFilter]);
 
   const login = (profile: { displayName: string, state: string, role: 'admin' | 'user' | 'guest' }) => {
-    const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === profile.displayName.toLowerCase());
+    const authorizedUser = AUTHORIZED_USERS.find(u => u.displayName === profile.displayName);
     if (!authorizedUser) return;
 
     const fullProfile: UserProfile = {

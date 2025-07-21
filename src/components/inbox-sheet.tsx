@@ -18,7 +18,7 @@ export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
   const { assets } = useAppState();
 
   const recentlyModifiedAssets = assets
-    .filter(asset => asset.lastModified)
+    .filter(asset => asset.lastModified && asset.lastModifiedBy)
     .sort((a, b) => new Date(b.lastModified!).getTime() - new Date(a.lastModified!).getTime())
     .slice(0, 50); // Limit to the 50 most recent changes for performance
 

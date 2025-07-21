@@ -62,7 +62,7 @@ export default function UserProfileSetup() {
     }
     
     login({
-        displayName: foundUser.loginName,
+        displayName: foundUser.displayName,
         state: selectedState,
         role: foundUser.isAdmin ? 'admin' : foundUser.isGuest ? 'guest' : 'user',
     });
