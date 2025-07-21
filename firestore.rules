@@ -1,11 +1,9 @@
 
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write access to all documents if the user is authenticated.
-    // Our app now uses anonymous authentication, so this will always be true
-    // for requests coming from the app, while blocking unauthenticated access.
+    // Allow read/write access to all documents for any authenticated user.
+    // Our app uses anonymous authentication, so this means any app user can read/write.
     match /{document=**} {
       allow read, write: if request.auth != null;
     }

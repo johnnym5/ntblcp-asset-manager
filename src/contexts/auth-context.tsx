@@ -44,6 +44,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       try {
         // Step 1: Ensure we have an anonymous Firebase session for Firestore access.
         await ensureAnonymousSession();
+        setAuthInitialized(true); // Firebase connection is now ready.
 
         // Step 2: Check for a locally saved user profile for the UI.
         const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
@@ -63,7 +64,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           // Handle auth error, maybe show a message to the user
       } finally {
           setLoading(false);
-          setAuthInitialized(true);
       }
     };
     
