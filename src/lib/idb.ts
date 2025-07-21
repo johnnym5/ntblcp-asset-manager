@@ -1,15 +1,20 @@
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Asset } from './types';
+import type { Asset, UserProfile } from './types';
 
 const DB_NAME = 'ntblcp-asset-db';
-const DB_VERSION = 1;
-const STORE_NAME = 'assets';
+const DB_VERSION = 2; // Incremented version
+const ASSET_STORE_NAME = 'assets';
+const USER_PROFILE_STORE_NAME = 'userProfile'; // New store
 
 interface AssetDB extends DBSchema {
-  [STORE_NAME]: {
+  [ASSET_STORE_NAME]: {
     key: string;
     value: Asset;
+  };
+  [USER_PROFILE_STORE_NAME]: {
+    key: string;
+    value: UserProfile;
   };
 }
 
@@ -24,9 +29,16 @@ const getDb = () => {
     // If the promise hasn't been created yet, create it.
     if (!dbPromise) {
         dbPromise = openDB<AssetDB>(DB_NAME, DB_VERSION, {
-            upgrade(db) {
-                if (!db.objectStoreNames.contains(STORE_NAME)) {
-                    db.createObjectStore(STORE_NAME, { keyPath: 'id' });
+            upgrade(db, oldVersion) {
+                if (oldVersion < 1) {
+                  if (!db.objectStoreNames.contains(ASSET_STORE_NAME)) {
+                      db.createObjectStore(ASSET_STORE_NAME, { keyPath: 'id' });
+                  }
+                }
+                if (oldVersion < 2) {
+                  if (!db.objectStoreNames.contains(USER_PROFILE_STORE_NAME)) {
+                    db.createObjectStore(USER_PROFILE_STORE_NAME, { keyPath: 'uid' });
+                  }
                 }
             },
         });
@@ -35,13 +47,14 @@ const getDb = () => {
     return dbPromise;
 }
 
+// --- ASSET FUNCTIONS ---
 
 export const getLocalAssets = async (): Promise<Asset[]> => {
   const dbp = getDb();
   if (!dbp) return []; // Don't run on server
   try {
     const db = await dbp;
-    return await db.getAll(STORE_NAME);
+    return await db.getAll(ASSET_STORE_NAME);
   } catch (error) {
     console.error("Failed to get local assets from IndexedDB", error);
     return [];
@@ -53,7 +66,7 @@ export const saveAssets = async (assets: Asset[]): Promise<void> => {
   if (!dbp) return; // Don't run on server
   try {
     const db = await dbp;
-    const tx = db.transaction(STORE_NAME, 'readwrite');
+    const tx = db.transaction(ASSET_STORE_NAME, 'readwrite');
     await Promise.all(assets.map(asset => tx.store.put(asset)));
     await tx.done;
   } catch (error) {
@@ -67,9 +80,46 @@ export const clearAssets = async (): Promise<void> => {
   if (!dbp) return; // Don't run on server
   try {
     const db = await dbp;
-    await db.clear(STORE_NAME);
+    await db.clear(ASSET_STORE_NAME);
   }
   catch (error) {
     console.error("Failed to clear assets from IndexedDB", error);
   }
 };
+
+
+// --- USER PROFILE FUNCTIONS ---
+
+export const saveLocalUserProfile = async (profile: UserProfile): Promise<void> => {
+  const dbp = getDb();
+  if (!dbp) return;
+  try {
+    const db = await dbp;
+    await db.put(USER_PROFILE_STORE_NAME, profile);
+  } catch (error) {
+    console.error("Failed to save user profile to IndexedDB", error);
+  }
+};
+
+export const getLocalUserProfile = async (uid: string): Promise<UserProfile | undefined> => {
+  const dbp = getDb();
+  if (!dbp) return undefined;
+  try {
+    const db = await dbp;
+    return await db.get(USER_PROFILE_STORE_NAME, uid);
+  } catch (error) {
+    console.error("Failed to get user profile from IndexedDB", error);
+    return undefined;
+  }
+}
+
+export const clearLocalUserProfile = async (): Promise<void> => {
+  const dbp = getDb();
+  if (!dbp) return;
+  try {
+    const db = await dbp;
+    await db.clear(USER_PROFILE_STORE_NAME);
+  } catch (error) {
+    console.error("Failed to clear user profile from IndexedDB", error);
+  }
+}

@@ -1,6 +1,6 @@
 'use client';
 
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { storage } from './firebase';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -19,3 +19,19 @@ export const uploadImage = async (file: File, path: string): Promise<string> => 
   
   return downloadURL;
 };
+
+/**
+ * Deletes a file from Firebase Storage using its download URL.
+ * @param url The download URL of the file to delete.
+ * @returns A promise that resolves when the file is deleted.
+ */
+export const deleteImage = async (url: string): Promise<void> => {
+    try {
+        const storageRef = ref(storage, url);
+        await deleteObject(storageRef);
+    } catch (error: any) {
+        // It's common for this to fail if the file doesn't exist or permissions are wrong.
+        // We can often safely ignore these errors in the UI.
+        console.warn("Could not delete file from storage:", error.message);
+    }
+}

@@ -34,9 +34,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setLoading(true);
       if (firebaseUser) {
-        setUser(firebaseUser);
         let profile = await getUserProfile(firebaseUser.uid);
         
         if (!profile) {
@@ -45,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           profile = await createUserProfile(firebaseUser);
         }
         setUserProfile(profile);
-
+        setUser(firebaseUser);
       } else {
         setUser(null);
         setUserProfile(null);

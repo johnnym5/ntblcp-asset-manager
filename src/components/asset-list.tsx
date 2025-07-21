@@ -172,7 +172,7 @@ export default function AssetList() {
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { userProfile, authInitialized } = useAuth();
+  const { user, userProfile, authInitialized } = useAuth();
   const { toast } = useToast();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
@@ -292,13 +292,13 @@ export default function AssetList() {
   }, [setStatusOptions]);
 
   const stateFilteredAssets = useMemo(() => {
-    if (!globalStateFilter) {
-      return assets; // Admin view or no filter set
+    if (isAdmin || !globalStateFilter || globalStateFilter === 'All') {
+      return assets;
     }
     
     const zones: Record<string, string[]> = NIGERIAN_ZONES;
     const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
-    const isZone = !!zones[globalStateFilter]; // Check if the filter is a zone name
+    const isZone = !!zones[globalStateFilter];
 
     if (isZone) {
       const lowerCaseZone = globalStateFilter.toLowerCase();
@@ -317,11 +317,11 @@ export default function AssetList() {
         return matchesState || matchesCapital;
       });
     }
-  }, [assets, globalStateFilter]);
+  }, [assets, globalStateFilter, isAdmin]);
   
   useEffect(() => {
     const locations = new Set<string>();
-    stateFilteredAssets.forEach(asset => {
+    assets.forEach(asset => { // Use all assets to populate location options
       const normalized = normalizeAssetLocation(asset.location);
       if (normalized) {
         locations.add(normalized);
@@ -330,7 +330,7 @@ export default function AssetList() {
     setLocationOptions(Array.from(locations).map(l => ({ label: l, value: l })).sort((a, b) => a.label.localeCompare(b.label)));
 
     const assigneeMap = new Map<string, string>();
-    stateFilteredAssets.forEach(asset => {
+    assets.forEach(asset => { // Use all assets for assignee options
       if (asset.assignee) {
         const assigneeName = asset.assignee.trim();
         if (assigneeName) {
@@ -342,7 +342,7 @@ export default function AssetList() {
       }
     });
     setAssigneeOptions(Array.from(assigneeMap.values()).map(a => ({ label: a, value: a })).sort((a,b) => a.label.localeCompare(b.label)));
-  }, [stateFilteredAssets, setLocationOptions, setAssigneeOptions]);
+  }, [assets, setLocationOptions, setAssigneeOptions]);
 
 
   const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
@@ -859,7 +859,7 @@ export default function AssetList() {
             {selectedCategories.length > 0 && !isGuest && (
                  <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
-                    <Button variant="outline" size="sm" onClick={handleBatchEdit}>
+                    <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)}>
                         <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => handleExportClick(selectedCategories)}>
