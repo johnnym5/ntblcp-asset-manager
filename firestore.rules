@@ -1,49 +1,25 @@
-
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    
+    // User Profiles
     match /users/{userId} {
-      function isOwner() {
-        return request.auth.uid == userId;
-      }
-
-      function isAdmin() {
-        // Check the role of the user trying to make the request.
-        let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-        return userRole == 'admin';
-      }
-
-      // 1. A user can create their own profile document on signup.
-      // 2. An admin can create any user document.
-      allow create: if (isOwner() && request.resource.data.role != 'admin') || isAdmin();
-      
-      // Admins can read any user profile. A user can read their own.
-      allow read: if isOwner() || isAdmin();
-      
-      // An admin can update any user's role. A user cannot change their own role.
-      allow update: if isAdmin();
-      
-      // Nobody can delete user profiles from the client.
+      // Any authenticated user can create their own user document.
+      allow create: if request.auth.uid == userId;
+      // Users can read their own profile. Admins can read any profile.
+      allow read: if request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Only admins can update user profiles (e.g., to change a role).
+      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      // Nobody can delete user profiles.
       allow delete: if false;
     }
 
+    // Assets
     match /assets/{assetId} {
-      function isSignedIn() {
-        return request.auth != null;
-      }
-
-      function isUserOrAdmin() {
-        let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
-        return userRole == 'user' || userRole == 'admin';
-      }
-      
-      // Any authenticated user (including guests) can read asset data.
-      allow read: if isSignedIn();
-      
-      // Only users with the 'user' or 'admin' role can write data.
-      allow write: if isSignedIn() && isUserOrAdmin();
+      // Anyone, including guests, can read asset data.
+      allow read: if true;
+      // Only authenticated users who are not guests can write asset data.
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'guest';
     }
   }
 }
