@@ -236,8 +236,7 @@ export async function parseExcelFile(
                 });
 
                 if (!hasAnyData) {
-                    skipped++;
-                    continue;
+                    continue; // Skip completely empty rows
                 }
                 
                 const assetIdCode = String(assetObject.assetIdCode || '').trim();
