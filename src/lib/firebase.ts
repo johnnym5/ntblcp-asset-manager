@@ -1,7 +1,7 @@
-
 // Import the necessary functions from the Firebase SDKs.
 import { initializeApp, getApps, getApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration is now loaded from environment variables.
 const firebaseConfig = {
@@ -20,6 +20,8 @@ const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Get references to the Firebase services we'll use.
 const db = getFirestore(app);
+const storage = getStorage(app);
+
 
 // Export the initialized services for use throughout the app.
-export { app, db };
+export { app, db, storage };
