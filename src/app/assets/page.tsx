@@ -19,20 +19,22 @@ export default function AssetsPage() {
     }
   }, [userProfile, setGlobalStateFilter]);
 
+  // This is the key change: wait for Firebase to be fully initialized.
   if (loading || !authInitialized) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        <p className="ml-4 text-muted-foreground">Initializing...</p>
       </div>
     );
   }
 
+  // If initialization is complete and there's no user, show the login page.
   if (!user) {
-    return (
-      <UserProfileSetup />
-    );
+    return <UserProfileSetup />;
   }
 
+  // If we have a user, render the app.
   return (
     <AppLayout>
       <AssetList />
