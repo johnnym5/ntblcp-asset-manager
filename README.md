@@ -10,17 +10,18 @@ This application is designed to solve the critical challenge of managing and ver
 ### Core Features
 
 *   **Offline-First by Default**: The application is built to work completely offline. All data is stored and managed in the browser's local database (IndexedDB), ensuring that work is never lost due to a lack of internet.
-*   **Role-Based Access**: A simple, passwordless login screen grants access based on a predefined list of users. Each user is locked to the assets of their assigned state(s), while admins can view all assets.
+*   **Role-Based Access**: A simple, passwordless login screen grants access based on a predefined list of users (including admins, state users, and read-only guests). Each user is locked to the assets of their assigned state(s), while admins can view all assets.
 *   **Dynamic Excel Import & Export**:
     *   **Intelligent Import**: Parses complex Excel files containing multiple asset sheet formats, automatically detecting headers and mapping data to a unified structure. This works both online and offline.
     *   **Structure-Preserving Export**: Exports data back into an Excel file that mirrors the original's column structure and naming conventions, with "Verified Status" and "Verified Date" appended at the end.
 *   **Advanced Data Management**:
     *   **Smart Search**: A global search bar that understands multiple keywords to quickly find assets across all fields and categories.
-    *   **Filtering & Sorting**: Powerful popover filters for location, assignee, and status, along with multi-key sorting.
+    *   **Filtering & Sorting**: Powerful popover filters for location, assignee, and status, along with multi-key sorting. Location filters show asset counts.
     *   **Batch Editing**: Select multiple assets and apply changes (like updating location or status) to all of them in a single action.
 *   **Insightful Dashboard**:
-    *   The main dashboard provides a high-level overview of asset verification progress with clear, visual progress bars for both the overall status and individual asset categories.
+    *   The main dashboard provides a high-level overview of asset verification progress with clear, visual progress bars for both the overall status and individual asset categories. Admins can filter this view by any state or zone.
 *   **Selective Sync**: Users can select one or more assets or entire categories and push only those specific items to the cloud database, providing granular control over data synchronization.
+*   **Admin Inbox**: Admins have an inbox that shows a real-time feed of the most recently modified assets across the entire system.
 
 ### How It Works (Use Cases & Impact)
 
@@ -77,15 +78,24 @@ Firebase will build your Next.js application and deploy it. After the command co
 
 **CRITICAL STEP:** Before you can run the app locally, you must provide your Firebase project's credentials.
 
-1.  **Copy the example file**:
-    Make a copy of the `.env.example` file and rename it to `.env`.
+1.  **Create `.env` file**:
+    Create a file named `.env` in the root of the project.
 
 2.  **Fill in your credentials**:
-    Open the new `.env` file. You will see placeholders like `YOUR_API_KEY`. Go to your Firebase project's settings page in the Firebase Console. Under the "General" tab, find the "Your apps" section, select your web app, and copy the corresponding values into the `.env` file.
+    Open the new `.env` file and add the following lines, replacing the placeholder values with your actual Firebase project credentials. You can find these values in your Firebase project's settings page in the Firebase Console. Under the "General" tab, find the "Your apps" section, select your web app, and copy the corresponding values.
+
+    ```
+    NEXT_PUBLIC_FIREBASE_API_KEY=YOUR_API_KEY
+    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=YOUR_AUTH_DOMAIN
+    NEXT_PUBLIC_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
+    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=YOUR_STORAGE_BUCKET
+    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=YOUR_MESSAGING_SENDER_ID
+    NEXT_PUBLIC_FIREBASE_APP_ID=YOUR_APP_ID
+    ```
 
 3.  **Run the development server**:
     ```bash
     npm run dev
     ```
 
-Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.
+Open [http://localhost:9002](http://localhost:9002) with your browser to see the result. To log in, use a name from the authorized user list (e.g., `admin`, `seyi`, or `guest`).

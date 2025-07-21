@@ -58,7 +58,7 @@ export interface UserProfile {
   email: string | null;
   displayName: string | null;
   photoURL?: string | null;
-  role: 'admin' | 'user';
+  role: 'admin' | 'user' | 'guest';
   // You can add other fields like 'state' or 'zone' if needed
   state?: string;
 }

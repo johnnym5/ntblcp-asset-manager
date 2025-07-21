@@ -6,7 +6,6 @@ import { useAppState } from './app-state-context';
 import { AUTHORIZED_USERS } from '@/lib/authorized-users';
 import type { AuthorizedUser } from '@/lib/authorized-users';
 import { clearAssets as clearLocalAssets } from '@/lib/idb';
-import { ensureAnonymousSession } from '@/lib/auth';
 
 
 export interface UserProfile extends AuthorizedUser {
@@ -18,7 +17,7 @@ interface AuthContextType {
   loading: boolean;
   profileSetupComplete: boolean;
   authInitialized: boolean;
-  login: (profile: { displayName: string, state: string, role: 'admin' | 'user' }) => void;
+  login: (profile: { displayName: string, state: string, role: 'admin' | 'user' | 'guest' }) => void;
   logout: () => void;
 }
 
@@ -42,11 +41,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const initializeAuth = async () => {
       try {
-        // Step 1: Ensure we have an anonymous Firebase session for Firestore access.
-        await ensureAnonymousSession();
-        setAuthInitialized(true); // Firebase connection is now ready.
+        setAuthInitialized(true);
 
-        // Step 2: Check for a locally saved user profile for the UI.
         const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
         if (savedProfileJson) {
             const savedProfile: UserProfile = JSON.parse(savedProfileJson);
@@ -60,8 +56,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             }
         }
       } catch (error) {
-          console.error("Firebase authentication failed:", error);
-          // Handle auth error, maybe show a message to the user
+          console.error("Auth initialization failed:", error);
       } finally {
           setLoading(false);
       }
@@ -70,7 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initializeAuth();
   }, [setGlobalStateFilter]);
 
-  const login = (profile: { displayName: string, state: string, role: 'admin' | 'user' }) => {
+  const login = (profile: { displayName: string, state: string, role: 'admin' | 'user' | 'guest' }) => {
     const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === profile.displayName.toLowerCase());
     if (!authorizedUser) return;
 
@@ -92,7 +87,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setProfileSetupComplete(false);
     setGlobalStateFilter('');
     setAssets([]); 
-    window.location.reload(); // Force a full reload to clear all state
+    window.location.reload(); 
   };
 
   const value = { userProfile, loading, profileSetupComplete, login, logout, authInitialized };

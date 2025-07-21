@@ -4,10 +4,21 @@ export interface AuthorizedUser {
   loginName: string;
   states: string[];
   isAdmin: boolean;
+  isGuest?: boolean;
 }
+
+const ALL_STATES = [
+  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
+  "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe",
+  "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos",
+  "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto",
+  "Taraba", "Yobe", "Zamfara", "NTBLCP-PMU"
+];
+
 
 // Note: loginName should be lowercase for case-insensitive matching.
 export const AUTHORIZED_USERS: AuthorizedUser[] = [
+  { displayName: "Guest", loginName: "guest", states: ALL_STATES, isAdmin: false, isGuest: true },
   { displayName: "Admin", loginName: "admin", states: ["All"], isAdmin: true },
   { displayName: "Ann Okagbue", loginName: "ann okagbue", states: ["NTBLCP-PMU"], isAdmin: true },
   { displayName: "Emeka OAGF", loginName: "emeka oagf", states: ["Benue", "Akwa Ibom"], isAdmin: false },

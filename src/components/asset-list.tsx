@@ -116,7 +116,6 @@ const getStatusClasses = (status?: 'Verified' | 'Unverified' | 'Discrepancy') =>
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
     const keys = Object.keys(b) as (keyof Asset)[];
     for (const key of keys) {
-        // We don't care about these metadata fields for change detection
         if (key === 'id' || key === 'syncStatus' || key === 'lastModified' || key === 'lastModifiedBy' || key === 'lastModifiedByState') {
             continue;
         }
@@ -201,6 +200,7 @@ export default function AssetList() {
   } = useAppState();
 
   const isAdmin = userProfile?.isAdmin || false;
+  const isGuest = userProfile?.isGuest || false;
 
   useEffect(() => {
     setCurrentPage(1);
@@ -217,14 +217,15 @@ export default function AssetList() {
 
   // --- DATA LOADING & SYNC ---
   const performSync = useCallback(async () => {
-    if (!isOnline || !authInitialized) return;
+    if (!isOnline || !authInitialized || isGuest) return;
 
     setIsSyncing(true);
     addNotification({ title: 'Syncing with cloud...' });
 
     try {
-        const cloudAssets = await getAssets();
         const localAssets = await getLocalAssetsFromDb();
+        const cloudAssets = await getAssets();
+        
         const assetsToPush = localAssets.filter(asset => asset.syncStatus === 'local');
         
         if (assetsToPush.length > 0) {
@@ -232,7 +233,6 @@ export default function AssetList() {
           addNotification({ title: 'Local changes pushed', description: `${assetsToPush.length} assets updated in the cloud.`});
         }
         
-        // This is a simple sync, it replaces local with cloud data
         const finalAssets = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' as const }));
         
         await saveAssets(finalAssets);
@@ -250,7 +250,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, authInitialized, toast, setIsOnline, setAssets, setIsSyncing]);
+  }, [isOnline, authInitialized, isGuest, toast, setIsOnline, setAssets, setIsSyncing]);
   
   useEffect(() => {
     const loadInitialData = async () => {
@@ -259,7 +259,7 @@ export default function AssetList() {
         setAssets(localAssets);
         setIsLoading(false);
 
-        if (isOnline && authInitialized) {
+        if (isOnline && authInitialized && !isGuest) {
           await performSync();
         }
     };
@@ -267,13 +267,13 @@ export default function AssetList() {
     if (authInitialized) {
         loadInitialData();
     }
-  }, [authInitialized, performSync, setAssets, isOnline]);
+  }, [authInitialized, performSync, setAssets, isOnline, isGuest]);
   
   useEffect(() => {
-    if ((manualSyncTrigger > 0 || (autoSyncEnabled && dataSource === 'cloud')) && isOnline && authInitialized) {
+    if ((manualSyncTrigger > 0 || (autoSyncEnabled && dataSource === 'cloud')) && isOnline && authInitialized && !isGuest) {
         performSync();
     }
-  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync, dataSource]);
+  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync, dataSource, isGuest]);
   
   useEffect(() => {
     setStatusOptions([
@@ -319,7 +319,7 @@ export default function AssetList() {
         locations.set(normalized, (locations.get(normalized) || 0) + 1);
       }
     });
-    setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })).sort((a, b) => a.label.localeCompare(b.label)));
+    setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })).sort((a, b) => (b.count || 0) - (a.count || 0)));
 
     const assigneeMap = new Map<string, number>();
     stateFilteredAssets.forEach(asset => {
@@ -403,7 +403,7 @@ export default function AssetList() {
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
-    setIsFormReadOnly(true);
+    setIsFormReadOnly(isGuest);
     setIsFormOpen(true);
   };
 
@@ -702,7 +702,6 @@ export default function AssetList() {
       if (assetsToSync.length > 0) {
         await batchSetAssets(assetsToSync);
 
-        // Update local sync status
         const updatedLocalAssets = allLocalAssets.map(asset => 
           idsToSync.includes(asset.id) ? { ...asset, syncStatus: 'synced' as const } : asset
         );
@@ -828,8 +827,8 @@ export default function AssetList() {
 
   const clearAllDialogDescription = useMemo(() => {
     let message = "This will permanently delete all asset records from your local device storage.";
-    if (isAdmin) {
-      message += " As an admin, if you are online, this will ALSO delete all assets from the cloud database, which cannot be undone."
+    if (isAdmin && isOnline) {
+      message += " As an admin who is online, this will ALSO delete all assets from the cloud database, which cannot be undone."
     }
     return message;
   }, [isAdmin, isOnline]);
@@ -861,13 +860,13 @@ export default function AssetList() {
                       {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CloudUpload className="mr-2 h-4 w-4" />}
                        Sync Selected
                     </Button>
-                    <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)}>
+                    <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest}>
                         <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => handleExportClick(selectedCategories)}>
                         <FileDown className="mr-2 h-4 w-4" /> Export
                     </Button>
-                    <Button variant="destructive" size="sm" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting}>
+                    <Button variant="destructive" size="sm" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
                         {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                         Delete
                     </Button>
@@ -926,6 +925,7 @@ export default function AssetList() {
                         checked={areAllCategoriesSelected}
                         onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)}
                         aria-label="Select all categories"
+                        disabled={isGuest}
                     />
                 </div>
             </CardHeader>
@@ -953,6 +953,7 @@ export default function AssetList() {
                                   checked={isSelected}
                                   onCheckedChange={(checked) => handleSelectCategory(category, checked as boolean)}
                                   aria-label={`Select category ${category}`}
+                                  disabled={isGuest}
                                 />
                             </CardHeader>
                             <CardContent className="flex-grow space-y-4">
@@ -1037,16 +1038,16 @@ export default function AssetList() {
                        Sync Selected
                     </Button>
                      {selectedAssetIds.length === 1 && (
-                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)}>
+                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)} disabled={isGuest}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     )}
                     {selectedAssetIds.length > 0 && (
-                        <Button variant="outline" size="sm" onClick={handleBatchEdit}>
+                        <Button variant="outline" size="sm" onClick={handleBatchEdit} disabled={isGuest}>
                             <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                         </Button>
                     )}
-                    <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting}>
+                    <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting || isGuest}>
                         {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                         Delete
                     </Button>
@@ -1064,6 +1065,7 @@ export default function AssetList() {
                               checked={areAllCategoryResultsSelected}
                               onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
                               aria-label="Select all in this category"
+                              disabled={isGuest}
                           />
                       </TableHead>
                       <TableHead>S/N</TableHead>
@@ -1084,6 +1086,7 @@ export default function AssetList() {
                                   checked={selectedAssetIds.includes(asset.id)}
                                   onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
                                   aria-label={`Select asset ${asset.description}`}
+                                  disabled={isGuest}
                               />
                           </TableCell>
                           <TableCell>{asset.sn || 'N/A'}</TableCell>
@@ -1132,6 +1135,7 @@ export default function AssetList() {
                                   description: `Asset status changed to ${status}.`,
                                 });
                               }}
+                              disabled={isGuest}
                             >
                               <SelectTrigger className={cn("w-[150px] h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
                                 <SelectValue placeholder="Select status" />
@@ -1161,7 +1165,7 @@ export default function AssetList() {
                           <TableCell>{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</TableCell>
                           <TableCell className="text-right" onClick={e => e.stopPropagation()}>
                               <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                               <DropdownMenuContent align="end">
                                   <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
                                       <Edit className="mr-2 h-4 w-4" />

@@ -64,7 +64,7 @@ export default function UserProfileSetup() {
     login({
         displayName: foundUser.loginName,
         state: selectedState,
-        role: foundUser.isAdmin ? 'admin' : 'user',
+        role: foundUser.isAdmin ? 'admin' : foundUser.isGuest ? 'guest' : 'user',
     });
   };
   

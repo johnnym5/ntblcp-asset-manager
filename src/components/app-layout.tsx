@@ -162,6 +162,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
   const isAdmin = userProfile?.isAdmin || false;
+  const isGuest = userProfile?.isGuest || false;
+
+  const canImport = dataActions.isAdmin || !isOnline;
+  const canModifyData = !isGuest;
 
   return (
     <div className="flex flex-col w-full min-h-screen">
@@ -253,7 +257,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <TooltipProvider>
               <Tooltip>
                   <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing || !isOnline}>
+                        <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing || !isOnline || isGuest}>
                           {isSyncing ? <div className="animate-spin"><RefreshCw className="h-5 w-5" /></div> : <RefreshCw className="h-5 w-5" />}
                       </Button>
                   </TooltipTrigger>
@@ -282,6 +286,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
+                  {canModifyData && (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
                         <Database className="mr-2 h-4 w-4" />
@@ -289,7 +294,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
-                           {(isAdmin || !isOnline) && (
+                           {canImport && (
                             <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting}>
                               <FileUp className="mr-2 h-4 w-4" />
                               Import from Excel
@@ -317,6 +322,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         </DropdownMenuSubContent>
                       </DropdownMenuPortal>
                     </DropdownMenuSub>
+                  )}
                   {isAdmin && (
                     <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
                       <Settings className="mr-2 h-4 w-4"/>

@@ -89,15 +89,14 @@ const ReadOnlyField = ({ label, value }: { label: string; value: React.ReactNode
 
 
 export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, isReadOnly }: AssetFormProps) {
-  // --- State for Quick View ---
   const [quickViewRemarks, setQuickViewRemarks] = useState('');
   const [quickViewStatus, setQuickViewStatus] = useState<'Verified' | 'Unverified' | 'Discrepancy'>('Unverified');
   const [isQuickSaving, setIsQuickSaving] = useState(false);
 
-  // --- State for Full Form ---
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
+  const isAdmin = userProfile?.isAdmin || false;
+  const isGuest = userProfile?.isGuest || false;
   
   const defaultValues = {
     category: '',
@@ -129,15 +128,12 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   
   const watchedValues = form.watch();
 
-  // --- Effects ---
   useEffect(() => {
     if (isOpen) {
       if (asset) {
-        // Sync state for quick view when sheet opens
         setQuickViewRemarks(asset.remarks || '');
         setQuickViewStatus(asset.verifiedStatus || 'Unverified');
         
-        // Reset full form as well
         form.reset({
           ...defaultValues,
           ...asset,
@@ -145,7 +141,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
           verifiedStatus: asset.verifiedStatus || 'Unverified',
         });
       } else {
-        // Reset for new asset form
         form.reset(defaultValues);
       }
     }
@@ -154,16 +149,15 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   const watchedStatusInForm = form.watch('verifiedStatus');
   useEffect(() => {
     if (watchedStatusInForm === 'Verified' && !form.getValues('verifiedDate')) {
-        form.setValue('verifiedDate', new Date().toLocaleDateString('en-CA')); // YYYY-MM-DD
+        form.setValue('verifiedDate', new Date().toLocaleDateString('en-CA'));
     } else if (watchedStatusInForm !== 'Verified' && !isReadOnly) {
         form.setValue('verifiedDate', '');
     }
   }, [watchedStatusInForm, form, isReadOnly]);
 
 
-  // --- Handlers ---
   const handleQuickSaveClick = async () => {
-    if (!asset) return;
+    if (!asset || isGuest) return;
     setIsQuickSaving(true);
     try {
       const verifiedDate = quickViewStatus === 'Verified' ? new Date().toLocaleDateString('en-CA') : '';
@@ -181,6 +175,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   }
 
   const onSubmit = async (data: AssetFormValues) => {
+    if (isGuest) return;
     setIsSaving(true);
     try {
         const assetToSave: Asset = {
@@ -197,17 +192,15 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     }
   };
   
-  // --- RENDER LOGIC ---
-
+  // RENDER LOGIC
   if (isReadOnly && asset) {
-    // --- QUICK VIEW RENDER ---
     return (
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="sm:max-w-2xl w-full flex flex-col">
           <SheetHeader>
             <SheetTitle>Asset Quick View</SheetTitle>
             <SheetDescription>
-              Viewing asset details. Comments and status can be updated here.
+              {isGuest ? 'Viewing asset details.' : 'Viewing asset details. Comments and status can be updated here.'}
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 space-y-6 overflow-y-auto pr-6 py-4">
@@ -240,7 +233,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                      <div className="space-y-2">
                         <Label htmlFor="quick-view-status">Verified Status</Label>
-                        <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
+                        <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus} disabled={isGuest}>
                             <SelectTrigger id="quick-view-status">
                                 <SelectValue placeholder="Select status" />
                             </SelectTrigger>
@@ -253,10 +246,12 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     </div>
                      <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
                  </div>
-                <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
-                    {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Comments & Status
-                </Button>
+                 {!isGuest && (
+                    <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
+                        {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Save Comments & Status
+                    </Button>
+                 )}
             </div>
             
             <Accordion type="single" collapsible className="w-full pt-4">
@@ -289,7 +284,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     );
   }
 
-  // --- FULL EDIT/ADD FORM RENDER ---
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-4xl w-full flex flex-col">
@@ -307,7 +301,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4 p-1"
               >
-                {/* --- BASIC DETAILS --- */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <FormField
                     control={form.control}
@@ -447,7 +440,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 </div>
 
 
-                {/* --- ADVANCED DETAILS --- */}
                 <Accordion type="single" collapsible className="w-full pt-4">
                   <AccordionItem value="advanced">
                     <AccordionTrigger>Advanced Information</AccordionTrigger>
@@ -488,7 +480,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
           <SheetClose asChild>
             <Button variant="outline">Close</Button>
           </SheetClose>
-          <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
+          <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid || isGuest}>
               {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Save Changes
           </Button>
