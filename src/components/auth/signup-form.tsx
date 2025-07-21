@@ -18,14 +18,11 @@ import { Input } from '@/components/ui/input';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { AlertCircle, Loader2 } from 'lucide-react';
 import { signUpWithEmail } from '@/lib/auth';
-import { NIGERIAN_STATES } from '@/lib/constants';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 const formSchema = z.object({
   displayName: z.string().min(2, { message: 'Name must be at least 2 characters.' }),
   email: z.string().email({ message: 'Invalid email address.' }),
   password: z.string().min(6, { message: 'Password must be at least 6 characters.' }),
-  state: z.string().min(1, { message: 'Please select a state.' }),
 });
 
 export function SignUpForm() {
@@ -38,7 +35,6 @@ export function SignUpForm() {
       displayName: '',
       email: '',
       password: '',
-      state: '',
     },
   });
 
@@ -46,7 +42,7 @@ export function SignUpForm() {
     setError(null);
     setIsLoading(true);
     try {
-      await signUpWithEmail(values.email, values.password, values.displayName, values.state);
+      await signUpWithEmail(values.email, values.password, values.displayName);
       // onAuthStateChanged in AuthProvider will handle the rest
     } catch (e: any) {
       setError(e.message);
@@ -100,30 +96,6 @@ export function SignUpForm() {
               <FormControl>
                 <Input type="password" placeholder="••••••••" {...field} />
               </FormControl>
-              <FormMessage />
-            </FormItem>
-          )}
-        />
-         <FormField
-          control={form.control}
-          name="state"
-          render={({ field }) => (
-            <FormItem>
-              <FormLabel>Your Primary State/Location</FormLabel>
-                <Select onValueChange={field.onChange} defaultValue={field.value}>
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select your state" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {NIGERIAN_STATES.map((state) => (
-                      <SelectItem key={state} value={state}>
-                        {state}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
               <FormMessage />
             </FormItem>
           )}

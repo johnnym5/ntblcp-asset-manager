@@ -10,7 +10,7 @@ import UserProfileSetup from '@/components/auth/user-profile-setup';
 import { useAppState } from '@/contexts/app-state-context';
 
 export default function AssetsPage() {
-  const { user, userProfile, loading } = useAuth();
+  const { user, userProfile, loading, authInitialized } = useAuth();
   const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
@@ -19,7 +19,7 @@ export default function AssetsPage() {
     }
   }, [userProfile, setGlobalStateFilter]);
 
-  if (loading) {
+  if (loading || !authInitialized) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />

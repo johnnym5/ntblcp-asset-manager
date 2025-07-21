@@ -34,10 +34,6 @@ const formSchema = z.object({
   password: z.string().min(1, { message: 'Password is required.' }),
 });
 
-const forgotPasswordSchema = z.object({
-  email: z.string().email({ message: 'Please enter a valid email address.' }),
-});
-
 export function LoginForm() {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);

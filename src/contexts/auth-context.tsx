@@ -12,6 +12,7 @@ interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
   loading: boolean;
+  authInitialized: boolean;
   logout: () => Promise<void>;
 }
 
@@ -19,6 +20,7 @@ const AuthContext = createContext<AuthContextType>({
   user: null,
   userProfile: null,
   loading: true,
+  authInitialized: false,
   logout: async () => {},
 });
 
@@ -26,6 +28,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
+  
   const { setAssets } = useAppState();
 
   useEffect(() => {
@@ -34,20 +38,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (firebaseUser) {
         setUser(firebaseUser);
         let profile = await getUserProfile(firebaseUser.uid);
+        
         if (!profile) {
-          // If profile doesn't exist, create it. This happens on first sign-up.
+          // If profile doesn't exist, create it. This happens on first sign-up
+          // or first anonymous login.
           profile = await createUserProfile(firebaseUser);
         }
         setUserProfile(profile);
+
       } else {
         setUser(null);
         setUserProfile(null);
       }
       setLoading(false);
+      setAuthInitialized(true);
     });
 
     return () => unsubscribe();
   }, []);
+
 
   const logout = async () => {
     setLoading(true);
@@ -55,11 +64,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setUser(null);
     setUserProfile(null);
     setAssets([]); 
-    // No need to redirect, the page component will handle showing the login UI
-    setLoading(false);
+    window.location.href = '/';
   };
 
-  const value = { user, userProfile, loading, logout };
+  const value = { user, userProfile, loading, logout, authInitialized };
 
   return (
     <AuthContext.Provider value={value}>

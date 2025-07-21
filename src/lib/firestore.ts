@@ -13,15 +13,21 @@ export async function createUserProfile(user: User, additionalData: Partial<User
   const profile: UserProfile = {
     uid: user.uid,
     email: user.email || '',
-    displayName: user.displayName || user.email?.split('@')[0] || 'Anonymous',
-    role: 'guest', // All new users default to guest
-    state: additionalData.state || 'All',
+    displayName: user.displayName || 'Guest User',
+    role: 'user', // Default to user
+    state: 'All', // Default to all, can be changed by admin
     ...additionalData,
   };
 
-  // Assign admin role based on email
+  // Assign admin role based on email for specified users
   if (['jegbase@hotmail.com', 'jegbase@gmail.com'].includes(profile.email)) {
     profile.role = 'admin';
+  }
+  
+  // Anonymous users are always guests
+  if (user.isAnonymous) {
+      profile.role = 'guest';
+      profile.displayName = 'Guest User';
   }
 
   await setDoc(userRef, profile, { merge: true });
@@ -36,18 +42,6 @@ export async function getUserProfile(uid: string): Promise<UserProfile | null> {
   }
   return null;
 }
-
-export async function getAllUserProfiles(): Promise<UserProfile[]> {
-  const usersCollectionRef = collection(db, 'users');
-  const querySnapshot = await getDocs(usersCollectionRef);
-  return querySnapshot.docs.map(doc => doc.data() as UserProfile);
-}
-
-export async function updateUserRole(uid: string, role: 'admin' | 'user' | 'guest') {
-  const userRef = doc(db, 'users', uid);
-  await setDoc(userRef, { role }, { merge: true });
-}
-
 
 // --- Assets ---
 
