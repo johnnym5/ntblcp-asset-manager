@@ -21,7 +21,7 @@ import { setupRecaptcha, sendVerificationCode, confirmVerificationCode } from '@
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 
 const phoneSchema = z.object({
-  phoneNumber: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Please enter a valid phone number in E.164 format (e.g., +16505551234).'),
+  phoneNumber: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Please enter a valid phone number in E.164 format (e.g., +2348012345678).'),
 });
 
 const otpSchema = z.object({
@@ -47,12 +47,14 @@ export function PhoneLoginForm() {
 
   useEffect(() => {
     try {
-      const verifier = setupRecaptcha('recaptcha-container');
-      setAppVerifier(verifier);
+      if (!appVerifier) {
+        const verifier = setupRecaptcha('recaptcha-container');
+        setAppVerifier(verifier);
+      }
     } catch (e: any) {
       setError(e.message);
     }
-  }, []);
+  }, [appVerifier]);
 
   async function onSendCode(values: z.infer<typeof phoneSchema>) {
     setError(null);
@@ -110,7 +112,7 @@ export function PhoneLoginForm() {
                 <FormItem>
                   <FormLabel>Phone Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="+16505551234" {...field} />
+                    <Input placeholder="+2348012345678" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

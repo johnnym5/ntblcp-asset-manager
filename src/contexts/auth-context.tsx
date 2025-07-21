@@ -2,69 +2,81 @@
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
+import { onAuthStateChanged, type User } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { createUserProfile, getUserProfile } from '@/lib/firestore';
+import type { UserProfile } from '@/lib/types';
+import { 
+  saveLocalUserProfile, 
+  getLocalUserProfile, 
+  clearLocalUserProfile 
+} from '@/lib/idb';
 import { useAppState } from './app-state-context';
 
-export interface LocalUserProfile {
-  id: string;
-  displayName: string;
-  state: string; 
-  role: 'admin' | 'user' | 'guest';
-}
-
 interface AuthContextType {
-  userProfile: LocalUserProfile | null;
+  user: User | null;
+  userProfile: UserProfile | null;
   loading: boolean;
   profileSetupComplete: boolean;
-  login: (profile: Omit<LocalUserProfile, 'id'>) => void;
+  authInitialized: boolean;
   logout: () => void;
 }
 
 const AuthContext = createContext<AuthContextType>({
+  user: null,
   userProfile: null,
   loading: true,
   profileSetupComplete: false,
-  login: () => {},
+  authInitialized: false,
   logout: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
+  const [user, setUser] = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  
+  const [authInitialized, setAuthInitialized] = useState(false);
   const { setAssets } = useAppState();
 
   useEffect(() => {
-    try {
-      const savedProfile = localStorage.getItem('ntblcp-user-profile');
-      if (savedProfile) {
-        setUserProfile(JSON.parse(savedProfile));
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true);
+      if (firebaseUser) {
+        setUser(firebaseUser);
+        // Try fetching from local DB first for speed
+        let profile = await getLocalUserProfile(firebaseUser.uid);
+        if (!profile) {
+          // If not in local, fetch from Firestore
+          profile = await getUserProfile(firebaseUser.uid);
+          if (!profile) {
+            // If still no profile, it's likely a brand new user. Create a profile.
+            // This happens on first-time social/phone login.
+            profile = await createUserProfile(firebaseUser);
+          }
+        }
+        
+        setUserProfile(profile);
+        await saveLocalUserProfile(profile); // Cache for next time
+      } else {
+        setUser(null);
+        setUserProfile(null);
+        await clearLocalUserProfile();
+        setAssets([]); // Clear assets on logout
       }
-    } catch (e) {
-      console.error("Failed to load user profile", e);
-      localStorage.removeItem('ntblcp-user-profile');
-    } finally {
       setLoading(false);
-    }
-  }, []);
+      setAuthInitialized(true); // Signal that the initial auth check is complete
+    });
 
-  const login = (profile: Omit<LocalUserProfile, 'id'>) => {
-    const newProfile: LocalUserProfile = {
-      id: `${profile.displayName}-${Date.now()}`,
-      ...profile,
-    };
-    localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
-    setUserProfile(newProfile);
+    return () => unsubscribe();
+  }, [setAssets]);
+
+  const logout = async () => {
+    await auth.signOut();
   };
-
-  const logout = () => {
-    localStorage.removeItem('ntblcp-user-profile');
-    setUserProfile(null);
-    setAssets([]);
-    window.location.href = '/'; 
-  };
-
+  
   const profileSetupComplete = !!userProfile;
-  const value = { userProfile, loading, profileSetupComplete, login, logout };
+
+  const value = { user, userProfile, loading, profileSetupComplete, logout, authInitialized };
 
   return (
     <AuthContext.Provider value={value}>
