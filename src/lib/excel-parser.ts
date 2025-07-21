@@ -235,7 +235,8 @@ export async function parseExcelFile(
                     }
                 });
 
-                if (Object.keys(assetObject).length <= 1) {
+                // More flexible check: import if there's at least a description or serial number.
+                if (!assetObject.description && !assetObject.serialNumber) {
                     skipped++;
                     continue;
                 }

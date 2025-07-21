@@ -352,6 +352,16 @@ export default function AssetList() {
   const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
     if (!config) return assetsToSort;
     return [...assetsToSort].sort((a, b) => {
+        // Special handling for numeric sorting on 'sn' field
+        if (config.key === 'sn') {
+            const numA = Number(a.sn) || 0;
+            const numB = Number(b.sn) || 0;
+            if (numA < numB) return config.direction === 'asc' ? -1 : 1;
+            if (numA > numB) return config.direction === 'asc' ? 1 : -1;
+            return 0;
+        }
+        
+        // Default string-based sorting for all other fields
         const aVal = a[config.key] ?? '';
         const bVal = b[config.key] ?? '';
         if (aVal < bVal) return config.direction === 'asc' ? -1 : 1;
