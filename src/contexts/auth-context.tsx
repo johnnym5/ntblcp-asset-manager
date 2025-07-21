@@ -34,12 +34,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      setLoading(true); // Start loading whenever auth state might change.
       if (firebaseUser) {
         let profile = await getUserProfile(firebaseUser.uid);
         
         if (!profile) {
-          // If profile doesn't exist, create it. This happens on first sign-up
-          // or first anonymous login.
+          // If profile doesn't exist, create it. This happens on first sign-up.
           profile = await createUserProfile(firebaseUser);
         }
         setUserProfile(profile);
@@ -48,8 +48,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         setUser(null);
         setUserProfile(null);
       }
-      setLoading(false);
+      // Mark initialization as complete and stop loading.
       setAuthInitialized(true);
+      setLoading(false);
     });
 
     return () => unsubscribe();

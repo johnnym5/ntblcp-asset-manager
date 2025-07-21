@@ -1,25 +1,31 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // User Profiles
+    
+    // User profile rules
     match /users/{userId} {
-      // Any authenticated user can create their own user document.
-      allow create: if request.auth.uid == userId;
-      // Users can read their own profile. Admins can read any profile.
+      // A user can create their own profile document, but cannot make themselves an admin.
+      allow create: if request.auth.uid == userId && request.resource.data.role != 'admin';
+      
+      // A user can read their own profile. Admins can read any profile.
       allow read: if request.auth.uid == userId || get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      // Only admins can update user profiles (e.g., to change a role).
-      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-      // Nobody can delete user profiles.
-      allow delete: if false;
+
+      // An admin can update any user's role. A user cannot update their own role.
+      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' && request.resource.data.role != resource.data.role;
+
+      // Only admins can delete user profiles (for safety, generally not used).
+      allow delete: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Assets
+    // Asset rules
     match /assets/{assetId} {
-      // Anyone, including guests, can read asset data.
+      // Anyone can read assets. This allows guest access.
       allow read: if true;
-      // Only authenticated users who are not guests can write asset data.
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'guest';
+      
+      // Only authenticated users with a role of 'user' or 'admin' can write.
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['user', 'admin'];
     }
   }
 }

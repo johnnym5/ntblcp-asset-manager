@@ -14,17 +14,20 @@ export default function AssetsPage() {
   const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    if (userProfile) {
-      setGlobalStateFilter(userProfile.state || 'All');
+    if (userProfile && userProfile.state) {
+      setGlobalStateFilter(userProfile.state);
+    } else {
+      setGlobalStateFilter('All');
     }
   }, [userProfile, setGlobalStateFilter]);
 
-  // This is the key change: wait for Firebase to be fully initialized.
+  // The key change: wait for auth to be fully initialized AND for loading to be false.
+  // This ensures we have the user and their profile before rendering anything that might fetch data.
   if (loading || !authInitialized) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="ml-4 text-muted-foreground">Initializing...</p>
+        <p className="ml-4 text-muted-foreground">Authenticating...</p>
       </div>
     );
   }
