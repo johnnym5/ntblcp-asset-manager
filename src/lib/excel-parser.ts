@@ -241,8 +241,8 @@ export async function parseExcelFile(
                     continue;
                 }
                 
-                const assetIdCode = (assetObject.assetIdCode || '').trim();
-                const serialNumber = (assetObject.serialNumber || '').trim();
+                const assetIdCode = String(assetObject.assetIdCode || '').trim();
+                const serialNumber = String(assetObject.serialNumber || '').trim();
 
                 const key = `${assetIdCode}-${serialNumber}`.toLowerCase();
                 const existingAsset = (key !== '-') ? existingAssetByIdentifiers.get(key) : undefined;
