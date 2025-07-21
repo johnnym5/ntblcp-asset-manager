@@ -98,7 +98,7 @@ export default function UserProfileSetup() {
             <Label htmlFor="username">Name</Label>
             <Input
               id="username"
-              placeholder="Enter your name or 'admin'"
+              placeholder="Enter your name"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
             />

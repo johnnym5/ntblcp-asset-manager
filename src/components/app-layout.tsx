@@ -176,6 +176,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
   const isAdmin = userProfile?.role === 'admin';
+  const isGuest = userProfile?.role === 'guest';
 
   return (
     <div className="flex flex-col w-full min-h-screen">
@@ -303,7 +304,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                   {pathname === '/assets' && dataActions.onImport && isAdmin && (
+                  {pathname === '/assets' && !isGuest && (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
                         <Database className="mr-2 h-4 w-4" />
@@ -311,10 +312,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </DropdownMenuSubTrigger>
                       <DropdownMenuPortal>
                         <DropdownMenuSubContent>
-                          <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting}>
-                            <FileUp className="mr-2 h-4 w-4" />
-                            Import from Excel
-                          </DropdownMenuItem>
+                          {isAdmin && (
+                            <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting}>
+                              <FileUp className="mr-2 h-4 w-4" />
+                              Import from Excel
+                            </DropdownMenuItem>
+                          )}
                           <DropdownMenuItem onClick={dataActions.onExport}>
                             <FileDown className="mr-2 h-4 w-4" />
                             Export to Excel
@@ -324,16 +327,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             Add New Asset
                           </DropdownMenuItem>
                           
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:bg-destructive/20 focus:text-destructive"
-                            onClick={dataActions.onClearAll}
-                            disabled={!dataActions.hasAssets || (isOnline && !dataActions.isAdmin)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Clear All Assets
-                          </DropdownMenuItem>
-                          
+                          {isAdmin && (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:bg-destructive/20 focus:text-destructive"
+                                onClick={dataActions.onClearAll}
+                                disabled={!dataActions.hasAssets}
+                              >
+                                <Trash2 className="mr-2 h-4 w-4" />
+                                Clear All Assets
+                              </DropdownMenuItem>
+                            </>
+                          )}
                         </DropdownMenuSubContent>
                       </DropdownMenuPortal>
                     </DropdownMenuSub>
