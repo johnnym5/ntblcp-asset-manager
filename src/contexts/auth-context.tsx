@@ -14,6 +14,7 @@ interface AuthContextType {
   userProfile: UserProfile | null;
   loading: boolean;
   profileSetupComplete: boolean;
+  authInitialized: boolean;
   login: (profile: UserProfile) => void;
   logout: () => void;
 }
@@ -22,6 +23,7 @@ const AuthContext = createContext<AuthContextType>({
   userProfile: null,
   loading: true,
   profileSetupComplete: false,
+  authInitialized: false,
   login: () => {},
   logout: () => {},
 });
@@ -29,6 +31,7 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authInitialized, setAuthInitialized] = useState(false);
   const { setAssets, setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
@@ -43,6 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       console.error("Failed to load user profile", e);
     } finally {
       setLoading(false);
+      setAuthInitialized(true);
     }
   }, [setGlobalStateFilter]);
 
@@ -69,7 +73,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const profileSetupComplete = !!userProfile;
 
-  const value = { userProfile, loading, profileSetupComplete, login, logout };
+  const value = { userProfile, loading, profileSetupComplete, authInitialized, login, logout };
 
   return (
     <AuthContext.Provider value={value}>

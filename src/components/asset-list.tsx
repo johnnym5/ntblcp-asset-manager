@@ -57,7 +57,7 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 
-import { AssetForm, type AssetFormValues } from "./asset-form";
+import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
@@ -172,7 +172,7 @@ export default function AssetList() {
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const { userProfile } = useAuth();
+  const { userProfile, authInitialized } = useAuth();
   const { toast } = useToast();
 
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
@@ -214,9 +214,8 @@ export default function AssetList() {
     }
   }, [view]);
 
-  // --- DATA LOADING & SYNC ---
   const performSync = useCallback(async () => {
-    if (!isOnline) return;
+    if (!isOnline || !authInitialized) return;
 
     setIsSyncing(true);
     addNotification({ title: 'Syncing with cloud...' });
@@ -255,9 +254,8 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, isGuest, toast, setIsOnline, setAssets, setIsSyncing]);
+  }, [isOnline, isGuest, toast, setIsOnline, setAssets, setIsSyncing, authInitialized]);
   
-  // Initial data load effect
   useEffect(() => {
     const loadInitialData = async () => {
         setIsLoading(true);
@@ -269,16 +267,17 @@ export default function AssetList() {
           await performSync();
         }
     };
-    loadInitialData();
-  }, []); 
+
+    if (authInitialized) {
+        loadInitialData();
+    }
+  }, [authInitialized]); 
   
-  // Effect for manual or auto-sync triggers
   useEffect(() => {
-    if ((manualSyncTrigger > 0 || (isOnline && autoSyncEnabled))) {
+    if ((manualSyncTrigger > 0 || autoSyncEnabled) && isOnline && authInitialized) {
         performSync();
     }
-  }, [manualSyncTrigger, isOnline, autoSyncEnabled, performSync]);
-  
+  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync]);
   
   useEffect(() => {
     setStatusOptions([
