@@ -1,11 +1,11 @@
-
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Allow read/write access to all documents for any authenticated user.
-    // Our app uses anonymous authentication, so this means any app user can read/write.
-    match /{document=**} {
-      allow read, write: if request.auth != null;
+    // Grant universal read and write access to the assets collection.
+    // This allows the application code to handle all permission logic.
+    match /assets/{assetId} {
+      allow read, write: if true;
     }
   }
 }
