@@ -198,8 +198,8 @@ export default function AssetList() {
     autoSyncEnabled,
   } = useAppState();
 
-  const isAdmin = userProfile?.isAdmin || false;
-  const isGuest = !userProfile; // A user is a guest if there is no profile
+  const isAdmin = userProfile?.role === 'admin';
+  const isGuest = !userProfile || userProfile.role === 'guest';
 
   useEffect(() => {
     setCurrentPage(1);
@@ -249,7 +249,7 @@ export default function AssetList() {
         toast({
           title: "Sync Failed",
           description: (error as Error).message.includes('permission-denied')
-            ? 'Permission denied. Your name may not be authorized for this action.'
+            ? 'Permission denied. Your role may not be authorized for this action.'
             : (error as Error).message,
           variant: 'destructive'
         });
@@ -856,7 +856,7 @@ export default function AssetList() {
             <h2 className="text-2xl font-bold tracking-tight flex-1">
                 {isFiltered ? `Filter Results` : 'Asset Dashboard'}
             </h2>
-            {selectedCategories.length > 0 && (
+            {selectedCategories.length > 0 && !isGuest && (
                  <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
                     <Button variant="outline" size="sm" onClick={handleBatchEdit}>
@@ -875,7 +875,6 @@ export default function AssetList() {
         <Card>
              <CardHeader className="flex-row items-center justify-between">
                 <CardTitle>
-                    {isAdmin && !isFiltered ? (
                     <div className="flex flex-wrap items-center gap-2">
                         <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
                         <Select
@@ -913,14 +912,6 @@ export default function AssetList() {
                         </SelectContent>
                         </Select>
                     </div>
-                    ) : (
-                    <>
-                        {globalStateFilter && !isFiltered
-                        ? `Asset Verification Status for ${globalStateFilter}`
-                        : `Overall Asset Verification Status`
-                        }
-                    </>
-                    )}
                 </CardTitle>
                 <div className="flex items-center space-x-2">
                     <Label htmlFor="select-all-categories" className="text-sm font-medium">Select All</Label>
@@ -1034,7 +1025,7 @@ export default function AssetList() {
             <h2 className="text-2xl font-bold tracking-tight flex-1">
                 {currentCategory}
             </h2>
-            {selectedAssetIds.length > 0 && (
+            {selectedAssetIds.length > 0 && !isGuest && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
                      {selectedAssetIds.length === 1 && (

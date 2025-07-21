@@ -1,20 +1,21 @@
+
 rules_version = '2';
+
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // User profiles can be read by admins, or by the user themselves.
-    // They can only be created by anyone (on signup), but only updated by admins.
+
+    // Users can be read by anyone to facilitate role checks, but not written to by clients.
     match /users/{userId} {
-      allow read: if request.auth != null && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || request.auth.uid == userId);
-      allow create: if request.auth != null;
-      allow update: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      allow read: if true;
+      allow write: if false; // Should only be managed by admins via a backend function in a real scenario
     }
 
-    // Assets can be read by anyone.
-    // Writes are only allowed by authenticated 'admin' or 'user' roles. Guests cannot write.
+    // Assets can be read by anyone, but only modified by authenticated users who are not guests.
     match /assets/{assetId} {
       allow read: if true;
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'user'];
+      
+      // Allow create, update, delete only if the user is authenticated and their role is 'user' or 'admin'.
+      allow create, update, delete: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role != 'guest';
     }
   }
 }

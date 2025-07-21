@@ -1,3 +1,4 @@
+
 // This file contains all the client-side Firebase authentication functions.
 'use client';
 
@@ -10,6 +11,7 @@ import {
   signOut,
   signInAnonymously,
   updateProfile as updateFirebaseProfile,
+  sendPasswordResetEmail,
 } from 'firebase/auth';
 import { createUserProfile } from './firestore';
 
@@ -47,6 +49,16 @@ export const anonymousSignIn = async () => {
     return userCredential.user;
   } catch (error) {
     console.error('Error signing in anonymously', error);
+    throw error;
+  }
+};
+
+
+export const sendPasswordReset = async (email: string) => {
+  try {
+    await sendPasswordResetEmail(auth, email);
+  } catch (error) {
+    console.error("Error sending password reset email: ", error);
     throw error;
   }
 };
