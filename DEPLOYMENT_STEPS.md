@@ -76,6 +76,8 @@ Once all the prerequisites are met, you can deploy your application with a singl
 firebase deploy
 ```
 
-This command will automatically build your Next.js application and deploy it to App Hosting. When it's finished, the terminal will provide you with the public URL to your live application.
+This command will automatically build your Next.js application and deploy it to App Hosting. When it's finished, you can access your live application at the following URL:
+
+[https://ntblcp-asset-manager-k7hy1.web.app](https://ntblcp-asset-manager-k7hy1.web.app)
 
 That's it! Your application will be live.
