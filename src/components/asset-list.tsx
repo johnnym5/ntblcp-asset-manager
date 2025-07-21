@@ -870,43 +870,47 @@ export default function AssetList() {
         <Card>
              <CardHeader className="flex-row items-center justify-between">
                 <CardTitle>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
-                        <Select
-                            value={globalStateFilter || 'All'}
-                            onValueChange={(value) => setGlobalStateFilter(value)}
-                        >
-                        <SelectTrigger className="w-full sm:w-[280px]">
-                            <SelectValue placeholder="Select a location..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="All">Overall (All Assets)</SelectItem>
-                            <SelectSeparator />
-                            <SelectGroup>
-                                <SelectLabel>Special Locations</SelectLabel>
-                                {SPECIAL_LOCATIONS.map((loc) => (
-                                    <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                                ))}
-                            </SelectGroup>
-                            <SelectSeparator />
-                            <SelectGroup>
-                                <SelectLabel>Geopolitical Zones</SelectLabel>
-                                {ZONE_NAMES.map((zone) => (
-                                    <SelectItem key={zone} value={zone}>{zone}</SelectItem>
-                                ))}
-                            </SelectGroup>
-                            <SelectSeparator />
-                            <SelectGroup>
-                                <SelectLabel>States</SelectLabel>
-                                {NIGERIAN_STATES.map((state) => (
-                                    <SelectItem key={state} value={state}>
-                                      <StateProgress state={state} allAssets={assets} />
-                                    </SelectItem>
-                                ))}
-                            </SelectGroup>
-                        </SelectContent>
-                        </Select>
-                    </div>
+                    {isAdmin ? (
+                        <div className="flex flex-wrap items-center gap-2">
+                            <span className="text-lg font-semibold tracking-tight">Asset Verification Status for</span>
+                            <Select
+                                value={globalStateFilter || 'All'}
+                                onValueChange={(value) => setGlobalStateFilter(value)}
+                            >
+                            <SelectTrigger className="w-full sm:w-[280px]">
+                                <SelectValue placeholder="Select a location..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="All">Overall (All Assets)</SelectItem>
+                                <SelectSeparator />
+                                <SelectGroup>
+                                    <SelectLabel>Special Locations</SelectLabel>
+                                    {SPECIAL_LOCATIONS.map((loc) => (
+                                        <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                                    ))}
+                                </SelectGroup>
+                                <SelectSeparator />
+                                <SelectGroup>
+                                    <SelectLabel>Geopolitical Zones</SelectLabel>
+                                    {ZONE_NAMES.map((zone) => (
+                                        <SelectItem key={zone} value={zone}>{zone}</SelectItem>
+                                    ))}
+                                </SelectGroup>
+                                <SelectSeparator />
+                                <SelectGroup>
+                                    <SelectLabel>States</SelectLabel>
+                                    {NIGERIAN_STATES.map((state) => (
+                                        <SelectItem key={state} value={state}>
+                                          <StateProgress state={state} allAssets={assets} />
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </SelectContent>
+                            </Select>
+                        </div>
+                    ) : (
+                        `Asset Verification Status for ${globalStateFilter}`
+                    )}
                 </CardTitle>
                 <div className="flex items-center space-x-2">
                     <Label htmlFor="select-all-categories" className="text-sm font-medium">Select All</Label>
@@ -1215,3 +1219,6 @@ export default function AssetList() {
   );
 }
 
+
+
+    
