@@ -1,3 +1,4 @@
+
 # Offline Asset Assist
 
 A full-featured, offline-first Asset Management Web App for NTBLCP, built with Next.js, Tailwind CSS, and a local-first architecture.
@@ -74,12 +75,17 @@ Firebase will build your Next.js application and deploy it. After the command co
 
 ## Getting Started (Local Development)
 
-First, create a `.env` file in the root of the project by copying the `.env.example` file. Then, populate the Firebase configuration variables in the `.env` file with your project's credentials.
+**CRITICAL STEP:** Before you can run the app locally, you must provide your Firebase project's credentials.
 
-Then, run the development server:
+1.  **Copy the example file**:
+    Make a copy of the `.env.example` file and rename it to `.env`.
 
-```bash
-npm run dev
-```
+2.  **Fill in your credentials**:
+    Open the new `.env` file. You will see placeholders like `YOUR_API_KEY`. Go to your Firebase project's settings page in the Firebase Console. Under the "General" tab, find the "Your apps" section, select your web app, and copy the corresponding values into the `.env` file.
+
+3.  **Run the development server**:
+    ```bash
+    npm run dev
+    ```
 
 Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.

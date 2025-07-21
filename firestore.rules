@@ -1,10 +1,16 @@
+
 rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Grant universal read and write access to the assets collection.
-    // This allows the application code to handle all permission logic.
+    
+    // Allow all reads and writes to the assets collection
     match /assets/{assetId} {
+      allow read, write: if true;
+    }
+
+    // Allow all reads and writes to any other collection
+    match /{document=**} {
       allow read, write: if true;
     }
   }
