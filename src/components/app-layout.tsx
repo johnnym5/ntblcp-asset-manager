@@ -83,7 +83,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { 
     isOnline, setIsOnline, 
-    dataSource, setDataSource,
     searchTerm, setSearchTerm, 
     sortConfig, setSortConfig,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
@@ -164,7 +163,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
 
-  const canImport = dataActions.isAdmin || !isOnline;
+  const canImport = !isGuest;
   const canModifyData = !isGuest;
 
   return (
@@ -227,30 +226,39 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
-             <div className="flex items-center space-x-2">
-                <TooltipProvider>
-                  <Tooltip>
-                      <TooltipTrigger asChild>
-                         <HardDrive className={cn("h-5 w-5", dataSource === 'local' && "text-primary")} />
-                      </TooltipTrigger>
-                      <TooltipContent><p>Local Data</p></TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-                <Switch
-                  id="data-source-switch"
-                  checked={dataSource === 'cloud'}
-                  onCheckedChange={(checked) => setDataSource(checked ? 'cloud' : 'local')}
-                  disabled={!isOnline}
-                />
-                <TooltipProvider>
-                   <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Cloud className={cn("h-5 w-5", dataSource === 'cloud' && "text-primary", !isOnline && "text-muted-foreground/50")} />
-                      </TooltipTrigger>
-                      <TooltipContent><p>Cloud Data</p></TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-            </div>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                                const newIsOnline = !isOnline;
+                                setIsOnline(newIsOnline);
+                                addNotification({
+                                    title: `Mode Changed to ${newIsOnline ? 'Online' : 'Offline'}`,
+                                    description: newIsOnline
+                                        ? 'Application is now connecting to the server.'
+                                        : 'Application is running in offline mode.',
+                                });
+                                if (newIsOnline) {
+                                  setManualSyncTrigger(c => c + 1);
+                                }
+                            }}
+                            aria-label={`Switch to ${isOnline ? 'Offline' : 'Online'} mode`}
+                        >
+                            {isOnline ? (
+                                <Cloud className="h-5 w-5 text-green-500" />
+                            ) : (
+                                <CloudOff className="h-5 w-5 text-red-500" />
+                            )}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>{isOnline ? 'Go Offline' : 'Go Online'}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
             
             <Separator orientation="vertical" className="h-6" />
 

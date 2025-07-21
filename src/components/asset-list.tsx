@@ -11,11 +11,6 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -192,10 +187,9 @@ export default function AssetList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
-  const [openCollapsibleRow, setOpenCollapsibleRow] = useState<string | null>(null);
   
   const {
-    assets, setAssets, isOnline, setIsOnline, dataSource, 
+    assets, setAssets, isOnline, setIsOnline, 
     globalStateFilter, setGlobalStateFilter,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
@@ -212,7 +206,6 @@ export default function AssetList() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedCategories([]);
-    setOpenCollapsibleRow(null);
   }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter]);
   
   useEffect(() => {
@@ -280,10 +273,12 @@ export default function AssetList() {
   useEffect(() => {
     if (!isOnline) return;
 
-    if (manualSyncTrigger > 0 || autoSyncEnabled) {
-      if (authInitialized && !isGuest) {
+    // Only run sync if it's a manual trigger OR if auto-sync is enabled.
+    // The initial state of manualSyncTrigger (0) should not cause a sync.
+    const shouldSync = manualSyncTrigger > 0 || autoSyncEnabled;
+    
+    if (shouldSync && authInitialized && !isGuest) {
         performSync();
-      }
     }
   }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync, isGuest]);
   
@@ -1114,140 +1109,107 @@ export default function AssetList() {
                   <TableBody>
                       {paginatedCategoryAssets.length > 0 ? (
                       paginatedCategoryAssets.map((asset) => (
-                          <Collapsible asChild key={asset.id} open={openCollapsibleRow === asset.id} onOpenChange={() => setOpenCollapsibleRow(prev => prev === asset.id ? null : asset.id)}>
-                            <>
-                            <CollapsibleTrigger asChild>
-                              <TableRow data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''} className="cursor-pointer">
-                                <TableCell onClick={e => e.stopPropagation()}>
-                                    <Checkbox 
-                                        checked={selectedAssetIds.includes(asset.id)}
-                                        onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
-                                        aria-label={`Select asset ${asset.description}`}
-                                        disabled={isGuest}
-                                    />
-                                </TableCell>
-                                <TableCell>{asset.sn || 'N/A'}</TableCell>
-                                <TableCell className="font-medium">
-                                  <div className="flex items-center gap-2">
-                                      <span>{asset.description}</span>
-                                      {asset.syncStatus === 'local' && (
-                                          <TooltipProvider>
-                                              <Tooltip>
-                                                  <TooltipTrigger>
-                                                      <CloudOff className="h-4 w-4 text-blue-500" />
-                                                  </TooltipTrigger>
-                                                  <TooltipContent>
-                                                      <p>Local changes not synced</p>
-                                                  </TooltipContent>
-                                              </Tooltip>
-                                          </TooltipProvider>
-                                      )}
-                                      {asset.syncStatus === 'syncing' && (
-                                          <TooltipProvider>
-                                              <Tooltip>
-                                                  <TooltipTrigger>
-                                                      <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                                  </TooltipTrigger>
-                                                  <TooltipContent>
-                                                      <p>Syncing...</p>
-                                                  </TooltipContent>
-                                              </Tooltip>
-                                          </TooltipProvider>
-                                      )}
-                                  </div>
-                                </TableCell>
-                                <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
-                                <TableCell>{asset.assignee || 'N/A'}</TableCell>
-                                <TableCell onClick={(e) => e.stopPropagation()}>
-                                  <Select
-                                    value={asset.verifiedStatus || "Unverified"}
-                                    onValueChange={async (status) => {
-                                      await handleQuickSaveAsset(asset.id, {
-                                        verifiedStatus: status as any,
-                                        verifiedDate: status === "Verified" ? new Date().toLocaleDateString("en-CA") : "",
-                                        remarks: asset.remarks
-                                      });
-                                      toast({
-                                        title: "Status Updated",
-                                        description: `Asset status changed to ${status}.`,
-                                      });
-                                    }}
-                                    disabled={isGuest}
-                                  >
-                                    <SelectTrigger className={cn("w-[150px] h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                      <SelectValue placeholder="Select status" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="Unverified">
-                                        <div className="flex items-center">
-                                          <FileText className="mr-2 h-4 w-4 text-red-600 dark:text-red-400" />
-                                          Unverified
-                                        </div>
-                                      </SelectItem>
-                                      <SelectItem value="Verified">
-                                        <div className="flex items-center">
-                                          <Check className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
-                                          Verified
-                                        </div>
-                                      </SelectItem>
-                                      <SelectItem value="Discrepancy">
-                                        <div className="flex items-center">
-                                          <AlertCircle className="mr-2 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                                          Discrepancy
-                                        </div>
-                                      </SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </TableCell>
-                                <TableCell>{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</TableCell>
-                                <TableCell className="text-right">
-                                  <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
-                                    <Button variant="ghost" size="icon" className={cn("h-8 w-8 transition-transform", openCollapsibleRow === asset.id && "rotate-180")}>
-                                      <ChevronDown className="h-4 w-4" />
-                                    </Button>
-                                    <DropdownMenu>
-                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end">
-                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
-                                            <Edit className="mr-2 h-4 w-4" />
-                                            Edit Full Details
-                                        </DropdownMenuItem>
-                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
-                                            <Trash2 className="mr-2 h-4 w-4" />
-                                            Delete
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                    </DropdownMenu>
-                                  </div>
-                                </TableCell>
-                              </TableRow>
-                            </CollapsibleTrigger>
-                            <CollapsibleContent asChild>
-                                <tr className="bg-muted/50 hover:bg-muted/50">
-                                    <TableCell colSpan={8}>
-                                        <div className="p-4 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
-                                            <div className="space-y-2">
-                                                <p className="font-semibold">Location</p>
-                                                <p className="text-muted-foreground">{asset.location || 'N/A'}</p>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <p className="font-semibold">LGA</p>
-                                                <p className="text-muted-foreground">{asset.lga || 'N/A'}</p>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <p className="font-semibold">Condition</p>
-                                                <p className="text-muted-foreground">{asset.condition || 'N/A'}</p>
-                                            </div>
-                                            <div className="col-span-full space-y-2">
-                                                <p className="font-semibold">Remarks</p>
-                                                <p className="text-muted-foreground whitespace-pre-wrap">{asset.remarks || 'No remarks.'}</p>
-                                            </div>
-                                        </div>
-                                    </TableCell>
-                                </tr>
-                            </CollapsibleContent>
-                            </>
-                          </Collapsible>
+                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                              <TableCell onClick={e => e.stopPropagation()}>
+                                  <Checkbox 
+                                      checked={selectedAssetIds.includes(asset.id)}
+                                      onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
+                                      aria-label={`Select asset ${asset.description}`}
+                                      disabled={isGuest}
+                                  />
+                              </TableCell>
+                              <TableCell>{asset.sn || 'N/A'}</TableCell>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                    <span>{asset.description}</span>
+                                    {asset.syncStatus === 'local' && (
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger>
+                                                    <CloudOff className="h-4 w-4 text-blue-500" />
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Local changes not synced</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    )}
+                                    {asset.syncStatus === 'syncing' && (
+                                        <TooltipProvider>
+                                            <Tooltip>
+                                                <TooltipTrigger>
+                                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+                                                </TooltipTrigger>
+                                                <TooltipContent>
+                                                    <p>Syncing...</p>
+                                                </TooltipContent>
+                                            </Tooltip>
+                                        </TooltipProvider>
+                                    )}
+                                </div>
+                              </TableCell>
+                              <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
+                              <TableCell>{asset.assignee || 'N/A'}</TableCell>
+                              <TableCell onClick={(e) => e.stopPropagation()}>
+                                <Select
+                                  value={asset.verifiedStatus || "Unverified"}
+                                  onValueChange={async (status) => {
+                                    await handleQuickSaveAsset(asset.id, {
+                                      verifiedStatus: status as any,
+                                      verifiedDate: status === "Verified" ? new Date().toLocaleDateString("en-CA") : "",
+                                      remarks: asset.remarks
+                                    });
+                                    toast({
+                                      title: "Status Updated",
+                                      description: `Asset status changed to ${status}.`,
+                                    });
+                                  }}
+                                  disabled={isGuest}
+                                >
+                                  <SelectTrigger className={cn("w-[150px] h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                    <SelectValue placeholder="Select status" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Unverified">
+                                      <div className="flex items-center">
+                                        <FileText className="mr-2 h-4 w-4 text-red-600 dark:text-red-400" />
+                                        Unverified
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="Verified">
+                                      <div className="flex items-center">
+                                        <Check className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
+                                        Verified
+                                      </div>
+                                    </SelectItem>
+                                    <SelectItem value="Discrepancy">
+                                      <div className="flex items-center">
+                                        <AlertCircle className="mr-2 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                                        Discrepancy
+                                      </div>
+                                    </SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </TableCell>
+                              <TableCell>{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</TableCell>
+                              <TableCell className="text-right">
+                                <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
+                                  <DropdownMenu>
+                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                  <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
+                                          <Edit className="mr-2 h-4 w-4" />
+                                          Edit Full Details
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
+                                          <Trash2 className="mr-2 h-4 w-4" />
+                                          Delete
+                                      </DropdownMenuItem>
+                                  </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </div>
+                              </TableCell>
+                          </TableRow>
                       ))
                       ) : (
                           <TableRow><TableCell colSpan={8} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
