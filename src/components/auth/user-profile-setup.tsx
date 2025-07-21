@@ -21,6 +21,7 @@ import { anonymousSignIn, signInWithGoogle } from '@/lib/auth';
 export default function UserProfileSetup() {
   const [isLoading, setIsLoading] = useState<null | 'google' | 'guest'>(null);
   const { user } = useAuth(); // We just need to know if a user exists
+  const [activeTab, setActiveTab] = useState('login');
 
   const handleGuestLogin = async () => {
     setIsLoading('guest');
@@ -49,7 +50,7 @@ export default function UserProfileSetup() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <Tabs defaultValue="login" className="w-full max-w-md">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full max-w-md">
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="login">Email</TabsTrigger>
           <TabsTrigger value="phone">Phone</TabsTrigger>
@@ -64,7 +65,7 @@ export default function UserProfileSetup() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
-              <LoginForm />
+              <LoginForm onSwitchToSignUp={() => setActiveTab('signup')} />
                <div className="relative">
                 <div className="absolute inset-0 flex items-center">
                   <span className="w-full border-t" />

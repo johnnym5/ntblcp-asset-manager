@@ -34,7 +34,7 @@ const formSchema = z.object({
   password: z.string().min(1, { message: 'Password is required.' }),
 });
 
-export function LoginForm() {
+export function LoginForm({ onSwitchToSignUp }: { onSwitchToSignUp: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isForgotPasswordOpen, setIsForgotPasswordOpen] = useState(false);
@@ -56,7 +56,11 @@ export function LoginForm() {
     try {
       await loginWithEmail(values.email, values.password);
     } catch (e: any) {
-      setError(e.message);
+      if (e.code === 'auth/invalid-credential') {
+        setError('Invalid email or password. Please try again.');
+      } else {
+        setError(e.message);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -131,10 +135,23 @@ export function LoginForm() {
               </FormItem>
             )}
           />
-          <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Login
-          </Button>
+          <div className="space-y-2">
+            <Button type="submit" className="w-full" disabled={isLoading}>
+              {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Login
+            </Button>
+            <p className="text-center text-sm text-muted-foreground">
+              Don&apos;t have an account?{' '}
+              <Button
+                type="button"
+                variant="link"
+                className="p-0 h-auto"
+                onClick={onSwitchToSignUp}
+              >
+                Sign Up
+              </Button>
+            </p>
+          </div>
         </form>
       </Form>
       <Dialog open={isForgotPasswordOpen} onOpenChange={setIsForgotPasswordOpen}>
@@ -142,7 +159,7 @@ export function LoginForm() {
           <DialogHeader>
             <DialogTitle>Forgot Password</DialogTitle>
             <DialogDescription>
-              Enter your email address and we'll send you a link to reset your password.
+              Enter your email address and we&apos;ll send you a link to reset your password.
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-2">
