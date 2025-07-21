@@ -3,22 +3,47 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // User profiles can be read by any authenticated user.
-    // Users can only update their own profile.
-    // Admins can update any user's profile (e.g., to change their role).
+    
     match /users/{userId} {
-      allow read: if request.auth != null;
-      allow write: if request.auth.uid == userId;
-      allow update: if get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+      function isOwner() {
+        return request.auth.uid == userId;
+      }
+
+      function isAdmin() {
+        // Check the role of the user trying to make the request.
+        let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+        return userRole == 'admin';
+      }
+
+      // 1. A user can create their own profile document on signup.
+      // 2. An admin can create any user document.
+      allow create: if (isOwner() && request.resource.data.role != 'admin') || isAdmin();
+      
+      // Admins can read any user profile. A user can read their own.
+      allow read: if isOwner() || isAdmin();
+      
+      // An admin can update any user's role. A user cannot change their own role.
+      allow update: if isAdmin();
+      
+      // Nobody can delete user profiles from the client.
+      allow delete: if false;
     }
 
-    // Assets can be read by any authenticated user (including guests).
-    // Assets can only be written (created, updated, deleted) by authenticated users
-    // with the role of 'user' or 'admin'.
     match /assets/{assetId} {
-      allow read: if true;
-      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['user', 'admin'];
+      function isSignedIn() {
+        return request.auth != null;
+      }
+
+      function isUserOrAdmin() {
+        let userRole = get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+        return userRole == 'user' || userRole == 'admin';
+      }
+      
+      // Any authenticated user (including guests) can read asset data.
+      allow read: if isSignedIn();
+      
+      // Only users with the 'user' or 'admin' role can write data.
+      allow write: if isSignedIn() && isUserOrAdmin();
     }
   }
 }
