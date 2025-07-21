@@ -3,12 +3,13 @@ export const TARGET_SHEETS = [
   'NTBLCP-TB-FAR',
   'MOTORCYCLES-C19RM',
   'PDX-C19RM',
-  'TB LAMP-C19RM',
   'ECG monitors',
   'IHVN-GF N-THRIP',
   'TRUENAT-C19RM',
   'Vehicles-TB (IHVN)',
-  'GeneXpert machines-TB'
+  'GeneXpert machines-TB',
+  'TB LAMP-C19RM',
+  'TBlamp c19rm'
 ];
 
 export const NIGERIAN_STATES = [
@@ -99,13 +100,6 @@ export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
     'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
-  'TB LAMP-C19RM': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
-    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
-    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
-    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
-  ],
   'ECG monitors': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
@@ -133,6 +127,20 @@ export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
     'GRANT', 'Useful Life (Years)'
   ],
   'GeneXpert machines-TB': [
+    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
+    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
+    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
+    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
+    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
+  ],
+  'TB LAMP-C19RM': [
+    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
+    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
+    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
+    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
+    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
+  ],
+  'TBlamp c19rm': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',

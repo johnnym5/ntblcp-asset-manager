@@ -1,142 +1,85 @@
+# Offline Asset Assist
 
-export const TARGET_SHEETS = [
-  'NTBLCP-TB-FAR',
-  'MOTORCYCLES-C19RM',
-  'PDX-C19RM',
-  'TB LAMP-C19RM',
-  'ECG monitors',
-  'IHVN-GF N-THRIP',
-  'TRUENAT-C19RM',
-  'Vehicles-TB (IHVN)',
-  'GeneXpert machines-TB'
-];
+A full-featured, offline-first Asset Management Web App for NTBLCP, built with Next.js, Tailwind CSS, and a local-first architecture.
 
-export const NIGERIAN_STATES = [
-  "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
-  "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe",
-  "Imo", "Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Kogi", "Kwara", "Lagos",
-  "Nasarawa", "Niger", "Ogun", "Ondo", "Osun", "Oyo", "Plateau", "Rivers", "Sokoto",
-  "Taraba", "Yobe", "Zamfara"
-];
+## Application Features & Overview
 
-export const NIGERIAN_STATE_CAPITALS: Record<string, string> = {
-  "Abia": "Umuahia",
-  "Adamawa": "Yola",
-  "Akwa Ibom": "Uyo",
-  "Anambra": "Awka",
-  "Bauchi": "Bauchi",
-  "Bayelsa": "Yenagoa",
-  "Benue": "Makurdi",
-  "Borno": "Maiduguri",
-  "Cross River": "Calabar",
-  "Delta": "Asaba",
-  "Ebonyi": "Abakaliki",
-  "Edo": "Benin City",
-  "Ekiti": "Ado Ekiti",
-  "Enugu": "Enugu",
-  "FCT - Abuja": "Abuja",
-  "Gombe": "Gombe",
-  "Imo": "Owerri",
-  "Jigawa": "Dutse",
-  "Kaduna": "Kaduna",
-  "Kano": "Kano",
-  "Katsina": "Katsina",
-  "Kebbi": "Birnin Kebbi",
-  "Kogi": "Lokoja",
-  "Kwara": "Ilorin",
-  "Lagos": "Ikeja",
-  "Nasarawa": "Lafia",
-  "Niger": "Minna",
-  "Ogun": "Abeokuta",
-  "Ondo": "Akure",
-  "Osun": "Osogbo",
-  "Oyo": "Ibadan",
-  "Plateau": "Jos",
-  "Rivers": "Port Harcourt",
-  "Sokoto": "Sokoto",
-  "Taraba": "Jalingo",
-  "Yobe": "Damaturu",
-  "Zamfara": "Gusau",
-};
+This application is designed to solve the critical challenge of managing and verifying assets in diverse environments, especially in locations with limited or no internet connectivity.
 
+### Core Features
 
-export const NIGERIAN_ZONES: Record<string, string[]> = {
-  "North Central": ["Benue", "FCT - Abuja", "Kogi", "Kwara", "Nasarawa", "Niger", "Plateau"],
-  "North East": ["Adamawa", "Bauchi", "Borno", "Gombe", "Taraba", "Yobe"],
-  "North West": ["Jigawa", "Kaduna", "Kano", "Katsina", "Kebbi", "Sokoto", "Zamfara"],
-  "South East": ["Abia", "Anambra", "Ebonyi", "Enugu", "Imo"],
-  "South South": ["Akwa Ibom", "Bayelsa", "Cross River", "Delta", "Edo", "Rivers"],
-  "South West": ["Ekiti", "Lagos", "Ogun", "Ondo", "Osun", "Oyo"],
-};
+*   **Offline-First by Default**: The application is built to work completely offline. All data is stored and managed in the browser's local database (IndexedDB), ensuring that work is never lost due to a lack of internet.
+*   **Role-Based Access**: A simple, passwordless login screen grants access based on a predefined list of users. Each user is locked to the assets of their assigned state(s), while admins can view all assets.
+*   **Dynamic Excel Import & Export**:
+    *   **Intelligent Import**: Parses complex Excel files containing multiple asset sheet formats, automatically detecting headers and mapping data to a unified structure. This works both online and offline.
+    *   **Structure-Preserving Export**: Exports data back into an Excel file that mirrors the original's column structure and naming conventions, with "Verified Status" and "Verified Date" appended at the end.
+*   **Advanced Data Management**:
+    *   **Smart Search**: A global search bar that understands multiple keywords to quickly find assets across all fields and categories.
+    *   **Filtering & Sorting**: Powerful popover filters for location, assignee, and status, along with multi-key sorting.
+    *   **Batch Editing**: Select multiple assets and apply changes (like updating location or status) to all of them in a single action.
+*   **Insightful Dashboard**:
+    *   The main dashboard provides a high-level overview of asset verification progress with clear, visual progress bars for both the overall status and individual asset categories.
+*   **Selective Sync**: Users can select one or more assets or entire categories and push only those specific items to the cloud database, providing granular control over data synchronization.
 
-export const ZONE_NAMES = Object.keys(NIGERIAN_ZONES);
+### How It Works (Use Cases & Impact)
 
-export const SPECIAL_LOCATIONS = ["FCMS", "FCT", "NTBLCP"];
+*   **Impact**: This tool empowers field officers and administrators by providing a reliable, centralized system for asset management. It dramatically improves data accuracy, streamlines the verification process, and provides clear visibility into asset distribution, even in the most challenging offline environments.
+*   **Use Cases**:
+    *   **Field Verification**: An officer in a remote area can import a new list of assets from an Excel file, work entirely offline to update their status, and then selectively push only their updated records to the cloud once they regain connectivity.
+    *   **State Coordination**: A state coordinator can quickly get an overview of all assets within their state, track verification progress, and identify discrepancies.
+    *   **National Auditing**: An administrator can use the 'admin' view to see the complete national asset register, search across all records, and export comprehensive reports by category.
 
+---
 
-// This defines a clean, unique, and comprehensive set of headers for each sheet.
-// The parser will use this to find the header row, and the exporter will use this to generate the file.
-// This structure ensures data aligns correctly under its proper header.
-export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
-  'NTBLCP-TB-FAR': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
-    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
-    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
-    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
-  ],
-  'MOTORCYCLES-C19RM': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
-    'Asset Class', 'Manufacturer', 'Chasis no', 'Engine no', 'Suppliers',
-    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
-    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)'
-  ],
-  'PDX-C19RM': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
-    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
-    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
-    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
-  ],
-  'TB LAMP-C19RM': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
-    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
-    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
-    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
-  ],
-  'ECG monitors': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
-    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
-    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
-    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
-  ],
-  'IHVN-GF N-THRIP': [
-    'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION',
-    'ASSET SERIAL NUMBERS', 'MODEL NUMBERS', 'QTY', 'LOCATION', 'SITE',
-    'YEAR OF PURCHASE', 'COST (NGN)', 'GRANT'
-  ],
-  'TRUENAT-C19RM': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
-    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
-    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
-    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
-  ],
-  'Vehicles-TB (IHVN)': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
-    'Asset Class', 'Manufacturer', 'Engine no', 'Chasis no', 'Suppliers',
-    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
-    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'GRANT', 'Useful Life (Years)'
-  ],
-  'GeneXpert machines-TB': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
-    'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
-    'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
-    'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
-    'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
-  ]
-};
+## Deployment to Firebase App Hosting
+
+This project is configured for deployment to Firebase App Hosting.
+
+### Prerequisites
+
+1.  **Install Firebase CLI**:
+    ```bash
+    npm install -g firebase-tools
+    ```
+
+2.  **Login to Firebase**:
+    ```bash
+    firebase login
+    ```
+
+3.  **Set Project ID**:
+    Open the `.firebaserc` file and replace the placeholder with your actual Firebase Project ID.
+
+4.  **Configure Environment Variables**:
+    In the Firebase Console, navigate to your project's App Hosting backend. In the settings, add the following environment variables. You can find these values in your Firebase project settings under "General".
+
+    *   `NEXT_PUBLIC_FIREBASE_API_KEY`
+    *   `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
+    *   `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
+    *   `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
+    *   `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
+    *   `NEXT_PUBLIC_FIREBASE_APP_ID`
+
+### Deploy
+
+Once the prerequisites are met, deploy the app with a single command:
+
+```bash
+firebase deploy
+```
+
+Firebase will build your Next.js application and deploy it. After the command completes, you can access your live application at the following URL:
+
+[https://ntblcp-asset-manager-k7hy1.web.app](https://ntblcp-asset-manager-k7hy1.web.app)
+
+## Getting Started (Local Development)
+
+First, create a `.env` file in the root of the project by copying the `.env.example` file. Then, populate the Firebase configuration variables in the `.env` file with your project's credentials.
+
+Then, run the development server:
+
+```bash
+npm run dev
+```
+
+Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.

@@ -40,6 +40,7 @@ import {
   ClipboardEdit,
   FolderSearch,
   CloudOff,
+  CloudUpload,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -677,6 +678,50 @@ export default function AssetList() {
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
+  const handleSelectiveSync = useCallback(async () => {
+    if (!isOnline) {
+      addNotification({title: "Offline", description: "Cannot sync while offline.", variant: "destructive"});
+      return;
+    }
+
+    const idsToSync = view === 'dashboard'
+      ? selectedCategories.flatMap(cat => assetsByCategory[cat]?.map(a => a.id) || [])
+      : selectedAssetIds;
+
+    if (idsToSync.length === 0) {
+      addNotification({title: "No Selection", description: "Please select assets or categories to sync."});
+      return;
+    }
+    
+    setIsSyncing(true);
+    try {
+      addNotification({title: "Syncing selected items...", description: `Preparing to sync ${idsToSync.length} assets.`});
+      const allLocalAssets = await getLocalAssetsFromDb();
+      const assetsToSync = allLocalAssets.filter(a => idsToSync.includes(a.id));
+
+      if (assetsToSync.length > 0) {
+        await batchSetAssets(assetsToSync);
+
+        // Update local sync status
+        const updatedLocalAssets = allLocalAssets.map(asset => 
+          idsToSync.includes(asset.id) ? { ...asset, syncStatus: 'synced' as const } : asset
+        );
+        await saveAssets(updatedLocalAssets);
+        setAssets(updatedLocalAssets);
+        
+        addNotification({title: "Selective Sync Complete", description: `${assetsToSync.length} assets have been synced to the cloud.`});
+      }
+
+    } catch(e) {
+      console.error("Selective sync failed", e);
+      addNotification({title: "Sync Failed", description: (e as Error).message, variant: "destructive"});
+    } finally {
+      setIsSyncing(false);
+      setSelectedAssetIds([]);
+      setSelectedCategories([]);
+    }
+  }, [isOnline, view, selectedCategories, selectedAssetIds, assetsByCategory, setIsSyncing, setAssets]);
+
   useEffect(() => {
     setDataActions({
         onImport: handleImportClick,
@@ -812,6 +857,10 @@ export default function AssetList() {
             {selectedCategories.length > 0 && (
                  <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
+                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || !isOnline}>
+                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CloudUpload className="mr-2 h-4 w-4" />}
+                       Sync Selected
+                    </Button>
                     <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)}>
                         <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                     </Button>
@@ -983,6 +1032,10 @@ export default function AssetList() {
             {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
+                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || !isOnline}>
+                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CloudUpload className="mr-2 h-4 w-4" />}
+                       Sync Selected
+                    </Button>
                      {selectedAssetIds.length === 1 && (
                         <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
@@ -1171,7 +1224,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-
-
-    

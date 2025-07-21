@@ -198,7 +198,7 @@ export async function parseExcelFile(
             const normalizedWorkbookSheetNameForComparison = normalizeSheetNameForComparison(workbookSheetName);
             
             const canonicalSheetName = TARGET_SHEETS.find(
-                s => normalizeSheetNameForComparison(s) === normalizedWorkbookSheetNameForComparison
+                s => normalizeSheetNameForComparison(s) === normalizeSheetNameForComparison
             );
 
             if (!canonicalSheetName || !enabledSheets.includes(canonicalSheetName)) {
@@ -208,12 +208,7 @@ export async function parseExcelFile(
             const sheet = workbook.Sheets[workbookSheetName];
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
             
-            let headerRowIndex;
-            if (canonicalSheetName === 'NTBLCP-TB-FAR') {
-                headerRowIndex = 6;
-            } else {
-                headerRowIndex = findHeaderRowIndex(sheetData, HEADER_DEFINITIONS[canonicalSheetName] || []);
-            }
+            const headerRowIndex = findHeaderRowIndex(sheetData, HEADER_DEFINITIONS[canonicalSheetName] || []);
 
             if (headerRowIndex === -1 || headerRowIndex >= sheetData.length) {
                 errors.push(`Could not find a valid header row in sheet: ${canonicalSheetName}. Skipping.`);

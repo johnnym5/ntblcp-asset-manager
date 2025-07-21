@@ -1,4 +1,4 @@
-# NTBLCP ASSET VERIFICATOR
+# Offline Asset Assist
 
 A full-featured, offline-first Asset Management Web App for NTBLCP, built with Next.js, Tailwind CSS, and a local-first architecture.
 
@@ -8,28 +8,24 @@ This application is designed to solve the critical challenge of managing and ver
 
 ### Core Features
 
-*   **Offline-First by Default**: The application is built to work completely offline. All data is stored and managed in the browser's local storage, ensuring that work is never lost due to a lack of internet.
-*   **Installable App (PWA)**: The application is a Progressive Web App, which means it can be 'installed' on your mobile device or desktop for a fast, reliable, and app-like experience.
-*   **Role-Based Access**:
-    *   **State/Zone User**: Enters a username and selects an assigned State or Geopolitical Zone. The entire application is then automatically filtered to show only assets relevant to that specific location.
-    *   **Admin User**: By entering 'admin' as the username, the user gains access to view and manage all assets across all states and zones without any filters.
+*   **Offline-First by Default**: The application is built to work completely offline. All data is stored and managed in the browser's local database (IndexedDB), ensuring that work is never lost due to a lack of internet.
+*   **Role-Based Access**: A simple, passwordless login screen grants access based on a predefined list of users. Each user is locked to the assets of their assigned state(s), while admins can view all assets.
 *   **Dynamic Excel Import & Export**:
-    *   **Intelligent Import**: Parses complex Excel files containing up to 9 different asset sheet formats, automatically detecting headers and mapping data to a unified structure.
+    *   **Intelligent Import**: Parses complex Excel files containing multiple asset sheet formats, automatically detecting headers and mapping data to a unified structure. This works both online and offline.
     *   **Structure-Preserving Export**: Exports data back into an Excel file that mirrors the original's column structure and naming conventions, with "Verified Status" and "Verified Date" appended at the end.
-    *   **Smart Naming**: Exported filenames are automatically generated based on the user's role (e.g., `Lagos-export.xlsx` or `admin-export.xlsx`).
 *   **Advanced Data Management**:
     *   **Smart Search**: A global search bar that understands multiple keywords to quickly find assets across all fields and categories.
     *   **Filtering & Sorting**: Powerful popover filters for location, assignee, and status, along with multi-key sorting.
     *   **Batch Editing**: Select multiple assets and apply changes (like updating location or status) to all of them in a single action.
 *   **Insightful Dashboard**:
     *   The main dashboard provides a high-level overview of asset verification progress with clear, visual progress bars for both the overall status and individual asset categories.
-*   **User Activity Logging**: For admin users, the inbox shows a real-time feed of user logins and logouts, providing valuable oversight.
+*   **Selective Sync**: Users can select one or more assets or entire categories and push only those specific items to the cloud database, providing granular control over data synchronization.
 
 ### How It Works (Use Cases & Impact)
 
 *   **Impact**: This tool empowers field officers and administrators by providing a reliable, centralized system for asset management. It dramatically improves data accuracy, streamlines the verification process, and provides clear visibility into asset distribution, even in the most challenging offline environments.
 *   **Use Cases**:
-    *   **Field Verification**: An officer in a remote area can load the app, work entirely offline to find, view, and update the status of assets, and then export their work when they return to a connected area.
+    *   **Field Verification**: An officer in a remote area can import a new list of assets from an Excel file, work entirely offline to update their status, and then selectively push only their updated records to the cloud once they regain connectivity.
     *   **State Coordination**: A state coordinator can quickly get an overview of all assets within their state, track verification progress, and identify discrepancies.
     *   **National Auditing**: An administrator can use the 'admin' view to see the complete national asset register, search across all records, and export comprehensive reports by category.
 
@@ -52,7 +48,7 @@ This project is configured for deployment to Firebase App Hosting.
     ```
 
 3.  **Set Project ID**:
-    Open the `.firebaserc` file and replace `"ntblcp-asset-manager-k7hy1"` with your actual Firebase Project ID.
+    Open the `.firebaserc` file and replace the placeholder with your actual Firebase Project ID.
 
 4.  **Configure Environment Variables**:
     In the Firebase Console, navigate to your project's App Hosting backend. In the settings, add the following environment variables. You can find these values in your Firebase project settings under "General".
@@ -72,7 +68,9 @@ Once the prerequisites are met, deploy the app with a single command:
 firebase deploy
 ```
 
-Firebase will build your Next.js application and deploy it. After the command completes, it will provide you with the URL to your live application.
+Firebase will build your Next.js application and deploy it. After the command completes, you can access your live application at the following URL:
+
+[https://ntblcp-asset-manager-k7hy1.web.app](https://ntblcp-asset-manager-k7hy1.web.app)
 
 ## Getting Started (Local Development)
 
