@@ -198,7 +198,7 @@ export async function parseExcelFile(
             const normalizedWorkbookSheetNameForComparison = normalizeSheetNameForComparison(workbookSheetName);
             
             const canonicalSheetName = TARGET_SHEETS.find(
-                s => normalizeSheetNameForComparison(s) === normalizeSheetNameForComparison
+                s => normalizeSheetNameForComparison(s) === normalizedWorkbookSheetNameForComparison
             );
 
             if (!canonicalSheetName || !enabledSheets.includes(canonicalSheetName)) {
@@ -292,7 +292,8 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
     }, {} as Record<string, Asset[]>);
     
     for (const category in assetsByCategory) {
-        const canonicalSheetName = TARGET_SHEETS.find(s => s === category);
+        const canonicalSheetName = TARGET_SHEETS.find(s => normalizeSheetNameForComparison(s) === normalizeSheetNameForComparison(category));
+        
         if (!canonicalSheetName || !HEADER_DEFINITIONS[canonicalSheetName]) {
             console.warn(`No header definition for category ${category}, skipping export for this sheet.`);
             continue;

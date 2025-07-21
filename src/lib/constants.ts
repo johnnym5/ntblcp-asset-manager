@@ -1,15 +1,15 @@
 
 export const TARGET_SHEETS = [
-  'NTBLCP-TB-FAR',
-  'MOTORCYCLES-C19RM',
-  'PDX-C19RM',
-  'ECG monitors',
-  'IHVN-GF N-THRIP',
-  'TRUENAT-C19RM',
-  'Vehicles-TB (IHVN)',
-  'GeneXpert machines-TB',
-  'TB LAMP-C19RM',
-  'TBlamp c19rm'
+  'Ntb far',
+  'Motorcycles',
+  'Pdx',
+  'Ecg monitors',
+  'IHVN',
+  'Truenat',
+  'Vehicles',
+  'GeneXpert',
+  'Tb lamp',
+  'TBlamp c19rm',
 ];
 
 export const NIGERIAN_STATES = [
@@ -79,61 +79,61 @@ export const SPECIAL_LOCATIONS = ["FCMS", "FCT", "NTBLCP"];
 // The parser will use this to find the header row, and the exporter will use this to generate the file.
 // This structure ensures data aligns correctly under its proper header.
 export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
-  'NTBLCP-TB-FAR': [
+  'Ntb far': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
     'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
-  'MOTORCYCLES-C19RM': [
+  'Motorcycles': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Chasis no', 'Engine no', 'Suppliers',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
     'Remarks', 'GRANT', 'Useful Life (Years)'
   ],
-  'PDX-C19RM': [
+  'Pdx': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
     'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
-  'ECG monitors': [
+  'Ecg monitors': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
     'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
-  'IHVN-GF N-THRIP': [
+  'IHVN': [
     'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION',
     'ASSET SERIAL NUMBERS', 'MODEL NUMBERS', 'QTY', 'LOCATION', 'SITE',
     'YEAR OF PURCHASE', 'COST (NGN)', 'GRANT'
   ],
-  'TRUENAT-C19RM': [
+  'Truenat': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
     'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
-  'Vehicles-TB (IHVN)': [
+  'Vehicles': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Engine no', 'Chasis no', 'Suppliers',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
     'GRANT', 'Useful Life (Years)'
   ],
-  'GeneXpert machines-TB': [
+  'GeneXpert': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
     'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition',
     'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)'
   ],
-  'TB LAMP-C19RM': [
+  'Tb lamp': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code',
     'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier',
     'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No',
