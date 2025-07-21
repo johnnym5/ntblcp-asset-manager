@@ -6,18 +6,18 @@ import { useAuth } from '@/contexts/auth-context';
 import AppLayout from '@/components/app-layout';
 import AssetList from '@/components/asset-list';
 import { Loader2 } from 'lucide-react';
-import UserProfileSetup from '@/components/state-selector';
+import UserProfileSetup from '@/components/auth/user-profile-setup';
 import { useAppState } from '@/contexts/app-state-context';
 
 export default function AssetsPage() {
-  const { userProfile, loading, profileSetupComplete, updateProfile } = useAuth();
+  const { user, userProfile, loading } = useAuth();
   const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    if (profileSetupComplete && userProfile) {
-      setGlobalStateFilter(userProfile.state || '');
+    if (userProfile) {
+      setGlobalStateFilter(userProfile.state || 'All');
     }
-  }, [profileSetupComplete, userProfile, setGlobalStateFilter]);
+  }, [userProfile, setGlobalStateFilter]);
 
   if (loading) {
     return (
@@ -27,16 +27,11 @@ export default function AssetsPage() {
     );
   }
 
-  if (!profileSetupComplete) {
+  if (!user) {
     return (
-      <UserProfileSetup
-        isOpen={true}
-        onSubmit={updateProfile}
-        defaultDisplayName={userProfile?.displayName}
-      />
+      <UserProfileSetup />
     );
   }
-
 
   return (
     <AppLayout>
@@ -44,4 +39,3 @@ export default function AssetsPage() {
     </AppLayout>
   );
 }
-

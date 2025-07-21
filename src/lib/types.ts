@@ -1,4 +1,3 @@
-
 import type { Timestamp } from 'firebase/firestore';
 
 export interface Asset {
@@ -48,6 +47,14 @@ export interface Asset {
   verifiedDate?: string;
   syncStatus?: 'synced' | 'local' | 'syncing';
   lastModified?: string; // ISO 8601 date string
-  lastModifiedBy?: string; // loginName of user who last modified
+  lastModifiedBy?: string; // displayName of user who last modified
   lastModifiedByState?: string; // state of user who last modified
+}
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  displayName: string;
+  role: 'admin' | 'user' | 'guest';
+  state: string;
 }

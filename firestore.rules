@@ -1,22 +1,20 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // The 'users' collection is read-only for the app. 
-    // It should be managed directly in the Firebase Console.
-    match /users/{username} {
-      allow read: if true;
-      allow write: if false; // Lock down writes from the client
+    
+    // User profiles can be read by admins, or by the user themselves.
+    // They can only be created by anyone (on signup), but only updated by admins.
+    match /users/{userId} {
+      allow read: if request.auth != null && (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' || request.auth.uid == userId);
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
-    // Assets can be read by anyone, but only modified by an authorized user.
+    // Assets can be read by anyone.
+    // Writes are only allowed by authenticated 'admin' or 'user' roles. Guests cannot write.
     match /assets/{assetId} {
       allow read: if true;
-
-      // Allow write if the user's name exists in the users collection.
-      // We check the incoming data's 'lastModifiedBy' field.
-      allow write: if exists(/databases/$(database)/documents/users/$(request.resource.data.lastModifiedBy));
+      allow write: if request.auth != null && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'user'];
     }
   }
 }
