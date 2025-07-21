@@ -28,18 +28,27 @@ import { NIGERIAN_STATES } from '@/lib/constants';
 
 export default function UserProfileSetup() {
   const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
   const [selectedState, setSelectedState] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
   const { login } = useAuth();
   
-  const isGuestMode = !foundUser && username.length > 0 && username.toLowerCase() !== 'admin';
-  const specialAdmins = ['steve', 'ann', 'kodili'];
+  const isGuestMode = !foundUser && username.length > 0 && username.toLowerCase().trim() !== 'admin';
 
   useEffect(() => {
     setError(null);
-    const user = AUTHORIZED_USERS.find(u => u.loginName === username.trim().toLowerCase());
+    const lowerCaseUsername = username.trim().toLowerCase();
+    
+    if (lowerCaseUsername === 'admin') {
+      const adminUser = AUTHORIZED_USERS.find(u => u.loginName === 'admin');
+      setFoundUser(adminUser || null);
+      if (adminUser) {
+        setSelectedState(adminUser.states[0]); // 'All'
+      }
+      return;
+    }
+
+    const user = AUTHORIZED_USERS.find(u => u.loginName === lowerCaseUsername);
     setFoundUser(user || null);
 
     if (user && user.states.length === 1) {
@@ -51,26 +60,18 @@ export default function UserProfileSetup() {
 
   const handleLogin = () => {
     const lowerUsername = username.toLowerCase().trim();
-    const lowerPassword = password.toLowerCase().trim();
     
-    // Global Admin login
-    if (lowerUsername === 'admin' && lowerPassword === 'admin') {
-      login({ displayName: 'Admin', state: 'All', role: 'admin' });
-      return;
-    }
-    
-    // Special Admins login (with 'admin' as password)
-    if (specialAdmins.includes(lowerUsername) && lowerPassword === 'admin') {
-      const specialAdminUser = AUTHORIZED_USERS.find(u => u.loginName === lowerUsername)!;
+    // Admin login
+    if (lowerUsername === 'admin' && foundUser) {
       login({
-        displayName: specialAdminUser.displayName,
-        state: specialAdminUser.states[0], // Default to first state, can be changed in dashboard
+        displayName: foundUser.displayName,
+        state: foundUser.states[0],
         role: 'admin',
       });
       return;
     }
 
-    // Authorized user login (any password works)
+    // Authorized user login
     if (foundUser) {
       if (!selectedState) {
         setError('Please select your assigned location.');
@@ -98,21 +99,17 @@ export default function UserProfileSetup() {
       return;
     }
     
-    setError("Invalid username or password.");
+    setError("Please enter your name to continue.");
   };
   
-  const canLogin = username && (
-    (username.toLowerCase() === 'admin' && password) ||
-    (foundUser && selectedState) ||
-    isGuestMode
-  );
+  const canLogin = username && (foundUser || isGuestMode) && selectedState;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Welcome</CardTitle>
-          <CardDescription>Enter your details to access the asset register.</CardDescription>
+          <CardDescription>Enter your name to access the asset register.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -125,20 +122,6 @@ export default function UserProfileSetup() {
               autoComplete="username"
             />
           </div>
-
-          {(username.toLowerCase().trim() === 'admin' || foundUser) && (
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-            </div>
-          )}
           
           {foundUser && foundUser.states.length > 1 && (
              <div className="space-y-2">
