@@ -21,7 +21,7 @@ import { setupRecaptcha, sendVerificationCode, confirmVerificationCode } from '@
 import type { ConfirmationResult, RecaptchaVerifier } from 'firebase/auth';
 
 const phoneSchema = z.object({
-  phoneNumber: z.string().min(10, 'Please enter a valid phone number with country code. Eg: +16505551234'),
+  phoneNumber: z.string().regex(/^\+[1-9]\d{1,14}$/, 'Please enter a valid phone number in E.164 format (e.g., +16505551234).'),
 });
 
 const otpSchema = z.object({
@@ -110,7 +110,7 @@ export function PhoneLoginForm() {
                 <FormItem>
                   <FormLabel>Phone Number</FormLabel>
                   <FormControl>
-                    <Input placeholder="+1 650 555 1234" {...field} />
+                    <Input placeholder="+16505551234" {...field} />
                   </FormControl>
                   <FormMessage />
                 </FormItem>
