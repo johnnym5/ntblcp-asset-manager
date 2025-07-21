@@ -2,14 +2,21 @@ rules_version = '2';
 
 service cloud.firestore {
   match /databases/{database}/documents {
+
+    // The 'users' collection is read-only for the app. 
+    // It should be managed directly in the Firebase Console.
+    match /users/{username} {
+      allow read: if true;
+      allow write: if false; // Lock down writes from the client
+    }
+
+    // Assets can be read by anyone, but only modified by an authorized user.
     match /assets/{assetId} {
-      // Allow anyone to read the asset data.
-      // The application code handles filtering which assets a user can see.
       allow read: if true;
 
-      // Allow only authenticated (logged-in) users to create, update, or delete.
-      // The app ensures only authorized users can perform writes.
-      allow write: if request.auth != null;
+      // Allow write if the user's name exists in the users collection.
+      // We check the incoming data's 'lastModifiedBy' field.
+      allow write: if exists(/databases/$(database)/documents/users/$(request.resource.data.lastModifiedBy));
     }
   }
 }
