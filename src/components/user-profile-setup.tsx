@@ -20,7 +20,7 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Loader2, AlertCircle } from 'lucide-react';
+import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { AUTHORIZED_USERS, type AuthorizedUser } from '@/lib/authorized-users';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
@@ -34,7 +34,8 @@ export default function UserProfileSetup() {
   const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
   const { login } = useAuth();
   
-  const isGuestMode = !foundUser && username.length > 0;
+  const isGuestMode = !foundUser && username.length > 0 && username.toLowerCase() !== 'admin';
+  const specialAdmins = ['steve', 'ann', 'kodili'];
 
   useEffect(() => {
     setError(null);
@@ -52,13 +53,24 @@ export default function UserProfileSetup() {
     const lowerUsername = username.toLowerCase().trim();
     const lowerPassword = password.toLowerCase().trim();
     
-    // Admin login
+    // Global Admin login
     if (lowerUsername === 'admin' && lowerPassword === 'admin') {
       login({ displayName: 'Admin', state: 'All', role: 'admin' });
       return;
     }
     
-    // Authorized user login
+    // Special Admins login (with 'admin' as password)
+    if (specialAdmins.includes(lowerUsername) && lowerPassword === 'admin') {
+      const specialAdminUser = AUTHORIZED_USERS.find(u => u.loginName === lowerUsername)!;
+      login({
+        displayName: specialAdminUser.displayName,
+        state: specialAdminUser.states[0], // Default to first state, can be changed in dashboard
+        role: 'admin',
+      });
+      return;
+    }
+
+    // Authorized user login (any password works)
     if (foundUser) {
       if (!selectedState) {
         setError('Please select your assigned location.');
@@ -73,18 +85,27 @@ export default function UserProfileSetup() {
     }
     
     // Guest login
-    if (!selectedState) {
-      setError('Please select a state to view as a guest.');
+    if (isGuestMode) {
+      if (!selectedState) {
+        setError('Please select a state to view as a guest.');
+        return;
+      }
+      login({
+          displayName: username.trim() || 'Guest',
+          state: selectedState,
+          role: 'guest'
+      });
       return;
     }
-    login({
-        displayName: username.trim() || 'Guest',
-        state: selectedState,
-        role: 'guest'
-    });
+    
+    setError("Invalid username or password.");
   };
   
-  const canLogin = username && (selectedState || (foundUser && foundUser.states.length === 1)) || (username.toLowerCase().trim() === 'admin' && password);
+  const canLogin = username && (
+    (username.toLowerCase() === 'admin' && password) ||
+    (foundUser && selectedState) ||
+    isGuestMode
+  );
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
@@ -101,18 +122,20 @@ export default function UserProfileSetup() {
               placeholder="Enter your name"
               value={username}
               onChange={(e) => setUsername(e.target.value)}
+              autoComplete="username"
             />
           </div>
 
-          {username.toLowerCase().trim() === 'admin' && (
+          {(username.toLowerCase().trim() === 'admin' || foundUser) && (
             <div className="space-y-2">
               <Label htmlFor="password">Password</Label>
               <Input
                 id="password"
                 type="password"
-                placeholder="Enter admin password"
+                placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
               />
             </div>
           )}

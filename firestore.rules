@@ -2,42 +2,8 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // Check if a user's UID exists in the 'users' collection and has the 'admin' role.
-    function isAdmin() {
-      return exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
-    }
-    
-    // Check if a user is authenticated and has a profile document with a 'user' or 'admin' role.
-    // This excludes guests from writing.
-    function isUserOrAdmin() {
-      return request.auth != null &&
-             exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
-             get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['user', 'admin'];
-    }
-
-    // Users collection: Defines who can read/write user profiles.
-    match /users/{userId} {
-      // Any authenticated user can create their own profile.
-      // This is essential for the sign-up flow.
-      allow create: if request.auth != null && request.auth.uid == userId;
-
-      // Only the user themselves or an admin can read/update a profile.
-      allow read, update: if request.auth != null && (request.auth.uid == userId || isAdmin());
-      
-      // Only admins can delete user profiles (for safety).
-      allow delete: if isAdmin();
-    }
-
-    // Assets collection: Defines who can read/write assets.
-    match /assets/{assetId} {
-      // Anyone who is authenticated (including guests) can read assets.
-      allow read: if request.auth != null;
-
-      // Only authenticated users with the role 'user' or 'admin' can write (create, update, delete).
-      // This rule correctly prevents guests from making any changes.
-      allow write: if isUserOrAdmin();
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

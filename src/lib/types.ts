@@ -53,9 +53,7 @@ export interface Asset {
 }
 
 export interface UserProfile {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
+  displayName: string;
   role: 'admin' | 'user' | 'guest';
   state: string;
 }

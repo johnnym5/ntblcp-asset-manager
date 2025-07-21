@@ -1,67 +1,9 @@
 
 'use client';
 
-import { doc, getDoc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, updateDoc } from 'firebase/firestore';
+import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Asset, UserProfile } from '@/lib/types';
-import type { User } from 'firebase/auth';
-
-// --- User Profiles ---
-
-export async function createUserProfile(user: User, additionalData: Partial<UserProfile> = {}) {
-  const userRef = doc(db, 'users', user.uid);
-  
-  // Start with default values
-  let role: 'admin' | 'user' | 'guest' = 'user';
-  let displayName = user.displayName || 'New User';
-  let state = 'All';
-
-  // Override with specific logic
-  if (user.isAnonymous) {
-    role = 'guest';
-    displayName = 'Guest User';
-  } else if (user.email && ['jegbase@hotmail.com', 'jegbase@gmail.com'].includes(user.email.toLowerCase())) {
-    role = 'admin';
-  }
-
-  const profile: UserProfile = {
-    uid: user.uid,
-    email: user.email || null,
-    displayName,
-    role,
-    state,
-    ...additionalData,
-  };
-
-  await setDoc(userRef, profile);
-  return profile;
-}
-
-export async function getUserProfile(uid: string): Promise<UserProfile | null> {
-  const userRef = doc(db, 'users', uid);
-  const docSnap = await getDoc(userRef);
-  if (docSnap.exists()) {
-    return docSnap.data() as UserProfile;
-  }
-  return null;
-}
-
-export async function getAllUserProfiles(): Promise<UserProfile[]> {
-    const usersCollectionRef = collection(db, 'users');
-    const q = query(usersCollectionRef);
-    const querySnapshot = await getDocs(q);
-    const users: UserProfile[] = [];
-    querySnapshot.forEach((doc) => {
-        users.push({ ...doc.data() } as UserProfile);
-    });
-    return users;
-}
-
-export async function updateUserRole(uid: string, role: 'admin' | 'user' | 'guest'): Promise<void> {
-    const userRef = doc(db, 'users', uid);
-    await updateDoc(userRef, { role });
-}
-
+import type { Asset } from '@/lib/types';
 
 // --- Assets ---
 
