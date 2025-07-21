@@ -31,6 +31,7 @@ import type { Asset } from '@/lib/types';
 export interface OptionType {
   label: string;
   value: string;
+  count?: number;
 }
 
 interface AssetFilterSheetProps {
@@ -96,17 +97,26 @@ const FilterSection = ({ title, options, selected, onChange }: {
                       onSelect={() => handleSelect(option.value)}
                       className="cursor-pointer"
                     >
-                      <div
-                        className={cn(
-                          "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                          isSelected
-                            ? "bg-primary text-primary-foreground"
-                            : "opacity-50 [&_svg]:invisible"
+                      <div className="flex items-center justify-between w-full">
+                        <div className="flex items-center">
+                          <div
+                            className={cn(
+                              "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                              isSelected
+                                ? "bg-primary text-primary-foreground"
+                                : "opacity-50 [&_svg]:invisible"
+                            )}
+                          >
+                            <Check className={cn("h-4 w-4")} />
+                          </div>
+                          <span>{option.label}</span>
+                        </div>
+                        {option.count !== undefined && (
+                           <span className="ml-2 text-xs text-muted-foreground font-mono bg-muted/50 px-1.5 py-0.5 rounded-sm">
+                            {option.count}
+                          </span>
                         )}
-                      >
-                        <Check className={cn("h-4 w-4")} />
                       </div>
-                      <span>{option.label}</span>
                     </CommandItem>
                   );
                 })}

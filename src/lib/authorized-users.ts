@@ -20,7 +20,7 @@ export const AUTHORIZED_USERS: AuthorizedUser[] = [
   { displayName: "Praise", loginName: "praise", states: ["Kogi"], isAdmin: false },
   { displayName: "Shallom", loginName: "shallom", states: ["Jigawa"], isAdmin: false },
   { displayName: "Bassey", loginName: "bassey", states: ["Bauchi"], isAdmin: false },
-  { displayName: "John-Mary", loginName: "john-mary", states: ["Gombe"], isAdmin: false },
+  { displayName: "Johnmary", loginName: "johnmary", states: ["Gombe"], isAdmin: false },
   { displayName: "Isah", loginName: "isah", states: ["Cross River"], isAdmin: false },
   { displayName: "Pelumi", loginName: "pelumi", states: ["Kwara"], isAdmin: false },
   { displayName: "Kodili", loginName: "kodili", states: ["Ogun", "Lagos"], isAdmin: true },
