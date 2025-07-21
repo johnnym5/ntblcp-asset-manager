@@ -1,10 +1,19 @@
 rules_version = '2';
+
 service cloud.firestore {
+
   match /databases/{database}/documents {
-    match /{document=**} {
-      // This rule allows all authenticated users to read and write to any document.
-      // Permissions are handled in the application code.
+
+    // WARNING: These are open rules for development. 
+
+    // For a production app, you should secure these rules.
+
+    match /assets/{assetId} {
+
       allow read, write: if true;
+
     }
+
   }
+
 }

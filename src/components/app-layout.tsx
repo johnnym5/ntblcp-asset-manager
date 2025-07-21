@@ -74,6 +74,7 @@ import type { Asset } from "@/lib/types";
 import { useTheme } from "next-themes";
 import { Separator } from "./ui/separator";
 import { InboxSheet } from "./inbox-sheet";
+import { ScrollArea } from "./ui/scroll-area";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
