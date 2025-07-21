@@ -224,19 +224,18 @@ export async function parseExcelFile(
                 }
 
                 const assetObject: Partial<Asset> = { category: canonicalSheetName };
-                const populatedFields = new Set<keyof Asset>();
+                let hasAnyData = false;
 
                 headerRow.forEach((header, index) => {
                     const field = COLUMN_TO_ASSET_FIELD_MAP[header];
                     const cellValue = row[index];
-                    if (field && !populatedFields.has(field) && cellValue !== null && String(cellValue).trim() !== '') {
+                    if (field && cellValue !== null && String(cellValue).trim() !== '') {
                         assetObject[field] = cellValue;
-                        populatedFields.add(field);
+                        hasAnyData = true;
                     }
                 });
 
-                // If the only populated field is 'category', it's an empty row for our purposes.
-                if (Object.keys(assetObject).length <= 1) {
+                if (!hasAnyData) {
                     skipped++;
                     continue;
                 }
