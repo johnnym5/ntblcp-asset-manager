@@ -87,14 +87,7 @@ const AppStateContext = createContext<AppStateContextType | undefined>(undefined
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [isOnline, setIsOnline] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedStatus = localStorage.getItem('ntblcp-online-status');
-      // Default to false (offline) if nothing is saved
-      return savedStatus ? JSON.parse(savedStatus) : false; 
-    }
-    return false;
-  });
+  const [isOnline, setIsOnline] = useState(false);
   const [dataSource, setDataSource] = useState<DataSource>('local');
   const [searchTerm, setSearchTerm] = useState('');
   const [globalStateFilter, setGlobalStateFilter] = useState('');
@@ -141,15 +134,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [isOnline]);
 
-
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
-    }
-  }, [isOnline]);
+    // Safely read from localStorage only on the client
+    const savedStatus = localStorage.getItem('ntblcp-online-status');
+    // Default to false (offline) if nothing is saved
+    setIsOnline(savedStatus ? JSON.parse(savedStatus) : false);
 
-  useEffect(() => {
-    // This effect now only handles browser-based online/offline events.
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
@@ -161,6 +151,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
+    }
+  }, [isOnline]);
 
   useEffect(() => {
     if (!isOnline) {
