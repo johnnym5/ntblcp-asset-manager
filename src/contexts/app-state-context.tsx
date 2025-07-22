@@ -4,7 +4,8 @@
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
-import type { Asset, InboxMessageGroup } from '@/lib/types';
+import type { Asset, InboxMessageGroup, AppSettings } from '@/lib/types';
+import { getSettings, listenToSettings } from '@/lib/firestore';
 
 
 export interface SortConfig {
@@ -58,15 +59,14 @@ interface AppStateContextType {
   sortConfig: SortConfig | null;
   setSortConfig: Dispatch<SetStateAction<SortConfig | null>>;
 
-  // Sheet Settings
-  enabledSheets: string[];
-  setEnabledSheets: Dispatch<SetStateAction<string[]>>;
+  // Sheet Settings from Firestore
+  appSettings: AppSettings;
+  setAppSettings: Dispatch<SetStateAction<AppSettings>>;
   lockAssetList: boolean;
-  setLockAssetList: Dispatch<SetStateAction<boolean>>;
+  autoSyncEnabled: boolean;
+  enabledSheets: string[];
   
   // Sync Settings
-  autoSyncEnabled: boolean;
-  setAutoSyncEnabled: Dispatch<SetStateAction<boolean>>;
   manualSyncTrigger: number;
   setManualSyncTrigger: Dispatch<SetStateAction<number>>;
   isSyncing: boolean;
@@ -110,30 +110,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'description', direction: 'asc' });
 
-  const [enabledSheets, setEnabledSheets] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      const savedSheets = localStorage.getItem('ntblcp-enabled-sheets');
-      return savedSheets ? JSON.parse(savedSheets) : [...TARGET_SHEETS];
-    }
-    return [...TARGET_SHEETS];
+  // --- Global Settings from Firestore ---
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    lockAssetList: true,
+    autoSyncEnabled: true,
+    enabledSheets: [...TARGET_SHEETS],
   });
-  
-  const [lockAssetList, setLockAssetList] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const savedLock = localStorage.getItem('ntblcp-asset-lock');
-      // Default to true (locked) unless explicitly set to false by an admin.
-      return savedLock ? JSON.parse(savedLock) : true;
-    }
-    return true;
-  });
+  const { lockAssetList, autoSyncEnabled, enabledSheets } = appSettings;
 
-  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ntblcp-autosync-enabled');
-      return saved ? JSON.parse(saved) : true; // Default to true for admins
-    }
-    return true;
-  });
 
   const [manualSyncTrigger, setManualSyncTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
@@ -142,19 +126,22 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [inboxMessages, setInboxMessages] = useState<InboxMessageGroup[]>([]);
   const [unreadInboxCount, setUnreadInboxCount] = useState(0);
 
+  // Effect for real-time settings
+  useEffect(() => {
+    // Only listen for settings if online
+    if (!isOnline) return;
 
-  useEffect(() => {
-    localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
-  }, [enabledSheets]);
-  
-  useEffect(() => {
-    localStorage.setItem('ntblcp-asset-lock', JSON.stringify(lockAssetList));
-  }, [lockAssetList]);
+    const unsubscribe = listenToSettings((settings) => {
+        if (settings) {
+            setAppSettings(settings);
+        }
+    });
 
-  useEffect(() => {
-    localStorage.setItem('ntblcp-autosync-enabled', JSON.stringify(autoSyncEnabled));
-  }, [autoSyncEnabled]);
-  
+    // Clean up listener on component unmount or when going offline
+    return () => unsubscribe();
+  }, [isOnline]);
+
+
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
@@ -163,7 +150,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     // This effect now only handles browser-based online/offline events.
-    // The manual toggle is handled directly in the UI component.
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
 
@@ -209,12 +195,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setStatusOptions,
     sortConfig,
     setSortConfig,
-    enabledSheets,
-    setEnabledSheets,
+    appSettings,
+    setAppSettings,
     lockAssetList,
-    setLockAssetList,
     autoSyncEnabled,
-    setAutoSyncEnabled,
+    enabledSheets,
     manualSyncTrigger,
     setManualSyncTrigger,
     isSyncing,

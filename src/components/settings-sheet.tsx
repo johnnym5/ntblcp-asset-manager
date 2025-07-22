@@ -18,6 +18,8 @@ import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { TARGET_SHEETS } from '@/lib/constants';
 import { useAppState } from '@/contexts/app-state-context';
+import { updateSettings } from '@/lib/firestore';
+import { useToast } from '@/hooks/use-toast';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -26,26 +28,57 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { 
-    enabledSheets, setEnabledSheets, 
-    lockAssetList, setLockAssetList,
-    autoSyncEnabled, setAutoSyncEnabled 
+    lockAssetList,
+    autoSyncEnabled,
+    enabledSheets,
+    isOnline,
   } = useAppState();
 
-  const handleToggleSheet = (sheetName: string, checked: boolean) => {
-    setEnabledSheets(prev => {
-      if (checked) {
-        return [...prev, sheetName];
-      } else {
-        return prev.filter(name => name !== sheetName);
-      }
-    });
+  const { toast } = useToast();
+
+  const handleSettingChange = async (key: 'lockAssetList' | 'autoSyncEnabled', value: boolean) => {
+    if (!isOnline) {
+      toast({ title: 'Offline', description: 'Settings can only be changed while online.', variant: 'destructive' });
+      return;
+    }
+    try {
+      await updateSettings({ [key]: value });
+      toast({ title: 'Setting Updated', description: 'The change has been saved for all users.' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Could not save setting to the database.', variant: 'destructive' });
+    }
   };
 
-  const handleToggleAll = (enable: boolean) => {
-    if (enable) {
-      setEnabledSheets([...TARGET_SHEETS]);
+  const handleToggleSheet = async (sheetName: string, checked: boolean) => {
+    if (!isOnline) {
+      toast({ title: 'Offline', description: 'Settings can only be changed while online.', variant: 'destructive' });
+      return;
+    }
+    let newEnabledSheets;
+    if (checked) {
+      newEnabledSheets = [...enabledSheets, sheetName];
     } else {
-      setEnabledSheets([]);
+      newEnabledSheets = enabledSheets.filter(name => name !== sheetName);
+    }
+    try {
+      await updateSettings({ enabledSheets: newEnabledSheets });
+      toast({ title: 'Sheet Setting Updated' });
+    } catch (error) {
+      toast({ title: 'Error', description: 'Could not save setting to the database.', variant: 'destructive' });
+    }
+  };
+
+  const handleToggleAll = async (enable: boolean) => {
+    if (!isOnline) {
+      toast({ title: 'Offline', description: 'Settings can only be changed while online.', variant: 'destructive' });
+      return;
+    }
+    const newEnabledSheets = enable ? [...TARGET_SHEETS] : [];
+    try {
+      await updateSettings({ enabledSheets: newEnabledSheets });
+      toast({ title: 'Sheet Settings Updated' });
+    } catch (error) {
+       toast({ title: 'Error', description: 'Could not save setting to the database.', variant: 'destructive' });
     }
   };
 
@@ -56,9 +89,9 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="flex flex-col">
         <SheetHeader>
-          <SheetTitle>Application Settings</SheetTitle>
+          <SheetTitle>Global Settings (Admin)</SheetTitle>
           <SheetDescription>
-            Manage application behavior and import settings.
+            These settings affect all users of the application in real-time.
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto pr-2 py-4">
@@ -78,7 +111,8 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                   <Switch
                     id="lock-assets"
                     checked={lockAssetList}
-                    onCheckedChange={setLockAssetList}
+                    onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}
+                    disabled={!isOnline}
                   />
                 </div>
                 <div className="flex items-center justify-between pt-4">
@@ -93,7 +127,8 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                   <Switch
                     id="autosync-assets"
                     checked={autoSyncEnabled}
-                    onCheckedChange={setAutoSyncEnabled}
+                    onCheckedChange={(checked) => handleSettingChange('autoSyncEnabled', checked)}
+                    disabled={!isOnline}
                   />
                 </div>
               </div>
@@ -104,10 +139,10 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
               <div className="flex items-center justify-between mb-4">
                   <p className="text-sm font-medium">Toggle all sheets</p>
                   <div className="flex gap-2">
-                      <Button size="sm" variant="outline" onClick={() => handleToggleAll(true)} disabled={allEnabled}>
+                      <Button size="sm" variant="outline" onClick={() => handleToggleAll(true)} disabled={allEnabled || !isOnline}>
                           Enable All
                       </Button>
-                      <Button size="sm" variant="outline" onClick={() => handleToggleAll(false)} disabled={noneEnabled}>
+                      <Button size="sm" variant="outline" onClick={() => handleToggleAll(false)} disabled={noneEnabled || !isOnline}>
                           Disable All
                       </Button>
                   </div>
@@ -124,6 +159,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                           id={`switch-${sheet}`}
                           checked={enabledSheets.includes(sheet)}
                           onCheckedChange={(checked) => handleToggleSheet(sheet, checked)}
+                          disabled={!isOnline}
                         />
                       </div>
                     ))}

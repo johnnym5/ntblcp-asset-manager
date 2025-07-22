@@ -91,3 +91,9 @@ export interface InboxMessageGroup {
   updatedAssets?: Asset[];
   activityMessage?: string;
 }
+
+export interface AppSettings {
+  lockAssetList: boolean;
+  autoSyncEnabled: boolean;
+  enabledSheets: string[];
+}
