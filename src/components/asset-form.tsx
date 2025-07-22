@@ -436,12 +436,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                   </FormItem>
                 )} />
 
-                <div className="space-y-2">
-                    <Label>Last Modified</Label>
-                    <p className="text-sm text-muted-foreground h-10 flex items-center">{asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p>
-                </div>
-
-
                 <Accordion type="single" collapsible className="w-full pt-4">
                   <AccordionItem value="advanced">
                     <AccordionTrigger>Advanced Information</AccordionTrigger>
@@ -466,6 +460,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                            <FormField control={form.control} name="dateReceived" render={({ field }) => (
                                 <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                             )} />
+                           <ReadOnlyField label="Last Modified" value={asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
                         </div>
                     </AccordionContent>
                   </AccordionItem>

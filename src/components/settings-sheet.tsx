@@ -23,6 +23,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
 import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -33,9 +34,6 @@ interface SettingsSheetProps {
 export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: SettingsSheetProps) {
   const { userProfile } = useAuth();
   const { 
-    lockAssetList,
-    autoSyncEnabled,
-    enabledSheets,
     isOnline,
     dataActions,
     appSettings,
@@ -92,7 +90,13 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const canImport = !isGuest;
   
   if (!localSettings) {
-    return null; // Or a loading spinner
+    return (
+      <Sheet open={isOpen} onOpenChange={onOpenChange}>
+        <SheetContent className="flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
+        </SheetContent>
+      </Sheet>
+    );
   }
 
   const allEnabled = localSettings.enabledSheets.length === TARGET_SHEETS.length;

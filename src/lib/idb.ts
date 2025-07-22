@@ -21,12 +21,10 @@ interface AssetDB extends DBSchema {
 let dbPromise: Promise<IDBPDatabase<AssetDB>> | null = null;
 
 // This function ensures the DB is only opened on the client-side.
-const getDb = () => {
-    // If we're on the server, return null.
+const getDb = (): Promise<IDBPDatabase<AssetDB>> | null => {
     if (typeof window === 'undefined') {
         return null;
     }
-    // If the promise hasn't been created yet, create it.
     if (!dbPromise) {
         dbPromise = openDB<AssetDB>(DB_NAME, DB_VERSION, {
             upgrade(db, oldVersion) {
@@ -43,7 +41,6 @@ const getDb = () => {
             },
         });
     }
-    // Return the promise.
     return dbPromise;
 }
 

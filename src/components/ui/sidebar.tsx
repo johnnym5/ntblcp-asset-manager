@@ -1,763 +1,487 @@
-"use client"
+"use client";
 
-import * as React from "react"
-import { Slot } from "@radix-ui/react-slot"
-import { VariantProps, cva } from "class-variance-authority"
-import { PanelLeft } from "lucide-react"
-
-import { useIsMobile } from "@/hooks/use-mobile"
-import { cn } from "@/lib/utils"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Separator } from "@/components/ui/separator"
-import { Sheet, SheetContent } from "@/components/ui/sheet"
-import { Skeleton } from "@/components/ui/skeleton"
+import React, { useEffect, useState } from "react";
+import { useForm } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as z from "zod";
 import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetClose,
+} from "@/components/ui/sheet";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion"
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import type { Asset } from "@/lib/types";
+import { AlertCircle, Loader2, FileText, Check } from "lucide-react";
+import { TARGET_SHEETS } from "@/lib/constants";
+import { AssetChecklist } from "./asset-checklist";
+import { useAuth } from "@/contexts/auth-context";
+import { addNotification } from "@/hooks/use-notifications";
+import { Label } from "./ui/label";
 
-const SIDEBAR_COOKIE_NAME = "sidebar_state"
-const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
-const SIDEBAR_WIDTH = "16rem"
-const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
-const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+const assetFormSchema = z.object({
+  category: z.string({ required_error: "Please select a category." }),
+  description: z.string().min(1, "Description is required."),
+  serialNumber: z.string().optional(),
+  location: z.string().optional(),
+  condition: z.string().optional(),
+  remarks: z.string().optional(),
+  assignee: z.string().optional(),
+  verifiedStatus: z.string().optional(),
+  verifiedDate: z.string().optional(),
+  lga: z.string().optional(),
+  assetIdCode: z.string().optional(),
+  manufacturer: z.string().optional(),
+  // Advanced Fields
+  assetClass: z.string().optional(),
+  modelNumber: z.string().optional(),
+  supplier: z.string().optional(),
+  dateReceived: z.string().optional(),
+  grant: z.string().optional(),
+  chasisNo: z.string().optional(),
+  engineNo: z.string().optional(),
+});
 
-type SidebarContext = {
-  state: "expanded" | "collapsed"
-  open: boolean
-  setOpen: (open: boolean) => void
-  openMobile: boolean
-  setOpenMobile: (open: boolean) => void
-  isMobile: boolean
-  toggleSidebar: () => void
+export type AssetFormValues = z.infer<typeof assetFormSchema>;
+
+interface AssetFormProps {
+  isOpen: boolean;
+  onOpenChange: (isOpen: boolean) => void;
+  asset?: Asset;
+  onSave: (assetToSave: Asset) => Promise<void>;
+  onQuickSave: (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy'; verifiedDate?: string; }) => Promise<void>;
+  isReadOnly: boolean;
 }
 
-const SidebarContext = React.createContext<SidebarContext | null>(null)
-
-function useSidebar() {
-  const context = React.useContext(SidebarContext)
-  if (!context) {
-    throw new Error("useSidebar must be used within a SidebarProvider.")
-  }
-
-  return context
-}
-
-const SidebarProvider = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div"> & {
-    defaultOpen?: boolean
-    open?: boolean
-    onOpenChange?: (open: boolean) => void
-  }
->(
-  (
-    {
-      defaultOpen = true,
-      open: openProp,
-      onOpenChange: setOpenProp,
-      className,
-      style,
-      children,
-      ...props
-    },
-    ref
-  ) => {
-    const isMobile = useIsMobile()
-    const [openMobile, setOpenMobile] = React.useState(false)
-
-    // This is the internal state of the sidebar.
-    // We use openProp and setOpenProp for control from outside the component.
-    const [_open, _setOpen] = React.useState(defaultOpen)
-    const open = openProp ?? _open
-    const setOpen = React.useCallback(
-      (value: boolean | ((value: boolean) => boolean)) => {
-        const openState = typeof value === "function" ? value(open) : value
-        if (setOpenProp) {
-          setOpenProp(openState)
-        } else {
-          _setOpen(openState)
-        }
-
-        // This sets the cookie to keep the sidebar state.
-        document.cookie = `${SIDEBAR_COOKIE_NAME}=${openState}; path=/; max-age=${SIDEBAR_COOKIE_MAX_AGE}`
-      },
-      [setOpenProp, open]
-    )
-
-    // Helper to toggle the sidebar.
-    const toggleSidebar = React.useCallback(() => {
-      return isMobile
-        ? setOpenMobile((open) => !open)
-        : setOpen((open) => !open)
-    }, [isMobile, setOpen, setOpenMobile])
-
-    // Adds a keyboard shortcut to toggle the sidebar.
-    React.useEffect(() => {
-      const handleKeyDown = (event: KeyboardEvent) => {
-        if (
-          event.key === SIDEBAR_KEYBOARD_SHORTCUT &&
-          (event.metaKey || event.ctrlKey)
-        ) {
-          event.preventDefault()
-          toggleSidebar()
-        }
-      }
-
-      window.addEventListener("keydown", handleKeyDown)
-      return () => window.removeEventListener("keydown", handleKeyDown)
-    }, [toggleSidebar])
-
-    // We add a state so that we can do data-state="expanded" or "collapsed".
-    // This makes it easier to style the sidebar with Tailwind classes.
-    const state = open ? "expanded" : "collapsed"
-
-    const contextValue = React.useMemo<SidebarContext>(
-      () => ({
-        state,
-        open,
-        setOpen,
-        isMobile,
-        openMobile,
-        setOpenMobile,
-        toggleSidebar,
-      }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
-    )
-
-    return (
-      <SidebarContext.Provider value={contextValue}>
-        <TooltipProvider delayDuration={0}>
-          <div
-            style={
-              {
-                "--sidebar-width": SIDEBAR_WIDTH,
-                "--sidebar-width-icon": SIDEBAR_WIDTH_ICON,
-                ...style,
-              } as React.CSSProperties
-            }
-            className={cn(
-              "group/sidebar-wrapper flex min-h-svh w-full has-[[data-variant=inset]]:bg-sidebar",
-              className
-            )}
-            ref={ref}
-            {...props}
-          >
-            {children}
-          </div>
-        </TooltipProvider>
-      </SidebarContext.Provider>
-    )
-  }
-)
-SidebarProvider.displayName = "SidebarProvider"
-
-const Sidebar = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div"> & {
-    side?: "left" | "right"
-    variant?: "sidebar" | "floating" | "inset"
-    collapsible?: "offcanvas" | "icon" | "none"
-  }
->(
-  (
-    {
-      side = "left",
-      variant = "sidebar",
-      collapsible = "offcanvas",
-      className,
-      children,
-      ...props
-    },
-    ref
-  ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
-
-    if (collapsible === "none") {
-      return (
-        <div
-          className={cn(
-            "flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground",
-            className
-          )}
-          ref={ref}
-          {...props}
-        >
-          {children}
-        </div>
-      )
-    }
-
-    if (isMobile) {
-      return (
-        <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
-          <SheetContent
-            data-sidebar="sidebar"
-            data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-            style={
-              {
-                "--sidebar-width": SIDEBAR_WIDTH_MOBILE,
-              } as React.CSSProperties
-            }
-            side={side}
-          >
-            <div className="flex h-full w-full flex-col">{children}</div>
-          </SheetContent>
-        </Sheet>
-      )
-    }
-
-    return (
-      <div
-        ref={ref}
-        className="group peer hidden md:block text-sidebar-foreground"
-        data-state={state}
-        data-collapsible={state === "collapsed" ? collapsible : ""}
-        data-variant={variant}
-        data-side={side}
-      >
-        {/* This is what handles the sidebar gap on desktop */}
-        <div
-          className={cn(
-            "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear",
-            "group-data-[collapsible=offcanvas]:w-0",
-            "group-data-[side=right]:rotate-180",
-            variant === "floating" || variant === "inset"
-              ? "group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4))]"
-              : "group-data-[collapsible=icon]:w-[--sidebar-width-icon]"
-          )}
-        />
-        <div
-          className={cn(
-            "duration-200 fixed inset-y-0 z-10 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear md:flex",
-            side === "left"
-              ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
-              : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
-            // Adjust the padding for floating and inset variants.
-            variant === "floating" || variant === "inset"
-              ? "p-2 group-data-[collapsible=icon]:w-[calc(var(--sidebar-width-icon)_+_theme(spacing.4)_+2px)]"
-              : "group-data-[collapsible=icon]:w-[--sidebar-width-icon] group-data-[side=left]:border-r group-data-[side=right]:border-l",
-            className
-          )}
-          {...props}
-        >
-          <div
-            data-sidebar="sidebar"
-            className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow"
-          >
-            {children}
-          </div>
-        </div>
-      </div>
-    )
-  }
-)
-Sidebar.displayName = "Sidebar"
-
-const SidebarTrigger = React.forwardRef<
-  React.ElementRef<typeof Button>,
-  React.ComponentProps<typeof Button>
->(({ className, onClick, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar()
-
-  return (
-    <Button
-      ref={ref}
-      data-sidebar="trigger"
-      variant="ghost"
-      size="icon"
-      className={cn("h-7 w-7", className)}
-      onClick={(event) => {
-        onClick?.(event)
-        toggleSidebar()
-      }}
-      {...props}
-    >
-      <PanelLeft />
-      <span className="sr-only">Toggle Sidebar</span>
-    </Button>
-  )
-})
-SidebarTrigger.displayName = "SidebarTrigger"
-
-const SidebarRail = React.forwardRef<
-  HTMLButtonElement,
-  React.ComponentProps<"button">
->(({ className, ...props }, ref) => {
-  const { toggleSidebar } = useSidebar()
-
-  return (
-    <button
-      ref={ref}
-      data-sidebar="rail"
-      aria-label="Toggle Sidebar"
-      tabIndex={-1}
-      onClick={toggleSidebar}
-      title="Toggle Sidebar"
-      className={cn(
-        "absolute inset-y-0 z-20 hidden w-4 -translate-x-1/2 transition-all ease-linear after:absolute after:inset-y-0 after:left-1/2 after:w-[2px] hover:after:bg-sidebar-border group-data-[side=left]:-right-4 group-data-[side=right]:left-0 sm:flex",
-        "[[data-side=left]_&]:cursor-w-resize [[data-side=right]_&]:cursor-e-resize",
-        "[[data-side=left][data-state=collapsed]_&]:cursor-e-resize [[data-side=right][data-state=collapsed]_&]:cursor-w-resize",
-        "group-data-[collapsible=offcanvas]:translate-x-0 group-data-[collapsible=offcanvas]:after:left-full group-data-[collapsible=offcanvas]:hover:bg-sidebar",
-        "[[data-side=left][data-collapsible=offcanvas]_&]:-right-2",
-        "[[data-side=right][data-collapsible=offcanvas]_&]:-left-2",
-        className
-      )}
-      {...props}
-    />
-  )
-})
-SidebarRail.displayName = "SidebarRail"
-
-const SidebarInset = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"main">
->(({ className, ...props }, ref) => {
-  return (
-    <main
-      ref={ref}
-      className={cn(
-        "relative flex min-h-svh flex-1 flex-col bg-background",
-        "peer-data-[variant=inset]:min-h-[calc(100svh-theme(spacing.4))] md:peer-data-[variant=inset]:m-2 md:peer-data-[state=collapsed]:peer-data-[variant=inset]:ml-2 md:peer-data-[variant=inset]:ml-0 md:peer-data-[variant=inset]:rounded-xl md:peer-data-[variant=inset]:shadow",
-        className
-      )}
-      {...props}
-    />
-  )
-})
-SidebarInset.displayName = "SidebarInset"
-
-const SidebarInput = React.forwardRef<
-  React.ElementRef<typeof Input>,
-  React.ComponentProps<typeof Input>
->(({ className, ...props }, ref) => {
-  return (
-    <Input
-      ref={ref}
-      data-sidebar="input"
-      className={cn(
-        "h-8 w-full bg-background shadow-none focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-        className
-      )}
-      {...props}
-    />
-  )
-})
-SidebarInput.displayName = "SidebarInput"
-
-const SidebarHeader = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div">
->(({ className, ...props }, ref) => {
-  return (
-    <div
-      ref={ref}
-      data-sidebar="header"
-      className={cn("flex flex-col gap-2 p-2", className)}
-      {...props}
-    />
-  )
-})
-SidebarHeader.displayName = "SidebarHeader"
-
-const SidebarFooter = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div">
->(({ className, ...props }, ref) => {
-  return (
-    <div
-      ref={ref}
-      data-sidebar="footer"
-      className={cn("flex flex-col gap-2 p-2", className)}
-      {...props}
-    />
-  )
-})
-SidebarFooter.displayName = "SidebarFooter"
-
-const SidebarSeparator = React.forwardRef<
-  React.ElementRef<typeof Separator>,
-  React.ComponentProps<typeof Separator>
->(({ className, ...props }, ref) => {
-  return (
-    <Separator
-      ref={ref}
-      data-sidebar="separator"
-      className={cn("mx-2 w-auto bg-sidebar-border", className)}
-      {...props}
-    />
-  )
-})
-SidebarSeparator.displayName = "SidebarSeparator"
-
-const SidebarContent = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div">
->(({ className, ...props }, ref) => {
-  return (
-    <div
-      ref={ref}
-      data-sidebar="content"
-      className={cn(
-        "flex min-h-0 flex-1 flex-col gap-2 overflow-auto group-data-[collapsible=icon]:overflow-hidden",
-        className
-      )}
-      {...props}
-    />
-  )
-})
-SidebarContent.displayName = "SidebarContent"
-
-const SidebarGroup = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div">
->(({ className, ...props }, ref) => {
-  return (
-    <div
-      ref={ref}
-      data-sidebar="group"
-      className={cn("relative flex w-full min-w-0 flex-col p-2", className)}
-      {...props}
-    />
-  )
-})
-SidebarGroup.displayName = "SidebarGroup"
-
-const SidebarGroupLabel = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div"> & { asChild?: boolean }
->(({ className, asChild = false, ...props }, ref) => {
-  const Comp = asChild ? Slot : "div"
-
-  return (
-    <Comp
-      ref={ref}
-      data-sidebar="group-label"
-      className={cn(
-        "duration-200 flex h-8 shrink-0 items-center rounded-md px-2 text-xs font-medium text-sidebar-foreground/70 outline-none ring-sidebar-ring transition-[margin,opa] ease-linear focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        "group-data-[collapsible=icon]:-mt-8 group-data-[collapsible=icon]:opacity-0",
-        className
-      )}
-      {...props}
-    />
-  )
-})
-SidebarGroupLabel.displayName = "SidebarGroupLabel"
-
-const SidebarGroupAction = React.forwardRef<
-  HTMLButtonElement,
-  React.ComponentProps<"button"> & { asChild?: boolean }
->(({ className, asChild = false, ...props }, ref) => {
-  const Comp = asChild ? Slot : "button"
-
-  return (
-    <Comp
-      ref={ref}
-      data-sidebar="group-action"
-      className={cn(
-        "absolute right-3 top-3.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
-        "after:absolute after:-inset-2 after:md:hidden",
-        "group-data-[collapsible=icon]:hidden",
-        className
-      )}
-      {...props}
-    />
-  )
-})
-SidebarGroupAction.displayName = "SidebarGroupAction"
-
-const SidebarGroupContent = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div">
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    data-sidebar="group-content"
-    className={cn("w-full text-sm", className)}
-    {...props}
-  />
-))
-SidebarGroupContent.displayName = "SidebarGroupContent"
-
-const SidebarMenu = React.forwardRef<
-  HTMLUListElement,
-  React.ComponentProps<"ul">
->(({ className, ...props }, ref) => (
-  <ul
-    ref={ref}
-    data-sidebar="menu"
-    className={cn("flex w-full min-w-0 flex-col gap-1", className)}
-    {...props}
-  />
-))
-SidebarMenu.displayName = "SidebarMenu"
-
-const SidebarMenuItem = React.forwardRef<
-  HTMLLIElement,
-  React.ComponentProps<"li">
->(({ className, ...props }, ref) => (
-  <li
-    ref={ref}
-    data-sidebar="menu-item"
-    className={cn("group/menu-item relative", className)}
-    {...props}
-  />
-))
-SidebarMenuItem.displayName = "SidebarMenuItem"
-
-const sidebarMenuButtonVariants = cva(
-  "peer/menu-button flex w-full items-center gap-2 overflow-hidden rounded-md p-2 text-left text-sm outline-none ring-sidebar-ring transition-[width,height,padding] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 group-has-[[data-sidebar=menu-action]]/menu-item:pr-8 aria-disabled:pointer-events-none aria-disabled:opacity-50 data-[active=true]:bg-sidebar-accent data-[active=true]:font-medium data-[active=true]:text-sidebar-accent-foreground data-[state=open]:hover:bg-sidebar-accent data-[state=open]:hover:text-sidebar-accent-foreground group-data-[collapsible=icon]:!size-8 group-data-[collapsible=icon]:!p-2 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0",
-  {
-    variants: {
-      variant: {
-        default: "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        outline:
-          "bg-background shadow-[0_0_0_1px_hsl(var(--sidebar-border))] hover:bg-sidebar-accent hover:text-sidebar-accent-foreground hover:shadow-[0_0_0_1px_hsl(var(--sidebar-accent))]",
-      },
-      size: {
-        default: "h-8 text-sm",
-        sm: "h-7 text-xs",
-        lg: "h-12 text-sm group-data-[collapsible=icon]:!p-0",
-      },
-    },
-    defaultVariants: {
-      variant: "default",
-      size: "default",
-    },
-  }
-)
-
-const SidebarMenuButton = React.forwardRef<
-  HTMLButtonElement,
-  React.ComponentProps<"button"> & {
-    asChild?: boolean
-    isActive?: boolean
-    tooltip?: string | React.ComponentProps<typeof TooltipContent>
-  } & VariantProps<typeof sidebarMenuButtonVariants>
->(
-  (
-    {
-      asChild = false,
-      isActive = false,
-      variant = "default",
-      size = "default",
-      tooltip,
-      className,
-      ...props
-    },
-    ref
-  ) => {
-    const Comp = asChild ? Slot : "button"
-    const { isMobile, state } = useSidebar()
-
-    const button = (
-      <Comp
-        ref={ref}
-        data-sidebar="menu-button"
-        data-size={size}
-        data-active={isActive}
-        className={cn(sidebarMenuButtonVariants({ variant, size }), className)}
-        {...props}
-      />
-    )
-
-    if (!tooltip) {
-      return button
-    }
-
-    if (typeof tooltip === "string") {
-      tooltip = {
-        children: tooltip,
-      }
-    }
-
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{button}</TooltipTrigger>
-        <TooltipContent
-          side="right"
-          align="center"
-          hidden={state !== "collapsed" || isMobile}
-          {...tooltip}
-        />
-      </Tooltip>
-    )
-  }
-)
-SidebarMenuButton.displayName = "SidebarMenuButton"
-
-const SidebarMenuAction = React.forwardRef<
-  HTMLButtonElement,
-  React.ComponentProps<"button"> & {
-    asChild?: boolean
-    showOnHover?: boolean
-  }
->(({ className, asChild = false, showOnHover = false, ...props }, ref) => {
-  const Comp = asChild ? Slot : "button"
-
-  return (
-    <Comp
-      ref={ref}
-      data-sidebar="menu-action"
-      className={cn(
-        "absolute right-1 top-1.5 flex aspect-square w-5 items-center justify-center rounded-md p-0 text-sidebar-foreground outline-none ring-sidebar-ring transition-transform hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 peer-hover/menu-button:text-sidebar-accent-foreground [&>svg]:size-4 [&>svg]:shrink-0",
-        // Increases the hit area of the button on mobile.
-        "after:absolute after:-inset-2 after:md:hidden",
-        "peer-data-[size=sm]/menu-button:top-1",
-        "peer-data-[size=default]/menu-button:top-1.5",
-        "peer-data-[size=lg]/menu-button:top-2.5",
-        "group-data-[collapsible=icon]:hidden",
-        showOnHover &&
-          "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
-        className
-      )}
-      {...props}
-    />
-  )
-})
-SidebarMenuAction.displayName = "SidebarMenuAction"
-
-const SidebarMenuBadge = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div">
->(({ className, ...props }, ref) => (
-  <div
-    ref={ref}
-    data-sidebar="menu-badge"
-    className={cn(
-      "absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium tabular-nums text-sidebar-foreground select-none pointer-events-none",
-      "peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[active=true]/menu-button:text-sidebar-accent-foreground",
-      "peer-data-[size=sm]/menu-button:top-1",
-      "peer-data-[size=default]/menu-button:top-1.5",
-      "peer-data-[size=lg]/menu-button:top-2.5",
-      "group-data-[collapsible=icon]:hidden",
-      className
-    )}
-    {...props}
-  />
-))
-SidebarMenuBadge.displayName = "SidebarMenuBadge"
-
-const SidebarMenuSkeleton = React.forwardRef<
-  HTMLDivElement,
-  React.ComponentProps<"div"> & {
-    showIcon?: boolean
-  }
->(({ className, showIcon = false, ...props }, ref) => {
-  // Random width between 50 to 90%.
-  const width = React.useMemo(() => {
-    return `${Math.floor(Math.random() * 40) + 50}%`
-  }, [])
-
-  return (
-    <div
-      ref={ref}
-      data-sidebar="menu-skeleton"
-      className={cn("rounded-md h-8 flex gap-2 px-2 items-center", className)}
-      {...props}
-    >
-      {showIcon && (
-        <Skeleton
-          className="size-4 rounded-md"
-          data-sidebar="menu-skeleton-icon"
-        />
-      )}
-      <Skeleton
-        className="h-4 flex-1 max-w-[--skeleton-width]"
-        data-sidebar="menu-skeleton-text"
-        style={
-          {
-            "--skeleton-width": width,
-          } as React.CSSProperties
-        }
-      />
+const ReadOnlyField = ({ label, value }: { label: string; value: React.ReactNode }) => (
+    <div className="space-y-1">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="text-sm">{value || <span className="text-muted-foreground/70">N/A</span>}</p>
     </div>
-  )
-})
-SidebarMenuSkeleton.displayName = "SidebarMenuSkeleton"
+);
 
-const SidebarMenuSub = React.forwardRef<
-  HTMLUListElement,
-  React.ComponentProps<"ul">
->(({ className, ...props }, ref) => (
-  <ul
-    ref={ref}
-    data-sidebar="menu-sub"
-    className={cn(
-      "mx-3.5 flex min-w-0 translate-x-px flex-col gap-1 border-l border-sidebar-border px-2.5 py-0.5",
-      "group-data-[collapsible=icon]:hidden",
-      className
-    )}
-    {...props}
-  />
-))
-SidebarMenuSub.displayName = "SidebarMenuSub"
 
-const SidebarMenuSubItem = React.forwardRef<
-  HTMLLIElement,
-  React.ComponentProps<"li">
->(({ ...props }, ref) => <li ref={ref} {...props} />)
-SidebarMenuSubItem.displayName = "SidebarMenuSubItem"
+export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, isReadOnly }: AssetFormProps) {
+  const [quickViewRemarks, setQuickViewRemarks] = useState('');
+  const [quickViewStatus, setQuickViewStatus] = useState<'Verified' | 'Unverified' | 'Discrepancy'>('Unverified');
+  const [isQuickSaving, setIsQuickSaving] = useState(false);
 
-const SidebarMenuSubButton = React.forwardRef<
-  HTMLAnchorElement,
-  React.ComponentProps<"a"> & {
-    asChild?: boolean
-    size?: "sm" | "md"
-    isActive?: boolean
+  const [isSaving, setIsSaving] = useState(false);
+  const { userProfile } = useAuth();
+  const isAdmin = userProfile?.isAdmin || false;
+  
+  const defaultValues = {
+    category: '',
+    description: '',
+    serialNumber: '',
+    location: userProfile?.state || '',
+    condition: '',
+    remarks: '',
+    assignee: '',
+    verifiedStatus: 'Unverified',
+    verifiedDate: '',
+    lga: '',
+    assetIdCode: '',
+    manufacturer: '',
+    assetClass: '',
+    modelNumber: '',
+    supplier: '',
+    dateReceived: '',
+    grant: '',
+    chasisNo: '',
+    engineNo: '',
+  };
+
+  const form = useForm<AssetFormValues>({
+    resolver: zodResolver(assetFormSchema),
+    defaultValues: asset ? { ...asset, verifiedStatus: asset.verifiedStatus || 'Unverified' } : defaultValues,
+    mode: 'onChange',
+  });
+  
+  const watchedValues = form.watch();
+
+  useEffect(() => {
+    if (isOpen) {
+      if (asset) {
+        setQuickViewRemarks(asset.remarks || '');
+        setQuickViewStatus(asset.verifiedStatus || 'Unverified');
+        
+        form.reset({
+          ...defaultValues,
+          ...asset,
+          location: asset.location || userProfile?.state || '',
+          verifiedStatus: asset.verifiedStatus || 'Unverified',
+        });
+      } else {
+        form.reset(defaultValues);
+      }
+    }
+  }, [isOpen, asset, form, userProfile]);
+  
+  const watchedStatusInForm = form.watch('verifiedStatus');
+  useEffect(() => {
+    if (watchedStatusInForm === 'Verified' && !form.getValues('verifiedDate')) {
+        form.setValue('verifiedDate', new Date().toLocaleDateString('en-CA'));
+    } else if (watchedStatusInForm !== 'Verified' && !isReadOnly) {
+        form.setValue('verifiedDate', '');
+    }
+  }, [watchedStatusInForm, form, isReadOnly]);
+
+
+  const handleQuickSaveClick = async () => {
+    if (!asset) return;
+    setIsQuickSaving(true);
+    try {
+      const verifiedDate = quickViewStatus === 'Verified' ? new Date().toLocaleDateString('en-CA') : '';
+      await onQuickSave(asset.id, {
+        remarks: quickViewRemarks,
+        verifiedStatus: quickViewStatus,
+        verifiedDate,
+      });
+      addNotification({ title: "Saved", description: "Your changes have been saved locally." });
+    } catch(e) {
+      addNotification({ title: "Error", description: "Could not save changes.", variant: "destructive" });
+    } finally {
+      setIsQuickSaving(false);
+    }
   }
->(({ asChild = false, size = "md", isActive, className, ...props }, ref) => {
-  const Comp = asChild ? Slot : "a"
+
+  const onSubmit = async (data: AssetFormValues) => {
+    setIsSaving(true);
+    try {
+        const assetToSave: Asset = {
+            id: asset?.id || crypto.randomUUID(),
+            ...asset,
+            ...data,
+        };
+        await onSave(assetToSave);
+        onOpenChange(false);
+    } catch (e) {
+        // Error toast is handled by the caller
+    } finally {
+        setIsSaving(false);
+    }
+  };
+  
+  // RENDER LOGIC
+  if (isReadOnly && asset) {
+    return (
+      <Sheet open={isOpen} onOpenChange={onOpenChange}>
+        <SheetContent className="sm:max-w-2xl w-full flex flex-col">
+          <SheetHeader>
+            <SheetTitle>Asset Quick View</SheetTitle>
+            <SheetDescription>
+              Viewing asset details. Comments and status can be updated here.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex-1 space-y-6 overflow-y-auto pr-6 py-4">
+            <div className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="S/N" value={asset.sn} />
+                    <ReadOnlyField label="LGA" value={asset.lga} />
+                </div>
+                 <ReadOnlyField label="Assignee" value={asset.assignee} />
+                <ReadOnlyField label="Asset Description" value={asset.description} />
+                <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                     <div className="space-y-2">
+                        <Label htmlFor="quick-view-status">Verified Status</Label>
+                        <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
+                            <SelectTrigger id="quick-view-status" className="w-full">
+                                <SelectValue placeholder="Select status" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
+                                <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                                <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="quick-view-remarks">Remarks/Comments</Label>
+                    <Textarea
+                      id="quick-view-remarks"
+                      value={quickViewRemarks}
+                      onChange={(e) => setQuickViewRemarks(e.target.value)}
+                      className="min-h-24"
+                    />
+                </div>
+                
+                <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
+                    {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Comments & Status
+                </Button>
+            </div>
+            
+            <Accordion type="single" collapsible className="w-full pt-4">
+                <AccordionItem value="advanced">
+                    <AccordionTrigger>Full Asset Details</AccordionTrigger>
+                    <AccordionContent className="pt-4 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <ReadOnlyField label="Location" value={asset.location} />
+                           <ReadOnlyField label="Asset Class" value={asset.assetClass} />
+                        </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
+                            <ReadOnlyField label="Model Number" value={asset.modelNumber} />
+                        </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
+                            <ReadOnlyField label="Condition" value={asset.condition} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Engine Number" value={asset.engineNo} />
+                            <ReadOnlyField label="Chasis Number" value={asset.chasisNo} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Supplier" value={asset.supplier} />
+                            <ReadOnlyField label="Grant" value={asset.grant} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Date Received" value={asset.dateReceived ? String(asset.dateReceived) : 'N/A'} />
+                            <ReadOnlyField label="Verified Date" value={asset.verifiedDate || 'N/A'} />
+                        </div>
+                         <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
+                    </AccordionContent>
+                </AccordionItem>
+            </Accordion>
+          </div>
+          <SheetFooter className="mt-auto pt-4 border-t">
+            <SheetClose asChild>
+              <Button variant="outline">Close</Button>
+            </SheetClose>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+    );
+  }
 
   return (
-    <Comp
-      ref={ref}
-      data-sidebar="menu-sub-button"
-      data-size={size}
-      data-active={isActive}
-      className={cn(
-        "flex h-7 min-w-0 -translate-x-px items-center gap-2 overflow-hidden rounded-md px-2 text-sidebar-foreground outline-none ring-sidebar-ring hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 active:bg-sidebar-accent active:text-sidebar-accent-foreground disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50 [&>span:last-child]:truncate [&>svg]:size-4 [&>svg]:shrink-0 [&>svg]:text-sidebar-accent-foreground",
-        "data-[active=true]:bg-sidebar-accent data-[active=true]:text-sidebar-accent-foreground",
-        size === "sm" && "text-xs",
-        size === "md" && "text-sm",
-        "group-data-[collapsible=icon]:hidden",
-        className
-      )}
-      {...props}
-    />
-  )
-})
-SidebarMenuSubButton.displayName = "SidebarMenuSubButton"
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetContent className="sm:max-w-4xl w-full flex flex-col">
+        <SheetHeader>
+          <SheetTitle>{asset ? `Edit Asset` : 'Add New Asset'}</SheetTitle>
+          <SheetDescription>
+            {asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.'}
+          </SheetDescription>
+        </SheetHeader>
+        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto pr-4 py-4">
+          <div className="md:col-span-2">
+            <Form {...form}>
+              <form
+                id="asset-form"
+                onSubmit={form.handleSubmit(onSubmit)}
+                className="space-y-4 p-1"
+              >
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField
+                    control={form.control}
+                    name="category"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Category</FormLabel>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={!!asset}>
+                          <FormControl>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select a category" />
+                            </SelectTrigger>
+                          </FormControl>
+                          <SelectContent>
+                            {TARGET_SHEETS.map(sheet => (
+                              <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="description"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Asset Description</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                  )} />
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <FormField control={form.control} name="serialNumber" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Serial Number</FormLabel>
+                      <FormControl><Input {...field} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                  <FormField control={form.control} name="assetIdCode" render={({ field }) => (
+                    <FormItem>
+                        <FormLabel>Asset ID Code</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                    </FormItem>
+                  )} />
+                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <FormField control={form.control} name="location" render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Location</FormLabel>
+                      <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )} />
+                   <FormField control={form.control} name="lga" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>LGA</FormLabel>
+                            <FormControl><Input {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                   <FormField control={form.control} name="assignee" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Assignee</FormLabel>
+                        <FormControl><Input {...field} /></FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )} />
+                    <FormField control={form.control} name="condition" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Condition</FormLabel>
+                          <FormControl><Input {...field} /></FormControl>
+                          <FormMessage />
+                        </FormItem>
+                    )} />
+                </div>
+                
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="manufacturer" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel>Manufacturer</FormLabel>
+                            <FormControl><Input {...field} /></FormControl>
+                            <FormMessage />
+                        </FormItem>
+                    )} />
+                    <FormField control={form.control} name="modelNumber" render={({ field }) => (
+                        <FormItem><FormLabel>Model Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                </div>
+                
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField control={form.control} name="assetClass" render={({ field }) => (
+                        <FormItem><FormLabel>Asset Class</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                    )} />
+                    <FormField
+                      control={form.control}
+                      name="verifiedStatus"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Verified Status</FormLabel>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select status" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
+                              <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                              <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                </div>
 
-export {
-  Sidebar,
-  SidebarContent,
-  SidebarFooter,
-  SidebarGroup,
-  SidebarGroupAction,
-  SidebarGroupContent,
-  SidebarGroupLabel,
-  SidebarHeader,
-  SidebarInput,
-  SidebarInset,
-  SidebarMenu,
-  SidebarMenuAction,
-  SidebarMenuBadge,
-  SidebarMenuButton,
-  SidebarMenuItem,
-  SidebarMenuSkeleton,
-  SidebarMenuSub,
-  SidebarMenuSubButton,
-  SidebarMenuSubItem,
-  SidebarProvider,
-  SidebarRail,
-  SidebarSeparator,
-  SidebarTrigger,
-  useSidebar,
+                <FormField control={form.control} name="remarks" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Remarks/Comments</FormLabel>
+                    <FormControl><Textarea {...field} /></FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+
+                <Accordion type="single" collapsible className="w-full pt-4">
+                  <AccordionItem value="advanced">
+                    <AccordionTrigger>Advanced Information</AccordionTrigger>
+                    <AccordionContent className="pt-4 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <FormField control={form.control} name="engineNo" render={({ field }) => (
+                                <FormItem><FormLabel>Engine Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                           <FormField control={form.control} name="chasisNo" render={({ field }) => (
+                                <FormItem><FormLabel>Chasis Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                        </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <FormField control={form.control} name="supplier" render={({ field }) => (
+                                <FormItem><FormLabel>Supplier</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                            <FormField control={form.control} name="grant" render={({ field }) => (
+                                <FormItem><FormLabel>Grant</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <FormField control={form.control} name="dateReceived" render={({ field }) => (
+                                <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                            )} />
+                           <ReadOnlyField label="Last Modified" value={asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
+                        </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                </Accordion>
+                
+              </form>
+            </Form>
+          </div>
+          <div className="md:col-span-1 space-y-6">
+            <AssetChecklist values={watchedValues} />
+          </div>
+        </div>
+        <SheetFooter className="mt-auto pt-4 border-t">
+          <SheetClose asChild>
+            <Button variant="outline">Close</Button>
+          </SheetClose>
+          <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
+              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Save Changes
+          </Button>
+        </SheetFooter>
+      </SheetContent>
+    </Sheet>
+  );
 }
