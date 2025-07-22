@@ -10,10 +10,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -36,14 +32,7 @@ import {
   Filter,
   ArrowUpDown,
   RefreshCw,
-  Database,
-  FileDown,
-  FileUp,
-  PlusCircle,
-  Trash2,
   Bell,
-  Sun,
-  Moon,
   CheckCheck,
   X,
   Inbox,
@@ -71,10 +60,10 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
-import { useTheme } from "next-themes";
 import { Separator } from "./ui/separator";
 import { InboxSheet } from "./inbox-sheet";
 import { ScrollArea } from "./ui/scroll-area";
+import { ChangePasswordDialog } from "./change-password-dialog";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -88,7 +77,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     locationOptions, assigneeOptions, statusOptions,
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     setManualSyncTrigger, isSyncing,
-    dataActions,
     unreadInboxCount
   } = useAppState();
 
@@ -98,9 +86,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
-  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    // Force password change on first login
+    if (userProfile && !userProfile.passwordChanged) {
+      setIsChangePasswordOpen(true);
+    }
+  }, [userProfile]);
 
   useEffect(() => {
     setSearchTerm(debouncedSearchTerm);
@@ -159,23 +154,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
-  const isAdmin = userProfile?.isAdmin || false;
   const isGuest = !userProfile || (userProfile.displayName.toLowerCase().trim() === 'guest');
-
-  const canImport = !isGuest;
-  const canModifyData = !isGuest;
 
   return (
     <div className="flex flex-col w-full min-h-screen">
       <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm sm:h-16 md:px-6">
         
-        {/* Left Side */}
         <div className="flex items-center gap-2">
             <Boxes className="h-5 w-5 text-primary" />
             <span className="text-lg font-semibold hidden sm:inline-block">Asset Assist</span>
         </div>
 
-        {/* Center */}
         <div className="flex-1 flex justify-center px-4">
             <div className="w-full max-w-lg">
                 {router === '/assets' && (
@@ -223,7 +212,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
         </div>
 
-        {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
             <TooltipProvider>
                 <Tooltip>
@@ -293,52 +281,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                  {canModifyData && (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>
-                        <Database className="mr-2 h-4 w-4" />
-                        Data Management
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                           {canImport && (
-                            <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting}>
-                              <FileUp className="mr-2 h-4 w-4" />
-                              Import from Excel
-                            </DropdownMenuItem>
-                          )}
-                          <DropdownMenuItem onClick={dataActions.onExport}>
-                            <FileDown className="mr-2 h-4 w-4" />
-                            Export to Excel
-                          </DropdownMenuItem>
-                           <DropdownMenuItem onClick={dataActions.onAddAsset}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add New Asset
-                          </DropdownMenuItem>
-                          
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:bg-destructive/20 focus:text-destructive"
-                            onClick={dataActions.onClearAll}
-                            disabled={!dataActions.hasAssets}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Clear All Assets
-                          </DropdownMenuItem>
-                          
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-                  )}
-                  {isAdmin && (
-                    <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
-                      <Settings className="mr-2 h-4 w-4"/>
-                      Settings
-                    </DropdownMenuItem>
-                  )}
-                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
+                    <Settings className="mr-2 h-4 w-4"/>
+                    Settings
+                  </DropdownMenuItem>
                   
-                  {isAdmin && (
+                  {userProfile?.isAdmin && (
                      <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
                       <Inbox className="mr-2 h-4 w-4" />
                       <span>Inbox</span>
@@ -359,27 +307,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </span>
                     )}
                   </DropdownMenuItem>
-
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <Sun className="mr-2 h-4 w-4" />
-                      <span>Theme</span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuPortal>
-                      <DropdownMenuSubContent>
-                        <DropdownMenuItem onClick={() => setTheme('light')}>
-                          Light
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setTheme('dark')}>
-                          Dark
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setTheme('system')}>
-                          System
-                        </DropdownMenuItem>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuPortal>
-                  </DropdownMenuSub>
-
+                  
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
@@ -391,7 +319,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="flex-1 flex flex-col p-4 md:p-6 bg-muted/40">{children}</main>
-      <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} openChangePassword={() => setIsChangePasswordOpen(true)} />
       <AssetFilterSheet
         isOpen={isFilterSheetOpen}
         onOpenChange={setIsFilterSheetOpen}
@@ -461,6 +389,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SheetFooter>
         </SheetContent>
       </Sheet>
+      <ChangePasswordDialog isOpen={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen} />
     </div>
   );
 }

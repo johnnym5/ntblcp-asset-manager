@@ -27,6 +27,7 @@ import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 export default function UserProfileSetup() {
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [selectedState, setSelectedState] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
@@ -56,6 +57,21 @@ export default function UserProfileSetup() {
       return;
     }
 
+    if (foundUser.isGuest) {
+      login({
+        displayName: foundUser.displayName,
+        state: selectedState,
+        role: 'guest',
+        passwordChanged: true,
+      });
+      return;
+    }
+
+    if (foundUser.password !== password) {
+      setError('Incorrect password. Please try again.');
+      return;
+    }
+
     if (foundUser.states.length > 1 && !selectedState) {
         setError('Please select your assigned location.');
         return;
@@ -64,18 +80,20 @@ export default function UserProfileSetup() {
     login({
         displayName: foundUser.displayName,
         state: selectedState,
-        role: foundUser.isAdmin ? 'admin' : foundUser.isGuest ? 'guest' : 'user',
+        role: foundUser.isAdmin ? 'admin' : 'user',
+        password: foundUser.password,
+        passwordChanged: foundUser.passwordChanged,
     });
   };
   
-  const canLogin = foundUser && selectedState;
+  const canLogin = foundUser && (selectedState || foundUser?.isGuest) && (password || foundUser?.isGuest);
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
       <Card className="w-full max-w-md">
         <CardHeader>
           <CardTitle>Welcome</CardTitle>
-          <CardDescription>Enter your name to access the asset register.</CardDescription>
+          <CardDescription>Enter your name and password to access the asset register.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
@@ -88,6 +106,20 @@ export default function UserProfileSetup() {
               autoComplete="username"
             />
           </div>
+
+          {!foundUser?.isGuest && (
+            <div className="space-y-2">
+              <Label htmlFor="password">Password</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="Enter your password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                autoComplete="current-password"
+              />
+            </div>
+          )}
           
           {foundUser && foundUser.states.length > 1 && (
              <div className="space-y-2">

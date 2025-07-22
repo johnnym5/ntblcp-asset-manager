@@ -17,7 +17,8 @@ interface AuthContextType {
   loading: boolean;
   profileSetupComplete: boolean;
   authInitialized: boolean;
-  login: (profile: { displayName: string, state: string, role: 'admin' | 'user' | 'guest' }) => void;
+  login: (profile: { displayName: string, state: string, role: 'admin' | 'user' | 'guest', password?: string, passwordChanged?: boolean }) => void;
+  updatePassword: (newPassword: string) => void;
   logout: () => void;
 }
 
@@ -27,6 +28,7 @@ const AuthContext = createContext<AuthContextType>({
   profileSetupComplete: false,
   authInitialized: false,
   login: () => {},
+  updatePassword: () => {},
   logout: () => {},
 });
 
@@ -38,8 +40,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { setAssets, setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    // This effect runs only on the client, after the initial render.
-    // This prevents hydration errors.
     const initializeAuth = () => {
       try {
         const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
@@ -48,11 +48,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === savedProfile.loginName.toLowerCase());
             
             if (authorizedUser) {
-                // Restore the valid session
-                setUserProfile(savedProfile);
+                // Restore the valid session, ensuring password is included
+                const restoredProfile = { ...savedProfile };
+                if (!restoredProfile.password) {
+                  // If password somehow doesn't exist in local storage, fetch from default
+                  restoredProfile.password = authorizedUser.password;
+                }
+                setUserProfile(restoredProfile);
                 setGlobalStateFilter(savedProfile.state);
             } else {
-                // Clear invalid profile from storage
                 localStorage.removeItem('ntblcp-user-profile');
             }
         }
@@ -68,19 +72,34 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     initializeAuth();
   }, [setGlobalStateFilter]);
 
-  const login = (profile: { displayName: string, state: string, role: 'admin' | 'user' | 'guest' }) => {
+  const login = (profile: { displayName: string, state: string, role: 'admin' | 'user' | 'guest', password?: string, passwordChanged?: boolean }) => {
     const authorizedUser = AUTHORIZED_USERS.find(u => u.displayName === profile.displayName);
     if (!authorizedUser) return;
 
     const fullProfile: UserProfile = {
       ...authorizedUser,
       state: profile.state,
+      password: profile.password || authorizedUser.password,
+      passwordChanged: profile.passwordChanged || authorizedUser.passwordChanged,
     };
 
     localStorage.setItem('ntblcp-user-profile', JSON.stringify(fullProfile));
     setUserProfile(fullProfile);
     setGlobalStateFilter(profile.state);
   };
+  
+  const updatePassword = (newPassword: string) => {
+    if (userProfile) {
+        const updatedProfile = {
+            ...userProfile,
+            password: newPassword,
+            passwordChanged: true,
+        };
+        localStorage.setItem('ntblcp-user-profile', JSON.stringify(updatedProfile));
+        setUserProfile(updatedProfile);
+    }
+  };
+
 
   const logout = async () => {
     localStorage.removeItem('ntblcp-user-profile');
@@ -92,7 +111,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   
   const profileSetupComplete = !!userProfile;
 
-  const value = { userProfile, loading, profileSetupComplete, login, logout, authInitialized };
+  const value = { userProfile, loading, profileSetupComplete, login, logout, authInitialized, updatePassword };
 
   return (
     <AuthContext.Provider value={value}>
