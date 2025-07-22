@@ -33,28 +33,32 @@ const AuthContext = createContext<AuthContextType>({
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   
   const { setAssets, setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    const initializeAuth = async () => {
+    // This effect runs only on the client, after the initial render.
+    // This prevents hydration errors.
+    const initializeAuth = () => {
       try {
         const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
         if (savedProfileJson) {
             const savedProfile: UserProfile = JSON.parse(savedProfileJson);
             const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === savedProfile.loginName.toLowerCase());
+            
             if (authorizedUser) {
+                // Restore the valid session
                 setUserProfile(savedProfile);
                 setGlobalStateFilter(savedProfile.state);
-                setProfileSetupComplete(true);
             } else {
+                // Clear invalid profile from storage
                 localStorage.removeItem('ntblcp-user-profile');
             }
         }
       } catch (error) {
           console.error("Auth initialization failed:", error);
+          localStorage.removeItem('ntblcp-user-profile');
       } finally {
           setAuthInitialized(true);
           setLoading(false);
@@ -76,19 +80,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('ntblcp-user-profile', JSON.stringify(fullProfile));
     setUserProfile(fullProfile);
     setGlobalStateFilter(profile.state);
-    setProfileSetupComplete(true);
   };
 
   const logout = async () => {
-    // We don't clear assets on logout anymore to preserve the master list.
-    // await clearLocalAssets();
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
-    setProfileSetupComplete(false);
     setGlobalStateFilter('');
-    setAssets([]); // Just clear the in-memory state, not the DB
+    setAssets([]); 
     window.location.reload(); 
   };
+  
+  const profileSetupComplete = !!userProfile;
 
   const value = { userProfile, loading, profileSetupComplete, login, logout, authInitialized };
 

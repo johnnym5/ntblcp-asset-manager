@@ -10,7 +10,7 @@ import UserProfileSetup from '@/components/user-profile-setup';
 import { useAppState } from '@/contexts/app-state-context';
 
 export default function AssetsPage() {
-  const { userProfile, loading, profileSetupComplete, login } = useAuth();
+  const { userProfile, loading, profileSetupComplete } = useAuth();
   const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
