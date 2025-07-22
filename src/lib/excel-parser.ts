@@ -221,9 +221,12 @@ export async function parseExcelFile(
                 continue;
             }
             
+            let lastSeenState: string | null = null;
+
             for (let i = 0; i < headerRowIndices.length; i++) {
                 const headerRowIndex = headerRowIndices[i];
                 const headerRow = sheetData[headerRowIndex].map(normalizeHeader);
+                const stateColumnIndex = headerRow.indexOf('STATE');
                 
                 // Data rows are between this header and the next header (or end of sheet)
                 const startRow = headerRowIndex + 1;
@@ -238,10 +241,25 @@ export async function parseExcelFile(
                     const assetObject: Partial<Asset> = { category: canonicalSheetName };
                     let hasAnyData = false;
 
+                    // Handle state persistence for merged cells in IHVN sheet
+                    if (canonicalSheetName === 'IHVN-GF N-THRIP' && stateColumnIndex !== -1) {
+                        const stateValue = row[stateColumnIndex];
+                        if (stateValue && String(stateValue).trim()) {
+                            lastSeenState = String(stateValue).trim();
+                        }
+                        if (lastSeenState) {
+                            assetObject.location = lastSeenState;
+                        }
+                    }
+
                     headerRow.forEach((header, index) => {
                         const field = COLUMN_TO_ASSET_FIELD_MAP[header];
                         const cellValue = row[index];
-                        if (field && cellValue !== null && String(cellValue).trim() !== '') {
+
+                        // Special handling for IHVN sheet to prevent 'LOCATION' column from overwriting 'STATE'
+                        if (canonicalSheetName === 'IHVN-GF N-THRIP' && header === 'LOCATION') {
+                            // Do nothing, we've already set location from STATE
+                        } else if (field && cellValue !== null && String(cellValue).trim() !== '') {
                             assetObject[field] = cellValue;
                             hasAnyData = true;
                         }
