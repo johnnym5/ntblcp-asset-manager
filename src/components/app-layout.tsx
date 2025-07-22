@@ -79,8 +79,7 @@ import { ScrollArea } from "./ui/scroll-area";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { userProfile, loading, logout } = useAuth();
-  const router = useRouter();
-  const pathname = usePathname();
+  const router = usePathname();
   const { 
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
@@ -161,7 +160,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
   const isAdmin = userProfile?.isAdmin || false;
-  const isGuest = userProfile?.isGuest || false;
+  const isGuest = !userProfile || (userProfile.displayName.toLowerCase().trim() === 'guest');
 
   const canImport = !isGuest;
   const canModifyData = !isGuest;
@@ -179,7 +178,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Center */}
         <div className="flex-1 flex justify-center px-4">
             <div className="w-full max-w-lg">
-                {pathname === '/assets' && (
+                {router === '/assets' && (
                     <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
                         <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
                         <Input
