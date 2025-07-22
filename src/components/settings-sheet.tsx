@@ -38,27 +38,22 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     enabledSheets,
     isOnline,
     dataActions,
+    appSettings,
+    setAppSettings,
   } = useAppState();
 
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
-  const [localSettings, setLocalSettings] = useState({
-    lockAssetList,
-    autoSyncEnabled,
-    enabledSheets,
-  });
+  const [localSettings, setLocalSettings] = useState(appSettings);
 
   useEffect(() => {
-    setLocalSettings({
-        lockAssetList,
-        autoSyncEnabled,
-        enabledSheets,
-    });
-  }, [lockAssetList, autoSyncEnabled, enabledSheets, isOpen]);
+    if (isOpen) {
+      setLocalSettings(appSettings);
+    }
+  }, [appSettings, isOpen]);
 
-
-  const handleSettingChange = (key: 'lockAssetList' | 'autoSyncEnabled', value: boolean) => {
+  const handleSettingChange = (key: keyof typeof localSettings, value: any) => {
     setLocalSettings(prev => ({ ...prev, [key]: value }));
   };
 
@@ -69,12 +64,12 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     } else {
       newEnabledSheets = localSettings.enabledSheets.filter(name => name !== sheetName);
     }
-    setLocalSettings(prev => ({ ...prev, enabledSheets: newEnabledSheets }));
+    handleSettingChange('enabledSheets', newEnabledSheets);
   };
 
   const handleToggleAll = (enable: boolean) => {
     const newEnabledSheets = enable ? [...TARGET_SHEETS] : [];
-    setLocalSettings(prev => ({ ...prev, enabledSheets: newEnabledSheets }));
+    handleSettingChange('enabledSheets', newEnabledSheets);
   };
   
   const handleSaveChanges = async () => {
@@ -95,6 +90,11 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const isGuest = userProfile?.isGuest || false;
   const canModifyData = !isGuest;
   const canImport = !isGuest;
+  
+  if (!localSettings) {
+    return null; // Or a loading spinner
+  }
+
   const allEnabled = localSettings.enabledSheets.length === TARGET_SHEETS.length;
   const noneEnabled = localSettings.enabledSheets.length === 0;
 
@@ -109,17 +109,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         </SheetHeader>
         <ScrollArea className="flex-1 -mx-6 px-6 py-4">
           <div className="space-y-6">
-
-            {!isGuest && (
-              <div>
-                <h3 className="text-lg font-medium mb-4">Account</h3>
-                <div className="rounded-lg border p-3">
-                  <Button variant="outline" className="w-full justify-start" onClick={() => { onOpenChange(false); openChangePassword(); }}>
-                    Reset Password
-                  </Button>
-                </div>
-              </div>
-            )}
 
             {canModifyData && (
               <div>
@@ -237,6 +226,17 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                   </div>
                 </div>
               </>
+            )}
+
+             {!isGuest && (
+              <div className="pt-4">
+                <h3 className="text-lg font-medium mb-4">Account</h3>
+                <div className="rounded-lg border p-3">
+                  <Button variant="outline" className="w-full justify-start" onClick={() => { onOpenChange(false); openChangePassword(); }}>
+                    Reset Password
+                  </Button>
+                </div>
+              </div>
             )}
           </div>
         </ScrollArea>

@@ -205,39 +205,17 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
             <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <ReadOnlyField label="S/N" value={asset.sn} />
-                    <ReadOnlyField label="Location" value={asset.location} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <ReadOnlyField label="LGA" value={asset.lga} />
-                    <ReadOnlyField label="Assignee" value={asset.assignee} />
                 </div>
+                 <ReadOnlyField label="Assignee" value={asset.assignee} />
                 <ReadOnlyField label="Asset Description" value={asset.description} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
-                    <ReadOnlyField label="Asset Class" value={asset.assetClass} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
-                    <ReadOnlyField label="Model Number" value={asset.modelNumber} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
-                    <ReadOnlyField label="Condition" value={asset.condition} />
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="quick-view-remarks">Remarks/Comments</Label>
-                    <Textarea
-                      id="quick-view-remarks"
-                      value={quickViewRemarks}
-                      onChange={(e) => setQuickViewRemarks(e.target.value)}
-                      className="min-h-24"
-                    />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
                      <div className="space-y-2">
                         <Label htmlFor="quick-view-status">Verified Status</Label>
                         <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
-                            <SelectTrigger id="quick-view-status">
+                            <SelectTrigger id="quick-view-status" className="w-full">
                                 <SelectValue placeholder="Select status" />
                             </SelectTrigger>
                             <SelectContent>
@@ -247,8 +225,18 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                             </SelectContent>
                         </Select>
                     </div>
-                     <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
-                 </div>
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="quick-view-remarks">Remarks/Comments</Label>
+                    <Textarea
+                      id="quick-view-remarks"
+                      value={quickViewRemarks}
+                      onChange={(e) => setQuickViewRemarks(e.target.value)}
+                      className="min-h-24"
+                    />
+                </div>
+                
                 <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
                     {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Save Comments & Status
@@ -257,8 +245,20 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
             
             <Accordion type="single" collapsible className="w-full pt-4">
                 <AccordionItem value="advanced">
-                    <AccordionTrigger>Advanced Information</AccordionTrigger>
+                    <AccordionTrigger>Full Asset Details</AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                           <ReadOnlyField label="Location" value={asset.location} />
+                           <ReadOnlyField label="Asset Class" value={asset.assetClass} />
+                        </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
+                            <ReadOnlyField label="Model Number" value={asset.modelNumber} />
+                        </div>
+                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
+                            <ReadOnlyField label="Condition" value={asset.condition} />
+                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <ReadOnlyField label="Engine Number" value={asset.engineNo} />
                             <ReadOnlyField label="Chasis Number" value={asset.chasisNo} />
@@ -271,6 +271,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                             <ReadOnlyField label="Date Received" value={asset.dateReceived ? String(asset.dateReceived) : 'N/A'} />
                             <ReadOnlyField label="Verified Date" value={asset.verifiedDate || 'N/A'} />
                         </div>
+                         <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
