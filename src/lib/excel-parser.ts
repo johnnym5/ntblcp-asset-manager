@@ -190,7 +190,8 @@ export async function parseExcelFile(
 
     try {
         const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        // IMPORTANT FIX: `raw: true` prevents XLSX from converting "Yes" to boolean `true`.
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, raw: true });
 
         const existingAssetByIdentifiers = new Map<string, Asset>();
         existingAssets.forEach(asset => {
