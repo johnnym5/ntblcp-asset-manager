@@ -85,7 +85,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     }
     setIsSaving(true);
     try {
-      // The app state is already updated, so we just need to push to Firestore
       await updateSettings(appSettings);
       toast({ title: 'Settings Updated', description: 'Your changes have been saved and applied.' });
       onOpenChange(false);
@@ -276,7 +275,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                         </div>
                     </div>
                     <div className="rounded-lg border p-3">
-                      <ScrollArea className="h-full max-h-60">
                         <div className="space-y-1">
                           {allSheetNames.map(sheetName => (
                             <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
@@ -291,7 +289,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                             </div>
                           ))}
                         </div>
-                      </ScrollArea>
                     </div>
                     <div className="mt-4 flex flex-col sm:flex-row gap-2">
                         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />

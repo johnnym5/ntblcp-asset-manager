@@ -4,23 +4,11 @@ import type { Asset, AppSettings, SheetDefinition } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_DEFINITIONS } from './constants';
 
-/**
- * Normalizes a header string for reliable matching.
- * Converts to uppercase, trims whitespace, and collapses multiple spaces.
- * @param header The header string to normalize.
- * @returns The normalized header string.
- */
 const normalizeHeader = (header: any): string => {
     if (header === null || header === undefined) return '';
     return String(header).trim().toUpperCase().replace(/\s+/g, ' ');
 };
 
-/**
- * Finds the row index of the headers in a sheet by matching against a definitive list.
- * @param sheetData The sheet data as an array of arrays.
- * @param definitiveHeaders The list of headers that MUST be present.
- * @returns The index of the header row, or -1 if not found.
- */
 const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[]): number => {
     const normalizedDefinitiveHeaders = definitiveHeaders.map(normalizeHeader);
     
@@ -31,19 +19,19 @@ const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[]): nu
         const normalizedRow = row.map(normalizeHeader);
         const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
         
-        // Require a high confidence match (e.g., >70% of the defined headers)
         if (matchCount / normalizedDefinitiveHeaders.length > 0.7) {
             return i;
         }
     }
-    return -1; // No header row found
+    return -1;
 };
 
 const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   sn: ['S/N'],
   description: ['DESCRIPTION', 'ASSET DESCRIPTION'],
-  location: ['LOCATION', 'STATE', 'SITE'],
-  lga: ['LGA'],
+  location: ['LOCATION', 'STATE'],
+  lga: ['LGA', 'LOCATION'],
+  site: ['SITE'],
   assignee: ['ASSIGNEE'],
   assetIdCode: ['ASSET ID CODE', 'TAG NUMBERS'],
   assetClass: ['ASSET CLASS', 'CLASSIFICATION'],
@@ -67,6 +55,7 @@ const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   imei: ['IMEI (TABLETS & MOBILE PHONES)'],
 };
 
+
 const COLUMN_TO_ASSET_FIELD_MAP = new Map<string, keyof Asset>();
 for (const key in HEADER_ALIASES) {
     const assetKey = key as keyof Asset;
@@ -89,7 +78,6 @@ export const sanitizeForFirestore = <T extends object>(obj: T): T => {
 };
 
 
-// --- CORE PARSING LOGIC ---
 export async function parseExcelFile(
     file: File, 
     appSettings: AppSettings, 
@@ -116,12 +104,10 @@ export async function parseExcelFile(
             }
 
             let actualSheetName: string | undefined;
-            if (singleSheetName) {
-                // For single sheet import, find an exact (case-insensitive) match.
+             if (singleSheetName) {
                 const normalizedTarget = targetSheetName.toLowerCase().trim();
                 actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().trim() === normalizedTarget);
             } else {
-                // For multi-sheet import, find a sheet that contains the target name.
                 const normalizedTarget = targetSheetName.toLowerCase().trim();
                 actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().trim().includes(normalizedTarget));
             }
@@ -135,7 +121,7 @@ export async function parseExcelFile(
             }
 
             const sheet = workbook.Sheets[actualSheetName];
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
+            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
             
             const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers);
 
@@ -160,7 +146,8 @@ export async function parseExcelFile(
                     const fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
                     
                     if (fieldName) {
-                        const cellValue = row[colIndex];
+                        const cell = row[colIndex];
+                        const cellValue = cell?.w ?? cell?.v ?? null;
                         const finalValue = cellValue !== null && cellValue !== undefined ? String(cellValue).trim() : null;
 
                         if (finalValue) {
@@ -182,7 +169,7 @@ export async function parseExcelFile(
         }
 
         if (newAssets.length === 0 && errors.length === 0) {
-            errors.push(`No data found to import. Check if sheet names in the file match the enabled sheets in Settings: ${Object.keys(sheetDefinitions).join(', ')}`);
+            errors.push(`No data found to import. Check if sheet names in the file match the enabled sheets in Settings: ${appSettings.enabledSheets.join(', ')}`);
         }
     } catch (e) {
         console.error("Error parsing Excel file:", e);
@@ -194,7 +181,6 @@ export async function parseExcelFile(
 
 
 
-// --- Core Export Logic ---
 export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, SheetDefinition>, fileName: string): void {
     const workbook = XLSX.utils.book_new();
 
@@ -266,21 +252,20 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
     const sheet = workbook.Sheets[sheetName];
     const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
     
-    // A simplified header finding logic for template creation
     for (let i = 0; i < Math.min(sheetData.length, 10); i++) {
         const row = sheetData[i];
         if (!Array.isArray(row)) continue;
         const normalizedRow = row.map(normalizeHeader);
         const matchCount = normalizedRow.filter(h => allPossibleHeaders.has(h)).length;
 
-        if (matchCount > 5) { // If we find more than 5 known headers, it's likely the header row
+        if (matchCount > 5) {
             const headerRow = row.map(h => String(h || '').trim()).filter(h => h);
             templates.push({
                 name: sheetName,
                 headers: headerRow,
                 displayFields: HEADER_DEFINITIONS[sheetName]?.displayFields || []
             });
-            break; // Move to the next sheet
+            break; 
         }
     }
   }
