@@ -1307,10 +1307,10 @@ export default function AssetList() {
                               <TableCell>{asset.assetIdCode ?? 'N/A'}</TableCell>
                               <TableCell>{asset.assignee ?? 'N/A'}</TableCell>
                               <TableCell>
-                                <div className={cn("w-[135px] h-9 text-sm inline-flex items-center justify-center rounded-md px-2 py-1", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                  {asset.verifiedStatus === 'Verified' && <Check className="mr-2 h-4 w-4" />}
-                                  {asset.verifiedStatus === 'Unverified' && <FileText className="mr-2 h-4 w-4" />}
-                                  {asset.verifiedStatus === 'Discrepancy' && <AlertCircle className="mr-2 h-4 w-4" />}
+                                <div className={cn("w-auto h-auto text-xs font-medium inline-flex items-center rounded-full px-2.5 py-0.5", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                  {asset.verifiedStatus === 'Verified' && <Check className="mr-1 h-3 w-3" />}
+                                  {asset.verifiedStatus === 'Unverified' && <FileText className="mr-1 h-3 w-3" />}
+                                  {asset.verifiedStatus === 'Discrepancy' && <AlertCircle className="mr-1 h-3 w-3" />}
                                   {asset.verifiedStatus || 'Unverified'}
                                 </div>
                               </TableCell>

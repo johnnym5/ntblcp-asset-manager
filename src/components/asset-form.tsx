@@ -45,6 +45,7 @@ import { AssetChecklist } from "./asset-checklist";
 import { useAuth } from "@/contexts/auth-context";
 import { addNotification } from "@/hooks/use-notifications";
 import { Label } from "./ui/label";
+import { Separator } from "./ui/separator";
 
 const assetFormSchema = z.object({
   category: z.string({ required_error: "Please select a category." }),
@@ -130,14 +131,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   useEffect(() => {
     if (isOpen) {
       if (asset) {
-        setQuickViewRemarks(asset.remarks || '');
-        setQuickViewStatus(asset.verifiedStatus || 'Unverified');
+        setQuickViewRemarks(asset.remarks ?? '');
+        setQuickViewStatus(asset.verifiedStatus ?? 'Unverified');
         
         form.reset({
           ...defaultValues,
           ...asset,
-          location: asset.location || userProfile?.state || '',
-          verifiedStatus: asset.verifiedStatus || 'Unverified',
+          location: asset.location ?? userProfile?.state ?? '',
+          verifiedStatus: asset.verifiedStatus ?? 'Unverified',
         });
       } else {
         form.reset(defaultValues);
@@ -177,7 +178,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     setIsSaving(true);
     try {
         const assetToSave: Asset = {
-            id: asset?.id || crypto.randomUUID(),
+            id: asset?.id ?? crypto.randomUUID(),
             ...asset,
             ...data,
         };
@@ -194,75 +195,59 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   if (isReadOnly && asset) {
     return (
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="sm:max-w-2xl w-full flex flex-col">
+        <SheetContent className="sm:max-w-xl w-full flex flex-col">
           <SheetHeader>
             <SheetTitle>Asset Quick View</SheetTitle>
             <SheetDescription>
               Viewing asset details. Comments and status can be updated here.
             </SheetDescription>
           </SheetHeader>
-          <div className="flex-1 space-y-6 overflow-y-auto pr-6 py-4">
-            <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ReadOnlyField label="S/N" value={asset.sn} />
-                    <ReadOnlyField label="Location" value={asset.location} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ReadOnlyField label="LGA" value={asset.lga} />
-                    <ReadOnlyField label="Assignee" value={asset.assignee} />
-                </div>
-                <ReadOnlyField label="Asset Description" value={asset.description} />
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
-                    <ReadOnlyField label="Asset Class" value={asset.assetClass} />
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
-                    <ReadOnlyField label="Model Number" value={asset.modelNumber} />
-                </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
-                    <ReadOnlyField label="Condition" value={asset.condition} />
-                </div>
+          <div className="flex-1 space-y-4 overflow-y-auto pr-6 py-4">
+              <ReadOnlyField label="Asset Description" value={asset.description} />
+              <Separator/>
+              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <ReadOnlyField label="S/N" value={asset.sn} />
+                <ReadOnlyField label="Location" value={asset.location} />
+                <ReadOnlyField label="LGA" value={asset.lga} />
+                <ReadOnlyField label="Assignee" value={asset.assignee} />
+                <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
+                <ReadOnlyField label="Asset Class" value={asset.assetClass} />
+                <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
+                <ReadOnlyField label="Model Number" value={asset.modelNumber} />
+                <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
+                <ReadOnlyField label="Condition" value={asset.condition} />
+              </div>
+              <Separator/>
+               <div className="space-y-2">
+                  <Label>Remarks/Comments (Editable)</Label>
+                  <Textarea
+                    id="quick-view-remarks"
+                    value={quickViewRemarks}
+                    onChange={(e) => setQuickViewRemarks(e.target.value)}
+                    className="min-h-24"
+                  />
+              </div>
+              <div className="space-y-2">
+                  <Label htmlFor="quick-view-status">Verified Status</Label>
+                  <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
+                      <SelectTrigger id="quick-view-status" className="w-full">
+                          <SelectValue placeholder="Select status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
+                          <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                          <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
+                      </SelectContent>
+                  </Select>
+              </div>
+              <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
+                  {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Comments & Status
+              </Button>
 
-                 <div className="space-y-2">
-                    <Label>Remarks/Comments</Label>
-                    <p className="text-sm p-3 bg-muted rounded-md min-h-24 whitespace-pre-wrap">{asset.remarks ?? <span className="text-muted-foreground/70">N/A</span>}</p>
-                </div>
-
-                <div className="space-y-2">
-                    <Label htmlFor="quick-view-status">Verified Status</Label>
-                    <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
-                        <SelectTrigger id="quick-view-status" className="w-full">
-                            <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
-                            <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                            <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <div className="space-y-2">
-                    <Label htmlFor="quick-view-remarks">Remarks/Comments (Editable)</Label>
-                    <Textarea
-                      id="quick-view-remarks"
-                      value={quickViewRemarks}
-                      onChange={(e) => setQuickViewRemarks(e.target.value)}
-                      className="min-h-24"
-                    />
-                </div>
-                
-                <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
-                    {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Comments & Status
-                </Button>
-            </div>
-            
             <Accordion type="single" collapsible className="w-full pt-4">
                 <AccordionItem value="advanced">
-                    <AccordionTrigger>Full Asset Details</AccordionTrigger>
+                    <AccordionTrigger>Advanced Information</AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <ReadOnlyField label="Engine Number" value={asset.engineNo} />
