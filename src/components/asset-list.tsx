@@ -432,7 +432,7 @@ export default function AssetList() {
   }, [lockAssetList, isAdmin, dataSource]);
   
   const handleViewAsset = (asset: Asset) => {
-    setSelectedAsset(asset);
+    setSelectedAsset(assets.find(a => a.id === asset.id));
     setIsFormReadOnly(true);
     setIsFormOpen(true);
   };
@@ -1253,10 +1253,11 @@ export default function AssetList() {
                       </TableHead>
                       <TableHead>S/N</TableHead>
                       <TableHead>Description</TableHead>
+                      <TableHead>LGA</TableHead>
                       <TableHead>Asset ID</TableHead>
                       <TableHead>Assignee</TableHead>
                       <TableHead>Verified Status</TableHead>
-                      <TableHead>Last Modified</TableHead>
+                      <TableHead>Serial Number</TableHead>
                       <TableHead className="w-[100px] text-right">Actions</TableHead>
                       </TableRow>
                   </TableHeader>
@@ -1302,6 +1303,7 @@ export default function AssetList() {
                                     )}
                                 </div>
                               </TableCell>
+                              <TableCell>{asset.lga ?? 'N/A'}</TableCell>
                               <TableCell>{asset.assetIdCode ?? 'N/A'}</TableCell>
                               <TableCell>{asset.assignee ?? 'N/A'}</TableCell>
                               <TableCell>
@@ -1312,7 +1314,7 @@ export default function AssetList() {
                                   {asset.verifiedStatus || 'Unverified'}
                                 </div>
                               </TableCell>
-                              <TableCell>{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</TableCell>
+                              <TableCell>{asset.serialNumber ?? 'N/A'}</TableCell>
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
                                   <DropdownMenu>
@@ -1333,7 +1335,7 @@ export default function AssetList() {
                           </TableRow>
                       ))
                       ) : (
-                          <TableRow><TableCell colSpan={8} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={9} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
                       )}
                   </TableBody>
               </Table>
