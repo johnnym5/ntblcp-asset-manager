@@ -40,45 +40,45 @@ const findHeaderRowIndex = (sheetData: any[][]): number => {
 };
 
 
-const COLUMN_TO_ASSET_FIELD_MAP: { [key: string]: keyof Asset } = {
-    'S/N': 'sn',
-    'DESCRIPTION': 'description',
-    'ASSET DESCRIPTION': 'description',
-    'LOCATION': 'location',
-    'STATE': 'location',
-    'LGA': 'lga',
-    'ASSIGNEE': 'assignee',
-    'ASSET ID CODE': 'assetIdCode',
-    'TAG NUMBERS': 'assetIdCode',
-    'ASSET CLASS': 'assetClass',
-    'CLASSIFICATION': 'assetClass',
-    'MANUFACTURER': 'manufacturer',
-    'MODEL NUMBER': 'modelNumber',
-    'MODEL NUMBERS': 'modelNumber',
-    'SERIAL NUMBER': 'serialNumber',
-    'ASSET SERIAL NUMBERS': 'serialNumber',
-    'SUPPLIER': 'supplier',
-    'SUPPLIERS': 'supplier',
-    'DATE PURCHASED OR RECEIVED': 'dateReceived',
-    'DATE PURCHASED OR  RECEIVED': 'dateReceived',
-    'YEAR OF PURCHASE': 'dateReceived',
-    'CHQ NO / GOODS RECEIVED NOTE NO.': 'grnNo',
-    'PV NO': 'pvNo',
-    'PURCHASE PRICE (NAIRA)': 'costNgn',
-    'COST (NGN)': 'costNgn',
-    'PURCHASE PRICE [USD)': 'costUsd',
-    'FUNDER': 'funder',
-    'CONDITION': 'condition',
-    'REMARKS': 'remarks',
-    'COMMENTS': 'remarks',
-    'GRANT': 'grant',
-    'USEFUL LIFE (YEARS)': 'usefulLifeYears',
-    'CHASIS NO': 'chasisNo',
-    'ENGINE NO': 'engineNo',
-    'QTY': 'qty',
-    'SITE': 'site',
-    'IMEI (TABLETS & MOBILE PHONES)': 'imei',
+const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
+  sn: ['S/N'],
+  description: ['DESCRIPTION', 'ASSET DESCRIPTION'],
+  location: ['LOCATION', 'STATE', 'SITE'],
+  lga: ['LGA'],
+  assignee: ['ASSIGNEE'],
+  assetIdCode: ['ASSET ID CODE', 'TAG NUMBERS', 'ASSET TAG', 'ASSET ID'],
+  assetClass: ['ASSET CLASS', 'CLASSIFICATION'],
+  manufacturer: ['MANUFACTURER'],
+  modelNumber: ['MODEL NUMBER', 'MODEL NUMBERS'],
+  serialNumber: ['SERIAL NUMBER', 'ASSET SERIAL NUMBERS'],
+  supplier: ['SUPPLIER', 'SUPPLIERS'],
+  dateReceived: ['DATE PURCHASED OR RECEIVED', 'DATE PURCHASED OR  RECEIVED', 'YEAR OF PURCHASE'],
+  grnNo: ['CHQ NO / GOODS RECEIVED NOTE NO.'],
+  pvNo: ['PV NO'],
+  costNgn: ['PURCHASE PRICE (NAIRA)', 'COST (NGN)'],
+  costUsd: ['PURCHASE PRICE [USD)'],
+  funder: ['FUNDER'],
+  condition: ['CONDITION'],
+  remarks: ['REMARKS', 'COMMENTS'],
+  grant: ['GRANT'],
+  usefulLifeYears: ['USEFUL LIFE (YEARS)'],
+  chasisNo: ['CHASIS NO'],
+  engineNo: ['ENGINE NO'],
+  qty: ['QTY'],
+  imei: ['IMEI (TABLETS & MOBILE PHONES)'],
 };
+
+// Create a reverse map for faster lookups: from excel header to asset field key
+const COLUMN_TO_ASSET_FIELD_MAP = new Map<string, keyof Asset>();
+for (const key in HEADER_ALIASES) {
+    const assetKey = key as keyof Asset;
+    const aliases = HEADER_ALIASES[assetKey];
+    if (aliases) {
+        for (const alias of aliases) {
+            COLUMN_TO_ASSET_FIELD_MAP.set(normalizeHeader(alias), assetKey);
+        }
+    }
+}
 
 
 /**
@@ -116,25 +116,25 @@ export async function parseExcelFile(
 
         for (const sheetName of sheetNamesToProcess) {
             
+            // Find the canonical sheet name from settings that this sheet might match
             const canonicalSheetName = singleSheetName ?? enabledSheets.find(s => sheetName.toLowerCase().includes(s.toLowerCase()));
             
             if (!canonicalSheetName) {
-                if(!singleSheetName) continue; // If importing all, skip non-matching sheets
-                 else {
-                     // If importing a single sheet and it's not found in the workbook
-                     const matchingSheet = workbook.SheetNames.find(s => s.toLowerCase().includes(canonicalSheetName.toLowerCase()));
-                     if(!matchingSheet) {
-                         errors.push(`The specified sheet "${canonicalSheetName}" was not found in the uploaded workbook.`);
-                         continue;
-                     }
-                 }
+                // If importing all sheets, we just skip ones that don't match any definition.
+                // If importing a single sheet and it's not found, we handle it later.
+                if(!singleSheetName) continue;
             }
-            
+
             // Find the actual sheet name in the workbook that matches, accommodating for variations.
-            const actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes(canonicalSheetName.toLowerCase()));
+            const actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes((canonicalSheetName || sheetName).toLowerCase()));
 
             if (!actualSheetName) {
-                errors.push(`Could not find a sheet in the workbook matching the name: "${canonicalSheetName}".`);
+                errors.push(`Could not find a sheet in the workbook matching the name: "${canonicalSheetName || sheetName}".`);
+                continue;
+            }
+
+            if (!enabledSheets.includes(canonicalSheetName!)) {
+                // Silently skip sheets that are not enabled in settings
                 continue;
             }
 
@@ -159,18 +159,26 @@ export async function parseExcelFile(
                 
                 headerRow.forEach((rawHeader, colIndex) => {
                     const normalizedHeader = normalizeHeader(rawHeader);
-                    const fieldName = COLUMN_TO_ASSET_FIELD_MAP[normalizedHeader];
+                    const fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
                     
                     if (fieldName) {
-                        const cellValue = row[colIndex] !== null ? String(row[colIndex]).trim() : null;
-                        if (cellValue) {
-                           (assetObject as any)[fieldName] = cellValue;
+                        // Prioritize the formatted text (.w), fall back to the raw value (.v)
+                        const cell = sheet.hasOwnProperty(XLSX.utils.encode_cell({c: colIndex, r: headerRowIndex + 1 + jsonData.indexOf(row)})) 
+                            ? sheet[XLSX.utils.encode_cell({c: colIndex, r: headerRowIndex + 1 + jsonData.indexOf(row)})]
+                            : null;
+                        
+                        const cellValue = cell?.w ?? cell?.v ?? row[colIndex];
+
+                        const finalValue = cellValue !== null ? String(cellValue).trim() : null;
+
+                        if (finalValue) {
+                           (assetObject as any)[fieldName] = finalValue;
                            hasData = true;
                         }
                     }
                 });
                 
-                if (hasData && assetObject.description) {
+                if (hasData && (assetObject.description || assetObject.assetIdCode || assetObject.serialNumber)) {
                    const newAsset: Asset = { 
                         id: uuidv4(), 
                         ...assetObject, 
@@ -210,7 +218,8 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
         const definition = sheetDefinitions[category];
         if (!definition) continue;
 
-        const headerArray = definition.headers?.length > 0 ? [...definition.headers] : Object.keys(COLUMN_TO_ASSET_FIELD_MAP);
+        const headerArray = definition.headers?.length > 0 ? [...definition.headers] : [];
+        if (headerArray.length === 0) continue; // Don't export sheets with no defined headers
         
         // Ensure verification columns are added
         if (!headerArray.includes("Verified Status")) headerArray.push("Verified Status");
@@ -224,17 +233,19 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
                 const normalizedHeader = normalizeHeader(header);
                 
                 // Find the key in the map that matches the normalized header
-                const mapKey = Object.keys(COLUMN_TO_ASSET_FIELD_MAP).find(k => k === normalizedHeader);
+                const assetKey = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
                 
-                if (mapKey) {
-                   const assetKey = COLUMN_TO_ASSET_FIELD_MAP[mapKey];
+                if (assetKey) {
                    row[header] = asset[assetKey] ?? '';
+                } else {
+                   // Handle special cases not in the map
+                   if (normalizedHeader === 'VERIFIED STATUS') row[header] = asset.verifiedStatus || 'Unverified';
+                   else if (normalizedHeader === 'VERIFIED DATE') row[header] = asset.verifiedDate || '';
+                   else if (normalizedHeader === 'LAST MODIFIED BY') row[header] = asset.lastModifiedBy || '';
+                   else if (normalizedHeader === 'LAST MODIFIED DATE') row[header] = asset.lastModified ? new Date(asset.lastModified).toLocaleString() : '';
+                   else row[header] = ''; // Default for unknown headers
                 }
             });
-            row["Verified Status"] = asset.verifiedStatus || 'Unverified';
-            row["Verified Date"] = asset.verifiedDate || '';
-            row["Last Modified By"] = asset.lastModifiedBy || '';
-            row["Last Modified Date"] = asset.lastModified ? new Date(asset.lastModified).toLocaleString() : '';
             return row;
         });
         
