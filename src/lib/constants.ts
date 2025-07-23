@@ -1,3 +1,4 @@
+import type { SheetDefinition } from "./types";
 
 
 export const TARGET_SHEETS = [
@@ -78,58 +79,76 @@ export const SPECIAL_LOCATIONS = ["FCMS", "NTBLCP"];
 // This defines a clean, unique, and comprehensive set of headers for each sheet.
 // The parser will use this to find the header row, and the exporter will use this to generate the file.
 // This structure ensures data aligns correctly under its proper header.
-export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
-  'NTBLCP-TB-FAR': [
-    'S/N', 'LOCATION', 'LGA', 'ASSIGNEE', 'ASSET DESCRIPTION', 'ASSET ID CODE', 'ASSET CLASS',
-    'MANUFACTURER', 'MODEL NUMBER', 'SERIAL NUMBER', 'SUPPLIER', 'DATE PURCHASED OR RECEIVED',
-    'CHQ NO / GOODS RECEIVED NOTE NO.', 'PV NO', 'PURCHASE PRICE (NAIRA)', 'PURCHASE PRICE [USD)',
-    'FUNDER', 'CONDITION', 'REMARKS', 'GRANT', 'USEFUL LIFE (YEARS)'
-  ],
-  'MOTORCYCLES-C19RM': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
-    'Manufacturer', 'Chasis no', 'Engine no', 'Suppliers', 'Date Purchased or Received',
-    'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
-    'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)'
-  ],
-  'PDX-C19RM': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
-    'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
-    'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
-    'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
-  ],
-  'TB LAMP-C19RM': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
-    'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
-    'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
-    'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
-  ],
-  'ECG monitors': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
-    'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
-    'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
-    'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
-  ],
-  'IHVN-GF N-THRIP': [
-    'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION',
-    'ASSET SERIAL NUMBERS', 'MODEL NUMBERS', 'QTY', 'LOCATION', 'SITE',
-    'YEAR OF PURCHASE', 'COST (NGN)', 'GRANT'
-  ],
-  'TRUENAT-C19RM': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
-    'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
-    'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
-    'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
-  ],
-  'Vehicles-TB (IHVN)': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
-    'Manufacturer', 'Engine no', 'Chasis no', 'Suppliers', 'Date Purchased or Received',
-    'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
-    'Funder', 'Condition', 'GRANT', 'Useful Life (Years)'
-  ],
-  'GeneXpert machines-TB': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
-    'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
-    'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
-    'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
-  ]
+export const HEADER_DEFINITIONS: { [key: string]: Partial<SheetDefinition> } = {
+  'NTBLCP-TB-FAR': {
+    headers: [
+      'S/N', 'LOCATION', 'LGA', 'ASSIGNEE', 'ASSET DESCRIPTION', 'ASSET ID CODE', 'ASSET CLASS',
+      'MANUFACTURER', 'MODEL NUMBER', 'SERIAL NUMBER', 'SUPPLIER', 'DATE PURCHASED OR RECEIVED',
+      'CHQ NO / GOODS RECEIVED NOTE NO.', 'PV NO', 'PURCHASE PRICE (NAIRA)', 'PURCHASE PRICE [USD)',
+      'FUNDER', 'CONDITION', 'REMARKS', 'GRANT', 'USEFUL LIFE (YEARS)'
+    ],
+  },
+  'MOTORCYCLES-C19RM': {
+    headers: [
+      'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
+      'Manufacturer', 'Chasis no', 'Engine no', 'Suppliers', 'Date Purchased or Received',
+      'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
+      'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)'
+    ],
+  },
+  'PDX-C19RM': {
+    headers: [
+      'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
+      'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
+      'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
+      'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
+    ],
+  },
+  'TB LAMP-C19RM': {
+    headers: [
+      'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
+      'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
+      'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
+      'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
+    ],
+  },
+  'ECG monitors': {
+    headers: [
+      'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
+      'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
+      'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
+      'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
+    ],
+  },
+  'IHVN-GF N-THRIP': {
+    headers: [
+      'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION',
+      'ASSET SERIAL NUMBERS', 'MODEL NUMBERS', 'QTY', 'LOCATION', 'SITE',
+      'YEAR OF PURCHASE', 'COST (NGN)', 'GRANT'
+    ],
+  },
+  'TRUENAT-C19RM': {
+    headers: [
+      'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
+      'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
+      'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
+      'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
+    ],
+  },
+  'Vehicles-TB (IHVN)': {
+    headers: [
+      'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
+      'Manufacturer', 'Engine no', 'Chasis no', 'Suppliers', 'Date Purchased or Received',
+      'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
+      'Funder', 'Condition', 'GRANT', 'Useful Life (Years)'
+    ],
+  },
+  'GeneXpert machines-TB': {
+    headers: [
+      'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
+      'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
+      'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
+      'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
+    ],
+  }
 };

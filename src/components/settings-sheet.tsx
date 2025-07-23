@@ -27,11 +27,12 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon } from 'lucide-react';
 import { SheetDefinitionForm } from './sheet-definition-form';
 import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
+import { SingleSheetImportDialog } from './single-sheet-import-dialog';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -53,6 +54,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
 
   const [isSaving, setIsSaving] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
+  const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -214,7 +216,10 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                   <h3 className="text-lg font-medium mb-4">Data Management</h3>
                   <div className="rounded-lg border p-3 space-y-2">
                     <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting || !canModifyData}>
-                      <FileUp className="mr-2 h-4 w-4" /> Import from Excel
+                      <FileUp className="mr-2 h-4 w-4" /> Import from Full Workbook
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start" onClick={() => setIsSingleSheetImportOpen(true)} disabled={dataActions?.isImporting || !canModifyData}>
+                      <SheetIcon className="mr-2 h-4 w-4" /> Import from Single Sheet
                     </Button>
                     <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || !canModifyData}>
                       <FileDown className="mr-2 h-4 w-4" /> Export to Excel
@@ -331,6 +336,11 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         onOpenChange={setIsSheetFormOpen}
         onSave={handleSaveSheet}
         sheet={sheetToEdit}
+      />
+
+      <SingleSheetImportDialog
+        isOpen={isSingleSheetImportOpen}
+        onOpenChange={setIsSingleSheetImportOpen}
       />
     </>
   );

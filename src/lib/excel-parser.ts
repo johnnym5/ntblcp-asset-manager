@@ -101,7 +101,8 @@ export const sanitizeForFirestore = <T extends object>(obj: T): T => {
 export async function parseExcelFile(
     file: File, 
     appSettings: AppSettings, 
-    existingAssets: Asset[]
+    existingAssets: Asset[],
+    singleSheetName?: string
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
     const { enabledSheets } = appSettings;
     const newAssets: Asset[] = [];
@@ -111,24 +112,39 @@ export async function parseExcelFile(
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
 
-        for (const sheetName of workbook.SheetNames) {
-            // **RELIABILITY FIX**: Instead of an exact match, check if the sheet name in the file
-            // *contains* one of the official, enabled sheet names. This is more flexible.
-            const canonicalSheetName = enabledSheets.find(s => sheetName.toLowerCase().includes(s.toLowerCase()));
+        const sheetNamesToProcess = singleSheetName ? [singleSheetName] : workbook.SheetNames;
+
+        for (const sheetName of sheetNamesToProcess) {
+            
+            const canonicalSheetName = singleSheetName ?? enabledSheets.find(s => sheetName.toLowerCase().includes(s.toLowerCase()));
             
             if (!canonicalSheetName) {
-                continue; // Skip sheets that don't match our enabled list.
+                if(!singleSheetName) continue; // If importing all, skip non-matching sheets
+                 else {
+                     // If importing a single sheet and it's not found in the workbook
+                     const matchingSheet = workbook.SheetNames.find(s => s.toLowerCase().includes(canonicalSheetName.toLowerCase()));
+                     if(!matchingSheet) {
+                         errors.push(`The specified sheet "${canonicalSheetName}" was not found in the uploaded workbook.`);
+                         continue;
+                     }
+                 }
+            }
+            
+            // Find the actual sheet name in the workbook that matches, accommodating for variations.
+            const actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes(canonicalSheetName.toLowerCase()));
+
+            if (!actualSheetName) {
+                errors.push(`Could not find a sheet in the workbook matching the name: "${canonicalSheetName}".`);
+                continue;
             }
 
-            const sheet = workbook.Sheets[sheetName];
-            // Get data as an array of arrays, which is more robust for finding headers.
-            // Using { raw: false } ensures we get formatted text like dates, solving "yes/no" issues.
+            const sheet = workbook.Sheets[actualSheetName];
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
             
             const headerRowIndex = findHeaderRowIndex(sheetData);
 
             if (headerRowIndex === -1) {
-                errors.push(`Could not find a valid header row in sheet: "${sheetName}". Skipping.`);
+                errors.push(`Could not find a valid header row in sheet: "${actualSheetName}". Skipping.`);
                 continue;
             }
             
@@ -136,7 +152,7 @@ export async function parseExcelFile(
             const jsonData = sheetData.slice(headerRowIndex + 1);
 
             for (const row of jsonData) {
-                if (row.every(cell => cell === null)) continue; // Skip entirely empty rows
+                if (row.every(cell => cell === null || String(cell).trim() === '')) continue; // Skip entirely empty rows
 
                 const assetObject: Partial<Asset> = { category: canonicalSheetName };
                 let hasData = false;
@@ -154,7 +170,6 @@ export async function parseExcelFile(
                     }
                 });
                 
-                // Ensure row has at least a description to be considered valid
                 if (hasData && assetObject.description) {
                    const newAsset: Asset = { 
                         id: uuidv4(), 
