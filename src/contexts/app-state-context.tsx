@@ -37,6 +37,10 @@ interface AppStateContextType {
   globalStateFilter: string;
   setGlobalStateFilter: Dispatch<SetStateAction<string>>;
   
+  // Pagination
+  itemsPerPage: number;
+  setItemsPerPage: Dispatch<SetStateAction<number>>;
+
   // Filters
   selectedLocations: string[];
   setSelectedLocations: Dispatch<SetStateAction<string[]>>;
@@ -45,7 +49,7 @@ interface AppStateContextType {
   selectedStatuses: string[];
   setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
   missingFieldFilter: string;
-  setMissingFieldFilter: Dispatch<SetStateAction<string>>;
+  setMissingFieldFilter: Dispatch<SetStateAction<string[]>>;
   
   // Filter Options
   locationOptions: OptionType[];
@@ -92,6 +96,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [globalStateFilter, setGlobalStateFilter] = useState('');
   
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
@@ -108,6 +113,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     lockAssetList: true,
     autoSyncEnabled: true,
     enabledSheets: [...TARGET_SHEETS],
+    sheetDefinitions: {},
+    headerMappings: {},
   });
   const { lockAssetList, autoSyncEnabled, enabledSheets } = appSettings;
 
@@ -126,7 +133,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
     const unsubscribe = listenToSettings((settings) => {
         if (settings) {
-            setAppSettings(settings);
+            setAppSettings(prevSettings => ({
+              ...prevSettings,
+              ...settings
+            }));
         }
     });
 
@@ -176,6 +186,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setSearchTerm,
     globalStateFilter,
     setGlobalStateFilter,
+    itemsPerPage,
+    setItemsPerPage,
     selectedLocations,
     setSelectedLocations,
     selectedAssignees,

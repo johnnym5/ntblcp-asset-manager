@@ -75,8 +75,6 @@ import { cn } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 
 
-const ITEMS_PER_PAGE = 25;
-
 const normalizeAssetLocation = (location?: string): string => {
     if (!location) return '';
     const originalLocation = location.trim();
@@ -191,14 +189,19 @@ export default function AssetList() {
   const {
     assets, setAssets, isOnline, setIsOnline, 
     globalStateFilter, setGlobalStateFilter,
+    itemsPerPage, setItemsPerPage,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
-    sortConfig, setSortConfig, enabledSheets, setEnabledSheets, lockAssetList,
+    sortConfig, setSortConfig,
+    appSettings,
     manualSyncTrigger, setManualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
     searchTerm,
     autoSyncEnabled,
   } = useAppState();
+
+  const { enabledSheets } = appSettings;
+  const lockAssetList = appSettings.lockAssetList ?? true;
 
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
@@ -593,7 +596,7 @@ export default function AssetList() {
     
     const baseAssets = await getLocalAssetsFromDb();
 
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, enabledSheets, baseAssets, lockAssetList);
+    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets, lockAssetList);
     
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
@@ -644,13 +647,13 @@ export default function AssetList() {
           fileName = `${exportPrefix}-${categoriesToExport.join('&')}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
       }
 
-      exportToExcel(assetsToExport, fileName);
+      exportToExcel(assetsToExport, appSettings.headerMappings, fileName);
       addNotification({ title: "Export Successful" });
     } catch(error) {
       console.error("Export Error:", error);
       addNotification({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
     }
-  }, [displayedAssets, userProfile, assetsByCategory]);
+  }, [displayedAssets, userProfile, assetsByCategory, appSettings]);
   
   const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
     if (checked) {
@@ -777,7 +780,11 @@ export default function AssetList() {
     });
 
     if (data.hide && isAdmin) {
-        setEnabledSheets(prev => prev.filter(sheet => !selectedCategories.includes(sheet)));
+        const newSettings = { 
+          ...appSettings,
+          enabledSheets: appSettings.enabledSheets.filter(sheet => !selectedCategories.includes(sheet))
+        };
+        // await updateSettings(newSettings);
         addNotification({ title: 'Sheets Hidden', description: `${selectedCategories.length} categories have been hidden from view.`});
         setSelectedCategories([]);
     }
@@ -1045,8 +1052,8 @@ export default function AssetList() {
 
   // TABLE VIEW
   const paginatedCategoryAssets = categoryFilteredAssets.slice(
-    (currentPage - 1) * ITEMS_PER_PAGE,
-    currentPage * ITEMS_PER_PAGE
+    (currentPage - 1) * itemsPerPage,
+    currentPage * itemsPerPage
   );
   const areAllCategoryResultsSelected = categoryFilteredAssets.length > 0 && categoryFilteredAssets.every(a => selectedAssetIds.includes(a.id));
 
@@ -1220,9 +1227,10 @@ export default function AssetList() {
             <CardFooter className="border-t pt-4">
                <PaginationControls 
                     currentPage={currentPage}
-                    totalPages={Math.ceil(categoryFilteredAssets.length / ITEMS_PER_PAGE)}
+                    totalPages={Math.ceil(categoryFilteredAssets.length / itemsPerPage)}
                     onPageChange={setCurrentPage}
-                    itemsPerPage={ITEMS_PER_PAGE}
+                    itemsPerPage={itemsPerPage}
+                    setItemsPerPage={setItemsPerPage}
                     totalItems={categoryFilteredAssets.length}
                   />
             </CardFooter>
