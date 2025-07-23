@@ -38,7 +38,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { Asset } from "@/lib/types";
+import type { Asset, SheetDefinition } from "@/lib/types";
 import { AlertCircle, Loader2, FileText, Check } from "lucide-react";
 import { TARGET_SHEETS } from "@/lib/constants";
 import { AssetChecklist } from "./asset-checklist";
@@ -46,6 +46,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { addNotification } from "@/hooks/use-notifications";
 import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
+import { useAppState } from "@/contexts/app-state-context";
 
 const assetFormSchema = z.object({
   category: z.string({ required_error: "Please select a category." }),
@@ -96,6 +97,8 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
 
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
+  const { appSettings } = useAppState();
+  const { sheetDefinitions } = appSettings;
   const isAdmin = userProfile?.isAdmin || false;
   
   const defaultValues = {
@@ -193,6 +196,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   
   // RENDER LOGIC
   if (isReadOnly && asset) {
+    const sheetDefinition = sheetDefinitions[asset.category];
+    const quickViewFields = sheetDefinition?.displayFields.filter(f => f.quickView) || [];
+
     return (
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="sm:max-w-xl w-full flex flex-col">
@@ -203,19 +209,10 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 space-y-4 overflow-y-auto pr-6 py-4">
-              <ReadOnlyField label="Asset Description" value={asset.description} />
-              <Separator/>
               <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                <ReadOnlyField label="S/N" value={asset.sn} />
-                <ReadOnlyField label="Location" value={asset.location} />
-                <ReadOnlyField label="LGA" value={asset.lga} />
-                <ReadOnlyField label="Assignee" value={asset.assignee} />
-                <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
-                <ReadOnlyField label="Asset Class" value={asset.assetClass} />
-                <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
-                <ReadOnlyField label="Model Number" value={asset.modelNumber} />
-                <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
-                <ReadOnlyField label="Condition" value={asset.condition} />
+                {quickViewFields.map(field => (
+                  <ReadOnlyField key={field.key} label={field.label} value={String(asset[field.key] ?? '')} />
+                ))}
               </div>
               <Separator/>
                <div className="space-y-2">
@@ -244,27 +241,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                   {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                   Save Comments & Status
               </Button>
-
-            <Accordion type="single" collapsible className="w-full pt-4">
-                <AccordionItem value="advanced">
-                    <AccordionTrigger>Advanced Information</AccordionTrigger>
-                    <AccordionContent className="pt-4 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Engine Number" value={asset.engineNo} />
-                            <ReadOnlyField label="Chasis Number" value={asset.chasisNo} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Supplier" value={asset.supplier} />
-                            <ReadOnlyField label="Grant" value={asset.grant} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Date Received" value={asset.dateReceived ? String(asset.dateReceived) : null} />
-                            <ReadOnlyField label="Verified Date" value={asset.verifiedDate} />
-                        </div>
-                         <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : null} />
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
           </div>
           <SheetFooter className="mt-auto pt-4 border-t">
             <SheetClose asChild>

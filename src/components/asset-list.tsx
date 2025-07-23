@@ -44,6 +44,7 @@ import {
   CloudUpload,
   HardDrive,
   ArrowRightLeft,
+  Columns,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -62,7 +63,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Progress } from "@/components/ui/progress";
 
 import { AssetForm } from "./asset-form";
-import type { Asset } from "@/lib/types";
+import type { Asset, SheetDefinition } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
@@ -71,10 +72,11 @@ import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets } from "@/lib/firestore";
+import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, clearLockedOfflineAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
+import { ColumnCustomizationSheet } from "./column-customization-sheet";
 
 
 const normalizeAssetLocation = (location?: string): string => {
@@ -187,6 +189,7 @@ export default function AssetList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
+  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
@@ -196,14 +199,14 @@ export default function AssetList() {
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
     sortConfig,
-    appSettings,
+    appSettings, setAppSettings,
     manualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
     searchTerm,
     autoSyncEnabled,
   } = useAppState();
 
-  const { enabledSheets, lockAssetList } = appSettings;
+  const { enabledSheets, lockAssetList, sheetDefinitions } = appSettings;
 
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
@@ -983,6 +986,24 @@ export default function AssetList() {
     setIsBatchDeleting(false);
   }
 
+  const handleSaveColumnSettings = async (newDefinition: SheetDefinition) => {
+    if (!currentCategory) return;
+    const newSettings = {
+      ...appSettings,
+      sheetDefinitions: {
+        ...appSettings.sheetDefinitions,
+        [currentCategory]: newDefinition,
+      }
+    };
+    setAppSettings(newSettings);
+    if(isOnline && isAdmin) {
+      await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
+      addNotification({ title: "Column settings saved", description: "Your changes have been saved to the cloud." });
+    } else {
+      addNotification({ title: "Column settings saved locally", description: "Changes will be synced when an admin is online." });
+    }
+  };
+
   const clearAllDialogDescription = useMemo(() => {
     let message = `This will permanently delete all asset records from the ${dataSource === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
     if (isAdmin && isOnline && dataSource === 'cloud') {
@@ -1203,6 +1224,9 @@ export default function AssetList() {
 
   const syncButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Sync to Cloud';
   const SyncButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
+  
+  const currentSheetDefinition = sheetDefinitions[currentCategory!];
+  const tableFields = currentSheetDefinition?.displayFields.filter(f => f.table) || [];
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -1213,6 +1237,12 @@ export default function AssetList() {
             <h2 className="text-2xl font-bold tracking-tight flex-1">
                 {currentCategory}
             </h2>
+             {isAdmin && currentCategory && (
+              <Button variant="outline" size="sm" onClick={() => setIsColumnSheetOpen(true)}>
+                <Columns className="mr-2 h-4 w-4" />
+                Edit Table
+              </Button>
+            )}
             {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
@@ -1243,22 +1273,18 @@ export default function AssetList() {
               <Table>
                   <TableHeader>
                       <TableRow>
-                      <TableHead className="w-[50px]">
-                          <Checkbox
-                              checked={areAllCategoryResultsSelected}
-                              onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
-                              aria-label="Select all in this category"
-                              disabled={isGuest}
-                          />
-                      </TableHead>
-                      <TableHead>S/N</TableHead>
-                      <TableHead>Description</TableHead>
-                      <TableHead>LGA</TableHead>
-                      <TableHead>Asset ID</TableHead>
-                      <TableHead>Assignee</TableHead>
-                      <TableHead>Verified Status</TableHead>
-                      <TableHead>Serial Number</TableHead>
-                      <TableHead className="w-[100px] text-right">Actions</TableHead>
+                          <TableHead className="w-[50px]">
+                              <Checkbox
+                                  checked={areAllCategoryResultsSelected}
+                                  onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
+                                  aria-label="Select all in this category"
+                                  disabled={isGuest}
+                              />
+                          </TableHead>
+                          {tableFields.map(field => (
+                            <TableHead key={field.key}>{field.label}</TableHead>
+                          ))}
+                          <TableHead className="w-[100px] text-right">Actions</TableHead>
                       </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -1273,48 +1299,20 @@ export default function AssetList() {
                                       disabled={isGuest}
                                   />
                               </TableCell>
-                              <TableCell>{asset.sn ?? 'N/A'}</TableCell>
-                              <TableCell className="font-medium">
-                                <div className="flex items-center gap-2">
-                                    <span>{asset.description}</span>
-                                    {asset.syncStatus === 'local' && (
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger>
-                                                    <CloudOff className="h-4 w-4 text-blue-500" />
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Local changes not synced</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    )}
-                                    {asset.syncStatus === 'syncing' && (
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger>
-                                                    <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Syncing...</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    )}
-                                </div>
-                              </TableCell>
-                              <TableCell>{asset.lga ?? 'N/A'}</TableCell>
-                              <TableCell>{asset.assetIdCode ?? 'N/A'}</TableCell>
-                              <TableCell>{asset.assignee ?? 'N/A'}</TableCell>
-                              <TableCell>
-                                <div className={cn("w-auto h-auto text-xs font-medium inline-flex items-center rounded-full px-2.5 py-0.5", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                  {asset.verifiedStatus === 'Verified' && <Check className="mr-1 h-3 w-3" />}
-                                  {asset.verifiedStatus === 'Unverified' && <FileText className="mr-1 h-3 w-3" />}
-                                  {asset.verifiedStatus === 'Discrepancy' && <AlertCircle className="mr-1 h-3 w-3" />}
-                                  {asset.verifiedStatus || 'Unverified'}
-                                </div>
-                              </TableCell>
-                              <TableCell>{asset.serialNumber ?? 'N/A'}</TableCell>
+                              {tableFields.map(field => (
+                                <TableCell key={field.key}>
+                                  {field.key === 'verifiedStatus' ? (
+                                    <div className={cn("w-auto h-auto text-xs font-medium inline-flex items-center rounded-full px-2.5 py-0.5", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                      {asset.verifiedStatus === 'Verified' && <Check className="mr-1 h-3 w-3" />}
+                                      {asset.verifiedStatus === 'Unverified' && <FileText className="mr-1 h-3 w-3" />}
+                                      {asset.verifiedStatus === 'Discrepancy' && <AlertCircle className="mr-1 h-3 w-3" />}
+                                      {asset.verifiedStatus || 'Unverified'}
+                                    </div>
+                                  ) : (
+                                    <span>{String(asset[field.key] ?? 'N/A')}</span>
+                                  )}
+                                </TableCell>
+                              ))}
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
                                   <DropdownMenu>
@@ -1335,7 +1333,7 @@ export default function AssetList() {
                           </TableRow>
                       ))
                       ) : (
-                          <TableRow><TableCell colSpan={9} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
+                          <TableRow><TableCell colSpan={tableFields.length + 2} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
                       )}
                   </TableBody>
               </Table>
@@ -1380,6 +1378,14 @@ export default function AssetList() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+        {currentCategory && currentSheetDefinition && (
+          <ColumnCustomizationSheet 
+            isOpen={isColumnSheetOpen}
+            onOpenChange={setIsColumnSheetOpen}
+            sheetDefinition={currentSheetDefinition}
+            onSave={handleSaveColumnSettings}
+          />
+        )}
     </div>
   );
 }

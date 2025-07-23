@@ -92,10 +92,17 @@ export interface InboxMessageGroup {
   activityMessage?: string;
 }
 
+export interface DisplayField {
+  key: keyof Asset;
+  label: string;
+  table: boolean;
+  quickView: boolean;
+}
+
 export interface SheetDefinition {
   name: string;
   headers: string[];
-  displayFields: (keyof Asset)[];
+  displayFields: DisplayField[];
 }
 
 export interface AppSettings {

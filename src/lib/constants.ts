@@ -1,4 +1,5 @@
 
+
 export const TARGET_SHEETS = [
   'NTBLCP-TB-FAR',
   'MOTORCYCLES-C19RM',
@@ -79,10 +80,10 @@ export const SPECIAL_LOCATIONS = ["FCMS", "NTBLCP"];
 // This structure ensures data aligns correctly under its proper header.
 export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
   'NTBLCP-TB-FAR': [
-    'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
-    'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
-    'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
-    'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)'
+    'S/N', 'LOCATION', 'LGA', 'ASSIGNEE', 'ASSET DESCRIPTION', 'ASSET ID CODE', 'ASSET CLASS',
+    'MANUFACTURER', 'MODEL NUMBER', 'SERIAL NUMBER', 'SUPPLIER', 'DATE PURCHASED OR RECEIVED',
+    'CHQ NO / GOODS RECEIVED NOTE NO.', 'PV NO', 'PURCHASE PRICE (NAIRA)', 'PURCHASE PRICE [USD)',
+    'FUNDER', 'CONDITION', 'REMARKS', 'GRANT', 'USEFUL LIFE (YEARS)'
   ],
   'MOTORCYCLES-C19RM': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
@@ -132,4 +133,3 @@ export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
     'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
   ]
 };
-
