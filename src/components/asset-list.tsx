@@ -438,7 +438,7 @@ export default function AssetList() {
   };
 
   const handleEditAsset = (asset: Asset) => {
-    setSelectedAsset(asset);
+    setSelectedAsset(assets.find(a => a.id === asset.id));
     setIsFormReadOnly(false);
     setIsFormOpen(true);
   };
@@ -1221,7 +1221,7 @@ export default function AssetList() {
                        {syncButtonText}
                     </Button>
                      {selectedAssetIds.length === 1 && (
-                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={isGuest}>
+                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)} disabled={isGuest}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     )}
@@ -1381,5 +1381,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
