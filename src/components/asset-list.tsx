@@ -43,6 +43,7 @@ import {
   CloudUpload,
   HardDrive,
   Cloud,
+  ArrowRightLeft,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -650,10 +651,9 @@ export default function AssetList() {
     setIsImporting(true);
     addNotification({ title: "Parsing file...", description: "Please wait..." });
 
-    const useOfflineStore = lockAssetList && isAdmin;
-    const baseAssets = useOfflineStore ? await getLockedOfflineAssets() : await getLocalAssetsFromDb();
-
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets);
+    // All imports now go to the locked offline store first for review.
+    const baseAssets = await getLockedOfflineAssets();
+    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets, false); // `allowAdd` is effectively true for offline store
 
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
@@ -665,7 +665,7 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
-        syncStatus: useOfflineStore ? undefined : 'local' as const
+        syncStatus: undefined // No sync status for locked offline items
     }));
 
     if (allChanges.length > 0) {
@@ -673,16 +673,10 @@ export default function AssetList() {
         allChanges.forEach(a => assetMap.set(a.id, a));
         const combinedAssets = Array.from(assetMap.values());
         
-        if (useOfflineStore) {
-          await saveLockedOfflineAssets(combinedAssets);
-          setOfflineAssets(combinedAssets);
-          addNotification({ title: 'Imported to Locked Offline Store', description: `${allChanges.length} changes saved.` });
-          setDataSource('local_locked'); // Switch to the offline view
-        } else {
-          await saveAssets(combinedAssets);
-          setAssets(combinedAssets);
-          addNotification({ title: 'Imported to Main List', description: `${allChanges.length} changes saved.` });
-        }
+        await saveLockedOfflineAssets(combinedAssets);
+        setOfflineAssets(combinedAssets);
+        addNotification({ title: 'Imported to Locked Offline Store', description: `${allChanges.length} changes saved. Review and merge to main list when ready.` });
+        setDataSource('local_locked'); // Switch to the offline view to show the imported data
         
     } else if (errors.length === 0) {
         addNotification({ title: "No Changes Detected", description: "No new or updated assets were found."});
@@ -782,8 +776,8 @@ export default function AssetList() {
     }
 
     if (dataSource === 'local_locked') {
-      addNotification({title: "Cannot Sync", description: "Assets in the locked offline store cannot be synced.", variant: "destructive"});
-      return;
+        handleMergeToMainList();
+        return;
     }
 
     const idsToSync = view === 'dashboard'
@@ -822,6 +816,46 @@ export default function AssetList() {
       setSelectedCategories([]);
     }
   }, [isOnline, view, selectedCategories, selectedAssetIds, assetsByCategory, setIsSyncing, setAssets, dataSource]);
+  
+  const handleMergeToMainList = async () => {
+    const idsToMerge = view === 'dashboard'
+        ? selectedCategories.flatMap(cat => assetsByCategory[cat]?.map(a => a.id) || [])
+        : selectedAssetIds;
+
+    if (idsToMerge.length === 0) {
+        addNotification({ title: "No Selection", description: "Please select assets or categories to merge." });
+        return;
+    }
+
+    setIsSyncing(true);
+    try {
+        const offlineAssetsToMerge = offlineAssets.filter(a => idsToMerge.includes(a.id));
+        const remainingOfflineAssets = offlineAssets.filter(a => !idsToMerge.includes(a.id));
+
+        const mainAssets = await getLocalAssetsFromDb();
+        const mainAssetsMap = new Map(mainAssets.map(a => [a.id, a]));
+
+        offlineAssetsToMerge.forEach(asset => {
+            mainAssetsMap.set(asset.id, { ...asset, syncStatus: 'local' });
+        });
+
+        await saveAssets(Array.from(mainAssetsMap.values()));
+        await saveLockedOfflineAssets(remainingOfflineAssets);
+
+        setAssets(Array.from(mainAssetsMap.values()));
+        setOfflineAssets(remainingOfflineAssets);
+
+        addNotification({ title: 'Merge Complete', description: `${idsToMerge.length} assets merged to the main list and are ready for cloud sync.` });
+        
+    } catch (e) {
+        addNotification({ title: 'Merge Failed', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+        setIsSyncing(false);
+        setSelectedAssetIds([]);
+        setSelectedCategories([]);
+    }
+  };
+
 
   useEffect(() => {
     const hasCurrentAssets = activeAssets.length > 0;
@@ -970,6 +1004,9 @@ export default function AssetList() {
     const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
     
+    const syncButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Sync to Cloud';
+    const SyncButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
+
     return (
       <div className="flex flex-col h-full gap-4">
         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
@@ -980,9 +1017,9 @@ export default function AssetList() {
             {selectedCategories.length > 0 && (
                  <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
-                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || !isOnline || dataSource === 'local_locked'}>
-                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CloudUpload className="mr-2 h-4 w-4" />}
-                       Sync Selected
+                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
+                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <SyncButtonIcon className="mr-2 h-4 w-4" />}
+                       {syncButtonText}
                     </Button>
                     <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest}>
                         <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
@@ -1164,6 +1201,9 @@ export default function AssetList() {
   );
   const areAllCategoryResultsSelected = categoryFilteredAssets.length > 0 && categoryFilteredAssets.every(a => selectedAssetIds.includes(a.id));
 
+  const syncButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Sync to Cloud';
+  const SyncButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
+
   return (
     <div className="flex flex-col h-full gap-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -1176,9 +1216,9 @@ export default function AssetList() {
             {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
-                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || !isOnline || dataSource === 'local_locked'}>
-                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CloudUpload className="mr-2 h-4 w-4" />}
-                       Sync Selected
+                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
+                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <SyncButtonIcon className="mr-2 h-4 w-4" />}
+                       {syncButtonText}
                     </Button>
                      {selectedAssetIds.length === 1 && (
                         <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={isGuest}>
@@ -1374,3 +1414,4 @@ export default function AssetList() {
     </div>
   );
 }
+
