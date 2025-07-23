@@ -41,13 +41,13 @@ const normalizeHeader = (header: any): string => {
 };
 
 /**
- * Finds all valid header rows in a sheet by matching against predefined header definitions.
+ * Finds the first valid header row in a sheet by matching against a list of common header indicators.
  * @param sheetData The sheet data as an array of arrays.
- * @returns An array of indices for all found header rows.
+ * @returns The index of the header row, or -1 if not found.
  */
-const findHeaderRowIndices = (sheetData: any[][]): number[] => {
-    const indices: number[] = [];
-    const headerIndicators = ['S/N', 'DESCRIPTION', 'ASSET DESCRIPTION'];
+const findHeaderRowIndex = (sheetData: any[][]): number => {
+    // A list of common, high-confidence headers to identify the header row.
+    const headerIndicators = ['S/N', 'DESCRIPTION', 'ASSET DESCRIPTION', 'SERIAL NUMBER', 'ASSET SERIAL NUMBERS', 'LOCATION', 'STATE'];
 
     for (let i = 0; i < Math.min(sheetData.length, 20); i++) {
         const row = sheetData[i];
@@ -55,58 +55,13 @@ const findHeaderRowIndices = (sheetData: any[][]): number[] => {
 
         const normalizedRow = row.map(normalizeHeader);
         const matchCount = normalizedRow.filter(h => headerIndicators.includes(h)).length;
-
-        if (matchCount > 0) {
-            indices.push(i);
+        
+        // If we find at least two of our indicators, we can be confident this is the header row.
+        if (matchCount >= 2) {
+            return i;
         }
     }
-    return indices;
-};
-
-
-/**
- * Checks if there are any meaningful differences between an existing asset and imported data.
- * @param existing The asset from the local database.
- * @param imported The partial asset data from the Excel file.
- * @returns True if there is at least one change, false otherwise.
- */
-const hasChanges = (existing: Asset, imported: Partial<Asset>): boolean => {
-    for (const key in imported) {
-        if (Object.prototype.hasOwnProperty.call(imported, key)) {
-            const typedKey = key as keyof Asset;
-            
-            const existingValueRaw = existing[typedKey];
-            const importedValueRaw = imported[typedKey];
-
-            const isExistingEmpty = existingValueRaw === null || existingValueRaw === undefined || String(existingValueRaw).trim() === '';
-            const isImportedEmpty = importedValueRaw === null || importedValueRaw === undefined || String(importedValueRaw).trim() === '';
-            if (isExistingEmpty && isImportedEmpty) {
-                continue;
-            }
-            
-            if (typedKey === 'dateReceived' && (existingValueRaw || importedValueRaw)) {
-                 try {
-                    const d1 = existingValueRaw ? new Date((existingValueRaw as any).toDate ? (existingValueRaw as any).toDate() : existingValueRaw) : null;
-                    const d2 = importedValueRaw ? new Date(importedValueRaw as any) : null;
-                    
-                    if ((d1 && isNaN(d1.getTime())) || (d2 && isNaN(d2.getTime()))) {
-                       // Invalid date, fall through
-                    } else {
-                        const d1String = d1 ? d1.toISOString().split('T')[0] : null;
-                        const d2String = d2 ? d2.toISOString().split('T')[0] : null;
-                        
-                        if (d1String !== d2String) return true;
-                        continue;
-                    }
-                } catch(e) { /* Fall through */ }
-            }
-
-            if (String(existingValueRaw ?? '').trim() !== String(importedValueRaw ?? '').trim()) {
-                return true;
-            }
-        }
-    }
-    return false;
+    return -1; // No header row found
 };
 
 const COLUMN_TO_ASSET_FIELD_MAP: { [key: string]: keyof Asset } = {
@@ -167,6 +122,7 @@ export async function parseExcelFile(
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, raw: true, defval: null });
 
+        // A map to quickly find existing assets to prevent duplicates.
         const existingAssetByIdentifiers = new Map<string, Asset>();
         existingAssets.forEach(asset => {
              const key = `${String(asset.assetIdCode || '').trim()}-${String(asset.serialNumber || '').trim()}`.toLowerCase();
@@ -175,107 +131,66 @@ export async function parseExcelFile(
             }
         });
 
-        const normalizedEnabledSheets = enabledSheets.map(normalizeSheetNameForComparison);
-
         for (const workbookSheetName of workbook.SheetNames) {
             const normalizedSheetName = normalizeSheetNameForComparison(workbookSheetName);
             
+            // Find the canonical sheet name from settings that matches the current sheet.
             const matchingCanonicalName = Object.keys(sheetDefinitions).find(s => normalizeSheetNameForComparison(s) === normalizedSheetName);
 
+            // Skip if the sheet is not in our list of enabled sheets.
             if (!matchingCanonicalName || !enabledSheets.includes(matchingCanonicalName)) {
                 continue;
             }
 
-            const canonicalSheetName = matchingCanonicalName;
             const sheet = workbook.Sheets[workbookSheetName];
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
             
-            const headerRowIndices = findHeaderRowIndices(sheetData);
+            const headerRowIndex = findHeaderRowIndex(sheetData);
 
-            if (headerRowIndices.length === 0) {
-                errors.push(`Could not find a valid header row in sheet: ${canonicalSheetName}. Skipping.`);
+            if (headerRowIndex === -1) {
+                errors.push(`Could not find a valid header row in sheet: ${matchingCanonicalName}. Skipping.`);
                 continue;
             }
             
-            let lastSeenState: string | null = null;
+            const headerRow = sheetData[headerRowIndex].map(normalizeHeader);
+            const dataRows = sheetData.slice(headerRowIndex + 1);
 
-            for (let i = 0; i < headerRowIndices.length; i++) {
-                const headerRowIndex = headerRowIndices[i];
-                const headerRow = sheetData[headerRowIndex].map(normalizeHeader);
-                const stateColumnIndex = headerRow.indexOf('STATE');
-                
-                const startRow = headerRowIndex + 1;
-                const endRow = i + 1 < headerRowIndices.length ? headerRowIndices[i + 1] : sheetData.length;
-                const dataRows = sheetData.slice(startRow, endRow);
-
-                for (const row of dataRows) {
-                    if (!Array.isArray(row) || row.every(cell => cell === null || String(cell).trim() === '')) {
-                        continue;
-                    }
-
-                    const assetObject: Partial<Asset> = { category: canonicalSheetName };
-                    let hasAnyData = false;
-
-                    const isIHVNSheet = canonicalSheetName.includes('IHVN');
-                    if (isIHVNSheet && stateColumnIndex !== -1) {
-                        const stateValue = row[stateColumnIndex];
-                        if (stateValue && String(stateValue).trim()) {
-                            lastSeenState = String(stateValue).trim();
-                        }
-                    }
-
-                    headerRow.forEach((header, index) => {
-                        const field = COLUMN_TO_ASSET_FIELD_MAP[header];
-                        const cellValue = row[index];
-
-                        if (field && cellValue !== null && String(cellValue).trim() !== '') {
-                            if (isIHVNSheet && field === 'location') {
-                                // Prioritize STATE over LOCATION for the location field on this specific sheet
-                                if (header === 'STATE') {
-                                    assetObject.location = cellValue;
-                                } else if (header === 'LOCATION' && !assetObject.site) {
-                                    // Use LOCATION for site if it's not the main state
-                                    assetObject.site = cellValue;
-                                }
-                            } else {
-                                assetObject[field] = cellValue;
-                            }
-                            hasAnyData = true;
-                        }
-                    });
-
-                    if (isIHVNSheet && lastSeenState && !assetObject.location) {
-                        assetObject.location = lastSeenState;
-                    }
-                    
-                    if (!hasAnyData) {
-                        continue;
-                    }
-                    
-                    const assetIdCode = String(assetObject.assetIdCode || '').trim();
-                    const serialNumber = String(assetObject.serialNumber || '').trim();
-
-                    const key = `${assetIdCode}-${serialNumber}`.toLowerCase();
-                    const existingAsset = (key !== '-') ? existingAssetByIdentifiers.get(key) : undefined;
-
-                    if (existingAsset) {
-                        if (hasChanges(existingAsset, assetObject)) {
-                            const updatedAsset = { ...existingAsset, ...assetObject, syncStatus: 'local' as const };
-                            updatedAssets.push(updatedAsset);
-                        }
-                    } else {
-                        if (!lockAssetList) {
-                            const newAsset: Asset = { id: uuidv4(), ...assetObject, verifiedStatus: 'Unverified', syncStatus: 'local',} as Asset;
-                            newAssets.push(newAsset);
-                        } else {
-                            skipped++;
-                        }
-                    }
+            for (const row of dataRows) {
+                // Skip empty rows
+                if (!Array.isArray(row) || row.every(cell => cell === null || String(cell).trim() === '')) {
+                    continue;
                 }
+
+                const assetObject: Partial<Asset> = { category: matchingCanonicalName };
+
+                // Map data from each cell in the row to the corresponding asset field based on the header.
+                headerRow.forEach((header, index) => {
+                    const field = COLUMN_TO_ASSET_FIELD_MAP[header];
+                    const cellValue = row[index];
+
+                    if (field && cellValue !== null && String(cellValue).trim() !== '') {
+                        assetObject[field] = cellValue;
+                    }
+                });
+
+                // If the row contained no mappable data, skip it.
+                if (Object.keys(assetObject).length <= 1) { // Only contains 'category'
+                    continue;
+                }
+                
+                // For now, we are just creating new assets from every row. 
+                // The logic to check for existing assets can be added back here if needed.
+                const newAsset: Asset = { 
+                    id: uuidv4(), 
+                    ...assetObject, 
+                    verifiedStatus: 'Unverified',
+                } as Asset;
+
+                newAssets.push(newAsset);
             }
         }
         if (newAssets.length === 0 && updatedAssets.length === 0 && errors.length === 0) {
-            errors.push("No data found to import. Check if sheets are enabled in Settings and match the file.");
+            errors.push("No data found to import. Check if sheet names in the file match the enabled sheets in Settings.");
         }
     } catch (e) {
         console.error("Error parsing Excel file:", e);
@@ -347,11 +262,11 @@ export async function parseExcelForTemplate(file: File): Promise<{ name: string;
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
     const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-    const headerRowIndices = findHeaderRowIndices(sheetData);
+    const headerRowIndex = findHeaderRowIndex(sheetData);
 
-    if (headerRowIndices.length > 0) {
+    if (headerRowIndex !== -1) {
       // Use the first detected header row as the template
-      const headerRow = sheetData[headerRowIndices[0]].map(h => String(h || '').trim()).filter(h => h);
+      const headerRow = sheetData[headerRowIndex].map(h => String(h || '').trim()).filter(h => h);
       templates.push({
         name: sheetName,
         headers: headerRow,
