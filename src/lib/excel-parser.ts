@@ -2,6 +2,7 @@
 import * as XLSX from 'xlsx';
 import type { Asset, AppSettings, SheetDefinition } from './types';
 import { v4 as uuidv4 } from 'uuid';
+import { HEADER_DEFINITIONS } from './constants';
 
 /**
  * Normalizes a header string for reliable matching.
@@ -38,14 +39,11 @@ const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[]): nu
     return -1; // No header row found
 };
 
-// This alias map is now the single source of truth for mapping various Excel
-// header names to a single, consistent field in the Asset object.
 const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   sn: ['S/N'],
   description: ['DESCRIPTION', 'ASSET DESCRIPTION'],
-  location: ['LOCATION', 'STATE'],
+  location: ['LOCATION', 'STATE', 'SITE'],
   lga: ['LGA'],
-  site: ['SITE'],
   assignee: ['ASSIGNEE'],
   assetIdCode: ['ASSET ID CODE', 'TAG NUMBERS'],
   assetClass: ['ASSET CLASS', 'CLASSIFICATION'],
@@ -69,7 +67,6 @@ const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   imei: ['IMEI (TABLETS & MOBILE PHONES)'],
 };
 
-// Create a reverse map for faster lookups: from excel header to asset field key
 const COLUMN_TO_ASSET_FIELD_MAP = new Map<string, keyof Asset>();
 for (const key in HEADER_ALIASES) {
     const assetKey = key as keyof Asset;
@@ -81,12 +78,6 @@ for (const key in HEADER_ALIASES) {
     }
 }
 
-
-/**
- * Replaces undefined values with null in an object, which is compatible with Firestore.
- * @param obj The object to sanitize.
- * @returns A new object with undefined values replaced by null.
- */
 export const sanitizeForFirestore = <T extends object>(obj: T): T => {
     const sanitizedObj = { ...obj };
     for (const key in sanitizedObj) {
@@ -111,22 +102,35 @@ export async function parseExcelFile(
 
     try {
         const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, cellText: false });
 
-        const sheetNamesToProcess = singleSheetName ? [singleSheetName] : Object.keys(sheetDefinitions);
+        const sheetNamesToProcess = singleSheetName 
+            ? [singleSheetName] 
+            : Object.keys(sheetDefinitions).filter(sheetName => appSettings.enabledSheets.includes(sheetName));
         
         for (const targetSheetName of sheetNamesToProcess) {
             const definition = sheetDefinitions[targetSheetName];
             if (!definition) {
                  if(singleSheetName) errors.push(`No definition found for sheet: "${targetSheetName}".`);
-                 continue; // Skip if no definition exists
+                 continue;
             }
 
-            // Find the actual sheet in the workbook by checking if the workbook sheet name CONTAINS the target name
-            const actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes(targetSheetName.toLowerCase()));
+            let actualSheetName: string | undefined;
+            if (singleSheetName) {
+                // For single sheet import, find an exact (case-insensitive) match.
+                const normalizedTarget = targetSheetName.toLowerCase().trim();
+                actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().trim() === normalizedTarget);
+            } else {
+                // For multi-sheet import, find a sheet that contains the target name.
+                const normalizedTarget = targetSheetName.toLowerCase().trim();
+                actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().trim().includes(normalizedTarget));
+            }
+
 
             if (!actualSheetName) {
-                if(singleSheetName) errors.push(`Could not find a sheet in the workbook matching: "${targetSheetName}".`);
+                if(singleSheetName) {
+                    errors.push(`Could not find a sheet in the workbook with the exact name: "${targetSheetName}".`);
+                }
                 continue;
             }
 
@@ -144,7 +148,7 @@ export async function parseExcelFile(
             const jsonData = sheetData.slice(headerRowIndex + 1);
 
             for (const row of jsonData) {
-                if (row.every(cell => cell === null || String(cell).trim() === '')) continue; // Skip entirely empty rows
+                if (row.every(cell => cell === null || String(cell).trim() === '')) continue;
 
                 const assetObject: Partial<Asset> = { category: targetSheetName };
                 let hasData = false;
@@ -207,10 +211,9 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
         const definition = sheetDefinitions[category];
         if (!definition) continue;
 
-        const headerArray = definition.headers?.length > 0 ? [...definition.headers] : [];
-        if (headerArray.length === 0) continue; // Don't export sheets with no defined headers
+        const headerArray = definition?.headers?.length > 0 ? [...definition.headers] : [];
+        if (headerArray.length === 0) continue; 
         
-        // Ensure verification columns are added
         if (!headerArray.includes("Verified Status")) headerArray.push("Verified Status");
         if (!headerArray.includes("Verified Date")) headerArray.push("Verified Date");
         if (!headerArray.includes("Last Modified By")) headerArray.push("Last Modified By");
@@ -221,18 +224,16 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
             headerArray.forEach(header => {
                 const normalizedHeader = normalizeHeader(header);
                 
-                // Find the key in the map that matches the normalized header
                 const assetKey = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
                 
                 if (assetKey) {
                    row[header] = asset[assetKey] ?? '';
                 } else {
-                   // Handle special cases not in the map
                    if (normalizedHeader === 'VERIFIED STATUS') row[header] = asset.verifiedStatus || 'Unverified';
                    else if (normalizedHeader === 'VERIFIED DATE') row[header] = asset.verifiedDate || '';
                    else if (normalizedHeader === 'LAST MODIFIED BY') row[header] = asset.lastModifiedBy || '';
                    else if (normalizedHeader === 'LAST MODIFIED DATE') row[header] = asset.lastModified ? new Date(asset.lastModified).toLocaleString() : '';
-                   else row[header] = ''; // Default for unknown headers
+                   else row[header] = '';
                 }
             });
             return row;
@@ -256,19 +257,31 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
 
+  const allPossibleHeaders = new Set<string>();
+  for(const key in HEADER_DEFINITIONS) {
+    HEADER_DEFINITIONS[key].headers.forEach(h => allPossibleHeaders.add(normalizeHeader(h)));
+  }
+
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
     const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-    const headerRowIndex = findHeaderRowIndex(sheetData, []); // Pass empty array to just find *a* header row
+    
+    // A simplified header finding logic for template creation
+    for (let i = 0; i < Math.min(sheetData.length, 10); i++) {
+        const row = sheetData[i];
+        if (!Array.isArray(row)) continue;
+        const normalizedRow = row.map(normalizeHeader);
+        const matchCount = normalizedRow.filter(h => allPossibleHeaders.has(h)).length;
 
-    if (headerRowIndex !== -1) {
-      // Use the first detected header row as the template
-      const headerRow = sheetData[headerRowIndex].map(h => String(h || '').trim()).filter(h => h);
-      templates.push({
-        name: sheetName,
-        headers: headerRow,
-        displayFields: [], // Let the app decide defaults
-      });
+        if (matchCount > 5) { // If we find more than 5 known headers, it's likely the header row
+            const headerRow = row.map(h => String(h || '').trim()).filter(h => h);
+            templates.push({
+                name: sheetName,
+                headers: headerRow,
+                displayFields: HEADER_DEFINITIONS[sheetName]?.displayFields || []
+            });
+            break; // Move to the next sheet
+        }
     }
   }
 
