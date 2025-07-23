@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -51,34 +51,28 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
-  const [localSettings, setLocalSettings] = useState(appSettings);
+  const [isSaving, setIsSaving] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    if (isOpen) {
-      setLocalSettings(appSettings);
-    }
-  }, [appSettings, isOpen]);
-
-  const handleSettingChange = (key: keyof typeof localSettings, value: any) => {
-    setLocalSettings(prev => ({ ...prev, [key]: value }));
+  const handleSettingChange = (key: keyof AppSettings, value: any) => {
+    setAppSettings(prev => ({ ...prev, [key]: value }));
   };
 
   const handleToggleSheet = (sheetName: string, checked: boolean) => {
     let newEnabledSheets;
     if (checked) {
-      newEnabledSheets = [...localSettings.enabledSheets, sheetName];
+      newEnabledSheets = [...appSettings.enabledSheets, sheetName];
     } else {
-      newEnabledSheets = localSettings.enabledSheets.filter(name => name !== sheetName);
+      newEnabledSheets = appSettings.enabledSheets.filter(name => name !== sheetName);
     }
     handleSettingChange('enabledSheets', newEnabledSheets);
   };
   
   const handleToggleAll = (enable: boolean) => {
-    const allSheetNames = Object.keys(localSettings.sheetDefinitions);
+    const allSheetNames = Object.keys(appSettings.sheetDefinitions);
     handleSettingChange('enabledSheets', enable ? allSheetNames : []);
   };
 
@@ -87,13 +81,16 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
       toast({ title: 'Offline', description: 'Settings can only be changed while online.', variant: 'destructive' });
       return;
     }
+    setIsSaving(true);
     try {
-      await updateSettings(localSettings);
-      setAppSettings(localSettings);
-      toast({ title: 'Settings Updated', description: 'Your changes have been saved.' });
+      // The app state is already updated, so we just need to push to Firestore
+      await updateSettings(appSettings);
+      toast({ title: 'Settings Updated', description: 'Your changes have been saved and applied.' });
       onOpenChange(false);
     } catch (error) {
       toast({ title: 'Error', description: 'Could not save settings to the database.', variant: 'destructive' });
+    } finally {
+        setIsSaving(false);
     }
   }
 
@@ -104,18 +101,18 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   };
 
   const handleEditSheet = (sheetName: string) => {
-    setSheetToEdit(localSettings.sheetDefinitions[sheetName]);
+    setSheetToEdit(appSettings.sheetDefinitions[sheetName]);
     setOriginalSheetName(sheetName);
     setIsSheetFormOpen(true);
   };
   
   const handleDeleteSheet = (sheetNameToDelete: string) => {
-    const newSheetDefinitions = { ...localSettings.sheetDefinitions };
+    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
     delete newSheetDefinitions[sheetNameToDelete];
     
-    const newEnabledSheets = localSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
+    const newEnabledSheets = appSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
 
-    setLocalSettings(prev => ({
+    setAppSettings(prev => ({
       ...prev,
       sheetDefinitions: newSheetDefinitions,
       enabledSheets: newEnabledSheets,
@@ -123,8 +120,8 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   };
 
   const handleSaveSheet = (sheet: SheetDefinition) => {
-    const newSheetDefinitions = { ...localSettings.sheetDefinitions };
-    let newEnabledSheets = [...localSettings.enabledSheets];
+    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
+    let newEnabledSheets = [...appSettings.enabledSheets];
     
     if (originalSheetName && originalSheetName !== sheet.name) {
       delete newSheetDefinitions[originalSheetName];
@@ -135,7 +132,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
       newEnabledSheets.push(sheet.name);
     }
 
-    setLocalSettings(prev => ({
+    setAppSettings(prev => ({
       ...prev,
       sheetDefinitions: {
         ...newSheetDefinitions,
@@ -155,8 +152,8 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
 
     try {
       const templates = await parseExcelForTemplate(file);
-      let currentDefs = localSettings.sheetDefinitions;
-      let currentEnabled = localSettings.enabledSheets;
+      let currentDefs = appSettings.sheetDefinitions;
+      let currentEnabled = appSettings.enabledSheets;
       
       templates.forEach(template => {
         currentDefs[template.name] = template;
@@ -165,7 +162,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         }
       });
 
-      setLocalSettings(prev => ({
+      setAppSettings(prev => ({
         ...prev,
         sheetDefinitions: currentDefs,
         enabledSheets: currentEnabled,
@@ -183,7 +180,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const isGuest = userProfile?.isGuest || false;
   const canModifyData = !isGuest;
   
-  if (!localSettings?.sheetDefinitions) {
+  if (!appSettings?.sheetDefinitions) {
     return (
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="flex items-center justify-center">
@@ -193,9 +190,9 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     );
   }
 
-  const allSheetNames = Object.keys(localSettings.sheetDefinitions);
-  const allEnabled = allSheetNames.length > 0 && localSettings.enabledSheets.length === allSheetNames.length;
-  const noneEnabled = localSettings.enabledSheets.length === 0;
+  const allSheetNames = Object.keys(appSettings.sheetDefinitions);
+  const allEnabled = allSheetNames.length > 0 && appSettings.enabledSheets.length === allSheetNames.length;
+  const noneEnabled = appSettings.enabledSheets.length === 0;
 
   return (
     <>
@@ -204,13 +201,13 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
           <SheetHeader>
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
-              Manage application settings and preferences.
+              Manage application settings and preferences. Admin changes apply to all users.
             </SheetDescription>
           </SheetHeader>
           <Tabs defaultValue={isAdmin ? "general" : "account"} className="flex-1 flex flex-col overflow-y-hidden">
             <TabsList className="grid w-full grid-cols-2">
-                <TabsTrigger value="general"><SettingsIcon className="mr-2" />General</TabsTrigger>
-                <TabsTrigger value="account"><UserCog className="mr-2" />Account</TabsTrigger>
+                <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
+                <TabsTrigger value="account"><UserCog className="mr-2 h-4 w-4" />Account</TabsTrigger>
             </TabsList>
             <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
@@ -252,14 +249,14 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                           <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
                           <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
                         </div>
-                        <Switch id="lock-assets" checked={localSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)} disabled={!isOnline}/>
+                        <Switch id="lock-assets" checked={appSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)} disabled={!isOnline}/>
                       </div>
                       <div className="flex items-center justify-between pt-4">
                         <div className="space-y-1">
                           <Label htmlFor="autosync-assets" className="text-sm">Enable Automatic Sync</Label>
                           <p className="text-xs text-muted-foreground">Automatically sync with the cloud when online.</p>
                         </div>
-                        <Switch id="autosync-assets" checked={localSettings.autoSyncEnabled} onCheckedChange={(checked) => handleSettingChange('autoSyncEnabled', checked)} disabled={!isOnline}/>
+                        <Switch id="autosync-assets" checked={appSettings.autoSyncEnabled} onCheckedChange={(checked) => handleSettingChange('autoSyncEnabled', checked)} disabled={!isOnline}/>
                       </div>
                     </div>
                   </div>
@@ -279,7 +276,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                           {allSheetNames.map(sheetName => (
                             <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
                               <div className="flex items-center">
-                                <Switch id={`switch-${sheetName}`} checked={localSettings.enabledSheets.includes(sheetName)} onCheckedChange={(checked) => handleToggleSheet(sheetName, checked)} disabled={!isOnline}/>
+                                <Switch id={`switch-${sheetName}`} checked={appSettings.enabledSheets.includes(sheetName)} onCheckedChange={(checked) => handleToggleSheet(sheetName, checked)} disabled={!isOnline}/>
                                 <Label htmlFor={`switch-${sheetName}`} className="text-sm pl-2 cursor-pointer">{sheetName}</Label>
                               </div>
                               <div className="flex items-center gap-1">
@@ -305,7 +302,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                 <div className="pt-4">
                   <h3 className="text-lg font-medium mb-4">My Account</h3>
                   <div className="rounded-lg border p-3 space-y-2">
-                    <Button variant="outline" className="w-full justify-start" onClick={() => { onOpenChange(false); openChangePassword(); }} disabled={isGuest}><KeyRound className="mr-2"/>Change Password</Button>
+                    <Button variant="outline" className="w-full justify-start" onClick={() => { onOpenChange(false); openChangePassword(); }} disabled={isGuest}><KeyRound className="mr-2 h-4 w-4"/>Change Password</Button>
                   </div>
                 </div>
                 {isAdmin && (
@@ -321,7 +318,10 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
 
           <SheetFooter className="mt-auto pt-4 border-t">
             <SheetClose asChild><Button variant="outline">Cancel</Button></SheetClose>
-            {isAdmin && <Button onClick={handleSaveChanges} disabled={!isOnline}>Save Admin Changes</Button>}
+            {isAdmin && <Button onClick={handleSaveChanges} disabled={isSaving || !isOnline}>
+                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Save Admin Changes
+            </Button>}
           </SheetFooter>
         </SheetContent>
       </Sheet>
