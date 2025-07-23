@@ -1166,7 +1166,7 @@ export default function AssetList() {
                                   }}
                                   disabled={isGuest}
                                 >
-                                  <SelectTrigger className={cn("w-[150px] h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                  <SelectTrigger className={cn("w-[135px] h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
                                     <SelectValue placeholder="Select status" />
                                   </SelectTrigger>
                                   <SelectContent>

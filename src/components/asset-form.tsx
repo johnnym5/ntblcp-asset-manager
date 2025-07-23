@@ -207,11 +207,11 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     <ReadOnlyField label="S/N" value={asset.sn} />
                     <ReadOnlyField label="LGA" value={asset.lga} />
                 </div>
-                 <ReadOnlyField label="Assignee" value={asset.assignee} />
-                <ReadOnlyField label="Asset Description" value={asset.description} />
                 <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
+                <ReadOnlyField label="Assignee" value={asset.assignee} />
+                <ReadOnlyField label="Asset Description" value={asset.description} />
+                
+                <div className="pt-4">
                      <div className="space-y-2">
                         <Label htmlFor="quick-view-status">Verified Status</Label>
                         <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>

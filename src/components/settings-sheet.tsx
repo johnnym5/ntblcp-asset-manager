@@ -77,6 +77,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     }
     try {
       await updateSettings(localSettings);
+      setAppSettings(localSettings); // Update global state immediately
       toast({ title: 'Settings Updated', description: 'Your changes have been saved.' });
       onOpenChange(false);
     } catch (error) {
@@ -124,7 +125,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                       Import from Excel
                     </Button>
                   )}
-                  <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport}>
+                  <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport} disabled={!dataActions.hasAssets}>
                     <FileDown className="mr-2 h-4 w-4" />
                     Export to Excel
                   </Button>
