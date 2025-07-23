@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -39,18 +39,31 @@ export function SingleSheetImportDialog({ isOpen, onOpenChange }: SingleSheetImp
   const { toast } = useToast();
   
   const [selectedSheet, setSelectedSheet] = useState<string>('');
-  const [file, setFile] = useState<File | null>(null);
+  const [fileBuffer, setFileBuffer] = useState<ArrayBuffer | null>(null);
+  const [fileName, setFileName] = useState<string>('');
   const [isImporting, setIsImporting] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
-      setFile(event.target.files[0]);
+      const file = event.target.files[0];
+      setFileName(file.name);
+      try {
+        const buffer = await file.arrayBuffer();
+        setFileBuffer(buffer);
+      } catch (error) {
+        toast({
+            title: 'File Read Error',
+            description: 'Could not read the selected file. Please try again.',
+            variant: 'destructive'
+        });
+        console.error("Error reading file to buffer:", error);
+      }
     }
   };
 
   const handleImport = async () => {
-    if (!file || !selectedSheet) {
+    if (!fileBuffer || !selectedSheet) {
       toast({ title: 'Missing Information', description: 'Please select a sheet and a file to import.', variant: 'destructive' });
       return;
     }
@@ -59,7 +72,7 @@ export function SingleSheetImportDialog({ isOpen, onOpenChange }: SingleSheetImp
     addNotification({ title: `Importing ${selectedSheet}...`, description: "Please wait..." });
 
     const baseAssets = await getLockedOfflineAssets();
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets, selectedSheet);
+    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(fileBuffer, appSettings, baseAssets, selectedSheet);
 
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
@@ -94,7 +107,8 @@ export function SingleSheetImportDialog({ isOpen, onOpenChange }: SingleSheetImp
 
   const resetState = () => {
     setSelectedSheet('');
-    setFile(null);
+    setFileBuffer(null);
+    setFileName('');
     if (fileInputRef.current) {
         fileInputRef.current.value = '';
     }
@@ -138,7 +152,7 @@ export function SingleSheetImportDialog({ isOpen, onOpenChange }: SingleSheetImp
               onClick={() => fileInputRef.current?.click()}
             >
               <FileUp className="mr-2 h-4 w-4" />
-              {file ? file.name : "Select a file..."}
+              {fileName || "Select a file..."}
             </Button>
             <input
               type="file"
@@ -153,7 +167,7 @@ export function SingleSheetImportDialog({ isOpen, onOpenChange }: SingleSheetImp
           <DialogClose asChild>
             <Button variant="outline">Cancel</Button>
           </DialogClose>
-          <Button onClick={handleImport} disabled={isImporting || !file || !selectedSheet}>
+          <Button onClick={handleImport} disabled={isImporting || !fileBuffer || !selectedSheet}>
             {isImporting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
             Import
           </Button>

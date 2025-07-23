@@ -30,7 +30,7 @@ const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   sn: ['S/N'],
   description: ['DESCRIPTION', 'ASSET DESCRIPTION'],
   location: ['LOCATION', 'STATE'],
-  lga: ['LGA', 'LOCATION'],
+  lga: ['LGA'],
   site: ['SITE'],
   assignee: ['ASSIGNEE'],
   assetIdCode: ['ASSET ID CODE', 'TAG NUMBERS'],
@@ -66,6 +66,9 @@ for (const key in HEADER_ALIASES) {
         }
     }
 }
+// Specific override for IHVN sheet where 'LOCATION' means LGA
+COLUMN_TO_ASSET_FIELD_MAP.set('IHVN-GF N-THRIP:LOCATION', 'lga');
+
 
 export const sanitizeForFirestore = <T extends object>(obj: T): T => {
     const sanitizedObj = { ...obj };
@@ -79,7 +82,7 @@ export const sanitizeForFirestore = <T extends object>(obj: T): T => {
 
 
 export async function parseExcelFile(
-    file: File, 
+    fileOrBuffer: File | ArrayBuffer, 
     appSettings: AppSettings, 
     existingAssets: Asset[],
     singleSheetName?: string
@@ -89,7 +92,7 @@ export async function parseExcelFile(
     const errors: string[] = [];
 
     try {
-        const buffer = await file.arrayBuffer();
+        const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, cellText: false });
 
         const sheetNamesToProcess = singleSheetName 
@@ -104,29 +107,32 @@ export async function parseExcelFile(
             }
 
             let actualSheetName: string | undefined;
-             if (singleSheetName) {
+            if (singleSheetName) {
+                // For single sheet import, find an exact, case-insensitive match
                 const normalizedTarget = targetSheetName.toLowerCase().trim();
                 actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().trim() === normalizedTarget);
             } else {
+                // For full workbook import, find a sheet that contains the target name
                 const normalizedTarget = targetSheetName.toLowerCase().trim();
                 actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().trim().includes(normalizedTarget));
             }
 
 
             if (!actualSheetName) {
-                if(singleSheetName) {
-                    errors.push(`Could not find a sheet in the workbook with the exact name: "${targetSheetName}".`);
-                }
+                const message = singleSheetName
+                    ? `Could not find a sheet with the exact name: "${targetSheetName}".`
+                    : `Sheet "${targetSheetName}" not found in workbook. Skipping.`;
+                if (singleSheetName) errors.push(message); // Only show error for single import
                 continue;
             }
 
             const sheet = workbook.Sheets[actualSheetName];
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
             
             const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers);
 
             if (headerRowIndex === -1) {
-                errors.push(`Could not find a valid header row in sheet: "${actualSheetName}". Please ensure it matches the defined headers.`);
+                errors.push(`Could not find a valid header row in sheet: "${actualSheetName}". Please ensure it matches one of the defined templates.`);
                 continue;
             }
             
@@ -143,12 +149,19 @@ export async function parseExcelFile(
                     if (rawHeader === null || rawHeader === undefined) return;
 
                     const normalizedHeader = normalizeHeader(rawHeader);
-                    const fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
+                    
+                    // Check for sheet-specific override first
+                    let fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(`${targetSheetName}:${normalizedHeader}`);
+                    // Fallback to general mapping
+                    if (!fieldName) {
+                        fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
+                    }
                     
                     if (fieldName) {
+                        // Always prioritize the raw formatted text (.w) if it exists.
+                        // This prevents misinterpretation of numbers/dates as booleans ("Yes").
                         const cell = row[colIndex];
-                        const cellValue = cell?.w ?? cell?.v ?? null;
-                        const finalValue = cellValue !== null && cellValue !== undefined ? String(cellValue).trim() : null;
+                        const finalValue = (cell && typeof cell === 'object' && 'w' in cell) ? String(cell.w).trim() : (cell !== null ? String(cell).trim() : null);
 
                         if (finalValue) {
                            (assetObject as any)[fieldName] = finalValue;
@@ -173,7 +186,11 @@ export async function parseExcelFile(
         }
     } catch (e) {
         console.error("Error parsing Excel file:", e);
-        errors.push(e instanceof Error ? e.message : "An unknown error occurred during parsing.");
+        if (e instanceof Error && e.name === 'NotFoundError') {
+             errors.push('The requested file could not be read, typically due to permission problems that have occurred after a reference to a file was acquired.');
+        } else {
+             errors.push(e instanceof Error ? e.message : "An unknown error occurred during parsing.");
+        }
     }
     
     return { assets: newAssets, updatedAssets: [], skipped: 0, errors };
@@ -210,7 +227,12 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
             headerArray.forEach(header => {
                 const normalizedHeader = normalizeHeader(header);
                 
-                const assetKey = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
+                // Check for sheet-specific override first
+                let assetKey = COLUMN_TO_ASSET_FIELD_MAP.get(`${category}:${normalizedHeader}`);
+                // Fallback to general mapping
+                if (!assetKey) {
+                    assetKey = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
+                }
                 
                 if (assetKey) {
                    row[header] = asset[assetKey] ?? '';
