@@ -1,6 +1,6 @@
 
 import * as XLSX from 'xlsx';
-import type { Asset } from './types';
+import type { Asset, AppSettings } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_DEFINITIONS, TARGET_SHEETS } from './constants';
 
@@ -90,18 +90,15 @@ const normalizeSheetNameForComparison = (name: string): string => {
 /**
  * Finds all valid header rows in a sheet by matching against predefined header definitions.
  * @param sheetData The sheet data as an array of arrays.
- * @param headersToFind The list of expected headers for the sheet.
- * @param sheetName The name of the sheet, used for special case logic.
+ * @param sheetHeaders The list of expected headers for the sheet.
  * @returns An array of indices for all found header rows.
  */
-const findHeaderRowIndices = (sheetData: any[][], headersToFind: string[], sheetName: string): number[] => {
+const findHeaderRowIndices = (sheetData: any[][], sheetHeaders: string[]): number[] => {
   const indices: number[] = [];
-  if (!headersToFind || headersToFind.length === 0) return indices;
+  if (!sheetHeaders || sheetHeaders.length === 0) return indices;
 
-  const normalizedHeadersToFind = new Set(headersToFind.map(normalizeHeader));
-  
-  // Define scan depth based on sheet name
-  const scanDepth = sheetName === 'IHVN-GF N-THRIP' ? 3000 : 20;
+  const normalizedHeadersToFind = new Set(sheetHeaders.map(normalizeHeader));
+  const scanDepth = 20;
 
   for (let i = 0; i < Math.min(sheetData.length, scanDepth); i++) {
     const row = sheetData[i];
@@ -111,7 +108,7 @@ const findHeaderRowIndices = (sheetData: any[][], headersToFind: string[], sheet
     const matchCount = normalizedRowHeaders.filter(h => normalizedHeadersToFind.has(h)).length;
     
     // A high match percentage suggests this is a header row.
-    if (matchCount / headersToFind.length > 0.7) {
+    if (matchCount / sheetHeaders.length > 0.7) {
       indices.push(i);
     }
   }
@@ -121,7 +118,6 @@ const findHeaderRowIndices = (sheetData: any[][], headersToFind: string[], sheet
 
 /**
  * Checks if there are any meaningful differences between an existing asset and imported data.
- * This function is robust against different data types (e.g. dates vs strings).
  * @param existing The asset from the local database.
  * @param imported The partial asset data from the Excel file.
  * @returns True if there is at least one change, false otherwise.
@@ -134,38 +130,29 @@ const hasChanges = (existing: Asset, imported: Partial<Asset>): boolean => {
             const existingValueRaw = existing[typedKey];
             const importedValueRaw = imported[typedKey];
 
-            // If both values are considered "empty", treat them as the same and continue.
             const isExistingEmpty = existingValueRaw === null || existingValueRaw === undefined || String(existingValueRaw).trim() === '';
             const isImportedEmpty = importedValueRaw === null || importedValueRaw === undefined || String(importedValueRaw).trim() === '';
             if (isExistingEmpty && isImportedEmpty) {
                 continue;
             }
             
-            // Special handling for date fields to make comparison robust
             if (typedKey === 'dateReceived' && (existingValueRaw || importedValueRaw)) {
                  try {
-                    // Create Date objects, handling Firestore Timestamps and various date formats
                     const d1 = existingValueRaw ? new Date(existingValueRaw.toDate ? existingValueRaw.toDate() : existingValueRaw) : null;
-                    const d2 = importedValueRaw ? new Date(importedValueRaw) : null;
+                    const d2 = importedValueRaw ? new Date(importedValueRaw as any) : null;
                     
-                    // If either is an invalid date, we can't compare them as dates. Fall through to string comparison.
                     if ((d1 && isNaN(d1.getTime())) || (d2 && isNaN(d2.getTime()))) {
-                       // Fall through to string comparison below
+                       // Fall through
                     } else {
                         const d1String = d1 ? d1.toISOString().split('T')[0] : null;
                         const d2String = d2 ? d2.toISOString().split('T')[0] : null;
                         
-                        if (d1String !== d2String) {
-                            return true;
-                        }
-                        continue; // Dates are the same, skip to next field
+                        if (d1String !== d2String) return true;
+                        continue;
                     }
-                } catch(e) {
-                    // Fall through to string comparison if date parsing fails
-                }
+                } catch(e) { /* Fall through */ }
             }
 
-            // Fallback to simple string comparison for all other fields
             if (String(existingValueRaw ?? '').trim() !== String(importedValueRaw ?? '').trim()) {
                 return true;
             }
@@ -179,9 +166,8 @@ const hasChanges = (existing: Asset, imported: Partial<Asset>): boolean => {
 
 export async function parseExcelFile(
     file: File, 
-    enabledSheets: string[], 
+    appSettings: AppSettings, 
     existingAssets: Asset[],
-    lockAssetList: boolean
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
     const newAssets: Asset[] = [];
     const updatedAssets: Asset[] = [];
@@ -190,7 +176,6 @@ export async function parseExcelFile(
 
     try {
         const buffer = await file.arrayBuffer();
-        // IMPORTANT FIX: `raw: true` prevents XLSX from converting "Yes" to boolean `true`.
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, raw: true });
 
         const existingAssetByIdentifiers = new Map<string, Asset>();
@@ -204,18 +189,19 @@ export async function parseExcelFile(
         for (const workbookSheetName of workbook.SheetNames) {
             const normalizedWorkbookSheetNameForComparison = normalizeSheetNameForComparison(workbookSheetName);
             
-            const canonicalSheetName = TARGET_SHEETS.find(
+            const canonicalSheetName = Object.keys(appSettings.sheetDefinitions).find(
                 s => normalizeSheetNameForComparison(s) === normalizedWorkbookSheetNameForComparison
             );
-
-            if (!canonicalSheetName || !enabledSheets.includes(canonicalSheetName)) {
+            
+            if (!canonicalSheetName || !appSettings.enabledSheets.includes(canonicalSheetName)) {
                 continue;
             }
 
             const sheet = workbook.Sheets[workbookSheetName];
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
             
-            const headerRowIndices = findHeaderRowIndices(sheetData, HEADER_DEFINITIONS[canonicalSheetName] || [], canonicalSheetName);
+            const sheetHeaders = appSettings.sheetDefinitions[canonicalSheetName];
+            const headerRowIndices = findHeaderRowIndices(sheetData, sheetHeaders);
 
             if (headerRowIndices.length === 0) {
                 errors.push(`Could not find a valid header row in sheet: ${canonicalSheetName}. Skipping.`);
@@ -229,7 +215,6 @@ export async function parseExcelFile(
                 const headerRow = sheetData[headerRowIndex].map(normalizeHeader);
                 const stateColumnIndex = headerRow.indexOf('STATE');
                 
-                // Data rows are between this header and the next header (or end of sheet)
                 const startRow = headerRowIndex + 1;
                 const endRow = i + 1 < headerRowIndices.length ? headerRowIndices[i + 1] : sheetData.length;
                 const dataRows = sheetData.slice(startRow, endRow);
@@ -242,8 +227,7 @@ export async function parseExcelFile(
                     const assetObject: Partial<Asset> = { category: canonicalSheetName };
                     let hasAnyData = false;
 
-                    // Handle state persistence for merged cells in IHVN sheet
-                    if (canonicalSheetName === 'IHVN-GF N-THRIP' && stateColumnIndex !== -1) {
+                    if (canonicalSheetName.includes('IHVN') && stateColumnIndex !== -1) {
                         const stateValue = row[stateColumnIndex];
                         if (stateValue && String(stateValue).trim()) {
                             lastSeenState = String(stateValue).trim();
@@ -254,14 +238,14 @@ export async function parseExcelFile(
                     }
 
                     headerRow.forEach((header, index) => {
-                        const field = COLUMN_TO_ASSET_FIELD_MAP[header];
+                        const mapping = appSettings.headerMappings[canonicalSheetName];
+                        const field = mapping ? mapping[header] : undefined;
                         const cellValue = row[index];
 
-                        // Special handling for IHVN sheet to prevent 'LOCATION' column from overwriting 'STATE'
-                        if (canonicalSheetName === 'IHVN-GF N-THRIP' && header === 'LOCATION') {
-                            // Do nothing, we've already set location from STATE
+                        if (canonicalSheetName.includes('IHVN') && header === 'LOCATION') {
+                           // This is handled by the state persistence logic above
                         } else if (field && cellValue !== null && String(cellValue).trim() !== '') {
-                            assetObject[field] = cellValue;
+                            assetObject[field as keyof Asset] = cellValue;
                             hasAnyData = true;
                         }
                     });
@@ -282,7 +266,7 @@ export async function parseExcelFile(
                             updatedAssets.push(updatedAsset);
                         }
                     } else {
-                        if (!lockAssetList) {
+                        if (!appSettings.lockAssetList) {
                             const newAsset: Asset = {
                                 id: uuidv4(),
                                 ...assetObject,
@@ -308,9 +292,39 @@ export async function parseExcelFile(
     return { assets: newAssets, updatedAssets, skipped, errors };
 }
 
+export async function parseExcelForTemplate(file: File): Promise<{ sheetDefinitions: Record<string, string[]>, errors: string[] }> {
+  const sheetDefinitions: Record<string, string[]> = {};
+  const errors: string[] = [];
+
+  try {
+    const buffer = await file.arrayBuffer();
+    const workbook = XLSX.read(buffer, { type: 'array' });
+
+    for (const sheetName of workbook.SheetNames) {
+      if (!TARGET_SHEETS.includes(sheetName)) continue;
+
+      const sheet = workbook.Sheets[sheetName];
+      const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1 });
+      
+      const headerRowIndices = findHeaderRowIndices(sheetData, HEADER_DEFINITIONS[sheetName] || []);
+      
+      if (headerRowIndices.length > 0) {
+        const headerRow = sheetData[headerRowIndices[0]];
+        sheetDefinitions[sheetName] = headerRow.map(String).filter(h => h.trim());
+      } else {
+        errors.push(`Could not automatically find headers for sheet: ${sheetName}`);
+      }
+    }
+  } catch (e) {
+    errors.push(e instanceof Error ? e.message : "An unknown error occurred while parsing the template.");
+  }
+
+  return { sheetDefinitions, errors };
+}
+
 // --- Core Export Logic ---
 
-export function exportToExcel(assets: Asset[], fileName: string): void {
+export function exportToExcel(assets: Asset[], headerMappings: AppSettings['headerMappings'], fileName: string): void {
     const workbook = XLSX.utils.book_new();
 
     const assetsByCategory = assets.reduce((acc, asset) => {
@@ -323,24 +337,20 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
     }, {} as Record<string, Asset[]>);
     
     for (const category in assetsByCategory) {
-        const canonicalSheetName = TARGET_SHEETS.find(s => normalizeSheetNameForComparison(s) === normalizeSheetNameForComparison(category));
-        
-        if (!canonicalSheetName || !HEADER_DEFINITIONS[canonicalSheetName]) {
+        const headerMapping = headerMappings[category];
+        if (!headerMapping) {
             console.warn(`No header definition for category ${category}, skipping export for this sheet.`);
             continue;
         }
 
-        const exportHeaders = [...HEADER_DEFINITIONS[canonicalSheetName]];
+        const exportHeaders = Object.keys(headerMapping);
         
         const sheetData = assetsByCategory[category].map(asset => {
             const row: { [key: string]: any } = {};
             for (const header of exportHeaders) {
-                const normalizedHeader = normalizeHeader(header);
-                const fieldName = Object.keys(COLUMN_TO_ASSET_FIELD_MAP).find(key => normalizeHeader(key) === normalizedHeader);
-                const assetField = fieldName ? COLUMN_TO_ASSET_FIELD_MAP[fieldName] : undefined;
-
+                const assetField = headerMapping[header];
                 if (assetField) {
-                    row[header] = asset[assetField] || '';
+                    row[header] = asset[assetField as keyof Asset] ?? '';
                 }
             }
             row["Verified Status"] = asset.verifiedStatus || 'Unverified';
@@ -351,13 +361,14 @@ export function exportToExcel(assets: Asset[], fileName: string): void {
         });
 
         // Add verification and modification headers if they don't exist
-        if (!exportHeaders.includes("Verified Status")) exportHeaders.push("Verified Status");
-        if (!exportHeaders.includes("Verified Date")) exportHeaders.push("Verified Date");
-        if (!exportHeaders.includes("Last Modified By")) exportHeaders.push("Last Modified By");
-        if (!exportHeaders.includes("Last Modified Date")) exportHeaders.push("Last Modified Date");
+        const finalHeaders = [...exportHeaders];
+        if (!finalHeaders.includes("Verified Status")) finalHeaders.push("Verified Status");
+        if (!finalHeaders.includes("Verified Date")) finalHeaders.push("Verified Date");
+        if (!finalHeaders.includes("Last Modified By")) finalHeaders.push("Last Modified By");
+        if (!finalHeaders.includes("Last Modified Date")) finalHeaders.push("Last Modified Date");
         
-        const worksheet = XLSX.utils.json_to_sheet(sheetData, { header: exportHeaders, skipHeader: false });
-        const safeSheetName = canonicalSheetName.replace(/[\\/?*[\]]/g, '-').substring(0, 31);
+        const worksheet = XLSX.utils.json_to_sheet(sheetData, { header: finalHeaders, skipHeader: false });
+        const safeSheetName = category.replace(/[\\/?*[\]]/g, '-').substring(0, 31);
         XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
     }
 
