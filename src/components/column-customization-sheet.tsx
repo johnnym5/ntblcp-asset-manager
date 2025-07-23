@@ -15,8 +15,12 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from './ui/scroll-area';
-import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react';
-import type { SheetDefinition, DisplayField, Asset } from '@/lib/types';
+import { ArrowDown, ArrowUp } from 'lucide-react';
+import type { SheetDefinition, DisplayField, Asset, AppSettings } from '@/lib/types';
+import { useAppState } from '@/contexts/app-state-context';
+import { updateSettings } from '@/lib/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { Separator } from './ui/separator';
 
 // A comprehensive list of all possible fields that can be displayed.
 const ALL_POSSIBLE_FIELDS: { key: keyof Asset; label: string }[] = [
@@ -59,24 +63,30 @@ export function ColumnCustomizationSheet({
   onSave,
 }: ColumnCustomizationSheetProps) {
   const [fields, setFields] = useState<DisplayField[]>([]);
+  const { appSettings, setAppSettings, isOnline } = useAppState();
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && sheetDefinition) {
-      // Create a full list of fields, including any that might be missing from the definition
-      const existingFieldKeys = new Set(sheetDefinition.displayFields.map(f => f.key));
+      // Create a full list of fields, ensuring order is preserved and new fields are added at the end.
+      const definedFields = sheetDefinition.displayFields || [];
+      const definedFieldKeys = new Set(definedFields.map(f => f.key));
+      
       const newFieldsToAdd = ALL_POSSIBLE_FIELDS
-        .filter(p => !existingFieldKeys.has(p.key))
+        .filter(p => !definedFieldKeys.has(p.key))
         .map(p => ({ key: p.key, label: p.label, table: false, quickView: false }));
       
-      const fullFieldList = [...sheetDefinition.displayFields, ...newFieldsToAdd];
+      const fullFieldList = [...definedFields, ...newFieldsToAdd];
       setFields(fullFieldList);
     }
   }, [isOpen, sheetDefinition]);
 
   const handleToggle = (index: number, view: 'table' | 'quickView') => {
-    const newFields = [...fields];
-    newFields[index][view] = !newFields[index][view];
-    setFields(newFields);
+    setFields(currentFields => {
+      const newFields = [...currentFields];
+      newFields[index] = { ...newFields[index], [view]: !newFields[index][view] };
+      return newFields;
+    });
   };
 
   const handleMove = (index: number, direction: 'up' | 'down') => {
@@ -88,14 +98,46 @@ export function ColumnCustomizationSheet({
       setFields(newFields);
     }
   };
-
-  const handleSaveChanges = () => {
-    onSave({
+  
+  const handleApplyToOne = async () => {
+    const newDefinition: SheetDefinition = {
       ...sheetDefinition,
       displayFields: fields,
-    });
+    };
+    onSave(newDefinition);
     onOpenChange(false);
+  }
+
+  const handleApplyToAll = async () => {
+    if (!isOnline) {
+      toast({ title: 'Offline', description: 'This action requires an internet connection.', variant: 'destructive' });
+      return;
+    }
+    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
+    const templateFields = fields; // The currently configured fields become the template
+
+    for (const sheetName in newSheetDefinitions) {
+        newSheetDefinitions[sheetName] = {
+            ...newSheetDefinitions[sheetName],
+            displayFields: templateFields,
+        };
+    }
+    
+    const newSettings: AppSettings = {
+        ...appSettings,
+        sheetDefinitions: newSheetDefinitions,
+    };
+    
+    try {
+        await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
+        setAppSettings(newSettings);
+        toast({ title: "Layout Applied", description: "Column settings have been applied to all sheets for all users."});
+        onOpenChange(false);
+    } catch (e) {
+        toast({ title: "Error", description: "Could not save settings to the database.", variant: "destructive" });
+    }
   };
+
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -103,12 +145,12 @@ export function ColumnCustomizationSheet({
         <SheetHeader>
           <SheetTitle>Customize Columns for '{sheetDefinition?.name}'</SheetTitle>
           <SheetDescription>
-            Drag to reorder columns, or use switches to control visibility in the main table and quick view panel.
+            Drag to reorder, or use switches to control visibility. Changes will affect all users.
           </SheetDescription>
         </SheetHeader>
         <div className="flex-grow overflow-hidden flex flex-col">
           <div className="flex items-center px-4 py-2 border-b font-medium text-sm">
-            <div className="w-10"></div>
+            <div className="w-16"></div>
             <div className="flex-1">Field</div>
             <div className="w-24 text-center">Table</div>
             <div className="w-24 text-center">Quick View</div>
@@ -117,7 +159,7 @@ export function ColumnCustomizationSheet({
             <div className="space-y-1 p-2">
               {fields.map((field, index) => (
                 <div key={field.key} className="flex items-center p-2 rounded-md hover:bg-muted/50">
-                  <div className="flex flex-col items-center w-10">
+                  <div className="flex flex-col items-center w-16">
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMove(index, 'up')} disabled={index === 0}>
                         <ArrowUp className="h-4 w-4" />
                     </Button>
@@ -145,11 +187,14 @@ export function ColumnCustomizationSheet({
             </div>
           </ScrollArea>
         </div>
-        <SheetFooter>
+        <SheetFooter className="sm:justify-between items-center pt-4 border-t">
           <SheetClose asChild>
             <Button variant="outline">Cancel</Button>
           </SheetClose>
-          <Button onClick={handleSaveChanges}>Save Changes</Button>
+          <div className="flex gap-2">
+            <Button variant="secondary" onClick={handleApplyToAll}>Apply to All Sheets</Button>
+            <Button onClick={handleApplyToOne}>Apply to This Sheet</Button>
+          </div>
         </SheetFooter>
       </SheetContent>
     </Sheet>
