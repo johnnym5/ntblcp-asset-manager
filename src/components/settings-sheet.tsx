@@ -11,6 +11,12 @@ import {
   SheetFooter,
   SheetClose,
 } from '@/components/ui/sheet';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -21,10 +27,11 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2 } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon } from 'lucide-react';
 import { SheetDefinitionForm } from './sheet-definition-form';
 import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
+import { UserManagement } from './admin/user-management';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -119,15 +126,11 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     const newSheetDefinitions = { ...localSettings.sheetDefinitions };
     let newEnabledSheets = [...localSettings.enabledSheets];
     
-    // If it's a rename, remove old entry and update enabled sheets
     if (originalSheetName && originalSheetName !== sheet.name) {
       delete newSheetDefinitions[originalSheetName];
       newEnabledSheets = newEnabledSheets.map(s => s === originalSheetName ? sheet.name : s);
     }
     
-    newSheetDefinitions[sheet.name] = sheet;
-    
-    // If it's a new sheet, make sure it's enabled
     if (!originalSheetName && !newEnabledSheets.includes(sheet.name)) {
       newEnabledSheets.push(sheet.name);
     }
@@ -194,47 +197,48 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="flex flex-col">
+        <SheetContent className="w-full sm:max-w-2xl flex flex-col">
           <SheetHeader>
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
               Manage application settings and preferences.
             </SheetDescription>
           </SheetHeader>
-          <ScrollArea className="flex-1 -mx-6 px-6 py-4">
-            <div className="space-y-6">
-
-              {canModifyData && (
+          <Tabs defaultValue={isAdmin ? "general" : "account"} className="flex-1 flex flex-col overflow-y-hidden">
+            <TabsList className="grid w-full grid-cols-2">
+                <TabsTrigger value="general"><SettingsIcon className="mr-2" />General</TabsTrigger>
+                <TabsTrigger value="account"><UserCog className="mr-2" />Account</TabsTrigger>
+            </TabsList>
+            <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
                   <h3 className="text-lg font-medium mb-4">Data Management</h3>
                   <div className="rounded-lg border p-3 space-y-2">
-                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting}>
+                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting || !canModifyData}>
                       <FileUp className="mr-2 h-4 w-4" /> Import from Excel
                     </Button>
-                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets}>
+                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || !canModifyData}>
                       <FileDown className="mr-2 h-4 w-4" /> Export to Excel
                     </Button>
-                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset}>
+                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={!canModifyData}>
                       <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
                     </Button>
                     <Separator className="my-2"/>
-                    <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets}>
+                    <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || !canModifyData}>
                       <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
                     </Button>
                   </div>
                 </div>
-              )}
               
-              <div>
-                <h3 className="text-lg font-medium mb-4">Appearance</h3>
-                <div className="rounded-lg border p-3 flex justify-around">
-                    <Button variant="outline" size="icon" onClick={() => setTheme('light')}><Sun /></Button>
-                    <Button variant="outline" size="icon" onClick={() => setTheme('dark')}><Moon /></Button>
-                    <Button variant="outline" size="icon" onClick={() => setTheme('system')}><Database /></Button>
+                <div>
+                    <h3 className="text-lg font-medium mb-4">Appearance</h3>
+                    <div className="rounded-lg border p-3 flex justify-around">
+                        <Button variant="outline" size="icon" onClick={() => setTheme('light')}><Sun /></Button>
+                        <Button variant="outline" size="icon" onClick={() => setTheme('dark')}><Moon /></Button>
+                        <Button variant="outline" size="icon" onClick={() => setTheme('system')}><Database /></Button>
+                    </div>
                 </div>
-              </div>
 
-              {isAdmin && (
+                {isAdmin && (
                 <>
                   <Separator/>
                   <div>
@@ -293,16 +297,25 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                 </>
               )}
 
-              {!isGuest && (
+            </TabsContent>
+            <TabsContent value="account" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div className="pt-4">
                   <h3 className="text-lg font-medium mb-4">Account</h3>
-                  <div className="rounded-lg border p-3">
-                    <Button variant="outline" className="w-full justify-start" onClick={() => { onOpenChange(false); openChangePassword(); }}>Reset Password</Button>
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <Button variant="outline" className="w-full justify-start" onClick={() => { onOpenChange(false); openChangePassword(); }} disabled={isGuest}><KeyRound className="mr-2"/>Change Password</Button>
                   </div>
                 </div>
-              )}
-            </div>
-          </ScrollArea>
+                {isAdmin && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">User Management</h3>
+                    <div className="rounded-lg border p-3">
+                      <UserManagement />
+                    </div>
+                  </div>
+                )}
+            </TabsContent>
+          </Tabs>
+
           <SheetFooter className="mt-auto pt-4 border-t">
             <SheetClose asChild><Button variant="outline">Cancel</Button></SheetClose>
             {isAdmin && <Button onClick={handleSaveChanges} disabled={!isOnline}>Save Admin Changes</Button>}
@@ -319,4 +332,3 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     </>
   );
 }
-

@@ -53,14 +53,19 @@ export interface Asset {
 }
 
 
-export interface UserProfile {
-  uid: string;
-  email: string | null;
-  displayName: string | null;
-  photoURL?: string | null;
-  role: 'admin' | 'user' | 'guest';
-  // You can add other fields like 'state' or 'zone' if needed
-  state?: string;
+export interface AuthorizedUser {
+  displayName: string;
+  loginName: string;
+  states: string[];
+  isAdmin: boolean;
+  isGuest?: boolean;
+  password?: string;
+  passwordChanged?: boolean;
+}
+
+
+export interface UserProfile extends AuthorizedUser {
+  state: string; // The specific state the user is currently logged into.
 }
 
 // New types for detailed inbox

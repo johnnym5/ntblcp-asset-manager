@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Table,
   TableBody,
@@ -18,70 +18,84 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, KeyRound } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { getAllUserProfiles, updateUserRole } from '@/lib/firestore';
-import type { UserProfile } from '@/lib/types';
+import { AUTHORIZED_USERS } from '@/lib/authorized-users';
+import type { AuthorizedUser, UserProfile } from '@/lib/types';
 import { useAuth } from '@/contexts/auth-context';
 
 export function UserManagement() {
-  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [users, setUsers] = useState<AuthorizedUser[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isSaving, setIsSaving] = useState<string | null>(null); // Store UID of user being saved
   const { userProfile: adminProfile } = useAuth();
   const { toast } = useToast();
 
-  const fetchUsers = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const userProfiles = await getAllUserProfiles();
-      setUsers(userProfiles);
-    } catch (error) {
-      toast({
-        title: 'Error fetching users',
-        description: (error as Error).message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
   useEffect(() => {
-    fetchUsers();
-  }, [fetchUsers]);
+    // In this auth model, the user list is static from the code.
+    setUsers(AUTHORIZED_USERS);
+    setIsLoading(false);
+  }, []);
 
-  const handleRoleChange = async (uid: string, role: 'admin' | 'user' | 'guest') => {
-    if (adminProfile?.uid === uid) {
+  const handleRoleChange = async (loginName: string, role: 'admin' | 'user' | 'guest') => {
+    // This is a UI-only representation for now. A real implementation
+    // would update a database.
+    toast({
+      title: 'Action Not Implemented',
+      description: `In a real app, this would change ${loginName}'s role to ${role}.`,
+    });
+  };
+
+  const handlePasswordReset = (userToReset: AuthorizedUser) => {
+    if (adminProfile?.loginName === userToReset.loginName) {
       toast({
-        title: 'Action Denied',
-        description: 'You cannot change your own role.',
-        variant: 'destructive'
+        title: "Action Denied",
+        description: "You cannot reset your own password here. Use the 'Change Password' option.",
+        variant: 'destructive',
       });
       return;
     }
-    
-    setIsSaving(uid);
+
+    // Since we don't have a database of users, we fake this by manipulating
+    // the user profile in the viewer's (admin's) local storage.
+    // This is a conceptual demonstration. A real app would have a DB.
     try {
-      await updateUserRole(uid, role);
-      // Update local state to reflect change immediately
-      setUsers(prevUsers => prevUsers.map(user => 
-        user.uid === uid ? { ...user, role } : user
-      ));
-      toast({
-        title: 'Role Updated',
-        description: `User role has been successfully changed to ${role}.`,
-      });
-    } catch (error) {
-      toast({
-        title: 'Error updating role',
-        description: (error as Error).message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsSaving(null);
+        // Find if this user's profile is in the browser's local storage
+        const allLocalStorageItems = { ...localStorage };
+        let userProfileKey: string | null = null;
+        let userProfileData: UserProfile | null = null;
+
+        // This is inefficient but necessary without a user database.
+        for (const key in allLocalStorageItems) {
+            if (key.includes('ntblcp-user-profile')) {
+                const profile = JSON.parse(allLocalStorageItems[key]);
+                if (profile.loginName === userToReset.loginName) {
+                    userProfileKey = key;
+                    userProfileData = profile;
+                    break;
+                }
+            }
+        }
+
+        if (userProfileKey && userProfileData) {
+            // Found the user's profile, reset the password flag
+            userProfileData.passwordChanged = false;
+            userProfileData.password = "0000"; // Reset to default
+            localStorage.setItem(userProfileKey, JSON.stringify(userProfileData));
+             toast({
+              title: 'Password Reset',
+              description: `${userToReset.displayName}'s password has been reset. They will be prompted to create a new one on their next login.`,
+            });
+        } else {
+             toast({
+              title: 'User Has Not Logged In',
+              description: `Cannot reset password for ${userToReset.displayName} because they have not logged into this browser before.`,
+              variant: 'destructive'
+            });
+        }
+    } catch (e) {
+        toast({ title: 'Error', description: 'Could not reset password due to a local storage error.', variant: 'destructive' });
     }
-  };
+  }
 
   if (isLoading) {
     return (
@@ -97,38 +111,37 @@ export function UserManagement() {
         <TableHeader>
           <TableRow>
             <TableHead>Display Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Assigned State</TableHead>
-            <TableHead className="w-[180px]">Role</TableHead>
+            <TableHead>Assigned State(s)</TableHead>
+            <TableHead>Role</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {users.map(user => (
-            <TableRow key={user.uid}>
+            <TableRow key={user.loginName}>
               <TableCell className="font-medium">{user.displayName}</TableCell>
-              <TableCell>{user.email}</TableCell>
-              <TableCell>{user.state}</TableCell>
+              <TableCell className="text-muted-foreground">{user.states.join(', ')}</TableCell>
               <TableCell>
-                {isSaving === user.uid ? (
-                    <div className="flex items-center justify-center">
-                        <Loader2 className="h-5 w-5 animate-spin" />
-                    </div>
-                ) : (
-                    <Select
-                        value={user.role}
-                        onValueChange={(value) => handleRoleChange(user.uid, value as any)}
-                        disabled={adminProfile?.uid === user.uid}
-                    >
-                        <SelectTrigger>
-                            <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="admin">Admin</SelectItem>
-                            <SelectItem value="user">User</SelectItem>
-                            <SelectItem value="guest">Guest</SelectItem>
-                        </SelectContent>
-                    </Select>
-                )}
+                <Select
+                    value={user.isAdmin ? 'admin' : (user.isGuest ? 'guest' : 'user')}
+                    onValueChange={(value) => handleRoleChange(user.loginName, value as any)}
+                    disabled={adminProfile?.loginName === user.loginName}
+                >
+                    <SelectTrigger className="w-[120px]">
+                        <SelectValue placeholder="Select role" />
+                    </SelectTrigger>
+                    <SelectContent>
+                        <SelectItem value="admin">Admin</SelectItem>
+                        <SelectItem value="user">User</SelectItem>
+                        <SelectItem value="guest">Guest</SelectItem>
+                    </SelectContent>
+                </Select>
+              </TableCell>
+              <TableCell className="text-right">
+                <Button variant="ghost" size="sm" onClick={() => handlePasswordReset(user)} disabled={user.isGuest}>
+                    <KeyRound className="mr-2 h-4 w-4" />
+                    Reset Pass
+                </Button>
               </TableCell>
             </TableRow>
           ))}
