@@ -82,7 +82,7 @@ export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
     'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received',
     'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)',
-    'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
+    'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)'
   ],
   'MOTORCYCLES-C19RM': [
     'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class',
@@ -132,3 +132,4 @@ export const HEADER_DEFINITIONS: { [key: string]: string[] } = {
     'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)', 'Comments'
   ]
 };
+
