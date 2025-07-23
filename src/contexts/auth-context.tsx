@@ -45,15 +45,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
         if (savedProfileJson) {
             const savedProfile: UserProfile = JSON.parse(savedProfileJson);
-            // Re-validate that the user is still in the authorized list.
-            const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === savedProfile.loginName.toLowerCase());
+            const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === savedProfile.loginName?.toLowerCase());
             if (authorizedUser) {
-              // The user is valid. Use the profile from local storage as the source of truth,
-              // as it contains the potentially updated password.
               setUserProfile(savedProfile);
               setGlobalStateFilter(savedProfile.state);
             } else {
-              // The user was removed from the authorized list in the code.
               localStorage.removeItem('ntblcp-user-profile');
             }
         }
@@ -73,19 +69,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const authorizedUser = AUTHORIZED_USERS.find(u => u.displayName === profile.displayName);
     if (!authorizedUser) return;
 
-    // The user's saved profile is the source of truth for password.
-    const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
-    const savedProfile = savedProfileJson ? JSON.parse(savedProfileJson) : null;
-
-    let finalPassword = profile.password || authorizedUser.password;
-    let finalPasswordChanged = profile.passwordChanged || authorizedUser.passwordChanged;
-    
-    // If a saved profile exists for this user, use its password details.
-    if (savedProfile && savedProfile.loginName === authorizedUser.loginName) {
-        finalPassword = savedProfile.password;
-        finalPasswordChanged = savedProfile.passwordChanged;
+    // Check local storage for an existing profile for this user
+    let existingProfile = null;
+    try {
+        const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
+        if (savedProfileJson) {
+            const savedProfile = JSON.parse(savedProfileJson);
+            if (savedProfile.loginName === authorizedUser.loginName) {
+                existingProfile = savedProfile;
+            }
+        }
+    } catch (e) {
+        console.error("Could not read user profile from storage", e);
     }
-
+    
+    // Prioritize existing profile's password details, otherwise use defaults from code.
+    const finalPassword = existingProfile?.password ?? authorizedUser.password;
+    const finalPasswordChanged = existingProfile?.passwordChanged ?? authorizedUser.passwordChanged;
+    
     const fullProfile: UserProfile = {
       ...authorizedUser,
       state: profile.state,
