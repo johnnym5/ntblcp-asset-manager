@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -435,13 +434,13 @@ export default function AssetList() {
   }, [lockAssetList, isAdmin, dataSource]);
   
   const handleViewAsset = (asset: Asset) => {
-    setSelectedAsset(assets.find(a => a.id === asset.id));
+    setSelectedAsset(asset);
     setIsFormReadOnly(true);
     setIsFormOpen(true);
   };
 
   const handleEditAsset = (asset: Asset) => {
-    setSelectedAsset(assets.find(a => a.id === asset.id));
+    setSelectedAsset(asset);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
   };

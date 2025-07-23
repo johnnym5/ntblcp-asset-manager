@@ -122,15 +122,6 @@ export async function parseExcelFile(
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, raw: true, defval: null });
 
-        // A map to quickly find existing assets to prevent duplicates.
-        const existingAssetByIdentifiers = new Map<string, Asset>();
-        existingAssets.forEach(asset => {
-             const key = `${String(asset.assetIdCode || '').trim()}-${String(asset.serialNumber || '').trim()}`.toLowerCase();
-            if (key !== '-') {
-                existingAssetByIdentifiers.set(key, asset);
-            }
-        });
-
         for (const workbookSheetName of workbook.SheetNames) {
             const normalizedSheetName = normalizeSheetNameForComparison(workbookSheetName);
             
@@ -168,8 +159,8 @@ export async function parseExcelFile(
                     const field = COLUMN_TO_ASSET_FIELD_MAP[header];
                     const cellValue = row[index];
 
-                    if (field && cellValue !== null && String(cellValue).trim() !== '') {
-                        assetObject[field] = cellValue;
+                    if (field) {
+                        assetObject[field] = cellValue ?? null;
                     }
                 });
 
@@ -229,9 +220,10 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
             const row: { [key: string]: any } = {};
             headerArray.forEach(header => {
                 const normalizedHeader = normalizeHeader(header);
-                const field = COLUMN_TO_ASSET_FIELD_MAP[normalizedHeader];
+                const field = Object.keys(COLUMN_TO_ASSET_FIELD_MAP).find(k => k === normalizedHeader);
                 if (field) {
-                   row[header] = asset[field] ?? '';
+                   const assetKey = COLUMN_TO_ASSET_FIELD_MAP[field];
+                   row[header] = asset[assetKey] ?? '';
                 }
             });
             row["Verified Status"] = asset.verifiedStatus || 'Unverified';
