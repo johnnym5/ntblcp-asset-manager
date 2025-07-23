@@ -225,6 +225,11 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     <ReadOnlyField label="Condition" value={asset.condition} />
                 </div>
 
+                 <div className="space-y-2">
+                    <Label>Remarks/Comments</Label>
+                    <p className="text-sm p-3 bg-muted rounded-md min-h-24 whitespace-pre-wrap">{asset.remarks ?? <span className="text-muted-foreground/70">N/A</span>}</p>
+                </div>
+
                 <div className="space-y-2">
                     <Label htmlFor="quick-view-status">Verified Status</Label>
                     <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
@@ -240,7 +245,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 </div>
 
                 <div className="space-y-2">
-                    <Label htmlFor="quick-view-remarks">Remarks/Comments</Label>
+                    <Label htmlFor="quick-view-remarks">Remarks/Comments (Editable)</Label>
                     <Textarea
                       id="quick-view-remarks"
                       value={quickViewRemarks}
