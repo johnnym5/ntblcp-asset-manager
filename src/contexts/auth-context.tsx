@@ -48,12 +48,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === savedProfile.loginName.toLowerCase());
             
             if (authorizedUser) {
-                // Restore the valid session, ensuring password is included
-                const restoredProfile = { ...savedProfile };
-                if (!restoredProfile.password) {
-                  // If password somehow doesn't exist in local storage, fetch from default
-                  restoredProfile.password = authorizedUser.password;
-                }
+                // Restore the valid session, using the saved password if it exists
+                const restoredProfile = { ...authorizedUser, ...savedProfile };
                 setUserProfile(restoredProfile);
                 setGlobalStateFilter(savedProfile.state);
             } else {

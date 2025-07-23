@@ -460,10 +460,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                            <FormField control={form.control} name="dateReceived" render={({ field }) => (
                                 <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                             )} />
-                           <div className="space-y-2">
-                            <Label>Last Modified</Label>
-                            <p className="text-sm text-muted-foreground h-10 flex items-center">{asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p>
-                           </div>
+                           <ReadOnlyField label="Last Modified" value={asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
                         </div>
                     </AccordionContent>
                   </AccordionItem>
@@ -489,4 +486,3 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     </Sheet>
   );
 }
-
