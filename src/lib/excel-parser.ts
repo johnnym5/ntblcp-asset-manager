@@ -1,6 +1,6 @@
 
 import * as XLSX from 'xlsx';
-import type { Asset, AppSettings } from './types';
+import type { Asset, AppSettings, SheetDefinition } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
 /**
@@ -10,7 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
  * @returns The normalized header string.
  */
 const normalizeHeader = (header: any): string => {
-    return String(header || '').trim().toUpperCase().replace(/\s+/g, ' ');
+    if (header === null || header === undefined) return '';
+    return String(header).trim().toUpperCase().replace(/\s+/g, ' ');
 };
 
 /**
@@ -111,15 +112,18 @@ export async function parseExcelFile(
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
 
         for (const sheetName of workbook.SheetNames) {
-            const canonicalSheetName = enabledSheets.find(s => s.toLowerCase() === sheetName.toLowerCase());
+            // **RELIABILITY FIX**: Instead of an exact match, check if the sheet name in the file
+            // *contains* one of the official, enabled sheet names. This is more flexible.
+            const canonicalSheetName = enabledSheets.find(s => sheetName.toLowerCase().includes(s.toLowerCase()));
             
             if (!canonicalSheetName) {
-                continue; // Skip sheets not in our enabled list
+                continue; // Skip sheets that don't match our enabled list.
             }
 
             const sheet = workbook.Sheets[sheetName];
             // Get data as an array of arrays, which is more robust for finding headers.
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+            // Using { raw: false } ensures we get formatted text like dates, solving "yes/no" issues.
+            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
             
             const headerRowIndex = findHeaderRowIndex(sheetData);
 
@@ -128,26 +132,27 @@ export async function parseExcelFile(
                 continue;
             }
             
-            // Re-read the sheet from the header row onwards to get objects directly.
-            // This is more reliable than manual mapping.
-            const jsonData = XLSX.utils.sheet_to_json(sheet, { header: headerRowIndex + 1, defval: null });
+            const headerRow = sheetData[headerRowIndex];
+            const jsonData = sheetData.slice(headerRowIndex + 1);
 
             for (const row of jsonData) {
+                if (row.every(cell => cell === null)) continue; // Skip entirely empty rows
+
                 const assetObject: Partial<Asset> = { category: canonicalSheetName };
                 let hasData = false;
                 
-                for (const rawHeader in row) {
+                headerRow.forEach((rawHeader, colIndex) => {
                     const normalizedHeader = normalizeHeader(rawHeader);
                     const fieldName = COLUMN_TO_ASSET_FIELD_MAP[normalizedHeader];
                     
                     if (fieldName) {
-                        const cellValue = row[rawHeader] !== null ? String(row[rawHeader]).trim() : null;
+                        const cellValue = row[colIndex] !== null ? String(row[colIndex]).trim() : null;
                         if (cellValue) {
                            (assetObject as any)[fieldName] = cellValue;
                            hasData = true;
                         }
                     }
-                }
+                });
                 
                 // Ensure row has at least a description to be considered valid
                 if (hasData && assetObject.description) {
@@ -161,14 +166,13 @@ export async function parseExcelFile(
             }
         }
         if (newAssets.length === 0 && errors.length === 0) {
-            errors.push("No data found to import. Check if sheet names in the file match the enabled sheets in Settings.");
+            errors.push(`No data found to import. Please check if your Excel sheet names are similar to the enabled sheets in Settings: ${enabledSheets.join(', ')}`);
         }
     } catch (e) {
         console.error("Error parsing Excel file:", e);
         errors.push(e instanceof Error ? e.message : "An unknown error occurred during parsing.");
     }
     
-    // The simplified parser no longer updates existing assets, it only adds new ones.
     return { assets: newAssets, updatedAssets: [], skipped: 0, errors };
 }
 
@@ -189,7 +193,9 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
     
     for (const category in assetsByCategory) {
         const definition = sheetDefinitions[category];
-        const headerArray = definition?.headers?.length > 0 ? [...definition.headers] : Object.keys(COLUMN_TO_ASSET_FIELD_MAP);
+        if (!definition) continue;
+
+        const headerArray = definition.headers?.length > 0 ? [...definition.headers] : Object.keys(COLUMN_TO_ASSET_FIELD_MAP);
         
         // Ensure verification columns are added
         if (!headerArray.includes("Verified Status")) headerArray.push("Verified Status");
@@ -230,8 +236,8 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
 }
 
 
-export async function parseExcelForTemplate(file: File): Promise<{ name: string; headers: string[], displayFields: (keyof Asset)[] }[]> {
-  const templates: { name: string; headers: string[], displayFields: (keyof Asset)[] }[] = [];
+export async function parseExcelForTemplate(file: File): Promise<SheetDefinition[]> {
+  const templates: SheetDefinition[] = [];
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
 
