@@ -3,10 +3,8 @@
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAppState } from './app-state-context';
-import { AUTHORIZED_USERS } from '@/lib/authorized-users';
-import type { AuthorizedUser } from '@/lib/authorized-users';
-import { clearAssets as clearLocalAssets } from '@/lib/idb';
-
+import type { AuthorizedUser } from '@/lib/types';
+import { updateSettings } from '@/lib/firestore';
 
 export interface UserProfile extends AuthorizedUser {
   state: string; // The specific state the user is currently logged into.
@@ -17,7 +15,7 @@ interface AuthContextType {
   loading: boolean;
   profileSetupComplete: boolean;
   authInitialized: boolean;
-  login: (profile: { displayName: string, state: string, role: 'admin' | 'user' | 'guest', password?: string, passwordChanged?: boolean }) => void;
+  login: (profile: { displayName: string, state: string, password?: string }) => void;
   updatePassword: (newPassword: string) => void;
   logout: () => void;
 }
@@ -37,7 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { setAssets, setGlobalStateFilter } = useAppState();
+  const { setAssets, setGlobalStateFilter, appSettings } = useAppState();
 
   useEffect(() => {
     const initializeAuth = () => {
@@ -45,7 +43,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
         if (savedProfileJson) {
             const savedProfile: UserProfile = JSON.parse(savedProfileJson);
-            const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === savedProfile.loginName?.toLowerCase());
+            const authorizedUser = appSettings.authorizedUsers.find(u => u.loginName === savedProfile.loginName?.toLowerCase());
             if (authorizedUser) {
               setUserProfile(savedProfile);
               setGlobalStateFilter(savedProfile.state);
@@ -62,11 +60,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     };
     
-    initializeAuth();
-  }, [setGlobalStateFilter]);
+    // Wait until app settings (which contain users) are loaded
+    if (appSettings.authorizedUsers.length > 0) {
+      initializeAuth();
+    }
+  }, [setGlobalStateFilter, appSettings.authorizedUsers]);
 
-  const login = (profile: { displayName: string, state: string, role: 'admin' | 'user' | 'guest', password?: string, passwordChanged?: boolean }) => {
-    const authorizedUser = AUTHORIZED_USERS.find(u => u.displayName === profile.displayName);
+  const login = (profile: { displayName: string, state: string, password?: string }) => {
+    const authorizedUser = appSettings.authorizedUsers.find(u => u.displayName === profile.displayName);
     if (!authorizedUser) return;
 
     // Check local storage for an existing profile for this user
@@ -83,7 +84,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Could not read user profile from storage", e);
     }
     
-    // Prioritize existing profile's password details, otherwise use defaults from code.
     const finalPassword = existingProfile?.password ?? authorizedUser.password;
     const finalPasswordChanged = existingProfile?.passwordChanged ?? authorizedUser.passwordChanged;
     
@@ -108,6 +108,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         };
         localStorage.setItem('ntblcp-user-profile', JSON.stringify(updatedProfile));
         setUserProfile(updatedProfile);
+        
+        // Also update this in the global settings state so it can be synced
+        const newUsers = appSettings.authorizedUsers.map(u => u.loginName === userProfile.loginName ? updatedProfile : u);
+        updateSettings({ authorizedUsers: newUsers });
     }
   };
 

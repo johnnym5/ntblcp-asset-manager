@@ -4,8 +4,9 @@
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { HEADER_DEFINITIONS, TARGET_SHEETS } from '@/lib/constants';
-import type { Asset, AppSettings, SheetDefinition } from '@/lib/types';
+import type { Asset, AppSettings, SheetDefinition, AuthorizedUser } from '@/lib/types';
 import { getSettings, listenToSettings } from '@/lib/firestore';
+import { AUTHORIZED_USERS } from '@/lib/authorized-users';
 
 
 export interface SortConfig {
@@ -88,10 +89,11 @@ interface AppStateContextType {
 // Convert initial constants to the new AppSettings format
 const initialSheetDefinitions: Record<string, SheetDefinition> = {};
 TARGET_SHEETS.forEach(sheetName => {
+  const definition = HEADER_DEFINITIONS[sheetName];
   initialSheetDefinitions[sheetName] = {
     name: sheetName,
-    headers: HEADER_DEFINITIONS[sheetName] || [],
-    displayFields: ['sn', 'description', 'assetIdCode', 'assignee', 'verifiedStatus', 'lastModified'],
+    headers: definition?.headers || [],
+    displayFields: definition?.displayFields || [],
   };
 });
 
@@ -100,6 +102,7 @@ const defaultAppSettings: AppSettings = {
   autoSyncEnabled: true,
   enabledSheets: [...TARGET_SHEETS],
   sheetDefinitions: initialSheetDefinitions,
+  authorizedUsers: AUTHORIZED_USERS,
 };
 
 

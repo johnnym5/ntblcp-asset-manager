@@ -22,7 +22,8 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import { AUTHORIZED_USERS, type AuthorizedUser } from '@/lib/authorized-users';
+import type { AuthorizedUser } from '@/lib/types';
+import { useAppState } from '@/contexts/app-state-context';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 export default function UserProfileSetup() {
@@ -32,12 +33,13 @@ export default function UserProfileSetup() {
   const [error, setError] = useState<string | null>(null);
   const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
   const { login } = useAuth();
+  const { appSettings } = useAppState();
   
   useEffect(() => {
     setError(null);
     const lowerCaseUsername = username.trim().toLowerCase();
     
-    const user = AUTHORIZED_USERS.find(u => u.loginName === lowerCaseUsername);
+    const user = appSettings.authorizedUsers.find(u => u.loginName === lowerCaseUsername);
     setFoundUser(user || null);
 
     if (user) {
@@ -49,7 +51,7 @@ export default function UserProfileSetup() {
     } else {
         setSelectedState('');
     }
-  }, [username]);
+  }, [username, appSettings.authorizedUsers]);
 
   const handleLogin = () => {
     if (!foundUser) {
@@ -61,8 +63,6 @@ export default function UserProfileSetup() {
       login({
         displayName: foundUser.displayName,
         state: selectedState,
-        role: 'guest',
-        passwordChanged: true,
       });
       return;
     }
@@ -80,9 +80,7 @@ export default function UserProfileSetup() {
     login({
         displayName: foundUser.displayName,
         state: selectedState,
-        role: foundUser.isAdmin ? 'admin' : 'user',
         password: foundUser.password,
-        passwordChanged: foundUser.passwordChanged,
     });
   };
   

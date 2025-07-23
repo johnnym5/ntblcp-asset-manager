@@ -115,4 +115,5 @@ export interface AppSettings {
   autoSyncEnabled: boolean;
   enabledSheets: string[];
   sheetDefinitions: Record<string, SheetDefinition>; // Key is the sheet name
+  authorizedUsers: AuthorizedUser[];
 }

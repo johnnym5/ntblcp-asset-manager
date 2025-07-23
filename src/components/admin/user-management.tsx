@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Table,
   TableBody,
@@ -10,143 +10,170 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
-import { Loader2, KeyRound } from 'lucide-react';
+import { Loader2, KeyRound, UserPlus, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { AUTHORIZED_USERS } from '@/lib/authorized-users';
 import type { AuthorizedUser, UserProfile } from '@/lib/types';
 import { useAuth } from '@/contexts/auth-context';
+import { useAppState } from '@/contexts/app-state-context';
+import { updateSettings } from '@/lib/firestore';
+import { UserEditForm } from './user-edit-form';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function UserManagement() {
-  const [users, setUsers] = useState<AuthorizedUser[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
   const { userProfile: adminProfile } = useAuth();
+  const { appSettings, setAppSettings, isOnline } = useAppState();
   const { toast } = useToast();
+  
+  const [isEditFormOpen, setIsEditFormOpen] = useState(false);
+  const [userToEdit, setUserToEdit] = useState<AuthorizedUser | null>(null);
+  const [userToDelete, setUserToDelete] = useState<AuthorizedUser | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  useEffect(() => {
-    // In this auth model, the user list is static from the code.
-    setUsers(AUTHORIZED_USERS);
-    setIsLoading(false);
-  }, []);
-
-  const handleRoleChange = async (loginName: string, role: 'admin' | 'user' | 'guest') => {
-    // This is a UI-only representation for now. A real implementation
-    // would update a database.
-    toast({
-      title: 'Action Not Implemented',
-      description: `In a real app, this would change ${loginName}'s role to ${role}.`,
-    });
+  const handleAddNewUser = () => {
+    setUserToEdit(null);
+    setIsEditFormOpen(true);
+  };
+  
+  const handleEditUser = (user: AuthorizedUser) => {
+    setUserToEdit(user);
+    setIsEditFormOpen(true);
   };
 
-  const handlePasswordReset = (userToReset: AuthorizedUser) => {
+  const handleSaveUser = async (userToSave: AuthorizedUser) => {
+    const newUsers = [...appSettings.authorizedUsers];
+    const existingUserIndex = newUsers.findIndex(u => u.loginName === userToSave.loginName);
+
+    if (existingUserIndex > -1) {
+      // Update existing user
+      newUsers[existingUserIndex] = userToSave;
+    } else {
+      // Add new user
+      newUsers.push(userToSave);
+    }
+    
+    const newSettings = { ...appSettings, authorizedUsers: newUsers };
+    setAppSettings(newSettings);
+    await updateSettings({ authorizedUsers: newUsers });
+
+    toast({ title: 'User Saved', description: `${userToSave.displayName} has been saved.` });
+    setIsEditFormOpen(false);
+  };
+
+  const handleDeleteUser = async () => {
+    if (!userToDelete) return;
+    setIsDeleting(true);
+
+    const newUsers = appSettings.authorizedUsers.filter(u => u.loginName !== userToDelete.loginName);
+    const newSettings = { ...appSettings, authorizedUsers: newUsers };
+
+    setAppSettings(newSettings);
+    await updateSettings({ authorizedUsers: newUsers });
+    
+    toast({ title: 'User Removed', description: `${userToDelete.displayName} has been removed from the system.` });
+    setUserToDelete(null);
+    setIsDeleting(false);
+  };
+  
+  const handlePasswordReset = async (userToReset: AuthorizedUser) => {
     if (adminProfile?.loginName === userToReset.loginName) {
       toast({
         title: "Action Denied",
-        description: "You cannot reset your own password here. Use the 'Change Password' option.",
+        description: "You cannot reset your own password here.",
         variant: 'destructive',
       });
       return;
     }
 
-    // Since we don't have a database of users, we fake this by manipulating
-    // the user profile in the viewer's (admin's) local storage.
-    // This is a conceptual demonstration. A real app would have a DB.
-    try {
-        // Find if this user's profile is in the browser's local storage
-        const allLocalStorageItems = { ...localStorage };
-        let userProfileKey: string | null = null;
-        let userProfileData: UserProfile | null = null;
-
-        // This is inefficient but necessary without a user database.
-        for (const key in allLocalStorageItems) {
-            if (key.includes('ntblcp-user-profile')) {
-                const profile = JSON.parse(allLocalStorageItems[key]);
-                if (profile.loginName === userToReset.loginName) {
-                    userProfileKey = key;
-                    userProfileData = profile;
-                    break;
-                }
-            }
-        }
-
-        if (userProfileKey && userProfileData) {
-            // Found the user's profile, reset the password flag
-            userProfileData.passwordChanged = false;
-            userProfileData.password = "0000"; // Reset to default
-            localStorage.setItem(userProfileKey, JSON.stringify(userProfileData));
-             toast({
-              title: 'Password Reset',
-              description: `${userToReset.displayName}'s password has been reset. They will be prompted to create a new one on their next login.`,
-            });
-        } else {
-             toast({
-              title: 'User Has Not Logged In',
-              description: `Cannot reset password for ${userToReset.displayName} because they have not logged into this browser before.`,
-              variant: 'destructive'
-            });
-        }
-    } catch (e) {
-        toast({ title: 'Error', description: 'Could not reset password due to a local storage error.', variant: 'destructive' });
-    }
-  }
-
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin" />
-      </div>
+    const newUsers = appSettings.authorizedUsers.map(u => 
+      u.loginName === userToReset.loginName 
+        ? { ...u, password: '0000', passwordChanged: false } 
+        : u
     );
-  }
+    const newSettings = { ...appSettings, authorizedUsers: newUsers };
+    
+    setAppSettings(newSettings);
+    await updateSettings({ authorizedUsers: newUsers });
 
+    toast({
+      title: 'Password Reset',
+      description: `${userToReset.displayName}'s password has been reset to the default.`,
+    });
+  }
+  
   return (
-    <div className="rounded-lg border">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Display Name</TableHead>
-            <TableHead>Assigned State(s)</TableHead>
-            <TableHead>Role</TableHead>
-            <TableHead className="text-right">Actions</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {users.map(user => (
-            <TableRow key={user.loginName}>
-              <TableCell className="font-medium">{user.displayName}</TableCell>
-              <TableCell className="text-muted-foreground">{user.states.join(', ')}</TableCell>
-              <TableCell>
-                <Select
-                    value={user.isAdmin ? 'admin' : (user.isGuest ? 'guest' : 'user')}
-                    onValueChange={(value) => handleRoleChange(user.loginName, value as any)}
-                    disabled={adminProfile?.loginName === user.loginName}
-                >
-                    <SelectTrigger className="w-[120px]">
-                        <SelectValue placeholder="Select role" />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="admin">Admin</SelectItem>
-                        <SelectItem value="user">User</SelectItem>
-                        <SelectItem value="guest">Guest</SelectItem>
-                    </SelectContent>
-                </Select>
-              </TableCell>
-              <TableCell className="text-right">
-                <Button variant="ghost" size="sm" onClick={() => handlePasswordReset(user)} disabled={user.isGuest}>
-                    <KeyRound className="mr-2 h-4 w-4" />
-                    Reset Pass
-                </Button>
-              </TableCell>
+    <div>
+      <div className="flex justify-end mb-4">
+        <Button onClick={handleAddNewUser} disabled={!isOnline}>
+          <UserPlus className="mr-2 h-4 w-4" /> Add New User
+        </Button>
+      </div>
+      <div className="rounded-lg border">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>Display Name</TableHead>
+              <TableHead>Login Name</TableHead>
+              <TableHead>Role</TableHead>
+              <TableHead className="text-right">Actions</TableHead>
             </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+          </TableHeader>
+          <TableBody>
+            {appSettings.authorizedUsers.map(user => (
+              <TableRow key={user.loginName}>
+                <TableCell className="font-medium">{user.displayName}</TableCell>
+                <TableCell className="text-muted-foreground">{user.loginName}</TableCell>
+                <TableCell>{user.isAdmin ? 'Admin' : (user.isGuest ? 'Guest' : 'User')}</TableCell>
+                <TableCell className="text-right space-x-1">
+                   <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)} disabled={!isOnline}>
+                    <Edit className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" onClick={() => handlePasswordReset(user)} disabled={user.isGuest || !isOnline}>
+                      <KeyRound className="h-4 w-4" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setUserToDelete(user)} disabled={adminProfile?.loginName === user.loginName || !isOnline}>
+                      <Trash2 className="h-4 w-4" />
+                  </Button>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+      
+      <UserEditForm 
+        isOpen={isEditFormOpen} 
+        onOpenChange={setIsEditFormOpen} 
+        user={userToEdit}
+        onSave={handleSaveUser}
+      />
+      
+      <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will permanently remove <strong>{userToDelete?.displayName}</strong> from the system. This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
+              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Yes, remove user
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

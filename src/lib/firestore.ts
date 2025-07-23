@@ -3,8 +3,9 @@
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Asset, AppSettings, SheetDefinition } from '@/lib/types';
+import type { Asset, AppSettings, SheetDefinition, AuthorizedUser } from '@/lib/types';
 import { HEADER_DEFINITIONS, TARGET_SHEETS } from './constants';
+import { AUTHORIZED_USERS } from './authorized-users';
 
 // --- Assets ---
 
@@ -86,18 +87,21 @@ const SETTINGS_DOC_ID = 'global';
 // Convert initial constants to the new AppSettings format
 const initialSheetDefinitions: Record<string, SheetDefinition> = {};
 TARGET_SHEETS.forEach(sheetName => {
+  const definition = HEADER_DEFINITIONS[sheetName];
   initialSheetDefinitions[sheetName] = {
     name: sheetName,
-    headers: HEADER_DEFINITIONS[sheetName] || [],
-    displayFields: ['sn', 'description', 'assetIdCode', 'assignee', 'verifiedStatus', 'lastModified'],
+    headers: definition?.headers || [],
+    displayFields: definition?.displayFields || [],
   };
 });
+
 
 const defaultAppSettings: AppSettings = {
   lockAssetList: true,
   autoSyncEnabled: true,
   enabledSheets: [...TARGET_SHEETS],
   sheetDefinitions: initialSheetDefinitions,
+  authorizedUsers: AUTHORIZED_USERS,
 };
 
 /**
@@ -108,9 +112,17 @@ export async function getSettings(): Promise<AppSettings> {
     const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
     const docSnap = await getDoc(settingsRef);
     if (docSnap.exists()) {
-        const data = docSnap.data();
+        const data = docSnap.data() as Partial<AppSettings>;
         // Merge with defaults to ensure all keys are present
-        return { ...defaultAppSettings, ...data } as AppSettings;
+        const mergedSettings = { ...defaultAppSettings, ...data };
+        
+        // Deep merge authorizedUsers, giving precedence to stored data but keeping defaults for new users.
+        const storedUsersMap = new Map((data.authorizedUsers || []).map(u => [u.loginName, u]));
+        const defaultUsers = defaultAppSettings.authorizedUsers.filter(u => !storedUsersMap.has(u.loginName));
+        mergedSettings.authorizedUsers = [...storedUsersMap.values(), ...defaultUsers];
+
+        return mergedSettings;
+
     } else {
         // If no settings exist, create them with default values
         await updateSettings(defaultAppSettings);
@@ -136,7 +148,16 @@ export function listenToSettings(callback: (settings: AppSettings | null) => voi
     const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
     const unsubscribe = onSnapshot(settingsRef, (doc) => {
         if (doc.exists()) {
-            callback({ ...defaultAppSettings, ...doc.data() } as AppSettings);
+            const data = doc.data() as Partial<AppSettings>;
+            // Merge with defaults to ensure all keys are present
+            const mergedSettings = { ...defaultAppSettings, ...data };
+            
+             // Deep merge authorizedUsers
+            const storedUsersMap = new Map((data.authorizedUsers || []).map(u => [u.loginName, u]));
+            const defaultUsers = defaultAppSettings.authorizedUsers.filter(u => !storedUsersMap.has(u.loginName));
+            mergedSettings.authorizedUsers = [...storedUsersMap.values(), ...defaultUsers];
+
+            callback(mergedSettings);
         } else {
             // If the document is deleted, we can fetch/create defaults.
             getSettings().then(settings => callback(settings));

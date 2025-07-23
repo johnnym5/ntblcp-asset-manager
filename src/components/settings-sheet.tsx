@@ -137,7 +137,10 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
 
     setLocalSettings(prev => ({
       ...prev,
-      sheetDefinitions: newSheetDefinitions,
+      sheetDefinitions: {
+        ...newSheetDefinitions,
+        [sheet.name]: sheet,
+      },
       enabledSheets: newEnabledSheets
     }));
   };
@@ -300,7 +303,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
             </TabsContent>
             <TabsContent value="account" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div className="pt-4">
-                  <h3 className="text-lg font-medium mb-4">Account</h3>
+                  <h3 className="text-lg font-medium mb-4">My Account</h3>
                   <div className="rounded-lg border p-3 space-y-2">
                     <Button variant="outline" className="w-full justify-start" onClick={() => { onOpenChange(false); openChangePassword(); }} disabled={isGuest}><KeyRound className="mr-2"/>Change Password</Button>
                   </div>
@@ -308,7 +311,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                 {isAdmin && (
                   <div>
                     <h3 className="text-lg font-medium mb-4">User Management</h3>
-                    <div className="rounded-lg border p-3">
+                    <div className="p-1">
                       <UserManagement />
                     </div>
                   </div>
