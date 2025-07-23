@@ -108,7 +108,7 @@ export async function parseExcelFile(
 
     try {
         const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, rawNumbers: false });
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
 
         for (const sheetName of workbook.SheetNames) {
             const canonicalSheetName = enabledSheets.find(s => s.toLowerCase() === sheetName.toLowerCase());
@@ -118,39 +118,39 @@ export async function parseExcelFile(
             }
 
             const sheet = workbook.Sheets[sheetName];
-            // Use raw: false to get formatted strings, not raw values. This is crucial.
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
+            // Get data as an array of arrays, which is more robust for finding headers.
+            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
             
             const headerRowIndex = findHeaderRowIndex(sheetData);
 
             if (headerRowIndex === -1) {
-                errors.push(`Could not find a valid header row in sheet: ${sheetName}. Skipping.`);
+                errors.push(`Could not find a valid header row in sheet: "${sheetName}". Skipping.`);
                 continue;
             }
             
-            const headers = sheetData[headerRowIndex].map(normalizeHeader);
-            const dataRows = sheetData.slice(headerRowIndex + 1);
+            // Re-read the sheet from the header row onwards to get objects directly.
+            // This is more reliable than manual mapping.
+            const jsonData = XLSX.utils.sheet_to_json(sheet, { header: headerRowIndex + 1, defval: null });
 
-            for (const row of dataRows) {
-                if (!Array.isArray(row) || row.every(cell => cell === null || String(cell).trim() === '')) {
-                    continue; // Skip empty rows
-                }
-
+            for (const row of jsonData) {
                 const assetObject: Partial<Asset> = { category: canonicalSheetName };
-                
                 let hasData = false;
-                headers.forEach((header, index) => {
-                    const fieldName = COLUMN_TO_ASSET_FIELD_MAP[header];
+                
+                for (const rawHeader in row) {
+                    const normalizedHeader = normalizeHeader(rawHeader);
+                    const fieldName = COLUMN_TO_ASSET_FIELD_MAP[normalizedHeader];
+                    
                     if (fieldName) {
-                        const cellValue = row[index] !== null ? String(row[index]).trim() : null;
+                        const cellValue = row[rawHeader] !== null ? String(row[rawHeader]).trim() : null;
                         if (cellValue) {
                            (assetObject as any)[fieldName] = cellValue;
                            hasData = true;
                         }
                     }
-                });
+                }
                 
-                if (hasData) {
+                // Ensure row has at least a description to be considered valid
+                if (hasData && assetObject.description) {
                    const newAsset: Asset = { 
                         id: uuidv4(), 
                         ...assetObject, 
@@ -189,7 +189,7 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
     
     for (const category in assetsByCategory) {
         const definition = sheetDefinitions[category];
-        const headerArray = definition ? [...definition.headers] : Object.keys(COLUMN_TO_ASSET_FIELD_MAP);
+        const headerArray = definition?.headers?.length > 0 ? [...definition.headers] : Object.keys(COLUMN_TO_ASSET_FIELD_MAP);
         
         // Ensure verification columns are added
         if (!headerArray.includes("Verified Status")) headerArray.push("Verified Status");
@@ -201,9 +201,12 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
             const row: { [key: string]: any } = {};
             headerArray.forEach(header => {
                 const normalizedHeader = normalizeHeader(header);
-                const field = Object.keys(COLUMN_TO_ASSET_FIELD_MAP).find(k => k === normalizedHeader);
-                if (field) {
-                   const assetKey = COLUMN_TO_ASSET_FIELD_MAP[field];
+                
+                // Find the key in the map that matches the normalized header
+                const mapKey = Object.keys(COLUMN_TO_ASSET_FIELD_MAP).find(k => k === normalizedHeader);
+                
+                if (mapKey) {
+                   const assetKey = COLUMN_TO_ASSET_FIELD_MAP[mapKey];
                    row[header] = asset[assetKey] ?? '';
                 }
             });
