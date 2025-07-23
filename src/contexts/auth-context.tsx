@@ -45,19 +45,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
         if (savedProfileJson) {
             const savedProfile: UserProfile = JSON.parse(savedProfileJson);
+            // If a profile is saved, we trust it and use it directly.
+            // This ensures the password saved in local storage is preserved.
             const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === savedProfile.loginName.toLowerCase());
-            
             if (authorizedUser) {
-                // Restore the valid session, honoring the locally saved password if it exists
-                const restoredProfile = { 
-                    ...authorizedUser, 
-                    ...savedProfile,
-                    password: savedProfile.password || authorizedUser.password, // Prioritize saved password
-                };
-                setUserProfile(restoredProfile);
-                setGlobalStateFilter(savedProfile.state);
+              setUserProfile(savedProfile);
+              setGlobalStateFilter(savedProfile.state);
             } else {
-                localStorage.removeItem('ntblcp-user-profile');
+              // The user is no longer in the authorized list.
+              localStorage.removeItem('ntblcp-user-profile');
             }
         }
       } catch (error) {
