@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -40,10 +41,10 @@ import { Textarea } from "@/components/ui/textarea";
 import type { Asset } from "@/lib/types";
 import { AlertCircle, Loader2, FileText, Check } from "lucide-react";
 import { TARGET_SHEETS } from "@/lib/constants";
-import { AssetChecklist } from "./asset-checklist";
+import { AssetChecklist } from "@/components/asset-checklist";
 import { useAuth } from "@/contexts/auth-context";
 import { addNotification } from "@/hooks/use-notifications";
-import { Label } from "./ui/label";
+import { Label } from "@/components/ui/label";
 
 const assetFormSchema = z.object({
   category: z.string({ required_error: "Please select a category." }),
@@ -82,7 +83,7 @@ interface AssetFormProps {
 const ReadOnlyField = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="space-y-1">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm">{value || <span className="text-muted-foreground/70">N/A</span>}</p>
+        <p className="text-sm">{value ?? <span className="text-muted-foreground/70">N/A</span>}</p>
     </div>
 );
 
@@ -268,7 +269,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <ReadOnlyField label="Date Received" value={asset.dateReceived ? String(asset.dateReceived) : 'N/A'} />
-                            <ReadOnlyField label="Verified Date" value={asset.verifiedDate || 'N/A'} />
+                            <ReadOnlyField label="Verified Date" value={asset.verifiedDate ?? 'N/A'} />
                         </div>
                          <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
                     </AccordionContent>
