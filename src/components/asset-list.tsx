@@ -39,6 +39,7 @@ import {
   FileText,
   ClipboardEdit,
   FolderSearch,
+  Cloud,
   CloudOff,
   CloudUpload,
   HardDrive,
@@ -1380,5 +1381,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-
