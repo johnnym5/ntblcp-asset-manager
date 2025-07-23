@@ -4,7 +4,7 @@
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { HEADER_DEFINITIONS, TARGET_SHEETS } from '@/lib/constants';
-import type { Asset, InboxMessageGroup, AppSettings, SheetDefinition } from '@/lib/types';
+import type { Asset, AppSettings, SheetDefinition } from '@/lib/types';
 import { getSettings, listenToSettings } from '@/lib/firestore';
 
 
@@ -23,11 +23,13 @@ export interface DataActions {
   hasAssets?: boolean;
 }
 
-export type DataSource = 'cloud' | 'local';
+export type DataSource = 'cloud' | 'local_locked';
 
 interface AppStateContextType {
   assets: Asset[];
   setAssets: Dispatch<SetStateAction<Asset[]>>;
+  offlineAssets: Asset[];
+  setOfflineAssets: Dispatch<SetStateAction<Asset[]>>;
   isOnline: boolean;
   setIsOnline: Dispatch<SetStateAction<boolean>>;
   dataSource: DataSource;
@@ -78,8 +80,6 @@ interface AppStateContextType {
   setDataActions: Dispatch<SetStateAction<DataActions>>;
 
   // Inbox
-  inboxMessages: InboxMessageGroup[];
-  setInboxMessages: Dispatch<SetStateAction<InboxMessageGroup[]>>;
   unreadInboxCount: number;
   setUnreadInboxCount: Dispatch<SetStateAction<number>>;
   autoSyncEnabled: boolean;
@@ -107,8 +107,9 @@ const AppStateContext = createContext<AppStateContextType | undefined>(undefined
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
   const [isOnline, setIsOnline] = useState(false);
-  const [dataSource, setDataSource] = useState<DataSource>('local');
+  const [dataSource, setDataSource] = useState<DataSource>('cloud');
   const [searchTerm, setSearchTerm] = useState('');
   const [globalStateFilter, setGlobalStateFilter] = useState('');
   
@@ -132,7 +133,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
   
-  const [inboxMessages, setInboxMessages] = useState<InboxMessageGroup[]>([]);
   const [unreadInboxCount, setUnreadInboxCount] = useState(0);
 
   // Effect for real-time settings
@@ -178,15 +178,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [isOnline]);
 
-  useEffect(() => {
-    if (!isOnline) {
-        setDataSource('local');
-    }
-  }, [isOnline]);
-
   const value = {
     assets,
     setAssets,
+    offlineAssets,
+    setOfflineAssets,
     isOnline,
     setIsOnline,
     dataSource,
@@ -221,8 +217,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setIsSyncing,
     dataActions,
     setDataActions,
-    inboxMessages,
-    setInboxMessages,
     unreadInboxCount,
     setUnreadInboxCount,
     autoSyncEnabled: appSettings.autoSyncEnabled,

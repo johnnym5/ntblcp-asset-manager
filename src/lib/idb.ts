@@ -3,12 +3,17 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Asset, UserProfile } from './types';
 
 const DB_NAME = 'ntblcp-asset-db';
-const DB_VERSION = 2; // Incremented version
+const DB_VERSION = 3; // Incremented version
 const ASSET_STORE_NAME = 'assets';
-const USER_PROFILE_STORE_NAME = 'userProfile'; // New store
+const OFFLINE_ASSET_STORE_NAME = 'offline-assets'; // New store for locked offline assets
+const USER_PROFILE_STORE_NAME = 'userProfile';
 
 interface AssetDB extends DBSchema {
   [ASSET_STORE_NAME]: {
+    key: string;
+    value: Asset;
+  };
+  [OFFLINE_ASSET_STORE_NAME]: {
     key: string;
     value: Asset;
   };
@@ -38,13 +43,18 @@ const getDb = (): Promise<IDBPDatabase<AssetDB>> | null => {
                     db.createObjectStore(USER_PROFILE_STORE_NAME, { keyPath: 'uid' });
                   }
                 }
+                if (oldVersion < 3) {
+                  if (!db.objectStoreNames.contains(OFFLINE_ASSET_STORE_NAME)) {
+                    db.createObjectStore(OFFLINE_ASSET_STORE_NAME, { keyPath: 'id' });
+                  }
+                }
             },
         });
     }
     return dbPromise;
 }
 
-// --- ASSET FUNCTIONS ---
+// --- SYNCABLE ASSET FUNCTIONS ---
 
 export const getLocalAssets = async (): Promise<Asset[]> => {
   const dbp = getDb();
@@ -68,7 +78,6 @@ export const saveAssets = async (assets: Asset[]): Promise<void> => {
     await tx.done;
   } catch (error) {
     console.error("Failed to save assets to IndexedDB", error);
-    // Optionally, notify the user about storage issues
   }
 };
 
@@ -81,6 +90,44 @@ export const clearAssets = async (): Promise<void> => {
   }
   catch (error) {
     console.error("Failed to clear assets from IndexedDB", error);
+  }
+};
+
+// --- LOCKED OFFLINE ASSET FUNCTIONS ---
+
+export const getLockedOfflineAssets = async (): Promise<Asset[]> => {
+  const dbp = getDb();
+  if (!dbp) return [];
+  try {
+    const db = await dbp;
+    return await db.getAll(OFFLINE_ASSET_STORE_NAME);
+  } catch (error) {
+    console.error("Failed to get locked offline assets from IndexedDB", error);
+    return [];
+  }
+};
+
+export const saveLockedOfflineAssets = async (assets: Asset[]): Promise<void> => {
+  const dbp = getDb();
+  if (!dbp) return;
+  try {
+    const db = await dbp;
+    const tx = db.transaction(OFFLINE_ASSET_STORE_NAME, 'readwrite');
+    await Promise.all(assets.map(asset => tx.store.put(asset)));
+    await tx.done;
+  } catch (error) {
+    console.error("Failed to save locked offline assets to IndexedDB", error);
+  }
+};
+
+export const clearLockedOfflineAssets = async (): Promise<void> => {
+  const dbp = getDb();
+  if (!dbp) return;
+  try {
+    const db = await dbp;
+    await db.clear(OFFLINE_ASSET_STORE_NAME);
+  } catch (error) {
+    console.error("Failed to clear locked offline assets from IndexedDB", error);
   }
 };
 

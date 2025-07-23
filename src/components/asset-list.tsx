@@ -41,7 +41,8 @@ import {
   FolderSearch,
   CloudOff,
   CloudUpload,
-  ChevronDown,
+  HardDrive,
+  Cloud,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -70,7 +71,7 @@ import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-for
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets } from "@/lib/firestore";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets } from "@/lib/idb";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, clearLockedOfflineAssets } from "@/lib/idb";
 import { cn } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 
@@ -188,28 +189,30 @@ export default function AssetList() {
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
+    offlineAssets, setOfflineAssets, dataSource, setDataSource,
     globalStateFilter, setGlobalStateFilter,
     itemsPerPage, setItemsPerPage,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
-    sortConfig, setSortConfig,
+    sortConfig,
     appSettings,
-    manualSyncTrigger, setManualSyncTrigger, isSyncing, setIsSyncing,
+    manualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
     searchTerm,
     autoSyncEnabled,
   } = useAppState();
 
-  const { enabledSheets } = appSettings;
-  const lockAssetList = appSettings.lockAssetList ?? true;
+  const { enabledSheets, lockAssetList } = appSettings;
 
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
+  
+  const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
 
   useEffect(() => {
     setCurrentPage(1);
     setSelectedCategories([]);
-  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter]);
+  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter, dataSource]);
   
   useEffect(() => {
     if (view === 'dashboard') {
@@ -260,7 +263,9 @@ export default function AssetList() {
     const loadInitialData = async () => {
         setIsLoading(true);
         const localAssets = await getLocalAssetsFromDb();
+        const localOfflineAssets = await getLockedOfflineAssets();
         setAssets(localAssets);
+        setOfflineAssets(localOfflineAssets);
         setIsLoading(false);
 
         if (isOnline && authInitialized && !isGuest) {
@@ -271,19 +276,17 @@ export default function AssetList() {
     if (authInitialized) {
         loadInitialData();
     }
-  }, [authInitialized, performSync, setAssets, isOnline, isGuest]);
+  }, [authInitialized, performSync, setAssets, isOnline, isGuest, setOfflineAssets]);
   
   useEffect(() => {
     if (!isOnline) return;
 
-    // Only run sync if it's a manual trigger OR if auto-sync is enabled.
-    // The initial state of manualSyncTrigger (0) should not cause a sync.
     const shouldSync = manualSyncTrigger > 0 || autoSyncEnabled;
     
-    if (shouldSync && authInitialized && !isGuest) {
+    if (shouldSync && authInitialized && !isGuest && dataSource === 'cloud') {
         performSync();
     }
-  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync, isGuest]);
+  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync, isGuest, dataSource]);
   
   useEffect(() => {
     setStatusOptions([
@@ -294,6 +297,7 @@ export default function AssetList() {
   }, [setStatusOptions]);
 
   const allAssetsForFiltering = useMemo(() => {
+    const currentAssets = dataSource === 'cloud' ? assets : offlineAssets;
     if (isAdmin && globalStateFilter && globalStateFilter !== 'All') {
         const zones: Record<string, string[]> = NIGERIAN_ZONES;
         const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
@@ -301,14 +305,14 @@ export default function AssetList() {
 
         if (isZone) {
             const lowerCaseZone = globalStateFilter.toLowerCase();
-            return assets.filter(asset => {
+            return currentAssets.filter(asset => {
                 const assetLocation = (asset.location || "").toLowerCase().trim();
                 return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
             });
         } else {
             const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
             const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
-            return assets.filter(asset => {
+            return currentAssets.filter(asset => {
                 const assetLocation = (asset.location || "").toLowerCase().trim();
                 const matchesState = assetLocation.startsWith(lowerCaseFilter);
                 const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
@@ -318,15 +322,15 @@ export default function AssetList() {
     } else if (!isAdmin && userProfile?.state) {
         const lowerCaseFilter = userProfile.state.toLowerCase().trim();
         const capitalCity = NIGERIAN_STATE_CAPITALS[userProfile.state]?.toLowerCase().trim();
-        return assets.filter(asset => {
+        return currentAssets.filter(asset => {
             const assetLocation = (asset.location || "").toLowerCase().trim();
             const matchesState = assetLocation.startsWith(lowerCaseFilter);
             const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
             return matchesState || matchesCapital;
         });
     }
-    return assets;
-  }, [assets, globalStateFilter, isAdmin, userProfile?.state]);
+    return currentAssets;
+  }, [assets, offlineAssets, dataSource, globalStateFilter, isAdmin, userProfile?.state]);
   
   useEffect(() => {
     const locations = new Map<string, number>();
@@ -354,7 +358,6 @@ export default function AssetList() {
   const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
     if (!config) return assetsToSort;
     return [...assetsToSort].sort((a, b) => {
-        // Special handling for numeric sorting on 'sn' field
         if (config.key === 'sn') {
             const numA = Number(a.sn) || 0;
             const numB = Number(b.sn) || 0;
@@ -363,7 +366,6 @@ export default function AssetList() {
             return 0;
         }
         
-        // Default string-based sorting for all other fields
         const aVal = a[config.key] ?? '';
         const bVal = b[config.key] ?? '';
         if (aVal < bVal) return config.direction === 'asc' ? -1 : 1;
@@ -419,14 +421,14 @@ export default function AssetList() {
 
 
   const handleAddAsset = useCallback(() => {
-    if (lockAssetList && isAdmin) {
-      addNotification({ title: "Asset List Locked", description: "Adding new assets is disabled. This can be changed in settings.", variant: "destructive" });
+    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+      addNotification({ title: "Asset List Locked", description: "Adding new assets to the main list is disabled. Switch to 'Locked Offline' source to add.", variant: "destructive" });
       return;
     }
     setSelectedAsset(undefined);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  }, [lockAssetList, isAdmin]);
+  }, [lockAssetList, isAdmin, dataSource]);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -443,53 +445,70 @@ export default function AssetList() {
   const handleDeleteConfirm = async () => {
     if (!assetToDelete) return;
 
-    if (lockAssetList && isAdmin) {
-        addNotification({ title: "Deletion Disabled", description: "The asset list is locked.", variant: "destructive" });
+    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+        addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
         setIsDeleteDialogOpen(false);
         return;
     }
 
-    const currentAssets = await getLocalAssetsFromDb();
-    const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
-    await saveAssets(updatedAssets);
-    setAssets(updatedAssets);
-    addNotification({ title: 'Deleted Locally', description: `Asset "${assetToDelete.description}" removed.` });
-
-    if (isOnline) {
-      try {
-        await deleteAsset(assetToDelete.id);
-        addNotification({ title: 'Deleted from Cloud', description: 'Asset also removed from the central database.' });
-      } catch (e) {
-        addNotification({ title: 'Cloud Deletion Failed', description: 'Could not delete from cloud.', variant: 'destructive'});
+    if (dataSource === 'cloud') {
+      const currentAssets = await getLocalAssetsFromDb();
+      const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
+      await saveAssets(updatedAssets);
+      setAssets(updatedAssets);
+      addNotification({ title: 'Deleted Locally', description: `Asset "${assetToDelete.description}" removed from main list.` });
+  
+      if (isOnline) {
+        try {
+          await deleteAsset(assetToDelete.id);
+          addNotification({ title: 'Deleted from Cloud', description: 'Asset also removed from the central database.' });
+        } catch (e) {
+          addNotification({ title: 'Cloud Deletion Failed', description: 'Could not delete from cloud.', variant: 'destructive'});
+        }
       }
+    } else {
+      const currentOfflineAssets = await getLockedOfflineAssets();
+      const updatedOfflineAssets = currentOfflineAssets.filter(a => a.id !== assetToDelete.id);
+      await saveLockedOfflineAssets(updatedOfflineAssets);
+      setOfflineAssets(updatedOfflineAssets);
+      addNotification({ title: 'Deleted from Offline Store', description: `Asset "${assetToDelete.description}" removed.` });
     }
+
 
     setAssetToDelete(null);
     setIsDeleteDialogOpen(false);
   }
 
   const handleBatchDelete = async () => {
-    if (lockAssetList && isAdmin) {
-        addNotification({ title: "Deletion Disabled", description: "The asset list is locked.", variant: "destructive" });
+    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+        addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
         return;
     }
     
     setIsBatchDeleting(true);
     const assetsToDeleteCount = selectedAssetIds.length;
-    
-    let currentAssets = await getLocalAssetsFromDb();
-    currentAssets = currentAssets.filter(a => !selectedAssetIds.includes(a.id));
-    await saveAssets(currentAssets);
-    setAssets(currentAssets);
-    addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted.` });
 
-    if (isOnline) {
-        try {
-            await batchDeleteAssets(selectedAssetIds);
-            addNotification({ title: 'Assets Deleted', description: `Successfully removed ${assetsToDeleteCount} assets from the cloud.` });
-        } catch (e) {
-            addNotification({ title: 'Error', description: 'Could not delete all selected assets from the cloud.', variant: 'destructive' });
-        }
+    if (dataSource === 'cloud') {
+      let currentAssets = await getLocalAssetsFromDb();
+      currentAssets = currentAssets.filter(a => !selectedAssetIds.includes(a.id));
+      await saveAssets(currentAssets);
+      setAssets(currentAssets);
+      addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted from main list.` });
+  
+      if (isOnline) {
+          try {
+              await batchDeleteAssets(selectedAssetIds);
+              addNotification({ title: 'Assets Deleted from Cloud', description: `Successfully removed ${assetsToDeleteCount} assets.` });
+          } catch (e) {
+              addNotification({ title: 'Error', description: 'Could not delete all selected assets from the cloud.', variant: 'destructive' });
+          }
+      }
+    } else {
+      let currentOfflineAssets = await getLockedOfflineAssets();
+      currentOfflineAssets = currentOfflineAssets.filter(a => !selectedAssetIds.includes(a.id));
+      await saveLockedOfflineAssets(currentOfflineAssets);
+      setOfflineAssets(currentOfflineAssets);
+      addNotification({ title: 'Deleted from Offline Store', description: `${assetsToDeleteCount} assets deleted.` });
     }
 
     setSelectedAssetIds([]);
@@ -501,8 +520,10 @@ export default function AssetList() {
   const handleSaveBatchEdit = async (data: BatchUpdateData) => {
     const assetsToUpdateCount = selectedAssetIds.length;
     addNotification({ title: 'Batch Updating...', description: `Applying changes to ${assetsToUpdateCount} assets.` });
-
-    const assetsToUpdate = assets.filter(asset => selectedAssetIds.includes(asset.id));
+    
+    const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
+    const assetsToUpdate = sourceAssets.filter(asset => selectedAssetIds.includes(asset.id));
+    
     const updatedAssets = assetsToUpdate.map(asset => {
         const updatedAsset: Asset = { 
             ...asset, 
@@ -510,7 +531,7 @@ export default function AssetList() {
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName,
             lastModifiedByState: userProfile?.state,
-            syncStatus: 'local',
+            syncStatus: dataSource === 'cloud' ? 'local' : undefined,
         };
         if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
             updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
@@ -520,18 +541,28 @@ export default function AssetList() {
         return sanitizeForFirestore(updatedAsset);
     });
 
-    let currentAssets = await getLocalAssetsFromDb();
-    const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
-    currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
-    await saveAssets(currentAssets);
-    setAssets(currentAssets);
-    addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets.` });
+    if (dataSource === 'cloud') {
+      let currentAssets = await getLocalAssetsFromDb();
+      const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
+      currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+      await saveAssets(currentAssets);
+      setAssets(currentAssets);
+      addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets.` });
+    } else {
+      let currentOfflineAssets = await getLockedOfflineAssets();
+      const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
+      currentOfflineAssets = currentOfflineAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+      await saveLockedOfflineAssets(currentOfflineAssets);
+      setOfflineAssets(currentOfflineAssets);
+      addNotification({ title: 'Updated in Offline Store', description: `Updated ${assetsToUpdateCount} assets.` });
+    }
     
     setSelectedAssetIds([]);
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    const originalAsset = assets.find(a => a.id === assetToSave.id);
+    const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
+    const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
 
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
       const finalAsset: Asset = sanitizeForFirestore({
@@ -539,19 +570,33 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
-        syncStatus: 'local',
+        syncStatus: dataSource === 'cloud' ? 'local' : undefined,
       });
       
-      const currentAssets = await getLocalAssetsFromDb();
-      const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
-      if (existingIndex > -1) {
-          currentAssets[existingIndex] = finalAsset;
+      if (dataSource === 'cloud') {
+        const currentAssets = await getLocalAssetsFromDb();
+        const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
+        if (existingIndex > -1) {
+            currentAssets[existingIndex] = finalAsset;
+        } else {
+            currentAssets.unshift(finalAsset);
+        }
+        await saveAssets(currentAssets);
+        setAssets(currentAssets);
+        addNotification({ title: 'Saved Locally', description: 'Changes will be synced with the cloud.' });
       } else {
-          currentAssets.unshift(finalAsset);
+        const currentOfflineAssets = await getLockedOfflineAssets();
+        const existingIndex = currentOfflineAssets.findIndex(a => a.id === finalAsset.id);
+        if (existingIndex > -1) {
+            currentOfflineAssets[existingIndex] = finalAsset;
+        } else {
+            currentOfflineAssets.unshift(finalAsset);
+        }
+        await saveLockedOfflineAssets(currentOfflineAssets);
+        setOfflineAssets(currentOfflineAssets);
+        addNotification({ title: 'Saved to Offline Store', description: 'These changes will not be synced.' });
       }
-      await saveAssets(currentAssets);
-      setAssets(currentAssets);
-      addNotification({ title: 'Saved Locally', description: 'Changes will be synced with the cloud.' });
+
     } else {
         addNotification({ title: 'No Changes Detected', description: 'The asset was not saved.' });
     }
@@ -560,7 +605,8 @@ export default function AssetList() {
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
-    const asset = assets.find(a => a.id === assetId);
+    const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
+    const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
 
     if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus) {
@@ -573,15 +619,25 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
-        syncStatus: 'local',
+        syncStatus: dataSource === 'cloud' ? 'local' : undefined,
     });
 
-    const currentAssets = await getLocalAssetsFromDb();
-    const existingIndex = currentAssets.findIndex(a => a.id === assetId);
-    if (existingIndex > -1) {
-        currentAssets[existingIndex] = updatedAsset;
-        await saveAssets(currentAssets);
-        setAssets(currentAssets);
+    if (dataSource === 'cloud') {
+      const currentAssets = await getLocalAssetsFromDb();
+      const existingIndex = currentAssets.findIndex(a => a.id === assetId);
+      if (existingIndex > -1) {
+          currentAssets[existingIndex] = updatedAsset;
+          await saveAssets(currentAssets);
+          setAssets(currentAssets);
+      }
+    } else {
+      const currentOfflineAssets = await getLockedOfflineAssets();
+      const existingIndex = currentOfflineAssets.findIndex(a => a.id === assetId);
+      if (existingIndex > -1) {
+          currentOfflineAssets[existingIndex] = updatedAsset;
+          await saveLockedOfflineAssets(currentOfflineAssets);
+          setOfflineAssets(currentOfflineAssets);
+      }
     }
   };
 
@@ -594,16 +650,15 @@ export default function AssetList() {
     setIsImporting(true);
     addNotification({ title: "Parsing file...", description: "Please wait..." });
     
-    const baseAssets = await getLocalAssetsFromDb();
+    // If list is locked, we operate on a separate offline asset list.
+    const useOfflineStore = lockAssetList;
+    const baseAssets = useOfflineStore ? await getLockedOfflineAssets() : await getLocalAssetsFromDb();
 
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets, lockAssetList);
+    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets, false); // always allow adding to offline store
     
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
-        const message = lockAssetList 
-          ? `${skipped} assets were skipped because they are not in the master list.`
-          : `${skipped} assets were skipped due to missing data.`;
-        addNotification({ title: "Import Notice", description: message });
+        addNotification({ title: "Import Notice", description: `${skipped} assets were skipped due to missing data.` });
     }
 
     const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
@@ -611,7 +666,7 @@ export default function AssetList() {
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
         lastModifiedByState: userProfile?.state,
-        syncStatus: 'local' as const
+        syncStatus: useOfflineStore ? undefined : 'local' as const
     }));
 
     if (allChanges.length > 0) {
@@ -619,9 +674,16 @@ export default function AssetList() {
         allChanges.forEach(a => assetMap.set(a.id, a));
         const combinedAssets = Array.from(assetMap.values());
         
-        await saveAssets(combinedAssets);
-        setAssets(combinedAssets);
-        addNotification({ title: 'Imported Locally', description: `${allChanges.length} changes saved.` });
+        if (useOfflineStore) {
+          await saveLockedOfflineAssets(combinedAssets);
+          setOfflineAssets(combinedAssets);
+          addNotification({ title: 'Imported to Locked Offline Store', description: `${allChanges.length} changes saved.` });
+          setDataSource('local_locked'); // Switch to the offline view
+        } else {
+          await saveAssets(combinedAssets);
+          setAssets(combinedAssets);
+          addNotification({ title: 'Imported to Main List', description: `${allChanges.length} changes saved.` });
+        }
         
     } else if (errors.length === 0) {
         addNotification({ title: "No Changes Detected", description: "No new or updated assets were found."});
@@ -682,32 +744,46 @@ export default function AssetList() {
   const handleClearAllAssets = useCallback(async () => {
     setIsClearAllDialogOpen(false);
     
-    addNotification({ title: 'Clearing Local Assets...', description: 'Removing all assets from your device.' });
-    await clearLocalAssets();
-    setAssets([]);
-    setSelectedAssetIds([]);
-    addNotification({ title: 'Local Data Cleared', description: 'All assets removed from this device.' });
-    
-    if (isOnline && isAdmin) {
-        addNotification({ title: 'Clearing Database...', description: `This will remove all assets.` });
-        try {
-            const allAssetsInCloud = await getAssets();
-            if (allAssetsInCloud.length > 0) {
-                const idsToDelete = allAssetsInCloud.map((a) => a.id);
-                await batchDeleteAssets(idsToDelete);
-            }
-            addNotification({ title: 'All Assets Cleared', description: 'The application is now in a clean state.' });
-        } catch (e) {
-            addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
-        }
+    if (dataSource === 'cloud') {
+      addNotification({ title: 'Clearing Main Assets...', description: 'Removing all assets from your device.' });
+      await clearLocalAssets();
+      setAssets([]);
+      addNotification({ title: 'Local Data Cleared', description: 'All main assets removed from this device.' });
+      
+      if (isOnline && isAdmin) {
+          addNotification({ title: 'Clearing Cloud Database...', description: `This will remove all assets.` });
+          try {
+              const allAssetsInCloud = await getAssets();
+              if (allAssetsInCloud.length > 0) {
+                  const idsToDelete = allAssetsInCloud.map((a) => a.id);
+                  await batchDeleteAssets(idsToDelete);
+              }
+              addNotification({ title: 'All Cloud Assets Cleared', description: 'The application is now in a clean state.' });
+          } catch (e) {
+              addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
+          }
+      }
+    } else {
+      addNotification({ title: 'Clearing Offline Assets...', description: 'Removing all locked offline assets.' });
+      await clearLockedOfflineAssets();
+      setOfflineAssets([]);
+      addNotification({ title: 'Offline Data Cleared', description: 'The locked offline store is now empty.' });
     }
-  }, [isOnline, isAdmin, setAssets]);
+
+    setSelectedAssetIds([]);
+
+  }, [isOnline, isAdmin, setAssets, dataSource, setOfflineAssets]);
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
   const handleSelectiveSync = useCallback(async () => {
     if (!isOnline) {
       addNotification({title: "Offline", description: "Cannot sync while offline.", variant: "destructive"});
+      return;
+    }
+
+    if (dataSource === 'local_locked') {
+      addNotification({title: "Cannot Sync", description: "Assets in the locked offline store cannot be synced.", variant: "destructive"});
       return;
     }
 
@@ -746,9 +822,10 @@ export default function AssetList() {
       setSelectedAssetIds([]);
       setSelectedCategories([]);
     }
-  }, [isOnline, view, selectedCategories, selectedAssetIds, assetsByCategory, setIsSyncing, setAssets]);
+  }, [isOnline, view, selectedCategories, selectedAssetIds, assetsByCategory, setIsSyncing, setAssets, dataSource]);
 
   useEffect(() => {
+    const hasCurrentAssets = activeAssets.length > 0;
     setDataActions({
         onImport: handleImportClick,
         onExport: () => handleExportClick(),
@@ -756,7 +833,7 @@ export default function AssetList() {
         onClearAll: handleClearAllClick,
         isImporting: isImporting,
         isAdmin: isAdmin,
-        hasAssets: assets.length > 0
+        hasAssets: hasCurrentAssets
     });
 
     return () => {
@@ -770,7 +847,7 @@ export default function AssetList() {
       handleClearAllClick, 
       isImporting, 
       isAdmin, 
-      assets.length
+      activeAssets.length
   ]);
   
   const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
@@ -800,7 +877,7 @@ export default function AssetList() {
                 lastModified: new Date().toISOString(),
                 lastModifiedBy: userProfile?.displayName,
                 lastModifiedByState: userProfile?.state,
-                syncStatus: 'local',
+                syncStatus: dataSource === 'cloud' ? 'local' : undefined,
             };
             if (data.status === 'Verified' && !asset.verifiedDate) {
                 updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
@@ -810,12 +887,21 @@ export default function AssetList() {
             return sanitizeForFirestore(updatedAsset);
         });
         
-        let currentAssets = await getLocalAssetsFromDb();
-        const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
-        currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
-        await saveAssets(currentAssets);
-        setAssets(currentAssets);
-        addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets.` });
+        if (dataSource === 'cloud') {
+          let currentAssets = await getLocalAssetsFromDb();
+          const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
+          currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+          await saveAssets(currentAssets);
+          setAssets(currentAssets);
+          addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets.` });
+        } else {
+            let currentOfflineAssets = await getLockedOfflineAssets();
+            const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
+            currentOfflineAssets = currentOfflineAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+            await saveLockedOfflineAssets(currentOfflineAssets);
+            setOfflineAssets(currentOfflineAssets);
+            addNotification({ title: 'Updated in Offline Store', description: `Updated ${assetsToUpdateCount} assets.` });
+        }
     }
     
     setSelectedCategories([]);
@@ -830,26 +916,34 @@ export default function AssetList() {
 
     if (idsToDelete.length === 0) return;
 
-    if (lockAssetList && isAdmin) {
-        addNotification({ title: "Deletion Disabled", description: "The asset list is locked.", variant: "destructive" });
+    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+        addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
         return;
     }
     
     setIsBatchDeleting(true);
-    
-    let currentAssets = await getLocalAssetsFromDb();
-    currentAssets = currentAssets.filter(a => !idsToDelete.includes(a.id));
-    await saveAssets(currentAssets);
-    setAssets(currentAssets);
-    addNotification({ title: 'Deleted Locally', description: `${idsToDelete.length} assets deleted.` });
 
-    if (isOnline) {
-        try {
-            await batchDeleteAssets(idsToDelete);
-            addNotification({ title: 'Categories Deleted', description: `Successfully removed ${idsToDelete.length} assets.` });
-        } catch (e) {
-            addNotification({ title: 'Error', description: 'Could not delete all assets from cloud.', variant: 'destructive' });
-        }
+    if (dataSource === 'cloud') {
+      let currentAssets = await getLocalAssetsFromDb();
+      currentAssets = currentAssets.filter(a => !idsToDelete.includes(a.id));
+      await saveAssets(currentAssets);
+      setAssets(currentAssets);
+      addNotification({ title: 'Deleted Locally', description: `${idsToDelete.length} assets deleted.` });
+  
+      if (isOnline) {
+          try {
+              await batchDeleteAssets(idsToDelete);
+              addNotification({ title: 'Categories Deleted', description: `Successfully removed ${idsToDelete.length} assets.` });
+          } catch (e) {
+              addNotification({ title: 'Error', description: 'Could not delete all assets from cloud.', variant: 'destructive' });
+          }
+      }
+    } else {
+      let currentOfflineAssets = await getLockedOfflineAssets();
+      currentOfflineAssets = currentOfflineAssets.filter(a => !idsToDelete.includes(a.id));
+      await saveLockedOfflineAssets(currentOfflineAssets);
+      setOfflineAssets(currentOfflineAssets);
+      addNotification({ title: 'Deleted from Offline Store', description: `${idsToDelete.length} assets deleted.` });
     }
 
     setSelectedCategories([]);
@@ -857,12 +951,12 @@ export default function AssetList() {
   }
 
   const clearAllDialogDescription = useMemo(() => {
-    let message = "This will permanently delete all asset records from your local device storage.";
-    if (isAdmin && isOnline) {
+    let message = `This will permanently delete all asset records from the ${dataSource === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
+    if (isAdmin && isOnline && dataSource === 'cloud') {
       message += " As an admin who is online, this will ALSO delete all assets from the cloud database, which cannot be undone."
     }
     return message;
-  }, [isAdmin, isOnline]);
+  }, [isAdmin, isOnline, dataSource]);
 
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
@@ -887,7 +981,7 @@ export default function AssetList() {
             {selectedCategories.length > 0 && (
                  <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
-                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || !isOnline}>
+                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || !isOnline || dataSource === 'local_locked'}>
                       {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CloudUpload className="mr-2 h-4 w-4" />}
                        Sync Selected
                     </Button>
@@ -907,7 +1001,21 @@ export default function AssetList() {
         <Card>
              <CardHeader className="flex-row items-start justify-between">
                 <div>
-                  <CardTitle>Verification Status</CardTitle>
+                  <CardTitle className="flex items-center gap-2">
+                    <span>Verification Status</span>
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDataSource(prev => prev === 'cloud' ? 'local_locked' : 'cloud')}>
+                              {dataSource === 'cloud' ? <Cloud className="h-5 w-5 text-blue-500"/> : <HardDrive className="h-5 w-5 text-gray-500" />}
+                           </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p>Data Source: {dataSource === 'cloud' ? 'Cloud Synced' : 'Locked Offline'}</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </CardTitle>
                   <CardDescription>
                       {isAdmin && !isFiltered
                         ? `Viewing: ${globalStateFilter || 'All Assets'}`
@@ -946,7 +1054,7 @@ export default function AssetList() {
                             <SelectLabel>States</SelectLabel>
                             {NIGERIAN_STATES.map((state) => (
                                 <SelectItem key={state} value={state}>
-                                  <StateProgress state={state} allAssets={assets} />
+                                  <StateProgress state={state} allAssets={activeAssets} />
                                 </SelectItem>
                             ))}
                         </SelectGroup>
@@ -1069,12 +1177,12 @@ export default function AssetList() {
             {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
-                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || !isOnline}>
+                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || !isOnline || dataSource === 'local_locked'}>
                       {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <CloudUpload className="mr-2 h-4 w-4" />}
                        Sync Selected
                     </Button>
                      {selectedAssetIds.length === 1 && (
-                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(assets.find(a => a.id === selectedAssetIds[0])!)} disabled={isGuest}>
+                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={isGuest}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     )}
@@ -1255,7 +1363,7 @@ export default function AssetList() {
                     <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
                     <AlertDialogDescription>
                         This action cannot be undone. This will permanently delete the asset
-                        from your {isOnline ? 'online database and ' : ''}local storage.
+                        from your {dataSource === 'cloud' ? (isOnline ? 'online database and ' : '') : ''}local storage.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <AlertDialogFooter>
