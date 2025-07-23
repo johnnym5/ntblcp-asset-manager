@@ -243,7 +243,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                       <div className="flex items-center justify-between pt-1">
                         <div className="space-y-1">
                           <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
-                          <p className="text-xs text-muted-foreground">Prevent adding or deleting assets. Only updates are allowed.</p>
+                          <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
                         </div>
                         <Switch id="lock-assets" checked={localSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)} disabled={!isOnline}/>
                       </div>
@@ -319,3 +319,4 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     </>
   );
 }
+

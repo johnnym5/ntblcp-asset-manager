@@ -489,3 +489,4 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     </Sheet>
   );
 }
+

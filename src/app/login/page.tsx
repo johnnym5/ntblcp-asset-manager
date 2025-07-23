@@ -1,10 +1,6 @@
-
 "use client";
 
-import React, { useEffect, useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import React, { useEffect, useState } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -13,476 +9,312 @@ import {
   SheetDescription,
   SheetFooter,
   SheetClose,
-} from "@/components/ui/sheet";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import type { Asset } from "@/lib/types";
-import { AlertCircle, Loader2, FileText, Check } from "lucide-react";
-import { TARGET_SHEETS } from "@/lib/constants";
-import { AssetChecklist } from "@/components/asset-checklist";
-import { useAuth } from "@/contexts/auth-context";
-import { addNotification } from "@/hooks/use-notifications";
-import { Label } from "@/components/ui/label";
+} from '@/components/ui/sheet';
+import { Button } from '@/components/ui/button';
+import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
+import { ScrollArea } from './ui/scroll-area';
+import { Separator } from './ui/separator';
+import { useAppState } from '@/contexts/app-state-context';
+import { updateSettings } from '@/lib/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/auth-context';
+import { useTheme } from 'next-themes';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2 } from 'lucide-react';
+import { SheetDefinitionForm } from './sheet-definition-form';
+import type { SheetDefinition } from '@/lib/types';
+import { parseExcelForTemplate } from '@/lib/excel-parser';
 
-const assetFormSchema = z.object({
-  category: z.string({ required_error: "Please select a category." }),
-  description: z.string().min(1, "Description is required."),
-  serialNumber: z.string().optional(),
-  location: z.string().optional(),
-  condition: z.string().optional(),
-  remarks: z.string().optional(),
-  assignee: z.string().optional(),
-  verifiedStatus: z.string().optional(),
-  verifiedDate: z.string().optional(),
-  lga: z.string().optional(),
-  assetIdCode: z.string().optional(),
-  manufacturer: z.string().optional(),
-  // Advanced Fields
-  assetClass: z.string().optional(),
-  modelNumber: z.string().optional(),
-  supplier: z.string().optional(),
-  dateReceived: z.string().optional(),
-  grant: z.string().optional(),
-  chasisNo: z.string().optional(),
-  engineNo: z.string().optional(),
-});
-
-export type AssetFormValues = z.infer<typeof assetFormSchema>;
-
-interface AssetFormProps {
+interface SettingsSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  asset?: Asset;
-  onSave: (assetToSave: Asset) => Promise<void>;
-  onQuickSave: (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy'; verifiedDate?: string; }) => Promise<void>;
-  isReadOnly: boolean;
+  openChangePassword: () => void;
 }
 
-const ReadOnlyField = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm">{value ?? <span className="text-muted-foreground/70">N/A</span>}</p>
-    </div>
-);
-
-
-export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, isReadOnly }: AssetFormProps) {
-  const [quickViewRemarks, setQuickViewRemarks] = useState('');
-  const [quickViewStatus, setQuickViewStatus] = useState<'Verified' | 'Unverified' | 'Discrepancy'>('Unverified');
-  const [isQuickSaving, setIsQuickSaving] = useState(false);
-
-  const [isSaving, setIsSaving] = useState(false);
+export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const isAdmin = userProfile?.isAdmin || false;
-  
-  const defaultValues = {
-    category: '',
-    description: '',
-    serialNumber: '',
-    location: userProfile?.state || '',
-    condition: '',
-    remarks: '',
-    assignee: '',
-    verifiedStatus: 'Unverified',
-    verifiedDate: '',
-    lga: '',
-    assetIdCode: '',
-    manufacturer: '',
-    assetClass: '',
-    modelNumber: '',
-    supplier: '',
-    dateReceived: '',
-    grant: '',
-    chasisNo: '',
-    engineNo: '',
-  };
+  const { 
+    isOnline,
+    dataActions,
+    appSettings,
+    setAppSettings,
+  } = useAppState();
 
-  const form = useForm<AssetFormValues>({
-    resolver: zodResolver(assetFormSchema),
-    defaultValues: asset ? { ...asset, verifiedStatus: asset.verifiedStatus || 'Unverified' } : defaultValues,
-    mode: 'onChange',
-  });
-  
-  const watchedValues = form.watch();
+  const { toast } = useToast();
+  const { setTheme } = useTheme();
+
+  const [localSettings, setLocalSettings] = useState(appSettings);
+  const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
+  const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
+  const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      if (asset) {
-        setQuickViewRemarks(asset.remarks || '');
-        setQuickViewStatus(asset.verifiedStatus || 'Unverified');
-        
-        form.reset({
-          ...defaultValues,
-          ...asset,
-          location: asset.location || userProfile?.state || '',
-          verifiedStatus: asset.verifiedStatus || 'Unverified',
-        });
-      } else {
-        form.reset(defaultValues);
-      }
+      setLocalSettings(appSettings);
     }
-  }, [isOpen, asset, form, userProfile]);
+  }, [appSettings, isOpen]);
+
+  const handleSettingChange = (key: keyof typeof localSettings, value: any) => {
+    setLocalSettings(prev => ({ ...prev, [key]: value }));
+  };
+
+  const handleToggleSheet = (sheetName: string, checked: boolean) => {
+    let newEnabledSheets;
+    if (checked) {
+      newEnabledSheets = [...localSettings.enabledSheets, sheetName];
+    } else {
+      newEnabledSheets = localSettings.enabledSheets.filter(name => name !== sheetName);
+    }
+    handleSettingChange('enabledSheets', newEnabledSheets);
+  };
   
-  const watchedStatusInForm = form.watch('verifiedStatus');
-  useEffect(() => {
-    if (watchedStatusInForm === 'Verified' && !form.getValues('verifiedDate')) {
-        form.setValue('verifiedDate', new Date().toLocaleDateString('en-CA'));
-    } else if (watchedStatusInForm !== 'Verified' && !isReadOnly) {
-        form.setValue('verifiedDate', '');
+  const handleToggleAll = (enable: boolean) => {
+    const allSheetNames = Object.keys(localSettings.sheetDefinitions);
+    handleSettingChange('enabledSheets', enable ? allSheetNames : []);
+  };
+
+  const handleSaveChanges = async () => {
+    if (!isOnline) {
+      toast({ title: 'Offline', description: 'Settings can only be changed while online.', variant: 'destructive' });
+      return;
     }
-  }, [watchedStatusInForm, form, isReadOnly]);
-
-
-  const handleQuickSaveClick = async () => {
-    if (!asset) return;
-    setIsQuickSaving(true);
     try {
-      const verifiedDate = quickViewStatus === 'Verified' ? new Date().toLocaleDateString('en-CA') : '';
-      await onQuickSave(asset.id, {
-        remarks: quickViewRemarks,
-        verifiedStatus: quickViewStatus,
-        verifiedDate,
-      });
-      addNotification({ title: "Saved", description: "Your changes have been saved locally." });
-    } catch(e) {
-      addNotification({ title: "Error", description: "Could not save changes.", variant: "destructive" });
-    } finally {
-      setIsQuickSaving(false);
+      await updateSettings(localSettings);
+      setAppSettings(localSettings);
+      toast({ title: 'Settings Updated', description: 'Your changes have been saved.' });
+      onOpenChange(false);
+    } catch (error) {
+      toast({ title: 'Error', description: 'Could not save settings to the database.', variant: 'destructive' });
     }
   }
 
-  const onSubmit = async (data: AssetFormValues) => {
-    setIsSaving(true);
+  const handleAddSheet = () => {
+    setSheetToEdit(null);
+    setOriginalSheetName(null);
+    setIsSheetFormOpen(true);
+  };
+
+  const handleEditSheet = (sheetName: string) => {
+    setSheetToEdit(localSettings.sheetDefinitions[sheetName]);
+    setOriginalSheetName(sheetName);
+    setIsSheetFormOpen(true);
+  };
+  
+  const handleDeleteSheet = (sheetNameToDelete: string) => {
+    const newSheetDefinitions = { ...localSettings.sheetDefinitions };
+    delete newSheetDefinitions[sheetNameToDelete];
+    
+    const newEnabledSheets = localSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
+
+    setLocalSettings(prev => ({
+      ...prev,
+      sheetDefinitions: newSheetDefinitions,
+      enabledSheets: newEnabledSheets,
+    }));
+  };
+
+  const handleSaveSheet = (sheet: SheetDefinition) => {
+    const newSheetDefinitions = { ...localSettings.sheetDefinitions };
+    let newEnabledSheets = [...localSettings.enabledSheets];
+    
+    // If it's a rename, remove old entry and update enabled sheets
+    if (originalSheetName && originalSheetName !== sheet.name) {
+      delete newSheetDefinitions[originalSheetName];
+      newEnabledSheets = newEnabledSheets.map(s => s === originalSheetName ? sheet.name : s);
+    }
+    
+    newSheetDefinitions[sheet.name] = sheet;
+    
+    // If it's a new sheet, make sure it's enabled
+    if (!originalSheetName && !newEnabledSheets.includes(sheet.name)) {
+      newEnabledSheets.push(sheet.name);
+    }
+
+    setLocalSettings(prev => ({
+      ...prev,
+      sheetDefinitions: newSheetDefinitions,
+      enabledSheets: newEnabledSheets
+    }));
+  };
+
+  const handleImportTemplate = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
     try {
-        const assetToSave: Asset = {
-            id: asset?.id || crypto.randomUUID(),
-            ...asset,
-            ...data,
-        };
-        await onSave(assetToSave);
-        onOpenChange(false);
-    } catch (e) {
-        // Error toast is handled by the caller
+      const templates = await parseExcelForTemplate(file);
+      let currentDefs = localSettings.sheetDefinitions;
+      let currentEnabled = localSettings.enabledSheets;
+      
+      templates.forEach(template => {
+        currentDefs[template.name] = template;
+        if (!currentEnabled.includes(template.name)) {
+          currentEnabled.push(template.name);
+        }
+      });
+
+      setLocalSettings(prev => ({
+        ...prev,
+        sheetDefinitions: currentDefs,
+        enabledSheets: currentEnabled,
+      }));
+
+      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added or updated.` });
+    } catch (error) {
+      toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
-        setIsSaving(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
   
-  // RENDER LOGIC
-  if (isReadOnly && asset) {
+  const isAdmin = userProfile?.isAdmin || false;
+  const isGuest = userProfile?.isGuest || false;
+  const canModifyData = !isGuest;
+  
+  if (!localSettings?.sheetDefinitions) {
     return (
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="sm:max-w-2xl w-full flex flex-col">
-          <SheetHeader>
-            <SheetTitle>Asset Quick View</SheetTitle>
-            <SheetDescription>
-              Viewing asset details. Comments and status can be updated here.
-            </SheetDescription>
-          </SheetHeader>
-          <div className="flex-1 space-y-6 overflow-y-auto pr-6 py-4">
-            <div className="space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <ReadOnlyField label="S/N" value={asset.sn} />
-                    <ReadOnlyField label="LGA" value={asset.lga} />
-                </div>
-                 <ReadOnlyField label="Assignee" value={asset.assignee} />
-                <ReadOnlyField label="Asset Description" value={asset.description} />
-                <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                     <div className="space-y-2">
-                        <Label htmlFor="quick-view-status">Verified Status</Label>
-                        <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
-                            <SelectTrigger id="quick-view-status" className="w-full">
-                                <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
-                                <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                                <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-
-                <div className="space-y-2">
-                    <Label htmlFor="quick-view-remarks">Remarks/Comments</Label>
-                    <Textarea
-                      id="quick-view-remarks"
-                      value={quickViewRemarks}
-                      onChange={(e) => setQuickViewRemarks(e.target.value)}
-                      className="min-h-24"
-                    />
-                </div>
-                
-                <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
-                    {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Comments & Status
-                </Button>
-            </div>
-            
-            <Accordion type="single" collapsible className="w-full pt-4">
-                <AccordionItem value="advanced">
-                    <AccordionTrigger>Full Asset Details</AccordionTrigger>
-                    <AccordionContent className="pt-4 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <ReadOnlyField label="Location" value={asset.location} />
-                           <ReadOnlyField label="Asset Class" value={asset.assetClass} />
-                        </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
-                            <ReadOnlyField label="Model Number" value={asset.modelNumber} />
-                        </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
-                            <ReadOnlyField label="Condition" value={asset.condition} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Engine Number" value={asset.engineNo} />
-                            <ReadOnlyField label="Chasis Number" value={asset.chasisNo} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Supplier" value={asset.supplier} />
-                            <ReadOnlyField label="Grant" value={asset.grant} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Date Received" value={asset.dateReceived ? String(asset.dateReceived) : 'N/A'} />
-                            <ReadOnlyField label="Verified Date" value={asset.verifiedDate ?? 'N/A'} />
-                        </div>
-                         <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
-                    </AccordionContent>
-                </AccordionItem>
-            </Accordion>
-          </div>
-          <SheetFooter className="mt-auto pt-4 border-t">
-            <SheetClose asChild>
-              <Button variant="outline">Close</Button>
-            </SheetClose>
-          </SheetFooter>
+        <SheetContent className="flex items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin" />
         </SheetContent>
       </Sheet>
     );
   }
 
+  const allSheetNames = Object.keys(localSettings.sheetDefinitions);
+  const allEnabled = allSheetNames.length > 0 && localSettings.enabledSheets.length === allSheetNames.length;
+  const noneEnabled = localSettings.enabledSheets.length === 0;
+
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-4xl w-full flex flex-col">
-        <SheetHeader>
-          <SheetTitle>{asset ? `Edit Asset` : 'Add New Asset'}</SheetTitle>
-          <SheetDescription>
-            {asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.'}
-          </SheetDescription>
-        </SheetHeader>
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto pr-4 py-4">
-          <div className="md:col-span-2">
-            <Form {...form}>
-              <form
-                id="asset-form"
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-4 p-1"
-              >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!!asset}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {TARGET_SHEETS.map(sheet => (
-                              <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Asset Description</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                  )} />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <FormField control={form.control} name="serialNumber" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Serial Number</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="assetIdCode" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Asset ID Code</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="location" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                   <FormField control={form.control} name="lga" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>LGA</FormLabel>
-                            <FormControl><Input {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
-                </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <FormField control={form.control} name="assignee" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Assignee</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField control={form.control} name="condition" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Condition</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
-                          <FormMessage />
-                        </FormItem>
-                    )} />
-                </div>
-                
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="manufacturer" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Manufacturer</FormLabel>
-                            <FormControl><Input {...field} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
-                    <FormField control={form.control} name="modelNumber" render={({ field }) => (
-                        <FormItem><FormLabel>Model Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                </div>
-                
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="assetClass" render={({ field }) => (
-                        <FormItem><FormLabel>Asset Class</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField
-                      control={form.control}
-                      name="verifiedStatus"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Verified Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
-                              <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                              <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                </div>
+    <>
+      <Sheet open={isOpen} onOpenChange={onOpenChange}>
+        <SheetContent className="flex flex-col">
+          <SheetHeader>
+            <SheetTitle>Settings</SheetTitle>
+            <SheetDescription>
+              Manage application settings and preferences.
+            </SheetDescription>
+          </SheetHeader>
+          <ScrollArea className="flex-1 -mx-6 px-6 py-4">
+            <div className="space-y-6">
 
-                <FormField control={form.control} name="remarks" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Remarks/Comments</FormLabel>
-                    <FormControl><Textarea {...field} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
+              {canModifyData && (
+                <div>
+                  <h3 className="text-lg font-medium mb-4">Data Management</h3>
+                  <div className="rounded-lg border p-3 space-y-2">
+                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting}>
+                      <FileUp className="mr-2 h-4 w-4" /> Import from Excel
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets}>
+                      <FileDown className="mr-2 h-4 w-4" /> Export to Excel
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset}>
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                    </Button>
+                    <Separator className="my-2"/>
+                    <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets}>
+                      <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
+                    </Button>
+                  </div>
+                </div>
+              )}
+              
+              <div>
+                <h3 className="text-lg font-medium mb-4">Appearance</h3>
+                <div className="rounded-lg border p-3 flex justify-around">
+                    <Button variant="outline" size="icon" onClick={() => setTheme('light')}><Sun /></Button>
+                    <Button variant="outline" size="icon" onClick={() => setTheme('dark')}><Moon /></Button>
+                    <Button variant="outline" size="icon" onClick={() => setTheme('system')}><Database /></Button>
+                </div>
+              </div>
 
-                <Accordion type="single" collapsible className="w-full pt-4">
-                  <AccordionItem value="advanced">
-                    <AccordionTrigger>Advanced Information</AccordionTrigger>
-                    <AccordionContent className="pt-4 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <FormField control={form.control} name="engineNo" render={({ field }) => (
-                                <FormItem><FormLabel>Engine Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                           <FormField control={form.control} name="chasisNo" render={({ field }) => (
-                                <FormItem><FormLabel>Chasis Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
+              {isAdmin && (
+                <>
+                  <Separator/>
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
+                    <div className="rounded-lg border p-3 space-y-4 divide-y">
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="space-y-1">
+                          <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
+                          <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
                         </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <FormField control={form.control} name="supplier" render={({ field }) => (
-                                <FormItem><FormLabel>Supplier</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={form.control} name="grant" render={({ field }) => (
-                                <FormItem><FormLabel>Grant</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
+                        <Switch id="lock-assets" checked={localSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)} disabled={!isOnline}/>
+                      </div>
+                      <div className="flex items-center justify-between pt-4">
+                        <div className="space-y-1">
+                          <Label htmlFor="autosync-assets" className="text-sm">Enable Automatic Sync</Label>
+                          <p className="text-xs text-muted-foreground">Automatically sync with the cloud when online.</p>
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <FormField control={form.control} name="dateReceived" render={({ field }) => (
-                                <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                           <ReadOnlyField label="Last Modified" value={asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
+                        <Switch id="autosync-assets" checked={localSettings.autoSyncEnabled} onCheckedChange={(checked) => handleSettingChange('autoSyncEnabled', checked)} disabled={!isOnline}/>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Sheet Definitions</h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <p className="text-sm font-medium">Toggle all sheets</p>
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(true)} disabled={allEnabled || !isOnline}>Enable All</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(false)} disabled={noneEnabled || !isOnline}>Disable All</Button>
                         </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-                
-              </form>
-            </Form>
-          </div>
-          <div className="md:col-span-1 space-y-6">
-            <AssetChecklist values={watchedValues} />
-          </div>
-        </div>
-        <SheetFooter className="mt-auto pt-4 border-t">
-          <SheetClose asChild>
-            <Button variant="outline">Close</Button>
-          </SheetClose>
-          <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
-          </Button>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                      <ScrollArea className="h-full max-h-60">
+                        <div className="space-y-1">
+                          {allSheetNames.map(sheetName => (
+                            <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
+                              <div className="flex items-center">
+                                <Switch id={`switch-${sheetName}`} checked={localSettings.enabledSheets.includes(sheetName)} onCheckedChange={(checked) => handleToggleSheet(sheetName, checked)} disabled={!isOnline}/>
+                                <Label htmlFor={`switch-${sheetName}`} className="text-sm pl-2 cursor-pointer">{sheetName}</Label>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditSheet(sheetName)} disabled={!isOnline}><Edit className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSheet(sheetName)} disabled={!isOnline}><Trash2 className="h-4 w-4" /></Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    </div>
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                        <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
+                        <Button variant="outline" className="w-full" onClick={handleAddSheet} disabled={!isOnline}><PlusCircle className="mr-2" /> Add Manually</Button>
+                        <Button variant="outline" className="w-full" onClick={handleImportTemplate} disabled={!isOnline}><FileUp className="mr-2" /> Import from File</Button>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {!isGuest && (
+                <div className="pt-4">
+                  <h3 className="text-lg font-medium mb-4">Account</h3>
+                  <div className="rounded-lg border p-3">
+                    <Button variant="outline" className="w-full justify-start" onClick={() => { onOpenChange(false); openChangePassword(); }}>Reset Password</Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </ScrollArea>
+          <SheetFooter className="mt-auto pt-4 border-t">
+            <SheetClose asChild><Button variant="outline">Cancel</Button></SheetClose>
+            {isAdmin && <Button onClick={handleSaveChanges} disabled={!isOnline}>Save Admin Changes</Button>}
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+      
+      <SheetDefinitionForm
+        isOpen={isSheetFormOpen}
+        onOpenChange={setIsSheetFormOpen}
+        onSave={handleSaveSheet}
+        sheet={sheetToEdit}
+      />
+    </>
   );
 }

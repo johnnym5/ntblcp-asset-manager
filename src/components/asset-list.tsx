@@ -42,7 +42,6 @@ import {
   CloudOff,
   CloudUpload,
   HardDrive,
-  Cloud,
   ArrowRightLeft,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -651,13 +650,13 @@ export default function AssetList() {
     setIsImporting(true);
     addNotification({ title: "Parsing file...", description: "Please wait..." });
 
-    // All imports now go to the locked offline store first for review.
+    // Enforce Sandbox-First Imports: All imports now go to the locked offline store first for review.
     const baseAssets = await getLockedOfflineAssets();
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets, false); // `allowAdd` is effectively true for offline store
+    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets);
 
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
-        addNotification({ title: "Import Notice", description: `${skipped} assets were skipped due to missing data.` });
+        addNotification({ title: "Import Notice", description: `${skipped} assets were skipped as they already exist.` });
     }
 
     const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
@@ -1304,46 +1303,13 @@ export default function AssetList() {
                               </TableCell>
                               <TableCell>{asset.assetIdCode ?? 'N/A'}</TableCell>
                               <TableCell>{asset.assignee ?? 'N/A'}</TableCell>
-                              <TableCell onClick={(e) => e.stopPropagation()}>
-                                <Select
-                                  value={asset.verifiedStatus || "Unverified"}
-                                  onValueChange={async (status) => {
-                                    await handleQuickSaveAsset(asset.id, {
-                                      verifiedStatus: status as any,
-                                      verifiedDate: status === "Verified" ? new Date().toLocaleDateString("en-CA") : "",
-                                      remarks: asset.remarks
-                                    });
-                                    toast({
-                                      title: "Status Updated",
-                                      description: `Asset status changed to ${status}.`,
-                                    });
-                                  }}
-                                  disabled={isGuest}
-                                >
-                                  <SelectTrigger className={cn("w-[135px] h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                    <SelectValue placeholder="Select status" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Unverified">
-                                      <div className="flex items-center">
-                                        <FileText className="mr-2 h-4 w-4 text-red-600 dark:text-red-400" />
-                                        Unverified
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="Verified">
-                                      <div className="flex items-center">
-                                        <Check className="mr-2 h-4 w-4 text-green-600 dark:text-green-400" />
-                                        Verified
-                                      </div>
-                                    </SelectItem>
-                                    <SelectItem value="Discrepancy">
-                                      <div className="flex items-center">
-                                        <AlertCircle className="mr-2 h-4 w-4 text-yellow-600 dark:text-yellow-400" />
-                                        Discrepancy
-                                      </div>
-                                    </SelectItem>
-                                  </SelectContent>
-                                </Select>
+                              <TableCell>
+                                <div className={cn("w-[135px] h-9 text-sm inline-flex items-center justify-center rounded-md px-2 py-1", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                  {asset.verifiedStatus === 'Verified' && <Check className="mr-2 h-4 w-4" />}
+                                  {asset.verifiedStatus === 'Unverified' && <FileText className="mr-2 h-4 w-4" />}
+                                  {asset.verifiedStatus === 'Discrepancy' && <AlertCircle className="mr-2 h-4 w-4" />}
+                                  {asset.verifiedStatus || 'Unverified'}
+                                </div>
                               </TableCell>
                               <TableCell>{asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</TableCell>
                               <TableCell className="text-right">
@@ -1414,4 +1380,5 @@ export default function AssetList() {
     </div>
   );
 }
+
 
