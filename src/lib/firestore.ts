@@ -3,8 +3,8 @@
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Asset, AppSettings } from '@/lib/types';
-import { TARGET_SHEETS } from './constants';
+import type { Asset, AppSettings, SheetDefinition } from '@/lib/types';
+import { HEADER_DEFINITIONS, TARGET_SHEETS } from './constants';
 
 // --- Assets ---
 
@@ -83,24 +83,37 @@ export async function batchDeleteAssets(assetIds: string[]) {
 
 const SETTINGS_DOC_ID = 'global';
 
+// Convert initial constants to the new AppSettings format
+const initialSheetDefinitions: Record<string, SheetDefinition> = {};
+TARGET_SHEETS.forEach(sheetName => {
+  initialSheetDefinitions[sheetName] = {
+    name: sheetName,
+    headers: HEADER_DEFINITIONS[sheetName] || []
+  };
+});
+
+const defaultAppSettings: AppSettings = {
+  lockAssetList: true,
+  autoSyncEnabled: true,
+  enabledSheets: [...TARGET_SHEETS],
+  sheetDefinitions: initialSheetDefinitions,
+};
+
 /**
  * Fetches the global application settings from Firestore.
  * @returns A promise that resolves with the AppSettings object or null if not found.
  */
-export async function getSettings(): Promise<AppSettings | null> {
+export async function getSettings(): Promise<AppSettings> {
     const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
     const docSnap = await getDoc(settingsRef);
     if (docSnap.exists()) {
-        return docSnap.data() as AppSettings;
+        const data = docSnap.data();
+        // Merge with defaults to ensure all keys are present
+        return { ...defaultAppSettings, ...data } as AppSettings;
     } else {
         // If no settings exist, create them with default values
-        const defaultSettings: AppSettings = {
-            lockAssetList: true,
-            autoSyncEnabled: true,
-            enabledSheets: [...TARGET_SHEETS]
-        };
-        await updateSettings(defaultSettings);
-        return defaultSettings;
+        await updateSettings(defaultAppSettings);
+        return defaultAppSettings;
     }
 }
 
@@ -122,7 +135,7 @@ export function listenToSettings(callback: (settings: AppSettings | null) => voi
     const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
     const unsubscribe = onSnapshot(settingsRef, (doc) => {
         if (doc.exists()) {
-            callback(doc.data() as AppSettings);
+            callback({ ...defaultAppSettings, ...doc.data() } as AppSettings);
         } else {
             // If the document is deleted, we can fetch/create defaults.
             getSettings().then(settings => callback(settings));

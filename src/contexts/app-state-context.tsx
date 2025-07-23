@@ -3,8 +3,8 @@
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
-import { TARGET_SHEETS } from '@/lib/constants';
-import type { Asset, InboxMessageGroup, AppSettings } from '@/lib/types';
+import { HEADER_DEFINITIONS, TARGET_SHEETS } from '@/lib/constants';
+import type { Asset, InboxMessageGroup, AppSettings, SheetDefinition } from '@/lib/types';
 import { getSettings, listenToSettings } from '@/lib/firestore';
 
 
@@ -49,7 +49,7 @@ interface AppStateContextType {
   selectedStatuses: string[];
   setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
   missingFieldFilter: string;
-  setMissingFieldFilter: Dispatch<SetStateAction<string[]>>;
+  setMissingFieldFilter: Dispatch<SetStateAction<string>>;
   
   // Filter Options
   locationOptions: OptionType[];
@@ -66,9 +66,6 @@ interface AppStateContextType {
   // Sheet Settings from Firestore
   appSettings: AppSettings;
   setAppSettings: Dispatch<SetStateAction<AppSettings>>;
-  lockAssetList: boolean;
-  autoSyncEnabled: boolean;
-  enabledSheets: string[];
   
   // Sync Settings
   manualSyncTrigger: number;
@@ -86,6 +83,23 @@ interface AppStateContextType {
   unreadInboxCount: number;
   setUnreadInboxCount: Dispatch<SetStateAction<number>>;
 }
+
+// Convert initial constants to the new AppSettings format
+const initialSheetDefinitions: Record<string, SheetDefinition> = {};
+TARGET_SHEETS.forEach(sheetName => {
+  initialSheetDefinitions[sheetName] = {
+    name: sheetName,
+    headers: HEADER_DEFINITIONS[sheetName] || []
+  };
+});
+
+const defaultAppSettings: AppSettings = {
+  lockAssetList: true,
+  autoSyncEnabled: true,
+  enabledSheets: [...TARGET_SHEETS],
+  sheetDefinitions: initialSheetDefinitions,
+};
+
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
@@ -109,14 +123,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'description', direction: 'asc' });
 
   // --- Global Settings from Firestore ---
-  const [appSettings, setAppSettings] = useState<AppSettings>({
-    lockAssetList: true,
-    autoSyncEnabled: true,
-    enabledSheets: [...TARGET_SHEETS],
-    sheetDefinitions: {},
-    headerMappings: {},
-  });
-  const { lockAssetList, autoSyncEnabled, enabledSheets } = appSettings;
+  const [appSettings, setAppSettings] = useState<AppSettings>(defaultAppSettings);
 
 
   const [manualSyncTrigger, setManualSyncTrigger] = useState(0);
@@ -206,9 +213,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setSortConfig,
     appSettings,
     setAppSettings,
-    lockAssetList,
-    autoSyncEnabled,
-    enabledSheets,
     manualSyncTrigger,
     setManualSyncTrigger,
     isSyncing,

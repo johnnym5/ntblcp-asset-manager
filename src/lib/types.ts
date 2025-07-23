@@ -92,8 +92,14 @@ export interface InboxMessageGroup {
   activityMessage?: string;
 }
 
+export interface SheetDefinition {
+  name: string;
+  headers: string[];
+}
+
 export interface AppSettings {
   lockAssetList: boolean;
   autoSyncEnabled: boolean;
   enabledSheets: string[];
+  sheetDefinitions: Record<string, SheetDefinition>; // Key is the sheet name
 }
