@@ -15,38 +15,39 @@ const normalizeHeader = (header: any): string => {
 };
 
 /**
- * Finds the row index of the headers in a sheet.
- * It looks for a row with a high concentration of known header names.
+ * Finds the row index of the headers in a sheet by matching against a definitive list.
  * @param sheetData The sheet data as an array of arrays.
+ * @param definitiveHeaders The list of headers that MUST be present.
  * @returns The index of the header row, or -1 if not found.
  */
-const findHeaderRowIndex = (sheetData: any[][]): number => {
-    // A list of common, high-confidence headers to identify the header row.
-    const headerIndicators = ['S/N', 'DESCRIPTION', 'ASSET DESCRIPTION', 'SERIAL NUMBER', 'ASSET SERIAL NUMBERS', 'LOCATION', 'STATE', 'ASSET ID CODE', 'TAG NUMBERS'];
-
+const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[]): number => {
+    const normalizedDefinitiveHeaders = definitiveHeaders.map(normalizeHeader);
+    
     for (let i = 0; i < Math.min(sheetData.length, 20); i++) {
         const row = sheetData[i];
         if (!Array.isArray(row)) continue;
 
         const normalizedRow = row.map(normalizeHeader);
-        const matchCount = normalizedRow.filter(h => headerIndicators.includes(h)).length;
+        const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
         
-        // If we find at least two of our indicators, we can be confident this is the header row.
-        if (matchCount >= 2) {
+        // Require a high confidence match (e.g., >70% of the defined headers)
+        if (matchCount / normalizedDefinitiveHeaders.length > 0.7) {
             return i;
         }
     }
     return -1; // No header row found
 };
 
-
+// This alias map is now the single source of truth for mapping various Excel
+// header names to a single, consistent field in the Asset object.
 const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   sn: ['S/N'],
   description: ['DESCRIPTION', 'ASSET DESCRIPTION'],
-  location: ['LOCATION', 'STATE', 'SITE'],
+  location: ['LOCATION', 'STATE'],
   lga: ['LGA'],
+  site: ['SITE'],
   assignee: ['ASSIGNEE'],
-  assetIdCode: ['ASSET ID CODE', 'TAG NUMBERS', 'ASSET TAG', 'ASSET ID'],
+  assetIdCode: ['ASSET ID CODE', 'TAG NUMBERS'],
   assetClass: ['ASSET CLASS', 'CLASSIFICATION'],
   manufacturer: ['MANUFACTURER'],
   modelNumber: ['MODEL NUMBER', 'MODEL NUMBERS'],
@@ -104,7 +105,7 @@ export async function parseExcelFile(
     existingAssets: Asset[],
     singleSheetName?: string
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
-    const { enabledSheets } = appSettings;
+    const { sheetDefinitions } = appSettings;
     const newAssets: Asset[] = [];
     const errors: string[] = [];
 
@@ -112,39 +113,30 @@ export async function parseExcelFile(
         const buffer = await file.arrayBuffer();
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
 
-        const sheetNamesToProcess = singleSheetName ? [singleSheetName] : workbook.SheetNames;
-
-        for (const sheetName of sheetNamesToProcess) {
-            
-            // Find the canonical sheet name from settings that this sheet might match
-            const canonicalSheetName = singleSheetName ?? enabledSheets.find(s => sheetName.toLowerCase().includes(s.toLowerCase()));
-            
-            if (!canonicalSheetName) {
-                // If importing all sheets, we just skip ones that don't match any definition.
-                // If importing a single sheet and it's not found, we handle it later.
-                if(!singleSheetName) continue;
+        const sheetNamesToProcess = singleSheetName ? [singleSheetName] : Object.keys(sheetDefinitions);
+        
+        for (const targetSheetName of sheetNamesToProcess) {
+            const definition = sheetDefinitions[targetSheetName];
+            if (!definition) {
+                 if(singleSheetName) errors.push(`No definition found for sheet: "${targetSheetName}".`);
+                 continue; // Skip if no definition exists
             }
 
-            // Find the actual sheet name in the workbook that matches, accommodating for variations.
-            const actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes((canonicalSheetName || sheetName).toLowerCase()));
+            // Find the actual sheet in the workbook by checking if the workbook sheet name CONTAINS the target name
+            const actualSheetName = workbook.SheetNames.find(s => s.toLowerCase().includes(targetSheetName.toLowerCase()));
 
             if (!actualSheetName) {
-                errors.push(`Could not find a sheet in the workbook matching the name: "${canonicalSheetName || sheetName}".`);
-                continue;
-            }
-
-            if (!enabledSheets.includes(canonicalSheetName!)) {
-                // Silently skip sheets that are not enabled in settings
+                if(singleSheetName) errors.push(`Could not find a sheet in the workbook matching: "${targetSheetName}".`);
                 continue;
             }
 
             const sheet = workbook.Sheets[actualSheetName];
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
             
-            const headerRowIndex = findHeaderRowIndex(sheetData);
+            const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers);
 
             if (headerRowIndex === -1) {
-                errors.push(`Could not find a valid header row in sheet: "${actualSheetName}". Skipping.`);
+                errors.push(`Could not find a valid header row in sheet: "${actualSheetName}". Please ensure it matches the defined headers.`);
                 continue;
             }
             
@@ -154,22 +146,18 @@ export async function parseExcelFile(
             for (const row of jsonData) {
                 if (row.every(cell => cell === null || String(cell).trim() === '')) continue; // Skip entirely empty rows
 
-                const assetObject: Partial<Asset> = { category: canonicalSheetName };
+                const assetObject: Partial<Asset> = { category: targetSheetName };
                 let hasData = false;
                 
                 headerRow.forEach((rawHeader, colIndex) => {
+                    if (rawHeader === null || rawHeader === undefined) return;
+
                     const normalizedHeader = normalizeHeader(rawHeader);
                     const fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
                     
                     if (fieldName) {
-                        // Prioritize the formatted text (.w), fall back to the raw value (.v)
-                        const cell = sheet.hasOwnProperty(XLSX.utils.encode_cell({c: colIndex, r: headerRowIndex + 1 + jsonData.indexOf(row)})) 
-                            ? sheet[XLSX.utils.encode_cell({c: colIndex, r: headerRowIndex + 1 + jsonData.indexOf(row)})]
-                            : null;
-                        
-                        const cellValue = cell?.w ?? cell?.v ?? row[colIndex];
-
-                        const finalValue = cellValue !== null ? String(cellValue).trim() : null;
+                        const cellValue = row[colIndex];
+                        const finalValue = cellValue !== null && cellValue !== undefined ? String(cellValue).trim() : null;
 
                         if (finalValue) {
                            (assetObject as any)[fieldName] = finalValue;
@@ -188,8 +176,9 @@ export async function parseExcelFile(
                 }
             }
         }
+
         if (newAssets.length === 0 && errors.length === 0) {
-            errors.push(`No data found to import. Please check if your Excel sheet names are similar to the enabled sheets in Settings: ${enabledSheets.join(', ')}`);
+            errors.push(`No data found to import. Check if sheet names in the file match the enabled sheets in Settings: ${Object.keys(sheetDefinitions).join(', ')}`);
         }
     } catch (e) {
         console.error("Error parsing Excel file:", e);
@@ -202,7 +191,7 @@ export async function parseExcelFile(
 
 
 // --- Core Export Logic ---
-export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, any>, fileName: string): void {
+export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, SheetDefinition>, fileName: string): void {
     const workbook = XLSX.utils.book_new();
 
     const assetsByCategory = assets.reduce((acc, asset) => {
@@ -270,7 +259,7 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
     const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-    const headerRowIndex = findHeaderRowIndex(sheetData);
+    const headerRowIndex = findHeaderRowIndex(sheetData, []); // Pass empty array to just find *a* header row
 
     if (headerRowIndex !== -1) {
       // Use the first detected header row as the template
