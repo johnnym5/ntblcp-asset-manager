@@ -205,26 +205,38 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
             <div className="space-y-4">
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <ReadOnlyField label="S/N" value={asset.sn} />
-                    <ReadOnlyField label="LGA" value={asset.lga} />
+                    <ReadOnlyField label="Location" value={asset.location} />
                 </div>
-                <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
-                <ReadOnlyField label="Assignee" value={asset.assignee} />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="LGA" value={asset.lga} />
+                    <ReadOnlyField label="Assignee" value={asset.assignee} />
+                </div>
                 <ReadOnlyField label="Asset Description" value={asset.description} />
-                
-                <div className="pt-4">
-                     <div className="space-y-2">
-                        <Label htmlFor="quick-view-status">Verified Status</Label>
-                        <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
-                            <SelectTrigger id="quick-view-status" className="w-full">
-                                <SelectValue placeholder="Select status" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
-                                <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                                <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} />
+                    <ReadOnlyField label="Asset Class" value={asset.assetClass} />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
+                    <ReadOnlyField label="Model Number" value={asset.modelNumber} />
+                </div>
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
+                    <ReadOnlyField label="Condition" value={asset.condition} />
+                </div>
+
+                <div className="space-y-2">
+                    <Label htmlFor="quick-view-status">Verified Status</Label>
+                    <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
+                        <SelectTrigger id="quick-view-status" className="w-full">
+                            <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
+                            <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                            <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
+                        </SelectContent>
+                    </Select>
                 </div>
 
                 <div className="space-y-2">
@@ -247,18 +259,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 <AccordionItem value="advanced">
                     <AccordionTrigger>Full Asset Details</AccordionTrigger>
                     <AccordionContent className="pt-4 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <ReadOnlyField label="Location" value={asset.location} />
-                           <ReadOnlyField label="Asset Class" value={asset.assetClass} />
-                        </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Manufacturer" value={asset.manufacturer} />
-                            <ReadOnlyField label="Model Number" value={asset.modelNumber} />
-                        </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Serial Number" value={asset.serialNumber} />
-                            <ReadOnlyField label="Condition" value={asset.condition} />
-                        </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <ReadOnlyField label="Engine Number" value={asset.engineNo} />
                             <ReadOnlyField label="Chasis Number" value={asset.chasisNo} />
@@ -460,7 +460,10 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                            <FormField control={form.control} name="dateReceived" render={({ field }) => (
                                 <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                             )} />
-                           <ReadOnlyField label="Last Modified" value={asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : null} />
+                           <div className="space-y-2">
+                            <Label>Last Modified</Label>
+                            <p className="text-sm text-muted-foreground h-10 flex items-center">{asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'}</p>
+                           </div>
                         </div>
                     </AccordionContent>
                   </AccordionItem>
