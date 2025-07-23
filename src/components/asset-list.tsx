@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -76,6 +77,7 @@ import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clea
 import { cn } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
+import { ScrollArea } from "./ui/scroll-area";
 
 
 const normalizeAssetLocation = (location?: string): string => {
@@ -1267,10 +1269,10 @@ export default function AssetList() {
             )}
         </div>
         
-        <Card className="flex-1 flex flex-col">
-            <CardContent className="p-0 flex-1 overflow-auto">
-              <Table>
-                  <TableHeader>
+        <Card className="flex-1 flex flex-col overflow-hidden">
+            <div className="flex-grow overflow-y-auto">
+              <Table className="relative">
+                  <TableHeader className="sticky top-0 bg-background z-10">
                       <TableRow>
                           <TableHead className="w-[50px]">
                               <Checkbox
@@ -1336,7 +1338,7 @@ export default function AssetList() {
                       )}
                   </TableBody>
               </Table>
-            </CardContent>
+            </div>
             <CardFooter className="border-t pt-4">
                <PaginationControls 
                     currentPage={currentPage}

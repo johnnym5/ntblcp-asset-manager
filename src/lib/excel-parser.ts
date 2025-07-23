@@ -3,51 +3,25 @@ import * as XLSX from 'xlsx';
 import type { Asset, AppSettings } from './types';
 import { v4 as uuidv4 } from 'uuid';
 
-// --- Helper Functions ---
-
-/**
- * Normalizes a sheet name for robust matching by making it lowercase and removing non-alphanumeric characters.
- * @param name The sheet name to normalize.
- * @returns The normalized sheet name.
- */
-const normalizeSheetNameForComparison = (name: string): string => {
-    return (name || '').toLowerCase().replace(/[^a-z0-9]/g, '');
-};
-
-
-/**
- * Replaces undefined values with null in an object, which is compatible with Firestore.
- * @param obj The object to sanitize.
- * @returns A new object with undefined values replaced by null.
- */
-export const sanitizeForFirestore = <T extends object>(obj: T): T => {
-    const sanitizedObj = { ...obj };
-    for (const key in sanitizedObj) {
-        if (sanitizedObj[key] === undefined) {
-            (sanitizedObj as any)[key] = null;
-        }
-    }
-    return sanitizedObj;
-};
-
-
 /**
  * Normalizes a header string for reliable matching.
+ * Converts to uppercase, trims whitespace, and collapses multiple spaces.
  * @param header The header string to normalize.
  * @returns The normalized header string.
  */
 const normalizeHeader = (header: any): string => {
-    return String(header || '').trim().toUpperCase().replace(/[\s\u00A0]+/g, ' ');
+    return String(header || '').trim().toUpperCase().replace(/\s+/g, ' ');
 };
 
 /**
- * Finds the first valid header row in a sheet by matching against a list of common header indicators.
+ * Finds the row index of the headers in a sheet.
+ * It looks for a row with a high concentration of known header names.
  * @param sheetData The sheet data as an array of arrays.
  * @returns The index of the header row, or -1 if not found.
  */
 const findHeaderRowIndex = (sheetData: any[][]): number => {
     // A list of common, high-confidence headers to identify the header row.
-    const headerIndicators = ['S/N', 'DESCRIPTION', 'ASSET DESCRIPTION', 'SERIAL NUMBER', 'ASSET SERIAL NUMBERS', 'LOCATION', 'STATE'];
+    const headerIndicators = ['S/N', 'DESCRIPTION', 'ASSET DESCRIPTION', 'SERIAL NUMBER', 'ASSET SERIAL NUMBERS', 'LOCATION', 'STATE', 'ASSET ID CODE', 'TAG NUMBERS'];
 
     for (let i = 0; i < Math.min(sheetData.length, 20); i++) {
         const row = sheetData[i];
@@ -63,6 +37,7 @@ const findHeaderRowIndex = (sheetData: any[][]): number => {
     }
     return -1; // No header row found
 };
+
 
 const COLUMN_TO_ASSET_FIELD_MAP: { [key: string]: keyof Asset } = {
     'S/N': 'sn',
@@ -105,82 +80,87 @@ const COLUMN_TO_ASSET_FIELD_MAP: { [key: string]: keyof Asset } = {
 };
 
 
-// --- Core Parsing Logic ---
+/**
+ * Replaces undefined values with null in an object, which is compatible with Firestore.
+ * @param obj The object to sanitize.
+ * @returns A new object with undefined values replaced by null.
+ */
+export const sanitizeForFirestore = <T extends object>(obj: T): T => {
+    const sanitizedObj = { ...obj };
+    for (const key in sanitizedObj) {
+        if (sanitizedObj[key] === undefined) {
+            (sanitizedObj as any)[key] = null;
+        }
+    }
+    return sanitizedObj;
+};
 
+
+// --- CORE PARSING LOGIC ---
 export async function parseExcelFile(
     file: File, 
     appSettings: AppSettings, 
     existingAssets: Asset[]
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
-    const { enabledSheets, lockAssetList, sheetDefinitions } = appSettings;
+    const { enabledSheets } = appSettings;
     const newAssets: Asset[] = [];
-    const updatedAssets: Asset[] = [];
-    let skipped = 0;
     const errors: string[] = [];
 
     try {
         const buffer = await file.arrayBuffer();
-        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, raw: true, defval: null });
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, rawNumbers: false });
 
-        for (const workbookSheetName of workbook.SheetNames) {
-            const normalizedSheetName = normalizeSheetNameForComparison(workbookSheetName);
+        for (const sheetName of workbook.SheetNames) {
+            const canonicalSheetName = enabledSheets.find(s => s.toLowerCase() === sheetName.toLowerCase());
             
-            // Find the canonical sheet name from settings that matches the current sheet.
-            const matchingCanonicalName = Object.keys(sheetDefinitions).find(s => normalizeSheetNameForComparison(s) === normalizedSheetName);
-
-            // Skip if the sheet is not in our list of enabled sheets.
-            if (!matchingCanonicalName || !enabledSheets.includes(matchingCanonicalName)) {
-                continue;
+            if (!canonicalSheetName) {
+                continue; // Skip sheets not in our enabled list
             }
 
-            const sheet = workbook.Sheets[workbookSheetName];
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
+            const sheet = workbook.Sheets[sheetName];
+            // Use raw: false to get formatted strings, not raw values. This is crucial.
+            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: false });
             
             const headerRowIndex = findHeaderRowIndex(sheetData);
 
             if (headerRowIndex === -1) {
-                errors.push(`Could not find a valid header row in sheet: ${matchingCanonicalName}. Skipping.`);
+                errors.push(`Could not find a valid header row in sheet: ${sheetName}. Skipping.`);
                 continue;
             }
             
-            const headerRow = sheetData[headerRowIndex].map(normalizeHeader);
+            const headers = sheetData[headerRowIndex].map(normalizeHeader);
             const dataRows = sheetData.slice(headerRowIndex + 1);
 
             for (const row of dataRows) {
-                // Skip empty rows
                 if (!Array.isArray(row) || row.every(cell => cell === null || String(cell).trim() === '')) {
-                    continue;
+                    continue; // Skip empty rows
                 }
 
-                const assetObject: Partial<Asset> = { category: matchingCanonicalName };
-
-                // Map data from each cell in the row to the corresponding asset field based on the header.
-                headerRow.forEach((header, index) => {
-                    const field = COLUMN_TO_ASSET_FIELD_MAP[header];
-                    const cellValue = row[index];
-
-                    if (field) {
-                        assetObject[field] = cellValue ?? null;
+                const assetObject: Partial<Asset> = { category: canonicalSheetName };
+                
+                let hasData = false;
+                headers.forEach((header, index) => {
+                    const fieldName = COLUMN_TO_ASSET_FIELD_MAP[header];
+                    if (fieldName) {
+                        const cellValue = row[index] !== null ? String(row[index]).trim() : null;
+                        if (cellValue) {
+                           (assetObject as any)[fieldName] = cellValue;
+                           hasData = true;
+                        }
                     }
                 });
-
-                // If the row contained no mappable data, skip it.
-                if (Object.keys(assetObject).length <= 1) { // Only contains 'category'
-                    continue;
-                }
                 
-                // For now, we are just creating new assets from every row. 
-                // The logic to check for existing assets can be added back here if needed.
-                const newAsset: Asset = { 
-                    id: uuidv4(), 
-                    ...assetObject, 
-                    verifiedStatus: 'Unverified',
-                } as Asset;
-
-                newAssets.push(newAsset);
+                if (hasData) {
+                   const newAsset: Asset = { 
+                        id: uuidv4(), 
+                        ...assetObject, 
+                        verifiedStatus: 'Unverified',
+                    } as Asset;
+                    newAssets.push(newAsset);
+                }
             }
         }
-        if (newAssets.length === 0 && updatedAssets.length === 0 && errors.length === 0) {
+        if (newAssets.length === 0 && errors.length === 0) {
             errors.push("No data found to import. Check if sheet names in the file match the enabled sheets in Settings.");
         }
     } catch (e) {
@@ -188,12 +168,13 @@ export async function parseExcelFile(
         errors.push(e instanceof Error ? e.message : "An unknown error occurred during parsing.");
     }
     
-    return { assets: newAssets, updatedAssets, skipped, errors };
+    // The simplified parser no longer updates existing assets, it only adds new ones.
+    return { assets: newAssets, updatedAssets: [], skipped: 0, errors };
 }
 
 
-// --- Core Export Logic ---
 
+// --- Core Export Logic ---
 export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, any>, fileName: string): void {
     const workbook = XLSX.utils.book_new();
 
@@ -262,7 +243,7 @@ export async function parseExcelForTemplate(file: File): Promise<{ name: string;
       templates.push({
         name: sheetName,
         headers: headerRow,
-        displayFields: ['sn', 'description', 'assetIdCode', 'assignee', 'verifiedStatus', 'lastModified'],
+        displayFields: [], // Let the app decide defaults
       });
     }
   }
