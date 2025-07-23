@@ -336,8 +336,8 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
 }
 
 
-export async function parseExcelForTemplate(file: File): Promise<{ name: string; headers: string[] }[]> {
-  const templates: { name: string; headers: string[] }[] = [];
+export async function parseExcelForTemplate(file: File): Promise<{ name: string; headers: string[], displayFields: (keyof Asset)[] }[]> {
+  const templates: { name: string; headers: string[], displayFields: (keyof Asset)[] }[] = [];
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
 
@@ -352,6 +352,7 @@ export async function parseExcelForTemplate(file: File): Promise<{ name: string;
       templates.push({
         name: sheetName,
         headers: headerRow,
+        displayFields: ['sn', 'description', 'assetIdCode', 'assignee', 'verifiedStatus', 'lastModified'],
       });
     }
   }

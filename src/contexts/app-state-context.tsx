@@ -82,6 +82,7 @@ interface AppStateContextType {
   setInboxMessages: Dispatch<SetStateAction<InboxMessageGroup[]>>;
   unreadInboxCount: number;
   setUnreadInboxCount: Dispatch<SetStateAction<number>>;
+  autoSyncEnabled: boolean;
 }
 
 // Convert initial constants to the new AppSettings format
@@ -89,7 +90,8 @@ const initialSheetDefinitions: Record<string, SheetDefinition> = {};
 TARGET_SHEETS.forEach(sheetName => {
   initialSheetDefinitions[sheetName] = {
     name: sheetName,
-    headers: HEADER_DEFINITIONS[sheetName] || []
+    headers: HEADER_DEFINITIONS[sheetName] || [],
+    displayFields: ['sn', 'description', 'assetIdCode', 'assignee', 'verifiedStatus', 'lastModified'],
   };
 });
 
@@ -223,6 +225,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setInboxMessages,
     unreadInboxCount,
     setUnreadInboxCount,
+    autoSyncEnabled: appSettings.autoSyncEnabled,
   };
 
   return (

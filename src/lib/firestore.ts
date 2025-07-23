@@ -88,7 +88,8 @@ const initialSheetDefinitions: Record<string, SheetDefinition> = {};
 TARGET_SHEETS.forEach(sheetName => {
   initialSheetDefinitions[sheetName] = {
     name: sheetName,
-    headers: HEADER_DEFINITIONS[sheetName] || []
+    headers: HEADER_DEFINITIONS[sheetName] || [],
+    displayFields: ['sn', 'description', 'assetIdCode', 'assignee', 'verifiedStatus', 'lastModified'],
   };
 });
 

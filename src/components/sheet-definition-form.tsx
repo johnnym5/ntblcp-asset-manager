@@ -40,7 +40,12 @@ export function SheetDefinitionForm({ isOpen, onOpenChange, onSave, sheet }: She
 
   const handleSave = () => {
     const headersArray = headers.split(',').map(h => h.trim()).filter(h => h);
-    onSave({ name, headers: headersArray });
+    onSave({ 
+        name, 
+        headers: headersArray,
+        // Preserve existing displayFields or provide a default
+        displayFields: sheet?.displayFields || ['sn', 'description', 'assetIdCode', 'assignee', 'verifiedStatus', 'lastModified']
+    });
     onOpenChange(false);
   };
 

@@ -95,6 +95,7 @@ export interface InboxMessageGroup {
 export interface SheetDefinition {
   name: string;
   headers: string[];
+  displayFields: (keyof Asset)[];
 }
 
 export interface AppSettings {
