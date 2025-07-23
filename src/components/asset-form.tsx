@@ -83,7 +83,7 @@ interface AssetFormProps {
 const ReadOnlyField = ({ label, value }: { label: string; value: React.ReactNode }) => (
     <div className="space-y-1">
         <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm">{value || <span className="text-muted-foreground/70">N/A</span>}</p>
+        <p className="text-sm">{value ?? <span className="text-muted-foreground/70">N/A</span>}</p>
     </div>
 );
 
@@ -268,10 +268,10 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                             <ReadOnlyField label="Grant" value={asset.grant} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <ReadOnlyField label="Date Received" value={asset.dateReceived ? String(asset.dateReceived) : 'N/A'} />
-                            <ReadOnlyField label="Verified Date" value={asset.verifiedDate || 'N/A'} />
+                            <ReadOnlyField label="Date Received" value={asset.dateReceived ? String(asset.dateReceived) : null} />
+                            <ReadOnlyField label="Verified Date" value={asset.verifiedDate} />
                         </div>
-                         <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
+                         <ReadOnlyField label="Last Modified" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : null} />
                     </AccordionContent>
                 </AccordionItem>
             </Accordion>
@@ -460,7 +460,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                            <FormField control={form.control} name="dateReceived" render={({ field }) => (
                                 <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
                             )} />
-                           <ReadOnlyField label="Last Modified" value={asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
+                           <ReadOnlyField label="Last Modified" value={asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : null} />
                         </div>
                     </AccordionContent>
                   </AccordionItem>

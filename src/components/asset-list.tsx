@@ -649,13 +649,12 @@ export default function AssetList() {
 
     setIsImporting(true);
     addNotification({ title: "Parsing file...", description: "Please wait..." });
-    
-    // If list is locked, we operate on a separate offline asset list.
-    const useOfflineStore = lockAssetList;
+
+    const useOfflineStore = lockAssetList && isAdmin;
     const baseAssets = useOfflineStore ? await getLockedOfflineAssets() : await getLocalAssetsFromDb();
 
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets, false); // always allow adding to offline store
-    
+    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets);
+
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
         addNotification({ title: "Import Notice", description: `${skipped} assets were skipped due to missing data.` });
@@ -709,7 +708,7 @@ export default function AssetList() {
           fileName = `${exportPrefix}-${categoriesToExport.join('&')}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
       }
 
-      exportToExcel(assetsToExport, appSettings.headerMappings, fileName);
+      exportToExcel(assetsToExport, appSettings.sheetDefinitions, fileName);
       addNotification({ title: "Export Successful" });
     } catch(error) {
       console.error("Export Error:", error);
@@ -1233,7 +1232,7 @@ export default function AssetList() {
                                       disabled={isGuest}
                                   />
                               </TableCell>
-                              <TableCell>{asset.sn || 'N/A'}</TableCell>
+                              <TableCell>{asset.sn ?? 'N/A'}</TableCell>
                               <TableCell className="font-medium">
                                 <div className="flex items-center gap-2">
                                     <span>{asset.description}</span>
@@ -1263,8 +1262,8 @@ export default function AssetList() {
                                     )}
                                 </div>
                               </TableCell>
-                              <TableCell>{asset.assetIdCode || 'N/A'}</TableCell>
-                              <TableCell>{asset.assignee || 'N/A'}</TableCell>
+                              <TableCell>{asset.assetIdCode ?? 'N/A'}</TableCell>
+                              <TableCell>{asset.assignee ?? 'N/A'}</TableCell>
                               <TableCell onClick={(e) => e.stopPropagation()}>
                                 <Select
                                   value={asset.verifiedStatus || "Unverified"}

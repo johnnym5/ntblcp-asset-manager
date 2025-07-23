@@ -188,7 +188,7 @@ export async function parseExcelFile(
 
             const canonicalSheetName = matchingCanonicalName;
             const sheet = workbook.Sheets[workbookSheetName];
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null, raw: true });
             
             const headerRowIndices = findHeaderRowIndices(sheetData);
 
@@ -230,9 +230,11 @@ export async function parseExcelFile(
 
                         if (field && cellValue !== null && String(cellValue).trim() !== '') {
                             if (isIHVNSheet && field === 'location') {
+                                // Prioritize STATE over LOCATION for the location field on this specific sheet
                                 if (header === 'STATE') {
                                     assetObject.location = cellValue;
                                 } else if (header === 'LOCATION' && !assetObject.site) {
+                                    // Use LOCATION for site if it's not the main state
                                     assetObject.site = cellValue;
                                 }
                             } else {
@@ -245,7 +247,7 @@ export async function parseExcelFile(
                     if (isIHVNSheet && lastSeenState && !assetObject.location) {
                         assetObject.location = lastSeenState;
                     }
-
+                    
                     if (!hasAnyData) {
                         continue;
                     }
@@ -311,7 +313,8 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
         const sheetData = assetsByCategory[category].map(asset => {
             const row: { [key: string]: any } = {};
             headerArray.forEach(header => {
-                const field = COLUMN_TO_ASSET_FIELD_MAP[header];
+                const normalizedHeader = normalizeHeader(header);
+                const field = COLUMN_TO_ASSET_FIELD_MAP[normalizedHeader];
                 if (field) {
                    row[header] = asset[field] ?? '';
                 }
