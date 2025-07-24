@@ -205,16 +205,32 @@ export default function AssetList() {
 
     try {
         const localAssets = await getLocalAssetsFromDb();
-        const cloudAssets = await getAssets();
-        
         const assetsToPush = localAssets.filter(asset => asset.syncStatus === 'local');
         
         if (assetsToPush.length > 0) {
           await batchSetAssets(assetsToPush);
           addNotification({ title: 'Local changes pushed', description: `${assetsToPush.length} assets updated in the cloud.`});
+
+          // After pushing, update the local status of these assets to 'synced'
+          const pushedAssetIds = new Set(assetsToPush.map(a => a.id));
+          const updatedLocalAssets = localAssets.map(asset => 
+            pushedAssetIds.has(asset.id) ? { ...asset, syncStatus: 'synced' as const } : asset
+          );
+          await saveAssets(updatedLocalAssets);
+          setAssets(updatedLocalAssets);
+        } else {
+            addNotification({ title: 'No local changes to sync' });
         }
         
-        const finalAssets = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' as const }));
+        const cloudAssets = await getAssets();
+        const localAssetsAfterPush = await getLocalAssetsFromDb();
+
+        const cloudAssetsMap = new Map(cloudAssets.map(a => [a.id, { ...a, syncStatus: 'synced' as const }]));
+        const localAssetsMap = new Map(localAssetsAfterPush.map(a => [a.id, a]));
+
+        // Merge cloud and local, local takes precedence for any non-synced items
+        const mergedAssetsMap = new Map([...cloudAssetsMap, ...localAssetsMap]);
+        const finalAssets = Array.from(mergedAssetsMap.values());
         
         await saveAssets(finalAssets);
         setAssets(finalAssets);
