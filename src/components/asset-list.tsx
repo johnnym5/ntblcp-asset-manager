@@ -63,7 +63,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Progress } from "@/components/ui/progress";
 
 import { AssetForm } from "./asset-form";
-import type { Asset, SheetDefinition } from "@/lib/types";
+import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
@@ -77,7 +77,6 @@ import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clea
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
-import { ScrollArea } from "./ui/scroll-area";
 
 
 /**
@@ -1212,7 +1211,7 @@ export default function AssetList() {
   const SyncButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
   
   const currentSheetDefinition = sheetDefinitions[currentCategory!];
-  const tableFields = currentSheetDefinition?.displayFields.filter(f => f.table) || [];
+  const tableFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.table) || [];
 
   return (
     <div className="flex flex-col h-full gap-4">
@@ -1375,3 +1374,5 @@ export default function AssetList() {
     </div>
   );
 }
+
+    

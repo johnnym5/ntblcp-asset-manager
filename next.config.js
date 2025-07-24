@@ -1,3 +1,5 @@
+// This file is deprecated and has been replaced by next.config.ts.
+// It can be safely deleted.
 /** @type {import('next').NextConfig} */
 const withPWAInit = require('@ducanh2912/next-pwa').default;
 

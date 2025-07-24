@@ -1,5 +1,5 @@
 
-import type { SheetDefinition } from "./types";
+import type { Asset, SheetDefinition } from "./types";
 
 export const TARGET_SHEETS = [
   'NTBLCP-TB-FAR',
@@ -7,7 +7,10 @@ export const TARGET_SHEETS = [
   'PDX-C19RM',
   'TB LAMP-C19RM',
   'ECG monitors',
-  'IHVN-GF N-THRIP',
+  'IHVN-General',
+  'IHVN-Computers',
+  'IHVN-IT Equipment',
+  'IHVN-Inherited Assets',
   'TRUENAT-C19RM',
   'Vehicles-TB (IHVN)',
   'GeneXpert machines-TB',
@@ -75,111 +78,102 @@ export const ZONE_NAMES = Object.keys(NIGERIAN_ZONES);
 
 export const SPECIAL_LOCATIONS = ["FCMS", "NTBLCP"];
 
-const defaultDisplayFields = [
-    { key: 'sn', label: 'S/N', table: true, quickView: true },
-    { key: 'assetIdCode', label: 'Asset ID Code', table: true, quickView: true },
-    { key: 'lga', label: 'LGA', table: true, quickView: true },
-    { key: 'serialNumber', label: 'Serial Number', table: true, quickView: false },
-    { key: 'assignee', label: 'Assignee', table: true, quickView: true },
-    { key: 'verifiedStatus', label: 'Verified Status', table: true, quickView: true },
-    { key: 'location', label: 'Location', table: false, quickView: true },
-    { key: 'description', label: 'Description', table: false, quickView: true },
-    { key: 'condition', label: 'Condition', table: false, quickView: true },
-    { key: 'remarks', label: 'Remarks', table: false, quickView: true },
-    { key: 'manufacturer', label: 'Manufacturer', table: false, quickView: true },
-    { key: 'modelNumber', label: 'Model Number', table: false, quickView: false },
-    { key: 'assetClass', label: 'Asset Class', table: false, quickView: false },
-    { key: 'supplier', label: 'Supplier', table: false, quickView: false },
-    { key: 'dateReceived', label: 'Date Received', table: false, quickView: false },
-    { key: 'grant', label: 'Grant', table: false, quickView: false },
-    { key: 'lastModified', label: 'Last Modified', table: false, quickView: true },
-    { key: 'lastModifiedBy', label: 'Modified By', table: false, quickView: true },
-];
+const defaultTableFields: (keyof Asset)[] = ['sn', 'assetIdCode', 'lga', 'assignee', 'verifiedStatus'];
+const vehicleTableFields: (keyof Asset)[] = ['sn', 'assetIdCode', 'lga', 'chasisNo', 'engineNo', 'assignee', 'verifiedStatus'];
 
-const vehicleDisplayFields = [
-    { key: 'sn', label: 'S/N', table: true, quickView: true },
-    { key: 'assetIdCode', label: 'Asset ID Code', table: true, quickView: true },
-    { key: 'lga', label: 'LGA', table: true, quickView: true },
-    { key: 'chasisNo', label: 'Chasis No', table: true, quickView: true },
-    { key: 'engineNo', label: 'Engine No', table: true, quickView: true },
-    { key: 'assignee', label: 'Assignee', table: true, quickView: true },
-    { key: 'verifiedStatus', label: 'Verified Status', table: true, quickView: true },
-    { key: 'location', label: 'Location', table: false, quickView: true },
-    { key: 'description', label: 'Description', table: false, quickView: true },
-    { key: 'condition', label: 'Condition', table: false, quickView: true },
-    { key: 'remarks', label: 'Remarks', table: false, quickView: true },
-    { key: 'manufacturer', label: 'Manufacturer', table: false, quickView: false },
-    { key: 'modelNumber', label: 'Model Number', table: false, quickView: false },
-    { key: 'assetClass', label: 'Asset Class', table: false, quickView: false },
-    { key: 'supplier', label: 'Supplier', table: false, quickView: false },
-    { key: 'dateReceived', label: 'Date Received', table: false, quickView: false },
-    { key: 'grant', label: 'Grant', table: false, quickView: false },
-    { key: 'lastModified', label: 'Last Modified', table: false, quickView: true },
-    { key: 'lastModifiedBy', label: 'Modified By', table: false, quickView: true },
-];
+const ntblcpFarHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Suppliers', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ];
+const motorcycleHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Chasis no', 'Engine no', 'Suppliers', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ];
+const pdxHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)' ];
+const vehiclesIHVNHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Engine no', 'Chasis no', 'Suppliers', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'GRANT', 'Useful Life (Years)' ];
+const genexpertHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ];
+
+const ihvnGeneralHeaders = [ 'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION', 'ASSET SERIAL NUMBERS', 'MODEL NUMBERS', 'QTY', 'LOCATION', 'SITE', 'YEAR OF PURCHASE', 'COST (NGN)', 'GRANT' ];
+const ihvnComputersHeaders = [ 'S/N', 'CATEGORY', 'TAG NUMBER', 'DESCRIPTION', 'QTY', 'SERIAL NUMBER', 'MODEL NUMBER', 'YEAR OF PURCHASE', 'LOCATION/USER', 'COST (NGN)', 'Grant' ];
+const ihvnItHeaders = [ 'S/N', 'CATEGORY', 'TAG NUMBER', 'DESCRIPTION', 'QTY', 'SERIAL NUMBER', 'MODEL NUMBER', 'YEAR OF PURCHASE', 'LOCATION/USER', 'COST (NGN)', 'Grant' ];
+const ihvnInheritedHeaders = [ 'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION', 'SERIAL NUMBERS', 'MODEL NUMBERS', 'QTY', 'LOCATION', 'SITE', 'YEAR OF PURCHASE', 'COST(N)', 'GRANT' ];
+
+const createDisplayFields = (headers: string[], tableFields: (keyof Asset)[]): DisplayField[] => {
+  const quickViewFields = headers.slice(0, 10).map(h => {
+    for (const key in HEADER_ALIASES) {
+      if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES].map(a => a.toLowerCase()).includes(h.toLowerCase())) {
+        return { key: key as keyof Asset, label: h, quickView: true, table: false };
+      }
+    }
+    return null;
+  }).filter(Boolean) as DisplayField[];
+
+  const essentialQuickViewKeys: (keyof Asset)[] = ['remarks', 'condition', 'verifiedStatus', 'lastModified', 'lastModifiedBy'];
+  essentialQuickViewKeys.forEach(key => {
+    if (!quickViewFields.some(f => f.key === key)) {
+      const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+      quickViewFields.push({ key, label, quickView: true, table: false });
+    }
+  });
+
+  const finalFields: DisplayField[] = [];
+  const addedKeys = new Set<keyof Asset>();
+
+  tableFields.forEach(key => {
+    const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+    finalFields.push({ key, label, table: true, quickView: false });
+    addedKeys.add(key);
+  });
+  
+  quickViewFields.forEach(field => {
+    if (!addedKeys.has(field.key)) {
+      finalFields.push(field);
+      addedKeys.add(field.key);
+    }
+  });
+
+  return finalFields;
+}
+
 
 export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
-  'NTBLCP-TB-FAR': {
-    name: 'NTBLCP-TB-FAR',
-    headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price (USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ],
-    displayFields: defaultDisplayFields,
-  },
-  'MOTORCYCLES-C19RM': {
-    name: 'MOTORCYCLES-C19RM',
-    headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Chasis no', 'Engine no', 'Suppliers', 'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price (USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ],
-    displayFields: vehicleDisplayFields,
-  },
-  'PDX-C19RM': {
-    name: 'PDX-C19RM',
-    headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price (USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)' ],
-    displayFields: defaultDisplayFields,
-  },
-  'TB LAMP-C19RM': {
-    name: 'TB LAMP-C19RM',
-    headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price (USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)' ],
-    displayFields: defaultDisplayFields,
-  },
-  'ECG monitors': {
-    name: 'ECG monitors',
-    headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price (USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)' ],
-    displayFields: defaultDisplayFields,
-  },
-  'IHVN-GF N-THRIP': {
-    name: 'IHVN-GF N-THRIP',
-    headers: [ 'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION', 'ASSET SERIAL NUMBERS', 'MODEL NUMBERS', 'QTY', 'LOCATION', 'SITE', 'YEAR OF PURCHASE', 'COST (NGN)', 'GRANT' ],
-    displayFields: [
-      { key: 'sn', label: 'S/N', table: true, quickView: true },
-      { key: 'assetIdCode', label: 'TAG NUMBERS', table: true, quickView: true },
-      { key: 'lga', label: 'LOCATION', table: true, quickView: true },
-      { key: 'assignee', label: 'Assignee', table: true, quickView: true },
-      { key: 'verifiedStatus', label: 'Verified Status', table: true, quickView: true },
-      { key: 'location', label: 'STATE', table: false, quickView: true },
-      { key: 'description', label: 'DESCRIPTION', table: false, quickView: true },
-      { key: 'serialNumber', label: 'ASSET SERIAL NUMBERS', table: true, quickView: true },
-      { key: 'condition', label: 'Condition', table: false, quickView: true },
-      { key: 'remarks', label: 'Remarks', table: false, quickView: true },
-      { key: 'assetClass', label: 'CLASSIFICATION', table: false, quickView: false },
-      { key: 'modelNumber', label: 'MODEL NUMBERS', table: false, quickView: false },
-      { key: 'site', label: 'SITE', table: false, quickView: false },
-      { key: 'dateReceived', label: 'YEAR OF PURCHASE', table: false, quickView: false },
-      { key: 'grant', label: 'GRANT', table: false, quickView: false },
-      { key: 'lastModified', label: 'Last Modified', table: false, quickView: true },
-      { key: 'lastModifiedBy', label: 'Modified By', table: false, quickView: true },
-    ]
-  },
-  'TRUENAT-C19RM': {
-    name: 'TRUENAT-C19RM',
-    headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price (USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)' ],
-    displayFields: defaultDisplayFields,
-  },
-  'Vehicles-TB (IHVN)': {
-    name: 'Vehicles-TB (IHVN)',
-    headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Engine no', 'Chasis no', 'Suppliers', 'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price (USD)', 'Funder', 'Condition', 'GRANT', 'Useful Life (Years)' ],
-    displayFields: vehicleDisplayFields,
-  },
-  'GeneXpert machines-TB': {
-    name: 'GeneXpert machines-TB',
-    headers: [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price (USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)' ],
-    displayFields: defaultDisplayFields,
-  }
+  'NTBLCP-TB-FAR': { name: 'NTBLCP-TB-FAR', headers: ntblcpFarHeaders, displayFields: createDisplayFields(ntblcpFarHeaders, defaultTableFields) },
+  'MOTORCYCLES-C19RM': { name: 'MOTORCYCLES-C19RM', headers: motorcycleHeaders, displayFields: createDisplayFields(motorcycleHeaders, vehicleTableFields) },
+  'PDX-C19RM': { name: 'PDX-C19RM', headers: pdxHeaders, displayFields: createDisplayFields(pdxHeaders, defaultTableFields) },
+  'TB LAMP-C19RM': { name: 'TB LAMP-C19RM', headers: pdxHeaders, displayFields: createDisplayFields(pdxHeaders, defaultTableFields) },
+  'ECG monitors': { name: 'ECG monitors', headers: pdxHeaders, displayFields: createDisplayFields(pdxHeaders, defaultTableFields) },
+  'TRUENAT-C19RM': { name: 'TRUENAT-C19RM', headers: pdxHeaders, displayFields: createDisplayFields(pdxHeaders, defaultTableFields) },
+  'Vehicles-TB (IHVN)': { name: 'Vehicles-TB (IHVN)', headers: vehiclesIHVNHeaders, displayFields: createDisplayFields(vehiclesIHVNHeaders, vehicleTableFields) },
+  'GeneXpert machines-TB': { name: 'GeneXpert machines-TB', headers: genexpertHeaders, displayFields: createDisplayFields(genexpertHeaders, defaultTableFields) },
+
+  // IHVN Sub-sheets
+  'IHVN-General': { name: 'IHVN-General', headers: ihvnGeneralHeaders, displayFields: createDisplayFields(ihvnGeneralHeaders, defaultTableFields) },
+  'IHVN-Computers': { name: 'IHVN-Computers', headers: ihvnComputersHeaders, displayFields: createDisplayFields(ihvnComputersHeaders, defaultTableFields) },
+  'IHVN-IT Equipment': { name: 'IHVN-IT Equipment', headers: ihvnItHeaders, displayFields: createDisplayFields(ihvnItHeaders, defaultTableFields) },
+  'IHVN-Inherited Assets': { name: 'IHVN-Inherited Assets', headers: ihvnInheritedHeaders, displayFields: createDisplayFields(ihvnInheritedHeaders, defaultTableFields) },
 };
+
+export const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
+  sn: ['S/N'],
+  description: ['DESCRIPTION', 'ASSET DESCRIPTION'],
+  location: ['LOCATION', 'STATE'],
+  lga: ['LGA'],
+  site: ['SITE'],
+  assignee: ['ASSIGNEE', 'LOCATION/USER'],
+  assetIdCode: ['ASSET ID CODE', 'TAG NUMBERS', 'TAG NUMBER'],
+  assetClass: ['ASSET CLASS', 'CLASSIFICATION', 'CATEGORY'],
+  manufacturer: ['MANUFACTURER'],
+  modelNumber: ['MODEL NUMBER', 'MODEL NUMBERS'],
+  serialNumber: ['SERIAL NUMBER', 'ASSET SERIAL NUMBERS', 'SERIAL NUMBERS'],
+  supplier: ['SUPPLIER', 'SUPPLIERS'],
+  dateReceived: ['DATE PURCHASED OR RECEIVED', 'DATE PURCHASED OR  RECEIVED', 'YEAR OF PURCHASE'],
+  grnNo: ['CHQ NO / GOODS RECEIVED NOTE NO.'],
+  pvNo: ['PV NO'],
+  costNgn: ['PURCHASE PRICE (NAIRA)', 'COST (NGN)', 'COST(N)'],
+  costUsd: ['PURCHASE PRICE [USD)', 'PURCHASE PRICE (USD)'],
+  funder: ['FUNDER'],
+  condition: ['CONDITION', 'COMMENTS'],
+  remarks: ['REMARKS'],
+  grant: ['GRANT'],
+  usefulLifeYears: ['USEFUL LIFE (YEARS)'],
+  chasisNo: ['CHASIS NO'],
+  engineNo: ['ENGINE NO'],
+  qty: ['QTY'],
+  imei: ['IMEI (TABLETS & MOBILE PHONES)'],
+};
+
+    
