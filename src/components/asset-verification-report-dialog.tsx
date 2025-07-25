@@ -28,7 +28,12 @@ export function AssetVerificationReportDialog({ isOpen, onOpenChange }: AssetVer
   const generateReport = async () => {
     if (!userProfile) return;
 
-    // Dynamically import the library here
+    if (typeof window === 'undefined') {
+      // Should not happen, but as a safeguard
+      return;
+    }
+
+    // Dynamically import the library here to ensure it only runs on the client
     const HTMLtoDOCX = (await import('html-to-docx')).default;
 
     const sourceAssets = isOnline ? assets : offlineAssets;
@@ -103,10 +108,14 @@ export function AssetVerificationReportDialog({ isOpen, onOpenChange }: AssetVer
       </html>
     `;
 
-    const fileBuffer = await HTMLtoDOCX.asBlob(reportHtml);
-    const fileName = `Asset-Verification-Report-${userState.replace(' ', '-')}-${new Date().toISOString().split('T')[0]}.docx`;
+    const fileBuffer = await HTMLtoDOCX(reportHtml, undefined, {
+      type: 'blob',
+      container: 'body',
+    });
     
-    saveAs(fileBuffer, fileName);
+    const fileName = `Asset-Verification-Report-${userState.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.docx`;
+    
+    saveAs(fileBuffer as Blob, fileName);
 
     onOpenChange(false);
   };
