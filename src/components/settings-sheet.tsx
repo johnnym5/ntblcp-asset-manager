@@ -20,19 +20,19 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { useAppState } from '@/contexts/app-state-context';
 import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, FileSignature } from 'lucide-react';
 import { SheetDefinitionForm } from './sheet-definition-form';
 import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { SingleSheetImportDialog } from './single-sheet-import-dialog';
+import { AssetVerificationReportDialog } from './asset-verification-report-dialog';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -55,6 +55,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const [isSaving, setIsSaving] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
+  const [isVerificationReportOpen, setIsVerificationReportOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -212,7 +213,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
             </TabsList>
             <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
-                  <h3 className="text-lg font-medium mb-4">Data Management</h3>
+                  <h3 className="text-lg font-medium mb-4">Data & Reports</h3>
                   <div className="rounded-lg border p-3 space-y-2">
                     <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting || !canModifyData}>
                       <FileUp className="mr-2 h-4 w-4" /> Import from Full Workbook
@@ -220,13 +221,16 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                     <Button variant="outline" className="w-full justify-start" onClick={() => setIsSingleSheetImportOpen(true)} disabled={dataActions?.isImporting || !canModifyData}>
                       <SheetIcon className="mr-2 h-4 w-4" /> Import from Single Sheet
                     </Button>
+                     <Button variant="outline" className="w-full justify-start" onClick={() => setIsVerificationReportOpen(true)} disabled={!canModifyData}>
+                      <FileSignature className="mr-2 h-4 w-4" /> Asset Verification Report
+                    </Button>
                     <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || !canModifyData}>
                       <FileDown className="mr-2 h-4 w-4" /> Export to Excel
                     </Button>
+                    <Separator className="my-2"/>
                     <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={!canModifyData}>
                       <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
                     </Button>
-                    <Separator className="my-2"/>
                     <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || !canModifyData}>
                       <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
                     </Button>
@@ -338,6 +342,11 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
       <SingleSheetImportDialog
         isOpen={isSingleSheetImportOpen}
         onOpenChange={setIsSingleSheetImportOpen}
+      />
+
+      <AssetVerificationReportDialog
+        isOpen={isVerificationReportOpen}
+        onOpenChange={setIsVerificationReportOpen}
       />
     </>
   );
