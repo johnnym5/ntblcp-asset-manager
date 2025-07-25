@@ -15,7 +15,6 @@ import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { saveAs } from 'file-saver';
-import * as HTMLtoDOCX from 'html-to-docx';
 
 interface AssetVerificationReportDialogProps {
   isOpen: boolean;
@@ -28,6 +27,9 @@ export function AssetVerificationReportDialog({ isOpen, onOpenChange }: AssetVer
 
   const generateReport = async () => {
     if (!userProfile) return;
+
+    // Dynamically import the library here
+    const HTMLtoDOCX = (await import('html-to-docx')).default;
 
     const sourceAssets = isOnline ? assets : offlineAssets;
     

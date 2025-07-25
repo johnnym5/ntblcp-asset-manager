@@ -209,45 +209,64 @@ export default function AssetList() {
     addNotification({ title: 'Syncing with cloud...' });
 
     try {
-        // 1. Get all local assets that have been changed
         const localAssets = await getLocalAssetsFromDb();
-        const assetsToPush = localAssets.filter(asset => asset.syncStatus === 'local');
-        
-        if (assetsToPush.length > 0) {
-          // 2. Sanitize and push these changes to Firestore
-          const sanitizedAssetsToPush = assetsToPush.map(sanitizeForFirestore);
-          await batchSetAssets(sanitizedAssetsToPush);
-          addNotification({ title: 'Local changes pushed', description: `${assetsToPush.length} assets updated in the cloud.`});
-        } else {
-            addNotification({ title: 'No local changes to sync' });
-        }
-        
-        // 3. Fetch all assets from the cloud
         const cloudAssets = await getAssets();
-        const localAssetsAfterPush = await getLocalAssetsFromDb();
-
-        const cloudAssetsMap = new Map(cloudAssets.map(a => [a.id, { ...a, syncStatus: 'synced' as const }]));
-        const localAssetsMap = new Map(localAssetsAfterPush.map(a => [a.id, a]));
-
-        // 4. Intelligently merge cloud data with local data
-        //    - Start with the full cloud dataset.
-        //    - Overwrite with any local data that is still marked 'local' (meaning it was modified while the sync was happening or failed to push).
-        const mergedAssetsMap = new Map([...cloudAssetsMap]);
-        for (const [id, localAsset] of localAssetsMap.entries()) {
-            if (localAsset.syncStatus === 'local') {
-                mergedAssetsMap.set(id, localAsset);
-            }
-        }
-        const finalAssets = Array.from(mergedAssetsMap.values());
         
-        // 5. Save the final merged list back to local DB and update the UI state
+        const localMap = new Map(localAssets.map(a => [a.id, a]));
+        const cloudMap = new Map(cloudAssets.map(a => [a.id, a]));
+
+        const assetsToPush: Asset[] = [];
+        const assetsToPull: Asset[] = [];
+        const mergedAssetsMap = new Map(localMap);
+
+        // Iterate through all unique asset IDs from both sources
+        const allIds = new Set([...localMap.keys(), ...cloudMap.keys()]);
+
+        allIds.forEach(id => {
+            const local = localMap.get(id);
+            const cloud = cloudMap.get(id);
+
+            if (local && !cloud) {
+                // Exists locally, but not in cloud -> Push
+                assetsToPush.push(local);
+            } else if (!local && cloud) {
+                // Exists in cloud, but not locally -> Pull
+                assetsToPull.push(cloud);
+                mergedAssetsMap.set(id, { ...cloud, syncStatus: 'synced' });
+            } else if (local && cloud) {
+                // Exists in both, compare timestamps
+                const localDate = local.lastModified ? new Date(local.lastModified).getTime() : 0;
+                const cloudDate = cloud.lastModified ? new Date(cloud.lastModified).getTime() : 0;
+
+                if (localDate > cloudDate) {
+                    assetsToPush.push(local);
+                } else if (cloudDate > localDate) {
+                    assetsToPull.push(cloud);
+                    mergedAssetsMap.set(id, { ...cloud, syncStatus: 'synced' });
+                }
+            }
+        });
+
+        if (assetsToPush.length > 0) {
+            await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
+            addNotification({ title: 'Data Pushed', description: `${assetsToPush.length} local changes synced to the cloud.` });
+        }
+        
+        if (assetsToPull.length > 0) {
+            addNotification({ title: 'Data Pulled', description: `${assetsToPull.length} assets updated from the cloud.` });
+        }
+
+        if(assetsToPush.length === 0 && assetsToPull.length === 0) {
+            addNotification({ title: 'Already Up-to-Date', description: 'Your local data is in sync with the cloud.' });
+        }
+        
+        const finalAssets = Array.from(mergedAssetsMap.values());
         await saveAssets(finalAssets);
         setAssets(finalAssets);
         
-        addNotification({ title: 'Sync Complete', description: 'Your local data is up to date.' });
     } catch (error) {
         console.error("Sync failed:", error);
-        toast({
+        addNotification({
           title: "Sync Failed",
           description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during sync.",
           variant: 'destructive'
