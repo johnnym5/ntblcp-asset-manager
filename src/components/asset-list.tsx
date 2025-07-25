@@ -275,7 +275,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, authInitialized, isGuest, toast, setIsOnline, setAssets, setIsSyncing]);
+  }, [isOnline, authInitialized, isGuest, setIsOnline, setAssets, setIsSyncing]);
   
   useEffect(() => {
     const loadInitialData = async () => {
@@ -1050,14 +1050,6 @@ export default function AssetList() {
                 {isFiltered ? `Filter Results` : 'Asset Dashboard'}
             </h2>
             <div className="flex items-center gap-2">
-              <Button variant="outline" onClick={() => setIsTravelReportOpen(true)}>
-                  <Plane className="mr-2 h-4 w-4" />
-                  Travel Sheet
-              </Button>
-               <Button variant="outline" onClick={() => setIsPostTravelReportOpen(true)}>
-                  <FileSignature className="mr-2 h-4 w-4" />
-                  Post-Travel Report
-              </Button>
               {selectedCategories.length > 0 && (
                    <>
                       <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>

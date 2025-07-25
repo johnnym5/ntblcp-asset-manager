@@ -26,13 +26,15 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, FileSignature } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, FileSignature, Plane, Library } from 'lucide-react';
 import { SheetDefinitionForm } from './sheet-definition-form';
 import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { SingleSheetImportDialog } from './single-sheet-import-dialog';
-import { AssetVerificationReportDialog } from './asset-verification-report-dialog';
+import { TravelReportDialog } from './travel-report-dialog';
+import { PostTravelReportDialog } from './post-travel-report-dialog';
+
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -47,6 +49,9 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     dataActions,
     appSettings,
     setAppSettings,
+    assets,
+    offlineAssets,
+    dataSource,
   } = useAppState();
 
   const { toast } = useToast();
@@ -55,10 +60,13 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const [isSaving, setIsSaving] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
-  const [isVerificationReportOpen, setIsVerificationReportOpen] = useState(false);
+  const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
+  const [isPostTravelReportOpen, setIsPostTravelReportOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  const activeAssets = dataSource === 'cloud' ? assets : offlineAssets;
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     setAppSettings(prev => ({ ...prev, [key]: value }));
@@ -199,7 +207,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-2xl flex flex-col">
+        <SheetContent className="w-full sm:max-w-md flex flex-col">
           <SheetHeader>
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
@@ -213,19 +221,22 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
             </TabsList>
             <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
-                  <h3 className="text-lg font-medium mb-4">Data & Reports</h3>
+                  <h3 className="text-lg font-medium mb-4">Data Management</h3>
                   <div className="rounded-lg border p-3 space-y-2">
                     <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting || !canModifyData}>
-                      <FileUp className="mr-2 h-4 w-4" /> Import from Full Workbook
+                      <Library className="mr-2 h-4 w-4" /> Import to Offline Mode
                     </Button>
                     <Button variant="outline" className="w-full justify-start" onClick={() => setIsSingleSheetImportOpen(true)} disabled={dataActions?.isImporting || !canModifyData}>
                       <SheetIcon className="mr-2 h-4 w-4" /> Import from Single Sheet
                     </Button>
-                     <Button variant="outline" className="w-full justify-start" onClick={() => setIsVerificationReportOpen(true)} disabled={!canModifyData}>
-                      <FileSignature className="mr-2 h-4 w-4" /> Asset Verification Report
+                     <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || !canModifyData}>
+                      <FileDown className="mr-2 h-4 w-4" /> Export FAR to Excel
                     </Button>
-                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || !canModifyData}>
-                      <FileDown className="mr-2 h-4 w-4" /> Export to Excel
+                    <Button variant="outline" className="w-full justify-start" onClick={() => setIsTravelReportOpen(true)} disabled={!canModifyData}>
+                      <Plane className="mr-2 h-4 w-4" /> Export Travel Report
+                    </Button>
+                     <Button variant="outline" className="w-full justify-start" onClick={() => setIsPostTravelReportOpen(true)} disabled={!canModifyData}>
+                      <FileSignature className="mr-2 h-4 w-4" /> Post-Travel Report
                     </Button>
                     <Separator className="my-2"/>
                     <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={!canModifyData}>
@@ -344,9 +355,15 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         onOpenChange={setIsSingleSheetImportOpen}
       />
 
-      <AssetVerificationReportDialog
-        isOpen={isVerificationReportOpen}
-        onOpenChange={setIsVerificationReportOpen}
+      <TravelReportDialog
+        isOpen={isTravelReportOpen}
+        onOpenChange={setIsTravelReportOpen}
+        allAssets={activeAssets}
+      />
+       <PostTravelReportDialog
+        isOpen={isPostTravelReportOpen}
+        onOpenChange={setIsPostTravelReportOpen}
+        allAssets={activeAssets}
       />
     </>
   );

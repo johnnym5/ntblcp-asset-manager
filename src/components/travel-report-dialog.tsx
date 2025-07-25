@@ -18,6 +18,7 @@ import { ChevronsUpDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { NIGERIAN_STATES } from '@/lib/constants';
 import type { Asset } from '@/lib/types';
+import { useAppState } from '@/contexts/app-state-context';
 
 interface TravelReportDialogProps {
   isOpen: boolean;

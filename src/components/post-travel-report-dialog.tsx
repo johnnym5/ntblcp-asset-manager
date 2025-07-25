@@ -235,5 +235,3 @@ export function PostTravelReportDialog({ isOpen, onOpenChange, allAssets }: Post
     </Dialog>
   );
 }
-
-    
