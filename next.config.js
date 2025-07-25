@@ -1,12 +1,12 @@
-import type { NextConfig } from 'next';
-import withPWAInit from '@ducanh2912/next-pwa';
+/** @type {import('next').NextConfig} */
+const withPWAInit = require('@ducanh2912/next-pwa').default;
 
 const withPWA = withPWAInit({
   dest: 'public',
   disable: process.env.NODE_ENV === 'development',
 });
 
-const nextConfig: NextConfig = {
+const nextConfig = {
   /* config options here */
   typescript: {
     ignoreBuildErrors: true,
@@ -26,4 +26,4 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default withPWA(nextConfig);
+module.exports = withPWA(nextConfig);
