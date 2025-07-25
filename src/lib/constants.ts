@@ -1,5 +1,5 @@
 
-import type { Asset, SheetDefinition } from "./types";
+import type { Asset, SheetDefinition, DisplayField } from "./types";
 
 export const TARGET_SHEETS = [
   'NTBLCP-TB-FAR',
@@ -78,6 +78,35 @@ export const ZONE_NAMES = Object.keys(NIGERIAN_ZONES);
 
 export const SPECIAL_LOCATIONS = ["FCMS", "NTBLCP"];
 
+export const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
+  sn: ['S/N'],
+  description: ['DESCRIPTION', 'ASSET DESCRIPTION'],
+  location: ['LOCATION', 'STATE'],
+  lga: ['LGA'],
+  site: ['SITE'],
+  assignee: ['ASSIGNEE', 'LOCATION/USER'],
+  assetIdCode: ['ASSET ID CODE', 'TAG NUMBERS', 'TAG NUMBER'],
+  assetClass: ['ASSET CLASS', 'CLASSIFICATION', 'CATEGORY'],
+  manufacturer: ['MANUFACTURER'],
+  modelNumber: ['MODEL NUMBER', 'MODEL NUMBERS'],
+  serialNumber: ['SERIAL NUMBER', 'ASSET SERIAL NUMBERS', 'SERIAL NUMBERS'],
+  supplier: ['SUPPLIER', 'SUPPLIERS'],
+  dateReceived: ['DATE PURCHASED OR RECEIVED', 'DATE PURCHASED OR  RECEIVED', 'YEAR OF PURCHASE'],
+  grnNo: ['CHQ NO / GOODS RECEIVED NOTE NO.'],
+  pvNo: ['PV NO'],
+  costNgn: ['PURCHASE PRICE (NAIRA)', 'COST (NGN)', 'COST(N)'],
+  costUsd: ['PURCHASE PRICE [USD)', 'PURCHASE PRICE (USD)'],
+  funder: ['FUNDER'],
+  condition: ['CONDITION', 'COMMENTS'],
+  remarks: ['REMARKS'],
+  grant: ['GRANT'],
+  usefulLifeYears: ['USEFUL LIFE (YEARS)'],
+  chasisNo: ['CHASIS NO'],
+  engineNo: ['ENGINE NO'],
+  qty: ['QTY'],
+  imei: ['IMEI (TABLETS & MOBILE PHONES)'],
+};
+
 const defaultTableFields: (keyof Asset)[] = ['sn', 'assetIdCode', 'lga', 'assignee', 'verifiedStatus'];
 const vehicleTableFields: (keyof Asset)[] = ['sn', 'assetIdCode', 'lga', 'chasisNo', 'engineNo', 'assignee', 'verifiedStatus'];
 
@@ -146,34 +175,4 @@ export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
   'IHVN-IT Equipment': { name: 'IHVN-IT Equipment', headers: ihvnItHeaders, displayFields: createDisplayFields(ihvnItHeaders, defaultTableFields) },
   'IHVN-Inherited Assets': { name: 'IHVN-Inherited Assets', headers: ihvnInheritedHeaders, displayFields: createDisplayFields(ihvnInheritedHeaders, defaultTableFields) },
 };
-
-export const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
-  sn: ['S/N'],
-  description: ['DESCRIPTION', 'ASSET DESCRIPTION'],
-  location: ['LOCATION', 'STATE'],
-  lga: ['LGA'],
-  site: ['SITE'],
-  assignee: ['ASSIGNEE', 'LOCATION/USER'],
-  assetIdCode: ['ASSET ID CODE', 'TAG NUMBERS', 'TAG NUMBER'],
-  assetClass: ['ASSET CLASS', 'CLASSIFICATION', 'CATEGORY'],
-  manufacturer: ['MANUFACTURER'],
-  modelNumber: ['MODEL NUMBER', 'MODEL NUMBERS'],
-  serialNumber: ['SERIAL NUMBER', 'ASSET SERIAL NUMBERS', 'SERIAL NUMBERS'],
-  supplier: ['SUPPLIER', 'SUPPLIERS'],
-  dateReceived: ['DATE PURCHASED OR RECEIVED', 'DATE PURCHASED OR  RECEIVED', 'YEAR OF PURCHASE'],
-  grnNo: ['CHQ NO / GOODS RECEIVED NOTE NO.'],
-  pvNo: ['PV NO'],
-  costNgn: ['PURCHASE PRICE (NAIRA)', 'COST (NGN)', 'COST(N)'],
-  costUsd: ['PURCHASE PRICE [USD)', 'PURCHASE PRICE (USD)'],
-  funder: ['FUNDER'],
-  condition: ['CONDITION', 'COMMENTS'],
-  remarks: ['REMARKS'],
-  grant: ['GRANT'],
-  usefulLifeYears: ['USEFUL LIFE (YEARS)'],
-  chasisNo: ['CHASIS NO'],
-  engineNo: ['ENGINE NO'],
-  qty: ['QTY'],
-  imei: ['IMEI (TABLETS & MOBILE PHONES)'],
-};
-
     
