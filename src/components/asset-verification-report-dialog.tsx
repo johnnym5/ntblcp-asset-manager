@@ -14,7 +14,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
-import { saveAs } from 'file-saver';
 
 interface AssetVerificationReportDialogProps {
   isOpen: boolean;
@@ -28,13 +27,14 @@ export function AssetVerificationReportDialog({ isOpen, onOpenChange }: AssetVer
   const generateReport = async () => {
     if (!userProfile) return;
 
+    // Ensure this code only runs on the client
     if (typeof window === 'undefined') {
-      // Should not happen, but as a safeguard
       return;
     }
 
-    // Dynamically import the library here to ensure it only runs on the client
-    const HTMLtoDOCX = (await import('html-to-docx')).default;
+    // Dynamically import the libraries here to ensure they only run on the client
+    const { default: HTMLtoDOCX } = await import('html-to-docx');
+    const { saveAs } = await import('file-saver');
 
     const sourceAssets = isOnline ? assets : offlineAssets;
     
@@ -132,7 +132,7 @@ export function AssetVerificationReportDialog({ isOpen, onOpenChange }: AssetVer
         <div className="py-4">
           <p className="text-sm"><strong>Report For:</strong> {userProfile?.displayName}</p>
           <p className="text-sm"><strong>Location:</strong> {globalStateFilter || userProfile?.state}</p>
-          <p className="text-sm"><strong>Data Source:</strong> {isOnline ? 'Cloud Database' : 'Offline Storage'}</p>
+          <p className="text-sm"><strong>Data Source:</strong> {isOnline ? 'Cloud Synced Data' : 'Local Offline Data'}</p>
         </div>
         <DialogFooter>
           <DialogClose asChild>
