@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { setAssets, setGlobalStateFilter, appSettings, isOnline } = useAppState();
+  const { setAssets, setGlobalStateFilter, appSettings, setAppSettings, isOnline } = useAppState();
 
   useEffect(() => {
     const initializeAuth = () => {
@@ -114,9 +114,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
                 ? { ...u, password: newPassword, passwordChanged: true } 
                 : u
         );
+
+        const newSettings = { ...appSettings, authorizedUsers: newUsers };
+        setAppSettings(newSettings);
         
         // Update Firestore if online
-        if(isOnline) {
+        if (isOnline) {
           updateSettings({ authorizedUsers: newUsers });
         }
     }

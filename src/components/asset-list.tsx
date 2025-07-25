@@ -45,6 +45,8 @@ import {
   HardDrive,
   ArrowRightLeft,
   Columns,
+  Plane,
+  FileSignature,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -61,6 +63,7 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
+import { TravelReportDialog } from "./travel-report-dialog";
 
 import { AssetForm } from "./asset-form";
 import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
@@ -77,6 +80,7 @@ import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clea
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
+import { PostTravelReportDialog } from "./post-travel-report-dialog";
 
 
 /**
@@ -159,6 +163,8 @@ export default function AssetList() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
+  const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
+  const [isPostTravelReportOpen, setIsPostTravelReportOpen] = useState(false);
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
@@ -203,34 +209,38 @@ export default function AssetList() {
     addNotification({ title: 'Syncing with cloud...' });
 
     try {
+        // 1. Get all local assets that have been changed
         const localAssets = await getLocalAssetsFromDb();
         const assetsToPush = localAssets.filter(asset => asset.syncStatus === 'local');
         
         if (assetsToPush.length > 0) {
-          await batchSetAssets(assetsToPush);
+          // 2. Sanitize and push these changes to Firestore
+          const sanitizedAssetsToPush = assetsToPush.map(sanitizeForFirestore);
+          await batchSetAssets(sanitizedAssetsToPush);
           addNotification({ title: 'Local changes pushed', description: `${assetsToPush.length} assets updated in the cloud.`});
-
-          // After pushing, update the local status of these assets to 'synced'
-          const pushedAssetIds = new Set(assetsToPush.map(a => a.id));
-          const updatedLocalAssets = localAssets.map(asset => 
-            pushedAssetIds.has(asset.id) ? { ...asset, syncStatus: 'synced' as const } : asset
-          );
-          await saveAssets(updatedLocalAssets);
-          setAssets(updatedLocalAssets);
         } else {
             addNotification({ title: 'No local changes to sync' });
         }
         
+        // 3. Fetch all assets from the cloud
         const cloudAssets = await getAssets();
         const localAssetsAfterPush = await getLocalAssetsFromDb();
 
         const cloudAssetsMap = new Map(cloudAssets.map(a => [a.id, { ...a, syncStatus: 'synced' as const }]));
         const localAssetsMap = new Map(localAssetsAfterPush.map(a => [a.id, a]));
 
-        // Merge cloud and local, local takes precedence for any non-synced items
-        const mergedAssetsMap = new Map([...cloudAssetsMap, ...localAssetsMap]);
+        // 4. Intelligently merge cloud data with local data
+        //    - Start with the full cloud dataset.
+        //    - Overwrite with any local data that is still marked 'local' (meaning it was modified while the sync was happening or failed to push).
+        const mergedAssetsMap = new Map([...cloudAssetsMap]);
+        for (const [id, localAsset] of localAssetsMap.entries()) {
+            if (localAsset.syncStatus === 'local') {
+                mergedAssetsMap.set(id, localAsset);
+            }
+        }
         const finalAssets = Array.from(mergedAssetsMap.values());
         
+        // 5. Save the final merged list back to local DB and update the UI state
         await saveAssets(finalAssets);
         setAssets(finalAssets);
         
@@ -239,7 +249,7 @@ export default function AssetList() {
         console.error("Sync failed:", error);
         toast({
           title: "Sync Failed",
-          description: (error as Error).message,
+          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during sync.",
           variant: 'destructive'
         });
         setIsOnline(false);
@@ -1020,25 +1030,35 @@ export default function AssetList() {
             <h2 className="text-2xl font-bold tracking-tight flex-1">
                 {isFiltered ? `Filter Results` : 'Asset Dashboard'}
             </h2>
-            {selectedCategories.length > 0 && (
-                 <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
-                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
-                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <SyncButtonIcon className="mr-2 h-4 w-4" />}
-                       {syncButtonText}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest}>
-                        <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={() => handleExportClick(selectedCategories)}>
-                        <FileDown className="mr-2 h-4 w-4" /> Export
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
-                        {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                        Delete
-                    </Button>
-                </div>
-            )}
+            <div className="flex items-center gap-2">
+              <Button variant="outline" onClick={() => setIsTravelReportOpen(true)}>
+                  <Plane className="mr-2 h-4 w-4" />
+                  Travel Sheet
+              </Button>
+               <Button variant="outline" onClick={() => setIsPostTravelReportOpen(true)}>
+                  <FileSignature className="mr-2 h-4 w-4" />
+                  Post-Travel Report
+              </Button>
+              {selectedCategories.length > 0 && (
+                   <>
+                      <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
+                       <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
+                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <SyncButtonIcon className="mr-2 h-4 w-4" />}
+                         {syncButtonText}
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest}>
+                          <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
+                      </Button>
+                      <Button variant="outline" size="sm" onClick={() => handleExportClick(selectedCategories)}>
+                          <FileDown className="mr-2 h-4 w-4" /> Export
+                      </Button>
+                      <Button variant="destructive" size="sm" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
+                          {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                          Delete
+                      </Button>
+                  </>
+              )}
+            </div>
         </div>
         <Card>
              <CardHeader className="flex-row items-start justify-between">
@@ -1180,6 +1200,16 @@ export default function AssetList() {
         />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
         <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
+        <TravelReportDialog 
+          isOpen={isTravelReportOpen}
+          onOpenChange={setIsTravelReportOpen}
+          allAssets={activeAssets}
+        />
+        <PostTravelReportDialog
+          isOpen={isPostTravelReportOpen}
+          onOpenChange={setIsPostTravelReportOpen}
+          allAssets={activeAssets}
+        />
         <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>

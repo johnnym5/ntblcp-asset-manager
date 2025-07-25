@@ -1,19 +1,39 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/auth-context';
+import AppLayout from '@/components/app-layout';
+import AssetList from '@/components/asset-list';
 import { Loader2 } from 'lucide-react';
+import UserProfileSetup from '@/components/user-profile-setup';
+import { useAppState } from '@/contexts/app-state-context';
 
-export default function Home() {
-  const router = useRouter();
+export default function Page() {
+  const { userProfile, loading, profileSetupComplete } = useAuth();
+  const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    router.replace('/assets');
-  }, [router]);
+    if (profileSetupComplete && userProfile) {
+      setGlobalStateFilter(userProfile.state || '');
+    }
+  }, [profileSetupComplete, userProfile, setGlobalStateFilter]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (!profileSetupComplete) {
+    return <UserProfileSetup />;
+  }
+
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-background p-8">
-      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-    </main>
+    <AppLayout>
+      <AssetList />
+    </AppLayout>
   );
 }

@@ -1,8 +1,9 @@
 
 import * as XLSX from 'xlsx';
-import type { Asset, AppSettings, SheetDefinition } from './types';
+import type { Asset, AppSettings, SheetDefinition, DisplayField } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, HEADER_DEFINITIONS } from './constants';
+import { Timestamp } from 'firebase/firestore';
 
 const normalizeHeader = (header: any): string => {
     if (header === null || header === undefined) return '';
@@ -19,6 +20,7 @@ const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[], sta
         const normalizedRow = row.map(normalizeHeader);
         const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
         
+        // A row is considered the header if it contains over 70% of the expected headers.
         if (matchCount / normalizedDefinitiveHeaders.length > 0.7) {
             return i;
         }
@@ -26,6 +28,7 @@ const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[], sta
     return -1;
 };
 
+// This map is built from the aliases defined in constants.ts to quickly find the correct asset field for a given column header.
 const COLUMN_TO_ASSET_FIELD_MAP = new Map<string, keyof Asset>();
 for (const key in HEADER_ALIASES) {
     const assetKey = key as keyof Asset;
@@ -36,23 +39,40 @@ for (const key in HEADER_ALIASES) {
         }
     }
 }
-// Special mapping for IHVN sheets
+// Special mapping for IHVN sheets which have some inconsistent header naming.
 COLUMN_TO_ASSET_FIELD_MAP.set('IHVN-GF N-THRIP:LOCATION', 'lga');
 COLUMN_TO_ASSET_FIELD_MAP.set('IHVN-GF N-THRIP:STATE', 'location');
 
+/**
+ * Prepares an asset object for saving to Firestore. It removes any undefined fields 
+ * and temporary local-only fields like 'previousState' to prevent sync errors.
+ * It also converts any JavaScript Date objects to Firestore Timestamps.
+ * @param obj The asset object.
+ * @returns A sanitized object ready for Firestore.
+ */
 export const sanitizeForFirestore = <T extends object>(obj: T): T => {
-    const sanitizedObj = { ...obj };
-    for (const key in sanitizedObj) {
-        if (sanitizedObj[key] === undefined) {
-            (sanitizedObj as any)[key] = null;
+    const sanitizedObj: { [key: string]: any } = {};
+    for (const key in obj) {
+        const value = (obj as any)[key];
+        if (key === 'previousState') {
+            continue; // Skip the temporary previousState field
+        }
+        if (value !== undefined) {
+            if (value instanceof Date) {
+                // Convert JS Date to Firestore Timestamp
+                sanitizedObj[key] = Timestamp.fromDate(value);
+            } else {
+                sanitizedObj[key] = value;
+            }
         }
     }
-    return sanitizedObj;
+    return sanitizedObj as T;
 };
 
 const parseRows = (headerRow: any[], jsonData: any[][], category: string): Asset[] => {
     const assets: Asset[] = [];
     for (const row of jsonData) {
+        // Skip empty rows
         if (row.every(cell => cell === null || String(cell).trim() === '')) continue;
 
         const assetObject: Partial<Asset> = { category };
@@ -64,7 +84,7 @@ const parseRows = (headerRow: any[], jsonData: any[][], category: string): Asset
             const normalizedHeader = normalizeHeader(rawHeader);
             let fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
             
-            // Special IHVN context mapping
+            // Special handling for IHVN sheets where 'LOCATION' means 'LGA' and 'STATE' means 'Location'
             if(category.startsWith('IHVN')) {
                 if(normalizedHeader === 'LOCATION') fieldName = 'lga';
                 if(normalizedHeader === 'STATE') fieldName = 'location';
@@ -82,6 +102,7 @@ const parseRows = (headerRow: any[], jsonData: any[][], category: string): Asset
             }
         });
         
+        // A row is considered a valid asset if it has some data and at least one key identifier.
         if (hasData && (assetObject.description || assetObject.assetIdCode || assetObject.serialNumber)) {
            const newAsset: Asset = { 
                 id: uuidv4(), 
@@ -109,6 +130,7 @@ export async function parseExcelFile(
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, cellText: false });
         
+        // Special logic for IHVN master sheet which contains multiple sub-tables
         const ihvnMasterSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes('IHVN-GF N-THRIP'));
 
         if (ihvnMasterSheetName && (!singleSheetName || singleSheetName.startsWith('IHVN'))) {
@@ -145,7 +167,7 @@ export async function parseExcelFile(
             : Object.keys(sheetDefinitions).filter(sheetName => appSettings.enabledSheets.includes(sheetName) && !sheetName.startsWith('IHVN'));
 
         for (const targetSheetName of sheetNamesToProcess) {
-             if (targetSheetName.startsWith('IHVN')) continue;
+             if (targetSheetName.startsWith('IHVN')) continue; // Skip IHVN sheets as they are handled by the master sheet logic
 
             const definition = sheetDefinitions[targetSheetName];
             if (!definition) {
@@ -156,7 +178,7 @@ export async function parseExcelFile(
             let actualSheetName: string | undefined;
             const normalizedTarget = normalizeHeader(targetSheetName);
 
-            // Use exact match for single sheet, contains for full workbook
+            // Use exact match for single sheet import, but a more lenient 'contains' for full workbook import
             if (singleSheetName) {
                 actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s) === normalizedTarget);
             } else {
@@ -221,6 +243,7 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
         const headerArray = definition?.headers?.length > 0 ? [...definition.headers] : [];
         if (headerArray.length === 0) continue; 
         
+        // Append standard export columns if they don't exist
         if (!headerArray.includes("Verified Status")) headerArray.push("Verified Status");
         if (!headerArray.includes("Verified Date")) headerArray.push("Verified Date");
         if (!headerArray.includes("Last Modified By")) headerArray.push("Last Modified By");
@@ -287,10 +310,27 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
 
         if (matchCount > 5) {
             const headerRow = row.map(h => String(h || '').trim()).filter(h => h);
+            
+            // Create a default displayFields array based on what was found.
+            const displayFields: DisplayField[] = headerRow.map(header => {
+              const normalized = normalizeHeader(header);
+              for (const key in HEADER_ALIASES) {
+                if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES].map(a => normalizeHeader(a)).includes(normalized)) {
+                  return {
+                    key: key as keyof Asset,
+                    label: header,
+                    table: ['S/N', 'DESCRIPTION', 'ASSET ID CODE', 'ASSIGNEE', 'VERIFIED STATUS'].includes(normalized), // Default to showing these in table
+                    quickView: true,
+                  };
+                }
+              }
+              return null;
+            }).filter(Boolean) as DisplayField[];
+
             templates.push({
                 name: sheetName,
                 headers: headerRow,
-                displayFields: HEADER_DEFINITIONS[sheetName]?.displayFields || []
+                displayFields: displayFields,
             });
             break; 
         }
