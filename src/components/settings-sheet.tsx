@@ -32,8 +32,6 @@ import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { SingleSheetImportDialog } from './single-sheet-import-dialog';
-import { DataPatchDialog } from './data-patch-dialog';
-
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -56,7 +54,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const [isSaving, setIsSaving] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
-  const [isDataPatchOpen, setIsDataPatchOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -291,13 +288,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                         </div>
                         <Switch id="autosync-assets" checked={appSettings.autoSyncEnabled} onCheckedChange={(checked) => handleSettingChange('autoSyncEnabled', checked)} disabled={!isOnline}/>
                       </div>
-                       <div className="flex items-center justify-between pt-4">
-                        <div className="space-y-1">
-                          <Label className="text-sm">Data Patch</Label>
-                           <p className="text-xs text-muted-foreground">Run a one-time data update.</p>
-                        </div>
-                        <Button variant="secondary" size="sm" onClick={() => setIsDataPatchOpen(true)}><Wrench className="mr-2 h-4 w-4" /> Run Patch</Button>
-                      </div>
                     </div>
                   </div>
 
@@ -376,10 +366,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         onOpenChange={setIsSingleSheetImportOpen}
       />
 
-      <DataPatchDialog
-        isOpen={isDataPatchOpen}
-        onOpenChange={setIsDataPatchOpen}
-      />
     </>
   );
 }

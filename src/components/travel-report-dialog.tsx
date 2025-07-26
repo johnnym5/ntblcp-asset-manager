@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -16,30 +16,41 @@ import { Label } from './ui/label';
 import { useAuth } from '@/contexts/auth-context';
 import { useReactToPrint } from 'react-to-print';
 import type { Asset } from '@/lib/types';
+import { useAppState } from '@/contexts/app-state-context';
+import { NIGERIAN_STATES } from '@/lib/constants';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface TravelReportDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  assets: Asset[];
 }
 
-export function TravelReportDialog({ isOpen, onOpenChange, assets }: TravelReportDialogProps) {
+export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
   const { userProfile } = useAuth();
-  const [officerName, setOfficerName] = useState(userProfile?.displayName || '');
+  const { assets } = useAppState();
+  
+  const officerName = userProfile?.displayName || '';
   const [destination, setDestination] = useState('');
   const [purpose, setPurpose] = useState('');
   const [departureDate, setDepartureDate] = useState('');
   const [returnDate, setReturnDate] = useState('');
+  const [reportState, setReportState] = useState(userProfile?.state || '');
 
   const reportRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isOpen) {
-      setOfficerName(userProfile?.displayName || '');
       setDestination('');
       setPurpose('');
       setDepartureDate('');
       setReturnDate('');
+      setReportState(userProfile?.state || '');
     }
   }, [isOpen, userProfile]);
 
@@ -47,8 +58,14 @@ export function TravelReportDialog({ isOpen, onOpenChange, assets }: TravelRepor
     content: () => reportRef.current,
     documentTitle: `Travel Report - ${officerName}`,
   });
+  
+  const reportAssets = useMemo(() => {
+    if (!reportState) return [];
+    return assets.filter(asset => asset.location?.toLowerCase().includes(reportState.toLowerCase()));
+  }, [assets, reportState]);
 
-  const verifiedAssets = assets.filter(asset => asset.verifiedStatus === 'Verified');
+  const verifiedAssets = reportAssets.filter(asset => asset.verifiedStatus === 'Verified');
+  const unverifiedAssetsCount = reportAssets.length - verifiedAssets.length;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -64,8 +81,23 @@ export function TravelReportDialog({ isOpen, onOpenChange, assets }: TravelRepor
             <div className="space-y-4">
                 <div className="space-y-2">
                     <Label htmlFor="officerName">Officer's Name</Label>
-                    <Input id="officerName" value={officerName} onChange={(e) => setOfficerName(e.target.value)} />
+                    <Input id="officerName" value={officerName} readOnly disabled />
                 </div>
+                 {userProfile?.isAdmin && (
+                    <div className="space-y-2">
+                        <Label htmlFor="reportState">State for Report</Label>
+                        <Select onValueChange={setReportState} value={reportState}>
+                            <SelectTrigger>
+                                <SelectValue placeholder="Select a state..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {NIGERIAN_STATES.map(state => (
+                                    <SelectItem key={state} value={state}>{state}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                )}
                  <div className="space-y-2">
                     <Label htmlFor="destination">Destination</Label>
                     <Input id="destination" value={destination} onChange={(e) => setDestination(e.target.value)} />
@@ -97,6 +129,10 @@ export function TravelReportDialog({ isOpen, onOpenChange, assets }: TravelRepor
                                 <td className="border border-black p-2">{officerName}</td>
                             </tr>
                             <tr>
+                                <td className="border border-black p-2 font-semibold">State:</td>
+                                <td className="border border-black p-2">{reportState}</td>
+                            </tr>
+                            <tr>
                                 <td className="border border-black p-2 font-semibold">Destination:</td>
                                 <td className="border border-black p-2">{destination}</td>
                             </tr>
@@ -114,6 +150,30 @@ export function TravelReportDialog({ isOpen, onOpenChange, assets }: TravelRepor
                             </tr>
                         </tbody>
                     </table>
+
+                     <h3 className="font-bold mt-4 mb-2 text-center">ASSET VERIFICATION SUMMARY FOR {reportState.toUpperCase()}</h3>
+                      <table className="w-full border-collapse border border-black text-sm mb-4">
+                          <thead>
+                              <tr className="bg-gray-200">
+                                  <th className="border border-black p-2">Status</th>
+                                  <th className="border border-black p-2">Count</th>
+                              </tr>
+                          </thead>
+                          <tbody>
+                              <tr>
+                                  <td className="border border-black p-2">Total Verified</td>
+                                  <td className="border border-black p-2">{verifiedAssets.length}</td>
+                              </tr>
+                               <tr>
+                                  <td className="border border-black p-2">Total Unverified/Discrepancy</td>
+                                  <td className="border border-black p-2">{unverifiedAssetsCount}</td>
+                              </tr>
+                              <tr className="bg-gray-100 font-bold">
+                                  <td className="border border-black p-2">Total Assets in State</td>
+                                  <td className="border border-black p-2">{reportAssets.length}</td>
+                              </tr>
+                          </tbody>
+                      </table>
 
                     <h3 className="font-bold mt-4 mb-2 text-center">ASSETS CARRIED</h3>
                     <table className="w-full border-collapse border border-black text-sm">

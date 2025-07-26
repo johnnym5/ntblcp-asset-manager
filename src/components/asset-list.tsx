@@ -1092,8 +1092,10 @@ export default function AssetList() {
     const syncButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Sync to Cloud';
     const SyncButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
 
-    const mainCategories = Object.keys(assetsByCategory).filter(cat => cat !== 'IHVN-General' && cat !== 'IHVN-Computers' && cat !== 'IHVN-IT Equipment' && cat !== 'IHVN-Inherited Assets').sort((a,b) => a.localeCompare(b));
-    const ihvnCategories = Object.keys(assetsByCategory).filter(cat => cat.startsWith('IHVN-'));
+    const mainCategories = Object.keys(assetsByCategory).filter(cat => cat !== 'IHVN-GF N-THRIP' && !cat.startsWith('IHVN-')).sort((a,b) => a.localeCompare(b));
+    const hasIHVNCategories = Object.keys(assetsByCategory).some(cat => cat.startsWith('IHVN-'));
+    const ihvnSubCategories = Object.keys(assetsByCategory).filter(cat => cat.startsWith('IHVN-'));
+
 
     return (
       <div className="flex flex-col h-full gap-4">
@@ -1216,10 +1218,10 @@ export default function AssetList() {
         )}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {view === 'dashboard' && mainCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))}
-            {view === 'dashboard' && ihvnCategories.length > 0 && renderDashboardCard('IHVN-GF N-THRIP', ihvnCategories.flatMap(cat => assetsByCategory[cat]))}
-            {view === 'ihvn-group' && ihvnCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))}
+            {view === 'dashboard' && hasIHVNCategories && renderDashboardCard('IHVN-GF N-THRIP', ihvnSubCategories.flatMap(cat => assetsByCategory[cat]))}
+            {view === 'ihvn-group' && ihvnSubCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))}
 
-            {(mainCategories.length === 0 && ihvnCategories.length === 0) && (
+            {(mainCategories.length === 0 && !hasIHVNCategories) && (
                  <div className="col-span-full text-center py-24 text-muted-foreground">
                     <FolderSearch className="mx-auto h-12 w-12" />
                     <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
@@ -1231,7 +1233,7 @@ export default function AssetList() {
                 </div>
             )}
         </div>
-        <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} assets={displayedAssets} />
+        <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
         <AssetForm 
           isOpen={isFormOpen} 
           onOpenChange={setIsFormOpen} 
@@ -1438,3 +1440,4 @@ export default function AssetList() {
     </div>
   );
 }
+
