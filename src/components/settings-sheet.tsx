@@ -26,14 +26,12 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, FileSignature, Plane, Library, FileCheck } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library } from 'lucide-react';
 import { SheetDefinitionForm } from './sheet-definition-form';
 import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { SingleSheetImportDialog } from './single-sheet-import-dialog';
-import { TravelReportDialog } from './travel-report-dialog';
-import { PostTravelReportDialog } from './post-travel-report-dialog';
 
 
 interface SettingsSheetProps {
@@ -49,9 +47,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     dataActions,
     appSettings,
     setAppSettings,
-    assets,
-    offlineAssets,
-    dataSource,
   } = useAppState();
 
   const { toast } = useToast();
@@ -60,13 +55,9 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const [isSaving, setIsSaving] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
-  const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
-  const [isPostTravelReportOpen, setIsPostTravelReportOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-
-  const activeAssets = dataSource === 'cloud' ? assets : offlineAssets;
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     setAppSettings(prev => ({ ...prev, [key]: value }));
@@ -233,13 +224,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                         <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
                       </Button>
                       <Separator className="my-2"/>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => setIsTravelReportOpen(true)} disabled={!canModifyData}>
-                        <Plane className="mr-2 h-4 w-4" /> Travel Sign-off Sheet
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => setIsPostTravelReportOpen(true)} disabled={!canModifyData}>
-                        <FileSignature className="mr-2 h-4 w-4" /> Post-Travel Report
-                      </Button>
-                      <Separator className="my-2"/>
                       <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={!canModifyData}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
                       </Button>
@@ -354,17 +338,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
       <SingleSheetImportDialog
         isOpen={isSingleSheetImportOpen}
         onOpenChange={setIsSingleSheetImportOpen}
-      />
-
-      <TravelReportDialog
-        isOpen={isTravelReportOpen}
-        onOpenChange={setIsTravelReportOpen}
-        allAssets={activeAssets}
-      />
-       <PostTravelReportDialog
-        isOpen={isPostTravelReportOpen}
-        onOpenChange={setIsPostTravelReportOpen}
-        allAssets={activeAssets}
       />
     </>
   );

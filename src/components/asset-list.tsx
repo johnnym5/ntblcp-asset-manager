@@ -39,14 +39,10 @@ import {
   FileText,
   ClipboardEdit,
   FolderSearch,
-  Cloud,
-  CloudOff,
   CloudUpload,
   HardDrive,
   ArrowRightLeft,
   Columns,
-  Plane,
-  FileSignature,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -63,7 +59,6 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
-import { TravelReportDialog } from "./travel-report-dialog";
 
 import { AssetForm } from "./asset-form";
 import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
@@ -80,7 +75,6 @@ import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clea
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
-import { PostTravelReportDialog } from "./post-travel-report-dialog";
 
 
 /**
@@ -163,8 +157,6 @@ export default function AssetList() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
-  const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
-  const [isPostTravelReportOpen, setIsPostTravelReportOpen] = useState(false);
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
@@ -1080,7 +1072,7 @@ export default function AssetList() {
                       <Tooltip>
                         <TooltipTrigger asChild>
                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDataSource(prev => prev === 'cloud' ? 'local_locked' : 'cloud')}>
-                              {dataSource === 'cloud' ? <Cloud className="h-5 w-5 text-blue-500"/> : <HardDrive className="h-5 w-5 text-gray-500" />}
+                              {dataSource === 'cloud' ? <CloudUpload className="h-5 w-5 text-blue-500"/> : <HardDrive className="h-5 w-5 text-gray-500" />}
                            </Button>
                         </TooltipTrigger>
                         <TooltipContent>
@@ -1211,16 +1203,6 @@ export default function AssetList() {
         />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
         <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
-        <TravelReportDialog 
-          isOpen={isTravelReportOpen}
-          onOpenChange={setIsTravelReportOpen}
-          allAssets={activeAssets}
-        />
-        <PostTravelReportDialog
-          isOpen={isPostTravelReportOpen}
-          onOpenChange={setIsPostTravelReportOpen}
-          allAssets={activeAssets}
-        />
         <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -1415,5 +1397,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
