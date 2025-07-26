@@ -10,7 +10,6 @@ import {
   AlertDialogDescription,
   AlertDialogFooter,
   AlertDialogCancel,
-  AlertDialogAction,
 } from '@/components/ui/alert-dialog';
 import { Button } from './ui/button';
 import { useAppState } from '@/contexts/app-state-context';
@@ -128,31 +127,169 @@ const assigneePatchData: { [key: number]: string } = {
     667: "PM", 668: "PM", 669: "NTBLCP", 670: "NTBLCP"
 };
 
+const assetIdCodePatchData: { [key: number]: string } = {
+  1:"ARFH/NP/GF/TB/OE/003A-K", 2:"ARFH/NP/GF/TB/OE/005", 3:"ARFH/NP/GF/TB/OE/006", 4:"ARFH/NP/GF/TB/OE/007A-B", 5:"ARFH/NP/GF/TB/OE/008", 6:"ARFH/NP/GF/TB/OE/009",
+  7:"ARFH/NP/GF/TB/OE/010A-B", 8:"ARFH/NP/GF/TB/OE/011", 9:"ARFH/NP/GF/TB/CP/013", 10:"ARFH/NP/GF/TB/OE/012", 11:"ARFH/NP/GF/TB/OE/013", 12:"ARFH/NP/GF/TB/OE/014",
+  13:"ARFH/NP/GF/TB/OE/016", 14:"ARFH/NP/GF/TB/OE/017", 15:"ARFH/NP/GF/TB/OE/018", 16:"ARFH/NP/GF/TB/OE/021", 17:"ARFH/NP/GF/TB/OE/022", 18:"ARFH/NP/GF/TB/OE/023",
+  19:"ARFH/NP/GF/TB/OE/024", 20:"ARFH/NP/GF/TB/OE/025", 21:"ARFH/NP/GF/TB/OE/028", 22:"ARFH/NP/GF/TB/OE/029", 23:"ARFH/NP/GF/TB/OE/030", 24:"ARFH/NP/GF/TB/OE/031",
+  25:"ARFH/NP/GF/TB/OE/032", 26:"ARFH/NP/GF/TB/OE/033", 27:"ARFH/NP/GF/TB/OF/001", 28:"ARFH/NP/GF/TB/OE/034", 29:"ARFH/NP/GF/TB/OF/002", 30:"IHVN/EQP/0324",
+  31:"IHVN/1T/2", 32:"- 000659/3", 33:"ARFH/NP/GF/TB/OE/035", 34:"IHVN/OFFICE/1", 35:"- 004019", 36:"ARFH/NP/GF/TB/OE/039", 37:"ARFH/NP/GF/TB/OF/003",
+  38:"ARFH/NP/GF/TB/OF/004", 39:"ARFH/NP/GF/TB/OF/005", 40:"ARFH/NP/GF/TB/OF/006", 41:"ARFH/NP/GF/TB/OF/007", 42:"ARFH/NP/GF/TB/OF/008", 43:"ARFH/NP/GF/TB/CP/017",
+  44:"ARFH/NP/GF/TB/CP/018", 45:"ARFH/NP/GF/TB/CP/019", 46:"ARFH/NP/GF/TB/OE/040", 47:"ARFH/NP/GF/TB/OE/041", 48:"ARFH/NP/GF/TB/OE/043", 49:"ARFH/NP/GF/TB/OE/044",
+  50:"ARFH/NP/GF/TB/OE/045", 51:"ARFH/NP/GF/TB/OE/046", 52:"ARFH/NP/GF/TB/OE/047", 53:"ARFH/NP/GF/TB/OE/048", 54:"GF - NTBLCP/OE/048", 55:"GF - NTBLCP/OE/049",
+  56:"GF - NTBLCP/OE/050", 57:"GF - NTBLCP/OE/051", 58:"GF - NTBLCP/OE/052", 59:"GF - NTBLCP/OE/053", 60:"GF - NTBLCP/OE/054", 61:"GF - NTBLCP/OE/055",
+  62:"GF - NTBLCP/OE/056", 63:"GF - NTBLCP/OE/057", 64:"GF - NTBLCP/OE/495", 65:"GF - NTBLCP/OE/034", 66:"GF - NTBLCP/OE/060", 67:"GF - NTBLCP/OE/061",
+  68:"GF - NTBLCP/OE/062", 69:"GF - NTBLCP/OE/063", 70:"GF - NTBLCP/OE/064", 71:"GF - NTBLCP/OE/065", 72:"GF - NTBLCP/OE/066", 73:"GF - NTBLCP/OE/067",
+  74:"GF - NTBLCP/OE/068", 75:"GF - NTBLCP/OE/069", 76:"GF - NTBLCP/OE/070", 77:"GF - NTBLCP/OE/071", 78:"GF - NTBLCP/OE/072", 79:"GF - NTBLCP/OE/073",
+  80:"GF - NTBLCP/OE/074", 81:"GF - NTBLCP/OE/075", 82:"GF - NTBLCP/OE/076", 83:"GF - NTBLCP/OE/077", 84:"GF - NTBLCP/OE/078", 85:"GF - NTBLCP/OE/079",
+  86:"GF - NTBLCP/OE/080", 87:"GF - NTBLCP/OE/081", 88:"GF - NTBLCP/OE/082", 89:"GF - NTBLCP/OE/083", 90:"GF - NTBLCP/OE/084", 91:"GF - NTBLCP/OE/085",
+  92:"GF - NTBLCP/OE/086", 93:"GF - NTBLCP/OE/087", 94:"GF - NTBLCP/OE/088", 95:"GF - NTBLCP/OE/089", 96:"GF - NTBLCP/OE/090", 97:"GF - NTBLCP/OE/091",
+  98:"GF - NTBLCP/OE/092", 99:"GF - NTBLCP/OE/093", 100:"GF - NTBLCP/OE/094", 101:"GF - NTBLCP/OE/095", 102:"GF - NTBLCP/OE/096", 103:"GF - NTBLCP/OE/097",
+  104:"GF - NTBLCP/OE/098", 105:"GF - NTBLCP/OE/099", 106:"GF - NTBLCP/OE/100", 107:"GF - NTBLCP/OE/101", 108:"GF - NTBLCP/OE/102", 109:"GF - NTBLCP/OE/103",
+  110:"GF - NTBLCP/OE/104", 111:"GF - NTBLCP/OE/105", 112:"GF - NTBLCP/OE/106", 113:"GF - NTBLCP/OE/107", 114:"GF - NTBLCP/OE/108", 115:"GF - NTBLCP/OE/109",
+  116:"GF - NTBLCP/OE/110", 117:"GF - NTBLCP/OE/111", 118:"GF - NTBLCP/OE/112", 119:"GF - NTBLCP/OE/113", 120:"GF - NTBLCP/OE/114", 121:"GF - NTBLCP/OE/115",
+  122:"GF - NTBLCP/OE/116", 123:"GF - NTBLCP/OE/117", 124:"GF - NTBLCP/OE/118", 125:"GF - NTBLCP/OE/119", 126:"GF - NTBLCP/OE/120", 127:"GF - NTBLCP/OE/121",
+  128:"GF - NTBLCP/OE/230", 129:"GF - NTBLCP/OE/231", 130:"GF - NTBLCP/OE/232", 131:"GF - NTBLCP/OE/233", 132:"GF - NTBLCP/OE/234", 133:"GF - NTBLCP/OE/235",
+  134:"GF - NTBLCP/OE/236", 135:"GF - NTBLCP/OE/237", 136:"GF - NTBLCP/OE/238", 137:"GF - NTBLCP/OE/239", 138:"GF - NTBLCP/OE/240", 139:"GF - NTBLCP/OE/241",
+  140:"GF - NTBLCP/OE/242", 141:"GF - NTBLCP/OE/243", 142:"GF - NTBLCP/OE/244", 143:"GF - NTBLCP/OE/245", 144:"GF - NTBLCP/OE/246", 145:"GF - NTBLCP/OE/247",
+  146:"GF - NTBLCP/OE/248", 147:"GF - NTBLCP/OE/249", 148:"GF - NTBLCP/OE/250", 149:"GF - NTBLCP/OE/251", 150:"GF - NTBLCP/OE/252", 151:"GF - NTBLCP/OE/253",
+  152:"GF - NTBLCP/OE/254", 153:"GF - NTBLCP/OE/255", 154:"GF - NTBLCP/OE/256", 155:"GF - NTBLCP/OE/257", 156:"GF - NTBLCP/OE/258", 157:"GF - NTBLCP/OE/259",
+  158:"GF - NTBLCP/OE/260", 159:"GF - NTBLCP/OE/261", 160:"GF - NTBLCP/OE/262", 161:"GF - NTBLCP/OE/263", 162:"GF - NTBLCP/OE/264", 163:"GF - NTBLCP/OE/265",
+  164:"GF - NTBLCP/OE/266", 165:"GF - NTBLCP/OE/267", 166:"GF - NTBLCP/OE/268", 167:"GF - NTBLCP/OE/269", 168:"GF - NTBLCP/OE/270", 169:"GF - NTBLCP/OE/271",
+  170:"GF - NTBLCP/OE/272", 171:"GF - NTBLCP/OE/273", 172:"GF - NTBLCP/OE/274", 173:"GF - NTBLCP/OE/275", 174:"GF - NTBLCP/OE/276", 175:"GF - NTBLCP/OE/277",
+  176:"GF - NTBLCP/OE/278", 177:"GF - NTBLCP/OE/279", 178:"GF - NTBLCP/OE/280", 179:"GF - NTBLCP/OE/281", 180:"GF - NTBLCP/OE/282", 181:"GF - NTBLCP/OE/283",
+  182:"GF - NTBLCP/OE/284", 183:"GF - NTBLCP/OE/285", 184:"GF - NTBLCP/OE/286", 185:"GF - NTBLCP/OE/287", 186:"GF - NTBLCP/OE/288", 187:"GF - NTBLCP/OE/289",
+  188:"GF - NTBLCP/OE/290", 189:"GF - NTBLCP/OE/291", 190:"GF - NTBLCP/OE/292", 191:"GF - NTBLCP/OE/293", 192:"GF - NTBLCP/OE/294", 193:"GF - NTBLCP/OE/295",
+  194:"GF - NTBLCP/OE/296", 195:"GF - NTBLCP/OE/297", 196:"GF - NTBLCP/OE/298", 197:"GF - NTBLCP/OE/299", 198:"GF - NTBLCP/OE/300", 199:"GF - NTBLCP/OE/301",
+  200:"GF - NTBLCP/OE/302", 201:"GF - NTBLCP/OE/303", 202:"GF - NTBLCP/OE/304", 203:"GF - NTBLCP/OE/305", 204:"GF - NTBLCP/OE/306", 205:"GF - NTBLCP/OE/307",
+  206:"GF - NTBLCP/OE/308", 207:"GF - NTBLCP/OE/309", 208:"GF - NTBLCP/OE/310", 209:"GF - NTBLCP/OE/311", 210:"GF - NTBLCP/OE/312", 211:"GF - NTBLCP/OE/313",
+  212:"GF - NTBLCP/OE/314", 213:"GF - NTBLCP/OE/315", 214:"GF - NTBLCP/OE/316", 215:"GF - NTBLCP/OE/317", 216:"GF - NTBLCP/OE/318", 217:"GF - NTBLCP/OE/319",
+  218:"GF - NTBLCP/OE/320", 219:"GF - NTBLCP/OE/321", 220:"GF - NTBLCP/OE/322", 221:"GF - NTBLCP/OE/323", 222:"GF - NTBLCP/OE/324", 223:"GF - NTBLCP/OE/325",
+  224:"GF - NTBLCP/OE/326", 225:"GF - NTBLCP/OE/327", 226:"GF - NTBLCP/OE/328", 227:"GF - NTBLCP/OE/329", 228:"GF - NTBLCP/OE/330", 229:"GF - NTBLCP/OE/331",
+  230:"GF - NTBLCP/OE/332", 231:"GF - NTBLCP/OE/333", 232:"GF - NTBLCP/OE/334", 233:"GF - NTBLCP/OE/335", 234:"GF - NTBLCP/OE/336", 235:"GF - NTBLCP/OE/337",
+  236:"GF - NTBLCP/OE/338", 237:"GF - NTBLCP/OE/339", 238:"GF - NTBLCP/OE/340", 239:"GF - NTBLCP/OE/341", 240:"GF - NTBLCP/OE/342", 241:"GF - NTBLCP/OE/343",
+  242:"GF - NTBLCP/OE/344", 243:"GF - NTBLCP/OE/345", 244:"GF - NTBLCP/OE/346", 245:"GF - NTBLCP/OE/347", 246:"GF - NTBLCP/OE/348", 247:"GF - NTBLCP/OE/349",
+  248:"GF - NTBLCP/OE/350", 249:"GF - NTBLCP/OE/351", 250:"GF - NTBLCP/OE/352", 251:"GF - NTBLCP/OE/353", 252:"GF - NTBLCP/OE/354", 253:"GF - NTBLCP/OE/355",
+  254:"GF - NTBLCP/OE/356", 255:"GF - NTBLCP/OE/357", 256:"GF - NTBLCP/OE/358", 257:"GF - NTBLCP/OE/359", 258:"GF - NTBLCP/OE/360", 259:"GF - NTBLCP/OE/361",
+  260:"GF - NTBLCP/OE/362", 261:"GF - NTBLCP/OE/363", 262:"GF - NTBLCP/OE/364", 263:"GF - NTBLCP/OE/365", 264:"GF - NTBLCP/OE/366", 265:"GF - NTBLCP/OE/367",
+  266:"GF - NTBLCP/OE/368", 267:"GF - NTBLCP/OE/369", 268:"GF - NTBLCP/OE/370", 269:"GF - NTBLCP/OE/371", 270:"GF - NTBLCP/OE/372", 271:"GF - NTBLCP/OE/373",
+  272:"GF - NTBLCP/OE/374", 273:"GF - NTBLCP/OE/375", 274:"GF - NTBLCP/OE/376", 275:"GF - NTBLCP/OE/377", 276:"GF - NTBLCP/OE/378", 277:"GF - NTBLCP/OE/379",
+  278:"GF - NTBLCP/OE/380", 279:"GF - NTBLCP/OE/381", 280:"GF - NTBLCP/OE/382", 281:"GF - NTBLCP/OE/383", 282:"GF - NTBLCP/OE/384", 283:"GF - NTBLCP/OE/385",
+  284:"GF - NTBLCP/OE/386", 285:"GF - NTBLCP/OE/387", 286:"GF - NTBLCP/OE/388", 287:"GF - NTBLCP/OE/389", 288:"GF - NTBLCP/OE/390", 289:"GF - NTBLCP/OE/391",
+  290:"GF - NTBLCP/OE/392", 291:"GF - NTBLCP/OE/393", 292:"GF - NTBLCP/OE/394", 293:"GF - NTBLCP/OE/395", 294:"GF - NTBLCP/OE/396", 295:"GF - NTBLCP/OE/397",
+  296:"GF - NTBLCP/OE/398", 297:"GF - NTBLCP/OE/399", 298:"GF - NTBLCP/OE/400", 299:"GF - NTBLCP/OE/401", 300:"GF - NTBLCP/OE/402", 301:"GF - NTBLCP/OE/403",
+  302:"GF - NTBLCP/OE/404", 303:"GF - NTBLCP/OE/405", 304:"GF - NTBLCP/OE/406", 305:"GF - NTBLCP/OE/407", 306:"GF - NTBLCP/OE/408", 307:"GF - NTBLCP/OE/409",
+  308:"GF - NTBLCP/OE/410", 309:"GF - NTBLCP/OE/411", 310:"GF - NTBLCP/OE/412", 311:"GF - NTBLCP/OE/413", 312:"GF - NTBLCP/OE/414", 313:"GF - NTBLCP/OE/415",
+  314:"GF - NTBLCP/OE/416", 315:"GF - NTBLCP/OE/417", 316:"GF - NTBLCP/OE/418", 317:"GF - NTBLCP/OE/419", 318:"GF - NTBLCP/OE/420", 319:"GF - NTBLCP/OE/421",
+  320:"GF - NTBLCP/OE/422", 321:"GF - NTBLCP/OE/423", 322:"GF - NTBLCP/OE/424", 323:"GF - NTBLCP/OE/425", 324:"GF - NTBLCP/OE/426", 325:"GF - NTBLCP/OE/427",
+  326:"GF - NTBLCP/OE/428", 327:"GF - NTBLCP/OE/429", 328:"GF - NTBLCP/OE/430", 329:"GF - NTBLCP/OE/431", 330:"GF - NTBLCP/OE/432", 331:"GF - NTBLCP/OE/433",
+  332:"GF - NTBLCP/OE/434", 333:"GF - NTBLCP/OE/435", 334:"GF - NTBLCP/OE/436", 335:"GF - NTBLCP/OE/437", 336:"GF - NTBLCP/OE/438", 337:"GF - NTBLCP/OE/439",
+  338:"GF - NTBLCP/OE/440", 339:"GF - NTBLCP/OE/441", 340:"GF - NTBLCP/OE/442", 341:"GF - NTBLCP/OE/443", 342:"GF - NTBLCP/OE/444", 343:"GF - NTBLCP/OE/445",
+  344:"GF - NTBLCP/OE/446", 345:"GF - NTBLCP/OE/447", 346:"GF - NTBLCP/OE/448", 347:"GF - NTBLCP/OE/449", 348:"GF - NTBLCP/OE/450", 349:"GF - NTBLCP/OE/451",
+  350:"GF - NTBLCP/OE/452", 351:"GF - NTBLCP/OE/453", 352:"GF - NTBLCP/OE/454", 353:"GF - NTBLCP/OE/455", 354:"GF - NTBLCP/OE/456", 355:"GF - NTBLCP/OE/457",
+  356:"GF - NTBLCP/OE/458", 357:"GF - NTBLCP/OE/459", 358:"GF - NTBLCP/OE/460", 359:"GF - NTBLCP/OE/461", 360:"GF - NTBLCP/OE/462", 361:"GF - NTBLCP/OE/463",
+  362:"GF - NTBLCP/OE/464", 363:"GF - NTBLCP/OE/465", 364:"GF - NTBLCP/OE/466", 365:"GF - NTBLCP/OE/467", 366:"GF - NTBLCP/OE/468", 367:"GF - NTBLCP/OE/469",
+  368:"GF - NTBLCP/OE/470", 369:"GF - NTBLCP/OE/471", 370:"GF - NTBLCP/OE/472", 371:"GF - NTBLCP/OE/473", 372:"GF - NTBLCP/OE/474", 373:"GF - NTBLCP/OE/475",
+  374:"GF - NTBLCP/OE/476", 375:"GF - NTBLCP/OE/477", 376:"GF - NTBLCP/OE/478", 377:"GF - NTBLCP/OE/479", 378:"GF - NTBLCP/OE/480", 379:"GF - NTBLCP/ITE/020",
+  380:"GF - NTBLCP/ITE/006", 381:"GF - NTBLCP/ITE/007", 382:"GF - NTBLCP/ITE/008", 383:"GF - NTBLCP/ITE/021", 384:"GF - NTBLCP/ITE/023", 385:"GF - NTBLCP/ITE/009",
+  386:"GF - NTBLCP/ITE/010", 387:"GF - NTBLCP/ITE/011", 388:"GF - NTBLCP/ITE/012", 389:"GF - NTBLCP/ITE/013", 390:"GF - NTBLCP/ITE/014", 391:"GF - NTBLCP/ITE/015",
+  392:"GF - NTBLCP/ITE/016", 393:"GF - NTBLCP/ITE/017", 394:"GF - NTBLCP/ITE/018", 395:"GF - NTBLCP/ITE/019", 396:"GF - NTBLCP/OE/009", 397:"GF - NTBLCP/OE/010",
+  398:"GF - NTBLCP/OE/011", 399:"GF - NTBLCP/OE/012", 400:"GF - NTBLCP/OE/013", 401:"GF - NTBLCP/OE/014", 402:"GF - NTBLCP/OE/015", 403:"GF - NTBLCP/OE/016",
+  404:"GF - NTBLCP/OE/017", 405:"GF - NTBLCP/OE/018", 406:"GF - NTBLCP/OE/019", 407:"GF - NTBLCP/OE/020", 408:"GF - NTBLCP/OE/021", 409:"GF - NTBLCP/OE/022",
+  410:"GF - NTBLCP/OE/023", 411:"GF - NTBLCP/OE/024", 412:"GF - NTBLCP/OE/025", 413:"GF - NTBLCP/OE/026", 414:"GF - NTBLCP/OE/027", 415:"GF - NTBLCP/OE/028",
+  416:"GF - NTBLCP/OE/029", 417:"GF - NTBLCP/OE/030", 418:"GF - NTBLCP/OE/031", 419:"GF - NTBLCP/OE/032", 420:"GF - NTBLCP/OE/033", 421:"GF - NTBLCP/OE/035",
+  422:"GF - NTBLCP/OE/036", 423:"GF - NTBLCP/OE/037", 424:"GF - NTBLCP/OE/038", 425:"GF - NTBLCP/OE/039", 426:"GF - NTBLCP/OE/040A", 427:"GF - NTBLCP/OE/040B",
+  428:"GF - NTBLCP/OE/041", 429:"GF - NTBLCP/OE/042", 430:"GF - NTBLCP/OE/043", 431:"GF - NTBLCP/OE/044", 432:"GF - NTBLCP/OE/045", 433:"GF - NTBLCP/OE/046",
+  434:"GF - NTBLCP/OE/047", 435:"GF - NTBLCP/F&F/003", 436:"GF - NTBLCP/F&F/004", 437:"GF - NTBLCP/F&F/003B", 438:"GF - NTBLCP/F&F/006", 439:"GF - NTBLCP/F&F/007",
+  440:"GF - NTBLCP/F&F/008", 441:"GF - NTBLCP/F&F/010", 442:"GF - NTBLCP/F&F/011", 443:"GF - NTBLCP/F&F/012", 444:"GF - NTBLCP/F&F/013", 445:"GF - NTBLCP/F&F/014",
+  446:"GF - NTBLCP/F&F/016", 447:"GF - NTBLCP/F&F/020", 448:"GF - NTBLCP/F&F/021", 449:"GF - NTBLCP/F&F/022", 450:"GF - NTBLCP/F&F/022B", 451:"GF - NTBLCP/F&F/024",
+  452:"GF - NTBLCP/F&F/025", 453:"GF - NTBLCP/F&F/026", 454:"GF - NTBLCP/F&F/027", 455:"GF - NTBLCP/F&F/029", 456:"GF - NTBLCP/F&F/030", 457:"GF - NTBLCP/F&F/031",
+  458:"GF - NTBLCP/F&F/032", 459:"GF - NTBLCP/F&F/033", 460:"GF - NTBLCP/F&F/034", 461:"GF - NTBLCP/F&F/035", 462:"GF - NTBLCP/F&F/036", 463:"GF - NTBLCP/F&F/037",
+  464:"GF - NTBLCP/F&F/038", 465:"GF - NTBLCP/F&F/039", 466:"GF - NTBLCP/F&F/040", 467:"GF - NTBLCP/F&F/041", 468:"GF - NTBLCP/F&F/042", 469:"GF - NTBLCP/F&F/043",
+  470:"GF - NTBLCP/F&F/044", 471:"GF - NTBLCP/F&F/045", 472:"GF - NTBLCP/F&F/046", 473:"GF - NTBLCP/F&F/048", 474:"GF - NTBLCP/F&F/049", 475:"GF - NTBLCP/F&F/050",
+  476:"GF - NTBLCP/F&F/051", 477:"GF - NTBLCP/F&F/052", 478:"GF - NTBLCP/F&F/053", 479:"GF - NTBLCP/F&F/054", 480:"GF - NTBLCP/F&F/056", 481:"GF - NTBLCP/F&F/057",
+  482:"GF - NTBLCP/F&F/058", 483:"GF - NTBLCP/ITE/024", 484:"GF - NTBLCP/ITE/025", 485:"GF - NTBLCP/ITE/026", 486:"GF - NTBLCP/ITE/027", 487:"GF - NTBLCP/ITE/028",
+  488:"GF - NTBLCP/ITE/029", 489:"GF - NTBLCP/ITE/030", 490:"GF - NTBLCP/ITE/031", 491:"GF - NTBLCP/ITE/032", 492:"GF - NTBLCP/ITE/033", 493:"GF - NTBLCP/ITE/034",
+  494:"GF - NTBLCP/ITE/035", 495:"GF - NTBLCP/ITE/037", 496:"GF - NTBLCP/ITE/038", 497:"GF - NTBLCP/ITE/039", 498:"GF - NTBLCP/ITE/040", 499:"GF - NTBLCP/ITE/041",
+  500:"GF - NTBLCP/ITE/042", 501:"GF - NTBLCP/ITE/043", 502:"GF - NTBLCP/ITE/044", 503:"GF - NTBLCP/ITE/045", 504:"GF - NTBLCP/ITE/046", 505:"GF - NTBLCP/ITE/047",
+  506:"GF - NTBLCP/ITE/048", 507:"GF - NTBLCP/ITE/049", 508:"GF - NTBLCP/ITE/050", 509:"GF - NTBLCP/ITE/051", 510:"GF - NTBLCP/ITE/052", 511:"GF - NTBLCP/ITE/053",
+  512:"GF - NTBLCP/ITE/054", 513:"GF - NTBLCP/ITE/055", 514:"GF - NTBLCP/ITE/056", 515:"GF - NTBLCP/ITE/057", 516:"GF - NTBLCP/ITE/058", 517:"GF - NTBLCP/ITE/059",
+  518:"GF - NTBLCP/ITE/060", 519:"GF - NTBLCP/ITE/062", 520:"GF - NTBLCP/OE/481", 521:"GF - NTBLCP/OE/482", 522:"GF - NTBLCP/OE/483", 523:"GF - NTBLCP/OE/484",
+  524:"GF - NTBLCP/OE/485", 525:"GF - NTBLCP/OE/486", 526:"GF - NTBLCP/F&F/059", 527:"GF - NTBLCP/F&F/060", 528:"GF - NTBLCP/F&F/061", 529:"GF - NTBLCP/F&F/062",
+  530:"GF - NTBLCP/F&F/063", 531:"GF - NTBLCP/F&F/064", 532:"GF - NTBLCP/F&F/065", 533:"GF - NTBLCP/F&F/066", 534:"GF - NTBLCP/F&F/067", 535:"GF - NTBLCP/F&F/068",
+  536:"GF - NTBLCP/F&F/069", 537:"GF - NTBLCP/F&F/070", 538:"GF - NTBLCP/F&F/071", 539:"GF - NTBLCP/F&F/072", 540:"GF - NTBLCP/F&F/073", 541:"GF - NTBLCP/F&F/074",
+  542:"GF - NTBLCP/F&F/075", 543:"GF - NTBLCP/F&F/076", 544:"GF - NTBLCP/F&F/077", 545:"GF - NTBLCP/F&F/078", 546:"GF - NTBLCP/F&F/080", 547:"GF - NTBLCP/F&F/081",
+  548:"GF - NTBLCP/F&F/082", 549:"GF - NTBLCP/F&F/083", 550:"GF - NTBLCP/F&F/084", 551:"GF - NTBLCP/F&F/085", 552:"GF - NTBLCP/OE/487", 553:"GF - NTBLCP/OE/488",
+  554:"GF - NTBLCP/OE/489", 555:"GF - NTBLCP/OE/490", 556:"GF - NTBLCP/OE/491", 557:"GF - NTBLCP/OE/492", 558:"GF - NTBLCP/OE/493", 559:"GF - NTBLCP/OE/494-A",
+  560:"GF - NTBLCP/OE/494", 561:"GF - NTBLCP/ITE/001", 562:"GF - NTBLCP/ITE/002,", 563:"GF - NTBLCP/ITE/003,", 564:"GF - NTBLCP/ITE/004", 565:"GF - NTBLCP/CE/001",
+  566:"GF - NTBLCP/CE/002", 567:"GF - NTBLCP/CE/003", 568:"GF - NTBLCP/F&F/001", 569:"GF - NTBLCP/F&F/002", 570:"GF - NTBLCP/OE/004", 571:"GF - NTBLCP/OE/005",
+  572:"GF - NTBLCP/OE/006", 573:"GF - NTBLCP/CE/005", 574:"GF - NTBLCP/CE/006", 575:"GF - NTBLCP/CE/007", 576:"GF - NTBLCP/CE/008", 577:"GF - NTBLCP/CE/009",
+  578:"GF - NTBLCP/CE/010", 579:"GF - NTBLCP/CE/011", 580:"GF - NTBLCP/CE/012", 581:"GF - NTBLCP/CE/013", 582:"GF NTBLCP/CE/014", 583:"GF - NTBLCP/CE/035",
+  584:"GF - NTBLCP/CE/036", 585:"GF - NTBLCP/CE/037", 586:"GF - NTBLCP/CE/038", 587:"GF - NTBLCP/CE/039", 588:"GF - NTBLCP/CE/040", 589:"GF - NTBLCP/CE/041",
+  590:"GF - NTBLCP/CE/042", 591:"GF - NTBLCP/CE/043", 592:"GF - NTBLCP/CE/044", 593:"GF - NTBLCP/CE/045", 594:"GF - NTBLCP/CE/046", 595:"GF - NTBLCP/CE/047",
+  596:"GF - NTBLCP/CE/048", 597:"GF - NTBLCP/CE/049", 598:"GF - NTBLCP/CE/050", 599:"GF - NTBLCP/CE/051", 600:"GF - NTBLCP/CE/052", 601:"GF - NTBLCP/CE/053",
+  602:"GF - NTBLCP/CE/054", 603:"GF - NTBLCP/CE/055", 604:"GF - NTBLCP/CE/056", 605:"GF - NTBLCP/CE/057", 606:"GF - NTBLCP/CE/058", 607:"GF - NTBLCP/CE/059",
+  608:"GF - NTBLCP/CE/060", 609:"GF - NTBLCP/CE/062", 610:"GF - NTBLCP/CE/063", 611:"GF - NTBLCP/CE/064", 612:"GF - NTBLCP/CE/065", 613:"GF - NTBLCP/CE/066",
+  614:"GF - NTBLCP/CE/067", 615:"GF - NTBLCP/CE/068", 616:"GF - NTBLCP/CE/069", 617:"GF - NTBLCP/CE/070", 618:"GF - NTBLCP/CE/023", 619:"GF - NTBLCP/CE/024",
+  620:"GF - NTBLCP/CE/025", 621:"GF - NTBLCP/CE/026", 622:"GF - NTBLCP/CE/027", 623:"GF - NTBLCP/CE/029", 624:"GF - NTBLCP/CE/030", 625:"GF - NTBLCP/CE/031",
+  626:"GF - NTBLCP/CE/032", 627:"GF - NTBLCP/CE/033", 628:"GF - NTBLCP/CE/084", 629:"GF - NTBLCP/CE/088", 630:"GF - NTBLCP/CE/071", 631:"GF - NTBLCP/CE/072",
+  632:"GF - NTBLCP/CE/074", 633:"GF - NTBLCP/CE/081", 634:"GF - NTBLCP/CE/077", 635:"GF - NTBLCP/CE/082", 636:"GF - NTBLCP/CE/085", 637:"GF - NTBLCP/CE/076",
+  638:"GF - NTBLCP/CE/075", 639:"GF - NTBLCP/CE/079", 640:"GF - NTBLCP/CE/019", 641:"GF - NTBLCP/CE/087", 642:"GF - NTBLCP/CE/083", 643:"GF - NTBLCP/CE/078",
+  644:"GF - NTBLCP/CE/073", 645:"GF - NTBLCP/CE/080", 646:"GF - NTBLCP/CE/034", 647:"AG 583 SHD", 648:"AG 804 SHD", 649:"GR 726 LND / AO 503 FG",
+  650:"GR 727 LND / AO 505  FG", 651:"AAA 283 BU", 652:"AAA 285 BU", 653:"AAA 286 BU", 654:"GGE234CP", 655:"GGE216CP", 656:"GGE236CP",
+  657:"AAP 869  DX", 658:"AAP 870  DX", 659:"AAP 8721 DX", 660:"AAP 872  DX", 661:"GGE 760 EC", 662:"GGE 761 EC", 663:"GGE 762 EC",
+  664:"GGE 763 EC", 665:"ABC 829 GR", 666:"12 Z22FG (KUJ-420-JP)", 667:"32 J-35FG", 668:"32 J-36FG", 669:"32 J-38FG", 670:"32 J-39FG",
+  671:"12R920FG", 672:"32 J-40FG", 673:"FG 32 Z01 (GCE-764-EC)", 674:"FG 31 Z01 (AGL-59-CN)", 675:"12R921FG", 676:"BC 534 JJN",
+};
+
+
 export function DataPatchDialog({ isOpen, onOpenChange }: DataPatchDialogProps) {
   const { setAssets, userProfile } = useAppState();
   const [isPatching, setIsPatching] = useState(false);
   const { toast } = useToast();
 
-  const handleApplyPatch = async () => {
+  const handleApplyPatch = async (patchType: 'assignee' | 'assetIdCode') => {
     setIsPatching(true);
     try {
       const allAssets = await getLocalAssets();
       let updatedCount = 0;
+      
       const patchedAssets = allAssets.map(asset => {
-        if (asset.sn && assigneePatchData[Number(asset.sn)]) {
-            const newAssignee = assigneePatchData[Number(asset.sn)];
-            if (asset.assignee !== newAssignee) {
-                updatedCount++;
-                return sanitizeForFirestore({
-                    ...asset,
-                    assignee: newAssignee,
-                    lastModified: new Date().toISOString(),
-                    lastModifiedBy: userProfile?.displayName,
-                    lastModifiedByState: userProfile?.state,
-                    syncStatus: 'local',
-                });
-            }
+        let newAssignee: string | undefined;
+        let newAssetIdCode: string | undefined;
+
+        if (patchType === 'assignee' && asset.sn && assigneePatchData[Number(asset.sn)]) {
+          newAssignee = assigneePatchData[Number(asset.sn)];
         }
+        
+        if (patchType === 'assetIdCode' && asset.category === 'NTBLCP-TB-FAR' && asset.sn && assetIdCodePatchData[Number(asset.sn)]) {
+          newAssetIdCode = assetIdCodePatchData[Number(asset.sn)];
+        }
+
+        if (newAssignee && asset.assignee !== newAssignee) {
+          updatedCount++;
+          return sanitizeForFirestore({
+            ...asset,
+            assignee: newAssignee,
+            lastModified: new Date().toISOString(),
+            lastModifiedBy: userProfile?.displayName,
+            lastModifiedByState: userProfile?.state,
+            syncStatus: 'local',
+          });
+        }
+        
+        if (newAssetIdCode && asset.assetIdCode !== newAssetIdCode) {
+          updatedCount++;
+          return sanitizeForFirestore({
+            ...asset,
+            assetIdCode: newAssetIdCode,
+            lastModified: new Date().toISOString(),
+            lastModifiedBy: userProfile?.displayName,
+            lastModifiedByState: userProfile?.state,
+            syncStatus: 'local',
+          });
+        }
+
         return asset;
       });
 
@@ -161,7 +298,7 @@ export function DataPatchDialog({ isOpen, onOpenChange }: DataPatchDialogProps) 
       
       toast({
         title: 'Patch Applied',
-        description: `${updatedCount} asset(s) were updated with new assignees. Your changes have been saved locally and will be synced.`,
+        description: `${updatedCount} asset(s) were updated. Your changes have been saved locally and will be synced.`,
       });
       onOpenChange(false);
     } catch (error) {
@@ -180,17 +317,21 @@ export function DataPatchDialog({ isOpen, onOpenChange }: DataPatchDialogProps) 
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Apply Assignee Data Patch?</AlertDialogTitle>
+          <AlertDialogTitle>Apply Data Patch</AlertDialogTitle>
           <AlertDialogDescription>
-            This action will update the "Assignee" field for up to 670 assets based on a predefined list mapped by S/N. This is a one-time operation. Are you sure you want to continue?
+            This action will update asset data based on a predefined list mapped by S/N. This is a one-time operation. Please select a patch to apply.
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
           <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction onClick={handleApplyPatch} disabled={isPatching}>
-            {isPatching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            Apply Patch
-          </AlertDialogAction>
+          <Button onClick={() => handleApplyPatch('assignee')} disabled={isPatching}>
+            {isPatching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Apply Assignee Patch
+          </Button>
+           <Button onClick={() => handleApplyPatch('assetIdCode')} disabled={isPatching}>
+            {isPatching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            Apply Asset ID Patch
+          </Button>
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
