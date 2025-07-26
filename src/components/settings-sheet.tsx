@@ -26,12 +26,13 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library, Wrench, PlaneTakeoff } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library, Wrench, PlaneTakeoff, Info } from 'lucide-react';
 import { SheetDefinitionForm } from './sheet-definition-form';
 import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { SingleSheetImportDialog } from './single-sheet-import-dialog';
+import { DataPatchDialog } from './data-patch-dialog';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -54,6 +55,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const [isSaving, setIsSaving] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
+  const [isPatchDialogOpen, setIsPatchDialogOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -110,7 +112,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     setIsSheetFormOpen(true);
   };
   
-  const handleDeleteSheet = (sheetNameToDelete: string) => {
+  const handleDeleteSheet = async (sheetNameToDelete: string) => {
     const newSheetDefinitions = { ...appSettings.sheetDefinitions };
     delete newSheetDefinitions[sheetNameToDelete];
     
@@ -124,7 +126,12 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
 
     setAppSettings(newSettings);
     if (isOnline && isAdmin) {
-      updateSettings({ sheetDefinitions: newSettings.sheetDefinitions, enabledSheets: newSettings.enabledSheets });
+      try {
+        await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions, enabledSheets: newSettings.enabledSheets });
+        toast({ title: "Sheet Deleted", description: `'${sheetNameToDelete}' definition has been removed.`})
+      } catch (e) {
+        toast({ title: 'Error', description: 'Could not update settings in the database.', variant: 'destructive' });
+      }
     }
   };
 
@@ -226,7 +233,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
           <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-y-hidden">
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
-                <TabsTrigger value="account"><UserCog className="mr-2 h-4 w-4" />Account</TabsTrigger>
+                <TabsTrigger value="account" disabled={isGuest}><UserCog className="mr-2 h-4 w-4" />Account</TabsTrigger>
             </TabsList>
             <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
@@ -250,6 +257,9 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                           <Separator className="my-2"/>
                           <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={isGuest}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                          </Button>
+                           <Button variant="outline" className="w-full justify-start" onClick={() => setIsPatchDialogOpen(true)}>
+                              <Wrench className="mr-2 h-4 w-4" /> Data Patch Utility
                           </Button>
                           <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || isGuest}>
                             <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
@@ -366,6 +376,12 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         onOpenChange={setIsSingleSheetImportOpen}
       />
 
+      <DataPatchDialog
+        isOpen={isPatchDialogOpen}
+        onOpenChange={setIsPatchDialogOpen}
+      />
     </>
   );
 }
+
+    

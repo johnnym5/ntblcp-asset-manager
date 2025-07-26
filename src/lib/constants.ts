@@ -7,10 +7,10 @@ export const TARGET_SHEETS = [
   'PDX-C19RM',
   'TB LAMP-C19RM',
   'ECG monitors',
-  'IHVN-GF N-THRIP',
   'TRUENAT-C19RM',
   'Vehicles-TB (IHVN)',
   'GeneXpert machines-TB',
+  'IHVN-GF N-THRIP', // Simplified: now a single sheet
 ];
 
 export const NIGERIAN_STATES = [
@@ -106,17 +106,13 @@ export const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
 
 const defaultTableFields: (keyof Asset)[] = ['sn', 'assetIdCode', 'lga', 'assignee', 'verifiedStatus'];
 const vehicleTableFields: (keyof Asset)[] = ['sn', 'assetIdCode', 'lga', 'chasisNo', 'engineNo', 'assignee', 'verifiedStatus'];
+const ihvnTableFields: (keyof Asset)[] = ['sn', 'description', 'assetIdCode', 'serialNumber', 'location', 'site', 'assignee', 'verifiedStatus'];
 
 const ntblcpFarHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Suppliers', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ];
 const motorcycleHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Chasis no', 'Engine no', 'Suppliers', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ];
 const pdxHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)' ];
 const vehiclesIHVNHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Engine no', 'Chasis no', 'Suppliers', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'GRANT', 'Useful Life (Years)' ];
 const genexpertHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ];
-
-const ihvnGeneralHeaders = [ "S/N", "STATE", "TAG NUMBERS", "DESCRIPTION", "CLASSIFICATION", "ASSET SERIAL NUMBERS", "MODEL NUMBERS", "QTY", "LOCATION", "SITE", "YEAR OF PURCHASE", "COST (NGN)", "GRANT" ];
-const ihvnComputersHeaders = [ "S/N", "CATEGORY", "TAG NUMBER", "DESCRIPTION", "QTY", "SERIAL NUMBER", "MODEL NUMBER", "YEAR OF PURCHASE", "LOCATION/USER", "COST (NGN)", "Grant" ];
-const ihvnItHeaders = [ "S/N", "CATEGORY", "TAG NUMBER", "DESCRIPTION", "QTY", "SERIAL NUMBER", "MODEL NUMBER", "YEAR OF PURCHASE", "LOCATION/USER", "COST (NGN)", "Grant" ];
-const ihvnInheritedHeaders = [ "S/N", "STATE", "TAG NUMBERS", "DESCRIPTION", "CLASSIFICATION", "SERIAL NUMBERS", "MODEL NUMBERS", "QTY", "LOCATION", "SITE", "YEAR OF PURCHASE", "COST(N)", "GRANT" ];
 
 const createDisplayFields = (headers: string[], tableFields: (keyof Asset)[]): DisplayField[] => {
   const quickViewFields = headers.slice(0, 10).map(h => {
@@ -156,6 +152,15 @@ const createDisplayFields = (headers: string[], tableFields: (keyof Asset)[]): D
 }
 
 
+// These are the header definitions used to find and parse the different tables within the single "IHVN-GF N-THRIP" sheet.
+export const IHVN_SUB_SHEET_DEFINITIONS: Record<string, string[]> = {
+    'IHVN-General': [ "S/N", "STATE", "TAG NUMBERS", "DESCRIPTION", "CLASSIFICATION", "ASSET SERIAL NUMBERS", "MODEL NUMBERS", "QTY", "LOCATION", "SITE", "YEAR OF PURCHASE", "COST (NGN)", "GRANT" ],
+    'IHVN-Computers': [ "S/N", "CATEGORY", "TAG NUMBER", "DESCRIPTION", "QTY", "SERIAL NUMBER", "MODEL NUMBER", "YEAR OF PURCHASE", "LOCATION/USER", "COST (NGN)", "Grant" ],
+    'IHVN-IT Equipment': [ "S/N", "CATEGORY", "TAG NUMBER", "DESCRIPTION", "QTY", "SERIAL NUMBER", "MODEL NUMBER", "YEAR OF PURCHASE", "LOCATION/USER", "COST (NGN)", "Grant" ],
+    'IHVN-Inherited Assets': [ "S/N", "STATE", "TAG NUMBERS", "DESCRIPTION", "CLASSIFICATION", "SERIAL NUMBERS", "MODEL NUMBERS", "QTY", "LOCATION", "SITE", "YEAR OF PURCHASE", "COST(N)", "GRANT" ],
+};
+
+
 export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
   'NTBLCP-TB-FAR': { name: 'NTBLCP-TB-FAR', headers: ntblcpFarHeaders, displayFields: createDisplayFields(ntblcpFarHeaders, defaultTableFields) },
   'MOTORCYCLES-C19RM': { name: 'MOTORCYCLES-C19RM', headers: motorcycleHeaders, displayFields: createDisplayFields(motorcycleHeaders, vehicleTableFields) },
@@ -166,12 +171,13 @@ export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
   'Vehicles-TB (IHVN)': { name: 'Vehicles-TB (IHVN)', headers: vehiclesIHVNHeaders, displayFields: createDisplayFields(vehiclesIHVNHeaders, vehicleTableFields) },
   'GeneXpert machines-TB': { name: 'GeneXpert machines-TB', headers: genexpertHeaders, displayFields: createDisplayFields(genexpertHeaders, defaultTableFields) },
 
-  'IHVN-General': { name: 'IHVN-General', headers: ihvnGeneralHeaders, displayFields: createDisplayFields(ihvnGeneralHeaders, defaultTableFields) },
-  'IHVN-Computers': { name: 'IHVN-Computers', headers: ihvnComputersHeaders, displayFields: createDisplayFields(ihvnComputersHeaders, defaultTableFields) },
-  'IHVN-IT Equipment': { name: 'IHVN-IT Equipment', headers: ihvnItHeaders, displayFields: createDisplayFields(ihvnItHeaders, defaultTableFields) },
-  'IHVN-Inherited Assets': { name: 'IHVN-Inherited Assets', headers: ihvnInheritedHeaders, displayFields: createDisplayFields(ihvnInheritedHeaders, defaultTableFields) },
-  
-  // This is now just a virtual group, its definition is for display purposes.
-  'IHVN-GF N-THRIP': { name: 'IHVN-GF N-THRIP', headers: [], displayFields: [] } 
+  'IHVN-GF N-THRIP': { 
+    name: 'IHVN-GF N-THRIP',
+    // The 'headers' for this special sheet is a union of all possible headers from its sub-tables.
+    headers: Array.from(new Set(Object.values(IHVN_SUB_SHEET_DEFINITIONS).flat())),
+    displayFields: createDisplayFields(Array.from(new Set(Object.values(IHVN_SUB_SHEET_DEFINITIONS).flat())), ihvnTableFields),
+  }
 };
+    
+
     

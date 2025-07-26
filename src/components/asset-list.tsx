@@ -15,6 +15,7 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
+  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -43,6 +44,7 @@ import {
   HardDrive,
   ArrowRightLeft,
   Columns,
+  Delete,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -154,6 +156,8 @@ export default function AssetList() {
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
+  const [isClearCategoryDialogOpen, setIsClearCategoryDialogOpen] = useState(false);
+  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
@@ -793,6 +797,39 @@ export default function AssetList() {
   }, [isOnline, isAdmin, setAssets, dataSource, setOfflineAssets]);
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
+
+  const handleClearCategoryClick = useCallback((category: string) => {
+    setCategoryToDelete(category);
+    setIsClearCategoryDialogOpen(true);
+  }, []);
+
+  const handleClearCategory = async () => {
+    if (!categoryToDelete) return;
+    if (!isAdmin) {
+      addNotification({ title: 'Permission Denied', description: 'Only admins can delete categories.', variant: 'destructive'});
+      return;
+    }
+
+    setIsClearCategoryDialogOpen(false);
+    
+    const source = await getLocalAssetsFromDb();
+    const assetsToKeep = source.filter(a => a.category !== categoryToDelete);
+    const assetsToDelete = source.filter(a => a.category === categoryToDelete);
+    const idsToDelete = assetsToDelete.map(a => a.id);
+    
+    await saveAssets(assetsToKeep);
+    setAssets(assetsToKeep);
+    addNotification({ title: 'Category Cleared', description: `All ${idsToDelete.length} assets from '${categoryToDelete}' have been deleted locally.`});
+
+    if (isOnline) {
+      try {
+        await batchDeleteAssets(idsToDelete);
+        addNotification({ title: 'Cloud Data Deleted', description: `Category data has also been removed from the cloud.` });
+      } catch (e) {
+        addNotification({ title: 'Cloud Deletion Failed', description: `Could not remove category from cloud.`, variant: 'destructive'});
+      }
+    }
+  };
   
   const handleSelectiveSync = useCallback(async () => {
     if (!isOnline) {
@@ -824,7 +861,7 @@ export default function AssetList() {
         await batchSetAssets(assetsToSync);
 
         const updatedLocalAssets = allLocalAssets.map(asset => 
-          idsToSync.includes(asset.id) ? { ...asset, syncStatus: 'synced' as const } : asset
+          idsToSync.includes(a.id) ? { ...asset, syncStatus: 'synced' as const } : asset
         );
         await saveAssets(updatedLocalAssets);
         setAssets(updatedLocalAssets);
@@ -1047,14 +1084,28 @@ export default function AssetList() {
       
       return (
           <Card key={category} className={cn("hover:shadow-md transition-shadow flex flex-col", isSelected && "ring-2 ring-primary")}>
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                <div className="flex-1">
                   <CardTitle className="text-sm font-medium pr-2">{category}</CardTitle>
-                  <Checkbox
-                    checked={isSelected}
-                    onCheckedChange={(checked) => handleSelectCategory(category, checked as boolean)}
-                    aria-label={`Select category ${category}`}
-                    disabled={isGuest}
-                  />
+                </div>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" size="icon" className="h-6 w-6 -translate-y-1.5 -translate-x-1.5">
+                        <MoreHorizontal className="h-4 w-4" />
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                       <DropdownMenuItem onSelect={() => handleSelectCategory(category, !isSelected)} disabled={isGuest}>
+                          <Checkbox className="mr-2 h-4 w-4" checked={isSelected}/>
+                          {isSelected ? 'Deselect' : 'Select'}
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onSelect={() => handleClearCategoryClick(category)} disabled={isGuest || !isAdmin} className="text-destructive focus:text-destructive">
+                          <Delete className="mr-2 h-4 w-4" />
+                          Delete Category
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
               </CardHeader>
               <CardContent className="flex-grow space-y-4">
                   <div>
@@ -1067,21 +1118,14 @@ export default function AssetList() {
                   </div>
               </CardContent>
               <CardFooter className="pt-0 pb-4">
-                <Button variant="link" className="p-0 h-auto" onClick={() => { 
-                    if (category === 'IHVN-GF N-THRIP') {
-                        setView('ihvn-group');
-                    } else {
-                        setView('table'); 
-                        setCurrentCategory(category); 
-                    }
-                }}>View Assets</Button>
+                <Button variant="link" className="p-0 h-auto" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
               </CardFooter>
           </Card>
       );
   }
 
   // DASHBOARD VIEW
-  if (view === 'dashboard' || view === 'ihvn-group') {
+  if (view === 'dashboard') {
     const totalAssetsInScope = allAssetsForFiltering.length;
     const currentlyDisplayedAssets = displayedAssets.length;
     const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
@@ -1092,17 +1136,14 @@ export default function AssetList() {
     const syncButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Sync to Cloud';
     const SyncButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
 
-    const mainCategories = Object.keys(assetsByCategory).filter(cat => cat !== 'IHVN-GF N-THRIP' && !cat.startsWith('IHVN-')).sort((a,b) => a.localeCompare(b));
-    const hasIHVNCategories = Object.keys(assetsByCategory).some(cat => cat.startsWith('IHVN-'));
-    const ihvnSubCategories = Object.keys(assetsByCategory).filter(cat => cat.startsWith('IHVN-'));
-
+    const mainCategories = Object.keys(assetsByCategory).sort((a,b) => a.localeCompare(b));
 
     return (
       <div className="flex flex-col h-full gap-4">
         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
         <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight flex-1">
-                {view === 'ihvn-group' ? 'IHVN-GF N-THRIP Assets' : (isFiltered ? 'Filter Results' : 'Asset Dashboard')}
+                {isFiltered ? 'Filter Results' : 'Asset Dashboard'}
             </h2>
             <div className="flex items-center gap-2">
               {selectedCategories.length > 0 && (
@@ -1126,9 +1167,8 @@ export default function AssetList() {
               )}
             </div>
         </div>
-        {view === 'dashboard' && (
-          <Card>
-               <CardHeader className="flex-row items-start justify-between">
+        <Card>
+             <CardHeader className="flex-row items-start justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <span>Verification Status</span>
@@ -1211,17 +1251,11 @@ export default function AssetList() {
               </CardContent>
           </Card>
         )}
-        {view === 'ihvn-group' && (
-             <Button variant="outline" size="sm" className="self-start" onClick={() => setView('dashboard')}>
-                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
-            </Button>
-        )}
+        
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {view === 'dashboard' && mainCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))}
-            {view === 'dashboard' && hasIHVNCategories && renderDashboardCard('IHVN-GF N-THRIP', ihvnSubCategories.flatMap(cat => assetsByCategory[cat]))}
-            {view === 'ihvn-group' && ihvnSubCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))}
-
-            {(mainCategories.length === 0 && !hasIHVNCategories) && (
+            {mainCategories.length > 0 ? (
+              mainCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))
+            ) : (
                  <div className="col-span-full text-center py-24 text-muted-foreground">
                     <FolderSearch className="mx-auto h-12 w-12" />
                     <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
@@ -1260,6 +1294,22 @@ export default function AssetList() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+         <AlertDialog open={isClearCategoryDialogOpen} onOpenChange={setIsClearCategoryDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Delete all assets in '{categoryToDelete}'?</AlertDialogTitle>
+                    <AlertDialogDescription>
+                      This will permanently delete all assets from this category on your local device and from the cloud database. This action cannot be undone.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel onClick={() => setCategoryToDelete(null)}>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleClearCategory} className="bg-destructive hover:bg-destructive/90">
+                        Yes, delete this category
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
       </div>
     )
   }
@@ -1276,7 +1326,7 @@ export default function AssetList() {
   
   const currentSheetDefinition = sheetDefinitions[currentCategory!];
   const tableFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.table) || [];
-  const backButtonTarget = currentCategory?.startsWith('IHVN') ? 'ihvn-group' : 'dashboard';
+  const backButtonTarget = 'dashboard';
 
 
   return (
@@ -1441,3 +1491,4 @@ export default function AssetList() {
   );
 }
 
+    
