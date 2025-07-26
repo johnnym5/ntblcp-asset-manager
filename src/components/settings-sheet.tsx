@@ -26,7 +26,7 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library, Wrench } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library, Wrench, PlaneTakeoff } from 'lucide-react';
 import { SheetDefinitionForm } from './sheet-definition-form';
 import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
@@ -62,10 +62,14 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
-    setAppSettings(prev => ({ ...prev, [key]: value }));
+    const newSettings = { ...appSettings, [key]: value };
+    setAppSettings(newSettings);
+    if (isOnline && isAdmin) {
+      updateSettings({ [key]: value });
+    }
   };
 
-  const handleToggleSheet = (sheetName: string, checked: boolean) => {
+  const handleToggleSheet = async (sheetName: string, checked: boolean) => {
     let newEnabledSheets;
     if (checked) {
       newEnabledSheets = [...appSettings.enabledSheets, sheetName];
@@ -115,11 +119,16 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     
     const newEnabledSheets = appSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
 
-    setAppSettings(prev => ({
-      ...prev,
+    const newSettings = {
+      ...appSettings,
       sheetDefinitions: newSheetDefinitions,
       enabledSheets: newEnabledSheets,
-    }));
+    };
+
+    setAppSettings(newSettings);
+    if (isOnline && isAdmin) {
+      updateSettings({ sheetDefinitions: newSettings.sheetDefinitions, enabledSheets: newSettings.enabledSheets });
+    }
   };
 
   const handleSaveSheet = (sheet: SheetDefinition) => {
@@ -134,15 +143,21 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     if (!originalSheetName && !newEnabledSheets.includes(sheet.name)) {
       newEnabledSheets.push(sheet.name);
     }
-
-    setAppSettings(prev => ({
-      ...prev,
+    
+    const newSettings = {
+       ...appSettings,
       sheetDefinitions: {
         ...newSheetDefinitions,
         [sheet.name]: sheet,
       },
       enabledSheets: newEnabledSheets
-    }));
+    }
+
+    setAppSettings(newSettings);
+
+    if (isOnline && isAdmin) {
+      updateSettings({ sheetDefinitions: newSettings.sheetDefinitions, enabledSheets: newSettings.enabledSheets });
+    }
   };
 
   const handleImportTemplate = () => {
@@ -165,11 +180,16 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         }
       });
 
-      setAppSettings(prev => ({
-        ...prev,
+      const newSettings = {
+        ...appSettings,
         sheetDefinitions: currentDefs,
         enabledSheets: currentEnabled,
-      }));
+      };
+
+      setAppSettings(newSettings);
+      if (isOnline && isAdmin) {
+        await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions, enabledSheets: newSettings.enabledSheets });
+      }
 
       toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added or updated.` });
     } catch (error) {
@@ -206,7 +226,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
               Manage application settings and preferences. Admin changes apply to all users.
             </SheetDescription>
           </SheetHeader>
-          <Tabs defaultValue={isAdmin ? "general" : "account"} className="flex-1 flex flex-col overflow-y-hidden">
+          <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-y-hidden">
             <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
                 <TabsTrigger value="account"><UserCog className="mr-2 h-4 w-4" />Account</TabsTrigger>
@@ -225,12 +245,20 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                         <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
                       </Button>
                       <Separator className="my-2"/>
-                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={isGuest || !isAdmin}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onTravelReport} disabled={isGuest}>
+                         <PlaneTakeoff className="mr-2 h-4 w-4" /> Travel Sign-off Sheet
                       </Button>
-                      <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || isGuest}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
-                      </Button>
+                      {isAdmin && (
+                        <>
+                          <Separator className="my-2"/>
+                          <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={isGuest}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                          </Button>
+                          <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || isGuest}>
+                            <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
+                          </Button>
+                        </>
+                      )}
                     </div>
                 </div>
               

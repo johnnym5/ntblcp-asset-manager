@@ -75,6 +75,7 @@ import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clea
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
+import { TravelReportDialog } from "./travel-report-dialog";
 
 
 /**
@@ -157,6 +158,7 @@ export default function AssetList() {
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
+  const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
@@ -889,7 +891,8 @@ export default function AssetList() {
         onClearAll: handleClearAllClick,
         isImporting: isImporting,
         isAdmin: isAdmin,
-        hasAssets: hasCurrentAssets
+        hasAssets: hasCurrentAssets,
+        onTravelReport: () => setIsTravelReportOpen(true),
     });
 
     return () => {
@@ -1036,8 +1039,49 @@ export default function AssetList() {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
+  const renderDashboardCard = (category: string, categoryAssets: Asset[]) => {
+      const total = categoryAssets.length;
+      const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
+      const percentage = total > 0 ? (verified / total) * 100 : 0;
+      const isSelected = selectedCategories.includes(category);
+      
+      return (
+          <Card key={category} className={cn("hover:shadow-md transition-shadow flex flex-col", isSelected && "ring-2 ring-primary")}>
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                  <CardTitle className="text-sm font-medium pr-2">{category}</CardTitle>
+                  <Checkbox
+                    checked={isSelected}
+                    onCheckedChange={(checked) => handleSelectCategory(category, checked as boolean)}
+                    aria-label={`Select category ${category}`}
+                    disabled={isGuest}
+                  />
+              </CardHeader>
+              <CardContent className="flex-grow space-y-4">
+                  <div>
+                      <div className="text-2xl font-bold">{total}</div>
+                      <p className="text-xs text-muted-foreground">Total assets in this category</p>
+                  </div>
+                  <div className="space-y-2">
+                      <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
+                      <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
+                  </div>
+              </CardContent>
+              <CardFooter className="pt-0 pb-4">
+                <Button variant="link" className="p-0 h-auto" onClick={() => { 
+                    if (category === 'IHVN-GF N-THRIP') {
+                        setView('ihvn-group');
+                    } else {
+                        setView('table'); 
+                        setCurrentCategory(category); 
+                    }
+                }}>View Assets</Button>
+              </CardFooter>
+          </Card>
+      );
+  }
+
   // DASHBOARD VIEW
-  if (view === 'dashboard') {
+  if (view === 'dashboard' || view === 'ihvn-group') {
     const totalAssetsInScope = allAssetsForFiltering.length;
     const currentlyDisplayedAssets = displayedAssets.length;
     const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
@@ -1048,12 +1092,15 @@ export default function AssetList() {
     const syncButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Sync to Cloud';
     const SyncButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
 
+    const mainCategories = Object.keys(assetsByCategory).filter(cat => cat !== 'IHVN-General' && cat !== 'IHVN-Computers' && cat !== 'IHVN-IT Equipment' && cat !== 'IHVN-Inherited Assets').sort((a,b) => a.localeCompare(b));
+    const ihvnCategories = Object.keys(assetsByCategory).filter(cat => cat.startsWith('IHVN-'));
+
     return (
       <div className="flex flex-col h-full gap-4">
         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
         <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-2xl font-bold tracking-tight flex-1">
-                {isFiltered ? `Filter Results` : 'Asset Dashboard'}
+                {view === 'ihvn-group' ? 'IHVN-GF N-THRIP Assets' : (isFiltered ? 'Filter Results' : 'Asset Dashboard')}
             </h2>
             <div className="flex items-center gap-2">
               {selectedCategories.length > 0 && (
@@ -1077,126 +1124,103 @@ export default function AssetList() {
               )}
             </div>
         </div>
-        <Card>
-             <CardHeader className="flex-row items-start justify-between">
-                <div>
-                  <CardTitle className="flex items-center gap-2">
-                    <span>Verification Status</span>
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                           <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDataSource(prev => prev === 'cloud' ? 'local_locked' : 'cloud')}>
-                              {dataSource === 'cloud' ? <CloudUpload className="h-5 w-5 text-blue-500"/> : <HardDrive className="h-5 w-5 text-gray-500" />}
-                           </Button>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p>Data Source: {dataSource === 'cloud' ? 'Cloud Synced' : 'Locked Offline'}</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </CardTitle>
-                  <CardDescription>
-                      {isAdmin && !isFiltered
-                        ? `Viewing: ${globalStateFilter || 'All Assets'}`
-                        : `Viewing: ${userProfile?.state || 'All Assets'}`
-                      }
-                  </CardDescription>
-                </div>
-                
-                <div className="flex items-center gap-4">
-                  {isAdmin && !isFiltered && (
-                    <Select
-                        value={globalStateFilter || 'All'}
-                        onValueChange={(value) => setGlobalStateFilter(value)}
-                    >
-                    <SelectTrigger className="w-full sm:w-[280px]">
-                      <SelectValue placeholder="Select a location to filter..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="All">Overall (All Assets)</SelectItem>
-                        <SelectSeparator />
-                        <SelectGroup>
-                            <SelectLabel>Special Locations</SelectLabel>
-                            {SPECIAL_LOCATIONS.map((loc) => (
-                                <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                            ))}
-                        </SelectGroup>
-                        <SelectSeparator />
-                        <SelectGroup>
-                            <SelectLabel>Geopolitical Zones</SelectLabel>
-                            {ZONE_NAMES.map((zone) => (
-                                <SelectItem key={zone} value={zone}>{zone}</SelectItem>
-                            ))}
-                        </SelectGroup>
-                        <SelectSeparator />
-                        <SelectGroup>
-                            <SelectLabel>States</SelectLabel>
-                            {NIGERIAN_STATES.map((state) => (
-                                <SelectItem key={state} value={state}>
-                                  <StateProgress state={state} allAssets={activeAssets} />
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                    </SelectContent>
-                    </Select>
-                  )}
-                  <div className="flex items-center space-x-2">
-                    <Label htmlFor="select-all-categories" className="text-sm font-medium">Select All</Label>
-                    <Checkbox
-                        id="select-all-categories"
-                        checked={areAllCategoriesSelected}
-                        onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)}
-                        aria-label="Select all categories"
-                        disabled={isGuest}
-                    />
+        {view === 'dashboard' && (
+          <Card>
+               <CardHeader className="flex-row items-start justify-between">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <span>Verification Status</span>
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDataSource(prev => prev === 'cloud' ? 'local_locked' : 'cloud')}>
+                                {dataSource === 'cloud' ? <CloudUpload className="h-5 w-5 text-blue-500"/> : <HardDrive className="h-5 w-5 text-gray-500" />}
+                             </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Data Source: {dataSource === 'cloud' ? 'Cloud Synced' : 'Locked Offline'}</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    </CardTitle>
+                    <CardDescription>
+                        {isAdmin && !isFiltered
+                          ? `Viewing: ${globalStateFilter || 'All Assets'}`
+                          : `Viewing: ${userProfile?.state || 'All Assets'}`
+                        }
+                    </CardDescription>
                   </div>
-                </div>
-            </CardHeader>
-             <CardContent className="pt-2 space-y-2">
-                <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
-                <p className="text-sm text-muted-foreground">
-                  <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{currentlyDisplayedAssets}</span> assets verified.
-                  {isFiltered && ` (Showing from a total of ${totalAssetsInScope})`}
-                </p>
-            </CardContent>
-        </Card>
+                  
+                  <div className="flex items-center gap-4">
+                    {isAdmin && !isFiltered && (
+                      <Select
+                          value={globalStateFilter || 'All'}
+                          onValueChange={(value) => setGlobalStateFilter(value)}
+                      >
+                      <SelectTrigger className="w-full sm:w-[280px]">
+                        <SelectValue placeholder="Select a location to filter..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                          <SelectItem value="All">Overall (All Assets)</SelectItem>
+                          <SelectSeparator />
+                          <SelectGroup>
+                              <SelectLabel>Special Locations</SelectLabel>
+                              {SPECIAL_LOCATIONS.map((loc) => (
+                                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                              ))}
+                          </SelectGroup>
+                          <SelectSeparator />
+                          <SelectGroup>
+                              <SelectLabel>Geopolitical Zones</SelectLabel>
+                              {ZONE_NAMES.map((zone) => (
+                                  <SelectItem key={zone} value={zone}>{zone}</SelectItem>
+                              ))}
+                          </SelectGroup>
+                          <SelectSeparator />
+                          <SelectGroup>
+                              <SelectLabel>States</SelectLabel>
+                              {NIGERIAN_STATES.map((state) => (
+                                  <SelectItem key={state} value={state}>
+                                    <StateProgress state={state} allAssets={activeAssets} />
+                                  </SelectItem>
+                              ))}
+                          </SelectGroup>
+                      </SelectContent>
+                      </Select>
+                    )}
+                    <div className="flex items-center space-x-2">
+                      <Label htmlFor="select-all-categories" className="text-sm font-medium">Select All</Label>
+                      <Checkbox
+                          id="select-all-categories"
+                          checked={areAllCategoriesSelected}
+                          onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)}
+                          aria-label="Select all categories"
+                          disabled={isGuest}
+                      />
+                    </div>
+                  </div>
+              </CardHeader>
+               <CardContent className="pt-2 space-y-2">
+                  <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
+                  <p className="text-sm text-muted-foreground">
+                    <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{currentlyDisplayedAssets}</span> assets verified.
+                    {isFiltered && ` (Showing from a total of ${totalAssetsInScope})`}
+                  </p>
+              </CardContent>
+          </Card>
+        )}
+        {view === 'ihvn-group' && (
+             <Button variant="outline" size="sm" className="self-start" onClick={() => setView('dashboard')}>
+                <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+            </Button>
+        )}
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {Object.keys(assetsByCategory).length > 0 ? (
-                Object.entries(assetsByCategory).sort(([a], [b]) => a.localeCompare(b)).map(([category, categoryAssets]) => {
-                    const total = categoryAssets.length;
-                    const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
-                    const percentage = total > 0 ? (verified / total) * 100 : 0;
-                    const isSelected = selectedCategories.includes(category);
-                    
-                    return (
-                        <Card key={category} className={cn("hover:shadow-md transition-shadow flex flex-col", isSelected && "ring-2 ring-primary")}>
-                            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                                <CardTitle className="text-sm font-medium pr-2">{category}</CardTitle>
-                                <Checkbox
-                                  checked={isSelected}
-                                  onCheckedChange={(checked) => handleSelectCategory(category, checked as boolean)}
-                                  aria-label={`Select category ${category}`}
-                                  disabled={isGuest}
-                                />
-                            </CardHeader>
-                            <CardContent className="flex-grow space-y-4">
-                                <div>
-                                    <div className="text-2xl font-bold">{total}</div>
-                                    <p className="text-xs text-muted-foreground">{isFiltered ? 'Assets found' : 'Total assets'} in this category</p>
-                                </div>
-                                <div className="space-y-2">
-                                    <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
-                                    <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
-                                </div>
-                            </CardContent>
-                            <CardFooter className="pt-0 pb-4">
-                              <Button variant="link" className="p-0 h-auto" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
-                            </CardFooter>
-                        </Card>
-                    );
-                })
-            ) : (
-                <div className="col-span-full text-center py-24 text-muted-foreground">
+            {view === 'dashboard' && mainCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))}
+            {view === 'dashboard' && ihvnCategories.length > 0 && renderDashboardCard('IHVN-GF N-THRIP', ihvnCategories.flatMap(cat => assetsByCategory[cat]))}
+            {view === 'ihvn-group' && ihvnCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))}
+
+            {(mainCategories.length === 0 && ihvnCategories.length === 0) && (
+                 <div className="col-span-full text-center py-24 text-muted-foreground">
                     <FolderSearch className="mx-auto h-12 w-12" />
                     <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
                     {searchTerm ? (
@@ -1207,6 +1231,7 @@ export default function AssetList() {
                 </div>
             )}
         </div>
+        <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} assets={displayedAssets} />
         <AssetForm 
           isOpen={isFormOpen} 
           onOpenChange={setIsFormOpen} 
@@ -1249,11 +1274,13 @@ export default function AssetList() {
   
   const currentSheetDefinition = sheetDefinitions[currentCategory!];
   const tableFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.table) || [];
+  const backButtonTarget = currentCategory?.startsWith('IHVN') ? 'ihvn-group' : 'dashboard';
+
 
   return (
     <div className="flex flex-col h-full gap-4">
         <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => { setView('dashboard'); setCurrentCategory(null); setSelectedAssetIds([]); }}>
+            <Button variant="outline" size="icon" onClick={() => { setView(backButtonTarget); setCurrentCategory(null); setSelectedAssetIds([]); }}>
                 <ArrowLeft className="h-4 w-4" />
             </Button>
             <h2 className="text-2xl font-bold tracking-tight flex-1">
@@ -1272,17 +1299,17 @@ export default function AssetList() {
                       {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <SyncButtonIcon className="mr-2 h-4 w-4" />}
                        {syncButtonText}
                     </Button>
-                     {selectedAssetIds.length === 1 && (
-                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={isGuest || !isAdmin}>
+                     {selectedAssetIds.length === 1 && !isGuest && !isAdmin && (
+                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     )}
-                    {selectedAssetIds.length > 0 && (
-                        <Button variant="outline" size="sm" onClick={handleBatchEdit} disabled={isGuest || !isAdmin}>
+                    {selectedAssetIds.length > 0 && !isGuest && !isAdmin && (
+                        <Button variant="outline" size="sm" onClick={handleBatchEdit}>
                             <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                         </Button>
                     )}
-                    <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting || isGuest}>
+                    <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting || isGuest || !isAdmin}>
                         {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                         Delete
                     </Button>

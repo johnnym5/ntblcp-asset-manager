@@ -7,10 +7,7 @@ export const TARGET_SHEETS = [
   'PDX-C19RM',
   'TB LAMP-C19RM',
   'ECG monitors',
-  'IHVN-General',
-  'IHVN-Computers',
-  'IHVN-IT Equipment',
-  'IHVN-Inherited Assets',
+  'IHVN-GF N-THRIP',
   'TRUENAT-C19RM',
   'Vehicles-TB (IHVN)',
   'GeneXpert machines-TB',
@@ -169,11 +166,12 @@ export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
   'Vehicles-TB (IHVN)': { name: 'Vehicles-TB (IHVN)', headers: vehiclesIHVNHeaders, displayFields: createDisplayFields(vehiclesIHVNHeaders, vehicleTableFields) },
   'GeneXpert machines-TB': { name: 'GeneXpert machines-TB', headers: genexpertHeaders, displayFields: createDisplayFields(genexpertHeaders, defaultTableFields) },
 
-  // IHVN Sub-sheets
   'IHVN-General': { name: 'IHVN-General', headers: ihvnGeneralHeaders, displayFields: createDisplayFields(ihvnGeneralHeaders, defaultTableFields) },
   'IHVN-Computers': { name: 'IHVN-Computers', headers: ihvnComputersHeaders, displayFields: createDisplayFields(ihvnComputersHeaders, defaultTableFields) },
   'IHVN-IT Equipment': { name: 'IHVN-IT Equipment', headers: ihvnItHeaders, displayFields: createDisplayFields(ihvnItHeaders, defaultTableFields) },
   'IHVN-Inherited Assets': { name: 'IHVN-Inherited Assets', headers: ihvnInheritedHeaders, displayFields: createDisplayFields(ihvnInheritedHeaders, defaultTableFields) },
-  'IHVN-GF N-THRIP': { name: 'IHVN-GF N-THRIP', headers: [], displayFields: [] } // Placeholder for the group
+  
+  // This is now just a virtual group, its definition is for display purposes.
+  'IHVN-GF N-THRIP': { name: 'IHVN-GF N-THRIP', headers: [], displayFields: [] } 
 };
     
