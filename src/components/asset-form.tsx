@@ -78,7 +78,7 @@ interface AssetFormProps {
   onOpenChange: (isOpen: boolean) => void;
   asset?: Asset;
   onSave: (assetToSave: Asset) => Promise<void>;
-  onQuickSave: (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy'; verifiedDate?: string; }) => Promise<void>;
+  onQuickSave: (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified'; verifiedDate?: string; }) => Promise<void>;
   isReadOnly: boolean;
 }
 
@@ -92,7 +92,7 @@ const ReadOnlyField = ({ label, value }: { label: string; value: React.ReactNode
 
 export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, isReadOnly }: AssetFormProps) {
   const [quickViewRemarks, setQuickViewRemarks] = useState('');
-  const [quickViewStatus, setQuickViewStatus] = useState<'Verified' | 'Unverified' | 'Discrepancy'>('Unverified');
+  const [quickViewStatus, setQuickViewStatus] = useState<'Verified' | 'Unverified'>('Unverified');
   const [isQuickSaving, setIsQuickSaving] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -135,13 +135,13 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     if (isOpen) {
       if (asset) {
         setQuickViewRemarks(asset.remarks ?? '');
-        setQuickViewStatus(asset.verifiedStatus ?? 'Unverified');
+        setQuickViewStatus(asset.verifiedStatus === 'Discrepancy' ? 'Unverified' : (asset.verifiedStatus ?? 'Unverified'));
         
         form.reset({
           ...defaultValues,
           ...asset,
           location: asset.location ?? userProfile?.state ?? '',
-          verifiedStatus: asset.verifiedStatus ?? 'Unverified',
+          verifiedStatus: asset.verifiedStatus === 'Discrepancy' ? 'Unverified' : (asset.verifiedStatus ?? 'Unverified'),
         });
       } else {
         form.reset(defaultValues);
@@ -233,7 +233,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                       <SelectContent>
                           <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
                           <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                          <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
                       </SelectContent>
                   </Select>
               </div>
@@ -401,7 +400,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                             <SelectContent>
                               <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
                               <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                              <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
                             </SelectContent>
                           </Select>
                           <FormMessage />

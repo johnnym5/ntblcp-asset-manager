@@ -29,7 +29,7 @@ export interface BatchUpdateData {
   location?: string;
   assignee?: string;
   condition?: string;
-  verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy';
+  verifiedStatus?: 'Verified' | 'Unverified';
 }
 
 interface AssetBatchEditFormProps {
@@ -59,7 +59,7 @@ export function AssetBatchEditForm({
   const [condition, setCondition] = useState('');
 
   const [applyStatus, setApplyStatus] = useState(false);
-  const [status, setStatus] = useState<'Verified' | 'Unverified' | 'Discrepancy'>('Unverified');
+  const [status, setStatus] = useState<'Verified' | 'Unverified'>('Unverified');
 
   const handleSubmit = async () => {
     setIsSaving(true);
@@ -146,7 +146,6 @@ export function AssetBatchEditForm({
                 <SelectContent>
                     <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
                     <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                    <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
                 </SelectContent>
             </Select>
             </div>

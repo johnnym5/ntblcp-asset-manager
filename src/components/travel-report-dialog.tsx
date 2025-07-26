@@ -66,12 +66,13 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
 
   const verifiedAssets = reportAssets.filter(asset => asset.verifiedStatus === 'Verified');
   const unverifiedAssetsCount = reportAssets.length - verifiedAssets.length;
+  const assetsWithRemarks = reportAssets.filter(asset => asset.remarks);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Travel Sign-off Sheet</DialogTitle>
+          <DialogTitle>Travel Report</DialogTitle>
           <DialogDescription>
             Fill in the details below to generate a printable report for your trip.
           </DialogDescription>
@@ -121,7 +122,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
             {/* Report Preview */}
             <div className="border rounded-lg p-4 bg-muted/30 max-h-[50vh] overflow-y-auto">
                 <div ref={reportRef} className="p-4 bg-white text-black printable-area">
-                    <h2 className="text-xl font-bold text-center mb-4">TRAVEL SIGN-OFF SHEET</h2>
+                    <h2 className="text-xl font-bold text-center mb-4">TRAVEL REPORT</h2>
                     <table className="w-full border-collapse border border-black text-sm mb-4">
                         <tbody>
                             <tr>
@@ -165,7 +166,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                                   <td className="border border-black p-2">{verifiedAssets.length}</td>
                               </tr>
                                <tr>
-                                  <td className="border border-black p-2">Total Unverified/Discrepancy</td>
+                                  <td className="border border-black p-2">Total Unverified</td>
                                   <td className="border border-black p-2">{unverifiedAssetsCount}</td>
                               </tr>
                               <tr className="bg-gray-100 font-bold">
@@ -175,29 +176,29 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                           </tbody>
                       </table>
 
-                    <h3 className="font-bold mt-4 mb-2 text-center">ASSETS CARRIED</h3>
+                    <h3 className="font-bold mt-4 mb-2 text-center">ASSETS WITH REMARKS</h3>
                     <table className="w-full border-collapse border border-black text-sm">
                         <thead>
                             <tr className="bg-gray-200">
                                 <th className="border border-black p-2">S/N</th>
-                                <th className="border border-black p-2">Asset Description</th>
                                 <th className="border border-black p-2">Asset ID</th>
-                                <th className="border border-black p-2">Serial Number</th>
+                                <th className="border border-black p-2">Description</th>
+                                <th className="border border-black p-2">Remarks/Comments</th>
                             </tr>
                         </thead>
                          <tbody>
-                            {verifiedAssets.length > 0 ? (
-                                verifiedAssets.slice(0, 10).map((asset, index) => (
+                            {assetsWithRemarks.length > 0 ? (
+                                assetsWithRemarks.map((asset, index) => (
                                     <tr key={asset.id}>
-                                        <td className="border border-black p-2">{index + 1}</td>
-                                        <td className="border border-black p-2">{asset.description}</td>
+                                        <td className="border border-black p-2">{asset.sn || index + 1}</td>
                                         <td className="border border-black p-2">{asset.assetIdCode}</td>
-                                        <td className="border border-black p-2">{asset.serialNumber}</td>
+                                        <td className="border border-black p-2">{asset.description}</td>
+                                        <td className="border border-black p-2">{asset.remarks}</td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={4} className="border border-black p-2 text-center">No verified assets to report.</td>
+                                    <td colSpan={4} className="border border-black p-2 text-center">No assets with remarks found in this location.</td>
                                 </tr>
                             )}
                         </tbody>

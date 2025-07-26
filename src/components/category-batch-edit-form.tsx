@@ -25,7 +25,7 @@ import { AlertCircle, Check, FileText, Loader2, EyeOff } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
 export interface CategoryBatchUpdateData {
-  status?: 'Verified' | 'Unverified' | 'Discrepancy';
+  status?: 'Verified' | 'Unverified';
   hide?: boolean;
 }
 
@@ -44,10 +44,10 @@ export function CategoryBatchEditForm({
 }: CategoryBatchEditFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
+  const isAdmin = userProfile?.isAdmin || false;
 
   const [applyStatus, setApplyStatus] = useState(false);
-  const [status, setStatus] = useState<'Verified' | 'Unverified' | 'Discrepancy'>('Unverified');
+  const [status, setStatus] = useState<'Verified' | 'Unverified'>('Unverified');
 
   const [applyHide, setApplyHide] = useState(false);
 
@@ -98,7 +98,6 @@ export function CategoryBatchEditForm({
                 <SelectContent>
                     <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
                     <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                    <SelectItem value="Discrepancy"><div className="flex items-center"><AlertCircle className="mr-2 h-4 w-4"/>Discrepancy</div></SelectItem>
                 </SelectContent>
               </Select>
             </div>
