@@ -34,7 +34,7 @@ export function PostTravelReportDialog({ isOpen, onOpenChange, allAssets }: Post
   const [recommendations, setRecommendations] = useState('');
 
   const generateReport = async () => {
-    // Dynamically import libraries to ensure they are only loaded on the client
+    // Dynamically import libraries only when the function is called on the client-side.
     const HTMLtoDOCX = (await import('html-to-docx')).default;
     const { saveAs } = await import('file-saver');
 
@@ -149,7 +149,7 @@ export function PostTravelReportDialog({ isOpen, onOpenChange, allAssets }: Post
     });
 
     const fileName = `Post-Travel-Report-${stateVisited}-${new Date().toISOString().split('T')[0]}.docx`;
-    saveAs(fileBuffer, fileName);
+    saveAs(fileBuffer as Blob, fileName);
     
     onOpenChange(false);
   };
