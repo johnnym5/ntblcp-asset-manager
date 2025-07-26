@@ -431,6 +431,10 @@ export default function AssetList() {
 
 
   const handleAddAsset = useCallback(() => {
+    if (!isAdmin) {
+      addNotification({ title: "Permission Denied", description: "Only administrators can add new assets.", variant: "destructive" });
+      return;
+    }
     if (lockAssetList && isAdmin && dataSource === 'cloud') {
       addNotification({ title: "Asset List Locked", description: "Adding new assets to the main list is disabled. Switch to 'Locked Offline' source to add.", variant: "destructive" });
       return;
@@ -447,6 +451,10 @@ export default function AssetList() {
   };
 
   const handleEditAsset = (asset: Asset) => {
+    if (!isAdmin) {
+      addNotification({ title: "Permission Denied", description: "Only administrators can edit assets.", variant: "destructive" });
+      return;
+    }
     setSelectedAsset(asset);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
@@ -525,7 +533,13 @@ export default function AssetList() {
     setIsBatchDeleting(false);
   };
 
-  const handleBatchEdit = () => setIsBatchEditOpen(true);
+  const handleBatchEdit = () => {
+    if (!isAdmin) {
+      addNotification({ title: "Permission Denied", description: "Only administrators can batch edit assets.", variant: "destructive" });
+      return;
+    }
+    setIsBatchEditOpen(true);
+  }
   
   const handleSaveBatchEdit = async (data: BatchUpdateData) => {
     const assetsToUpdateCount = selectedAssetIds.length;
@@ -1049,7 +1063,7 @@ export default function AssetList() {
                         {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <SyncButtonIcon className="mr-2 h-4 w-4" />}
                          {syncButtonText}
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest}>
+                      <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || !isAdmin}>
                           <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => handleExportClick(selectedCategories)}>
@@ -1259,12 +1273,12 @@ export default function AssetList() {
                        {syncButtonText}
                     </Button>
                      {selectedAssetIds.length === 1 && (
-                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={isGuest}>
+                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={isGuest || !isAdmin}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     )}
                     {selectedAssetIds.length > 0 && (
-                        <Button variant="outline" size="sm" onClick={handleBatchEdit} disabled={isGuest}>
+                        <Button variant="outline" size="sm" onClick={handleBatchEdit} disabled={isGuest || !isAdmin}>
                             <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                         </Button>
                     )}
@@ -1324,7 +1338,7 @@ export default function AssetList() {
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
                                   <DropdownMenu>
-                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest || !isAdmin}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
                                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
                                           <Edit className="mr-2 h-4 w-4" />
@@ -1397,3 +1411,4 @@ export default function AssetList() {
     </div>
   );
 }
+

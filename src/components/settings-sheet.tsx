@@ -179,7 +179,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
-  const canModifyData = !isGuest;
   
   if (!appSettings?.sheetDefinitions) {
     return (
@@ -214,20 +213,20 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                 <div>
                   <h3 className="text-lg font-medium mb-4">Data Management</h3>
                    <div className="rounded-lg border p-3 space-y-2">
-                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting || !canModifyData}>
+                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting || isGuest}>
                          <Library className="mr-2 h-4 w-4" /> Import Full FAR
                       </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => setIsSingleSheetImportOpen(true)} disabled={dataActions?.isImporting || !canModifyData}>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => setIsSingleSheetImportOpen(true)} disabled={dataActions?.isImporting || isGuest}>
                         <SheetIcon className="mr-2 h-4 w-4" /> Import from Single Sheet
                       </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || !canModifyData}>
+                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || isGuest}>
                         <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
                       </Button>
                       <Separator className="my-2"/>
-                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={!canModifyData}>
+                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={isGuest || !isAdmin}>
                         <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
                       </Button>
-                      <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || !canModifyData}>
+                      <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || isGuest}>
                         <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
                       </Button>
                     </div>
