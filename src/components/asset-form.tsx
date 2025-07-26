@@ -213,6 +213,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 {quickViewFields.map(field => (
                   <ReadOnlyField key={field.key} label={field.label} value={String(asset[field.key] ?? '')} />
                 ))}
+                 <ReadOnlyField label="Condition" value={asset.condition} />
               </div>
               <Separator/>
                <div className="space-y-2">

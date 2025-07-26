@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -13,9 +13,8 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
 import { useAuth } from '@/contexts/auth-context';
-import { useReactToPrint } from 'react-to-print';
-import type { Asset } from '@/lib/types';
 import { useAppState } from '@/contexts/app-state-context';
 import { NIGERIAN_STATES } from '@/lib/constants';
 import {
@@ -25,40 +24,53 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { ScrollArea } from './ui/scroll-area';
+import { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun } from 'docx';
+import { saveAs } from 'file-saver';
+import type { Asset } from '@/lib/types';
+
 
 interface TravelReportDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
+const ReportInput = ({ label, id, value, onChange }: { label: string, id: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void }) => (
+    <div className="space-y-1.5">
+        <Label htmlFor={id} className="font-semibold">{label}</Label>
+        <Textarea id={id} value={value} onChange={onChange} className="min-h-[100px] text-sm" />
+    </div>
+);
+
+
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
   const { userProfile } = useAuth();
   const { assets } = useAppState();
   
-  const officerName = userProfile?.displayName || '';
-  const [destination, setDestination] = useState('');
-  const [purpose, setPurpose] = useState('');
-  const [departureDate, setDepartureDate] = useState('');
-  const [returnDate, setReturnDate] = useState('');
-  const [reportState, setReportState] = useState(userProfile?.state || '');
-
-  const reportRef = useRef<HTMLDivElement>(null);
+  const [reportState, setReportState] = useState('');
+  const [travelDate, setTravelDate] = useState('');
+  const [objectives, setObjectives] = useState('');
+  const [activities, setActivities] = useState('');
+  const [observations, setObservations] = useState('');
+  const [challenges, setChallenges] = useState('');
+  const [recommendations, setRecommendations] = useState('');
+  const [approvedBy, setApprovedBy] = useState('');
 
   useEffect(() => {
     if (isOpen) {
-      setDestination('');
-      setPurpose('');
-      setDepartureDate('');
-      setReturnDate('');
       setReportState(userProfile?.state || '');
+      // Reset other fields if needed
+      setTravelDate('');
+      setObjectives('• Ascertain the an d condition of the Assets\n• Identify which assets qualify to be classified as salvageable\n• Recommend appropriate maintenance practices');
+      setActivities('• Physical sighting of assets in the asset register, ascertained working conditions and asset numbers/tag number\n• Updated working conditions of assets');
+      setObservations('');
+      setChallenges('');
+      setRecommendations('• The focal person should follow up with the PM on asset maintenance and update the working conditions of the assets regularly');
+      setApprovedBy('');
+
     }
   }, [isOpen, userProfile]);
 
-  const handlePrint = useReactToPrint({
-    content: () => reportRef.current,
-    documentTitle: `Travel Report - ${officerName}`,
-  });
-  
   const reportAssets = useMemo(() => {
     if (!reportState) return [];
     return assets.filter(asset => asset.location?.toLowerCase().includes(reportState.toLowerCase()));
@@ -66,157 +78,139 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
 
   const verifiedAssets = reportAssets.filter(asset => asset.verifiedStatus === 'Verified');
   const unverifiedAssetsCount = reportAssets.length - verifiedAssets.length;
-  const assetsWithRemarks = reportAssets.filter(asset => asset.remarks);
+  const assetsWithRemarks = reportAssets.filter(asset => asset.remarks && asset.remarks.trim() !== '');
+
+  const generateWordDocument = () => {
+    const tableHeader = new TableRow({
+        children: [
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "S/N", bold: true })]})], ...cellStyles }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Asset ID Code", bold: true })]})], ...cellStyles }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Asset Description", bold: true })]})], ...cellStyles }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Remark/Comment", bold: true })]})], ...cellStyles }),
+        ],
+    });
+
+    const remarksRows = assetsWithRemarks.map((asset, index) => new TableRow({
+        children: [
+            new TableCell({ children: [new Paragraph(String(asset.sn || index + 1))], ...cellStyles }),
+            new TableCell({ children: [new Paragraph(asset.assetIdCode || '')], ...cellStyles }),
+            new TableCell({ children: [new Paragraph(asset.description || '')], ...cellStyles }),
+            new TableCell({ children: [new Paragraph(asset.remarks || '')], ...cellStyles }),
+        ],
+    }));
+    
+    const remarksTable = new Table({
+        rows: [tableHeader, ...remarksRows],
+        width: { size: 100, type: WidthType.PERCENTAGE },
+    });
+
+    const doc = new Document({
+        sections: [{
+            children: [
+                new Paragraph({ text: "NATIONAL TUBERCULOSIS, LEPROSY & BURULI - ULCER CONTROL PROGRAMME (NTBLCP)", heading: HeadingLevel.HEADING_1, alignment: 'center' }),
+                new Paragraph({ text: "TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: 'center' }),
+                new Paragraph(" "),
+                new Paragraph({ text: `DATE OF TRAVEL:\t\t${travelDate}` }),
+                new Paragraph({ text: `STATE VISITED:\t\t${reportState}` }),
+                new Paragraph({ text: `NAME OF OFFICER ON THE TRAVEL:\t${userProfile?.displayName}` }),
+                new Paragraph(" "),
+                new Paragraph({ text: "SUMMARY OF VERIFICATION:", heading: HeadingLevel.HEADING_3 }),
+                new Paragraph(`On my asset verification visit to ${reportState}, out of a total of ${reportAssets.length} assets, ${verifiedAssets.length} were verified and ${unverifiedAssetsCount} were unverified.`),
+                new Paragraph(" "),
+                new Paragraph({ text: "OBJECTIVES OF THE TRAVEL:", heading: HeadingLevel.HEADING_3 }),
+                new Paragraph(objectives),
+                 new Paragraph(" "),
+                new Paragraph({ text: "ACTIVITIES DONE:", heading: HeadingLevel.HEADING_3 }),
+                new Paragraph(activities),
+                 new Paragraph(" "),
+                new Paragraph({ text: "OBSERVATIONS:", heading: HeadingLevel.HEADING_3 }),
+                new Paragraph(observations),
+                 new Paragraph(" "),
+                new Paragraph({ text: "CHALLENGES:", heading: HeadingLevel.HEADING_3 }),
+                new Paragraph(challenges),
+                 new Paragraph(" "),
+                new Paragraph({ text: "RECOMMENDATIONS:", heading: HeadingLevel.HEADING_3 }),
+                new Paragraph(recommendations),
+                 new Paragraph(" "),
+                new Paragraph({ text: "ASSETS WITH REMARKS:", heading: HeadingLevel.HEADING_3 }),
+                remarksTable,
+                new Paragraph(" "),
+                new Paragraph(" "),
+                new Paragraph({ text: `Prepared by: ${userProfile?.displayName}` }),
+                new Paragraph(" "),
+                new Paragraph({ text: `Approved by: ${approvedBy}` }),
+            ],
+        }],
+    });
+
+    Packer.toBlob(doc).then(blob => {
+        saveAs(blob, `Travel-Report-${reportState}-${userProfile?.displayName}.docx`);
+    });
+  };
+
+  const cellStyles = { borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE } }};
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl">
         <DialogHeader>
-          <DialogTitle>Travel Report</DialogTitle>
+          <DialogTitle>Travel Report Generator</DialogTitle>
           <DialogDescription>
-            Fill in the details below to generate a printable report for your trip.
+            Fill in the details below to generate a Word document report for your trip.
           </DialogDescription>
         </DialogHeader>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
-            {/* Input Form */}
-            <div className="space-y-4">
-                <div className="space-y-2">
-                    <Label htmlFor="officerName">Officer's Name</Label>
-                    <Input id="officerName" value={officerName} readOnly disabled />
-                </div>
-                 {userProfile?.isAdmin && (
-                    <div className="space-y-2">
-                        <Label htmlFor="reportState">State for Report</Label>
-                        <Select onValueChange={setReportState} value={reportState}>
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select a state..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {NIGERIAN_STATES.map(state => (
-                                    <SelectItem key={state} value={state}>{state}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+        <ScrollArea className="max-h-[70vh] p-1">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 pr-4">
+                {/* Input Form */}
+                <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                         <div className="space-y-1.5">
+                            <Label htmlFor="officerName">Officer's Name</Label>
+                            <Input id="officerName" value={userProfile?.displayName || ''} readOnly disabled />
+                        </div>
+                         {userProfile?.isAdmin ? (
+                            <div className="space-y-1.5">
+                                <Label htmlFor="reportState">State for Report</Label>
+                                <Select onValueChange={setReportState} value={reportState}>
+                                    <SelectTrigger><SelectValue placeholder="Select a state..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {NIGERIAN_STATES.map(state => <SelectItem key={state} value={state}>{state}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        ) : (
+                             <div className="space-y-1.5">
+                                <Label htmlFor="reportState">State Visited</Label>
+                                <Input id="reportState" value={userProfile?.state || ''} readOnly disabled />
+                            </div>
+                        )}
                     </div>
-                )}
-                 <div className="space-y-2">
-                    <Label htmlFor="destination">Destination</Label>
-                    <Input id="destination" value={destination} onChange={(e) => setDestination(e.target.value)} />
-                </div>
-                 <div className="space-y-2">
-                    <Label htmlFor="purpose">Purpose of Trip</Label>
-                    <Input id="purpose" value={purpose} onChange={(e) => setPurpose(e.target.value)} />
-                </div>
-                 <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="departureDate">Departure Date</Label>
-                        <Input id="departureDate" type="date" value={departureDate} onChange={(e) => setDepartureDate(e.target.value)} />
+                     <div className="space-y-1.5">
+                        <Label htmlFor="travelDate">Date of Travel (e.g., 2nd-4th December 2024)</Label>
+                        <Input id="travelDate" value={travelDate} onChange={(e) => setTravelDate(e.target.value)} />
                     </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="returnDate">Return Date</Label>
-                        <Input id="returnDate" type="date" value={returnDate} onChange={(e) => setReturnDate(e.target.value)} />
+
+                    <p className="p-4 bg-muted rounded-md text-sm">
+                        On my asset verification visit to <span className="font-bold">{reportState}</span>, out of a total of <span className="font-bold">{reportAssets.length}</span> assets, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.
+                    </p>
+
+                    <div className="space-y-1.5">
+                        <Label htmlFor="approvedBy">Approved By</Label>
+                        <Input id="approvedBy" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} placeholder="Enter name of approver" />
                     </div>
+                </div>
+
+                <div className="space-y-4">
+                    <ReportInput label="Objectives of the Travel" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} />
+                    <ReportInput label="Activities Done" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} />
+                    <ReportInput label="Observations" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
+                    <ReportInput label="Challenges" id="challenges" value={challenges} onChange={(e) => setChallenges(e.target.value)} />
+                    <ReportInput label="Recommendations" id="recommendations" value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
                 </div>
             </div>
-
-            {/* Report Preview */}
-            <div className="border rounded-lg p-4 bg-muted/30 max-h-[50vh] overflow-y-auto">
-                <div ref={reportRef} className="p-4 bg-white text-black printable-area">
-                    <h2 className="text-xl font-bold text-center mb-4">TRAVEL REPORT</h2>
-                    <table className="w-full border-collapse border border-black text-sm mb-4">
-                        <tbody>
-                            <tr>
-                                <td className="border border-black p-2 font-semibold">Officer's Name:</td>
-                                <td className="border border-black p-2">{officerName}</td>
-                            </tr>
-                            <tr>
-                                <td className="border border-black p-2 font-semibold">State:</td>
-                                <td className="border border-black p-2">{reportState}</td>
-                            </tr>
-                            <tr>
-                                <td className="border border-black p-2 font-semibold">Destination:</td>
-                                <td className="border border-black p-2">{destination}</td>
-                            </tr>
-                             <tr>
-                                <td className="border border-black p-2 font-semibold">Purpose of Trip:</td>
-                                <td className="border border-black p-2">{purpose}</td>
-                            </tr>
-                             <tr>
-                                <td className="border border-black p-2 font-semibold">Departure Date:</td>
-                                <td className="border border-black p-2">{departureDate}</td>
-                            </tr>
-                             <tr>
-                                <td className="border border-black p-2 font-semibold">Return Date:</td>
-                                <td className="border border-black p-2">{returnDate}</td>
-                            </tr>
-                        </tbody>
-                    </table>
-
-                     <h3 className="font-bold mt-4 mb-2 text-center">ASSET VERIFICATION SUMMARY FOR {reportState.toUpperCase()}</h3>
-                      <table className="w-full border-collapse border border-black text-sm mb-4">
-                          <thead>
-                              <tr className="bg-gray-200">
-                                  <th className="border border-black p-2">Status</th>
-                                  <th className="border border-black p-2">Count</th>
-                              </tr>
-                          </thead>
-                          <tbody>
-                              <tr>
-                                  <td className="border border-black p-2">Total Verified</td>
-                                  <td className="border border-black p-2">{verifiedAssets.length}</td>
-                              </tr>
-                               <tr>
-                                  <td className="border border-black p-2">Total Unverified</td>
-                                  <td className="border border-black p-2">{unverifiedAssetsCount}</td>
-                              </tr>
-                              <tr className="bg-gray-100 font-bold">
-                                  <td className="border border-black p-2">Total Assets in State</td>
-                                  <td className="border border-black p-2">{reportAssets.length}</td>
-                              </tr>
-                          </tbody>
-                      </table>
-
-                    <h3 className="font-bold mt-4 mb-2 text-center">ASSETS WITH REMARKS</h3>
-                    <table className="w-full border-collapse border border-black text-sm">
-                        <thead>
-                            <tr className="bg-gray-200">
-                                <th className="border border-black p-2">S/N</th>
-                                <th className="border border-black p-2">Asset ID</th>
-                                <th className="border border-black p-2">Description</th>
-                                <th className="border border-black p-2">Remarks/Comments</th>
-                            </tr>
-                        </thead>
-                         <tbody>
-                            {assetsWithRemarks.length > 0 ? (
-                                assetsWithRemarks.map((asset, index) => (
-                                    <tr key={asset.id}>
-                                        <td className="border border-black p-2">{asset.sn || index + 1}</td>
-                                        <td className="border border-black p-2">{asset.assetIdCode}</td>
-                                        <td className="border border-black p-2">{asset.description}</td>
-                                        <td className="border border-black p-2">{asset.remarks}</td>
-                                    </tr>
-                                ))
-                            ) : (
-                                <tr>
-                                    <td colSpan={4} className="border border-black p-2 text-center">No assets with remarks found in this location.</td>
-                                </tr>
-                            )}
-                        </tbody>
-                    </table>
-
-                    <div className="grid grid-cols-2 gap-8 mt-16">
-                        <div className="space-y-2">
-                            <div className="border-t border-black pt-1 text-center">Signature</div>
-                        </div>
-                        <div className="space-y-2">
-                            <div className="border-t border-black pt-1 text-center">Date</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        </ScrollArea>
         <DialogFooter>
-          <Button onClick={handlePrint}>Print Report</Button>
+          <Button onClick={generateWordDocument}>Export to Word</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
