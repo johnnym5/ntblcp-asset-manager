@@ -255,7 +255,7 @@ export default function AssetList() {
         if (assetsToPull.length > 0) {
             addNotification({ title: 'Data Pulled', description: `${assetsToPull.length} assets updated from the cloud.` });
         }
-
+        
         if(assetsToPush.length === 0 && assetsToPull.length === 0) {
             addNotification({ title: 'Already Up-to-Date', description: 'Your local data is in sync with the cloud.' });
         }
@@ -463,13 +463,12 @@ export default function AssetList() {
   const handleDeleteConfirm = async () => {
     if (!assetToDelete) return;
 
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (dataSource === 'cloud') {
+      if (lockAssetList && isAdmin) {
         addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
         setIsDeleteDialogOpen(false);
         return;
-    }
-
-    if (dataSource === 'cloud') {
+      }
       const currentAssets = await getLocalAssetsFromDb();
       const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
       await saveAssets(updatedAssets);
@@ -492,10 +491,9 @@ export default function AssetList() {
       addNotification({ title: 'Deleted from Offline Store', description: `Asset "${assetToDelete.description}" removed.` });
     }
 
-
     setAssetToDelete(null);
     setIsDeleteDialogOpen(false);
-  }
+  };
 
   const handleBatchDelete = async () => {
     if (lockAssetList && isAdmin && dataSource === 'cloud') {
@@ -508,7 +506,8 @@ export default function AssetList() {
 
     if (dataSource === 'cloud') {
       let currentAssets = await getLocalAssetsFromDb();
-      currentAssets = currentAssets.filter(a => !selectedAssetIds.includes(a.id));
+      const idsToDelete = new Set(selectedAssetIds);
+      currentAssets = currentAssets.filter(a => !idsToDelete.has(a.id));
       await saveAssets(currentAssets);
       setAssets(currentAssets);
       addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted from main list.` });
@@ -523,7 +522,8 @@ export default function AssetList() {
       }
     } else {
       let currentOfflineAssets = await getLockedOfflineAssets();
-      currentOfflineAssets = currentOfflineAssets.filter(a => !selectedAssetIds.includes(a.id));
+      const idsToDelete = new Set(selectedAssetIds);
+      currentOfflineAssets = currentOfflineAssets.filter(a => !idsToDelete.has(a.id));
       await saveLockedOfflineAssets(currentOfflineAssets);
       setOfflineAssets(currentOfflineAssets);
       addNotification({ title: 'Deleted from Offline Store', description: `${assetsToDeleteCount} assets deleted.` });
@@ -531,7 +531,7 @@ export default function AssetList() {
 
     setSelectedAssetIds([]);
     setIsBatchDeleting(false);
-  }
+  };
 
   const handleBatchEdit = () => setIsBatchEditOpen(true);
   

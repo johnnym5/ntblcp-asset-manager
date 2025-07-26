@@ -26,7 +26,7 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, FileSignature, Plane, Library } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, FileSignature, Plane, Library, FileCheck } from 'lucide-react';
 import { SheetDefinitionForm } from './sheet-definition-form';
 import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
@@ -222,30 +222,31 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
             <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
                   <h3 className="text-lg font-medium mb-4">Data Management</h3>
-                  <div className="rounded-lg border p-3 space-y-2">
-                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting || !canModifyData}>
-                      <Library className="mr-2 h-4 w-4" /> Import to Offline Mode
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start" onClick={() => setIsSingleSheetImportOpen(true)} disabled={dataActions?.isImporting || !canModifyData}>
-                      <SheetIcon className="mr-2 h-4 w-4" /> Import from Single Sheet
-                    </Button>
-                     <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || !canModifyData}>
-                      <FileDown className="mr-2 h-4 w-4" /> Export FAR to Excel
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start" onClick={() => setIsTravelReportOpen(true)} disabled={!canModifyData}>
-                      <Plane className="mr-2 h-4 w-4" /> Export Travel Report
-                    </Button>
-                     <Button variant="outline" className="w-full justify-start" onClick={() => setIsPostTravelReportOpen(true)} disabled={!canModifyData}>
-                      <FileSignature className="mr-2 h-4 w-4" /> Post-Travel Report
-                    </Button>
-                    <Separator className="my-2"/>
-                    <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={!canModifyData}>
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
-                    </Button>
-                    <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || !canModifyData}>
-                      <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
-                    </Button>
-                  </div>
+                   <div className="rounded-lg border p-3 space-y-2">
+                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting || !canModifyData}>
+                         <Library className="mr-2 h-4 w-4" /> Import Full FAR
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => setIsSingleSheetImportOpen(true)} disabled={dataActions?.isImporting || !canModifyData}>
+                        <SheetIcon className="mr-2 h-4 w-4" /> Import from Single Sheet
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || !canModifyData}>
+                        <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
+                      </Button>
+                      <Separator className="my-2"/>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => setIsTravelReportOpen(true)} disabled={!canModifyData}>
+                        <Plane className="mr-2 h-4 w-4" /> Travel Sign-off Sheet
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => setIsPostTravelReportOpen(true)} disabled={!canModifyData}>
+                        <FileSignature className="mr-2 h-4 w-4" /> Post-Travel Report
+                      </Button>
+                      <Separator className="my-2"/>
+                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={!canModifyData}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                      </Button>
+                      <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || !canModifyData}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
+                      </Button>
+                    </div>
                 </div>
               
                 <div>
