@@ -165,7 +165,7 @@ export default function AssetList() {
     itemsPerPage, setItemsPerPage,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
-    sortConfig,
+    sortConfig, setSortConfig,
     appSettings, setAppSettings,
     manualSyncTrigger, isSyncing, setIsSyncing,
     setDataActions,
@@ -1411,4 +1411,3 @@ export default function AssetList() {
     </div>
   );
 }
-
