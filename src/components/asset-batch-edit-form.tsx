@@ -47,7 +47,7 @@ export function AssetBatchEditForm({
 }: AssetBatchEditFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const isAdmin = userProfile?.displayName?.toLowerCase().trim() === 'admin';
+  const isAdmin = userProfile?.isAdmin || false;
 
   const [applyLocation, setApplyLocation] = useState(false);
   const [location, setLocation] = useState('');
@@ -122,7 +122,17 @@ export function AssetBatchEditForm({
             <Checkbox id="applyCondition" checked={applyCondition} onCheckedChange={(checked) => setApplyCondition(!!checked)} />
             <div className="w-full space-y-2">
               <Label htmlFor="condition" className={!applyCondition ? 'text-muted-foreground' : ''}>Condition</Label>
-              <Input id="condition" value={condition} onChange={(e) => setCondition(e.target.value)} disabled={!applyCondition} />
+               <Select onValueChange={setCondition} value={condition} disabled={!applyCondition}>
+                <SelectTrigger id="batch-condition">
+                    <SelectValue placeholder="Select condition" />
+                </SelectTrigger>
+                <SelectContent>
+                    <SelectItem value="Good">Good</SelectItem>
+                    <SelectItem value="Fair">Fair</SelectItem>
+                    <SelectItem value="Poor">Poor</SelectItem>
+                    <SelectItem value="Needs Repair">Needs Repair</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </div>
            <div className="flex items-center space-x-4">

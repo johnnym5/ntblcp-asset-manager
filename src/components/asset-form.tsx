@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState } from "react";
@@ -343,13 +344,29 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                         <FormMessage />
                       </FormItem>
                     )} />
-                    <FormField control={form.control} name="condition" render={({ field }) => (
+                    <FormField
+                      control={form.control}
+                      name="condition"
+                      render={({ field }) => (
                         <FormItem>
                           <FormLabel>Condition</FormLabel>
-                          <FormControl><Input {...field} /></FormControl>
+                          <Select onValueChange={field.onChange} value={field.value}>
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select condition" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              <SelectItem value="Good">Good</SelectItem>
+                              <SelectItem value="Fair">Fair</SelectItem>
+                              <SelectItem value="Poor">Poor</SelectItem>
+                              <SelectItem value="Needs Repair">Needs Repair</SelectItem>
+                            </SelectContent>
+                          </Select>
                           <FormMessage />
                         </FormItem>
-                    )} />
+                      )}
+                    />
                 </div>
                 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
