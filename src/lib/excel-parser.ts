@@ -130,45 +130,47 @@ export async function parseExcelFile(
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, cellText: false });
         
-        // Special logic for IHVN master sheet which contains multiple sub-tables
-        const ihvnMasterSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes('IHVN-GF N-THRIP'));
+        const isIHVNImport = singleSheetName ? singleSheetName.startsWith('IHVN') : workbook.SheetNames.some(s => normalizeHeader(s).includes('IHVN-GF N-THRIP'));
+        
+        if (isIHVNImport) {
+            const ihvnMasterSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes('IHVN-GF N-THRIP'));
 
-        if (ihvnMasterSheetName && (!singleSheetName || singleSheetName.startsWith('IHVN'))) {
-            const sheet = workbook.Sheets[ihvnMasterSheetName];
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
-            
-            const groups = [
-                { category: 'IHVN-General', startRow: 0, endRow: 1591, headers: HEADER_DEFINITIONS['IHVN-General'].headers },
-                { category: 'IHVN-Computers', startRow: 1591, endRow: 1678, headers: HEADER_DEFINITIONS['IHVN-Computers'].headers },
-                { category: 'IHVN-IT Equipment', startRow: 1678, endRow: 1700, headers: HEADER_DEFINITIONS['IHVN-IT Equipment'].headers },
-                { category: 'IHVN-Inherited Assets', startRow: 1700, endRow: sheetData.length, headers: HEADER_DEFINITIONS['IHVN-Inherited Assets'].headers },
-            ];
+            if (ihvnMasterSheetName) {
+                const sheet = workbook.Sheets[ihvnMasterSheetName];
+                const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+                
+                const groups = [
+                    { category: 'IHVN-General', startRow: 0, endRow: 1591, headers: HEADER_DEFINITIONS['IHVN-General'].headers },
+                    { category: 'IHVN-Computers', startRow: 1591, endRow: 1678, headers: HEADER_DEFINITIONS['IHVN-Computers'].headers },
+                    { category: 'IHVN-IT Equipment', startRow: 1678, endRow: 1700, headers: HEADER_DEFINITIONS['IHVN-IT Equipment'].headers },
+                    { category: 'IHVN-Inherited Assets', startRow: 1700, endRow: sheetData.length, headers: HEADER_DEFINITIONS['IHVN-Inherited Assets'].headers },
+                ];
 
-            for (const group of groups) {
-                 if (singleSheetName && normalizeHeader(singleSheetName) !== normalizeHeader(group.category)) {
-                    continue;
+                for (const group of groups) {
+                    if (singleSheetName && normalizeHeader(singleSheetName) !== normalizeHeader(group.category)) {
+                        continue;
+                    }
+
+                    const headerRowIndex = findHeaderRowIndex(sheetData, group.headers, group.startRow);
+                    if (headerRowIndex !== -1) {
+                        const headerRow = sheetData[headerRowIndex];
+                        const groupData = sheetData.slice(headerRowIndex + 1, group.endRow);
+                        const parsedGroupAssets = parseRows(headerRow, groupData, group.category);
+                        newAssets.push(...parsedGroupAssets);
+                    } else {
+                        errors.push(`Could not find headers for group "${group.category}" in sheet "${ihvnMasterSheetName}".`);
+                    }
                 }
-
-                const headerRowIndex = findHeaderRowIndex(sheetData, group.headers, group.startRow);
-                if (headerRowIndex !== -1) {
-                    const headerRow = sheetData[headerRowIndex];
-                    const groupData = sheetData.slice(headerRowIndex + 1, group.endRow);
-                    const parsedGroupAssets = parseRows(headerRow, groupData, group.category);
-                    newAssets.push(...parsedGroupAssets);
-                } else {
-                     errors.push(`Could not find headers for group "${group.category}" in sheet "${ihvnMasterSheetName}".`);
-                }
+            } else {
+                 errors.push(`Could not find the "IHVN-GF N-THRIP" master sheet in the file.`);
             }
         }
 
-
         const sheetNamesToProcess = singleSheetName
-            ? [singleSheetName]
+            ? (isIHVNImport ? [] : [singleSheetName]) // If it was an IHVN import, we don't need to process again.
             : Object.keys(sheetDefinitions).filter(sheetName => appSettings.enabledSheets.includes(sheetName) && !sheetName.startsWith('IHVN'));
 
         for (const targetSheetName of sheetNamesToProcess) {
-             if (targetSheetName.startsWith('IHVN')) continue; // Skip IHVN sheets as they are handled by the master sheet logic
-
             const definition = sheetDefinitions[targetSheetName];
             if (!definition) {
                  if(singleSheetName) errors.push(`No definition found for sheet: "${targetSheetName}".`);
@@ -208,7 +210,7 @@ export async function parseExcelFile(
         }
 
         if (newAssets.length === 0 && errors.length === 0) {
-            errors.push(`No data found to import. Check if sheet names in the file match the enabled sheets in Settings: ${appSettings.enabledSheets.join(', ')}`);
+            errors.push(`No data found to import. Check if sheet names in the file match the enabled sheets in Settings.`);
         }
     } catch (e) {
         console.error("Error parsing Excel file:", e);

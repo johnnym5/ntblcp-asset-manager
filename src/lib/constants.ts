@@ -116,10 +116,10 @@ const pdxHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 
 const vehiclesIHVNHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Engine no', 'Chasis no', 'Suppliers', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'GRANT', 'Useful Life (Years)' ];
 const genexpertHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ];
 
-const ihvnGeneralHeaders = [ 'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION', 'ASSET SERIAL NUMBERS', 'MODEL NUMBERS', 'QTY', 'LOCATION', 'SITE', 'YEAR OF PURCHASE', 'COST (NGN)', 'GRANT' ];
-const ihvnComputersHeaders = [ 'S/N', 'CATEGORY', 'TAG NUMBER', 'DESCRIPTION', 'QTY', 'SERIAL NUMBER', 'MODEL NUMBER', 'YEAR OF PURCHASE', 'LOCATION/USER', 'COST (NGN)', 'Grant' ];
-const ihvnItHeaders = [ 'S/N', 'CATEGORY', 'TAG NUMBER', 'DESCRIPTION', 'QTY', 'SERIAL NUMBER', 'MODEL NUMBER', 'YEAR OF PURCHASE', 'LOCATION/USER', 'COST (NGN)', 'Grant' ];
-const ihvnInheritedHeaders = [ 'S/N', 'STATE', 'TAG NUMBERS', 'DESCRIPTION', 'CLASSIFICATION', 'SERIAL NUMBERS', 'MODEL NUMBERS', 'QTY', 'LOCATION', 'SITE', 'YEAR OF PURCHASE', 'COST(N)', 'GRANT' ];
+const ihvnGeneralHeaders = [ "S/N", "STATE", "TAG NUMBERS", "DESCRIPTION", "CLASSIFICATION", "ASSET SERIAL NUMBERS", "MODEL NUMBERS", "QTY", "LOCATION", "SITE", "YEAR OF PURCHASE", "COST (NGN)", "GRANT" ];
+const ihvnComputersHeaders = [ "S/N", "CATEGORY", "TAG NUMBER", "DESCRIPTION", "QTY", "SERIAL NUMBER", "MODEL NUMBER", "YEAR OF PURCHASE", "LOCATION/USER", "COST (NGN)", "Grant" ];
+const ihvnItHeaders = [ "S/N", "CATEGORY", "TAG NUMBER", "DESCRIPTION", "QTY", "SERIAL NUMBER", "MODEL NUMBER", "YEAR OF PURCHASE", "LOCATION/USER", "COST (NGN)", "Grant" ];
+const ihvnInheritedHeaders = [ "S/N", "STATE", "TAG NUMBERS", "DESCRIPTION", "CLASSIFICATION", "SERIAL NUMBERS", "MODEL NUMBERS", "QTY", "LOCATION", "SITE", "YEAR OF PURCHASE", "COST(N)", "GRANT" ];
 
 const createDisplayFields = (headers: string[], tableFields: (keyof Asset)[]): DisplayField[] => {
   const quickViewFields = headers.slice(0, 10).map(h => {
@@ -174,5 +174,6 @@ export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
   'IHVN-Computers': { name: 'IHVN-Computers', headers: ihvnComputersHeaders, displayFields: createDisplayFields(ihvnComputersHeaders, defaultTableFields) },
   'IHVN-IT Equipment': { name: 'IHVN-IT Equipment', headers: ihvnItHeaders, displayFields: createDisplayFields(ihvnItHeaders, defaultTableFields) },
   'IHVN-Inherited Assets': { name: 'IHVN-Inherited Assets', headers: ihvnInheritedHeaders, displayFields: createDisplayFields(ihvnInheritedHeaders, defaultTableFields) },
+  'IHVN-GF N-THRIP': { name: 'IHVN-GF N-THRIP', headers: [], displayFields: [] } // Placeholder for the group
 };
     
