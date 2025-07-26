@@ -13,10 +13,9 @@ import {
 } from '@/components/ui/alert-dialog';
 import { Button } from './ui/button';
 import { useAppState } from '@/contexts/app-state-context';
-import { useAuth } from '@/contexts/auth-context';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import { getLocalAssets, saveAssets } from '@/lib/idb';
+import { getLocalAssets, saveAssets, getLockedOfflineAssets, saveLockedOfflineAssets } from '@/lib/idb';
 import { sanitizeForFirestore } from '@/lib/excel-parser';
 
 interface DataPatchDialogProps {
@@ -92,7 +91,7 @@ const assigneePatchData: { [key: number]: string } = {
     423: "Dr Emperor", 424: "PMU KITCHEN", 425: "FINANCE", 426: "Dr Emperor", 427: "PMU KITCHEN", 428: "PMU KITCHEN", 429: "Finance office",
     430: "Finance office", 431: "FINANCE", 432: "FINANCE", 433: "PSM", 434: "M&E", 435: "FA", 436: "FINANCE", 437: "FUNMI", 438: "DR EMPEROR",
     439: "WEASLEY", 440: "DR EMPEROR", 441: "Conference room", 442: "MARY", 443: "Broken", 444: "LINDA FA", 445: "DR EMPEROR", 446: "TOSIN",
-    447: "Team Lead", 448: "DR OMBEKA", 449: "ANN", 450: "Broken", 451: "TUMISHE FA", 452: "DR EMPEROR", 453: "Mrs Elizabeth", 454: "Samuel Rabo",
+    447: "Team Lead", 448: "DR OMBEKA", 449: "ANN", 450: "Broken", 451: "TUMISHE FA", 452: "DR EMPEROR", 453: "Elizabeth", 454: "Samuel Rabo",
     455: "Dr Emperor", 456: "DR OBIOMA", 457: "GFA Ofice", 458: "GFA Ofice", 459: "ADELEKE", 460: "Programs Office", 461: "GFA Ofice",
     462: "PHARM RAJI", 463: "OFURE", 464: "MUMMY TUBI", 465: "Audit Office", 466: "DR OMBEKA", 467: "SFO ffice", 468: "Dr Emperor",
     469: "Programs Office", 470: "Pharm Raji", 471: "MUMMY TUBI", 472: "Mr Adeleke", 473: "Dr Obioma", 474: "GFA Ofice", 475: "Finance office",
@@ -109,15 +108,15 @@ const assigneePatchData: { [key: number]: string } = {
     547: "PMU Admin/HR", 548: "IT Equipment Room", 549: "M&E PMU", 550: "Programs", 551: "Audit Office", 552: "Admin Office", 553: "Logistics",
     554: "PPM", 555: "M&E", 556: "Pharm Alhassan", 557: "NTBLCP IT & Communication OFficer", 558: "NTBLCP IT & Communication OFficer", 559: "Rebecca Owolabi",
     560: "IT Store", 561: "IT Store", 562: "Admin", 563: "Admin", 564: "Finance Unit", 565: "Finance Unit", 566: "Finance Unit", 567: "IT officer",
-    568: "Lab Manager - Mrs. Abiola Tubi", 569: "Weasley", 570: "IT officer", 571: "IT/Communications Officer - Mr. Stephen Raji", 572: "IT Store",
+    568: "Lab Manager - Abiola Tubi", 569: "Weasley", 570: "IT officer", 571: "IT/Communications Officer - Mr. Stephen Raji", 572: "IT Store",
     573: "Daodu Olumide", 574: "Israel Adio", 575: "Samuel Rabo", 576: "Pharm. Raji Mobolaji", 577: "Program Manager", 578: "Program Manager",
     579: "Program Manager", 580: "Program Manager", 581: "Program Manager", 582: "Program Manager", 583: "Program Manager", 584: "Program Manager",
     585: "Program Manager", 586: "Program Manager", 587: "Program Manager", 588: "Program Manager", 589: "Program Manager", 590: "Program Manager",
     591: "Program Manager", 592: "Program Manager", 593: "Program Manager", 594: "Program Manager", 595: "Program Manager", 596: "Program Manager",
     597: "Program Manager", 598: "Program Manager", 599: "Program Manager", 600: "Program Manager", 601: "Program Manager", 602: "Program Manager",
     603: "Program Manager", 604: "Program Manager", 605: "Program Manager", 606: "Program Manager", 607: "Program Manager", 608: "Program Manager",
-    609: "Program Manager", 610: "Program Manager", 611: "Program Manager", 612: "Linus Dapiyah", 613: "Dr Obioma Akaniro", 614: "Mrs Funmilayo Omosebi",
-    615: "Miss Wumi Olarewaju", 616: "Dr Folasade Idowu ( SW Zone)", 617: "Dr Geoge Ikpe (SE Zone)", 618: "Pharm AlhassanShuaibu", 619: "IT Store",
+    609: "Program Manager", 610: "Program Manager", 611: "Program Manager", 612: "Linus Dapiyah", 613: "Dr Obioma Akaniro", 614: "Funmilayo Omosebi",
+    615: "Wumi Olarewaju", 616: "Dr Folasade Idowu ( SW Zone)", 617: "Dr Geoge Ikpe (SE Zone)", 618: "Pharm AlhassanShuaibu", 619: "IT Store",
     620: "Wesley Bala", 621: "IT Store", 622: "Gambo Ajegena", 623: "Ofure Ugbesia", 624: "MTN Data Centre", 625: "MTN Data Centre", 626: "Mary Etolue",
     627: "Bauchi State M& E Officer", 628: "Abia State M& E Officer", 629: "Akwa Ibom State M& E Officer", 630: "Kwara M& E Officer", 631: "Borno State M& E Officer",
     632: "Plateau State M& E Officer", 633: "Delta State M& E Officer", 634: "Yobe State M& E Officer", 635: "FCT State M& E Officer", 636: "Gombe State M& E Officer",
@@ -911,35 +910,80 @@ const farDetailsPatchData: { [key: number]: { manufacturer: string; modelNumber:
 };
 
 
-
 export function DataPatchDialog({ isOpen, onOpenChange }: DataPatchDialogProps) {
-  const { assets, setAssets } = useAppState();
+  const { setAssets, setOfflineAssets, dataSource } = useAppState();
   const [isPatching, setIsPatching] = useState(false);
   const { toast } = useToast();
 
-  const applyPatch = async (patchName: string, patchLogic: (asset: any) => any) => {
+  const applyPatch = async () => {
     setIsPatching(true);
-    toast({ title: 'Applying Patch...', description: `Running the ${patchName} update.` });
+    toast({ title: 'Applying Patch...', description: `Running the NTBLCP-TB-FAR update.` });
     
     try {
-      const allAssets = await getLocalAssets();
+      const isOfflineMode = dataSource === 'local_locked';
+      const assetsToPatch = isOfflineMode ? await getLockedOfflineAssets() : await getLocalAssets();
       let updatedCount = 0;
 
-      const updatedAssets = allAssets.map(asset => {
-        const updatedAsset = patchLogic(asset);
-        if (updatedAsset !== asset) {
-          updatedCount++;
-          return sanitizeForFirestore({ ...updatedAsset, lastModified: new Date().toISOString(), syncStatus: 'local' });
+      const updatedAssets = assetsToPatch.map(asset => {
+        // This patch should only affect the NTBLCP-TB-FAR sheet
+        if (asset.category !== 'NTBLCP-TB-FAR') {
+            return asset;
+        }
+      
+        const sn = parseInt(asset.sn || '', 10);
+        if (isNaN(sn)) {
+            return asset;
+        }
+      
+        let hasChanged = false;
+        const newAsset = { ...asset };
+
+        const assigneeUpdate = assigneePatchData[sn];
+        if (assigneeUpdate && newAsset.assignee !== assigneeUpdate) {
+            newAsset.assignee = assigneeUpdate;
+            hasChanged = true;
+        }
+
+        const assetIdCodeUpdate = assetIdCodePatchData[sn];
+        if (assetIdCodeUpdate && newAsset.assetIdCode !== assetIdCodeUpdate) {
+            newAsset.assetIdCode = assetIdCodeUpdate;
+            hasChanged = true;
+        }
+
+        const detailsUpdate = farDetailsPatchData[sn];
+        if (detailsUpdate) {
+            if (newAsset.manufacturer !== detailsUpdate.manufacturer) {
+            newAsset.manufacturer = detailsUpdate.manufacturer;
+            hasChanged = true;
+            }
+            if (newAsset.modelNumber !== detailsUpdate.modelNumber) {
+            newAsset.modelNumber = detailsUpdate.modelNumber;
+            hasChanged = true;
+            }
+            if (newAsset.serialNumber !== detailsUpdate.serialNumber) {
+            newAsset.serialNumber = detailsUpdate.serialNumber;
+            hasChanged = true;
+            }
+        }
+        
+        if (hasChanged) {
+            updatedCount++;
+            return sanitizeForFirestore({ ...newAsset, lastModified: new Date().toISOString(), syncStatus: isOfflineMode ? undefined : 'local' });
         }
         return asset;
       });
       
-      await saveAssets(updatedAssets);
-      setAssets(updatedAssets);
+      if (isOfflineMode) {
+        await saveLockedOfflineAssets(updatedAssets);
+        setOfflineAssets(updatedAssets);
+      } else {
+        await saveAssets(updatedAssets);
+        setAssets(updatedAssets);
+      }
 
       toast({
         title: 'Patch Complete',
-        description: `${updatedCount} assets were updated by the ${patchName}. Please sync your data.`,
+        description: `${updatedCount} assets were updated in the ${isOfflineMode ? 'Locked Offline' : 'Main'} store.`,
       });
     } catch (e) {
       toast({ title: 'Patch Failed', description: (e as Error).message, variant: 'destructive' });
@@ -947,52 +991,6 @@ export function DataPatchDialog({ isOpen, onOpenChange }: DataPatchDialogProps) 
       setIsPatching(false);
       onOpenChange(false);
     }
-  };
-
-  const applyComprehensiveFarPatch = () => {
-    applyPatch("Comprehensive NTBLCP-TB-FAR Patch", (asset) => {
-      if (asset.category !== 'NTBLCP-TB-FAR') {
-        return asset;
-      }
-      
-      const sn = parseInt(asset.sn, 10);
-      if (isNaN(sn)) {
-        return asset;
-      }
-      
-      let hasChanged = false;
-      const newAsset = { ...asset };
-
-      const assigneeUpdate = assigneePatchData[sn];
-      if (assigneeUpdate && newAsset.assignee !== assigneeUpdate) {
-        newAsset.assignee = assigneeUpdate;
-        hasChanged = true;
-      }
-
-      const assetIdCodeUpdate = assetIdCodePatchData[sn];
-      if (assetIdCodeUpdate && newAsset.assetIdCode !== assetIdCodeUpdate) {
-        newAsset.assetIdCode = assetIdCodeUpdate;
-        hasChanged = true;
-      }
-
-      const detailsUpdate = farDetailsPatchData[sn];
-      if (detailsUpdate) {
-        if (newAsset.manufacturer !== detailsUpdate.manufacturer) {
-          newAsset.manufacturer = detailsUpdate.manufacturer;
-          hasChanged = true;
-        }
-        if (newAsset.modelNumber !== detailsUpdate.modelNumber) {
-          newAsset.modelNumber = detailsUpdate.modelNumber;
-          hasChanged = true;
-        }
-        if (newAsset.serialNumber !== detailsUpdate.serialNumber) {
-          newAsset.serialNumber = detailsUpdate.serialNumber;
-          hasChanged = true;
-        }
-      }
-      
-      return hasChanged ? newAsset : asset;
-    });
   };
 
   return (
@@ -1007,7 +1005,7 @@ export function DataPatchDialog({ isOpen, onOpenChange }: DataPatchDialogProps) 
         <div className="py-4 space-y-2">
            <Button
             className="w-full justify-center"
-            onClick={applyComprehensiveFarPatch}
+            onClick={applyPatch}
             disabled={isPatching}
           >
             {isPatching && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
