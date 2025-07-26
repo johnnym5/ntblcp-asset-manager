@@ -45,36 +45,32 @@ const ReportInput = ({ label, id, value, onChange }: { label: string, id: string
 
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
   const { userProfile } = useAuth();
-  const { assets } = useAppState();
+  const { assets, offlineAssets, dataSource } = useAppState();
   
   const [reportState, setReportState] = useState('');
   const [travelDate, setTravelDate] = useState('');
-  const [objectives, setObjectives] = useState('');
-  const [activities, setActivities] = useState('');
   const [observations, setObservations] = useState('');
   const [challenges, setChallenges] = useState('');
   const [recommendations, setRecommendations] = useState('');
-  const [approvedBy, setApprovedBy] = useState('');
 
   useEffect(() => {
     if (isOpen) {
       setReportState(userProfile?.state || '');
-      // Reset other fields if needed
       setTravelDate('');
-      setObjectives('• Ascertain the an d condition of the Assets\n• Identify which assets qualify to be classified as salvageable\n• Recommend appropriate maintenance practices');
-      setActivities('• Physical sighting of assets in the asset register, ascertained working conditions and asset numbers/tag number\n• Updated working conditions of assets');
       setObservations('');
       setChallenges('');
-      setRecommendations('• The focal person should follow up with the PM on asset maintenance and update the working conditions of the assets regularly');
-      setApprovedBy('');
-
+      setRecommendations('');
     }
   }, [isOpen, userProfile]);
 
+  const activeAssets = useMemo(() => {
+    return dataSource === 'cloud' ? assets : offlineAssets;
+  }, [dataSource, assets, offlineAssets]);
+
   const reportAssets = useMemo(() => {
     if (!reportState) return [];
-    return assets.filter(asset => asset.location?.toLowerCase().includes(reportState.toLowerCase()));
-  }, [assets, reportState]);
+    return activeAssets.filter(asset => asset.location?.toLowerCase().includes(reportState.toLowerCase()));
+  }, [activeAssets, reportState]);
 
   const verifiedAssets = reportAssets.filter(asset => asset.verifiedStatus === 'Verified');
   const unverifiedAssetsCount = reportAssets.length - verifiedAssets.length;
@@ -117,12 +113,6 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                 new Paragraph({ text: "SUMMARY OF VERIFICATION:", heading: HeadingLevel.HEADING_3 }),
                 new Paragraph(`On my asset verification visit to ${reportState}, out of a total of ${reportAssets.length} assets, ${verifiedAssets.length} were verified and ${unverifiedAssetsCount} were unverified.`),
                 new Paragraph(" "),
-                new Paragraph({ text: "OBJECTIVES OF THE TRAVEL:", heading: HeadingLevel.HEADING_3 }),
-                new Paragraph(objectives),
-                 new Paragraph(" "),
-                new Paragraph({ text: "ACTIVITIES DONE:", heading: HeadingLevel.HEADING_3 }),
-                new Paragraph(activities),
-                 new Paragraph(" "),
                 new Paragraph({ text: "OBSERVATIONS:", heading: HeadingLevel.HEADING_3 }),
                 new Paragraph(observations),
                  new Paragraph(" "),
@@ -133,12 +123,10 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                 new Paragraph(recommendations),
                  new Paragraph(" "),
                 new Paragraph({ text: "ASSETS WITH REMARKS:", heading: HeadingLevel.HEADING_3 }),
-                remarksTable,
+                remarksRows.length > 0 ? remarksTable : new Paragraph("No assets with remarks were found for this location."),
                 new Paragraph(" "),
                 new Paragraph(" "),
                 new Paragraph({ text: `Prepared by: ${userProfile?.displayName}` }),
-                new Paragraph(" "),
-                new Paragraph({ text: `Approved by: ${approvedBy}` }),
             ],
         }],
     });
@@ -193,16 +181,9 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                     <p className="p-4 bg-muted rounded-md text-sm">
                         On my asset verification visit to <span className="font-bold">{reportState}</span>, out of a total of <span className="font-bold">{reportAssets.length}</span> assets, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.
                     </p>
-
-                    <div className="space-y-1.5">
-                        <Label htmlFor="approvedBy">Approved By</Label>
-                        <Input id="approvedBy" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} placeholder="Enter name of approver" />
-                    </div>
                 </div>
 
                 <div className="space-y-4">
-                    <ReportInput label="Objectives of the Travel" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} />
-                    <ReportInput label="Activities Done" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} />
                     <ReportInput label="Observations" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
                     <ReportInput label="Challenges" id="challenges" value={challenges} onChange={(e) => setChallenges(e.target.value)} />
                     <ReportInput label="Recommendations" id="recommendations" value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
