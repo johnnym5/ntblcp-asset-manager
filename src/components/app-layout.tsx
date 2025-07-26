@@ -59,6 +59,7 @@ import type { Asset } from "@/lib/types";
 import { Separator } from "./ui/separator";
 import { InboxSheet } from "./inbox-sheet";
 import { ChangePasswordDialog } from "./change-password-dialog";
+import { ScrollArea } from "./ui/scroll-area";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
