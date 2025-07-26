@@ -308,7 +308,6 @@ export default function AssetList() {
     setStatusOptions([
       { value: "Verified", label: "Verified" },
       { value: "Unverified", label: "Unverified" },
-      { value: "Discrepancy", label: "Discrepancy" },
     ]);
   }, [setStatusOptions]);
 
@@ -634,7 +633,7 @@ export default function AssetList() {
     setIsFormOpen(false);
   };
 
-  const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy', verifiedDate?: string }) => {
+  const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified', verifiedDate?: string }) => {
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
@@ -1351,12 +1350,12 @@ export default function AssetList() {
                       {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <SyncButtonIcon className="mr-2 h-4 w-4" />}
                        {syncButtonText}
                     </Button>
-                     {selectedAssetIds.length === 1 && !isGuest && !isAdmin && (
+                     {selectedAssetIds.length === 1 && !isGuest && (
                         <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     )}
-                    {selectedAssetIds.length > 0 && !isGuest && !isAdmin && (
+                    {selectedAssetIds.length > 0 && !isGuest && (
                         <Button variant="outline" size="sm" onClick={handleBatchEdit}>
                             <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                         </Button>
@@ -1406,8 +1405,7 @@ export default function AssetList() {
                                     <div className={cn("w-auto h-auto text-xs font-medium inline-flex items-center rounded-full px-2.5 py-0.5", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
                                       {asset.verifiedStatus === 'Verified' && <Check className="mr-1 h-3 w-3" />}
                                       {asset.verifiedStatus === 'Unverified' && <FileText className="mr-1 h-3 w-3" />}
-                                      {asset.verifiedStatus === 'Discrepancy' && <AlertCircle className="mr-1 h-3 w-3" />}
-                                      {asset.verifiedStatus || 'Unverified'}
+                                      {asset.verifiedStatus}
                                     </div>
                                   ) : (
                                     <span>{String(asset[field.key] ?? 'N/A')}</span>

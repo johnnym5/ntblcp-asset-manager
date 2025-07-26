@@ -32,7 +32,6 @@ import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { SingleSheetImportDialog } from './single-sheet-import-dialog';
-import { DataPatchDialog } from './data-patch-dialog';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -55,7 +54,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const [isSaving, setIsSaving] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
-  const [isPatchDialogOpen, setIsPatchDialogOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -250,16 +248,13 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                       </Button>
                       <Separator className="my-2"/>
                       <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onTravelReport} disabled={isGuest}>
-                         <PlaneTakeoff className="mr-2 h-4 w-4" /> Travel Sign-off Sheet
+                         <PlaneTakeoff className="mr-2 h-4 w-4" /> Travel Report
                       </Button>
                       {isAdmin && (
                         <>
                           <Separator className="my-2"/>
                           <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={isGuest}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
-                          </Button>
-                           <Button variant="outline" className="w-full justify-start" onClick={() => setIsPatchDialogOpen(true)}>
-                              <Wrench className="mr-2 h-4 w-4" /> Data Patch Utility
                           </Button>
                           <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || isGuest}>
                             <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
@@ -376,12 +371,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         onOpenChange={setIsSingleSheetImportOpen}
       />
 
-      <DataPatchDialog
-        isOpen={isPatchDialogOpen}
-        onOpenChange={setIsPatchDialogOpen}
-      />
     </>
   );
 }
-
-    
