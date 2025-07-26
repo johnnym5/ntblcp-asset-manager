@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,13 +11,10 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Switch } from "@/components/ui/switch";
-import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
   SelectItem,
-  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -36,7 +33,6 @@ import {
   CheckCheck,
   X,
   Inbox,
-  HardDrive,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -62,13 +58,12 @@ import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
 import { Separator } from "./ui/separator";
 import { InboxSheet } from "./inbox-sheet";
-import { ScrollArea } from "./ui/scroll-area";
 import { ChangePasswordDialog } from "./change-password-dialog";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { userProfile, loading, logout } = useAuth();
-  const router = usePathname();
+  const pathname = usePathname();
   const { 
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
@@ -92,7 +87,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Force password change on first login
-    if (userProfile && !userProfile.passwordChanged) {
+    if (userProfile && !userProfile.isGuest && !userProfile.passwordChanged) {
       setIsChangePasswordOpen(true);
     }
   }, [userProfile]);
@@ -154,7 +149,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
-  const isGuest = !userProfile || (userProfile.displayName.toLowerCase().trim() === 'guest');
+  const isGuest = !userProfile || userProfile.isGuest;
 
   return (
     <div className="flex flex-col w-full min-h-screen">
@@ -167,7 +162,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         <div className="flex-1 flex justify-center px-4">
             <div className="w-full max-w-lg">
-                {router === '/assets' && (
+                {pathname === '/' && (
                     <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
                         <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
                         <Input
