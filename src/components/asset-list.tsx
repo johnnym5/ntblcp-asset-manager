@@ -633,12 +633,12 @@ export default function AssetList() {
     setIsFormOpen(false);
   };
 
-  const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified', verifiedDate?: string }) => {
+  const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; condition?: string; verifiedStatus?: 'Verified' | 'Unverified', verifiedDate?: string }) => {
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
 
-    if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus) {
+    if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus && asset.condition === data.condition) {
         return;
     }
 
@@ -1400,13 +1400,29 @@ export default function AssetList() {
                                   />
                               </TableCell>
                               {tableFields.map(field => (
-                                <TableCell key={field.key}>
+                                <TableCell key={field.key} onClick={field.key === 'verifiedStatus' ? (e) => e.stopPropagation() : undefined}>
                                   {field.key === 'verifiedStatus' ? (
-                                    <div className={cn("w-auto h-auto text-xs font-medium inline-flex items-center rounded-full px-2.5 py-0.5", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                      {asset.verifiedStatus === 'Verified' && <Check className="mr-1 h-3 w-3" />}
-                                      {asset.verifiedStatus === 'Unverified' && <FileText className="mr-1 h-3 w-3" />}
-                                      {asset.verifiedStatus}
-                                    </div>
+                                    <Select
+                                      value={asset.verifiedStatus || 'Unverified'}
+                                      onValueChange={async (status) => {
+                                        const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
+                                        await handleQuickSaveAsset(asset.id, {
+                                            verifiedStatus: status as 'Verified' | 'Unverified',
+                                            verifiedDate,
+                                            remarks: asset.remarks,
+                                            condition: asset.condition,
+                                        });
+                                        addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
+                                      }}
+                                    >
+                                      <SelectTrigger className={cn("w-[130px] h-8 text-xs font-medium", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                        <SelectValue placeholder="Select status" />
+                                      </SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-3 w-3"/>Unverified</div></SelectItem>
+                                        <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-3 w-3"/>Verified</div></SelectItem>
+                                      </SelectContent>
+                                    </Select>
                                   ) : (
                                     <span>{String(asset[field.key] ?? 'N/A')}</span>
                                   )}

@@ -78,7 +78,7 @@ interface AssetFormProps {
   onOpenChange: (isOpen: boolean) => void;
   asset?: Asset;
   onSave: (assetToSave: Asset) => Promise<void>;
-  onQuickSave: (assetId: string, data: { remarks?: string; verifiedStatus?: 'Verified' | 'Unverified'; verifiedDate?: string; }) => Promise<void>;
+  onQuickSave: (assetId: string, data: { remarks?: string; condition?: string; verifiedStatus?: 'Verified' | 'Unverified'; verifiedDate?: string; }) => Promise<void>;
   isReadOnly: boolean;
 }
 
@@ -93,6 +93,7 @@ const ReadOnlyField = ({ label, value }: { label: string; value: React.ReactNode
 export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, isReadOnly }: AssetFormProps) {
   const [quickViewRemarks, setQuickViewRemarks] = useState('');
   const [quickViewStatus, setQuickViewStatus] = useState<'Verified' | 'Unverified'>('Unverified');
+  const [quickViewCondition, setQuickViewCondition] = useState('');
   const [isQuickSaving, setIsQuickSaving] = useState(false);
 
   const [isSaving, setIsSaving] = useState(false);
@@ -136,6 +137,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
       if (asset) {
         setQuickViewRemarks(asset.remarks ?? '');
         setQuickViewStatus(asset.verifiedStatus === 'Discrepancy' ? 'Unverified' : (asset.verifiedStatus ?? 'Unverified'));
+        setQuickViewCondition(asset.condition ?? '');
         
         form.reset({
           ...defaultValues,
@@ -168,6 +170,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
         remarks: quickViewRemarks,
         verifiedStatus: quickViewStatus,
         verifiedDate,
+        condition: quickViewCondition,
       });
       addNotification({ title: "Saved", description: "Your changes have been saved locally." });
     } catch(e) {
@@ -213,7 +216,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 {quickViewFields.map(field => (
                   <ReadOnlyField key={field.key} label={field.label} value={String(asset[field.key] ?? '')} />
                 ))}
-                 <ReadOnlyField label="Condition" value={asset.condition} />
               </div>
               <Separator/>
                <div className="space-y-2">
@@ -225,21 +227,44 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     className="min-h-24"
                   />
               </div>
-              <div className="space-y-2">
-                  <Label htmlFor="quick-view-status">Verified Status</Label>
-                  <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
-                      <SelectTrigger id="quick-view-status" className="w-full">
-                          <SelectValue placeholder="Select status" />
-                      </SelectTrigger>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                    <Label htmlFor="quick-view-status">Verified Status</Label>
+                    <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
+                        <SelectTrigger id="quick-view-status" className="w-full">
+                            <SelectValue placeholder="Select status" />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
+                            <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                        </SelectContent>
+                    </Select>
+                </div>
+                <div className="space-y-2">
+                    <Label htmlFor="quick-view-condition">Condition</Label>
+                    <Select onValueChange={setQuickViewCondition} value={quickViewCondition}>
+                      <SelectTrigger id="quick-view-condition"><SelectValue placeholder="Select condition" /></SelectTrigger>
                       <SelectContent>
-                          <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
-                          <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                          <SelectItem value="New">New</SelectItem>
+                          <SelectItem value="Used- good condition">Used- good condition</SelectItem>
+                          <SelectItem value="Used but in good working condition">Used but in good working condition</SelectItem>
+                          <SelectItem value="Used but requires occasional repair">Used but requires occasional repair</SelectItem>
+                          <SelectItem value="Used but in poor condition">Used but in poor condition</SelectItem>
+                          <SelectItem value="Bad condition">Bad condition</SelectItem>
+                          <SelectItem value="F2: Major repairs required-poor condition">F2: Major repairs required-poor condition</SelectItem>
+                          <SelectItem value="Unsalvageable">Unsalvageable</SelectItem>
+                          <SelectItem value="Burnt">Burnt</SelectItem>
+                          <SelectItem value="Stolen">Stolen</SelectItem>
+                          <SelectItem value="Obsolete">Obsolete</SelectItem>
+                          <SelectItem value="Insurance settlement">Insurance settlement</SelectItem>
+                          <SelectItem value="Writeoff">Writeoff</SelectItem>
                       </SelectContent>
-                  </Select>
+                    </Select>
+                </div>
               </div>
               <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
                   {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Comments & Status
+                  Save Changes
               </Button>
           </div>
           <SheetFooter className="mt-auto pt-4 border-t">
