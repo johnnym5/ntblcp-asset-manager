@@ -37,6 +37,11 @@ export function RecentActivitiesSheet({ isOpen, onOpenChange, onViewDetails }: R
     setDismissedActivities([]);
   };
 
+  const handleDismissGroup = (groupToDismiss: ActivityGroup) => {
+    const activityIdsToDismiss = groupToDismiss.activities.map(a => a.lastModified).filter(Boolean) as string[];
+    setDismissedActivities(prev => [...new Set([...prev, ...activityIdsToDismiss])]);
+  };
+
   const activityGroups: ActivityGroup[] = React.useMemo(() => {
     const groups: Record<string, ActivityGroup> = {};
 
@@ -82,11 +87,25 @@ export function RecentActivitiesSheet({ isOpen, onOpenChange, onViewDetails }: R
               {activityGroups.map((group) => (
                 <AccordionItem value={group.userName} key={group.userName}>
                   <AccordionTrigger>
-                    <div className="flex items-center gap-2">
-                      <User className="h-4 w-4" />
-                      <span className="font-semibold">{group.userName}</span>
-                      <span className="text-muted-foreground">({group.userState})</span>
-                      <Badge variant="secondary">{group.activities.length}</Badge>
+                    <div className="flex items-center justify-between w-full">
+                      <div className="flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        <span className="font-semibold">{group.userName}</span>
+                        <span className="text-muted-foreground">({group.userState})</span>
+                        <Badge variant="secondary">{group.activities.length}</Badge>
+                      </div>
+                       <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 rounded-full hover:bg-muted mr-2"
+                        onClick={(e) => {
+                            e.stopPropagation(); // Prevent accordion from toggling
+                            handleDismissGroup(group);
+                        }}
+                      >
+                        <X className="h-4 w-4 text-muted-foreground" />
+                        <span className="sr-only">Dismiss all activities from {group.userName}</span>
+                      </Button>
                     </div>
                   </AccordionTrigger>
                   <AccordionContent>
