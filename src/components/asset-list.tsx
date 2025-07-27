@@ -79,6 +79,7 @@ import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { TravelReportDialog } from "./travel-report-dialog";
+import { ScrollArea } from "./ui/scroll-area";
 
 
 /**
@@ -148,7 +149,7 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[] }> =
     const displayName = locationName === 'All' ? 'Overall (All Assets)' : locationName;
 
     return (
-        <div className="flex flex-col w-full gap-1">
+        <div className="flex flex-col w-full gap-1 p-2 rounded-md hover:bg-muted">
             <div className="flex justify-between items-center w-full text-sm">
                 <span>{displayName}</span>
                 <span className="text-xs font-mono">{verified}/{total} verified</span>
@@ -1220,45 +1221,47 @@ export default function AssetList() {
                   
                   <div className="flex items-center gap-4">
                     {isAdmin && !isFiltered && (
-                      <Select
+                       <Select
                           value={globalStateFilter || 'All'}
                           onValueChange={(value) => setGlobalStateFilter(value)}
                       >
                       <SelectTrigger className="w-full sm:w-[280px]">
                         <SelectValue placeholder="Select a location to filter..." />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="All">
-                            <LocationProgress locationName="All" allAssets={activeAssets} />
-                        </SelectItem>
-                        <SelectSeparator />
-                        <SelectGroup>
-                            <SelectLabel>Special Locations</SelectLabel>
-                            {SPECIAL_LOCATIONS.map((loc) => (
-                                <SelectItem key={loc} value={loc}>
-                                    <LocationProgress locationName={loc} allAssets={activeAssets} />
+                        <SelectContent>
+                            <ScrollArea className="h-[400px]">
+                                <SelectItem value="All">
+                                    <LocationProgress locationName="All" allAssets={activeAssets} />
                                 </SelectItem>
-                            ))}
-                        </SelectGroup>
-                        <SelectSeparator />
-                        <SelectGroup>
-                            <SelectLabel>Geopolitical Zones</SelectLabel>
-                            {ZONE_NAMES.map((zone) => (
-                                <SelectItem key={zone} value={zone}>
-                                    <LocationProgress locationName={zone} allAssets={activeAssets} />
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                        <SelectSeparator />
-                        <SelectGroup>
-                            <SelectLabel>States</SelectLabel>
-                            {NIGERIAN_STATES.map((state) => (
-                                <SelectItem key={state} value={state}>
-                                    <LocationProgress locationName={state} allAssets={activeAssets} />
-                                </SelectItem>
-                            ))}
-                        </SelectGroup>
-                      </SelectContent>
+                                <SelectSeparator />
+                                <SelectGroup>
+                                    <SelectLabel>Special Locations</SelectLabel>
+                                    {SPECIAL_LOCATIONS.map((loc) => (
+                                        <SelectItem key={loc} value={loc} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
+                                            <LocationProgress locationName={loc} allAssets={activeAssets} />
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                                <SelectSeparator />
+                                <SelectGroup>
+                                    <SelectLabel>Geopolitical Zones</SelectLabel>
+                                    {ZONE_NAMES.map((zone) => (
+                                        <SelectItem key={zone} value={zone} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
+                                            <LocationProgress locationName={zone} allAssets={activeAssets} />
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                                <SelectSeparator />
+                                <SelectGroup>
+                                    <SelectLabel>States</SelectLabel>
+                                    {NIGERIAN_STATES.map((state) => (
+                                        <SelectItem key={state} value={state} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
+                                            <LocationProgress locationName={state} allAssets={activeAssets} />
+                                        </SelectItem>
+                                    ))}
+                                </SelectGroup>
+                            </ScrollArea>
+                        </SelectContent>
                       </Select>
                     )}
                     <div className="flex items-center space-x-2">

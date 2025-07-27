@@ -124,6 +124,7 @@ export function UserManagement() {
               <TableHead>Display Name</TableHead>
               <TableHead>Login Name</TableHead>
               <TableHead>Role</TableHead>
+              <TableHead>Password</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
@@ -133,6 +134,7 @@ export function UserManagement() {
                 <TableCell className="font-medium">{user.displayName}</TableCell>
                 <TableCell className="text-muted-foreground">{user.loginName}</TableCell>
                 <TableCell>{user.isAdmin ? 'Admin' : (user.isGuest ? 'Guest' : 'User')}</TableCell>
+                <TableCell className="font-mono text-muted-foreground text-xs">{user.password}</TableCell>
                 <TableCell className="text-right space-x-1">
                    <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)} disabled={!isOnline}>
                     <Edit className="h-4 w-4" />
