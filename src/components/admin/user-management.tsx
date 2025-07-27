@@ -31,7 +31,7 @@ import {
 
 export function UserManagement() {
   const { userProfile: adminProfile } = useAuth();
-  const { appSettings, setAppSettings, isOnline } = useAppState();
+  const { appSettings, setAppSettings } = useAppState();
   const { toast } = useToast();
   
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
@@ -61,12 +61,14 @@ export function UserManagement() {
       newUsers.push(userToSave);
     }
     
-    const newSettings = { ...appSettings, authorizedUsers: newUsers };
-    setAppSettings(newSettings);
-    await updateSettings({ authorizedUsers: newUsers });
-
-    toast({ title: 'User Saved', description: `${userToSave.displayName} has been saved.` });
-    setIsEditFormOpen(false);
+    try {
+      await updateSettings({ authorizedUsers: newUsers });
+      setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
+      toast({ title: 'User Saved', description: `${userToSave.displayName} has been saved.` });
+      setIsEditFormOpen(false);
+    } catch (e) {
+      toast({ title: "Save Failed", description: "Could not save user data to the database.", variant: "destructive" });
+    }
   };
 
   const handleDeleteUser = async () => {
@@ -74,14 +76,17 @@ export function UserManagement() {
     setIsDeleting(true);
 
     const newUsers = appSettings.authorizedUsers.filter(u => u.loginName !== userToDelete.loginName);
-    const newSettings = { ...appSettings, authorizedUsers: newUsers };
 
-    setAppSettings(newSettings);
-    await updateSettings({ authorizedUsers: newUsers });
-    
-    toast({ title: 'User Removed', description: `${userToDelete.displayName} has been removed from the system.` });
-    setUserToDelete(null);
-    setIsDeleting(false);
+    try {
+      await updateSettings({ authorizedUsers: newUsers });
+      setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
+      toast({ title: 'User Removed', description: `${userToDelete.displayName} has been removed from the system.` });
+    } catch (e) {
+      toast({ title: "Removal Failed", description: "Could not remove user from the database.", variant: "destructive" });
+    } finally {
+      setUserToDelete(null);
+      setIsDeleting(false);
+    }
   };
   
   const handlePasswordReset = async (userToReset: AuthorizedUser) => {
@@ -99,15 +104,17 @@ export function UserManagement() {
         ? { ...u, password: '0000', passwordChanged: false } 
         : u
     );
-    const newSettings = { ...appSettings, authorizedUsers: newUsers };
     
-    setAppSettings(newSettings);
-    await updateSettings({ authorizedUsers: newUsers });
-
-    toast({
-      title: 'Password Reset',
-      description: `${userToReset.displayName}'s password has been reset to the default.`,
-    });
+    try {
+      await updateSettings({ authorizedUsers: newUsers });
+      setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
+      toast({
+        title: 'Password Reset',
+        description: `${userToReset.displayName}'s password has been reset to the default.`,
+      });
+    } catch (e) {
+       toast({ title: "Reset Failed", description: "Could not reset the password.", variant: "destructive" });
+    }
   }
   
   return (

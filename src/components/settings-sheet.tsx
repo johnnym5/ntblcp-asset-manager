@@ -43,7 +43,6 @@ interface SettingsSheetProps {
 export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: SettingsSheetProps) {
   const { userProfile } = useAuth();
   const { 
-    isOnline,
     dataActions,
     appSettings,
     setAppSettings,
@@ -60,10 +59,12 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const handleSettingChange = async (key: keyof AppSettings, value: any) => {
-    const newSettings = { ...appSettings, [key]: value };
-    setAppSettings(newSettings);
-    // Always save to local storage, and to firestore if online
-    await updateSettings({ [key]: value });
+    try {
+      await updateSettings({ [key]: value });
+      setAppSettings(prev => ({ ...prev, [key]: value }));
+    } catch (e) {
+      toast({ title: "Save Failed", description: "Could not save setting to the database.", variant: "destructive" });
+    }
   };
 
   const handleToggleSheet = async (sheetName: string, checked: boolean) => {
@@ -80,22 +81,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     const allSheetNames = Object.keys(appSettings.sheetDefinitions);
     handleSettingChange('enabledSheets', enable ? allSheetNames : []);
   };
-
-  const handleSaveChanges = async () => {
-    if (typeof window !== 'undefined' && !navigator.onLine) {
-        toast({ title: 'Offline', description: 'Cannot save global settings while offline.', variant: 'destructive' });
-        return;
-    }
-    try {
-      await updateSettings(appSettings);
-      toast({ title: 'Settings Updated', description: 'Your changes have been saved and applied.' });
-      onOpenChange(false);
-    } catch (error) {
-      toast({ title: 'Error', description: 'Could not save settings to the database.', variant: 'destructive' });
-    } finally {
-        setIsSaving(false);
-    }
-  }
 
   const handleAddSheet = () => {
     setSheetToEdit(null);
@@ -121,7 +106,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     toast({ title: "Sheet Deleted", description: `'${sheetNameToDelete}' definition has been removed.`})
   };
 
-  const handleSaveSheet = (sheet: SheetDefinition) => {
+  const handleSaveSheet = async (sheet: SheetDefinition) => {
     const newSheetDefinitions = { ...appSettings.sheetDefinitions };
     let newEnabledSheets = [...appSettings.enabledSheets];
     
@@ -142,8 +127,8 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
       enabledSheets: newEnabledSheets
     };
 
-    handleSettingChange('sheetDefinitions', settingsToUpdate.sheetDefinitions);
-    handleSettingChange('enabledSheets', settingsToUpdate.enabledSheets);
+    await handleSettingChange('sheetDefinitions', settingsToUpdate.sheetDefinitions);
+    await handleSettingChange('enabledSheets', settingsToUpdate.enabledSheets);
   };
 
   const handleImportTemplate = () => {

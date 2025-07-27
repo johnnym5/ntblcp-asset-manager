@@ -135,17 +135,19 @@ export async function getSettings(): Promise<AppSettings> {
  * @param settings The partial or full settings object to save.
  */
 export async function updateSettings(settings: Partial<AppSettings>) {
-    // Also save to local storage for offline persistence
+    const isActuallyOnline = typeof window !== 'undefined' && navigator.onLine;
+
+    // Always try to save to Firestore if online
+    if (isActuallyOnline) {
+        const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
+        await setDoc(settingsRef, settings, { merge: true });
+    }
+    
+    // Update local storage regardless of online status for offline persistence
     const currentSettingsJSON = localStorage.getItem('ntblcp-app-settings');
     const currentSettings = currentSettingsJSON ? JSON.parse(currentSettingsJSON) : defaultAppSettings;
     const newSettings = { ...currentSettings, ...settings };
     localStorage.setItem('ntblcp-app-settings', JSON.stringify(newSettings));
-    
-    // Save to Firestore if online
-    if (navigator.onLine) {
-        const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
-        await setDoc(settingsRef, settings, { merge: true });
-    }
 }
 
 
@@ -155,6 +157,8 @@ export async function updateSettings(settings: Partial<AppSettings>) {
  * @returns An unsubscribe function to stop listening.
  */
 export function listenToSettings(callback: (settings: AppSettings | null) => void) {
+    const isActuallyOnline = typeof window !== 'undefined' && navigator.onLine;
+    
     // First, load from local storage for immediate offline access
     const localSettingsJSON = localStorage.getItem('ntblcp-app-settings');
     if (localSettingsJSON) {
@@ -167,21 +171,26 @@ export function listenToSettings(callback: (settings: AppSettings | null) => voi
       });
     }
 
-    // Then, set up the Firestore listener for real-time updates when online
-    const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
-    const unsubscribe = onSnapshot(settingsRef, (doc) => {
-        if (doc.exists()) {
-            const data = doc.data() as Partial<AppSettings>;
-            const mergedSettings = { ...defaultAppSettings, ...data };
-            
-            const storedUsersMap = new Map((data.authorizedUsers || []).map(u => [u.loginName, u]));
-            const defaultUsers = defaultAppSettings.authorizedUsers.filter(u => !storedUsersMap.has(u.loginName));
-            mergedSettings.authorizedUsers = [...storedUsersMap.values(), ...defaultUsers];
-            
-            // Update local storage and state when a change is received
-            localStorage.setItem('ntblcp-app-settings', JSON.stringify(mergedSettings));
-            callback(mergedSettings);
-        }
-    });
-    return unsubscribe;
+    // Then, set up the Firestore listener for real-time updates IF online
+    if (isActuallyOnline) {
+      const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
+      const unsubscribe = onSnapshot(settingsRef, (doc) => {
+          if (doc.exists()) {
+              const data = doc.data() as Partial<AppSettings>;
+              const mergedSettings = { ...defaultAppSettings, ...data };
+              
+              const storedUsersMap = new Map((data.authorizedUsers || []).map(u => [u.loginName, u]));
+              const defaultUsers = defaultAppSettings.authorizedUsers.filter(u => !storedUsersMap.has(u.loginName));
+              mergedSettings.authorizedUsers = [...storedUsersMap.values(), ...defaultUsers];
+              
+              // Update local storage and state when a change is received
+              localStorage.setItem('ntblcp-app-settings', JSON.stringify(mergedSettings));
+              callback(mergedSettings);
+          }
+      });
+      return unsubscribe;
+    }
+    
+    // Return a no-op unsubscribe function if offline
+    return () => {};
 }

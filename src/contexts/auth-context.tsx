@@ -16,7 +16,7 @@ interface AuthContextType {
   profileSetupComplete: boolean;
   authInitialized: boolean;
   login: (profile: { displayName: string, state: string, password?: string }) => void;
-  updatePassword: (newPassword: string) => void;
+  updatePassword: (newPassword: string) => Promise<void>;
   logout: () => void;
 }
 
@@ -26,7 +26,7 @@ const AuthContext = createContext<AuthContextType>({
   profileSetupComplete: false,
   authInitialized: false,
   login: () => {},
-  updatePassword: () => {},
+  updatePassword: async () => {},
   logout: () => {},
 });
 
@@ -35,7 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { setAssets, setGlobalStateFilter, appSettings, setAppSettings, isOnline } = useAppState();
+  const { setAssets, setGlobalStateFilter, appSettings, setAppSettings } = useAppState();
 
   useEffect(() => {
     const initializeAuth = () => {
@@ -48,12 +48,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const authorizedUser = appSettings.authorizedUsers.find(u => u.loginName === savedProfile.loginName?.toLowerCase());
             
             if (authorizedUser) {
-              // Create the final profile, prioritizing the saved password and passwordChanged status over the default
+              // Create the final profile by merging the authoritative definition with the saved one
               const finalProfile: UserProfile = {
-                ...authorizedUser, // Base permissions and states
-                ...savedProfile,  // Saved state and display name
-                password: savedProfile.password, // IMPORTANT: Use the saved password
-                passwordChanged: savedProfile.passwordChanged, // IMPORTANT: Use the saved status
+                ...authorizedUser, // Base permissions and states from settings
+                ...savedProfile,  // Overwrite with saved state, etc.
               };
               setUserProfile(finalProfile);
               setGlobalStateFilter(finalProfile.state);
@@ -82,10 +80,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const authorizedUser = appSettings.authorizedUsers.find(u => u.displayName === profile.displayName);
     if (!authorizedUser) return;
 
-    // On login, we construct the definitive profile for the session.
-    // We prioritize the password from the *base* authorized user list.
-    // If a user has changed their password, that change is stored in `updatePassword`
-    // and will be reflected correctly on the next app load by the useEffect above.
     const fullProfile: UserProfile = {
       ...authorizedUser,
       state: profile.state,
@@ -96,33 +90,26 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setGlobalStateFilter(profile.state);
   };
   
-  const updatePassword = (newPassword: string) => {
-    if (userProfile) {
-        const updatedProfile: UserProfile = {
-            ...userProfile,
-            password: newPassword,
-            passwordChanged: true,
-        };
+  const updatePassword = async (newPassword: string) => {
+    if (!userProfile) return;
+    
+    const updatedProfile: UserProfile = {
+        ...userProfile,
+        password: newPassword,
+        passwordChanged: true,
+    };
 
-        // Immediately update the local state and localStorage for persistence
-        setUserProfile(updatedProfile);
-        localStorage.setItem('ntblcp-user-profile', JSON.stringify(updatedProfile));
-        
-        // Also update this user's entry in the global settings state, which will then be synced.
-        const newUsers = appSettings.authorizedUsers.map(u => 
-            u.loginName === userProfile.loginName 
-                ? { ...u, password: newPassword, passwordChanged: true } 
-                : u
-        );
+    setUserProfile(updatedProfile);
+    localStorage.setItem('ntblcp-user-profile', JSON.stringify(updatedProfile));
+    
+    const newUsers = appSettings.authorizedUsers.map(u => 
+        u.loginName === userProfile.loginName 
+            ? { ...u, password: newPassword, passwordChanged: true } 
+            : u
+    );
 
-        const newSettings = { ...appSettings, authorizedUsers: newUsers };
-        setAppSettings(newSettings);
-        
-        // Update Firestore if online
-        if (isOnline) {
-          updateSettings({ authorizedUsers: newUsers });
-        }
-    }
+    await updateSettings({ authorizedUsers: newUsers });
+    setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
   };
 
 

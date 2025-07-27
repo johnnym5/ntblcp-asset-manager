@@ -123,14 +123,9 @@ export function ColumnCustomizationSheet({
         };
     }
     
-    const newSettings: AppSettings = {
-        ...appSettings,
-        sheetDefinitions: newSheetDefinitions,
-    };
-    
     try {
-        await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
-        setAppSettings(newSettings);
+        await updateSettings({ sheetDefinitions: newSheetDefinitions });
+        setAppSettings(prev => ({...prev, sheetDefinitions: newSheetDefinitions}));
         toast({ title: "Layout Applied", description: "Column settings have been applied to all sheets for all users."});
         onOpenChange(false);
     } catch (e) {

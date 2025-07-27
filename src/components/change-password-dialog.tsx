@@ -35,7 +35,7 @@ export function ChangePasswordDialog({ isOpen, onOpenChange }: ChangePasswordDia
   const [error, setError] = useState<string | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   
-  const isInitialChange = !userProfile?.passwordChanged;
+  const isInitialChange = userProfile && !userProfile.passwordChanged;
 
   const handleSave = async () => {
     setError(null);
@@ -62,7 +62,7 @@ export function ChangePasswordDialog({ isOpen, onOpenChange }: ChangePasswordDia
 
     setIsSaving(true);
     try {
-      updatePassword(newPassword);
+      await updatePassword(newPassword);
       toast({
         title: 'Password Updated',
         description: 'Your password has been changed successfully.',
