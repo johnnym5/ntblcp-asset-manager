@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ScrollArea } from './ui/scroll-area';
-import { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, ShadingType } from 'docx';
+import { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, ShadingType, Bullet, AlignmentType } from 'docx';
 import { saveAs } from 'file-saver';
 import type { Asset } from '@/lib/types';
 
@@ -42,6 +42,20 @@ const ReportInput = ({ label, id, value, onChange }: { label: string, id: string
     </div>
 );
 
+const defaultActivities = [
+  "Physical verification of all assets in the state.",
+  "On-the-spot-assessment of the assets condition.",
+  "Proper documentation of the verified assets.",
+  "Proper documentation of the unverified assets.",
+  "Syncing of all the data into the server."
+].join('\n');
+
+const defaultObservations = [
+  "All assets are in good working condition.",
+  "All assets are properly maintained.",
+  "All assets are properly documented."
+].join('\n');
+
 
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
   const { userProfile } = useAuth();
@@ -50,10 +64,10 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
   const [reportState, setReportState] = useState('');
   const [travelDate, setTravelDate] = useState('');
   const [objectives, setObjectives] = useState('');
-  const [activities, setActivities] = useState('');
+  const [activities, setActivities] = useState(defaultActivities);
   const [approvedBy, setApprovedBy] = useState('');
   
-  const [observations, setObservations] = useState('');
+  const [observations, setObservations] = useState(defaultObservations);
   const [challenges, setChallenges] = useState('');
   const [recommendations, setRecommendations] = useState('');
 
@@ -61,10 +75,10 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
     if (isOpen) {
       setReportState(userProfile?.state || '');
       setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
-      setObjectives('');
-      setActivities('');
+      setObjectives('To conduct physical verification of NTBLCP assets in the state.');
+      setActivities(defaultActivities);
+      setObservations(defaultObservations);
       setApprovedBy('');
-      setObservations('');
       setChallenges('');
       setRecommendations('');
     }
@@ -84,6 +98,16 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
   const assetsWithRemarks = reportAssets.filter(asset => asset.remarks && asset.remarks.trim() !== '');
 
   const generateWordDocument = () => {
+    const createBulletedParagraphs = (text: string) => {
+        return text.split('\n').filter(line => line.trim() !== '').map(line => {
+            return new Paragraph({
+                text: line.startsWith('- ') ? line.substring(2) : line,
+                bullet: { level: 0 },
+                style: "default-bullet-style",
+            });
+        });
+    };
+    
     const tableHeader = new TableRow({
         children: [
             new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "S/N", bold: true })]})], ...cellStyles }),
@@ -141,10 +165,24 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
     });
 
     const doc = new Document({
+        styles: {
+            paragraphStyles: [{
+                id: "default-bullet-style",
+                name: "Default Bullet Style",
+                basedOn: "Normal",
+                next: "Normal",
+                run: {
+                    size: 22, // 11pt
+                },
+                paragraph: {
+                    indent: { left: 720, hanging: 360 }, // 0.5 inch indent, 0.25 inch hanging
+                },
+            }]
+        },
         sections: [{
             children: [
-                new Paragraph({ text: "NATIONAL TUBERCULOSIS, LEPROSY & BURULI - ULCER CONTROL PROGRAMME (NTBLCP)", heading: HeadingLevel.HEADING_1, alignment: 'center' }),
-                new Paragraph({ text: "TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: 'center' }),
+                new Paragraph({ text: "NATIONAL TUBERCULOSIS, LEPROSY & BURULI - ULCER CONTROL PROGRAMME (NTBLCP)", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+                new Paragraph({ text: "TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
                 new Paragraph(" "),
                 new Paragraph({ text: `DATE OF TRAVEL:\t\t${travelDate}` }),
                 new Paragraph({ text: `STATE VISITED:\t\t${reportState}` }),
@@ -159,16 +197,16 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                 new Paragraph(objectives),
                 new Paragraph(" "),
                 new Paragraph({ text: "ACTIVITIES DONE:", heading: HeadingLevel.HEADING_3 }),
-                new Paragraph(activities),
+                ...createBulletedParagraphs(activities),
                 new Paragraph(" "),
                 new Paragraph({ text: "OBSERVATIONS:", heading: HeadingLevel.HEADING_3 }),
-                new Paragraph(observations),
+                ...createBulletedParagraphs(observations),
                  new Paragraph(" "),
                 new Paragraph({ text: "CHALLENGES:", heading: HeadingLevel.HEADING_3 }),
-                new Paragraph(challenges),
+                 ...createBulletedParagraphs(challenges),
                  new Paragraph(" "),
                 new Paragraph({ text: "RECOMMENDATIONS:", heading: HeadingLevel.HEADING_3 }),
-                new Paragraph(recommendations),
+                 ...createBulletedParagraphs(recommendations),
                  new Paragraph(" "),
                 new Paragraph({ text: "ASSETS WITH REMARKS:", heading: HeadingLevel.HEADING_3 }),
                 remarksRows.length > 0 ? remarksTable : new Paragraph("No assets with remarks were found for this location."),
