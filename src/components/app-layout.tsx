@@ -60,7 +60,7 @@ import { Separator } from "./ui/separator";
 import { RecentActivitiesSheet } from "./recent-activities-sheet";
 import { ChangePasswordDialog } from "./change-password-dialog";
 import { ScrollArea } from "./ui/scroll-area";
-import { AssetForm } from "./asset-form";
+import { UpdatedAssetsDialog } from "./updated-assets-dialog";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -87,9 +87,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
 
   // State to control AssetForm from the layout
-  const [isAssetFormOpen, setIsAssetFormOpen] = useState(false);
-  const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
-  const [isAssetFormReadOnly, setIsAssetFormReadOnly] = useState(true);
+  const [isUpdatedAssetsDialogOpen, setIsUpdatedAssetsDialogOpen] = useState(false);
+  const [selectedAssetForDetails, setSelectedAssetForDetails] = useState<Asset | undefined>(undefined);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
 
@@ -164,21 +163,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const handleViewAssetDetails = (asset: Asset) => {
-    setSelectedAsset(asset);
-    setIsAssetFormReadOnly(true);
+    setSelectedAssetForDetails(asset);
     setIsRecentActivitiesOpen(false); // Close the activities sheet
-    setIsAssetFormOpen(true); // Open the asset form
-  }
-
-  const handleSaveAsset = async (assetToSave: Asset) => {
-     // This function body can be added if saving from the layout is needed.
-     // For now, we just need to pass it to the form.
-     console.log("Saving asset from layout:", assetToSave)
-  }
-
-  const handleQuickSaveAsset = async (assetId: string, data: any) => {
-    // This function body can be added if quick-saving from the layout is needed.
-    console.log("Quick saving asset from layout:", assetId, data)
+    setIsUpdatedAssetsDialogOpen(true); // Open the asset form
   }
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
@@ -422,14 +409,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SheetContent>
       </Sheet>
       <ChangePasswordDialog isOpen={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen} />
-      <AssetForm
-          isOpen={isAssetFormOpen}
-          onOpenChange={setIsAssetFormOpen}
-          asset={selectedAsset}
-          onSave={handleSaveAsset}
-          onQuickSave={handleQuickSaveAsset}
-          isReadOnly={isAssetFormReadOnly}
-        />
+      <UpdatedAssetsDialog
+        isOpen={isUpdatedAssetsDialogOpen}
+        onOpenChange={setIsUpdatedAssetsDialogOpen}
+        asset={selectedAssetForDetails}
+      />
     </div>
   );
 }

@@ -47,6 +47,8 @@ import { addNotification } from "@/hooks/use-notifications";
 import { Label } from "./ui/label";
 import { Separator } from "./ui/separator";
 import { useAppState } from "@/contexts/app-state-context";
+import { cn } from "@/lib/utils";
+
 
 const assetFormSchema = z.object({
   category: z.string({ required_error: "Please select a category." }),
@@ -73,6 +75,19 @@ const assetFormSchema = z.object({
 
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
 
+interface ReadOnlyFieldProps {
+  label: string;
+  value: React.ReactNode;
+}
+
+const ReadOnlyField: React.FC<ReadOnlyFieldProps> = ({ label, value }) => (
+    <div className="space-y-1">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        <p className="text-sm">{value || <span className="text-muted-foreground/70">N/A</span>}</p>
+    </div>
+);
+
+
 interface AssetFormProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
@@ -82,23 +97,7 @@ interface AssetFormProps {
   isReadOnly: boolean;
 }
 
-const ReadOnlyField = ({ label, value, icon }: { label: string; value: React.ReactNode, icon?: React.ReactNode }) => (
-    <div className="flex items-start gap-2">
-        {icon && <div className="mt-1 text-muted-foreground">{icon}</div>}
-        <div className="space-y-1 w-full">
-            <p className="text-xs font-medium text-muted-foreground">{label}</p>
-            <p className="text-sm bg-muted rounded-md px-3 py-2 min-h-10 flex items-center">{value ?? <span className="text-muted-foreground/70">N/A</span>}</p>
-        </div>
-    </div>
-);
-
-
 export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, isReadOnly }: AssetFormProps) {
-  const [quickViewRemarks, setQuickViewRemarks] = useState('');
-  const [quickViewStatus, setQuickViewStatus] = useState<'Verified' | 'Unverified'>('Unverified');
-  const [quickViewCondition, setQuickViewCondition] = useState('');
-  const [isQuickSaving, setIsQuickSaving] = useState(false);
-
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
   const { appSettings } = useAppState();
@@ -138,10 +137,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   useEffect(() => {
     if (isOpen) {
       if (asset) {
-        setQuickViewRemarks(asset.remarks ?? '');
-        setQuickViewStatus(asset.verifiedStatus === 'Discrepancy' ? 'Unverified' : (asset.verifiedStatus ?? 'Unverified'));
-        setQuickViewCondition(asset.condition ?? '');
-        
         form.reset({
           ...defaultValues,
           ...asset,
@@ -164,43 +159,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   }, [watchedStatusInForm, form, isReadOnly]);
 
 
-  const handleQuickSaveClick = async () => {
-    if (!asset) return;
-    setIsQuickSaving(true);
-    
-    let changeDescription = "";
-    if(asset.verifiedStatus !== quickViewStatus){
-        changeDescription += `Status changed from ${asset.verifiedStatus || 'Unverified'} to ${quickViewStatus}. `;
-    }
-    if(asset.condition !== quickViewCondition){
-        changeDescription += `Condition updated to ${quickViewCondition}. `;
-    }
-    if(asset.remarks !== quickViewRemarks){
-        changeDescription += 'Remarks updated. ';
-    }
-
-    if (changeDescription === "") {
-        addNotification({ title: "No Changes", description: "No changes were detected to save."});
-        setIsQuickSaving(false);
-        return;
-    }
-
-    try {
-      const verifiedDate = quickViewStatus === 'Verified' ? new Date().toLocaleDateString('en-CA') : '';
-      await onQuickSave(asset.id, {
-        remarks: quickViewRemarks,
-        verifiedStatus: quickViewStatus,
-        verifiedDate,
-        condition: quickViewCondition,
-      });
-      addNotification({ title: "Quick Save Successful", description: changeDescription });
-    } catch(e) {
-      addNotification({ title: "Error", description: "Could not save changes.", variant: "destructive" });
-    } finally {
-      setIsQuickSaving(false);
-    }
-  }
-
   const onSubmit = async (data: AssetFormValues) => {
     setIsSaving(true);
     try {
@@ -219,84 +177,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   };
   
   // RENDER LOGIC
-  if (isReadOnly && asset) {
-    const sheetDefinition = sheetDefinitions[asset.category];
-
-    return (
-      <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="sm:max-w-xl w-full flex flex-col">
-          <SheetHeader>
-            <SheetTitle>Asset Details</SheetTitle>
-            <SheetDescription>
-              A read-only view of the asset's last known state.
-            </SheetDescription>
-          </SheetHeader>
-          <div className="flex-1 space-y-4 overflow-y-auto pr-6 py-4">
-              <ReadOnlyField label="Asset Description" value={asset.description} icon={<FileText className="h-4 w-4" />} />
-              <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} icon={<Tag className="h-4 w-4" />} />
-              <ReadOnlyField label="Location of Asset" value={asset.location} icon={<MapPin className="h-4 w-4" />} />
-              <ReadOnlyField label="Last Modified By" value={asset.lastModifiedBy} icon={<User className="h-4 w-4" />} />
-              <ReadOnlyField label="Time of Change" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} icon={<Clock className="h-4 w-4" />} />
-              <Separator />
-               <div className="space-y-2">
-                  <Label>Remarks/Comments (Editable)</Label>
-                  <Textarea
-                    id="quick-view-remarks"
-                    value={quickViewRemarks}
-                    onChange={(e) => setQuickViewRemarks(e.target.value)}
-                    className="min-h-24"
-                  />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                    <Label htmlFor="quick-view-status">Verified Status</Label>
-                    <Select onValueChange={(value) => setQuickViewStatus(value as any)} value={quickViewStatus}>
-                        <SelectTrigger id="quick-view-status" className="w-full">
-                            <SelectValue placeholder="Select status" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
-                            <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-                <div className="space-y-2">
-                    <Label htmlFor="quick-view-condition">Condition</Label>
-                    <Select onValueChange={setQuickViewCondition} value={quickViewCondition}>
-                      <SelectTrigger id="quick-view-condition"><SelectValue placeholder="Select condition" /></SelectTrigger>
-                      <SelectContent>
-                          <SelectItem value="New">New</SelectItem>
-                          <SelectItem value="Used- good condition">Used- good condition</SelectItem>
-                          <SelectItem value="Used but in good working condition">Used but in good working condition</SelectItem>
-                          <SelectItem value="Used but requires occasional repair">Used but requires occasional repair</SelectItem>
-                          <SelectItem value="Used but in poor condition">Used but in poor condition</SelectItem>
-                          <SelectItem value="Bad condition">Bad condition</SelectItem>
-                          <SelectItem value="F2: Major repairs required-poor condition">F2: Major repairs required-poor condition</SelectItem>
-                          <SelectItem value="Unsalvageable">Unsalvageable</SelectItem>
-                          <SelectItem value="Burnt">Burnt</SelectItem>
-                          <SelectItem value="Stolen">Stolen</SelectItem>
-                          <SelectItem value="Obsolete">Obsolete</SelectItem>
-                          <SelectItem value="Insurance settlement">Insurance settlement</SelectItem>
-                          <SelectItem value="Writeoff">Writeoff</SelectItem>
-                      </SelectContent>
-                    </Select>
-                </div>
-              </div>
-              <Button onClick={handleQuickSaveClick} disabled={isQuickSaving}>
-                  {isQuickSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Changes
-              </Button>
-          </div>
-          <SheetFooter className="mt-auto pt-4 border-t">
-            <SheetClose asChild>
-              <Button variant="outline">Close</Button>
-            </SheetClose>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
-    );
-  }
-
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-4xl w-full flex flex-col">
