@@ -167,6 +167,24 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   const handleQuickSaveClick = async () => {
     if (!asset) return;
     setIsQuickSaving(true);
+    
+    let changeDescription = "";
+    if(asset.verifiedStatus !== quickViewStatus){
+        changeDescription += `Status changed from ${asset.verifiedStatus || 'Unverified'} to ${quickViewStatus}. `;
+    }
+    if(asset.condition !== quickViewCondition){
+        changeDescription += `Condition updated to ${quickViewCondition}. `;
+    }
+    if(asset.remarks !== quickViewRemarks){
+        changeDescription += 'Remarks updated. ';
+    }
+
+    if (changeDescription === "") {
+        addNotification({ title: "No Changes", description: "No changes were detected to save."});
+        setIsQuickSaving(false);
+        return;
+    }
+
     try {
       const verifiedDate = quickViewStatus === 'Verified' ? new Date().toLocaleDateString('en-CA') : '';
       await onQuickSave(asset.id, {
@@ -175,7 +193,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
         verifiedDate,
         condition: quickViewCondition,
       });
-      addNotification({ title: "Saved", description: "Your changes have been saved locally." });
+      addNotification({ title: "Quick Save Successful", description: changeDescription });
     } catch(e) {
       addNotification({ title: "Error", description: "Could not save changes.", variant: "destructive" });
     } finally {
