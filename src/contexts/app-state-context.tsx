@@ -19,6 +19,7 @@ export interface DataActions {
   onExport?: () => void;
   onAddAsset?: () => void;
   onClearAll?: () => void;
+  onTravelReport?: () => void;
   isImporting?: boolean;
   isAdmin?: boolean;
   hasAssets?: boolean;
@@ -83,6 +84,8 @@ interface AppStateContextType {
   // Inbox
   unreadInboxCount: number;
   setUnreadInboxCount: Dispatch<SetStateAction<number>>;
+  dismissedActivities: string[];
+  setDismissedActivities: Dispatch<SetStateAction<string[]>>;
   autoSyncEnabled: boolean;
 }
 
@@ -137,6 +140,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [dataActions, setDataActions] = useState<DataActions>({});
   
   const [unreadInboxCount, setUnreadInboxCount] = useState(0);
+  const [dismissedActivities, setDismissedActivities] = useState<string[]>(() => {
+    if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('ntblcp-dismissed-activities');
+        return saved ? JSON.parse(saved) : [];
+    }
+    return [];
+  });
+
 
   // Effect for real-time settings
   useEffect(() => {
@@ -181,6 +192,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [isOnline]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+        localStorage.setItem('ntblcp-dismissed-activities', JSON.stringify(dismissedActivities));
+    }
+  }, [dismissedActivities]);
+
+
   const value = {
     assets,
     setAssets,
@@ -222,6 +240,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setDataActions,
     unreadInboxCount,
     setUnreadInboxCount,
+    dismissedActivities,
+    setDismissedActivities,
     autoSyncEnabled: appSettings.autoSyncEnabled,
   };
 
