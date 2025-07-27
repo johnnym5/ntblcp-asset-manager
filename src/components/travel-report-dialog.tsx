@@ -182,7 +182,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         sections: [{
             children: [
                 new Paragraph({ text: "NATIONAL TUBERCULOSIS, LEPROSY & BURULI - ULCER CONTROL PROGRAMME (NTBLCP)", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
-                new Paragraph({ text: "TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
+                new Paragraph({ text: "ASSET VERIFICATION TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
                 new Paragraph(" "),
                 new Paragraph({ text: `DATE OF TRAVEL:\t\t${travelDate}` }),
                 new Paragraph({ text: `STATE VISITED:\t\t${reportState}` }),
