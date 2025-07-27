@@ -118,12 +118,17 @@ export function RecentActivitiesSheet({ isOpen, onOpenChange, onViewDetails }: R
               <CheckCheck className="h-12 w-12 mb-4" />
               <h3 className="text-lg font-semibold">All Caught Up</h3>
               <p className="text-sm">There are no new activities to show.</p>
+              {dismissedActivities.length > 0 && (
+                <Button variant="link" size="sm" className="mt-4" onClick={handleClearDismissed}>
+                  Show cleared activities
+                </Button>
+              )}
             </div>
           )}
         </ScrollArea>
         <SheetFooter className="p-6 pt-4 border-t sm:justify-between">
-           <Button variant="outline" onClick={handleClearDismissed} disabled={dismissedActivities.length === 0}>
-             Show All Activities
+           <Button variant="outline" onClick={handleDismissAll} disabled={totalActivities === 0}>
+             Clear All
            </Button>
            <SheetClose asChild>
              <Button>Close</Button>
