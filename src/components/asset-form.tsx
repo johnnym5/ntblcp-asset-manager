@@ -39,7 +39,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Asset, SheetDefinition } from "@/lib/types";
-import { AlertCircle, Loader2, FileText, Check } from "lucide-react";
+import { AlertCircle, Loader2, FileText, Check, User, MapPin, Clock, Tag } from "lucide-react";
 import { TARGET_SHEETS } from "@/lib/constants";
 import { AssetChecklist } from "./asset-checklist";
 import { useAuth } from "@/contexts/auth-context";
@@ -82,10 +82,13 @@ interface AssetFormProps {
   isReadOnly: boolean;
 }
 
-const ReadOnlyField = ({ label, value }: { label: string; value: React.ReactNode }) => (
-    <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm">{value ?? <span className="text-muted-foreground/70">N/A</span>}</p>
+const ReadOnlyField = ({ label, value, icon }: { label: string; value: React.ReactNode, icon?: React.ReactNode }) => (
+    <div className="flex items-start gap-2">
+        {icon && <div className="mt-1 text-muted-foreground">{icon}</div>}
+        <div className="space-y-1 w-full">
+            <p className="text-xs font-medium text-muted-foreground">{label}</p>
+            <p className="text-sm bg-muted rounded-md px-3 py-2 min-h-10 flex items-center">{value ?? <span className="text-muted-foreground/70">N/A</span>}</p>
+        </div>
     </div>
 );
 
@@ -200,24 +203,23 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
   // RENDER LOGIC
   if (isReadOnly && asset) {
     const sheetDefinition = sheetDefinitions[asset.category];
-    const quickViewFields = sheetDefinition?.displayFields.filter(f => f.quickView) || [];
 
     return (
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="sm:max-w-xl w-full flex flex-col">
           <SheetHeader>
-            <SheetTitle>Asset Quick View</SheetTitle>
+            <SheetTitle>Asset Details</SheetTitle>
             <SheetDescription>
-              Viewing asset details. Comments and status can be updated here.
+              A read-only view of the asset's last known state.
             </SheetDescription>
           </SheetHeader>
           <div className="flex-1 space-y-4 overflow-y-auto pr-6 py-4">
-              <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                {quickViewFields.map(field => (
-                  <ReadOnlyField key={field.key} label={field.label} value={String(asset[field.key] ?? '')} />
-                ))}
-              </div>
-              <Separator/>
+              <ReadOnlyField label="Asset Description" value={asset.description} icon={<FileText className="h-4 w-4" />} />
+              <ReadOnlyField label="Asset ID Code" value={asset.assetIdCode} icon={<Tag className="h-4 w-4" />} />
+              <ReadOnlyField label="Location of Asset" value={asset.location} icon={<MapPin className="h-4 w-4" />} />
+              <ReadOnlyField label="Last Modified By" value={asset.lastModifiedBy} icon={<User className="h-4 w-4" />} />
+              <ReadOnlyField label="Time of Change" value={asset.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} icon={<Clock className="h-4 w-4" />} />
+              <Separator />
                <div className="space-y-2">
                   <Label>Remarks/Comments (Editable)</Label>
                   <Textarea
