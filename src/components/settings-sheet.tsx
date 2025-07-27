@@ -82,6 +82,10 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   };
 
   const handleSaveChanges = async () => {
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+        toast({ title: 'Offline', description: 'Cannot save global settings while offline.', variant: 'destructive' });
+        return;
+    }
     try {
       await updateSettings(appSettings);
       toast({ title: 'Settings Updated', description: 'Your changes have been saved and applied.' });

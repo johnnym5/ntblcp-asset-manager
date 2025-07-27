@@ -113,7 +113,7 @@ export function UserManagement() {
   return (
     <div>
       <div className="flex justify-end mb-4">
-        <Button onClick={handleAddNewUser} disabled={!isOnline}>
+        <Button onClick={handleAddNewUser}>
           <UserPlus className="mr-2 h-4 w-4" /> Add New User
         </Button>
       </div>
@@ -136,13 +136,13 @@ export function UserManagement() {
                 <TableCell>{user.isAdmin ? 'Admin' : (user.isGuest ? 'Guest' : 'User')}</TableCell>
                 <TableCell className="font-mono text-muted-foreground text-xs">{user.password}</TableCell>
                 <TableCell className="text-right space-x-1">
-                   <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)} disabled={!isOnline}>
+                   <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)}>
                     <Edit className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={() => handlePasswordReset(user)} disabled={user.isGuest || !isOnline}>
+                  <Button variant="ghost" size="icon" onClick={() => handlePasswordReset(user)} disabled={user.isGuest}>
                       <KeyRound className="h-4 w-4" />
                   </Button>
-                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setUserToDelete(user)} disabled={adminProfile?.loginName === user.loginName || !isOnline}>
+                  <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => setUserToDelete(user)} disabled={adminProfile?.loginName === user.loginName}>
                       <Trash2 className="h-4 w-4" />
                   </Button>
                 </TableCell>

@@ -63,7 +63,7 @@ export function ColumnCustomizationSheet({
   onSave,
 }: ColumnCustomizationSheetProps) {
   const [fields, setFields] = useState<DisplayField[]>([]);
-  const { appSettings, setAppSettings, isOnline } = useAppState();
+  const { appSettings, setAppSettings } = useAppState();
   const { toast } = useToast();
 
   useEffect(() => {
@@ -109,7 +109,7 @@ export function ColumnCustomizationSheet({
   }
 
   const handleApplyToAll = async () => {
-    if (!isOnline) {
+    if (typeof window !== 'undefined' && !navigator.onLine) {
       toast({ title: 'Offline', description: 'This action requires an internet connection.', variant: 'destructive' });
       return;
     }
