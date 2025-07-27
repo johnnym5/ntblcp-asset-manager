@@ -45,6 +45,7 @@ import {
   ArrowRightLeft,
   Columns,
   Delete,
+  PlaneTakeoff,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -928,7 +929,6 @@ export default function AssetList() {
         isImporting: isImporting,
         isAdmin: isAdmin,
         hasAssets: hasCurrentAssets,
-        onTravelReport: () => setIsTravelReportOpen(true),
     });
 
     return () => {
@@ -1249,7 +1249,6 @@ export default function AssetList() {
                   </p>
               </CardContent>
           </Card>
-        )}
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {mainCategories.length > 0 ? (
