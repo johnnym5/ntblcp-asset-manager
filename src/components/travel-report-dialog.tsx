@@ -16,7 +16,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
-import { NIGERIAN_STATES, NIGERIAN_ZONES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from '@/lib/constants';
+import { NIGERIAN_STATES, NIGERIAN_ZONES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from '@/lib/constants';
 import {
   Select,
   SelectContent,
@@ -91,15 +91,14 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
     if (!reportState) return [];
     if (reportState === 'All Locations') return activeAssets;
     
-    const zones: Record<string, string[]> = NIGERIAN_ZONES;
-    const isZone = !!zones[reportState];
+    const isZonalStore = ZONAL_STORES.map(z => z.toLowerCase()).includes(reportState.toLowerCase());
 
-    if (isZone) {
-      const lowerCaseZone = reportState.toLowerCase();
-      return activeAssets.filter(asset => {
-        const assetLocation = (asset.location || "").toLowerCase().trim();
-        return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
-      });
+    if (isZonalStore) {
+        const lowerCaseZone = reportState.toLowerCase();
+        return activeAssets.filter(asset => {
+            const assetLocation = (asset.location || "").toLowerCase().trim();
+            return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
+        });
     }
 
     const lowerCaseFilter = reportState.toLowerCase().trim();
@@ -291,8 +290,8 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                                           </SelectGroup>
                                           <SelectSeparator />
                                           <SelectGroup>
-                                              <SelectLabel>Geopolitical Zones</SelectLabel>
-                                              {ZONE_NAMES.map((zone) => (
+                                              <SelectLabel>Zonal Stores</SelectLabel>
+                                              {ZONAL_STORES.map((zone) => (
                                                   <SelectItem key={zone} value={zone}>{zone}</SelectItem>
                                               ))}
                                           </SelectGroup>
