@@ -463,8 +463,8 @@ export default function AssetList() {
 
 
   const handleAddAsset = useCallback(() => {
-    if (!isAdmin) {
-      addNotification({ title: "Permission Denied", description: "Only administrators can add new assets.", variant: "destructive" });
+    if (!userProfile?.canAddAssets && !isAdmin) {
+      addNotification({ title: "Permission Denied", description: "You do not have permission to add new assets.", variant: "destructive" });
       return;
     }
     if (lockAssetList && isAdmin && dataSource === 'cloud') {
@@ -474,7 +474,7 @@ export default function AssetList() {
     setSelectedAsset(undefined);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  }, [lockAssetList, isAdmin, dataSource]);
+  }, [lockAssetList, isAdmin, dataSource, userProfile]);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -483,8 +483,8 @@ export default function AssetList() {
   };
 
   const handleEditAsset = (asset: Asset) => {
-    if (!isAdmin) {
-      addNotification({ title: "Permission Denied", description: "Only administrators can edit assets.", variant: "destructive" });
+    if (!userProfile?.canEditAssets && !isAdmin) {
+      addNotification({ title: "Permission Denied", description: "You do not have permission to edit assets.", variant: "destructive" });
       return;
     }
     setSelectedAsset(asset);
@@ -566,8 +566,8 @@ export default function AssetList() {
   };
 
   const handleBatchEdit = () => {
-    if (!isAdmin) {
-      addNotification({ title: "Permission Denied", description: "Only administrators can batch edit assets.", variant: "destructive" });
+    if (!userProfile?.canEditAssets && !isAdmin) {
+      addNotification({ title: "Permission Denied", description: "You do not have permission to batch edit.", variant: "destructive" });
       return;
     }
     setIsBatchEditOpen(true);
@@ -1178,7 +1178,7 @@ export default function AssetList() {
                         {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <SyncButtonIcon className="mr-2 h-4 w-4" />}
                          {syncButtonText}
                       </Button>
-                      <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || !isAdmin}>
+                      <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
                           <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => handleExportClick(selectedCategories)}>
@@ -1384,12 +1384,12 @@ export default function AssetList() {
                        {syncButtonText}
                     </Button>
                      {selectedAssetIds.length === 1 && !isGuest && (
-                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)}>
+                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={!userProfile?.canEditAssets && !isAdmin}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     )}
                     {selectedAssetIds.length > 0 && !isGuest && (
-                        <Button variant="outline" size="sm" onClick={handleBatchEdit}>
+                        <Button variant="outline" size="sm" onClick={handleBatchEdit} disabled={!userProfile?.canEditAssets && !isAdmin}>
                             <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                         </Button>
                     )}
@@ -1474,13 +1474,13 @@ export default function AssetList() {
                               <TableCell className="text-right">
                                 <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
                                   <DropdownMenu>
-                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest || !isAdmin}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }}>
+                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }} disabled={!userProfile?.canEditAssets && !isAdmin}>
                                           <Edit className="mr-2 h-4 w-4" />
                                           Edit Full Details
                                       </DropdownMenuItem>
-                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20">
+                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20" disabled={!isAdmin}>
                                           <Trash2 className="mr-2 h-4 w-4" />
                                           Delete
                                       </DropdownMenuItem>

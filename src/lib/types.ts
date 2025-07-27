@@ -61,6 +61,8 @@ export interface AuthorizedUser {
   isGuest?: boolean;
   password?: string;
   passwordChanged?: boolean;
+  canAddAssets?: boolean;
+  canEditAssets?: boolean;
 }
 
 

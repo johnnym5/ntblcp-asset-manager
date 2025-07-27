@@ -42,6 +42,7 @@ import { ChevronsUpDown, Check } from 'lucide-react';
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
+import { Separator } from '../ui/separator';
 
 const userFormSchema = z.object({
   displayName: z.string().min(2, 'Display name must be at least 2 characters.'),
@@ -50,6 +51,8 @@ const userFormSchema = z.object({
   isAdmin: z.boolean(),
   isGuest: z.boolean(),
   password: z.string().optional(),
+  canAddAssets: z.boolean(),
+  canEditAssets: z.boolean(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -74,6 +77,8 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
       isAdmin: false,
       isGuest: false,
       password: '',
+      canAddAssets: false,
+      canEditAssets: false,
     },
   });
   
@@ -89,6 +94,8 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
           isAdmin: user.isAdmin,
           isGuest: user.isGuest || false,
           password: user.password || '0000',
+          canAddAssets: user.canAddAssets || false,
+          canEditAssets: user.canEditAssets || false,
         });
       } else {
         form.reset({
@@ -98,6 +105,8 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
           isAdmin: false,
           isGuest: false,
           password: '0000',
+          canAddAssets: false,
+          canEditAssets: false,
         });
       }
     }
@@ -231,6 +240,9 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                     </FormItem>
                 )}
                 />
+            
+            <Separator />
+            
             <FormField
                 control={form.control}
                 name="isAdmin"
@@ -260,6 +272,46 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                         <FormLabel>Guest Account</FormLabel>
                         <FormDescription>
                         Read-only access with no password required.
+                        </FormDescription>
+                    </div>
+                    <FormControl>
+                        <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        />
+                    </FormControl>
+                    </FormItem>
+                )}
+                />
+             <FormField
+                control={form.control}
+                name="canAddAssets"
+                render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                        <FormLabel>Allow Adding Assets</FormLabel>
+                        <FormDescription>
+                         User can create new asset records.
+                        </FormDescription>
+                    </div>
+                    <FormControl>
+                        <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        />
+                    </FormControl>
+                    </FormItem>
+                )}
+                />
+             <FormField
+                control={form.control}
+                name="canEditAssets"
+                render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                        <FormLabel>Allow Editing Assets</FormLabel>
+                        <FormDescription>
+                         User can modify existing asset records.
                         </FormDescription>
                     </div>
                     <FormControl>
