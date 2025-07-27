@@ -16,13 +16,16 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
-import { NIGERIAN_STATES } from '@/lib/constants';
+import { NIGERIAN_STATES, NIGERIAN_ZONES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from '@/lib/constants';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
+  SelectSeparator,
 } from '@/components/ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, ShadingType, Bullet, AlignmentType } from 'docx';
@@ -73,7 +76,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
       setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
       setObjectives('To conduct physical verification of NTBLCP assets in the state.');
       setActivities(defaultActivities);
-      setObservations('');
+      setObservations(defaultObservations);
       setApprovedBy('');
       setChallenges('');
       setRecommendations('');
@@ -86,7 +89,28 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
 
   const reportAssets = useMemo(() => {
     if (!reportState) return [];
-    return activeAssets.filter(asset => asset.location?.toLowerCase().includes(reportState.toLowerCase()));
+    if (reportState === 'All Locations') return activeAssets;
+    
+    const zones: Record<string, string[]> = NIGERIAN_ZONES;
+    const isZone = !!zones[reportState];
+
+    if (isZone) {
+      const lowerCaseZone = reportState.toLowerCase();
+      return activeAssets.filter(asset => {
+        const assetLocation = (asset.location || "").toLowerCase().trim();
+        return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
+      });
+    }
+
+    const lowerCaseFilter = reportState.toLowerCase().trim();
+    const capitalCity = NIGERIAN_STATE_CAPITALS[reportState]?.toLowerCase().trim();
+    
+    return activeAssets.filter(asset => {
+      const assetLocation = (asset.location || "").toLowerCase().trim();
+      const matchesState = assetLocation.startsWith(lowerCaseFilter);
+      const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+      return matchesState || matchesCapital || (SPECIAL_LOCATIONS.includes(reportState) && assetLocation.includes(lowerCaseFilter));
+    });
   }, [activeAssets, reportState]);
 
   const verifiedAssets = reportAssets.filter(asset => asset.verifiedStatus === 'Verified');
@@ -127,7 +151,18 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         width: { size: 100, type: WidthType.PERCENTAGE },
     });
     
-    const summaryParagraph = new Paragraph({
+    const summaryParagraph = reportState === 'All Locations' 
+    ? new Paragraph({
+        children: [
+            new TextRun("This is a compilation of all assets in all locations. Out of a total of "),
+            new TextRun({ text: `${reportAssets.length} assets`, bold: true }),
+            new TextRun(", "),
+            new TextRun({ text: `${verifiedAssets.length} were verified`, bold: true, color: "008000" }), // Green
+            new TextRun(" and "),
+            new TextRun({ text: `${unverifiedAssetsCount} were unverified.`, bold: true, color: "FF0000" }), // Red
+        ],
+      })
+    : new Paragraph({
         children: [
             new TextRun("On my asset verification visit to "),
             new TextRun({ text: reportState, bold: true }),
@@ -244,9 +279,28 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                             <div className="space-y-1.5">
                                 <Label htmlFor="reportState">State for Report</Label>
                                 <Select onValueChange={setReportState} value={reportState}>
-                                    <SelectTrigger><SelectValue placeholder="Select a state..." /></SelectTrigger>
+                                    <SelectTrigger><SelectValue placeholder="Select a location..." /></SelectTrigger>
                                     <SelectContent>
-                                        {NIGERIAN_STATES.map(state => <SelectItem key={state} value={state}>{state}</SelectItem>)}
+                                          <SelectItem value="All Locations">All Locations</SelectItem>
+                                          <SelectSeparator />
+                                          <SelectGroup>
+                                              <SelectLabel>Special Locations</SelectLabel>
+                                              {SPECIAL_LOCATIONS.map((loc) => (
+                                                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                                              ))}
+                                          </SelectGroup>
+                                          <SelectSeparator />
+                                          <SelectGroup>
+                                              <SelectLabel>Geopolitical Zones</SelectLabel>
+                                              {ZONE_NAMES.map((zone) => (
+                                                  <SelectItem key={zone} value={zone}>{zone}</SelectItem>
+                                              ))}
+                                          </SelectGroup>
+                                          <SelectSeparator />
+                                          <SelectGroup>
+                                              <SelectLabel>States</SelectLabel>
+                                              {NIGERIAN_STATES.map(state => <SelectItem key={state} value={state}>{state}</SelectItem>)}
+                                          </SelectGroup>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -263,7 +317,10 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                     </div>
 
                     <p className="p-4 bg-muted rounded-md text-sm">
-                        On my asset verification visit to <span className="font-bold">{reportState}</span>, out of a total of <span className="font-bold">{reportAssets.length}</span> assets, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.
+                        {reportState === 'All Locations'
+                        ? <>A compilation of all assets in all locations. Out of <span className="font-bold">{reportAssets.length}</span> total assets, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.</>
+                        : <>On my asset verification visit to <span className="font-bold">{reportState}</span>, out of a total of <span className="font-bold">{reportAssets.length}</span> assets, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.</>
+                        }
                     </p>
                     <ReportInput label="Objectives" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} />
                     <ReportInput label="Activities Done" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} />
