@@ -63,10 +63,12 @@ const parseRows = (headerRow: any[], jsonData: any[][], category: string): { ass
 
     for (const row of jsonData) {
         rowsParsed++;
-        // Stop if we hit an empty row or what looks like a new header section
-        if (row.every(cell => cell === null || String(cell).trim() === '') || (row[0] && normalizeHeader(row[0]) === 'S/N' && assets.length > 0)) {
-            // If we hit a new "S/N" header after already parsing some assets, it's a new section.
-             rowsParsed--; // Don't count this row as parsed for the current section
+
+        const firstCell = row[0] ? String(row[0]).trim().toLowerCase() : '';
+        const isEndOfTable = category === 'NTBLCP-TB-FAR' && (firstCell.startsWith('total') || firstCell.startsWith('grand total'));
+
+        if (row.every(cell => cell === null || String(cell).trim() === '') || (row[0] && normalizeHeader(row[0]) === 'S/N' && assets.length > 0) || isEndOfTable) {
+             rowsParsed--;
             break;
         }
 
