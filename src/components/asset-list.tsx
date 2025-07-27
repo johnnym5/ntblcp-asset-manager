@@ -1389,7 +1389,17 @@ export default function AssetList() {
                   <TableBody>
                       {paginatedCategoryAssets.length > 0 ? (
                       paginatedCategoryAssets.map((asset) => (
-                          <TableRow key={asset.id} data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''} onClick={() => handleViewAsset(asset)} className="cursor-pointer">
+                          <TableRow 
+                            key={asset.id}
+                            data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''} 
+                            onClick={() => handleViewAsset(asset)}
+                            className={cn(
+                                "cursor-pointer",
+                                asset.verifiedStatus === 'Verified' && 'border-l-4 border-l-green-500',
+                                asset.verifiedStatus === 'Unverified' && 'border-l-4 border-l-red-500',
+                                asset.verifiedStatus === 'Discrepancy' && 'border-l-4 border-l-yellow-500'
+                            )}
+                          >
                               <TableCell onClick={e => e.stopPropagation()}>
                                   <Checkbox 
                                       checked={selectedAssetIds.includes(asset.id)}
