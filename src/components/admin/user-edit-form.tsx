@@ -57,7 +57,7 @@ interface UserEditFormProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   user: AuthorizedUser | null;
-  onSave: (user: AuthorizedUser) => Promise<void>;
+  onSave: (userToSave: AuthorizedUser, originalLoginName?: string) => Promise<void>;
 }
 
 export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFormProps) {
@@ -106,7 +106,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
       password: user?.password || '0000',
       passwordChanged: user?.passwordChanged || false,
     };
-    await onSave(userToSave);
+    await onSave(userToSave, user?.loginName);
     setIsSaving(false);
   };
 
@@ -141,10 +141,10 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                 <FormItem>
                   <FormLabel>Login Name</FormLabel>
                   <FormControl>
-                    <Input placeholder="john doe" {...field} disabled={isEditing} />
+                    <Input placeholder="john doe" {...field} />
                   </FormControl>
                    <FormDescription>
-                    This is the unique, lowercase name the user will enter to log in. Cannot be changed after creation.
+                    This is the unique, lowercase name the user will enter to log in.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

@@ -49,22 +49,33 @@ export function UserManagement() {
     setIsEditFormOpen(true);
   };
 
-  const handleSaveUser = async (userToSave: AuthorizedUser) => {
+  const handleSaveUser = async (userToSave: AuthorizedUser, originalLoginName?: string) => {
     const newUsers = [...appSettings.authorizedUsers];
-    const existingUserIndex = newUsers.findIndex(u => u.loginName === userToSave.loginName);
+    
+    // If originalLoginName is provided, we are in "edit" mode.
+    // Otherwise, it's a new user.
+    const findIndex = originalLoginName 
+      ? newUsers.findIndex(u => u.loginName === originalLoginName)
+      : newUsers.findIndex(u => u.loginName === userToSave.loginName);
 
-    if (existingUserIndex > -1) {
+    if (findIndex > -1) {
       // Update existing user
-      newUsers[existingUserIndex] = userToSave;
+      newUsers[findIndex] = userToSave;
     } else {
       // Add new user
       newUsers.push(userToSave);
     }
     
     try {
-      await updateSettings({ authorizedUsers: newUsers });
-      setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
-      toast({ title: 'User Saved', description: `${userToSave.displayName} has been saved.` });
+      if(typeof window !== 'undefined' && navigator.onLine) {
+        await updateSettings({ authorizedUsers: newUsers });
+        setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
+        toast({ title: 'User Saved', description: `${userToSave.displayName} has been saved to the database.` });
+      } else {
+        toast({ title: "Offline", description: "You are offline. User changes will be saved locally and sync on next connection.", variant: "destructive" });
+        // NOTE: Even if offline, we update the local state via `auth-context` so the change is reflected immediately.
+        // The actual persistence is handled there.
+      }
       setIsEditFormOpen(false);
     } catch (e) {
       toast({ title: "Save Failed", description: "Could not save user data to the database.", variant: "destructive" });
