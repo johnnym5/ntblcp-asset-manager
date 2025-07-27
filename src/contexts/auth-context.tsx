@@ -93,25 +93,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const updatePassword = async (newPassword: string) => {
     if (!userProfile) return;
     
-    const updatedProfile: UserProfile = {
-        ...userProfile,
-        password: newPassword,
-        passwordChanged: true,
-    };
-
-    setUserProfile(updatedProfile);
-    localStorage.setItem('ntblcp-user-profile', JSON.stringify(updatedProfile));
-    
+    // Immediately prepare the updated user list
     const newUsers = appSettings.authorizedUsers.map(u => 
         u.loginName === userProfile.loginName 
             ? { ...u, password: newPassword, passwordChanged: true } 
             : u
     );
 
-    if (navigator.onLine) {
-        await updateSettings({ authorizedUsers: newUsers });
-    }
+    // Update the app state right away for immediate UI feedback
     setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
+
+    // Update the local user profile in both state and localStorage
+    const updatedProfile: UserProfile = {
+        ...userProfile,
+        password: newPassword,
+        passwordChanged: true,
+    };
+    setUserProfile(updatedProfile);
+    localStorage.setItem('ntblcp-user-profile', JSON.stringify(updatedProfile));
+    
+    // Attempt to save the entire updated user list to the database
+    // The updateSettings function will handle online/offline status.
+    await updateSettings({ authorizedUsers: newUsers });
   };
 
 

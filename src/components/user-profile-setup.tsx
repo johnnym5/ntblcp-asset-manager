@@ -59,7 +59,8 @@ export default function UserProfileSetup() {
       return;
     }
 
-    if (foundUser.isGuest) {
+    // This handles guest users or users without a password set in the DB
+    if (foundUser.isGuest || !foundUser.password) {
       login({
         loginName: foundUser.loginName,
         state: selectedState,
@@ -84,7 +85,8 @@ export default function UserProfileSetup() {
     });
   };
   
-  const canLogin = foundUser && (selectedState || foundUser?.isGuest) && (password || foundUser?.isGuest);
+  const canLogin = foundUser && (selectedState || foundUser?.isGuest) && (password || foundUser?.isGuest || !foundUser?.password);
+
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
