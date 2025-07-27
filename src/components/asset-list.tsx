@@ -102,40 +102,60 @@ const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean 
     return false;
 };
 
-const StateProgress: React.FC<{ state: string, allAssets: Asset[] }> = ({ state, allAssets }) => {
-  const stateAssets = useMemo(() => {
-    const lowerCaseState = state.toLowerCase();
-    const capitalCity = NIGERIAN_STATE_CAPITALS[state]?.toLowerCase().trim();
-    return allAssets.filter(asset => {
-      const assetLocation = (asset.location || "").toLowerCase().trim();
-      const matchesState = assetLocation.startsWith(lowerCaseState);
-      const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-      return matchesState || matchesCapital;
-    });
-  }, [state, allAssets]);
+const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[] }> = ({ locationName, allAssets }) => {
+    const locationAssets = useMemo(() => {
+        if (locationName === 'All') {
+            return allAssets;
+        }
 
-  const total = stateAssets.length;
-  if (total === 0) {
+        const lowerCaseLocation = locationName.toLowerCase().trim();
+        const isZone = ZONE_NAMES.map(z => z.toLowerCase()).includes(lowerCaseLocation);
+
+        if (isZone) {
+            const statesInZone = NIGERIAN_ZONES[locationName] || [];
+            return allAssets.filter(asset => {
+                const assetState = normalizeAssetLocation(asset.location);
+                return statesInZone.includes(assetState);
+            });
+        }
+        
+        if (SPECIAL_LOCATIONS.map(l => l.toLowerCase()).includes(lowerCaseLocation)) {
+             return allAssets.filter(asset => (asset.location || "").toLowerCase().trim().includes(lowerCaseLocation));
+        }
+
+        const capitalCity = NIGERIAN_STATE_CAPITALS[locationName]?.toLowerCase().trim();
+        return allAssets.filter(asset => {
+            const assetLocation = (asset.location || "").toLowerCase().trim();
+            const matchesState = assetLocation.startsWith(lowerCaseLocation);
+            const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+            return matchesState || matchesCapital;
+        });
+
+    }, [locationName, allAssets]);
+
+    const total = locationAssets.length;
+    if (total === 0 && locationName !== 'All') {
+        return (
+            <div className="flex justify-between items-center w-full">
+                <span>{locationName}</span>
+                <span className="text-xs text-muted-foreground">0 assets</span>
+            </div>
+        );
+    }
+
+    const verified = locationAssets.filter(a => a.verifiedStatus === 'Verified').length;
+    const percentage = total > 0 ? (verified / total) * 100 : 0;
+    const displayName = locationName === 'All' ? 'Overall (All Assets)' : locationName;
+
     return (
-      <div className="flex justify-between items-center w-full">
-        <span>{state}</span>
-        <span className="text-xs text-muted-foreground">0 assets</span>
-      </div>
+        <div className="flex flex-col w-full gap-1">
+            <div className="flex justify-between items-center w-full text-sm">
+                <span>{displayName}</span>
+                <span className="text-xs font-mono">{verified}/{total} verified</span>
+            </div>
+            <Progress value={percentage} className="h-1.5" />
+        </div>
     );
-  }
-
-  const verified = stateAssets.filter(a => a.verifiedStatus === 'Verified').length;
-  const percentage = (verified / total) * 100;
-
-  return (
-    <div className="flex flex-col w-full gap-1">
-      <div className="flex justify-between items-center w-full text-sm">
-        <span>{state}</span>
-        <span className="text-xs font-mono">{verified}/{total} verified</span>
-      </div>
-      <Progress value={percentage} className="h-1.5" />
-    </div>
-  );
 };
 
 
@@ -320,21 +340,27 @@ export default function AssetList() {
         const isZone = !!zones[globalStateFilter];
 
         if (isZone) {
-            const lowerCaseZone = globalStateFilter.toLowerCase();
+            const statesInZone = NIGERIAN_ZONES[globalStateFilter] || [];
             return currentAssets.filter(asset => {
-                const assetLocation = (asset.location || "").toLowerCase().trim();
-                return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
-            });
-        } else {
-            const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-            const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
-            return currentAssets.filter(asset => {
-                const assetLocation = (asset.location || "").toLowerCase().trim();
-                const matchesState = assetLocation.startsWith(lowerCaseFilter);
-                const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-                return matchesState || matchesCapital;
+                const assetState = normalizeAssetLocation(asset.location);
+                return statesInZone.includes(assetState);
             });
         }
+        
+        if (SPECIAL_LOCATIONS.includes(globalStateFilter)) {
+            const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
+            return currentAssets.filter(asset => (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter));
+        }
+
+        const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
+        const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
+        return currentAssets.filter(asset => {
+            const assetLocation = (asset.location || "").toLowerCase().trim();
+            const matchesState = assetLocation.startsWith(lowerCaseFilter);
+            const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+            return matchesState || matchesCapital;
+        });
+
     } else if (!isAdmin && userProfile?.state) {
         const lowerCaseFilter = userProfile.state.toLowerCase().trim();
         const capitalCity = NIGERIAN_STATE_CAPITALS[userProfile.state]?.toLowerCase().trim();
@@ -1202,30 +1228,36 @@ export default function AssetList() {
                         <SelectValue placeholder="Select a location to filter..." />
                       </SelectTrigger>
                       <SelectContent>
-                          <SelectItem value="All">Overall (All Assets)</SelectItem>
-                          <SelectSeparator />
-                          <SelectGroup>
-                              <SelectLabel>Special Locations</SelectLabel>
-                              {SPECIAL_LOCATIONS.map((loc) => (
-                                  <SelectItem key={loc} value={loc}>{loc}</SelectItem>
-                              ))}
-                          </SelectGroup>
-                          <SelectSeparator />
-                          <SelectGroup>
-                              <SelectLabel>Geopolitical Zones</SelectLabel>
-                              {ZONE_NAMES.map((zone) => (
-                                  <SelectItem key={zone} value={zone}>{zone}</SelectItem>
-                              ))}
-                          </SelectGroup>
-                          <SelectSeparator />
-                          <SelectGroup>
-                              <SelectLabel>States</SelectLabel>
-                              {NIGERIAN_STATES.map((state) => (
-                                  <SelectItem key={state} value={state}>
-                                    <StateProgress state={state} allAssets={activeAssets} />
-                                  </SelectItem>
-                              ))}
-                          </SelectGroup>
+                        <SelectItem value="All">
+                            <LocationProgress locationName="All" allAssets={activeAssets} />
+                        </SelectItem>
+                        <SelectSeparator />
+                        <SelectGroup>
+                            <SelectLabel>Special Locations</SelectLabel>
+                            {SPECIAL_LOCATIONS.map((loc) => (
+                                <SelectItem key={loc} value={loc}>
+                                    <LocationProgress locationName={loc} allAssets={activeAssets} />
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                        <SelectSeparator />
+                        <SelectGroup>
+                            <SelectLabel>Geopolitical Zones</SelectLabel>
+                            {ZONE_NAMES.map((zone) => (
+                                <SelectItem key={zone} value={zone}>
+                                    <LocationProgress locationName={zone} allAssets={activeAssets} />
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
+                        <SelectSeparator />
+                        <SelectGroup>
+                            <SelectLabel>States</SelectLabel>
+                            {NIGERIAN_STATES.map((state) => (
+                                <SelectItem key={state} value={state}>
+                                    <LocationProgress locationName={state} allAssets={activeAssets} />
+                                </SelectItem>
+                            ))}
+                        </SelectGroup>
                       </SelectContent>
                       </Select>
                     )}
