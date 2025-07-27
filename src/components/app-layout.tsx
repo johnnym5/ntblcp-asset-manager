@@ -57,15 +57,17 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
 import { Separator } from "./ui/separator";
-import { InboxSheet } from "./inbox-sheet";
+import { RecentActivitiesSheet } from "./recent-activities-sheet";
 import { ChangePasswordDialog } from "./change-password-dialog";
 import { ScrollArea } from "./ui/scroll-area";
+import { AssetForm } from "./asset-form";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { userProfile, loading, logout } = useAuth();
+  const { userProfile, loading, logout, updatePassword } = useAuth();
   const pathname = usePathname();
   const { 
+    assets, setAssets,
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
     sortConfig, setSortConfig,
@@ -81,8 +83,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isInboxOpen, setIsInboxOpen] = useState(false);
+  const [isRecentActivitiesOpen, setIsRecentActivitiesOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+
+  // State to control AssetForm from the layout
+  const [isAssetFormOpen, setIsAssetFormOpen] = useState(false);
+  const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
+  const [isAssetFormReadOnly, setIsAssetFormReadOnly] = useState(true);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
 
@@ -147,6 +154,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     if (open && unreadCount > 0) {
       setTimeout(() => markAllAsRead(), 500);
     }
+  }
+
+  const handleViewAssetDetails = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setIsAssetFormReadOnly(true);
+    setIsRecentActivitiesOpen(false); // Close the activities sheet
+    setIsAssetFormOpen(true); // Open the asset form
+  }
+
+  const handleSaveAsset = async (assetToSave: Asset) => {
+     // This function body can be added if saving from the layout is needed.
+     // For now, we just need to pass it to the form.
+     console.log("Saving asset from layout:", assetToSave)
+  }
+
+  const handleQuickSaveAsset = async (assetId: string, data: any) => {
+    // This function body can be added if quick-saving from the layout is needed.
+    console.log("Quick saving asset from layout:", assetId, data)
   }
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
@@ -283,9 +308,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuItem>
                   
                   {userProfile?.isAdmin && (
-                     <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
+                     <DropdownMenuItem onClick={() => setIsRecentActivitiesOpen(true)}>
                       <Inbox className="mr-2 h-4 w-4" />
-                      <span>Inbox</span>
+                      <span>Recent Activities</span>
                       {unreadInboxCount > 0 && (
                         <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white">
                           {unreadInboxCount}
@@ -331,7 +356,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         missingFieldFilter={missingFieldFilter}
         setMissingFieldFilter={setMissingFieldFilter}
       />
-       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
+       <RecentActivitiesSheet 
+          isOpen={isRecentActivitiesOpen} 
+          onOpenChange={setIsRecentActivitiesOpen}
+          onViewDetails={handleViewAssetDetails}
+        />
        <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
         <SheetContent className="w-full sm:max-w-sm p-0 flex flex-col">
             <SheetHeader className="p-4">
@@ -386,6 +415,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </SheetContent>
       </Sheet>
       <ChangePasswordDialog isOpen={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen} />
+      <AssetForm
+          isOpen={isAssetFormOpen}
+          onOpenChange={setIsAssetFormOpen}
+          asset={selectedAsset}
+          onSave={handleSaveAsset}
+          onQuickSave={handleQuickSaveAsset}
+          isReadOnly={isAssetFormReadOnly}
+        />
     </div>
   );
 }
