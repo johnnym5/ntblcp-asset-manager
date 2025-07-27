@@ -32,7 +32,6 @@ import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { SingleSheetImportDialog } from './single-sheet-import-dialog';
-import { DataPatchDialog } from './data-patch-dialog';
 
 
 interface SettingsSheetProps {
@@ -56,7 +55,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const [isSaving, setIsSaving] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
-  const [isDataPatchOpen, setIsDataPatchOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -230,9 +228,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                           <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={isGuest}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
                           </Button>
-                           <Button variant="outline" className="w-full justify-start" onClick={() => setIsDataPatchOpen(true)} disabled={isGuest}>
-                            <Wrench className="mr-2 h-4 w-4" /> Data Patch Utility
-                          </Button>
                           <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || isGuest}>
                             <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
                           </Button>
@@ -342,11 +337,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
       <SingleSheetImportDialog
         isOpen={isSingleSheetImportOpen}
         onOpenChange={setIsSingleSheetImportOpen}
-      />
-
-      <DataPatchDialog
-        isOpen={isDataPatchOpen}
-        onOpenChange={setIsDataPatchOpen}
       />
     </>
   );
