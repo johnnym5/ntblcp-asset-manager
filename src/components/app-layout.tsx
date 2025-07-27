@@ -75,7 +75,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     locationOptions, assigneeOptions, statusOptions,
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     setManualSyncTrigger, isSyncing,
-    unreadInboxCount
+    unreadInboxCount, setLastInboxCheck
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -153,6 +153,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setIsNotificationsOpen(open);
     if (open && unreadCount > 0) {
       setTimeout(() => markAllAsRead(), 500);
+    }
+  }
+
+  const handleRecentActivitiesOpenChange = (open: boolean) => {
+    setIsRecentActivitiesOpen(open);
+    if (open) {
+      setLastInboxCheck(Date.now());
     }
   }
 
@@ -308,7 +315,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuItem>
                   
                   {userProfile?.isAdmin && (
-                     <DropdownMenuItem onClick={() => setIsRecentActivitiesOpen(true)}>
+                     <DropdownMenuItem onClick={() => handleRecentActivitiesOpenChange(true)}>
                       <Inbox className="mr-2 h-4 w-4" />
                       <span>Recent Activities</span>
                       {unreadInboxCount > 0 && (
@@ -358,7 +365,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       />
        <RecentActivitiesSheet 
           isOpen={isRecentActivitiesOpen} 
-          onOpenChange={setIsRecentActivitiesOpen}
+          onOpenChange={handleRecentActivitiesOpenChange}
           onViewDetails={handleViewAssetDetails}
         />
        <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>

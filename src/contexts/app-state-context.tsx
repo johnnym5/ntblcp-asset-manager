@@ -82,8 +82,9 @@ interface AppStateContextType {
   setDataActions: Dispatch<SetStateAction<DataActions>>;
 
   // Inbox
+  lastInboxCheck: number;
+  setLastInboxCheck: Dispatch<SetStateAction<number>>;
   unreadInboxCount: number;
-  setUnreadInboxCount: Dispatch<SetStateAction<number>>;
   dismissedActivities: string[];
   setDismissedActivities: Dispatch<SetStateAction<string[]>>;
   autoSyncEnabled: boolean;
@@ -139,7 +140,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
   
-  const [unreadInboxCount, setUnreadInboxCount] = useState(0);
+  const [lastInboxCheck, setLastInboxCheck] = useState<number>(() => {
+    if (typeof window !== 'undefined') {
+        const saved = localStorage.getItem('ntblcp-last-inbox-check');
+        return saved ? parseInt(saved, 10) : Date.now();
+    }
+    return Date.now();
+  });
+  
   const [dismissedActivities, setDismissedActivities] = useState<string[]>(() => {
     if (typeof window !== 'undefined') {
         const saved = localStorage.getItem('ntblcp-dismissed-activities');
@@ -147,6 +155,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     }
     return [];
   });
+  
+  const unreadInboxCount = useMemo(() => {
+    return assets.filter(asset => 
+        asset.lastModified && 
+        new Date(asset.lastModified).getTime() > lastInboxCheck
+    ).length;
+  }, [assets, lastInboxCheck]);
 
 
   // Effect for real-time settings
@@ -198,6 +213,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [dismissedActivities]);
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+        localStorage.setItem('ntblcp-last-inbox-check', String(lastInboxCheck));
+    }
+  }, [lastInboxCheck]);
+
 
   const value = {
     assets,
@@ -238,8 +259,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setIsSyncing,
     dataActions,
     setDataActions,
+    lastInboxCheck,
+    setLastInboxCheck,
     unreadInboxCount,
-    setUnreadInboxCount,
     dismissedActivities,
     setDismissedActivities,
     autoSyncEnabled: appSettings.autoSyncEnabled,
