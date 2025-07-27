@@ -61,7 +61,7 @@ export default function UserProfileSetup() {
 
     if (foundUser.isGuest) {
       login({
-        displayName: foundUser.displayName,
+        loginName: foundUser.loginName,
         state: selectedState,
       });
       return;
@@ -78,7 +78,7 @@ export default function UserProfileSetup() {
     }
     
     login({
-        displayName: foundUser.displayName,
+        loginName: foundUser.loginName,
         state: selectedState,
         password: foundUser.password,
     });

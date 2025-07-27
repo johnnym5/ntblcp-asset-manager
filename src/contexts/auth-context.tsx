@@ -15,7 +15,7 @@ interface AuthContextType {
   loading: boolean;
   profileSetupComplete: boolean;
   authInitialized: boolean;
-  login: (profile: { displayName: string, state: string, password?: string }) => void;
+  login: (profile: { loginName: string, state: string, password?: string }) => void;
   updatePassword: (newPassword: string) => Promise<void>;
   logout: () => void;
 }
@@ -76,8 +76,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   }, [setGlobalStateFilter, appSettings.authorizedUsers]);
 
 
-  const login = (profile: { displayName: string, state: string, password?: string }) => {
-    const authorizedUser = appSettings.authorizedUsers.find(u => u.displayName === profile.displayName);
+  const login = (profile: { loginName: string, state: string, password?: string }) => {
+    const authorizedUser = appSettings.authorizedUsers.find(u => u.loginName === profile.loginName);
     if (!authorizedUser) return;
 
     const fullProfile: UserProfile = {
@@ -108,7 +108,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             : u
     );
 
-    await updateSettings({ authorizedUsers: newUsers });
+    if (navigator.onLine) {
+        await updateSettings({ authorizedUsers: newUsers });
+    }
     setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
   };
 

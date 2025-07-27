@@ -56,12 +56,17 @@ export function UserManagement() {
     // Otherwise, it's a new user.
     const findIndex = originalLoginName 
       ? newUsers.findIndex(u => u.loginName === originalLoginName)
-      : newUsers.findIndex(u => u.loginName === userToSave.loginName);
+      : -1;
 
     if (findIndex > -1) {
       // Update existing user
       newUsers[findIndex] = userToSave;
     } else {
+       // Check if the new login name already exists if we're creating or renaming
+      if (newUsers.some(u => u.loginName === userToSave.loginName && u.loginName !== originalLoginName)) {
+        toast({ title: "Save Failed", description: `The login name "${userToSave.loginName}" is already in use.`, variant: "destructive" });
+        return;
+      }
       // Add new user
       newUsers.push(userToSave);
     }
@@ -72,9 +77,7 @@ export function UserManagement() {
         setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
         toast({ title: 'User Saved', description: `${userToSave.displayName} has been saved to the database.` });
       } else {
-        toast({ title: "Offline", description: "You are offline. User changes will be saved locally and sync on next connection.", variant: "destructive" });
-        // NOTE: Even if offline, we update the local state via `auth-context` so the change is reflected immediately.
-        // The actual persistence is handled there.
+        toast({ title: "Offline", description: "You are offline. User changes cannot be saved.", variant: "destructive" });
       }
       setIsEditFormOpen(false);
     } catch (e) {
@@ -104,7 +107,7 @@ export function UserManagement() {
     if (adminProfile?.loginName === userToReset.loginName) {
       toast({
         title: "Action Denied",
-        description: "You cannot reset your own password here.",
+        description: "Admins cannot reset their own password from this panel. Use the 'Change Password' option in your account menu.",
         variant: 'destructive',
       });
       return;
@@ -121,7 +124,7 @@ export function UserManagement() {
       setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
       toast({
         title: 'Password Reset',
-        description: `${userToReset.displayName}'s password has been reset to the default.`,
+        description: `${userToReset.displayName}'s password has been reset to the default '0000'.`,
       });
     } catch (e) {
        toast({ title: "Reset Failed", description: "Could not reset the password.", variant: "destructive" });
