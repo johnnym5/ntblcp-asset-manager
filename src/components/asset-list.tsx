@@ -161,7 +161,6 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[] }> =
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isFormReadOnly, setIsFormReadOnly] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -472,13 +471,11 @@ export default function AssetList() {
       return;
     }
     setSelectedAsset(undefined);
-    setIsFormReadOnly(false);
     setIsFormOpen(true);
   }, [lockAssetList, isAdmin, dataSource, userProfile]);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
-    setIsFormReadOnly(true);
     setIsFormOpen(true);
   };
 
@@ -488,7 +485,6 @@ export default function AssetList() {
       return;
     }
     setSelectedAsset(asset);
-    setIsFormReadOnly(false);
     setIsFormOpen(true);
   };
   
@@ -1306,7 +1302,7 @@ export default function AssetList() {
           asset={selectedAsset} 
           onSave={handleSaveAsset}
           onQuickSave={handleQuickSaveAsset}
-          isReadOnly={isFormReadOnly} 
+          isReadOnly={!userProfile?.canEditAssets} 
         />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
         <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
@@ -1513,7 +1509,7 @@ export default function AssetList() {
           asset={selectedAsset} 
           onSave={handleSaveAsset} 
           onQuickSave={handleQuickSaveAsset}
-          isReadOnly={isFormReadOnly}
+          isReadOnly={!userProfile?.canEditAssets}
         />
         <AssetBatchEditForm 
             isOpen={isBatchEditOpen} 
