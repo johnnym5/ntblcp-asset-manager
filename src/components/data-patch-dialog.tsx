@@ -16,7 +16,6 @@ import { useAppState } from '@/contexts/app-state-context';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getLocalAssets, saveAssets, getLockedOfflineAssets, saveLockedOfflineAssets } from '@/lib/idb';
-import { applyNtblcpFarPatch } from '@/lib/excel-parser';
 
 interface DataPatchDialogProps {
   isOpen: boolean;
@@ -37,8 +36,19 @@ export function DataPatchDialog({ isOpen, onOpenChange }: DataPatchDialogProps) 
       const isOfflineMode = dataSource === 'local_locked';
       const assetsToPatch = isOfflineMode ? await getLockedOfflineAssets() : await getLocalAssets();
 
-      const { updatedAssets, updatedCount } = applyNtblcpFarPatch(assetsToPatch);
-      
+      // Placeholder for a real patching function.
+      // In a real scenario, this would import a patching script.
+      // For now, we'll just simulate a change.
+      const updatedCount = 0;
+      const updatedAssets = assetsToPatch.map(asset => {
+        // Example patch:
+        // if(asset.description === 'Old Name') {
+        //   updatedCount++;
+        //   return { ...asset, description: 'New Patched Name' };
+        // }
+        return asset;
+      });
+
       if (isOfflineMode) {
         await saveLockedOfflineAssets(updatedAssets);
         setOfflineAssets(updatedAssets);

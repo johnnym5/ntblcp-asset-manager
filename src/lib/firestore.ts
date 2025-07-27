@@ -131,13 +131,23 @@ export async function getSettings(): Promise<AppSettings> {
 }
 
 /**
- * Creates or updates the global application settings in Firestore.
+ * Creates or updates the global application settings in Firestore and local storage.
  * @param settings The partial or full settings object to save.
  */
 export async function updateSettings(settings: Partial<AppSettings>) {
-    const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
-    await setDoc(settingsRef, settings, { merge: true });
+    // Also save to local storage for offline persistence
+    const currentSettingsJSON = localStorage.getItem('ntblcp-app-settings');
+    const currentSettings = currentSettingsJSON ? JSON.parse(currentSettingsJSON) : defaultAppSettings;
+    const newSettings = { ...currentSettings, ...settings };
+    localStorage.setItem('ntblcp-app-settings', JSON.stringify(newSettings));
+    
+    // Save to Firestore if online
+    if (navigator.onLine) {
+        const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
+        await setDoc(settingsRef, settings, { merge: true });
+    }
 }
+
 
 /**
  * Listens for real-time updates to the global settings document.
@@ -145,22 +155,32 @@ export async function updateSettings(settings: Partial<AppSettings>) {
  * @returns An unsubscribe function to stop listening.
  */
 export function listenToSettings(callback: (settings: AppSettings | null) => void) {
+    // First, load from local storage for immediate offline access
+    const localSettingsJSON = localStorage.getItem('ntblcp-app-settings');
+    if (localSettingsJSON) {
+      callback(JSON.parse(localSettingsJSON));
+    } else {
+      // If nothing in local storage, get from Firestore and then store it locally
+      getSettings().then(settings => {
+        localStorage.setItem('ntblcp-app-settings', JSON.stringify(settings));
+        callback(settings);
+      });
+    }
+
+    // Then, set up the Firestore listener for real-time updates when online
     const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
     const unsubscribe = onSnapshot(settingsRef, (doc) => {
         if (doc.exists()) {
             const data = doc.data() as Partial<AppSettings>;
-            // Merge with defaults to ensure all keys are present
             const mergedSettings = { ...defaultAppSettings, ...data };
             
-             // Deep merge authorizedUsers
             const storedUsersMap = new Map((data.authorizedUsers || []).map(u => [u.loginName, u]));
             const defaultUsers = defaultAppSettings.authorizedUsers.filter(u => !storedUsersMap.has(u.loginName));
             mergedSettings.authorizedUsers = [...storedUsersMap.values(), ...defaultUsers];
-
+            
+            // Update local storage and state when a change is received
+            localStorage.setItem('ntblcp-app-settings', JSON.stringify(mergedSettings));
             callback(mergedSettings);
-        } else {
-            // If the document is deleted, we can fetch/create defaults.
-            getSettings().then(settings => callback(settings));
         }
     });
     return unsubscribe;

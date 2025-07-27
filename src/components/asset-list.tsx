@@ -738,6 +738,8 @@ export default function AssetList() {
       addNotification({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
     }
   }, [displayedAssets, userProfile, assetsByCategory, appSettings]);
+
+  const handleTravelReport = useCallback(() => setIsTravelReportOpen(true), []);
   
   const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
     if (checked) {
@@ -926,6 +928,7 @@ export default function AssetList() {
         onExport: () => handleExportClick(),
         onAddAsset: handleAddAsset,
         onClearAll: handleClearAllClick,
+        onTravelReport: handleTravelReport,
         isImporting: isImporting,
         isAdmin: isAdmin,
         hasAssets: hasCurrentAssets,
@@ -939,7 +942,8 @@ export default function AssetList() {
       handleImportClick, 
       handleExportClick, 
       handleAddAsset, 
-      handleClearAllClick, 
+      handleClearAllClick,
+      handleTravelReport,
       isImporting, 
       isAdmin, 
       activeAssets.length
@@ -1055,12 +1059,8 @@ export default function AssetList() {
       }
     };
     setAppSettings(newSettings);
-    if(isOnline && isAdmin) {
-      await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
-      addNotification({ title: "Column settings saved", description: "Your changes have been saved to the cloud." });
-    } else {
-      addNotification({ title: "Column settings saved locally", description: "Changes will be synced when an admin is online." });
-    }
+    await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
+    addNotification({ title: "Column settings saved", description: "Your changes have been saved." });
   };
 
   const clearAllDialogDescription = useMemo(() => {

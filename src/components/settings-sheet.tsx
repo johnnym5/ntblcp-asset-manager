@@ -32,6 +32,8 @@ import type { SheetDefinition } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { SingleSheetImportDialog } from './single-sheet-import-dialog';
+import { DataPatchDialog } from './data-patch-dialog';
+
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -54,16 +56,16 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   const [isSaving, setIsSaving] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
+  const [isDataPatchOpen, setIsDataPatchOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleSettingChange = (key: keyof AppSettings, value: any) => {
+  const handleSettingChange = async (key: keyof AppSettings, value: any) => {
     const newSettings = { ...appSettings, [key]: value };
     setAppSettings(newSettings);
-    if (isOnline && isAdmin) {
-      updateSettings({ [key]: value });
-    }
+    // Always save to local storage, and to firestore if online
+    await updateSettings({ [key]: value });
   };
 
   const handleToggleSheet = async (sheetName: string, checked: boolean) => {
@@ -73,7 +75,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     } else {
       newEnabledSheets = appSettings.enabledSheets.filter(name => name !== sheetName);
     }
-    handleSettingChange('enabledSheets', newEnabledSheets);
+    await handleSettingChange('enabledSheets', newEnabledSheets);
   };
   
   const handleToggleAll = (enable: boolean) => {
@@ -82,11 +84,6 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   };
 
   const handleSaveChanges = async () => {
-    if (!isOnline) {
-      toast({ title: 'Offline', description: 'Settings can only be changed while online.', variant: 'destructive' });
-      return;
-    }
-    setIsSaving(true);
     try {
       await updateSettings(appSettings);
       toast({ title: 'Settings Updated', description: 'Your changes have been saved and applied.' });
@@ -116,21 +113,10 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     
     const newEnabledSheets = appSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
 
-    const newSettings = {
-      ...appSettings,
-      sheetDefinitions: newSheetDefinitions,
-      enabledSheets: newEnabledSheets,
-    };
+    await handleSettingChange('sheetDefinitions', newSheetDefinitions);
+    await handleSettingChange('enabledSheets', newEnabledSheets);
 
-    setAppSettings(newSettings);
-    if (isOnline && isAdmin) {
-      try {
-        await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions, enabledSheets: newSettings.enabledSheets });
-        toast({ title: "Sheet Deleted", description: `'${sheetNameToDelete}' definition has been removed.`})
-      } catch (e) {
-        toast({ title: 'Error', description: 'Could not update settings in the database.', variant: 'destructive' });
-      }
-    }
+    toast({ title: "Sheet Deleted", description: `'${sheetNameToDelete}' definition has been removed.`})
   };
 
   const handleSaveSheet = (sheet: SheetDefinition) => {
@@ -146,20 +132,16 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
       newEnabledSheets.push(sheet.name);
     }
     
-    const newSettings = {
-       ...appSettings,
+    const settingsToUpdate = {
       sheetDefinitions: {
         ...newSheetDefinitions,
         [sheet.name]: sheet,
       },
       enabledSheets: newEnabledSheets
-    }
+    };
 
-    setAppSettings(newSettings);
-
-    if (isOnline && isAdmin) {
-      updateSettings({ sheetDefinitions: newSettings.sheetDefinitions, enabledSheets: newSettings.enabledSheets });
-    }
+    handleSettingChange('sheetDefinitions', settingsToUpdate.sheetDefinitions);
+    handleSettingChange('enabledSheets', settingsToUpdate.enabledSheets);
   };
 
   const handleImportTemplate = () => {
@@ -181,17 +163,9 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
           currentEnabled.push(template.name);
         }
       });
-
-      const newSettings = {
-        ...appSettings,
-        sheetDefinitions: currentDefs,
-        enabledSheets: currentEnabled,
-      };
-
-      setAppSettings(newSettings);
-      if (isOnline && isAdmin) {
-        await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions, enabledSheets: newSettings.enabledSheets });
-      }
+      
+      await handleSettingChange('sheetDefinitions', currentDefs);
+      await handleSettingChange('enabledSheets', currentEnabled);
 
       toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added or updated.` });
     } catch (error) {
@@ -256,6 +230,9 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                           <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={isGuest}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
                           </Button>
+                           <Button variant="outline" className="w-full justify-start" onClick={() => setIsDataPatchOpen(true)} disabled={isGuest}>
+                            <Wrench className="mr-2 h-4 w-4" /> Data Patch Utility
+                          </Button>
                           <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || isGuest}>
                             <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
                           </Button>
@@ -284,14 +261,14 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                           <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
                           <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
                         </div>
-                        <Switch id="lock-assets" checked={appSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)} disabled={!isOnline}/>
+                        <Switch id="lock-assets" checked={appSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
                       </div>
                       <div className="flex items-center justify-between pt-4">
                         <div className="space-y-1">
                           <Label htmlFor="autosync-assets" className="text-sm">Enable Automatic Sync</Label>
                           <p className="text-xs text-muted-foreground">Automatically sync with the cloud when online.</p>
                         </div>
-                        <Switch id="autosync-assets" checked={appSettings.autoSyncEnabled} onCheckedChange={(checked) => handleSettingChange('autoSyncEnabled', checked)} disabled={!isOnline}/>
+                        <Switch id="autosync-assets" checked={appSettings.autoSyncEnabled} onCheckedChange={(checked) => handleSettingChange('autoSyncEnabled', checked)}/>
                       </div>
                     </div>
                   </div>
@@ -301,8 +278,8 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                     <div className="flex items-center justify-between mb-4">
                         <p className="text-sm font-medium">Toggle all sheets</p>
                         <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(true)} disabled={allEnabled || !isOnline}>Enable All</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(false)} disabled={noneEnabled || !isOnline}>Disable All</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(true)} disabled={allEnabled}>Enable All</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(false)} disabled={noneEnabled}>Disable All</Button>
                         </div>
                     </div>
                     <div className="rounded-lg border p-3">
@@ -310,12 +287,12 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                           {allSheetNames.map(sheetName => (
                             <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
                               <div className="flex items-center">
-                                <Switch id={`switch-${sheetName}`} checked={appSettings.enabledSheets.includes(sheetName)} onCheckedChange={(checked) => handleToggleSheet(sheetName, checked)} disabled={!isOnline}/>
+                                <Switch id={`switch-${sheetName}`} checked={appSettings.enabledSheets.includes(sheetName)} onCheckedChange={(checked) => handleToggleSheet(sheetName, checked)}/>
                                 <Label htmlFor={`switch-${sheetName}`} className="text-sm pl-2 cursor-pointer">{sheetName}</Label>
                               </div>
                               <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditSheet(sheetName)} disabled={!isOnline}><Edit className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSheet(sheetName)} disabled={!isOnline}><Trash2 className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditSheet(sheetName)}><Edit className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSheet(sheetName)}><Trash2 className="h-4 w-4" /></Button>
                               </div>
                             </div>
                           ))}
@@ -323,8 +300,8 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                     </div>
                     <div className="mt-4 flex flex-col sm:flex-row gap-2">
                         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
-                        <Button variant="outline" className="w-full" onClick={handleAddSheet} disabled={!isOnline}><PlusCircle className="mr-2" /> Add Manually</Button>
-                        <Button variant="outline" className="w-full" onClick={handleImportTemplate} disabled={!isOnline}><FileUp className="mr-2" /> Import from File</Button>
+                        <Button variant="outline" className="w-full" onClick={handleAddSheet}><PlusCircle className="mr-2" /> Add Manually</Button>
+                        <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import from File</Button>
                     </div>
                   </div>
                 </>
@@ -350,11 +327,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
           </Tabs>
 
           <SheetFooter className="mt-auto pt-4 border-t">
-            <SheetClose asChild><Button variant="outline">Cancel</Button></SheetClose>
-            {isAdmin && <Button onClick={handleSaveChanges} disabled={isSaving || !isOnline}>
-                {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-                Save Admin Changes
-            </Button>}
+            <SheetClose asChild><Button variant="outline">Close</Button></SheetClose>
           </SheetFooter>
         </SheetContent>
       </Sheet>
@@ -371,6 +344,10 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         onOpenChange={setIsSingleSheetImportOpen}
       />
 
+      <DataPatchDialog
+        isOpen={isDataPatchOpen}
+        onOpenChange={setIsDataPatchOpen}
+      />
     </>
   );
 }
