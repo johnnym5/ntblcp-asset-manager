@@ -11,6 +11,7 @@ import { Inbox, User, MapPin, Clock, X, CheckCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Asset } from '@/lib/types';
 import { Separator } from './ui/separator';
+import { Badge } from '@/components/ui/badge';
 
 interface RecentActivitiesSheetProps {
   isOpen: boolean;
