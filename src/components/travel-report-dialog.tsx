@@ -61,7 +61,6 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
     if (isOpen) {
       setReportState(userProfile?.state || '');
       setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
-      // Clear fields on open
       setObjectives('');
       setActivities('');
       setApprovedBy('');
@@ -121,6 +120,26 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         ],
     });
 
+    const verifiedAssetsByCategory = verifiedAssets.reduce((acc, asset) => {
+        const category = asset.category || 'Uncategorized';
+        acc[category] = (acc[category] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+
+    const categorySummaryText = Object.entries(verifiedAssetsByCategory)
+        .map(([category, count]) => `${count} ${category.replace(/-C19RM/g, '').replace(/_|-/g, ' ')}`)
+        .join(', ');
+
+    const detailedSummaryParagraph = new Paragraph({
+        children: [
+            new TextRun("Out of the "),
+            new TextRun({ text: `${verifiedAssets.length} verified assets`, bold: true, color: "008000" }),
+            new TextRun(", I verified: "),
+            new TextRun({ text: categorySummaryText || 'none', bold: true }),
+            new TextRun("."),
+        ],
+    });
+
     const doc = new Document({
         sections: [{
             children: [
@@ -133,6 +152,8 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                 new Paragraph(" "),
                 new Paragraph({ text: "SUMMARY OF VERIFICATION:", heading: HeadingLevel.HEADING_3 }),
                 summaryParagraph,
+                new Paragraph(" "),
+                detailedSummaryParagraph,
                 new Paragraph(" "),
                 new Paragraph({ text: "OBJECTIVES:", heading: HeadingLevel.HEADING_3 }),
                 new Paragraph(objectives),
