@@ -49,6 +49,7 @@ const userFormSchema = z.object({
   states: z.array(z.string()).min(1, 'At least one state must be selected.'),
   isAdmin: z.boolean(),
   isGuest: z.boolean(),
+  password: z.string().optional(),
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -72,6 +73,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
       states: [],
       isAdmin: false,
       isGuest: false,
+      password: '',
     },
   });
   
@@ -86,6 +88,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
           states: user.states,
           isAdmin: user.isAdmin,
           isGuest: user.isGuest || false,
+          password: user.password || '0000',
         });
       } else {
         form.reset({
@@ -94,6 +97,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
           states: [],
           isAdmin: false,
           isGuest: false,
+          password: '0000',
         });
       }
     }
@@ -103,7 +107,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
     setIsSaving(true);
     const userToSave: AuthorizedUser = {
       ...data,
-      password: user?.password || '0000',
+      password: data.password || '0000',
       passwordChanged: user?.passwordChanged || false,
     };
     await onSave(userToSave, user?.loginName);
@@ -146,6 +150,19 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                    <FormDescription>
                     This is the unique, lowercase name the user will enter to log in.
                   </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+             <FormField
+              control={form.control}
+              name="password"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Password</FormLabel>
+                  <FormControl>
+                    <Input type="text" {...field} />
+                  </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
