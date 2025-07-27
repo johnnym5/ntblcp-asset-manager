@@ -71,7 +71,7 @@ export const NIGERIAN_ZONES: Record<string, string[]> = {
   "South West": ["Ekiti", "Lagos", "Ogun", "Ondo", "Osun", "Oyo"],
 };
 
-export const ZONE_NAMES = Object.keys(NIGERIAN_ZONES);
+export const ZONAL_STORES = Object.keys(NIGERIAN_ZONES);
 
 export const SPECIAL_LOCATIONS = ["FCMS", "NTBLCP"];
 

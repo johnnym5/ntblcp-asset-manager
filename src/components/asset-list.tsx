@@ -67,7 +67,7 @@ import { AssetForm } from "./asset-form";
 import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
-import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONE_NAMES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
+import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
@@ -110,13 +110,12 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[] }> =
         }
 
         const lowerCaseLocation = locationName.toLowerCase().trim();
-        const isZone = ZONE_NAMES.map(z => z.toLowerCase()).includes(lowerCaseLocation);
+        const isZonalStore = ZONAL_STORES.map(z => z.toLowerCase()).includes(lowerCaseLocation);
 
-        if (isZone) {
-            const statesInZone = NIGERIAN_ZONES[locationName] || [];
+        if (isZonalStore) {
             return allAssets.filter(asset => {
-                const assetState = normalizeAssetLocation(asset.location);
-                return statesInZone.includes(assetState);
+                const assetLocation = (asset.location || "").toLowerCase().trim();
+                return assetLocation.includes(lowerCaseLocation) && assetLocation.includes("zonal store");
             });
         }
         
@@ -338,13 +337,13 @@ export default function AssetList() {
     if (isAdmin && globalStateFilter && globalStateFilter !== 'All') {
         const zones: Record<string, string[]> = NIGERIAN_ZONES;
         const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
-        const isZone = !!zones[globalStateFilter];
+        const isZone = ZONAL_STORES.includes(globalStateFilter);
 
         if (isZone) {
-            const statesInZone = NIGERIAN_ZONES[globalStateFilter] || [];
+            const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
             return currentAssets.filter(asset => {
-                const assetState = normalizeAssetLocation(asset.location);
-                return statesInZone.includes(assetState);
+                const assetLocation = (asset.location || "").toLowerCase().trim();
+                return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
             });
         }
         
@@ -1244,8 +1243,8 @@ export default function AssetList() {
                                 </SelectGroup>
                                 <SelectSeparator />
                                 <SelectGroup>
-                                    <SelectLabel>Geopolitical Zones</SelectLabel>
-                                    {ZONE_NAMES.map((zone) => (
+                                    <SelectLabel>Zonal Stores</SelectLabel>
+                                    {ZONAL_STORES.map((zone) => (
                                         <SelectItem key={zone} value={zone} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
                                             <LocationProgress locationName={zone} allAssets={activeAssets} />
                                         </SelectItem>
