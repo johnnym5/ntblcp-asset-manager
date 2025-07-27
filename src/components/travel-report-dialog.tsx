@@ -35,8 +35,8 @@ interface TravelReportDialogProps {
   onOpenChange: (isOpen: boolean) => void;
 }
 
-const ReportInput = ({ label, id, value, onChange, isHidden }: { label: string, id: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void, isHidden?: boolean }) => (
-    <div className={`space-y-1.5 ${isHidden ? 'hidden' : ''}`}>
+const ReportInput = ({ label, id, value, onChange }: { label: string, id: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void }) => (
+    <div className="space-y-1.5">
         <Label htmlFor={id} className="font-semibold">{label}</Label>
         <Textarea id={id} value={value} onChange={onChange} className="min-h-[100px] text-sm" />
     </div>
@@ -49,7 +49,6 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
   
   const [reportState, setReportState] = useState('');
   const [travelDate, setTravelDate] = useState('');
-  // These fields are now managed in state but hidden from the primary UI
   const [objectives, setObjectives] = useState('');
   const [activities, setActivities] = useState('');
   const [approvedBy, setApprovedBy] = useState('');
@@ -211,6 +210,8 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                     <p className="p-4 bg-muted rounded-md text-sm">
                         On my asset verification visit to <span className="font-bold">{reportState}</span>, out of a total of <span className="font-bold">{reportAssets.length}</span> assets, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.
                     </p>
+                    <ReportInput label="Objectives" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} />
+                    <ReportInput label="Activities Done" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} />
                 </div>
 
                 <div className="space-y-4">
@@ -218,10 +219,10 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                     <ReportInput label="Challenges" id="challenges" value={challenges} onChange={(e) => setChallenges(e.target.value)} />
                     <ReportInput label="Recommendations" id="recommendations" value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
                     
-                    {/* Hidden inputs, but state is managed for the final report */}
-                    <ReportInput label="Objectives" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} isHidden />
-                    <ReportInput label="Activities Done" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} isHidden />
-                    <ReportInput label="Approved By" id="approvedBy" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} isHidden />
+                    <div className="space-y-1.5">
+                        <Label htmlFor="approvedBy" className="font-semibold">Approved By</Label>
+                        <Input id="approvedBy" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} />
+                    </div>
                 </div>
             </div>
         </ScrollArea>

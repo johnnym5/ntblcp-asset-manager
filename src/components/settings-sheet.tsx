@@ -222,17 +222,13 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                       <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onTravelReport} disabled={isGuest}>
                          <PlaneTakeoff className="mr-2 h-4 w-4" /> Travel Report
                       </Button>
-                      {isAdmin && (
-                        <>
-                          <Separator className="my-2"/>
-                          <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={isGuest}>
-                            <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
-                          </Button>
-                          <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || isGuest}>
-                            <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
-                          </Button>
-                        </>
-                      )}
+                      <Separator className="my-2"/>
+                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={isGuest}>
+                        <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                      </Button>
+                      <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || isGuest}>
+                        <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
+                      </Button>
                     </div>
                 </div>
               
