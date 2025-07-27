@@ -50,11 +50,7 @@ const defaultActivities = [
   "Syncing of all the data into the server."
 ].join('\n');
 
-const defaultObservations = [
-  "All assets are in good working condition.",
-  "All assets are properly maintained.",
-  "All assets are properly documented."
-].join('\n');
+const defaultObservations = "";
 
 
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
@@ -77,7 +73,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
       setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
       setObjectives('To conduct physical verification of NTBLCP assets in the state.');
       setActivities(defaultActivities);
-      setObservations(defaultObservations);
+      setObservations('');
       setApprovedBy('');
       setChallenges('');
       setRecommendations('');
@@ -194,13 +190,13 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                 detailedSummaryParagraph,
                 new Paragraph(" "),
                 new Paragraph({ text: "OBJECTIVES:", heading: HeadingLevel.HEADING_3 }),
-                new Paragraph(objectives),
+                ...createBulletedParagraphs(objectives),
                 new Paragraph(" "),
                 new Paragraph({ text: "ACTIVITIES DONE:", heading: HeadingLevel.HEADING_3 }),
                 ...createBulletedParagraphs(activities),
                 new Paragraph(" "),
                 new Paragraph({ text: "OBSERVATIONS:", heading: HeadingLevel.HEADING_3 }),
-                ...createBulletedParagraphs(observations),
+                 ...createBulletedParagraphs(observations),
                  new Paragraph(" "),
                 new Paragraph({ text: "CHALLENGES:", heading: HeadingLevel.HEADING_3 }),
                  ...createBulletedParagraphs(challenges),
