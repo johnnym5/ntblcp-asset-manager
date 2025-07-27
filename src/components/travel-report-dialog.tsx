@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { ScrollArea } from './ui/scroll-area';
-import { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun } from 'docx';
+import { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, ShadingType } from 'docx';
 import { saveAs } from 'file-saver';
 import type { Asset } from '@/lib/types';
 
@@ -35,8 +35,8 @@ interface TravelReportDialogProps {
   onOpenChange: (isOpen: boolean) => void;
 }
 
-const ReportInput = ({ label, id, value, onChange }: { label: string, id: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void }) => (
-    <div className="space-y-1.5">
+const ReportInput = ({ label, id, value, onChange, isHidden }: { label: string, id: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void, isHidden?: boolean }) => (
+    <div className={`space-y-1.5 ${isHidden ? 'hidden' : ''}`}>
         <Label htmlFor={id} className="font-semibold">{label}</Label>
         <Textarea id={id} value={value} onChange={onChange} className="min-h-[100px] text-sm" />
     </div>
@@ -49,6 +49,11 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
   
   const [reportState, setReportState] = useState('');
   const [travelDate, setTravelDate] = useState('');
+  // These fields are now managed in state but hidden from the primary UI
+  const [objectives, setObjectives] = useState('');
+  const [activities, setActivities] = useState('');
+  const [approvedBy, setApprovedBy] = useState('');
+  
   const [observations, setObservations] = useState('');
   const [challenges, setChallenges] = useState('');
   const [recommendations, setRecommendations] = useState('');
@@ -56,7 +61,11 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
   useEffect(() => {
     if (isOpen) {
       setReportState(userProfile?.state || '');
-      setTravelDate('');
+      setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
+      // Clear fields on open
+      setObjectives('');
+      setActivities('');
+      setApprovedBy('');
       setObservations('');
       setChallenges('');
       setRecommendations('');
@@ -99,6 +108,19 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         rows: [tableHeader, ...remarksRows],
         width: { size: 100, type: WidthType.PERCENTAGE },
     });
+    
+    const summaryParagraph = new Paragraph({
+        children: [
+            new TextRun("On my asset verification visit to "),
+            new TextRun({ text: reportState, bold: true }),
+            new TextRun(", out of a total of "),
+            new TextRun({ text: `${reportAssets.length} assets`, bold: true }),
+            new TextRun(", "),
+            new TextRun({ text: `${verifiedAssets.length} were verified`, bold: true, color: "008000" }), // Green
+            new TextRun(" and "),
+            new TextRun({ text: `${unverifiedAssetsCount} were unverified.`, bold: true, color: "FF0000" }), // Red
+        ],
+    });
 
     const doc = new Document({
         sections: [{
@@ -111,7 +133,13 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                 new Paragraph({ text: `NAME OF OFFICER ON THE TRAVEL:\t${userProfile?.displayName}` }),
                 new Paragraph(" "),
                 new Paragraph({ text: "SUMMARY OF VERIFICATION:", heading: HeadingLevel.HEADING_3 }),
-                new Paragraph(`On my asset verification visit to ${reportState}, out of a total of ${reportAssets.length} assets, ${verifiedAssets.length} were verified and ${unverifiedAssetsCount} were unverified.`),
+                summaryParagraph,
+                new Paragraph(" "),
+                new Paragraph({ text: "OBJECTIVES:", heading: HeadingLevel.HEADING_3 }),
+                new Paragraph(objectives),
+                new Paragraph(" "),
+                new Paragraph({ text: "ACTIVITIES DONE:", heading: HeadingLevel.HEADING_3 }),
+                new Paragraph(activities),
                 new Paragraph(" "),
                 new Paragraph({ text: "OBSERVATIONS:", heading: HeadingLevel.HEADING_3 }),
                 new Paragraph(observations),
@@ -127,6 +155,8 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                 new Paragraph(" "),
                 new Paragraph(" "),
                 new Paragraph({ text: `Prepared by: ${userProfile?.displayName}` }),
+                 new Paragraph(" "),
+                new Paragraph({ text: `Approved by: ${approvedBy}` }),
             ],
         }],
     });
@@ -187,6 +217,11 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                     <ReportInput label="Observations" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
                     <ReportInput label="Challenges" id="challenges" value={challenges} onChange={(e) => setChallenges(e.target.value)} />
                     <ReportInput label="Recommendations" id="recommendations" value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
+                    
+                    {/* Hidden inputs, but state is managed for the final report */}
+                    <ReportInput label="Objectives" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} isHidden />
+                    <ReportInput label="Activities Done" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} isHidden />
+                    <ReportInput label="Approved By" id="approvedBy" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} isHidden />
                 </div>
             </div>
         </ScrollArea>

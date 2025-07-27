@@ -16,7 +16,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { getLocalAssets, saveAssets, getLockedOfflineAssets, saveLockedOfflineAssets } from '@/lib/idb';
-import { sanitizeForFirestore, applyNtblcpFarPatch } from '@/lib/excel-parser';
+import { applyNtblcpFarPatch } from '@/lib/excel-parser';
 
 interface DataPatchDialogProps {
   isOpen: boolean;
@@ -85,4 +85,3 @@ export function DataPatchDialog({ isOpen, onOpenChange }: DataPatchDialogProps) 
     </AlertDialog>
   );
 }
-
