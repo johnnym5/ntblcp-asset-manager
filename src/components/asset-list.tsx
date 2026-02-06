@@ -87,6 +87,7 @@ import { TravelReportDialog } from "./travel-report-dialog";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
 import { ImportScannerDialog } from "./single-sheet-import-dialog";
+import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-dialog";
 
 
 /**
@@ -192,6 +193,8 @@ export default function AssetList() {
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
+  const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
+  const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
@@ -230,50 +233,29 @@ export default function AssetList() {
   }, [view]);
 
   // --- DATA LOADING & SYNC ---
-  const performDownload = useCallback(async () => {
-    if (!isOnline || !authInitialized || isGuest) return;
+  const executeDownload = useCallback(async () => {
+    if (!syncSummary || syncSummary.type !== 'download') return;
 
     setIsSyncing(true);
     addNotification({ title: 'Downloading from cloud...' });
-
+    
     try {
-        const cloudAssets = await getAssets();
+        const { newFromCloud, updatedFromCloud } = syncSummary;
         const localAssets = await getLocalAssetsFromDb();
-        
-        const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         const mergedAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
-        let overwrittenCount = 0;
-        let newCount = 0;
-        let keptLocalCount = 0;
+        const assetsToProcess = [...newFromCloud, ...updatedFromCloud];
 
-        for (const cloudAsset of cloudAssets) {
-            const localAsset = localAssetsMap.get(cloudAsset.id);
-            
-            if (localAsset && localAsset.syncStatus === 'local') {
-                keptLocalCount++;
-                continue; 
-            }
-            
-            if (localAsset) {
-                overwrittenCount++;
-            } else {
-                newCount++;
-            }
+        for (const cloudAsset of assetsToProcess) {
             mergedAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
         }
         
         const finalAssets = Array.from(mergedAssetsMap.values());
         await saveAssets(finalAssets);
         setAssets(finalAssets);
+
+        addNotification({ title: 'Download Complete', description: `${assetsToProcess.length} assets downloaded.` });
         
-        if (newCount === 0 && overwrittenCount === 0 && keptLocalCount === 0 && cloudAssets.length > 0) {
-            addNotification({ title: 'Download Complete', description: `Your local data is already up-to-date.` });
-        } else if (newCount > 0 || overwrittenCount > 0 || keptLocalCount > 0) {
-            addNotification({ title: 'Download Complete', description: `${newCount} new, ${overwrittenCount} updated. ${keptLocalCount} local changes kept.` });
-        } else {
-            addNotification({ title: 'Nothing to Download', description: `No assets found in the cloud database.` });
-        }
     } catch (error) {
         console.error("Download failed:", error);
         addNotification({
@@ -281,53 +263,143 @@ export default function AssetList() {
           description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during download.",
           variant: 'destructive'
         });
-        setIsOnline(false);
     } finally {
         setIsSyncing(false);
+        setIsSyncConfirmOpen(false);
+        setSyncSummary(null);
     }
-  }, [isOnline, authInitialized, isGuest, setIsOnline, setAssets, setIsSyncing]);
+}, [syncSummary, setAssets, setIsSyncing]);
 
-  const performUpload = useCallback(async () => {
+  const executeUpload = useCallback(async () => {
+      if (!syncSummary || syncSummary.type !== 'upload') return;
+
+      setIsSyncing(true);
+      addNotification({ title: 'Uploading changes...' });
+
+      try {
+          const { toUpload: assetsToPush } = syncSummary;
+
+          if (assetsToPush.length > 0) {
+              await batchSetAssets(assetsToPush);
+              
+              const localAssets = await getLocalAssetsFromDb();
+              const localMap = new Map(localAssets.map(a => [a.id, a]));
+              assetsToPush.forEach(pushedAsset => {
+                  const localVersion = localMap.get(pushedAsset.id);
+                  if (localVersion) {
+                      localMap.set(pushedAsset.id, { ...localVersion, syncStatus: 'synced' });
+                  }
+              });
+              const updatedLocalAssets = Array.from(localMap.values());
+              await saveAssets(updatedLocalAssets);
+              setAssets(updatedLocalAssets);
+
+              addNotification({ title: 'Upload Complete', description: `${assetsToPush.length} local changes uploaded.` });
+          }
+      } catch (error) {
+          console.error("Upload failed:", error);
+          addNotification({
+            title: "Upload Failed",
+            description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during upload.",
+            variant: 'destructive'
+          });
+      } finally {
+          setIsSyncing(false);
+          setIsSyncConfirmOpen(false);
+          setSyncSummary(null);
+      }
+  }, [syncSummary, setAssets, setIsSyncing]);
+
+  const handleDownloadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
-
     setIsSyncing(true);
-    addNotification({ title: 'Uploading changes...' });
+    addNotification({ title: 'Scanning for cloud changes...' });
 
     try {
+        const cloudAssets = await getAssets();
         const localAssets = await getLocalAssetsFromDb();
-        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
+        const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
-        if (assetsToPush.length > 0) {
-            await batchSetAssets(assetsToPush);
-            
-            const localMap = new Map(localAssets.map(a => [a.id, a]));
-            assetsToPush.forEach(pushedAsset => {
-                const localVersion = localMap.get(pushedAsset.id);
-                if (localVersion) {
-                    localMap.set(pushedAsset.id, { ...localVersion, syncStatus: 'synced' });
+        const summary: SyncSummary = {
+            newFromCloud: [],
+            updatedFromCloud: [],
+            keptLocal: [],
+            toUpload: [],
+            type: 'download',
+        };
+
+        for (const cloudAsset of cloudAssets) {
+            const localAsset = localAssetsMap.get(cloudAsset.id);
+            if (localAsset) {
+                const cloudTimestamp = cloudAsset.lastModified ? new Date(cloudAsset.lastModified).getTime() : 0;
+                const localTimestamp = localAsset.lastModified ? new Date(localAsset.lastModified).getTime() : 0;
+
+                if (localAsset.syncStatus === 'local' && localTimestamp > cloudTimestamp) {
+                    summary.keptLocal.push(localAsset);
+                } else {
+                    if (haveAssetDetailsChanged(localAsset, cloudAsset)) {
+                       summary.updatedFromCloud.push(cloudAsset);
+                    }
                 }
-            });
-            const updatedLocalAssets = Array.from(localMap.values());
-            await saveAssets(updatedLocalAssets);
-            setAssets(updatedLocalAssets);
-
-            addNotification({ title: 'Upload Complete', description: `${assetsToPush.length} local changes uploaded to the cloud.` });
+            } else {
+                summary.newFromCloud.push(cloudAsset);
+            }
+        }
+        
+        if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0 && summary.keptLocal.length === 0) {
+            addNotification({ title: 'Already Up-to-Date', description: 'Your local data is already in sync with the cloud.' });
         } else {
-            addNotification({ title: 'No Changes to Upload', description: 'Your local data is already in sync.' });
+            setSyncSummary(summary);
+            setIsSyncConfirmOpen(true);
         }
     } catch (error) {
-        console.error("Upload failed:", error);
+        console.error("Download scan failed:", error);
         addNotification({
-          title: "Upload Failed",
-          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during upload.",
+          title: "Download Scan Failed",
+          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred.",
           variant: 'destructive'
         });
         setIsOnline(false);
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, authInitialized, isGuest, setIsOnline, setAssets, setIsSyncing]);
+  }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing]);
   
+  const handleUploadScan = useCallback(async () => {
+    if (!isOnline || !authInitialized || isGuest) return;
+
+    setIsSyncing(true);
+    addNotification({ title: 'Scanning for local changes...' });
+    
+    try {
+        const localAssets = await getLocalAssetsFromDb();
+        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
+
+        if (assetsToPush.length > 0) {
+            setSyncSummary({
+                newFromCloud: [],
+                updatedFromCloud: [],
+                keptLocal: [],
+                toUpload: assetsToPush,
+                type: 'upload',
+            });
+            setIsSyncConfirmOpen(true);
+        } else {
+            addNotification({ title: 'No Local Changes', description: 'Everything is already in sync with the cloud.' });
+        }
+    } catch (error) {
+        console.error("Upload scan failed:", error);
+        addNotification({
+          title: "Upload Scan Failed",
+          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred.",
+          variant: 'destructive'
+        });
+    } finally {
+        setIsSyncing(false);
+    }
+}, [isOnline, authInitialized, isGuest, setIsSyncing]);
+
+
   // Effect for initial data load from IndexedDB. This runs once when component mounts.
   useEffect(() => {
     const loadInitialDataFromDb = async () => {
@@ -344,15 +416,15 @@ export default function AssetList() {
 
   useEffect(() => {
     if (manualDownloadTrigger > 0) {
-        performDownload();
+        handleDownloadScan();
     }
-  }, [manualDownloadTrigger, performDownload]);
+  }, [manualDownloadTrigger, handleDownloadScan]);
   
   useEffect(() => {
     if (manualUploadTrigger > 0) {
-        performUpload();
+        handleUploadScan();
     }
-  }, [manualUploadTrigger, performUpload]);
+  }, [manualUploadTrigger, handleUploadScan]);
   
   useEffect(() => {
     setStatusOptions([
@@ -722,6 +794,11 @@ export default function AssetList() {
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
+
+    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+      addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
+      return;
+    }
 
     if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus && asset.condition === data.condition) {
         return;
@@ -1128,6 +1205,14 @@ export default function AssetList() {
     return message;
   }, [isAdmin, isOnline, dataSource]);
 
+  const handleSyncConfirm = () => {
+    if (syncSummary?.type === 'download') {
+        executeDownload();
+    } else if (syncSummary?.type === 'upload') {
+        executeUpload();
+    }
+  };
+
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -1382,6 +1467,12 @@ export default function AssetList() {
             isOpen={isImportScanOpen}
             onOpenChange={setIsImportScanOpen}
         />
+         <SyncConfirmationDialog
+          isOpen={isSyncConfirmOpen}
+          onOpenChange={setIsSyncConfirmOpen}
+          onConfirm={handleSyncConfirm}
+          summary={syncSummary}
+        />
         <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -1627,5 +1718,7 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
 
     
