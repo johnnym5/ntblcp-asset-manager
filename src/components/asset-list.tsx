@@ -1322,7 +1322,7 @@ export default function AssetList() {
             <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className='flex-1'>
                     <CardTitle className="flex items-center gap-2">
-                      <span>Verification Status</span>
+                       <span>{appSettings.appMode === 'verification' ? 'Verification Status' : 'Management Status'}</span>
                       <TooltipProvider>
                         <Tooltip>
                           <TooltipTrigger asChild>
@@ -1521,7 +1521,10 @@ export default function AssetList() {
   const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
   
   const currentSheetDefinition = sheetDefinitions[currentCategory!];
-  const tableFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.table) || [];
+  let tableFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.table) || [];
+  if (appSettings.appMode === 'management') {
+    tableFields = tableFields.filter(f => f.key !== 'verifiedStatus');
+  }
   const backButtonTarget = 'dashboard';
 
 
@@ -1746,29 +1749,31 @@ export default function AssetList() {
                                   )
                               })}
                           </div>
-                          <div className="mt-4" onClick={e => e.stopPropagation()}>
-                              <p className="text-xs font-medium text-muted-foreground mb-1">Verified Status</p>
-                              <Select
-                                  value={asset.verifiedStatus || 'Unverified'}
-                                  onValueChange={async (status) => {
-                                    if (lockAssetList && isAdmin && dataSource === 'cloud') {
-                                        addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
-                                        return;
-                                    }
-                                    const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
-                                    await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate, remarks: asset.remarks, condition: asset.condition });
-                                    addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
-                                  }}
-                                >
-                                <SelectTrigger className={cn("h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                  <SelectValue placeholder="Select status" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-3 w-3"/>Unverified</div></SelectItem>
-                                    <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-3 w-3"/>Verified</div></SelectItem>
-                                </SelectContent>
-                              </Select>
-                          </div>
+                          {appSettings.appMode === 'verification' && (
+                            <div className="mt-4" onClick={e => e.stopPropagation()}>
+                                <p className="text-xs font-medium text-muted-foreground mb-1">Verified Status</p>
+                                <Select
+                                    value={asset.verifiedStatus || 'Unverified'}
+                                    onValueChange={async (status) => {
+                                      if (lockAssetList && isAdmin && dataSource === 'cloud') {
+                                          addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
+                                          return;
+                                      }
+                                      const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
+                                      await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate, remarks: asset.remarks, condition: asset.condition });
+                                      addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
+                                    }}
+                                  >
+                                  <SelectTrigger className={cn("h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                    <SelectValue placeholder="Select status" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                      <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-3 w-3"/>Unverified</div></SelectItem>
+                                      <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-3 w-3"/>Verified</div></SelectItem>
+                                  </SelectContent>
+                                </Select>
+                            </div>
+                          )}
                       </CardContent>
                     </Card>
                   ))
@@ -1828,5 +1833,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    

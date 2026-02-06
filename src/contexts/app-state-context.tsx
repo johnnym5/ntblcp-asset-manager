@@ -175,6 +175,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [isOnline]);
 
+  useEffect(() => {
+    if (appSettings.appMode === 'management') {
+      setSelectedStatuses([]);
+    }
+  }, [appSettings.appMode]);
+
   const value = {
     assets, setAssets,
     offlineAssets, setOfflineAssets,

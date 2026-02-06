@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -19,6 +18,7 @@ import { Separator } from './ui/separator';
 import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import type { Asset } from '@/lib/types';
+import { useAppState } from '@/contexts/app-state-context';
 
 export interface OptionType {
   label: string;
@@ -137,6 +137,7 @@ export function AssetFilterSheet({
   setMissingFieldFilter,
 }: AssetFilterSheetProps) {
   
+  const { appSettings } = useAppState();
   const handleClearAll = () => {
     setSelectedLocations([]);
     setSelectedAssignees([]);
@@ -169,13 +170,17 @@ export function AssetFilterSheet({
             selected={selectedAssignees}
             onChange={setSelectedAssignees}
           />
-          <Separator />
-          <FilterSection
-            title="Status"
-            options={statusOptions}
-            selected={selectedStatuses}
-            onChange={setSelectedStatuses}
-          />
+          {appSettings.appMode === 'verification' && (
+            <>
+              <Separator />
+              <FilterSection
+                title="Status"
+                options={statusOptions}
+                selected={selectedStatuses}
+                onChange={setSelectedStatuses}
+              />
+            </>
+          )}
           <Separator />
            <div className="space-y-3">
             <Label className="font-semibold">Find Assets with Missing Fields</Label>
