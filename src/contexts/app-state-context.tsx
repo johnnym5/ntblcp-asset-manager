@@ -18,6 +18,7 @@ export interface SortConfig {
 export interface DataActions {
   onImport?: () => void;
   onScanAndImport?: () => void;
+  onExport?: () => void;
   onExportToJson?: () => void;
   onAddAsset?: () => void;
   onClearAll?: () => void;

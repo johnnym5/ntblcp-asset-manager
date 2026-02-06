@@ -998,6 +998,23 @@ export default function AssetList() {
     }
   }, [activeAssets, appSettings]);
 
+  const handleExport = useCallback(() => {
+    try {
+        const timestamp = new Date().toISOString().replace(/:/g, '-');
+        exportToExcel(activeAssets, sheetDefinitions, `assets-export-${timestamp}.xlsx`);
+        addNotification({
+            title: 'Exporting to Excel',
+            description: `Your data is being downloaded as assets-export-${timestamp}.xlsx`,
+        });
+    } catch (e) {
+        addNotification({
+            title: 'Export Failed',
+            description: e instanceof Error ? e.message : 'An unknown error occurred.',
+            variant: 'destructive',
+        });
+    }
+  }, [activeAssets, sheetDefinitions]);
+
   useEffect(() => {
     setDataActions({
         onAddAsset: handleAddAsset,
@@ -1006,6 +1023,7 @@ export default function AssetList() {
         onClearAll: handleClearAllClick,
         onTravelReport: handleTravelReport,
         onExportToJson: handleExportToJson,
+        onExport: handleExport,
         isImporting,
     });
     return () => setDataActions({});
@@ -1016,6 +1034,7 @@ export default function AssetList() {
     handleClearAllClick, 
     handleTravelReport,
     handleExportToJson,
+    handleExport,
     isImporting
   ]);
 

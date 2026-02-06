@@ -48,6 +48,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Separator } from './ui/separator';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -56,7 +57,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings } = useAppState();
+  const { appSettings, setAppSettings, dataActions } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -287,6 +288,36 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                     </div>
                   </div>
                 )}
+                
+                <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Data Management</h3>
+                    <div className="rounded-lg border p-4 space-y-3">
+                        <p className="text-sm text-muted-foreground">Import, export, or manage the asset database.</p>
+                        <Separator />
+                        <div className="space-y-2">
+                           {dataActions.onAddAsset && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                                </Button>
+                            )}
+                             {dataActions.onImport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onImport} disabled={dataActions.isImporting}>
+                                    <FileUp className="mr-2 h-4 w-4" /> Import from Excel
+                                </Button>
+                            )}
+                             {dataActions.onExport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport}>
+                                    <Download className="mr-2 h-4 w-4" /> Export to Excel
+                                </Button>
+                            )}
+                             {dataActions.onTravelReport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
+                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </TabsContent>
             <TabsContent value="users" className="flex-1 overflow-y-auto pt-4 pr-2">
                 <div className="p-1">
