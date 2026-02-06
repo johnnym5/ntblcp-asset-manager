@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
@@ -6,6 +7,7 @@ import { TARGET_SHEETS } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
 import { getSettings, updateSettings } from '@/lib/firestore';
+import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 
 
 export interface SortConfig {
@@ -178,15 +180,27 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
 
   useEffect(() => {
-    const fetchAndEnsureUsers = async () => {
-      const settingsFromDb = await getSettings();
-      let currentUsers = settingsFromDb?.authorizedUsers || [];
+    const initializeSettings = async () => {
+      let settings = await getLocalSettings();
+
+      let isInitialSetup = false;
+      if (!settings) {
+        isInitialSetup = true;
+        settings = {
+          authorizedUsers: [],
+          sheetDefinitions: HEADER_DEFINITIONS,
+          enabledSheets: TARGET_SHEETS,
+          lockAssetList: true,
+        };
+      }
+      
+      let currentUsers = settings.authorizedUsers || [];
       let usersModified = false;
       
       const userMap = new Map(currentUsers.map(u => [u.email.toLowerCase(), u]));
-      
+
       stateManagersToAdd.forEach(manager => {
-          const loginName = manager.email.split('@')[0].replace(/\./g, '-');
+          const loginName = manager.displayName.toLowerCase().replace(/ /g, '-');
           const existingUser = userMap.get(manager.email.toLowerCase());
 
           if (!existingUser) {
@@ -203,33 +217,34 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
               });
               usersModified = true;
           } else {
-              // User exists, check if an update is needed
               const needsUpdate = 
                   existingUser.displayName !== manager.displayName ||
                   existingUser.password !== manager.password ||
-                  JSON.stringify(existingUser.states) !== JSON.stringify([manager.state]);
+                  existingUser.loginName !== loginName ||
+                  JSON.stringify(existingUser.states.sort()) !== JSON.stringify([manager.state].sort());
               
               if (needsUpdate) {
                   const userIndex = currentUsers.findIndex(u => u.email.toLowerCase() === manager.email.toLowerCase());
                   if (userIndex !== -1) {
                       currentUsers[userIndex] = {
-                          ...currentUsers[userIndex], // Preserve fields like isAdmin, isGuest, etc.
+                          ...currentUsers[userIndex],
+                          loginName: loginName,
                           displayName: manager.displayName,
                           password: manager.password,
-                          states: [manager.state]
+                          states: [manager.state],
                       };
                       usersModified = true;
                   }
               }
           }
       });
-
+      
       const adminEmail = 'jegbase@gmail.com';
       const adminIndex = currentUsers.findIndex(u => u.email.toLowerCase() === adminEmail);
 
       if (adminIndex !== -1) {
-        if (!currentUsers[adminIndex].isAdmin) {
-          currentUsers[adminIndex] = { ...currentUsers[adminIndex], isAdmin: true, states: ['All'] };
+        if (!currentUsers[adminIndex].isAdmin || currentUsers[adminIndex].loginName !== 'jegbase') {
+          currentUsers[adminIndex] = { ...currentUsers[adminIndex], isAdmin: true, states: ['All'], loginName: 'jegbase' };
           usersModified = true;
         }
       } else {
@@ -248,20 +263,18 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       }
       
       if (usersModified) {
-        await updateSettings({ authorizedUsers: currentUsers });
+        settings.authorizedUsers = currentUsers;
+        await saveLocalSettings(settings);
       }
       
-      setAppSettings(prev => ({
-        ...prev,
-        ...(settingsFromDb || {}),
-        authorizedUsers: currentUsers,
-        sheetDefinitions: settingsFromDb?.sheetDefinitions || HEADER_DEFINITIONS,
-        enabledSheets: settingsFromDb?.enabledSheets || TARGET_SHEETS,
-        lockAssetList: settingsFromDb?.lockAssetList ?? true,
-      }));
+      if (isInitialSetup && usersModified && typeof window !== 'undefined' && navigator.onLine) {
+        await updateSettings(settings);
+      }
+
+      setAppSettings(settings);
     };
 
-    fetchAndEnsureUsers();
+    initializeSettings();
   }, []);
 
   useEffect(() => {

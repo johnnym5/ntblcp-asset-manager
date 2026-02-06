@@ -1,12 +1,13 @@
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Asset, UserProfile } from './types';
+import type { Asset, UserProfile, AppSettings } from './types';
 
 const DB_NAME = 'ntblcp-asset-db';
-const DB_VERSION = 3; // Incremented version
+const DB_VERSION = 4; // Incremented version
 const ASSET_STORE_NAME = 'assets';
-const OFFLINE_ASSET_STORE_NAME = 'offline-assets'; // New store for locked offline assets
+const OFFLINE_ASSET_STORE_NAME = 'offline-assets';
 const USER_PROFILE_STORE_NAME = 'userProfile';
+const SETTINGS_STORE_NAME = 'settings';
 
 interface AssetDB extends DBSchema {
   [ASSET_STORE_NAME]: {
@@ -20,6 +21,10 @@ interface AssetDB extends DBSchema {
   [USER_PROFILE_STORE_NAME]: {
     key: string;
     value: UserProfile;
+  };
+  [SETTINGS_STORE_NAME]: {
+    key: string;
+    value: AppSettings;
   };
 }
 
@@ -46,6 +51,11 @@ const getDb = (): Promise<IDBPDatabase<AssetDB>> | null => {
                 if (oldVersion < 3) {
                   if (!db.objectStoreNames.contains(OFFLINE_ASSET_STORE_NAME)) {
                     db.createObjectStore(OFFLINE_ASSET_STORE_NAME, { keyPath: 'id' });
+                  }
+                }
+                if (oldVersion < 4) {
+                  if (!db.objectStoreNames.contains(SETTINGS_STORE_NAME)) {
+                    db.createObjectStore(SETTINGS_STORE_NAME);
                   }
                 }
             },
@@ -128,6 +138,30 @@ export const clearLockedOfflineAssets = async (): Promise<void> => {
     await db.clear(OFFLINE_ASSET_STORE_NAME);
   } catch (error) {
     console.error("Failed to clear locked offline assets from IndexedDB", error);
+  }
+};
+
+// --- App Settings ---
+export const getLocalSettings = async (): Promise<AppSettings | null> => {
+  const dbp = getDb();
+  if (!dbp) return null;
+  try {
+    const db = await dbp;
+    return await db.get(SETTINGS_STORE_NAME, 'app-settings');
+  } catch (error) {
+    console.error("Failed to get local settings from IndexedDB", error);
+    return null;
+  }
+};
+
+export const saveLocalSettings = async (settings: AppSettings): Promise<void> => {
+  const dbp = getDb();
+  if (!dbp) return;
+  try {
+    const db = await dbp;
+    await db.put(SETTINGS_STORE_NAME, settings, 'app-settings');
+  } catch (error) {
+    console.error("Failed to save settings to IndexedDB", error);
   }
 };
 

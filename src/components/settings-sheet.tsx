@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -41,6 +42,7 @@ import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { SingleSheetImportDialog } from './single-sheet-import-dialog';
+import { saveLocalSettings } from '@/lib/idb';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -198,6 +200,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (!draftSettings) return;
     try {
       await updateSettings(draftSettings);
+      await saveLocalSettings(draftSettings);
       setAppSettings(draftSettings); // Update global state
       toast({ title: "Settings Saved", description: "Your changes have been applied to the database." });
     } catch (e) {
