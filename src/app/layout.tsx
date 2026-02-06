@@ -8,7 +8,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 export const metadata: Metadata = {
-  title: 'Asset Manager',
+  title: 'NTBLCP Asset Manager',
   description: 'A full-featured, offline-first web app to manage assets efficiently.',
   manifest: '/manifest.json',
 };
