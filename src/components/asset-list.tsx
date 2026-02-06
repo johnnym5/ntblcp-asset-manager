@@ -230,10 +230,36 @@ export default function AssetList() {
 
     try {
         const cloudAssets = await getAssets();
-        await saveAssets(cloudAssets.map(a => ({ ...a, syncStatus: 'synced' })));
-        setAssets(cloudAssets.map(a => ({ ...a, syncStatus: 'synced' })));
+        const localAssets = await getLocalAssetsFromDb();
         
-        addNotification({ title: 'Download Complete', description: `${cloudAssets.length} assets downloaded from the cloud.` });
+        const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
+        const mergedAssetsMap = new Map(localAssets.map(a => [a.id, a]));
+
+        let overwrittenCount = 0;
+        let newCount = 0;
+        let keptLocalCount = 0;
+
+        for (const cloudAsset of cloudAssets) {
+            const localAsset = localAssetsMap.get(cloudAsset.id);
+            
+            if (localAsset && localAsset.syncStatus === 'local') {
+                keptLocalCount++;
+                continue; 
+            }
+            
+            if (localAsset) {
+                overwrittenCount++;
+            } else {
+                newCount++;
+            }
+            mergedAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
+        }
+        
+        const finalAssets = Array.from(mergedAssetsMap.values());
+        await saveAssets(finalAssets);
+        setAssets(finalAssets);
+        
+        addNotification({ title: 'Download Complete', description: `${newCount} new, ${overwrittenCount} updated. ${keptLocalCount} local changes kept.` });
     } catch (error) {
         console.error("Download failed:", error);
         addNotification({
@@ -1547,5 +1573,7 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
 
     
