@@ -314,25 +314,31 @@ export default function AssetList() {
     }
   }, [isOnline, authInitialized, isGuest, setIsOnline, setAssets, setIsSyncing]);
   
+  // Effect for initial data load from IndexedDB. This runs once when auth is ready.
   useEffect(() => {
-    const loadInitialData = async () => {
-        setIsLoading(true);
-        const localAssets = await getLocalAssetsFromDb();
-        const localOfflineAssets = await getLockedOfflineAssets();
-        setAssets(localAssets);
-        setOfflineAssets(localOfflineAssets);
-        setIsLoading(false);
-
-        if (isOnline && authInitialized && !isGuest) {
-          await performDownload();
-        }
+    const loadInitialDataFromDb = async () => {
+      if (!authInitialized) return;
+      setIsLoading(true);
+      const localAssets = await getLocalAssetsFromDb();
+      const localOfflineAssets = await getLockedOfflineAssets();
+      setAssets(localAssets);
+      setOfflineAssets(localOfflineAssets);
+      setIsLoading(false);
     };
 
-    if (authInitialized) {
-        loadInitialData();
+    loadInitialDataFromDb();
+  }, [authInitialized, setAssets, setOfflineAssets]);
+
+  // Effect for handling automatic download when coming online or on initial load.
+  useEffect(() => {
+    if (isOnline && authInitialized && !isGuest && appSettings.autoSyncEnabled) {
+      const timer = setTimeout(() => {
+        performDownload();
+      }, 500); // Small delay to ensure UI is responsive
+      return () => clearTimeout(timer);
     }
-  }, [authInitialized, isOnline, isGuest, setAssets, setOfflineAssets, performDownload]);
-  
+  }, [isOnline, authInitialized, isGuest, appSettings.autoSyncEnabled, performDownload]);
+
   useEffect(() => {
     if (manualDownloadTrigger > 0) {
         performDownload();

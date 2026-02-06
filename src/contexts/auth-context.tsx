@@ -123,7 +123,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
     setProfileSetupComplete(false);
-    setAssets([]); 
     window.location.href = '/';
   };
 
