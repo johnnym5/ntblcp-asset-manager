@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -73,7 +74,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (isOpen) {
       if (savedDraft) {
         setDraftSettings(JSON.parse(savedDraft));
-        toast({ title: 'Draft Restored', description: 'Your unsaved settings have been restored.'});
       } else {
         setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
       }
@@ -81,7 +81,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       setDraftSettings(null);
       localStorage.removeItem('ntblcp-settings-draft');
     }
-  }, [isOpen, appSettings, toast]);
+  }, [isOpen, appSettings]);
   
   useEffect(() => {
     if (draftSettings) {
