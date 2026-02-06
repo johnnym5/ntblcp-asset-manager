@@ -32,11 +32,11 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from './ui/separator';
 import { useAppState } from '@/contexts/app-state-context';
-import { updateSettings } from '@/lib/firestore';
+import { copyAssetsToRealtimeDB, updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Rocket } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
@@ -68,6 +68,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
+  const [isCopying, setIsCopying] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -213,6 +214,16 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
   
+    const handleCopyToRTDB = async () => {
+    if (typeof window !== 'undefined' && !window.navigator.onLine) {
+      toast({ title: 'Offline', description: 'This action requires an internet connection.', variant: 'destructive' });
+      return;
+    }
+    setIsCopying(true);
+    await copyAssetsToRealtimeDB();
+    setIsCopying(false);
+  };
+
   if (!draftSettings) {
     return (
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -361,6 +372,12 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                                     <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
                                 </Button>
                             )}
+                            <Separator />
+                            <p className="text-xs text-muted-foreground pt-2">Advanced test operations. Use with caution.</p>
+                            <Button variant="outline" className="w-full justify-start" onClick={handleCopyToRTDB} disabled={isCopying}>
+                                {isCopying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
+                                Copy Assets to Realtime DB
+                            </Button>
                             <Separator />
                             {dataActions.onClearAll && (
                                 <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>

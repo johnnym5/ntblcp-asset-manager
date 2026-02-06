@@ -1,10 +1,12 @@
 'use client';
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
-import { db, isConfigValid } from '@/lib/firebase';
+import { db, isConfigValid, rtdb } from '@/lib/firebase';
 import type { Asset, AppSettings } from '@/lib/types';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError } from '@/lib/errors';
+import { addNotification } from '@/hooks/use-notifications';
+import { ref, set } from 'firebase/database';
 
 // Helper function to ensure Firebase is properly configured before use.
 const checkConfig = () => {
@@ -165,6 +167,47 @@ export function batchDeleteAssets(assetIds: string[]) {
               requestResourceData: { note: `Batch delete for ${chunk.length} assets.` }
           });
           errorEmitter.emit('permission-error', permissionError);
+        });
+    }
+}
+
+export async function copyAssetsToRealtimeDB(): Promise<void> {
+    const rtdbInstance = rtdb;
+    if (!isConfigValid || !db || !rtdbInstance) {
+        addNotification({
+            title: 'Firebase Not Configured',
+            description: "Cannot perform operation. Please check your Firebase configuration.",
+            variant: 'destructive',
+        });
+        return;
+    }
+
+    try {
+        addNotification({ title: 'Starting copy...', description: 'Fetching all assets from Firestore.' });
+        const assets = await getAssets();
+        
+        if (assets.length === 0) {
+            addNotification({ title: 'No Assets Found', description: 'There are no assets in Firestore to copy.' });
+            return;
+        }
+
+        // Convert array to an object with IDs as keys for better RTDB structure
+        const assetsObject = assets.reduce((acc, asset) => {
+            const { id, ...rest } = asset; // RTDB doesn't need the ID inside the object if it's the key
+            acc[id] = rest;
+            return acc;
+        }, {} as { [key: string]: Omit<Asset, 'id'> });
+
+        const dbRef = ref(rtdbInstance, 'assets');
+        await set(dbRef, assetsObject);
+
+        addNotification({ title: 'Copy Successful', description: `${assets.length} assets have been copied to the Realtime Database.` });
+    } catch (error) {
+        console.error("Failed to copy assets to Realtime Database:", error);
+        addNotification({
+            title: 'Copy Failed',
+            description: error instanceof Error ? error.message : 'An unknown error occurred.',
+            variant: 'destructive',
         });
     }
 }

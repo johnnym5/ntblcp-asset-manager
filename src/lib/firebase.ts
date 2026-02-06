@@ -1,6 +1,7 @@
 // Import the necessary functions from the Firebase SDKs.
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getDatabase, type Database } from "firebase/database";
 
 // Your web app's Firebase configuration is now loaded from environment variables.
 const firebaseConfig = {
@@ -20,6 +21,7 @@ export const isConfigValid =
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
+let rtdb: Database | undefined;
 
 // Initialize Firebase only on the client side and if config is valid
 if (typeof window !== 'undefined') {
@@ -27,6 +29,7 @@ if (typeof window !== 'undefined') {
     try {
       app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
       db = getFirestore(app);
+      rtdb = getDatabase(app);
     } catch (e) {
       console.error("Firebase initialization error:", e);
     }
@@ -37,4 +40,4 @@ if (typeof window !== 'undefined') {
 }
 
 // Export the initialized services for use throughout the app.
-export { app, db };
+export { app, db, rtdb };
