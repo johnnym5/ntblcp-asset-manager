@@ -108,6 +108,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     sheetDefinitions: HEADER_DEFINITIONS,
     enabledSheets: TARGET_SHEETS,
     lockAssetList: true,
+    appMode: 'management',
   });
 
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
@@ -131,6 +132,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           sheetDefinitions: HEADER_DEFINITIONS,
           enabledSheets: TARGET_SHEETS,
           lockAssetList: true,
+          appMode: 'management',
         };
         settingsModified = true;
       }

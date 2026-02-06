@@ -104,6 +104,7 @@ export interface AppSettings {
   sheetDefinitions: Record<string, SheetDefinition>;
   enabledSheets: string[];
   lockAssetList: boolean;
+  appMode: 'management' | 'verification';
 }
 
 

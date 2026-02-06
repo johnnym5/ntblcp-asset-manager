@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/select';
 import { AlertCircle, Check, FileText, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { useAppState } from '@/contexts/app-state-context';
 
 export interface BatchUpdateData {
   location?: string;
@@ -47,7 +48,9 @@ export function AssetBatchEditForm({
 }: AssetBatchEditFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
+  const { appSettings } = useAppState();
   const isAdmin = userProfile?.isAdmin || false;
+  const isVerificationMode = appSettings.appMode === 'verification';
 
   const [applyLocation, setApplyLocation] = useState(false);
   const [location, setLocation] = useState('');
@@ -65,7 +68,7 @@ export function AssetBatchEditForm({
     setIsSaving(true);
     const updates: BatchUpdateData = {};
     if (applyLocation && isAdmin) updates.location = location;
-    if (applyAssignee) updates.assignee = assignee;
+    if (applyAssignee && (!isVerificationMode || isAdmin)) updates.assignee = assignee;
     if (applyCondition) updates.condition = condition;
     if (applyStatus) updates.verifiedStatus = status;
 
@@ -92,7 +95,7 @@ export function AssetBatchEditForm({
     onOpenChange(open);
   }
   
-  const canSave = (applyLocation && isAdmin) || applyAssignee || applyCondition || applyStatus;
+  const canSave = (applyLocation && isAdmin) || (applyAssignee && (!isVerificationMode || isAdmin)) || applyCondition || applyStatus;
 
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
@@ -112,10 +115,10 @@ export function AssetBatchEditForm({
             </div>
           </div>
           <div className="flex items-center space-x-4">
-            <Checkbox id="applyAssignee" checked={applyAssignee} onCheckedChange={(checked) => setApplyAssignee(!!checked)} />
+            <Checkbox id="applyAssignee" checked={applyAssignee} onCheckedChange={(checked) => setApplyAssignee(!!checked)} disabled={!isAdmin && isVerificationMode} />
             <div className="w-full space-y-2">
-              <Label htmlFor="assignee" className={!applyAssignee ? 'text-muted-foreground' : ''}>Assignee</Label>
-              <Input id="assignee" value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={!applyAssignee} />
+              <Label htmlFor="assignee" className={!applyAssignee || (!isAdmin && isVerificationMode) ? 'text-muted-foreground' : ''}>Assignee</Label>
+              <Input id="assignee" value={assignee} onChange={(e) => setAssignee(e.target.value)} disabled={!applyAssignee || (!isAdmin && isVerificationMode)} />
             </div>
           </div>
           <div className="flex items-center space-x-4">

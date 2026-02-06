@@ -57,7 +57,7 @@ interface AssetFormProps {
   isReadOnly: boolean;
 }
 
-export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: AssetFormProps) {
+export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: initialIsReadOnly }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
   const { appSettings } = useAppState();
@@ -67,6 +67,12 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
     resolver: zodResolver(assetFormSchema),
     mode: 'onChange',
   });
+  
+  const isReadOnly = useMemo(() => {
+      if (isAdmin || initialIsReadOnly) return initialIsReadOnly;
+      if (appSettings.appMode === 'management') return true;
+      return false;
+  }, [isAdmin, initialIsReadOnly, appSettings.appMode]);
   
   const currentCategory = form.watch('category');
   const sheetDefinition = useMemo(() => {
@@ -121,7 +127,11 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
   
     const renderField = (field: DisplayField) => {
         const fieldName = field.key as keyof AssetFormValues;
-        const disabled = isReadOnly || (fieldName === 'location' && !isAdmin) || (fieldName === 'category' && !!asset);
+        
+        const isManagementLock = !isAdmin && appSettings.appMode === 'management';
+        const isVerificationLock = !isAdmin && appSettings.appMode === 'verification' && !['verifiedStatus', 'remarks', 'condition'].includes(fieldName);
+
+        const disabled = isReadOnly || isManagementLock || isVerificationLock || (fieldName === 'location' && !isAdmin) || (fieldName === 'category' && !!asset);
         
         let component;
         switch(fieldName) {
@@ -171,7 +181,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
                 );
                 break;
             case 'remarks':
-                 component = <FormControl><Textarea {...form.register(fieldName)} readOnly={isReadOnly} /></FormControl>;
+                 component = <FormControl><Textarea {...form.register(fieldName)} readOnly={disabled} /></FormControl>;
                  break;
             default:
                  component = <FormControl><Input {...form.register(fieldName)} readOnly={disabled} /></FormControl>;
@@ -234,4 +244,3 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: A
     </Sheet>
   );
 }
-
