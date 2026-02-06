@@ -166,12 +166,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
   
   const handleManualDownload = () => {
-    if (isSyncing || !isOnline) return;
+    if (!isOnline) {
+      addNotification({
+        title: "Currently Offline",
+        description: "Please connect to the internet to download from the cloud.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (isSyncing) return;
     setManualDownloadTrigger(c => c + 1);
   };
   
   const handleManualUpload = () => {
-    if (isSyncing || !isOnline) return;
+    if (!isOnline) {
+      addNotification({
+        title: "Currently Offline",
+        description: "Please connect to the internet to upload to the cloud.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (isSyncing) return;
     setManualUploadTrigger(c => c + 1);
   };
 
@@ -248,7 +264,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <TooltipProvider>
               <Tooltip>
                   <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleManualDownload} disabled={isSyncing || !isOnline}>
+                        <Button variant="outline" size="icon" onClick={handleManualDownload} disabled={isSyncing}>
                           {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudDownload className="h-5 w-5" />}
                       </Button>
                   </TooltipTrigger>
@@ -259,7 +275,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <TooltipProvider>
               <Tooltip>
                   <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleManualUpload} disabled={isSyncing || !isOnline}>
+                        <Button variant="outline" size="icon" onClick={handleManualUpload} disabled={isSyncing}>
                           {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudUpload className="h-5 w-5" />}
                       </Button>
                   </TooltipTrigger>
