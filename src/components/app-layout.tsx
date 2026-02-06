@@ -177,64 +177,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex flex-col w-full min-h-screen">
-      <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm sm:h-16 md:px-6">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:h-16 md:flex-nowrap md:py-0 md:px-6">
         
         {/* Left Side */}
         <div className="flex items-center gap-2">
             <Boxes className="h-5 w-5 text-primary" />
             <span className="text-lg font-semibold hidden sm:inline-block">NTBLCP ASSET VERIFICATOR</span>
         </div>
-
-        {/* Center */}
-        <div className="flex-1 flex justify-center px-4">
-            <div className="w-full max-w-lg">
-                {pathname === '/' && (
-                    <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
-                        <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
-                        <Input
-                            type="search"
-                            placeholder="Search assets..."
-                            className="pl-10 pr-20 w-full h-full bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0"
-                            value={localSearchTerm}
-                            onChange={(e) => setLocalSearchTerm(e.target.value)}
-                        />
-                        <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Sort assets">
-                                        <ArrowUpDown className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-                                    <DropdownMenuSeparator />
-                                    {sortableFields.map(field => (
-                                        <DropdownMenuItem key={field.key} onClick={() => handleSort(field.key)}>
-                                            {field.label}
-                                            {sortConfig?.key === field.key && (
-                                                <span className="ml-auto text-xs">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-                                            )}
-                                        </DropdownMenuItem>
-                                    ))}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-
-                             <Button variant="ghost" size="icon" className="h-8 w-8 relative" onClick={() => setIsFilterSheetOpen(true)}>
-                                <Filter className="h-4 w-4" />
-                                {activeFilterCount > 0 && (
-                                    <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                                        {activeFilterCount}
-                                    </span>
-                                )}
-                             </Button>
-                        </div>
-                    </div>
-                )}
-            </div>
-        </div>
-
+        
         {/* Right Side */}
-        <div className="flex items-center gap-2 sm:gap-4">
+        <div className="flex items-center gap-2 md:order-3 sm:gap-4">
             {isOnline && (
               <>
                 <TooltipProvider>
@@ -350,6 +302,52 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
+        </div>
+
+        {/* Center Search */}
+        <div className="w-full md:flex-1 md:order-2 md:px-4">
+            {pathname === '/' && (
+                <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+                    <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="search"
+                        placeholder="Search assets..."
+                        className="pl-10 pr-20 w-full h-full bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        value={localSearchTerm}
+                        onChange={(e) => setLocalSearchTerm(e.target.value)}
+                    />
+                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Sort assets">
+                                    <ArrowUpDown className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {sortableFields.map(field => (
+                                    <DropdownMenuItem key={field.key} onClick={() => handleSort(field.key)}>
+                                        {field.label}
+                                        {sortConfig?.key === field.key && (
+                                            <span className="ml-auto text-xs">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                        )}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                         <Button variant="ghost" size="icon" className="h-8 w-8 relative" onClick={() => setIsFilterSheetOpen(true)}>
+                            <Filter className="h-4 w-4" />
+                            {activeFilterCount > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                         </Button>
+                    </div>
+                </div>
             )}
         </div>
       </header>
