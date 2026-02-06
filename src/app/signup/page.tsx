@@ -25,7 +25,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
 import { useAppState } from '@/contexts/app-state-context';
-import { updateSettings } from '@/lib/firestore';
+import { saveLocalSettings } from '@/lib/idb';
 import { NIGERIAN_STATES } from '@/lib/constants';
 import { Boxes, Loader2, AlertCircle } from 'lucide-react';
 import type { AuthorizedUser } from '@/lib/types';
@@ -62,7 +62,7 @@ export default function SignupPage() {
     },
   });
 
-  const onSubmit = (data: SignupFormValues) => {
+  const onSubmit = async (data: SignupFormValues) => {
     setIsSaving(true);
     setFormError(null);
 
@@ -95,20 +95,21 @@ export default function SignupPage() {
     };
 
     const newUsers = [...authorizedUsers, newUser];
+    const newSettings = { ...appSettings, authorizedUsers: newUsers };
 
     try {
-      updateSettings({ authorizedUsers: newUsers });
-      setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
+      setAppSettings(newSettings);
+      await saveLocalSettings(newSettings);
       
       toast({
-        title: 'Account Created!',
-        description: 'You can now sign in with your new credentials.',
+        title: 'Account Created Locally!',
+        description: 'You can now sign in on this device.',
       });
       
       router.push('/');
 
     } catch (e) {
-      setFormError('Failed to create account. Please try again later.');
+      setFormError('Failed to create account locally. Please try again later.');
       console.error(e);
     } finally {
       setIsSaving(false);
