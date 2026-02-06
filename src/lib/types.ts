@@ -95,7 +95,6 @@ export interface AppSettings {
   sheetDefinitions: Record<string, SheetDefinition>;
   enabledSheets: string[];
   lockAssetList: boolean;
-  autoSyncEnabled: boolean;
 }
 
 

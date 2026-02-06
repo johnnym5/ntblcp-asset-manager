@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -328,16 +327,6 @@ export default function AssetList() {
 
     loadInitialDataFromDb();
   }, [authInitialized, setAssets, setOfflineAssets]);
-
-  // Effect for handling automatic download when coming online or on initial load.
-  useEffect(() => {
-    if (isOnline && authInitialized && !isGuest && appSettings.autoSyncEnabled) {
-      const timer = setTimeout(() => {
-        performDownload();
-      }, 500); // Small delay to ensure UI is responsive
-      return () => clearTimeout(timer);
-    }
-  }, [isOnline, authInitialized, isGuest, appSettings.autoSyncEnabled, performDownload]);
 
   useEffect(() => {
     if (manualDownloadTrigger > 0) {

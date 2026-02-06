@@ -1,5 +1,4 @@
-
-'use client';
+"use client";
 
 import React, { useState } from 'react';
 import {
@@ -13,10 +12,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Loader2, KeyRound, UserPlus, Edit, Trash2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { AuthorizedUser, UserProfile } from '@/lib/types';
-import { useAuth } from '@/contexts/auth-context';
-import { useAppState } from '@/contexts/app-state-context';
-import { updateSettings } from '@/lib/firestore';
+import type { AuthorizedUser } from '@/lib/types';
 import { UserEditForm } from './user-edit-form';
 import {
   AlertDialog,
@@ -29,15 +25,18 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export function UserManagement() {
-  const { userProfile: adminProfile } = useAuth();
-  const { appSettings, setAppSettings } = useAppState();
+interface UserManagementProps {
+  users: AuthorizedUser[];
+  onUsersChange: (users: AuthorizedUser[]) => void;
+  adminProfile: { loginName: string } | null;
+}
+
+export function UserManagement({ users, onUsersChange, adminProfile }: UserManagementProps) {
   const { toast } = useToast();
   
   const [isEditFormOpen, setIsEditFormOpen] = useState(false);
   const [userToEdit, setUserToEdit] = useState<AuthorizedUser | null>(null);
   const [userToDelete, setUserToDelete] = useState<AuthorizedUser | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
 
   const handleAddNewUser = () => {
     setUserToEdit(null);
@@ -50,7 +49,7 @@ export function UserManagement() {
   };
 
   const handleSaveUser = async (userToSave: Partial<AuthorizedUser>, originalLoginName?: string) => {
-    let newUsers = [...appSettings.authorizedUsers];
+    let newUsers = [...users];
     
     const findIndex = originalLoginName 
       ? newUsers.findIndex(u => u.loginName === originalLoginName)
@@ -76,34 +75,19 @@ export function UserManagement() {
       newUsers.push(userToSave as AuthorizedUser);
     }
     
-    setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
-
-    try {
-      await updateSettings({ authorizedUsers: newUsers });
-      toast({ title: 'User Saved', description: `${userToSave.displayName} has been saved.` });
-      setIsEditFormOpen(false);
-    } catch (e) {
-      toast({ title: "Save Failed", description: "Could not save user data to the database.", variant: "destructive" });
-    }
+    onUsersChange(newUsers);
+    toast({ title: 'Staged Changes', description: `${userToSave.displayName} has been updated. Save settings to apply.` });
+    setIsEditFormOpen(false);
   };
 
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
-    setIsDeleting(true);
 
-    const newUsers = appSettings.authorizedUsers.filter(u => u.loginName !== userToDelete.loginName);
-
-    setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
-
-    try {
-      await updateSettings({ authorizedUsers: newUsers });
-      toast({ title: 'User Removed', description: `${userToDelete.displayName} has been removed from the system.` });
-    } catch (e) {
-      toast({ title: "Removal Failed", description: "Could not remove user from the database.", variant: "destructive" });
-    } finally {
-      setUserToDelete(null);
-      setIsDeleting(false);
-    }
+    const newUsers = users.filter(u => u.loginName !== userToDelete.loginName);
+    onUsersChange(newUsers);
+    
+    toast({ title: 'Staged Changes', description: `${userToDelete.displayName} will be removed. Save settings to apply.` });
+    setUserToDelete(null);
   };
   
   return (
@@ -124,7 +108,7 @@ export function UserManagement() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {appSettings.authorizedUsers.map(user => (
+            {users.map(user => (
               <TableRow key={user.loginName}>
                 <TableCell className="font-medium">{user.displayName}</TableCell>
                 <TableCell className="text-muted-foreground">{user.email}</TableCell>
@@ -155,14 +139,13 @@ export function UserManagement() {
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently remove <strong>{userToDelete?.displayName}</strong> from the system. This action cannot be undone.
+              This will stage <strong>{userToDelete?.displayName}</strong> for permanent removal from the system. This action cannot be undone once settings are saved.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} disabled={isDeleting} className="bg-destructive hover:bg-destructive/90">
-              {isDeleting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Yes, remove user
+            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive hover:bg-destructive/90">
+              Yes, stage for removal
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -164,7 +164,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     sheetDefinitions: HEADER_DEFINITIONS,
     enabledSheets: TARGET_SHEETS,
     lockAssetList: true,
-    autoSyncEnabled: true,
   });
 
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
@@ -238,7 +237,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         sheetDefinitions: settingsFromDb?.sheetDefinitions || HEADER_DEFINITIONS,
         enabledSheets: settingsFromDb?.enabledSheets || TARGET_SHEETS,
         lockAssetList: settingsFromDb?.lockAssetList ?? true,
-        autoSyncEnabled: settingsFromDb?.autoSyncEnabled ?? true,
       }));
     };
 

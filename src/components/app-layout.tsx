@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -298,9 +297,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                         ? 'Application is now connecting to the server.'
                                         : 'Application is running in offline mode.',
                                 });
-                                if (newIsOnline) {
-                                  setManualDownloadTrigger(c => c + 1);
-                                }
                             }}
                             aria-label={`Switch to ${isOnline ? 'Online' : 'Online'} mode`}
                         >

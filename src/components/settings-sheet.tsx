@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -17,6 +16,16 @@ import {
   TabsList,
   TabsTrigger,
 } from '@/components/ui/tabs';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -26,59 +35,88 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library, Wrench, PlaneTakeoff, Info } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library, Wrench, PlaneTakeoff, Info, Save } from 'lucide-react';
 import { SheetDefinitionForm } from './sheet-definition-form';
-import type { SheetDefinition } from '@/lib/types';
+import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { SingleSheetImportDialog } from './single-sheet-import-dialog';
 
-
 interface SettingsSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  openChangePassword: () => void;
 }
 
-export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: SettingsSheetProps) {
+export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { 
-    dataActions,
-    appSettings,
-    setAppSettings,
-  } = useAppState();
-
+  const { dataActions, appSettings, setAppSettings } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
-  const [isSaving, setIsSaving] = useState(false);
+  const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
-  const handleSettingChange = async (key: keyof AppSettings, value: any) => {
-    try {
-      await updateSettings({ [key]: value });
-      setAppSettings(prev => ({ ...prev, [key]: value }));
-    } catch (e) {
-      toast({ title: "Save Failed", description: "Could not save setting to the database.", variant: "destructive" });
+  useEffect(() => {
+    if (isOpen) {
+      setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
+    } else {
+      setDraftSettings(null);
     }
+  }, [isOpen, appSettings]);
+
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
+  }, [appSettings, draftSettings]);
+  
+  const calculatedChanges = useMemo(() => {
+    if (!draftSettings || !appSettings) return [];
+    const changes: string[] = [];
+    if (JSON.stringify(draftSettings.enabledSheets.sort()) !== JSON.stringify(appSettings.enabledSheets.sort())) {
+        changes.push(`Enabled sheets will be updated.`);
+    }
+    if (draftSettings.lockAssetList !== appSettings.lockAssetList) {
+        changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
+    }
+    if (JSON.stringify(draftSettings.authorizedUsers) !== JSON.stringify(appSettings.authorizedUsers)) {
+        const originalUsers = new Set(appSettings.authorizedUsers.map(u => u.loginName));
+        const newUsers = new Set(draftSettings.authorizedUsers.map(u => u.loginName));
+        const added = draftSettings.authorizedUsers.filter(u => !originalUsers.has(u.loginName));
+        const removed = appSettings.authorizedUsers.filter(u => !newUsers.has(u.loginName));
+        if(added.length > 0) changes.push(`${added.length} user(s) will be added.`);
+        if(removed.length > 0) changes.push(`${removed.length} user(s) will be removed.`);
+        if (added.length === 0 && removed.length === 0) changes.push('User details will be updated.');
+    }
+    if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
+      changes.push(`Sheet definitions (headers/columns) will be updated.`);
+    }
+    return changes;
+  }, [draftSettings, appSettings]);
+
+
+  const handleSettingChange = (key: keyof AppSettings, value: any) => {
+    if (!draftSettings) return;
+    setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
   };
 
-  const handleToggleSheet = async (sheetName: string, checked: boolean) => {
+  const handleToggleSheet = (sheetName: string, checked: boolean) => {
+    if (!draftSettings) return;
     let newEnabledSheets;
     if (checked) {
-      newEnabledSheets = [...appSettings.enabledSheets, sheetName];
+      newEnabledSheets = [...draftSettings.enabledSheets, sheetName];
     } else {
-      newEnabledSheets = appSettings.enabledSheets.filter(name => name !== sheetName);
+      newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetName);
     }
-    await handleSettingChange('enabledSheets', newEnabledSheets);
+    handleSettingChange('enabledSheets', newEnabledSheets);
   };
   
   const handleToggleAll = (enable: boolean) => {
-    const allSheetNames = Object.keys(appSettings.sheetDefinitions);
+    if (!draftSettings) return;
+    const allSheetNames = Object.keys(draftSettings.sheetDefinitions);
     handleSettingChange('enabledSheets', enable ? allSheetNames : []);
   };
 
@@ -89,26 +127,24 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   };
 
   const handleEditSheet = (sheetName: string) => {
-    setSheetToEdit(appSettings.sheetDefinitions[sheetName]);
+    if (!draftSettings) return;
+    setSheetToEdit(draftSettings.sheetDefinitions[sheetName]);
     setOriginalSheetName(sheetName);
     setIsSheetFormOpen(true);
   };
   
-  const handleDeleteSheet = async (sheetNameToDelete: string) => {
-    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
+  const handleDeleteSheet = (sheetNameToDelete: string) => {
+    if (!draftSettings) return;
+    const newSheetDefinitions = { ...draftSettings.sheetDefinitions };
     delete newSheetDefinitions[sheetNameToDelete];
-    
-    const newEnabledSheets = appSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
-
-    await handleSettingChange('sheetDefinitions', newSheetDefinitions);
-    await handleSettingChange('enabledSheets', newEnabledSheets);
-
-    toast({ title: "Sheet Deleted", description: `'${sheetNameToDelete}' definition has been removed.`})
+    const newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
+    setDraftSettings(prev => prev ? ({ ...prev, sheetDefinitions: newSheetDefinitions, enabledSheets: newEnabledSheets }) : null);
   };
 
-  const handleSaveSheet = async (sheet: SheetDefinition) => {
-    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
-    let newEnabledSheets = [...appSettings.enabledSheets];
+  const handleSaveSheet = (sheet: SheetDefinition) => {
+    if (!draftSettings) return;
+    const newSheetDefinitions = { ...draftSettings.sheetDefinitions };
+    let newEnabledSheets = [...draftSettings.enabledSheets];
     
     if (originalSheetName && originalSheetName !== sheet.name) {
       delete newSheetDefinitions[originalSheetName];
@@ -119,16 +155,11 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
       newEnabledSheets.push(sheet.name);
     }
     
-    const settingsToUpdate = {
-      sheetDefinitions: {
-        ...newSheetDefinitions,
-        [sheet.name]: sheet,
-      },
-      enabledSheets: newEnabledSheets
-    };
-
-    await handleSettingChange('sheetDefinitions', settingsToUpdate.sheetDefinitions);
-    await handleSettingChange('enabledSheets', settingsToUpdate.enabledSheets);
+    setDraftSettings(prev => prev ? ({ 
+        ...prev, 
+        sheetDefinitions: { ...newSheetDefinitions, [sheet.name]: sheet },
+        enabledSheets: newEnabledSheets
+    }) : null);
   };
 
   const handleImportTemplate = () => {
@@ -136,13 +167,14 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
   };
 
   const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!draftSettings) return;
     const file = event.target.files?.[0];
     if (!file) return;
 
     try {
       const templates = await parseExcelForTemplate(file);
-      let currentDefs = appSettings.sheetDefinitions;
-      let currentEnabled = appSettings.enabledSheets;
+      let currentDefs = draftSettings.sheetDefinitions;
+      let currentEnabled = draftSettings.enabledSheets;
       
       templates.forEach(template => {
         currentDefs[template.name] = template;
@@ -151,21 +183,35 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         }
       });
       
-      await handleSettingChange('sheetDefinitions', currentDefs);
-      await handleSettingChange('enabledSheets', currentEnabled);
+      handleSettingChange('sheetDefinitions', currentDefs);
+      handleSettingChange('enabledSheets', currentEnabled);
 
-      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added or updated.` });
+      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added/updated in your draft.` });
     } catch (error) {
       toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
   };
+
+  const handleConfirmSave = async () => {
+    if (!draftSettings) return;
+    try {
+      await updateSettings(draftSettings);
+      setAppSettings(draftSettings); // Update global state
+      toast({ title: "Settings Saved", description: "Your changes have been applied to the database." });
+    } catch (e) {
+      toast({ title: "Save Failed", description: "Could not save settings to the database.", variant: "destructive" });
+    } finally {
+      setIsConfirmOpen(false);
+      onOpenChange(false);
+    }
+  };
   
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
   
-  if (!appSettings?.sheetDefinitions) {
+  if (!draftSettings) {
     return (
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="flex items-center justify-center">
@@ -175,14 +221,14 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
     );
   }
 
-  const allSheetNames = Object.keys(appSettings.sheetDefinitions);
-  const allEnabled = allSheetNames.length > 0 && appSettings.enabledSheets.length === allSheetNames.length;
-  const noneEnabled = appSettings.enabledSheets.length === 0;
+  const allSheetNames = Object.keys(draftSettings.sheetDefinitions);
+  const allEnabled = allSheetNames.length > 0 && draftSettings.enabledSheets.length === allSheetNames.length;
+  const noneEnabled = draftSettings.enabledSheets.length === 0;
 
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-md flex flex-col">
+        <SheetContent className="w-full sm:max-w-xl flex flex-col">
           <SheetHeader>
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
@@ -241,14 +287,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                           <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
                           <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
                         </div>
-                        <Switch id="lock-assets" checked={appSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
-                      </div>
-                      <div className="flex items-center justify-between pt-4">
-                        <div className="space-y-1">
-                          <Label htmlFor="autosync-assets" className="text-sm">Enable Automatic Sync</Label>
-                          <p className="text-xs text-muted-foreground">Automatically sync with the cloud when online.</p>
-                        </div>
-                        <Switch id="autosync-assets" checked={appSettings.autoSyncEnabled} onCheckedChange={(checked) => handleSettingChange('autoSyncEnabled', checked)}/>
+                        <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
                       </div>
                     </div>
                   </div>
@@ -267,7 +306,7 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
                           {allSheetNames.map(sheetName => (
                             <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
                               <div className="flex items-center">
-                                <Switch id={`switch-${sheetName}`} checked={appSettings.enabledSheets.includes(sheetName)} onCheckedChange={(checked) => handleToggleSheet(sheetName, checked)}/>
+                                <Switch id={`switch-${sheetName}`} checked={draftSettings.enabledSheets.includes(sheetName)} onCheckedChange={(checked) => handleToggleSheet(sheetName, checked)}/>
                                 <Label htmlFor={`switch-${sheetName}`} className="text-sm pl-2 cursor-pointer">{sheetName}</Label>
                               </div>
                               <div className="flex items-center gap-1">
@@ -289,25 +328,27 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
 
             </TabsContent>
             <TabsContent value="account" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
-                <div className="pt-4">
-                  <h3 className="text-lg font-medium mb-4">My Account</h3>
-                  <div className="rounded-lg border p-3 space-y-2">
-                    <Button variant="outline" className="w-full justify-start" onClick={() => { onOpenChange(false); openChangePassword(); }} disabled={isGuest}><KeyRound className="mr-2 h-4 w-4"/>Change Password</Button>
-                  </div>
-                </div>
                 {isAdmin && (
                   <div>
                     <h3 className="text-lg font-medium mb-4">User Management</h3>
                     <div className="p-1">
-                      <UserManagement />
+                      <UserManagement 
+                        users={draftSettings.authorizedUsers}
+                        onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)}
+                        adminProfile={userProfile}
+                      />
                     </div>
                   </div>
                 )}
             </TabsContent>
           </Tabs>
 
-          <SheetFooter className="mt-auto pt-4 border-t">
-            <SheetClose asChild><Button variant="outline">Close</Button></SheetClose>
+          <SheetFooter className="mt-auto pt-4 border-t sm:justify-between">
+            <SheetClose asChild><Button variant="outline">Cancel</Button></SheetClose>
+            <Button onClick={() => setIsConfirmOpen(true)} disabled={!hasChanges}>
+                <Save className="mr-2 h-4 w-4" />
+                Save Changes
+            </Button>
           </SheetFooter>
         </SheetContent>
       </Sheet>
@@ -323,6 +364,29 @@ export function SettingsSheet({ isOpen, onOpenChange, openChangePassword }: Sett
         isOpen={isSingleSheetImportOpen}
         onOpenChange={setIsSingleSheetImportOpen}
       />
+
+      <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirm Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to save these changes to the database? This will affect all users.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          {calculatedChanges.length > 0 && (
+             <div className="py-4 text-sm text-foreground">
+                <p className="font-semibold mb-2">Summary of changes:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                    {calculatedChanges.map((change, i) => <li key={i}>{change}</li>)}
+                </ul>
+            </div>
+          )}
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSave}>Confirm & Save</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </>
   );
 }
