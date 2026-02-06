@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
@@ -66,6 +65,7 @@ interface AppStateContextType {
   // App Settings
   appSettings: AppSettings;
   setAppSettings: Dispatch<SetStateAction<AppSettings>>;
+  settingsLoaded: boolean;
   
   // Sync Settings
   manualDownloadTrigger: number;
@@ -120,6 +120,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     lockAssetList: true,
     appMode: 'management',
   });
+  const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
   const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
@@ -151,6 +152,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         await saveLocalSettings(settings);
       }
       setAppSettings(settings);
+      setSettingsLoaded(true);
     };
 
     initializeSettings();
@@ -178,6 +180,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     statusOptions, setStatusOptions,
     sortConfig, setSortConfig,
     appSettings, setAppSettings,
+    settingsLoaded,
     manualDownloadTrigger, setManualDownloadTrigger,
     manualUploadTrigger, setManualUploadTrigger,
     isSyncing, setIsSyncing,

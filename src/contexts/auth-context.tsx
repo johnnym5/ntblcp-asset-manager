@@ -35,18 +35,20 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { appSettings } = useAppState();
+  const { appSettings, settingsLoaded } = useAppState();
 
   useEffect(() => {
-    // This effect runs when the authorized user list is loaded or changed.
-    // It checks for a profile in local storage and validates it.
+    if (!settingsLoaded) {
+      // Don't validate auth until the app settings (and thus authorized users) have been loaded.
+      return;
+    }
+
     try {
       const savedProfile = localStorage.getItem('ntblcp-user-profile');
       if (savedProfile) {
         const profile: LocalUserProfile = JSON.parse(savedProfile);
         
         // Check if the user from local storage is still in the authorized list.
-        // This will correctly return undefined if appSettings.authorizedUsers is empty.
         const authorizedUser = appSettings.authorizedUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
@@ -75,7 +77,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       setAuthInitialized(true);
     }
-  }, [appSettings.authorizedUsers]);
+  }, [settingsLoaded, appSettings.authorizedUsers]);
 
   const login = async (user: AuthorizedUser, state: string) => {
     setLoading(true);
