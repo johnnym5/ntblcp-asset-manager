@@ -1,3 +1,4 @@
+
 'use client';
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
@@ -7,6 +8,8 @@ import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError } from '@/lib/errors';
 import { addNotification } from '@/hooks/use-notifications';
 import { ref, set } from 'firebase/database';
+import { getLocalAssets as getLocalAssetsFromDb } from './idb';
+
 
 // Helper function to ensure Firebase is properly configured before use.
 const checkConfig = () => {
@@ -183,11 +186,11 @@ export async function copyAssetsToRealtimeDB(): Promise<void> {
     }
 
     try {
-        addNotification({ title: 'Starting copy...', description: 'Fetching all assets from Firestore.' });
-        const assets = await getAssets();
+        addNotification({ title: 'Starting copy...', description: 'Fetching all local assets from your device.' });
+        const assets = await getLocalAssetsFromDb();
         
         if (assets.length === 0) {
-            addNotification({ title: 'No Assets Found', description: 'There are no assets in Firestore to copy.' });
+            addNotification({ title: 'No Local Assets Found', description: 'There are no assets stored on this device to copy.' });
             return;
         }
 
