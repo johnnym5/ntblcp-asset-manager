@@ -126,6 +126,7 @@ export interface ScannedSheetInfo {
   sheetName: string;
   definitionName: string;
   rowCount: number;
+  headers: string[];
 }
 
 export async function scanExcelFile(
@@ -151,11 +152,13 @@ export async function scanExcelFile(
                 if (headerRowIndex !== -1) {
                     const dataRows = sheetData.slice(headerRowIndex + 1);
                     const rowCount = dataRows.filter(row => Array.isArray(row) && row.some(cell => cell !== null && String(cell).trim() !== '')).length;
+                    const headers = sheetData[headerRowIndex].filter(h => h !== null).map(String);
                     
                     scannedSheets.push({
                         sheetName: sheetName,
                         definitionName: defName,
                         rowCount: rowCount,
+                        headers: headers,
                     });
                     
                     break; 
@@ -198,7 +201,7 @@ export async function parseExcelFile(
             ? sheetsToImport 
             : enabledSheets.map(defName => {
                 const actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader(defName)));
-                return actualSheetName ? { sheetName: actualSheetName, definitionName: defName, rowCount: 0 } : null;
+                return actualSheetName ? { sheetName: actualSheetName, definitionName: defName, rowCount: 0, headers: [] } : null;
             }).filter(Boolean) as ScannedSheetInfo[];
 
         for (const { sheetName, definitionName } of processList) {
