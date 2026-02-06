@@ -34,12 +34,14 @@ interface ColumnCustomizationSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   sheetDefinition: SheetDefinition;
+  onSave: (newDefinition: SheetDefinition) => void;
 }
 
 export function ColumnCustomizationSheet({
   isOpen,
   onOpenChange,
   sheetDefinition,
+  onSave,
 }: ColumnCustomizationSheetProps) {
   const [editedName, setEditedName] = useState('');
   const [editedFields, setEditedFields] = useState<DisplayField[]>([]);
@@ -103,28 +105,14 @@ export function ColumnCustomizationSheet({
   };
   
   const handleApplyToOne = () => {
-    if (typeof window !== 'undefined' && !navigator.onLine) {
-        toast({ title: 'Offline', description: 'Saving settings requires an internet connection.', variant: 'destructive' });
-        return;
-    }
     const newDefinition: SheetDefinition = {
       ...sheetDefinition,
       name: editedName,
       headers: editedFields.map(f => f.label),
       displayFields: editedFields,
     };
-    const newSheetDefinitions = {
-        ...appSettings.sheetDefinitions,
-        [newDefinition.name]: newDefinition,
-    };
-    try {
-        updateSettings({ sheetDefinitions: newSheetDefinitions });
-        setAppSettings(prev => ({...prev, sheetDefinitions: newSheetDefinitions}));
-        toast({ title: "Layout Saved", description: `Column settings for ${newDefinition.name} have been saved for all users.`});
-        onOpenChange(false);
-    } catch (e) {
-        toast({ title: "Error", description: "Could not save settings to the database.", variant: "destructive" });
-    }
+    onSave(newDefinition);
+    onOpenChange(false);
   }
 
   const handleApplyToAll = () => {
@@ -138,7 +126,7 @@ export function ColumnCustomizationSheet({
     for (const sheetName in newSheetDefinitions) {
         newSheetDefinitions[sheetName] = {
             ...newSheetDefinitions[sheetName],
-            displayFields: templateFields,
+            displayFields: templateFields.map(f => ({...f})), // Create copies
             headers: templateFields.map(f => f.label),
         };
     }
@@ -160,7 +148,7 @@ export function ColumnCustomizationSheet({
         <SheetHeader>
           <SheetTitle>Customize Sheet Layout</SheetTitle>
           <SheetDescription>
-            Reorder fields and edit their labels. To prevent data loss, renaming a sheet is disabled.
+            Reorder fields, edit labels, and control visibility on desktop vs. mobile. Renaming a sheet is disabled to prevent data loss.
           </SheetDescription>
         </SheetHeader>
         <div className="px-1 py-4">
@@ -172,6 +160,7 @@ export function ColumnCustomizationSheet({
             <div className="w-16"></div>
             <div className="flex-1">Field Label (Header Name)</div>
             <div className="w-24 text-center">In Table</div>
+            <div className="w-24 text-center">Quick View</div>
           </div>
           <ScrollArea className="flex-1">
             <div className="space-y-1 p-2">
@@ -198,6 +187,13 @@ export function ColumnCustomizationSheet({
                       checked={field.table}
                       onCheckedChange={() => handleToggle(index, 'table')}
                       aria-label={`Show ${field.label} in table`}
+                    />
+                  </div>
+                  <div className="w-24 flex justify-center">
+                    <Switch
+                      checked={field.quickView}
+                      onCheckedChange={() => handleToggle(index, 'quickView')}
+                      aria-label={`Show ${field.label} in quick view`}
                     />
                   </div>
                 </div>
@@ -236,3 +232,5 @@ export function ColumnCustomizationSheet({
     </Sheet>
   );
 }
+
+    

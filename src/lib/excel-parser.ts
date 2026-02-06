@@ -1,6 +1,6 @@
 
 import * as XLSX from 'xlsx';
-import type { Asset, AppSettings, SheetDefinition } from './types';
+import type { Asset, AppSettings, SheetDefinition, DisplayField } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, IHVN_SUB_SHEET_DEFINITIONS } from './constants';
 import { Timestamp } from 'firebase/firestore';
@@ -366,14 +366,39 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
         const normalizedRow = row.map(normalizeHeader);
         const matchCount = normalizedRow.filter(h => allPossibleHeaders.has(h)).length;
 
-        if (matchCount > 5) {
+        if (matchCount > 5) { // If we match a good number of known headers, treat it as a template
             const headerRow = row.map(h => String(h || '').trim()).filter(h => h);
-            
-            templates.push({
-                name: sheetName,
-                headers: headerRow,
-                displayFields: [], // Let the main app generate default display fields
-            });
+            const displayFields: DisplayField[] = [];
+
+            for (const header of headerRow) {
+                const normalizedHeader = normalizeHeader(header);
+                let fieldKey: keyof Asset | undefined;
+
+                for (const key in HEADER_ALIASES) {
+                    if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES].map(a => normalizeHeader(a)).includes(normalizedHeader)) {
+                        fieldKey = key as keyof Asset;
+                        break;
+                    }
+                }
+
+                if (fieldKey) {
+                    const showInTable = ['sn', 'description', 'assetIdCode', 'location', 'assignee', 'verifiedStatus'].includes(fieldKey);
+                    displayFields.push({
+                        key: fieldKey,
+                        label: header,
+                        table: showInTable,
+                        quickView: showInTable,
+                    });
+                }
+            }
+
+            if (displayFields.length > 0) {
+                 templates.push({
+                    name: sheetName,
+                    headers: headerRow,
+                    displayFields: displayFields,
+                });
+            }
             break; 
         }
     }
@@ -385,3 +410,5 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
 
   return templates;
 }
+
+    

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -430,11 +431,15 @@ export default function AssetList() {
   }, [manualUploadTrigger, handleUploadScan]);
   
   useEffect(() => {
-    setStatusOptions([
-      { value: "Verified", label: "Verified" },
-      { value: "Unverified", label: "Unverified" },
-    ]);
-  }, [setStatusOptions]);
+    if (appSettings.appMode === 'verification') {
+        setStatusOptions([
+            { value: "Verified", label: "Verified" },
+            { value: "Unverified", label: "Unverified" },
+        ]);
+    } else {
+        setStatusOptions([]);
+    }
+  }, [appSettings.appMode, setStatusOptions]);
 
   const allAssetsForFiltering = useMemo(() => {
     const currentAssets = dataSource === 'cloud' ? assets : offlineAssets;
@@ -1521,10 +1526,15 @@ export default function AssetList() {
   const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
   
   const currentSheetDefinition = sheetDefinitions[currentCategory!];
+  
   let tableFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.table) || [];
+  let quickViewFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.quickView) || [];
+
   if (appSettings.appMode === 'management') {
     tableFields = tableFields.filter(f => f.key !== 'verifiedStatus');
+    quickViewFields = quickViewFields.filter(f => f.key !== 'verifiedStatus');
   }
+  
   const backButtonTarget = 'dashboard';
 
 
@@ -1620,7 +1630,7 @@ export default function AssetList() {
                                 </TableCell>
                                 {tableFields.map(field => (
                                   <TableCell key={field.key} onClick={field.key === 'verifiedStatus' ? (e) => e.stopPropagation() : undefined}>
-                                    {field.key === 'verifiedStatus' ? (
+                                    {field.key === 'verifiedStatus' && appSettings.appMode === 'verification' ? (
                                       <Select
                                         value={asset.verifiedStatus || 'Unverified'}
                                         onValueChange={async (status) => {
@@ -1739,7 +1749,7 @@ export default function AssetList() {
                       </CardHeader>
                       <CardContent className="p-4 pt-0" onClick={() => handleViewAsset(asset)}>
                           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                              {tableFields.map(field => {
+                              {quickViewFields.map(field => {
                                   if (['description', 'category', 'verifiedStatus'].includes(field.key)) return null;
                                   return (
                                       <div key={field.key} className="space-y-1">
@@ -1833,3 +1843,5 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
