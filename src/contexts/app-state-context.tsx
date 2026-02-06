@@ -101,7 +101,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
   const [statusOptions, setStatusOptions] = useState<OptionType[]>([]);
   
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'description', direction: 'asc' });
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'sn', direction: 'asc' });
 
   const [appSettings, setAppSettings] = useState<AppSettings>({
     authorizedUsers: [],

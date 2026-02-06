@@ -51,6 +51,7 @@ import {
   PlusCircle,
   ScanSearch,
   Library,
+  CloudOff,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -589,8 +590,8 @@ export default function AssetList() {
       return;
     }
     if (lockAssetList && isAdmin && dataSource === 'cloud') {
-      addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
-      return;
+        addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
+        return;
     }
     setSelectedAsset(asset);
     setIsFormReadOnly(false);
@@ -1282,14 +1283,9 @@ export default function AssetList() {
     return (
       <div className="flex flex-col h-full gap-4">
         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
-        <div className="flex flex-wrap items-center gap-2">
-            <h2 className="text-2xl font-bold tracking-tight flex-1">
-                {isFiltered ? 'Filter Results' : 'Asset Dashboard'}
-            </h2>
-        </div>
         <Card>
             <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div>
+                  <div className='flex-1'>
                     <CardTitle className="flex items-center gap-2">
                       <span>Verification Status</span>
                       <TooltipProvider>
@@ -1417,7 +1413,7 @@ export default function AssetList() {
                   </p>
               </CardContent>
                {selectedCategories.length > 0 && (
-                <CardFooter className="bg-muted/50 p-2 border-t flex items-center gap-2">
+                <CardFooter className="bg-muted/50 p-2 border-t flex flex-wrap items-center gap-2">
                     <span className="text-sm font-medium text-muted-foreground">{selectedCategories.length} selected</span>
                     <Separator orientation="vertical" className="h-6"/>
                     <Button variant="ghost" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
@@ -1567,106 +1563,203 @@ export default function AssetList() {
         
         <Card className="flex-1 flex flex-col overflow-hidden">
             <div className="flex-grow overflow-y-auto">
-              <Table className="relative">
-                  <TableHeader className="sticky top-0 bg-background z-10">
-                      <TableRow>
-                          <TableHead className="w-[50px]">
+               {/* Desktop Table */}
+              <div className="hidden md:block">
+                <Table className="relative">
+                    <TableHeader className="sticky top-0 bg-background z-10">
+                        <TableRow>
+                            <TableHead className="w-[50px]">
+                                <Checkbox
+                                    checked={areAllCategoryResultsSelected}
+                                    onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
+                                    aria-label="Select all in this category"
+                                    disabled={isGuest}
+                                />
+                            </TableHead>
+                            {tableFields.map(field => (
+                              <TableHead key={field.key}>{field.label}</TableHead>
+                            ))}
+                            <TableHead className="w-[100px] text-right">Actions</TableHead>
+                        </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                        {paginatedCategoryAssets.length > 0 ? (
+                        paginatedCategoryAssets.map((asset) => (
+                            <TableRow 
+                              key={asset.id}
+                              data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''} 
+                              onClick={() => handleViewAsset(asset)}
+                              className="cursor-pointer"
+                            >
+                                <TableCell onClick={e => e.stopPropagation()}>
+                                    <Checkbox 
+                                        checked={selectedAssetIds.includes(asset.id)}
+                                        onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
+                                        aria-label={`Select asset ${asset.description}`}
+                                        disabled={isGuest}
+                                    />
+                                </TableCell>
+                                {tableFields.map(field => (
+                                  <TableCell key={field.key} onClick={field.key === 'verifiedStatus' ? (e) => e.stopPropagation() : undefined}>
+                                    {field.key === 'verifiedStatus' ? (
+                                      <Select
+                                        value={asset.verifiedStatus || 'Unverified'}
+                                        onValueChange={async (status) => {
+                                          if (lockAssetList && isAdmin && dataSource === 'cloud') {
+                                              addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
+                                              return;
+                                          }
+                                          const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
+                                          await handleQuickSaveAsset(asset.id, {
+                                              verifiedStatus: status as 'Verified' | 'Unverified',
+                                              verifiedDate,
+                                              remarks: asset.remarks,
+                                              condition: asset.condition,
+                                          });
+                                          addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
+                                        }}
+                                      >
+                                        <SelectTrigger className={cn("w-[130px] h-8 text-xs font-medium", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                          <SelectValue placeholder="Select status" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                          <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-3 w-3"/>Unverified</div></SelectItem>
+                                          <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-3 w-3"/>Verified</div></SelectItem>
+                                        </SelectContent>
+                                      </Select>
+                                    ) : (
+                                      <span className="flex items-center gap-2">
+                                        {field.key === 'description' && asset.syncStatus === 'local' && (
+                                            <TooltipProvider><Tooltip><TooltipTrigger><CloudOff className="h-4 w-4 text-blue-500" /></TooltipTrigger><TooltipContent><p>Local changes not synced</p></TooltipContent></Tooltip></TooltipProvider>
+                                        )}
+                                        {String(asset[field.key] ?? 'N/A')}
+                                      </span>
+                                    )}
+                                  </TableCell>
+                                ))}
+                                <TableCell className="text-right">
+                                  <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
+                                    <DropdownMenu>
+                                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                    <DropdownMenuContent align="end">
+                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewAsset(asset); }}>
+                                            <FolderSearch className="mr-2 h-4 w-4" />
+                                            View Details
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }} disabled={!userProfile?.canEditAssets && !isAdmin}>
+                                            <Edit className="mr-2 h-4 w-4" />
+                                            Edit Full Details
+                                        </DropdownMenuItem>
+                                        <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20" disabled={!isAdmin}>
+                                            <Trash2 className="mr-2 h-4 w-4" />
+                                            Delete
+                                        </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                    </DropdownMenu>
+                                  </div>
+                                </TableCell>
+                            </TableRow>
+                        ))
+                        ) : (
+                            <TableRow><TableCell colSpan={tableFields.length + 2} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
+                        )}
+                    </TableBody>
+                </Table>
+              </div>
+
+               {/* Mobile Cards */}
+              <div className="md:hidden space-y-4 p-2 sm:p-4">
+                {paginatedCategoryAssets.length > 0 ? (
+                  paginatedCategoryAssets.map((asset) => (
+                    <Card
+                      key={asset.id}
+                      data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''}
+                      className="data-[state=selected]:ring-2 data-[state=selected]:ring-primary"
+                    >
+                      <CardHeader className="flex flex-row items-center space-x-4 p-4">
+                          <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
                               <Checkbox
-                                  checked={areAllCategoryResultsSelected}
-                                  onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
-                                  aria-label="Select all in this category"
+                                  checked={selectedAssetIds.includes(asset.id)}
+                                  onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
+                                  aria-label={`Select asset ${asset.description}`}
                                   disabled={isGuest}
                               />
-                          </TableHead>
-                          {tableFields.map(field => (
-                            <TableHead key={field.key}>{field.label}</TableHead>
-                          ))}
-                          <TableHead className="w-[100px] text-right">Actions</TableHead>
-                      </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                      {paginatedCategoryAssets.length > 0 ? (
-                      paginatedCategoryAssets.map((asset) => (
-                          <TableRow 
-                            key={asset.id}
-                            data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''} 
-                            onClick={() => handleViewAsset(asset)}
-                            className={cn(
-                                "cursor-pointer",
-                                asset.verifiedStatus === 'Verified' && 'border-l-4 border-l-green-500',
-                                asset.verifiedStatus === 'Unverified' && 'border-l-4 border-l-red-500',
-                                asset.verifiedStatus === 'Discrepancy' && 'border-l-4 border-l-yellow-500'
-                            )}
-                          >
-                              <TableCell onClick={e => e.stopPropagation()}>
-                                  <Checkbox 
-                                      checked={selectedAssetIds.includes(asset.id)}
-                                      onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
-                                      aria-label={`Select asset ${asset.description}`}
-                                      disabled={isGuest}
-                                  />
-                              </TableCell>
-                              {tableFields.map(field => (
-                                <TableCell key={field.key} onClick={field.key === 'verifiedStatus' ? (e) => e.stopPropagation() : undefined}>
-                                  {field.key === 'verifiedStatus' ? (
-                                    <Select
-                                      value={asset.verifiedStatus || 'Unverified'}
-                                      onValueChange={async (status) => {
-                                        if (lockAssetList && isAdmin && dataSource === 'cloud') {
-                                            addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
-                                            return;
-                                        }
-                                        const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
-                                        await handleQuickSaveAsset(asset.id, {
-                                            verifiedStatus: status as 'Verified' | 'Unverified',
-                                            verifiedDate,
-                                            remarks: asset.remarks,
-                                            condition: asset.condition,
-                                        });
-                                        addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
-                                      }}
-                                    >
-                                      <SelectTrigger className={cn("w-[130px] h-8 text-xs font-medium", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                        <SelectValue placeholder="Select status" />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-3 w-3"/>Unverified</div></SelectItem>
-                                        <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-3 w-3"/>Verified</div></SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  ) : (
-                                    <span>{String(asset[field.key] ?? 'N/A')}</span>
+                          </div>
+                          <div className="flex-1 min-w-0" onClick={() => handleViewAsset(asset)}>
+                              <CardTitle className="text-base truncate">{asset.description || 'No Description'}</CardTitle>
+                              <CardDescription className="flex items-center gap-2">
+                                  {asset.syncStatus === 'local' && (
+                                      <TooltipProvider>
+                                          <Tooltip>
+                                              <TooltipTrigger>
+                                                  <CloudOff className="h-4 w-4 text-blue-500" />
+                                              </TooltipTrigger>
+                                              <TooltipContent><p>Local changes not synced</p></TooltipContent>
+                                          </Tooltip>
+                                      </TooltipProvider>
                                   )}
-                                </TableCell>
-                              ))}
-                              <TableCell className="text-right">
-                                <div className="flex items-center justify-end gap-2" onClick={e => e.stopPropagation()}>
-                                  <DropdownMenu>
-                                  <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                  <DropdownMenuContent align="end">
-                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewAsset(asset); }}>
-                                          <FolderSearch className="mr-2 h-4 w-4" />
-                                          View Details
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }} disabled={!userProfile?.canEditAssets && !isAdmin}>
-                                          <Edit className="mr-2 h-4 w-4" />
-                                          Edit Full Details
-                                      </DropdownMenuItem>
-                                      <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={(e) => { e.stopPropagation(); setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20" disabled={!isAdmin}>
-                                          <Trash2 className="mr-2 h-4 w-4" />
-                                          Delete
-                                      </DropdownMenuItem>
-                                  </DropdownMenuContent>
-                                  </DropdownMenu>
-                                </div>
-                              </TableCell>
-                          </TableRow>
-                      ))
-                      ) : (
-                          <TableRow><TableCell colSpan={tableFields.length + 2} className="text-center h-24">No assets found matching your criteria.</TableCell></TableRow>
-                      )}
-                  </TableBody>
-              </Table>
+                                  {asset.category}
+                              </CardDescription>
+                          </div>
+                          <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                    <DropdownMenuItem onClick={() => handleViewAsset(asset)}>
+                                        <FolderSearch className="mr-2 h-4 w-4" /> View
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => handleEditAsset(asset)} disabled={!userProfile?.canEditAssets && !isAdmin}>
+                                        <Edit className="mr-2 h-4 w-4" /> Edit
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={() => { setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20" disabled={!isAdmin}>
+                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                          </div>
+                      </CardHeader>
+                      <CardContent className="p-4 pt-0" onClick={() => handleViewAsset(asset)}>
+                          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                              {tableFields.map(field => {
+                                  if (['description', 'category', 'verifiedStatus'].includes(field.key)) return null;
+                                  return (
+                                      <div key={field.key} className="space-y-1">
+                                          <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
+                                          <p className="text-sm font-medium truncate">{String(asset[field.key] ?? 'N/A')}</p>
+                                      </div>
+                                  )
+                              })}
+                          </div>
+                          <div className="mt-4" onClick={e => e.stopPropagation()}>
+                              <p className="text-xs font-medium text-muted-foreground mb-1">Verified Status</p>
+                              <Select
+                                  value={asset.verifiedStatus || 'Unverified'}
+                                  onValueChange={async (status) => {
+                                    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+                                        addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
+                                        return;
+                                    }
+                                    const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
+                                    await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate, remarks: asset.remarks, condition: asset.condition });
+                                    addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
+                                  }}
+                                >
+                                <SelectTrigger className={cn("h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                  <SelectValue placeholder="Select status" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-3 w-3"/>Unverified</div></SelectItem>
+                                    <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-3 w-3"/>Verified</div></SelectItem>
+                                </SelectContent>
+                              </Select>
+                          </div>
+                      </CardContent>
+                    </Card>
+                  ))
+                ) : (
+                  <div className="text-center py-24 text-muted-foreground">No assets found matching your criteria.</div>
+                )}
+              </div>
             </div>
             <CardFooter className="border-t pt-4">
                <PaginationControls 
@@ -1719,9 +1812,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
-
-    
-
-    
