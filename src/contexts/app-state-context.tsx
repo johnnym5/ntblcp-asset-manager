@@ -15,6 +15,16 @@ export interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
+export interface DataActions {
+  onImport?: () => void;
+  onScanAndImport?: () => void;
+  onExport?: () => void;
+  onAddAsset?: () => void;
+  onClearAll?: () => void;
+  onTravelReport?: () => void;
+  isImporting?: boolean;
+}
+
 interface AppStateContextType {
   assets: Asset[];
   setAssets: Dispatch<SetStateAction<Asset[]>>;
@@ -74,6 +84,8 @@ interface AppStateContextType {
   // Cross-component communication
   assetToView: Asset | null;
   setAssetToView: Dispatch<SetStateAction<Asset | null>>;
+  dataActions: DataActions;
+  setDataActions: Dispatch<SetStateAction<DataActions>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -120,6 +132,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
+  const [dataActions, setDataActions] = useState<DataActions>({});
+
 
   useEffect(() => {
     const initializeSettings = async () => {
@@ -193,7 +207,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     unreadInboxCount, setUnreadInboxCount,
     dismissedActivities, setDismissedActivities,
     dataSource, setDataSource,
-    assetToView, setAssetToView
+    assetToView, setAssetToView,
+    dataActions, setDataActions,
   };
 
   return (

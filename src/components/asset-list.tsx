@@ -210,7 +210,8 @@ export default function AssetList() {
     manualUploadTrigger,
     isSyncing, setIsSyncing,
     searchTerm,
-    assetToView, setAssetToView
+    assetToView, setAssetToView,
+    setDataActions,
   } = useAppState();
 
   const { enabledSheets, lockAssetList, sheetDefinitions } = appSettings;
@@ -962,6 +963,25 @@ export default function AssetList() {
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
 
+  useEffect(() => {
+    setDataActions({
+        onAddAsset: handleAddAsset,
+        onImport: handleImportClick,
+        onScanAndImport: () => setIsImportScanOpen(true),
+        onClearAll: handleClearAllClick,
+        onTravelReport: handleTravelReport,
+        isImporting,
+    });
+    return () => setDataActions({});
+  }, [
+    setDataActions, 
+    handleAddAsset, 
+    handleImportClick, 
+    handleClearAllClick, 
+    handleTravelReport, 
+    isImporting
+  ]);
+
   const handleClearCategoryClick = useCallback((category: string) => {
     setCategoryToDelete(category);
     setIsClearCategoryDialogOpen(true);
@@ -1354,7 +1374,7 @@ export default function AssetList() {
                         </SelectContent>
                       </Select>
                     )}
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center justify-start gap-4">
                       <div className="flex items-center space-x-2">
                         <Label htmlFor="select-all-categories" className="text-sm font-medium whitespace-nowrap">Select All</Label>
                         <Checkbox
@@ -1365,43 +1385,9 @@ export default function AssetList() {
                             disabled={isGuest}
                         />
                       </div>
-                      
-                      <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                              <Button variant="outline" size="sm">
-                                  <Database className="mr-2 h-4 w-4" /> Actions
-                              </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                              <DropdownMenuLabel>Data Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator/>
-                              {(userProfile?.canAddAssets || isAdmin) && (
-                                <DropdownMenuItem onClick={handleAddAsset}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
-                                </DropdownMenuItem>
-                              )}
-                              <DropdownMenuItem onClick={handleImportClick} disabled={isImporting || !isAdmin}>
-                                  <Library className="mr-2 h-4 w-4" /> Import Full FAR
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => setIsImportScanOpen(true)} disabled={isImporting || !isAdmin}>
-                                  <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={() => handleExportClick()} disabled={activeAssets.length === 0}>
-                                  <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
-                              </DropdownMenuItem>
-                              <DropdownMenuItem onClick={handleTravelReport}>
-                                  <PlaneTakeoff className="mr-2 h-4 w-4" /> Travel Report
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                  className="text-destructive focus:bg-destructive/20"
-                                  onClick={handleClearAllClick}
-                                  disabled={activeAssets.length === 0 || !isAdmin}
-                              >
-                                  <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
-                              </DropdownMenuItem>
-                          </DropdownMenuContent>
-                      </DropdownMenu>
+                       <Button variant="outline" size="sm" onClick={() => handleExportClick()} disabled={activeAssets.length === 0}>
+                            <FileDown className="mr-2 h-4 w-4" /> Export Displayed
+                        </Button>
                     </div>
                   </div>
               </CardHeader>

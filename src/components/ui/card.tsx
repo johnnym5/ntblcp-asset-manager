@@ -2,22 +2,27 @@
 import * as React from "react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
+import { useIsMobile } from "@/hooks/use-mobile"
 
 const Card = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
->(({ className, ...props }, ref) => (
-  <motion.div
-    ref={ref}
-    className={cn(
-      "rounded-xl border bg-card/60 text-card-foreground shadow-xl backdrop-blur-lg transition-shadow duration-300 hover:shadow-primary/20",
-      className
-    )}
-    whileHover={{ y: -5, scale: 1.02 }}
-    transition={{ type: "spring", stiffness: 300, damping: 10 }}
-    {...props}
-  />
-))
+>(({ className, ...props }, ref) => {
+  const isMobile = useIsMobile();
+
+  return (
+    <motion.div
+      ref={ref}
+      className={cn(
+        "rounded-xl border bg-card/60 text-card-foreground shadow-xl backdrop-blur-lg transition-shadow duration-300 hover:shadow-primary/20",
+        className
+      )}
+      whileHover={!isMobile ? { y: -5, scale: 1.02 } : {}}
+      transition={{ type: "spring", stiffness: 300, damping: 10 }}
+      {...props}
+    />
+  )
+})
 Card.displayName = "Card"
 
 const CardHeader = React.forwardRef<

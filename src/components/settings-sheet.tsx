@@ -36,7 +36,7 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
@@ -51,7 +51,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings } = useAppState();
+  const { appSettings, setAppSettings, dataActions } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -78,6 +78,9 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const calculatedChanges = useMemo(() => {
     if (!draftSettings || !appSettings) return [];
     const changes: string[] = [];
+    if (draftSettings.appMode !== appSettings.appMode) {
+      changes.push(`App mode will be set to: ${draftSettings.appMode}.`);
+    }
     if (JSON.stringify(draftSettings.enabledSheets.sort()) !== JSON.stringify(appSettings.enabledSheets.sort())) {
         changes.push(`Enabled sheets will be updated.`);
     }
@@ -249,10 +252,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
             </SheetDescription>
           </SheetHeader>
           <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-y-hidden">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
                 <TabsTrigger value="users" disabled={isGuest || !isAdmin}><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
                 <TabsTrigger value="sheets" disabled={isGuest || !isAdmin}><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
+                <TabsTrigger value="data" disabled={isGuest || !isAdmin}><Database className="mr-2 h-4 w-4" />Data</TabsTrigger>
             </TabsList>
             <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
@@ -272,6 +276,26 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                     <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
                     <div className="rounded-lg border p-3 space-y-4 divide-y">
                       <div className="flex items-center justify-between pt-1">
+                        <div className="space-y-1">
+                          <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
+                          <p className="text-xs text-muted-foreground">
+                            {draftSettings.appMode === 'management'
+                              ? 'Management: Data is locked for non-admins.'
+                              : 'Verification: Users can update status/remarks.'
+                            }
+                          </p>
+                        </div>
+                         <Select value={draftSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
+                          <SelectTrigger className="w-[150px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="management">Management</SelectItem>
+                            <SelectItem value="verification">Verification</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center justify-between pt-4">
                         <div className="space-y-1">
                           <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
                           <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
@@ -322,12 +346,44 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                         <Button variant="outline" className="w-full" onClick={handleAddSheet}><PlusCircle className="mr-2" /> Add Manually</Button>
                         <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import from File</Button>
                     </div>
-                    <div className="mt-4">
-                        <Button variant="outline" className="w-full justify-start" onClick={() => setIsImportScanOpen(true)}>
-                            <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
-                        </Button>
-                    </div>
                   </div>
+            </TabsContent>
+             <TabsContent value="data" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
+                <div>
+                    <h3 className="text-lg font-medium mb-4">Data Management</h3>
+                    <div className="rounded-lg border p-4 space-y-3">
+                        <p className="text-sm text-muted-foreground">Perform global data operations. These actions may affect the entire dataset.</p>
+                        <Separator />
+                        <div className="space-y-2">
+                            {dataActions.onAddAsset && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                                </Button>
+                            )}
+                            {dataActions.onImport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onImport} disabled={dataActions.isImporting}>
+                                    <FileUp className="mr-2 h-4 w-4" /> Import Full FAR
+                                </Button>
+                            )}
+                            {dataActions.onScanAndImport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport} disabled={dataActions.isImporting}>
+                                    <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
+                                </Button>
+                            )}
+                            {dataActions.onTravelReport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
+                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
+                                </Button>
+                            )}
+                            <Separator />
+                            {dataActions.onClearAll && (
+                                <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>
+                                    <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </TabsContent>
           </Tabs>
 
