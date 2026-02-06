@@ -1,4 +1,3 @@
-
 import type { Asset } from './types';
 
 // This file is intentionally left blank. 

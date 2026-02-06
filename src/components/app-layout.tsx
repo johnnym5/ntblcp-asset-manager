@@ -1,8 +1,7 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,28 +9,59 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import {
   Select,
   SelectContent,
   SelectItem,
+  SelectSeparator,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Boxes,
   Settings,
   LogOut,
+  User,
   Search,
   Cloud,
   CloudOff,
   Filter,
   ArrowUpDown,
+  Check,
+  ChevronsUpDown,
+  Loader2,
   RefreshCw,
+  Database,
+  FileDown,
+  FileUp,
+  PlusCircle,
+  Trash2,
   Bell,
+  Sun,
+  Moon,
   CheckCheck,
   X,
+  Users,
   Inbox,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
@@ -56,18 +86,16 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
+import { useTheme } from "next-themes";
 import { Separator } from "./ui/separator";
-import { RecentActivitiesSheet } from "./recent-activities-sheet";
-import { ChangePasswordDialog } from "./change-password-dialog";
-import { ScrollArea } from "./ui/scroll-area";
-import { UpdatedAssetsDialog } from "./updated-assets-dialog";
+import { InboxSheet } from "./inbox-sheet";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { userProfile, loading, logout, updatePassword } = useAuth();
+  const { userProfile, loading, logout } = useAuth();
+  const router = useRouter();
   const pathname = usePathname();
   const { 
-    assets, setAssets,
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
     sortConfig, setSortConfig,
@@ -75,7 +103,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     locationOptions, assigneeOptions, statusOptions,
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
     setManualSyncTrigger, isSyncing,
-    unreadInboxCount, setLastInboxCheck
+    dataActions,
+    unreadInboxCount
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -83,21 +112,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isRecentActivitiesOpen, setIsRecentActivitiesOpen] = useState(false);
-  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
-
-  // State to control AssetForm from the layout
-  const [isUpdatedAssetsDialogOpen, setIsUpdatedAssetsDialogOpen] = useState(false);
-  const [selectedAssetForDetails, setSelectedAssetForDetails] = useState<Asset | undefined>(undefined);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
-
-  useEffect(() => {
-    // Force password change on first login
-    if (userProfile && !userProfile.isGuest && !userProfile.passwordChanged) {
-      setIsChangePasswordOpen(true);
-    }
-  }, [userProfile]);
+  const { setTheme } = useTheme();
 
   useEffect(() => {
     setSearchTerm(debouncedSearchTerm);
@@ -144,7 +162,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
   
   const handleManualSync = () => {
-    if (isSyncing || !isOnline) return;
+    if (isSyncing) return;
     setManualSyncTrigger(c => c + 1);
   };
 
@@ -154,35 +172,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       setTimeout(() => markAllAsRead(), 500);
     }
   }
-
-  const handleRecentActivitiesOpenChange = (open: boolean) => {
-    setIsRecentActivitiesOpen(open);
-    if (open) {
-      setLastInboxCheck(Date.now());
-    }
-  }
-
-  const handleViewAssetDetails = (asset: Asset) => {
-    setSelectedAssetForDetails(asset);
-    setIsRecentActivitiesOpen(false); // Close the activities sheet
-    setIsUpdatedAssetsDialogOpen(true); // Open the asset form
-  }
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
-  const isGuest = !userProfile || userProfile.isGuest;
+  const isAdmin = userProfile?.isAdmin || false;
 
   return (
     <div className="flex flex-col w-full min-h-screen">
       <header className="flex h-14 shrink-0 items-center gap-4 border-b bg-background/95 px-4 backdrop-blur-sm sm:h-16 md:px-6">
         
+        {/* Left Side */}
         <div className="flex items-center gap-2">
             <Boxes className="h-5 w-5 text-primary" />
-            <span className="text-lg font-semibold hidden sm:inline-block">Asset Assist</span>
+            <span className="text-lg font-semibold hidden sm:inline-block">NTBLCP ASSET VERIFICATOR</span>
         </div>
 
+        {/* Center */}
         <div className="flex-1 flex justify-center px-4">
             <div className="w-full max-w-lg">
-                {pathname === '/' && (
+                {pathname === '/assets' && (
                     <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
                         <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -227,7 +234,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
         </div>
 
+        {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
+            <TooltipProvider>
+              <Tooltip>
+                  <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing}>
+                          {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
+                      </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Sync Now</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -247,7 +266,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                   setManualSyncTrigger(c => c + 1);
                                 }
                             }}
-                            aria-label={`Switch to ${isOnline ? 'Offline' : 'Online'} mode`}
+                            aria-label={`Switch to ${isOnline ? 'Online' : 'Online'} mode`}
                         >
                             {isOnline ? (
                                 <Cloud className="h-5 w-5 text-green-500" />
@@ -260,19 +279,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <p>{isOnline ? 'Go Offline' : 'Go Online'}</p>
                     </TooltipContent>
                 </Tooltip>
-            </TooltipProvider>
-            
-            <Separator orientation="vertical" className="h-6" />
-
-            <TooltipProvider>
-              <Tooltip>
-                  <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing || !isOnline || isGuest}>
-                          {isSyncing ? <div className="animate-spin"><RefreshCw className="h-5 w-5" /></div> : <RefreshCw className="h-5 w-5" />}
-                      </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Sync Now</p></TooltipContent>
-              </Tooltip>
             </TooltipProvider>
             
             {loading ? (
@@ -296,15 +302,53 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                  <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
-                    <Settings className="mr-2 h-4 w-4"/>
-                    Settings
-                  </DropdownMenuItem>
+                   {pathname === '/assets' && dataActions.onImport && isAdmin && (
+                    <DropdownMenuSub>
+                      <DropdownMenuSubTrigger>
+                        <Database className="mr-2 h-4 w-4" />
+                        Data Management
+                      </DropdownMenuSubTrigger>
+                      <DropdownMenuPortal>
+                        <DropdownMenuSubContent>
+                          <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting}>
+                            <FileUp className="mr-2 h-4 w-4" />
+                            Import from Excel
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={dataActions.onExport}>
+                            <FileDown className="mr-2 h-4 w-4" />
+                            Export to Excel
+                          </DropdownMenuItem>
+                           <DropdownMenuItem onClick={dataActions.onAddAsset}>
+                            <PlusCircle className="mr-2 h-4 w-4" />
+                            Add New Asset
+                          </DropdownMenuItem>
+                          
+                          <DropdownMenuSeparator />
+                          <DropdownMenuItem
+                            className="text-destructive focus:bg-destructive/20 focus:text-destructive"
+                            onClick={dataActions.onClearAll}
+                            disabled={!dataActions.hasAssets || (isOnline && !dataActions.isAdmin)}
+                          >
+                            <Trash2 className="mr-2 h-4 w-4" />
+                            Clear All Assets
+                          </DropdownMenuItem>
+                          
+                        </DropdownMenuSubContent>
+                      </DropdownMenuPortal>
+                    </DropdownMenuSub>
+                  )}
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
+                      <Settings className="mr-2 h-4 w-4"/>
+                      Settings
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
                   
-                  {userProfile?.isAdmin && (
-                     <DropdownMenuItem onClick={() => handleRecentActivitiesOpenChange(true)}>
+                  {isAdmin && (
+                     <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
                       <Inbox className="mr-2 h-4 w-4" />
-                      <span>Recent Activities</span>
+                      <span>Inbox</span>
                       {unreadInboxCount > 0 && (
                         <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white">
                           {unreadInboxCount}
@@ -322,7 +366,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </span>
                     )}
                   </DropdownMenuItem>
-                  
+
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger>
+                      <Sun className="mr-2 h-4 w-4" />
+                      <span>Theme</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                      <DropdownMenuSubContent>
+                        <DropdownMenuItem onClick={() => setTheme('light')}>
+                          Light
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setTheme('dark')}>
+                          Dark
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setTheme('system')}>
+                          System
+                        </DropdownMenuItem>
+                      </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                  </DropdownMenuSub>
+
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
                     <LogOut className="mr-2 h-4 w-4" />
@@ -334,7 +398,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <main className="flex-1 flex flex-col p-4 md:p-6 bg-muted/40">{children}</main>
-      <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} openChangePassword={() => setIsChangePasswordOpen(true)} />
+      <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
       <AssetFilterSheet
         isOpen={isFilterSheetOpen}
         onOpenChange={setIsFilterSheetOpen}
@@ -350,11 +414,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         missingFieldFilter={missingFieldFilter}
         setMissingFieldFilter={setMissingFieldFilter}
       />
-       <RecentActivitiesSheet 
-          isOpen={isRecentActivitiesOpen} 
-          onOpenChange={handleRecentActivitiesOpenChange}
-          onViewDetails={handleViewAssetDetails}
-        />
+       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
        <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
         <SheetContent className="w-full sm:max-w-sm p-0 flex flex-col">
             <SheetHeader className="p-4">
@@ -408,12 +468,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SheetFooter>
         </SheetContent>
       </Sheet>
-      <ChangePasswordDialog isOpen={isChangePasswordOpen} onOpenChange={setIsChangePasswordOpen} />
-      <UpdatedAssetsDialog
-        isOpen={isUpdatedAssetsDialogOpen}
-        onOpenChange={setIsUpdatedAssetsDialogOpen}
-        asset={selectedAssetForDetails}
-      />
     </div>
   );
 }

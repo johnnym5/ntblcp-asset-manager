@@ -1,22 +1,24 @@
-
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAppState } from './app-state-context';
-import type { AuthorizedUser } from '@/lib/types';
-import { updateSettings } from '@/lib/firestore';
+import { v4 as uuidv4 } from 'uuid';
+import { AUTHORIZED_USERS } from '@/lib/authorized-users';
 
-export interface UserProfile extends AuthorizedUser {
-  state: string; // The specific state the user is currently logged into.
+
+interface LocalUserProfile {
+  id: string; // Unique ID for this user session
+  displayName: string;
+  state: string; 
+  isAdmin: boolean;
 }
 
 interface AuthContextType {
-  userProfile: UserProfile | null;
+  userProfile: LocalUserProfile | null;
   loading: boolean;
   profileSetupComplete: boolean;
   authInitialized: boolean;
-  login: (profile: { loginName: string, state: string, password?: string }) => void;
-  updatePassword: (newPassword: string) => Promise<void>;
+  updateProfile: (data: { displayName: string; state: string; }) => Promise<void>;
   logout: () => void;
 }
 
@@ -25,110 +27,82 @@ const AuthContext = createContext<AuthContextType>({
   loading: true,
   profileSetupComplete: false,
   authInitialized: false,
-  login: () => {},
-  updatePassword: async () => {},
+  updateProfile: async () => {},
   logout: () => {},
 });
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+  const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { setAssets, setGlobalStateFilter, appSettings, setAppSettings } = useAppState();
+  const { 
+    setAssets, 
+  } = useAppState();
 
   useEffect(() => {
-    const initializeAuth = () => {
-      try {
-        const savedProfileJson = localStorage.getItem('ntblcp-user-profile');
-        if (savedProfileJson) {
-            const savedProfile: UserProfile = JSON.parse(savedProfileJson);
-            
-            // Find the authoritative user definition from the latest app settings
-            const authorizedUser = appSettings.authorizedUsers.find(u => u.loginName === savedProfile.loginName?.toLowerCase());
+    // This app no longer uses Firebase Auth. We just check for a local profile.
+    try {
+        const savedProfile = localStorage.getItem('ntblcp-user-profile');
+        if (savedProfile) {
+            const profile: LocalUserProfile = JSON.parse(savedProfile);
+            const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === profile.displayName.toLowerCase());
             
             if (authorizedUser) {
-              // Create the final profile by merging the authoritative definition with the saved one
-              const finalProfile: UserProfile = {
-                ...authorizedUser, // Base permissions and states from settings
-                ...savedProfile,  // Overwrite with saved state, etc.
-              };
-              setUserProfile(finalProfile);
-              setGlobalStateFilter(finalProfile.state);
+                setUserProfile(profile);
+                setProfileSetupComplete(true);
             } else {
-              // The user is no longer in the authorized list, so clear their profile
-              localStorage.removeItem('ntblcp-user-profile');
+                // The saved user is no longer authorized. Clear the profile.
+                localStorage.removeItem('ntblcp-user-profile');
             }
         }
-      } catch (error) {
-          console.error("Auth initialization failed:", error);
-          localStorage.removeItem('ntblcp-user-profile');
-      } finally {
-          setAuthInitialized(true);
-          setLoading(false);
-      }
-    };
-    
-    // Wait until app settings (which contain users) are loaded from Firestore/defaults
-    if (appSettings.authorizedUsers.length > 0) {
-      initializeAuth();
+    } catch (e) {
+        console.error("Failed to load user profile from local storage", e);
+    } finally {
+        setLoading(false);
+        setAuthInitialized(true); // We are "initialized" as soon as we check local storage.
     }
-  }, [setGlobalStateFilter, appSettings.authorizedUsers]);
+  }, []);
 
+  const updateProfile = async (data: { displayName: string; state: string; }) => {
+    setLoading(true);
+    const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === data.displayName.toLowerCase());
+    if (!authorizedUser) {
+      // This should ideally not happen if the UI is correct, but as a safeguard:
+      console.error("Attempted to create a profile for an unauthorized user.");
+      setLoading(false);
+      return;
+    }
 
-  const login = (profile: { loginName: string, state: string, password?: string }) => {
-    const authorizedUser = appSettings.authorizedUsers.find(u => u.loginName === profile.loginName);
-    if (!authorizedUser) return;
-
-    const fullProfile: UserProfile = {
-      ...authorizedUser,
-      state: profile.state,
+    const newProfile: LocalUserProfile = {
+      id: uuidv4(),
+      displayName: authorizedUser.displayName, // Use the proper-cased name
+      state: data.state,
+      isAdmin: authorizedUser.isAdmin,
     };
-
-    localStorage.setItem('ntblcp-user-profile', JSON.stringify(fullProfile));
-    setUserProfile(fullProfile);
-    setGlobalStateFilter(profile.state);
+    try {
+      localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
+      setUserProfile(newProfile);
+      setProfileSetupComplete(true);
+    } catch(e) {
+      console.error("Failed to save user profile", e);
+    } finally {
+      setLoading(false);
+    }
   };
-  
-  const updatePassword = async (newPassword: string) => {
-    if (!userProfile) return;
-    
-    // Immediately prepare the updated user list
-    const newUsers = appSettings.authorizedUsers.map(u => 
-        u.loginName === userProfile.loginName 
-            ? { ...u, password: newPassword, passwordChanged: true } 
-            : u
-    );
-
-    // Update the app state right away for immediate UI feedback
-    setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
-
-    // Update the local user profile in both state and localStorage
-    const updatedProfile: UserProfile = {
-        ...userProfile,
-        password: newPassword,
-        passwordChanged: true,
-    };
-    setUserProfile(updatedProfile);
-    localStorage.setItem('ntblcp-user-profile', JSON.stringify(updatedProfile));
-    
-    // Attempt to save the entire updated user list to the database
-    // The updateSettings function will handle online/offline status.
-    await updateSettings({ authorizedUsers: newUsers });
-  };
-
 
   const logout = async () => {
+    setLoading(true);
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
-    setGlobalStateFilter('');
+    setProfileSetupComplete(false);
+    // Don't clear assets on logout, just reset the view
     setAssets([]); 
-    window.location.reload(); 
+    window.location.href = '/'; // Force a hard reload to ensure all state is cleared
   };
-  
-  const profileSetupComplete = !!userProfile;
 
-  const value = { userProfile, loading, profileSetupComplete, login, logout, authInitialized, updatePassword };
+  const value = { userProfile, loading, profileSetupComplete, updateProfile, logout, authInitialized };
 
   return (
     <AuthContext.Provider value={value}>

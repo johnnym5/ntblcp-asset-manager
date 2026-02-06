@@ -1,4 +1,3 @@
-
 # Offline Asset Assist
 
 A full-featured, offline-first Asset Management Web App for NTBLCP, built with Next.js, Tailwind CSS, and a local-first architecture.
@@ -10,18 +9,17 @@ This application is designed to solve the critical challenge of managing and ver
 ### Core Features
 
 *   **Offline-First by Default**: The application is built to work completely offline. All data is stored and managed in the browser's local database (IndexedDB), ensuring that work is never lost due to a lack of internet.
-*   **Role-Based Access**: A simple, passwordless login screen grants access based on a predefined list of users (including admins, state users, and read-only guests). Each user is locked to the assets of their assigned state(s), while admins can view all assets.
+*   **Role-Based Access**: A simple, passwordless login screen grants access based on a predefined list of users. Each user is locked to the assets of their assigned state(s), while admins can view all assets.
 *   **Dynamic Excel Import & Export**:
     *   **Intelligent Import**: Parses complex Excel files containing multiple asset sheet formats, automatically detecting headers and mapping data to a unified structure. This works both online and offline.
     *   **Structure-Preserving Export**: Exports data back into an Excel file that mirrors the original's column structure and naming conventions, with "Verified Status" and "Verified Date" appended at the end.
 *   **Advanced Data Management**:
     *   **Smart Search**: A global search bar that understands multiple keywords to quickly find assets across all fields and categories.
-    *   **Filtering & Sorting**: Powerful popover filters for location, assignee, and status, along with multi-key sorting. Location filters show asset counts.
+    *   **Filtering & Sorting**: Powerful popover filters for location, assignee, and status, along with multi-key sorting.
     *   **Batch Editing**: Select multiple assets and apply changes (like updating location or status) to all of them in a single action.
 *   **Insightful Dashboard**:
-    *   The main dashboard provides a high-level overview of asset verification progress with clear, visual progress bars for both the overall status and individual asset categories. Admins can filter this view by any state or zone.
+    *   The main dashboard provides a high-level overview of asset verification progress with clear, visual progress bars for both the overall status and individual asset categories.
 *   **Selective Sync**: Users can select one or more assets or entire categories and push only those specific items to the cloud database, providing granular control over data synchronization.
-*   **Admin Inbox**: Admins have an inbox that shows a real-time feed of the most recently modified assets across the entire system.
 
 ### How It Works (Use Cases & Impact)
 
@@ -72,7 +70,7 @@ firebase deploy
 
 Firebase will build your Next.js application and deploy it. After the command completes, you can access your live application at the following URL:
 
-[https://ntblcp-asset-manager-k7hy1.web.app](https://ntblcp-asset-manager-k7hy1.web.app)
+[https://globalassethub.web.app](https://globalassethub.web.app)
 
 ## Getting Started (Local Development)
 

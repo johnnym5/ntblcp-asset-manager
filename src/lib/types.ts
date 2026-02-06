@@ -1,4 +1,3 @@
-
 import type { Timestamp } from 'firebase/firestore';
 
 export interface Asset {
@@ -53,21 +52,14 @@ export interface Asset {
 }
 
 
-export interface AuthorizedUser {
-  displayName: string;
-  loginName: string;
-  states: string[];
-  isAdmin: boolean;
-  isGuest?: boolean;
-  password?: string;
-  passwordChanged?: boolean;
-  canAddAssets?: boolean;
-  canEditAssets?: boolean;
-}
-
-
-export interface UserProfile extends AuthorizedUser {
-  state: string; // The specific state the user is currently logged into.
+export interface UserProfile {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL?: string | null;
+  role: 'admin' | 'user' | 'guest';
+  // You can add other fields like 'state' or 'zone' if needed
+  state?: string;
 }
 
 // New types for detailed inbox
@@ -97,25 +89,4 @@ export interface InboxMessageGroup {
   changes?: AssetChange[];
   updatedAssets?: Asset[];
   activityMessage?: string;
-}
-
-export interface DisplayField {
-  key: keyof Asset;
-  label: string;
-  table: boolean;
-  quickView: boolean;
-}
-
-export interface SheetDefinition {
-  name: string;
-  headers: string[];
-  displayFields: DisplayField[];
-}
-
-export interface AppSettings {
-  lockAssetList: boolean;
-  autoSyncEnabled: boolean;
-  enabledSheets: string[];
-  sheetDefinitions: Record<string, SheetDefinition>; // Key is the sheet name
-  authorizedUsers: AuthorizedUser[];
 }

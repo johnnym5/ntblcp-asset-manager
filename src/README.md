@@ -52,7 +52,7 @@ This project is configured for deployment to Firebase App Hosting.
     ```
 
 3.  **Set Project ID**:
-    Open the `.firebaserc` file and replace `"ntblcp-asset-manager-k7hy1"` with your actual Firebase Project ID.
+    Open the `.firebaserc` file and replace `"globalassethub"` with your actual Firebase Project ID.
 
 4.  **Configure Environment Variables**:
     In the Firebase Console, navigate to your project's App Hosting backend. In the settings, add the following environment variables. You can find these values in your Firebase project settings under "General".

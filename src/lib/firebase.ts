@@ -1,18 +1,15 @@
-
 // Import the necessary functions from the Firebase SDKs.
 import { initializeApp, getApps, getApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
-import { getStorage } from "firebase/storage";
 
 // Your web app's Firebase configuration.
 const firebaseConfig = {
-  apiKey: "AIzaSyB9O662zXyyJkhtle1snkNLapre3_Sa3rc",
-  authDomain: "ntblcp-asset-manager-k7hy1.firebaseapp.com",
-  projectId: "ntblcp-asset-manager-k7hy1",
-  storageBucket: "ntblcp-asset-manager-k7hy1.appspot.com",
-  messagingSenderId: "45027293772",
-  appId: "1:45027293772:web:0116cfaa586d17fa4c52e9"
+  apiKey: "AIzaSyBoU-iXGO0600841daa1LZzSlfRuZojXxA",
+  authDomain: "globalassethub.firebaseapp.com",
+  projectId: "globalassethub",
+  storageBucket: "globalassethub.appspot.com",
+  messagingSenderId: "296731745587",
+  appId: "1:296731745587:web:91f0e8a28ca497e973b246"
 };
 
 
@@ -21,10 +18,7 @@ const firebaseConfig = {
 const app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
 
 // Get references to the Firebase services we'll use.
-const auth = getAuth(app);
 const db = getFirestore(app);
-const storage = getStorage(app);
-
 
 // Export the initialized services for use throughout the app.
-export { app, auth, db, storage };
+export { app, db };

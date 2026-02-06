@@ -1,15 +1,14 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+  AlertDialog,
+  AlertDialogContent,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogDescription,
+  AlertDialogFooter
+} from '@/components/ui/alert-dialog';
 import {
   Select,
   SelectContent,
@@ -20,138 +19,111 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
+import { Loader2 } from 'lucide-react';
+import { AUTHORIZED_USERS, type AuthorizedUser } from '@/lib/authorized-users';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { AlertCircle } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
-import type { AuthorizedUser } from '@/lib/types';
-import { useAppState } from '@/contexts/app-state-context';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 
 export default function UserProfileSetup() {
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [selectedState, setSelectedState] = useState('');
+  const [displayName, setDisplayName] = useState('');
+  const [selectedState, setSelectedState] = useState<string>('');
+  const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
-  const { login } = useAuth();
-  const { appSettings } = useAppState();
   
+  const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
+  const { updateProfile } = useAuth();
+
   useEffect(() => {
     setError(null);
-    const lowerCaseUsername = username.trim().toLowerCase();
-    
-    const user = appSettings.authorizedUsers.find(u => u.loginName === lowerCaseUsername);
-    setFoundUser(user || null);
-
+    const user = AUTHORIZED_USERS.find(u => u.loginName === displayName.trim().toLowerCase());
     if (user) {
-        if (user.states.length === 1) {
-            setSelectedState(user.states[0]);
-        } else {
-            setSelectedState('');
-        }
+      setFoundUser(user);
+      if (user.states.length === 1 && user.states[0] !== 'All') {
+        setSelectedState(user.states[0]);
+      } else if (user.loginName === 'admin') {
+        setSelectedState('All');
+      } else {
+        setSelectedState(''); // Reset if user has multiple states to choose from
+      }
     } else {
-        setSelectedState('');
+      setFoundUser(null);
+      setSelectedState('');
     }
-  }, [username, appSettings.authorizedUsers]);
+  }, [displayName]);
 
-  const handleLogin = () => {
-    if (!foundUser) {
-      setError('User not found. Please enter a valid name.');
-      return;
-    }
 
-    // This handles guest users or users without a password set in the DB
-    if (foundUser.isGuest || !foundUser.password) {
-      login({
-        loginName: foundUser.loginName,
-        state: selectedState,
-      });
-      return;
-    }
-
-    if (foundUser.password !== password) {
-      setError('Incorrect password. Please try again.');
-      return;
-    }
-
-    if (foundUser.states.length > 1 && !selectedState) {
-        setError('Please select your assigned location.');
+  const handleConfirm = async () => {
+    if (!foundUser || !selectedState) {
+        setError("Please provide a valid name and select a location.");
         return;
     }
     
-    login({
-        loginName: foundUser.loginName,
-        state: selectedState,
-        password: foundUser.password,
-    });
+    setError(null);
+    setIsSaving(true);
+    await updateProfile({ displayName: foundUser.loginName, state: selectedState });
+    setIsSaving(false);
   };
   
-  const canLogin = foundUser && (selectedState || foundUser?.isGuest) && (password || foundUser?.isGuest || !foundUser?.password);
-
+  const isConfirmDisabled = isSaving || !foundUser || !selectedState;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-muted/40 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle>Welcome</CardTitle>
-          <CardDescription>Enter your name and password to access the asset register.</CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="username">Name</Label>
-            <Input
-              id="username"
-              placeholder="Enter your name"
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              autoComplete="username"
-            />
-          </div>
-
-          {!foundUser?.isGuest && (
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Enter your password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                autoComplete="current-password"
-              />
-            </div>
-          )}
-          
-          {foundUser && foundUser.states.length > 1 && (
-             <div className="space-y-2">
-              <Label htmlFor="state">Select Your Location</Label>
-              <Select onValueChange={setSelectedState} value={selectedState}>
-                <SelectTrigger id="state">
-                  <SelectValue placeholder="Select a location..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {foundUser.states.map((state) => (
-                    <SelectItem key={state} value={state}>{state}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
-          {error && (
-            <Alert variant="destructive">
-              <AlertCircle className="h-4 w-4" />
-              <AlertTitle>Login Error</AlertTitle>
-              <AlertDescription>{error}</AlertDescription>
-            </Alert>
-          )}
-
-        </CardContent>
-        <CardFooter>
-          <Button className="w-full" onClick={handleLogin} disabled={!canLogin}>
-            Continue
-          </Button>
-        </CardFooter>
-      </Card>
+        <div className="w-full max-w-md">
+            <AlertDialog open={true}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                <AlertDialogTitle>User Login</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Please enter your name to access your assigned assets.
+                </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="py-4 space-y-4">
+                <div className="space-y-2">
+                    <Label htmlFor="displayName">Full Name</Label>
+                    <Input 
+                    id="displayName" 
+                    placeholder="E.g., John Doe or 'admin'"
+                    value={displayName} 
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    />
+                </div>
+                {foundUser && (
+                    <div className="space-y-2">
+                    <Label htmlFor="state">Assigned Location</Label>
+                    <Select onValueChange={setSelectedState} value={selectedState} disabled={foundUser.states[0] === 'All'}>
+                        <SelectTrigger id="state">
+                        <SelectValue placeholder="Select a location..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                            {foundUser.states.map((state) => (
+                            <SelectItem key={state} value={state}>
+                                {state}
+                            </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                    </div>
+                )}
+                {error && (
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Login Error</AlertTitle>
+                        <AlertDescription>
+                            {error}
+                        </AlertDescription>
+                    </Alert>
+                )}
+                </div>
+                <AlertDialogFooter>
+                <Button onClick={handleConfirm} disabled={isConfirmDisabled}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Confirm and Continue
+                </Button>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+            </AlertDialog>
+        </div>
     </div>
   );
 }

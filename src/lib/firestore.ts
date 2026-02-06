@@ -1,16 +1,15 @@
-
 'use client';
 
-import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc, onSnapshot } from 'firebase/firestore';
+import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Asset, AppSettings, SheetDefinition, AuthorizedUser } from '@/lib/types';
-import { HEADER_DEFINITIONS, TARGET_SHEETS } from './constants';
-import { AUTHORIZED_USERS } from './authorized-users';
+import type { Asset } from '@/lib/types';
+import type { User } from 'firebase/auth';
 
 // --- Assets ---
 
 /**
  * Fetches all asset documents from Firestore once.
+ * This is now the primary method for getting cloud data to avoid real-time listener costs.
  * @returns A promise that resolves with an array of assets.
  */
 export async function getAssets(): Promise<Asset[]> {
@@ -26,6 +25,7 @@ export async function getAssets(): Promise<Asset[]> {
 
 /**
  * Creates or updates an asset document in Firestore.
+ * The document ID is the asset's own `id` property.
  * @param asset The asset object to save.
  */
 export async function updateAsset(asset: Asset) {
@@ -78,119 +78,4 @@ export async function batchDeleteAssets(assetIds: string[]) {
         });
         await batch.commit();
     }
-}
-
-// --- Global App Settings ---
-
-const SETTINGS_DOC_ID = 'global';
-
-// Convert initial constants to the new AppSettings format
-const initialSheetDefinitions: Record<string, SheetDefinition> = {};
-TARGET_SHEETS.forEach(sheetName => {
-  const definition = HEADER_DEFINITIONS[sheetName];
-  initialSheetDefinitions[sheetName] = {
-    name: sheetName,
-    headers: definition?.headers || [],
-    displayFields: definition?.displayFields || [],
-  };
-});
-
-
-const defaultAppSettings: AppSettings = {
-  lockAssetList: true,
-  autoSyncEnabled: true,
-  enabledSheets: [...TARGET_SHEETS],
-  sheetDefinitions: initialSheetDefinitions,
-  authorizedUsers: AUTHORIZED_USERS,
-};
-
-/**
- * Fetches the global application settings from Firestore.
- * @returns A promise that resolves with the AppSettings object or null if not found.
- */
-export async function getSettings(): Promise<AppSettings> {
-    const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
-    const docSnap = await getDoc(settingsRef);
-    if (docSnap.exists()) {
-        const data = docSnap.data() as Partial<AppSettings>;
-        // Merge with defaults to ensure all keys are present
-        const mergedSettings = { ...defaultAppSettings, ...data };
-        
-        // Deep merge authorizedUsers, giving precedence to stored data but keeping defaults for new users.
-        const storedUsersMap = new Map((data.authorizedUsers || []).map(u => [u.loginName, u]));
-        const defaultUsers = defaultAppSettings.authorizedUsers.filter(u => !storedUsersMap.has(u.loginName));
-        mergedSettings.authorizedUsers = [...storedUsersMap.values(), ...defaultUsers];
-
-        return mergedSettings;
-
-    } else {
-        // If no settings exist, create them with default values
-        await updateSettings(defaultAppSettings);
-        return defaultAppSettings;
-    }
-}
-
-/**
- * Creates or updates the global application settings in Firestore and local storage.
- * @param settings The partial or full settings object to save.
- */
-export async function updateSettings(settings: Partial<AppSettings>) {
-    const isActuallyOnline = typeof window !== 'undefined' && navigator.onLine;
-
-    // Always try to save to Firestore if online
-    if (isActuallyOnline) {
-        const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
-        await setDoc(settingsRef, settings, { merge: true });
-    }
-    
-    // Update local storage regardless of online status for offline persistence
-    const currentSettingsJSON = localStorage.getItem('ntblcp-app-settings');
-    const currentSettings = currentSettingsJSON ? JSON.parse(currentSettingsJSON) : defaultAppSettings;
-    const newSettings = { ...currentSettings, ...settings };
-    localStorage.setItem('ntblcp-app-settings', JSON.stringify(newSettings));
-}
-
-
-/**
- * Listens for real-time updates to the global settings document.
- * @param callback The function to call with the new settings data.
- * @returns An unsubscribe function to stop listening.
- */
-export function listenToSettings(callback: (settings: AppSettings | null) => void) {
-    const isActuallyOnline = typeof window !== 'undefined' && navigator.onLine;
-    
-    // First, load from local storage for immediate offline access
-    const localSettingsJSON = localStorage.getItem('ntblcp-app-settings');
-    if (localSettingsJSON) {
-      callback(JSON.parse(localSettingsJSON));
-    } else {
-      // If nothing in local storage, get from Firestore and then store it locally
-      getSettings().then(settings => {
-        localStorage.setItem('ntblcp-app-settings', JSON.stringify(settings));
-        callback(settings);
-      });
-    }
-
-    // Then, set up the Firestore listener for real-time updates IF online
-    if (isActuallyOnline) {
-      const settingsRef = doc(db, 'settings', SETTINGS_DOC_ID);
-      const unsubscribe = onSnapshot(settingsRef, (doc) => {
-          if (doc.exists()) {
-              const data = doc.data() as Partial<AppSettings>;
-              const mergedSettings = { ...defaultAppSettings, ...data };
-              
-              const storedUsersMap = new Map((data.authorizedUsers || []).map(u => [u.loginName, u]));
-              const defaultUsers = defaultAppSettings.authorizedUsers.filter(u => !storedUsersMap.has(u.loginName));
-              mergedSettings.authorizedUsers = [...storedUsersMap.values(), ...defaultUsers];
-              
-              // Update local storage and state when a change is received
-              localStorage.setItem('ntblcp-app-settings', JSON.stringify(mergedSettings));
-              callback(mergedSettings);
-          }
-      });
-      return unsubscribe;
-    }
-    
-    // Return a no-op unsubscribe function if offline
-    return () => {};
 }
