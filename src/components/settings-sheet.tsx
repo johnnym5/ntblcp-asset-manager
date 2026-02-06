@@ -79,9 +79,9 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
 
   const hasChanges = useMemo(() => {
     if (!draftSettings) return false;
-    // We don't consider user list changes here anymore, as they are saved directly.
-    const settingsA = { ...appSettings, authorizedUsers: [] };
-    const settingsB = { ...draftSettings, authorizedUsers: [] };
+    // User list and sheet definitions are saved directly now, so we exclude them from this check
+    const settingsA = { ...appSettings, authorizedUsers: [], sheetDefinitions: {} };
+    const settingsB = { ...draftSettings, authorizedUsers: [], sheetDefinitions: {} };
     return JSON.stringify(settingsA) !== JSON.stringify(settingsB);
   }, [appSettings, draftSettings]);
   
@@ -97,10 +97,8 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (draftSettings.lockAssetList !== appSettings.lockAssetList) {
         changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
     }
-    // No longer show user changes here as they are saved instantly.
-    if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
-      changes.push(`Sheet definitions (headers/columns) will be updated.`);
-    }
+    // user changes are saved instantly.
+    // sheet definitions changes are saved instantly.
     return changes;
   }, [draftSettings, appSettings]);
 
@@ -113,15 +111,13 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const handleUsersChange = async (newUsers: AuthorizedUser[]) => {
     if (!draftSettings) return;
     try {
-      // Update DB first
-      await updateSettings({ authorizedUsers: newUsers, lastModified: new Date().toISOString() });
+      const settingsToSave = { authorizedUsers: newUsers };
+      await updateSettings(settingsToSave);
 
-      // Update the main app state and local storage
-      const newSettings: AppSettings = { ...appSettings, authorizedUsers: newUsers, lastModified: new Date().toISOString() };
+      const newSettings: AppSettings = { ...appSettings, ...settingsToSave, lastModified: new Date().toISOString() };
       await saveLocalSettings(newSettings);
       setAppSettings(newSettings);
       
-      // Update draft settings to keep them in sync for other potential changes in the sheet.
       setDraftSettings(prev => prev ? { ...prev, authorizedUsers: newUsers } : null);
       
       toast({ title: "User list updated", description: "The user list has been saved to the database." });
@@ -214,13 +210,15 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const handleConfirmSave = async () => {
     if (!draftSettings) return;
     
-    // Add timestamp to ensure propagation
-    const settingsToSave = { ...draftSettings, lastModified: new Date().toISOString() };
+    // Exclude properties that are saved directly
+    const { authorizedUsers, sheetDefinitions, ...otherSettings } = draftSettings;
+    const settingsToSave = { ...otherSettings, lastModified: new Date().toISOString() };
 
     try {
       await updateSettings(settingsToSave);
-      await saveLocalSettings(settingsToSave);
-      setAppSettings(settingsToSave); // Update global state
+      const newSettings = { ...appSettings, ...settingsToSave };
+      await saveLocalSettings(newSettings);
+      setAppSettings(newSettings); // Update global state
       toast({ title: "Settings Saved", description: "Your changes have been applied to the database." });
     } catch (e) {
       toast({ title: "Save Failed", description: "Could not save settings to the database.", variant: "destructive" });
@@ -413,13 +411,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           isOpen={isSheetFormOpen}
           onOpenChange={setIsSheetFormOpen}
           sheetDefinition={sheetToEdit}
-          onSave={(newDef) => {
-            if (!draftSettings) return;
-             handleSettingChange('sheetDefinitions', {
-                ...draftSettings.sheetDefinitions,
-                [newDef.name]: newDef,
-             });
-          }}
+          originalSheetName={originalSheetName}
         />
       )}
 
@@ -448,5 +440,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     </>
   );
 }
+
+    
 
     
