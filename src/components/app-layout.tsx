@@ -62,6 +62,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { 
+    assets,
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
     sortConfig, setSortConfig,
@@ -72,7 +73,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setManualUploadTrigger,
     isSyncing,
     dataActions,
-    unreadInboxCount
+    unreadInboxCount,
+    setUnreadInboxCount
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -163,6 +165,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
   const isAdmin = userProfile?.isAdmin || false;
+
+  useEffect(() => {
+    if (isAdmin) {
+      const pendingCount = assets.filter(a => a.approvalStatus === 'pending').length;
+      setUnreadInboxCount(pendingCount);
+    } else {
+      setUnreadInboxCount(0);
+    }
+  }, [assets, isAdmin, setUnreadInboxCount]);
 
   return (
     <div className="flex flex-col w-full min-h-screen">
@@ -313,7 +324,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   {isAdmin && (
                      <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
                       <Inbox className="mr-2 h-4 w-4" />
-                      <span>Inbox</span>
+                      <span>Approval Queue</span>
                       {unreadInboxCount > 0 && (
                         <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white">
                           {unreadInboxCount}

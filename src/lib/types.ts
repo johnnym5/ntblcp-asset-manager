@@ -49,6 +49,15 @@ export interface Asset {
   lastModified?: string; // ISO 8601 date string
   lastModifiedBy?: string; // displayName of user who last modified
   lastModifiedByState?: string; // state of user who last modified
+
+  // Approval Workflow Fields
+  approvalStatus?: 'pending'; // Only set when there's a pending change
+  pendingChanges?: Partial<Asset>;
+  changeSubmittedBy?: { 
+    displayName: string;
+    loginName: string; // for potential future notifications
+    state: string;
+  };
 }
 
 export interface AuthorizedUser {
