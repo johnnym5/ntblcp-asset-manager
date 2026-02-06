@@ -373,33 +373,40 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                           ))}
                         </div>
                     </div>
-                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                        <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
-                        <Button variant="outline" className="w-full" onClick={handleAddSheet}><PlusCircle className="mr-2" /> Add Manually</Button>
-                        <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import from File</Button>
-                    </div>
                   </div>
             </TabsContent>
             <TabsContent value="data" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
-                    <h3 className="text-lg font-medium mb-4">Data Management</h3>
+                    <h3 className="text-lg font-medium mb-4">Data &amp; Category Management</h3>
                     <div className="rounded-lg border p-4 space-y-3">
                         <p className="text-sm text-muted-foreground">Perform global data operations. These actions may affect the entire dataset.</p>
                         <Separator />
                         <div className="space-y-2">
-                           {dataActions.onAddAsset && (
+
+                            {dataActions.onAddAsset && (
                                 <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Single Asset
                                 </Button>
                             )}
-                             {dataActions.onImport && (
+                            
+                            <Separator />
+                            
+                            <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Manage Categories (Sheets)</Label>
+                             <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
+                            <Button variant="outline" className="w-full justify-start" onClick={handleAddSheet}><PlusCircle className="mr-2 h-4 w-4" /> Add New Sheet Manually</Button>
+                            <Button variant="outline" className="w-full justify-start" onClick={handleImportTemplate}><FileUp className="mr-2 h-4 w-4" /> Import Sheet from File</Button>
+                            
+                            <Separator />
+                            
+                            <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Bulk Data Operations</Label>
+                            {dataActions.onImport && (
                                 <Button variant="outline" className="w-full justify-start" onClick={dataActions.onImport} disabled={dataActions.isImporting}>
-                                    <FileUp className="mr-2 h-4 w-4" /> Import Full FAR
+                                    <FileUp className="mr-2 h-4 w-4" /> Update Assets from FAR
                                 </Button>
                             )}
-                             {dataActions.onScanAndImport && (
+                            {dataActions.onScanAndImport && (
                                 <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport} disabled={dataActions.isImporting}>
-                                    <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
+                                    <ScanSearch className="mr-2 h-4 w-4" /> Scan &amp; Import Workbook
                                 </Button>
                             )}
                              {dataActions.onTravelReport && (
@@ -409,10 +416,13 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             )}
                              {dataActions.onExport && (
                                 <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport}>
-                                    <Download className="mr-2 h-4 w-4" /> Export to Excel
+                                    <Download className="mr-2 h-4 w-4" /> Export All Data to Excel
                                 </Button>
                             )}
+
                             <Separator />
+
+                            <Label className="text-xs font-semibold uppercase text-destructive px-1">Danger Zone</Label>
                             {dataActions.onClearAll && (
                                 <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>
                                     <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
@@ -462,10 +472,12 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSave}>Confirm & Save</AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmSave}>Confirm &amp; Save</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>
   );
 }
+
+    
