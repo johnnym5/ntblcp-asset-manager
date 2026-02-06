@@ -186,8 +186,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       const userMap = new Map(currentUsers.map(u => [u.email.toLowerCase(), u]));
       
       stateManagersToAdd.forEach(manager => {
-          if (!userMap.has(manager.email)) {
-              const loginName = manager.email.split('@')[0].replace(/\./g, '-');
+          const loginName = manager.email.split('@')[0].replace(/\./g, '-');
+          const existingUser = userMap.get(manager.email.toLowerCase());
+
+          if (!existingUser) {
               currentUsers.push({
                   loginName: loginName,
                   displayName: manager.displayName,
@@ -200,6 +202,25 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
                   canEditAssets: true,
               });
               usersModified = true;
+          } else {
+              // User exists, check if an update is needed
+              const needsUpdate = 
+                  existingUser.displayName !== manager.displayName ||
+                  existingUser.password !== manager.password ||
+                  JSON.stringify(existingUser.states) !== JSON.stringify([manager.state]);
+              
+              if (needsUpdate) {
+                  const userIndex = currentUsers.findIndex(u => u.email.toLowerCase() === manager.email.toLowerCase());
+                  if (userIndex !== -1) {
+                      currentUsers[userIndex] = {
+                          ...currentUsers[userIndex], // Preserve fields like isAdmin, isGuest, etc.
+                          displayName: manager.displayName,
+                          password: manager.password,
+                          states: [manager.state]
+                      };
+                      usersModified = true;
+                  }
+              }
           }
       });
 
