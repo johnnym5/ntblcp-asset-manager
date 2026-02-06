@@ -105,7 +105,7 @@ This command will automatically build your Next.js application and deploy it to 
 
 **IMPORTANT:** For emergency access, a "super admin" user has been hardcoded into the application.
 
-*   **Username:** `admin`
+*   **Login Name:** `admin`
 *   **Password:** `setup`
 
 This user account provides full administrative access and is intended for use **only if you are locked out** or cannot access the user database.
