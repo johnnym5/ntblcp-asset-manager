@@ -11,7 +11,6 @@ export interface LocalUserProfile {
   id: string; // Unique ID for this user session
   loginName: string;
   displayName: string;
-  email: string;
   state: string; 
   isAdmin: boolean;
   isGuest?: boolean;
@@ -34,7 +33,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const superAdmin: AuthorizedUser = {
   loginName: 'admin',
   displayName: 'Super Admin',
-  email: 'admin',
   password: 'setup',
   states: ['All'],
   isAdmin: true,
@@ -64,12 +62,30 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const profile: LocalUserProfile = JSON.parse(savedProfile);
         
         const allUsers = [...appSettings.authorizedUsers, superAdmin];
-        // Check if the user from local storage is still in the authorized list.
         const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
-          // The user is valid, restore their session.
-          setUserProfile(profile);
+          // User is valid. Check if permissions need to be updated in the current session.
+          const permissionsChanged =
+            profile.isAdmin !== authorizedUser.isAdmin ||
+            profile.canAddAssets !== authorizedUser.canAddAssets ||
+            profile.canEditAssets !== authorizedUser.canEditAssets ||
+            profile.canVerifyAssets !== authorizedUser.canVerifyAssets;
+
+          let currentSessionProfile = profile;
+          if (permissionsChanged) {
+            // Permissions have changed in the main settings, so we update the active session profile
+            currentSessionProfile = {
+              ...profile,
+              isAdmin: authorizedUser.isAdmin,
+              canAddAssets: authorizedUser.canAddAssets,
+              canEditAssets: authorizedUser.canEditAssets,
+              canVerifyAssets: authorizedUser.canVerifyAssets,
+            };
+            // And also update localStorage so it's correct for the next page load
+            localStorage.setItem('ntblcp-user-profile', JSON.stringify(currentSessionProfile));
+          }
+          setUserProfile(currentSessionProfile);
           setProfileSetupComplete(true);
         } else {
           // The user is no longer authorized (or the list is empty), so clear their stale profile.
@@ -101,7 +117,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       id: uuidv4(),
       loginName: user.loginName,
       displayName: user.displayName,
-      email: user.email,
       state: state,
       isAdmin: user.isAdmin,
       isGuest: user.isGuest,

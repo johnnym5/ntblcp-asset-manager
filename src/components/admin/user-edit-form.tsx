@@ -47,7 +47,6 @@ import { ScrollArea } from '../ui/scroll-area';
 const userFormSchema = z.object({
   displayName: z.string().min(2, 'Display name must be at least 2 characters.'),
   loginName: z.string().min(2, 'Login name must be at least 2 characters.').transform(v => v.toLowerCase().trim()),
-  email: z.string().email('Please enter a valid email.'),
   states: z.array(z.string()).min(1, 'At least one state must be selected.'),
   isAdmin: z.boolean(),
   isGuest: z.boolean(),
@@ -81,7 +80,6 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
     defaultValues: {
       displayName: '',
       loginName: '',
-      email: '',
       states: [],
       isAdmin: false,
       isGuest: false,
@@ -101,7 +99,6 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
         form.reset({
           displayName: user.displayName,
           loginName: user.loginName,
-          email: user.email,
           states: user.states,
           isAdmin: user.isAdmin,
           isGuest: user.isGuest || false,
@@ -115,7 +112,6 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
         form.reset({
           displayName: '',
           loginName: '',
-          email: '',
           states: [],
           isAdmin: false,
           isGuest: false,
@@ -180,20 +176,20 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
         </DialogHeader>
         <Form {...form}>
           <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-4">
-            <FormField
-              control={form.control}
-              name="displayName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Display Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="John Doe" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="displayName"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Display Name</FormLabel>
+                    <FormControl>
+                        <Input placeholder="John Doe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
                 <FormField
                 control={form.control}
                 name="loginName"
@@ -207,20 +203,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                     </FormItem>
                 )}
                 />
-                <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                    <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                        <Input placeholder="jdoe@example.com" type="email" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                    </FormItem>
-                )}
-                />
-             </div>
+            </div>
              <div className="grid grid-cols-2 gap-4">
                 <FormField
                     control={form.control}

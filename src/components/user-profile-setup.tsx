@@ -32,7 +32,6 @@ import { Separator } from './ui/separator';
 const superAdmin: AuthorizedUser = {
   loginName: 'admin',
   displayName: 'Super Admin',
-  email: 'admin',
   password: 'setup',
   states: ['All'],
   isAdmin: true,
