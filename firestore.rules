@@ -1,13 +1,7 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Configuration settings - currently public, should be admin-only in a future update.
-    match /config/{docId} {
-      allow read, write: if true;
-    }
-
-    // Asset data - currently public, should be role-based in a future update.
-    match /assets/{assetId} {
+    match /{document=**} {
       allow read, write: if true;
     }
   }
