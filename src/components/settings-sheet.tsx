@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -70,19 +69,29 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    const savedDraft = localStorage.getItem('ntblcp-settings-draft');
     if (isOpen) {
-      setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
+      if (savedDraft) {
+        setDraftSettings(JSON.parse(savedDraft));
+        // Optional: Add a toast to notify user that their draft was restored
+      } else {
+        setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
+      }
     } else {
       setDraftSettings(null);
+      localStorage.removeItem('ntblcp-settings-draft');
     }
   }, [isOpen, appSettings]);
+  
+  useEffect(() => {
+    if (draftSettings) {
+      localStorage.setItem('ntblcp-settings-draft', JSON.stringify(draftSettings));
+    }
+  }, [draftSettings]);
 
   const hasChanges = useMemo(() => {
     if (!draftSettings) return false;
-    // User list and sheet definitions are saved directly now, so we exclude them from this check
-    const settingsA = { ...appSettings, authorizedUsers: [], sheetDefinitions: {} };
-    const settingsB = { ...draftSettings, authorizedUsers: [], sheetDefinitions: {} };
-    return JSON.stringify(settingsA) !== JSON.stringify(settingsB);
+    return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
   }, [appSettings, draftSettings]);
   
   const calculatedChanges = useMemo(() => {
@@ -97,8 +106,12 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (draftSettings.lockAssetList !== appSettings.lockAssetList) {
         changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
     }
-    // user changes are saved instantly.
-    // sheet definitions changes are saved instantly.
+    if (JSON.stringify(draftSettings.authorizedUsers) !== JSON.stringify(appSettings.authorizedUsers)) {
+      changes.push('User list will be updated.');
+    }
+    if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
+      changes.push(`Sheet definitions (headers/columns) will be updated.`);
+    }
     return changes;
   }, [draftSettings, appSettings]);
 
@@ -107,23 +120,10 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (!draftSettings) return;
     setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
   };
-
-  const handleUsersChange = async (newUsers: AuthorizedUser[]) => {
+  
+  const handleUsersChange = (newUsers: AuthorizedUser[]) => {
     if (!draftSettings) return;
-    try {
-      const settingsToSave = { authorizedUsers: newUsers };
-      await updateSettings(settingsToSave);
-
-      const newSettings: AppSettings = { ...appSettings, ...settingsToSave, lastModified: new Date().toISOString() };
-      await saveLocalSettings(newSettings);
-      setAppSettings(newSettings);
-      
-      setDraftSettings(prev => prev ? { ...prev, authorizedUsers: newUsers } : null);
-      
-      toast({ title: "User list updated", description: "The user list has been saved to the database." });
-    } catch (e) {
-      toast({ title: "Save Failed", description: "Could not save user list to the database.", variant: "destructive" });
-    }
+    handleSettingChange('authorizedUsers', newUsers);
   };
 
 
@@ -210,15 +210,12 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const handleConfirmSave = async () => {
     if (!draftSettings) return;
     
-    // Exclude properties that are saved directly
-    const { authorizedUsers, sheetDefinitions, ...otherSettings } = draftSettings;
-    const settingsToSave = { ...otherSettings, lastModified: new Date().toISOString() };
+    const settingsToSave: AppSettings = { ...draftSettings, lastModified: new Date().toISOString() };
 
     try {
       await updateSettings(settingsToSave);
-      const newSettings = { ...appSettings, ...settingsToSave };
-      await saveLocalSettings(newSettings);
-      setAppSettings(newSettings); // Update global state
+      await saveLocalSettings(settingsToSave);
+      setAppSettings(settingsToSave); // Update global state
       toast({ title: "Settings Saved", description: "Your changes have been applied to the database." });
     } catch (e) {
       toast({ title: "Save Failed", description: "Could not save settings to the database.", variant: "destructive" });
@@ -440,7 +437,5 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     </>
   );
 }
-
-    
 
     
