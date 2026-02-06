@@ -10,14 +10,18 @@ import { Inbox, User, MapPin, Clock } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Asset } from '@/lib/types';
 
-interface RecentActivitiesSheetProps {
+interface InboxSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  onViewDetails: (asset: Asset) => void;
 }
 
-export function RecentActivitiesSheet({ isOpen, onOpenChange, onViewDetails }: RecentActivitiesSheetProps) {
-  const { assets } = useAppState();
+export function InboxSheet({ isOpen, onOpenChange }: InboxSheetProps) {
+  const { assets, setAssetToView } = useAppState();
+
+  const handleViewDetails = (asset: Asset) => {
+    setAssetToView(asset);
+    onOpenChange(false);
+  }
 
   const recentlyModifiedAssets = assets
     .filter(asset => asset.lastModified && asset.lastModifiedBy)
@@ -57,7 +61,7 @@ export function RecentActivitiesSheet({ isOpen, onOpenChange, onViewDetails }: R
                       </div>
                   </CardContent>
                   <CardFooter>
-                    <Button variant="secondary" size="sm" onClick={() => onViewDetails(asset)}>View Details</Button>
+                    <Button variant="secondary" size="sm" onClick={() => handleViewDetails(asset)}>View Details</Button>
                   </CardFooter>
                 </Card>
               ))}

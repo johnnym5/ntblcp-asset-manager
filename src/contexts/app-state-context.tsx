@@ -1,9 +1,11 @@
+
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
-import type { Asset } from '@/lib/types';
+import type { Asset, AppSettings } from '@/lib/types';
+import { HEADER_DEFINITIONS } from '@/lib/constants';
 
 
 export interface SortConfig {
@@ -16,6 +18,7 @@ export interface DataActions {
   onExport?: () => void;
   onAddAsset?: () => void;
   onClearAll?: () => void;
+  onTravelReport?: () => void;
   isImporting?: boolean;
   isAdmin?: boolean;
   hasAssets?: boolean;
@@ -24,12 +27,18 @@ export interface DataActions {
 interface AppStateContextType {
   assets: Asset[];
   setAssets: Dispatch<SetStateAction<Asset[]>>;
+  offlineAssets: Asset[];
+  setOfflineAssets: Dispatch<SetStateAction<Asset[]>>;
   isOnline: boolean;
   setIsOnline: Dispatch<SetStateAction<boolean>>;
   searchTerm: string;
   setSearchTerm: Dispatch<SetStateAction<string>>;
   globalStateFilter: string;
   setGlobalStateFilter: Dispatch<SetStateAction<string>>;
+  itemsPerPage: number;
+  setItemsPerPage: Dispatch<SetStateAction<number>>;
+  dataSource: 'cloud' | 'local_locked';
+  setDataSource: Dispatch<SetStateAction<'cloud' | 'local_locked'>>;
   
   // Filters
   selectedLocations: string[];
@@ -53,15 +62,11 @@ interface AppStateContextType {
   sortConfig: SortConfig | null;
   setSortConfig: Dispatch<SetStateAction<SortConfig | null>>;
 
-  // Sheet Settings
-  enabledSheets: string[];
-  setEnabledSheets: Dispatch<SetStateAction<string[]>>;
-  lockAssetList: boolean;
-  setLockAssetList: Dispatch<SetStateAction<boolean>>;
+  // App Settings
+  appSettings: AppSettings;
+  setAppSettings: Dispatch<SetStateAction<AppSettings>>;
   
   // Sync Settings
-  autoSyncEnabled: boolean;
-  setAutoSyncEnabled: Dispatch<SetStateAction<boolean>>;
   manualSyncTrigger: number;
   setManualSyncTrigger: Dispatch<SetStateAction<number>>;
   isSyncing: boolean;
@@ -74,21 +79,29 @@ interface AppStateContextType {
   // Inbox count for UI display
   unreadInboxCount: number;
   setUnreadInboxCount: Dispatch<SetStateAction<number>>;
+  dismissedActivities: string[];
+  setDismissedActivities: Dispatch<SetStateAction<string[]>>;
+
+  // Cross-component communication
+  assetToView: Asset | null;
+  setAssetToView: Dispatch<SetStateAction<Asset | null>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
+  const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
   const [isOnline, setIsOnline] = useState(() => {
     if (typeof window !== 'undefined') {
       const savedStatus = localStorage.getItem('ntblcp-online-status');
-      return savedStatus ? JSON.parse(savedStatus) : false;
+      return savedStatus ? JSON.parse(savedStatus) : true;
     }
-    return false;
+    return true;
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const [globalStateFilter, setGlobalStateFilter] = useState('');
+  const [globalStateFilter, setGlobalStateFilter] = useState('All');
+  const [itemsPerPage, setItemsPerPage] = useState(25);
   
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
@@ -101,29 +114,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'description', direction: 'asc' });
 
-  const [enabledSheets, setEnabledSheets] = useState<string[]>(() => {
-    if (typeof window !== 'undefined') {
-      const savedSheets = localStorage.getItem('ntblcp-enabled-sheets');
-      return savedSheets ? JSON.parse(savedSheets) : [...TARGET_SHEETS];
-    }
-    return [...TARGET_SHEETS];
-  });
-  
-  const [lockAssetList, setLockAssetList] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const savedLock = localStorage.getItem('ntblcp-asset-lock');
-      // Default to true (locked) unless explicitly set to false by an admin.
-      return savedLock ? JSON.parse(savedLock) : true;
-    }
-    return true;
-  });
-
-  const [autoSyncEnabled, setAutoSyncEnabled] = useState<boolean>(() => {
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('ntblcp-autosync-enabled');
-      return saved ? JSON.parse(saved) : true; // Default to true for admins
-    }
-    return true;
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    authorizedUsers: [],
+    sheetDefinitions: HEADER_DEFINITIONS,
+    enabledSheets: TARGET_SHEETS,
+    lockAssetList: true,
+    autoSyncEnabled: true,
   });
 
   const [manualSyncTrigger, setManualSyncTrigger] = useState(0);
@@ -131,19 +127,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [dataActions, setDataActions] = useState<DataActions>({});
   
   const [unreadInboxCount, setUnreadInboxCount] = useState(0);
+  const [dismissedActivities, setDismissedActivities] = useState<string[]>([]);
 
+  const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
+  const [assetToView, setAssetToView] = useState<Asset | null>(null);
 
-  useEffect(() => {
-    localStorage.setItem('ntblcp-enabled-sheets', JSON.stringify(enabledSheets));
-  }, [enabledSheets]);
-  
-  useEffect(() => {
-    localStorage.setItem('ntblcp-asset-lock', JSON.stringify(lockAssetList));
-  }, [lockAssetList]);
-
-  useEffect(() => {
-    localStorage.setItem('ntblcp-autosync-enabled', JSON.stringify(autoSyncEnabled));
-  }, [autoSyncEnabled]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -152,44 +140,28 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   }, [isOnline]);
 
   const value = {
-    assets,
-    setAssets,
-    isOnline,
-    setIsOnline,
-    searchTerm,
-    setSearchTerm,
-    globalStateFilter,
-    setGlobalStateFilter,
-    selectedLocations,
-    setSelectedLocations,
-    selectedAssignees,
-    setSelectedAssignees,
-    selectedStatuses,
-    setSelectedStatuses,
-    missingFieldFilter,
-    setMissingFieldFilter,
-    locationOptions,
-    setLocationOptions,
-    assigneeOptions,
-    setAssigneeOptions,
-    statusOptions,
-    setStatusOptions,
-    sortConfig,
-    setSortConfig,
-    enabledSheets,
-    setEnabledSheets,
-    lockAssetList,
-    setLockAssetList,
-    autoSyncEnabled,
-    setAutoSyncEnabled,
-    manualSyncTrigger,
-    setManualSyncTrigger,
-    isSyncing,
-    setIsSyncing,
-    dataActions,
-    setDataActions,
-    unreadInboxCount,
-    setUnreadInboxCount,
+    assets, setAssets,
+    offlineAssets, setOfflineAssets,
+    isOnline, setIsOnline,
+    searchTerm, setSearchTerm,
+    globalStateFilter, setGlobalStateFilter,
+    itemsPerPage, setItemsPerPage,
+    selectedLocations, setSelectedLocations,
+    selectedAssignees, setSelectedAssignees,
+    selectedStatuses, setSelectedStatuses,
+    missingFieldFilter, setMissingFieldFilter,
+    locationOptions, setLocationOptions,
+    assigneeOptions, setAssigneeOptions,
+    statusOptions, setStatusOptions,
+    sortConfig, setSortConfig,
+    appSettings, setAppSettings,
+    manualSyncTrigger, setManualSyncTrigger,
+    isSyncing, setIsSyncing,
+    dataActions, setDataActions,
+    unreadInboxCount, setUnreadInboxCount,
+    dismissedActivities, setDismissedActivities,
+    dataSource, setDataSource,
+    assetToView, setAssetToView
   };
 
   return (

@@ -197,6 +197,7 @@ export default function AssetList() {
     setDataActions,
     searchTerm,
     autoSyncEnabled,
+    assetToView, setAssetToView
   } = useAppState();
 
   const { enabledSheets, lockAssetList, sheetDefinitions } = appSettings;
@@ -478,6 +479,13 @@ export default function AssetList() {
     setSelectedAsset(asset);
     setIsFormOpen(true);
   };
+
+  useEffect(() => {
+    if (assetToView) {
+        handleViewAsset(assetToView);
+        setAssetToView(null);
+    }
+  }, [assetToView, setAssetToView]);
 
   const handleEditAsset = (asset: Asset) => {
     if (!userProfile?.canEditAssets && !isAdmin) {
