@@ -6,7 +6,7 @@ import type { Asset, AppSettings } from '@/lib/types';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors';
 import { addNotification } from '@/hooks/use-notifications';
-import { ref, set as rtdbSet, get as rtdbGet } from 'firebase/database';
+import { ref, set as rtdbSet, get as rtdbGet, update as rtdbUpdate } from 'firebase/database';
 import { getLocalAssets as getLocalAssetsFromDb } from './idb';
 
 
@@ -143,7 +143,7 @@ export async function batchSetAssetsRTDB(assets: Asset[]) {
         delete (assetToSave as any).id;
         updates[`/assets/${asset.id}`] = assetToSave;
     }
-    await rtdbSet(ref(db), updates);
+    await rtdbUpdate(ref(db), updates);
 }
 
 export async function batchDeleteAssetsRTDB(assetIds: string[]) {
@@ -152,7 +152,7 @@ export async function batchDeleteAssetsRTDB(assetIds: string[]) {
     for (const assetId of assetIds) {
         updates[`/assets/${assetId}`] = null;
     }
-    await rtdbSet(ref(db), updates);
+    await rtdbUpdate(ref(db), updates);
 }
 
 
