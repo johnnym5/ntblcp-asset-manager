@@ -98,38 +98,6 @@ interface AppStateContextType {
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
-// This custom hook manages the AppSettings state while ensuring the databaseSource
-// preference is persisted to localStorage for immediate access on app load.
-const useAppSettingsWithPersistence = (): [AppSettings, Dispatch<SetStateAction<AppSettings>>] => {
-  const [appSettings, _setAppSettings] = useState<AppSettings>(() => {
-    // Force RTDB as the primary database to resolve post-deployment issues.
-    return {
-      authorizedUsers: [],
-      sheetDefinitions: HEADER_DEFINITIONS,
-      enabledSheets: TARGET_SHEETS,
-      lockAssetList: true,
-      appMode: 'management',
-      databaseSource: 'rtdb',
-    };
-  });
-
-  const setAppSettings: Dispatch<SetStateAction<AppSettings>> = (newSettingsAction) => {
-    _setAppSettings(prevState => {
-      const resolvedSettings = typeof newSettingsAction === 'function' ? newSettingsAction(prevState) : newSettingsAction;
-      
-      // Force databaseSource to RTDB and persist it to localStorage.
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('ntblcp-db-source', 'rtdb');
-      }
-      
-      return {...resolvedSettings, databaseSource: 'rtdb'};
-    });
-  };
-
-  return [appSettings, setAppSettings];
-};
-
-
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
@@ -155,7 +123,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'sn', direction: 'asc' });
 
-  const [appSettings, setAppSettings] = useAppSettingsWithPersistence();
+  const [appSettings, setAppSettings] = useState<AppSettings>({
+    authorizedUsers: [],
+    sheetDefinitions: HEADER_DEFINITIONS,
+    enabledSheets: TARGET_SHEETS,
+    lockAssetList: true,
+    appMode: 'management',
+    databaseSource: 'rtdb',
+  });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
@@ -172,40 +147,36 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
 
   const triggerFailover = () => {
-    // This function is now less relevant as we are hard-coding to RTDB.
-    // Kept for potential future use.
     console.warn("Failover triggered, but the app is already locked to RTDB.");
   };
 
   useEffect(() => {
-    // This effect is now simplified as failover is not the primary mechanism.
-  }, [isInFailoverMode]);
-
-
-  useEffect(() => {
-    const fetchAndApplySettings = async () => {
-      if (!isOnline || !settingsLoaded) return;
+    const syncRemoteSettings = async () => {
+      if (!isOnline) return;
 
       try {
         const remoteSettings = await getSettings();
         const localSettings = await getLocalSettings();
-        
-        if (remoteSettings && remoteSettings.lastModified && (!localSettings || !localSettings.lastModified || new Date(remoteSettings.lastModified) > new Date(localSettings.lastModified))) {
-          console.log("Polling: Found newer settings in the cloud, updating local state.");
-          setAppSettings(remoteSettings);
-          await saveLocalSettings(remoteSettings);
+
+        if (remoteSettings) {
+          const remoteTimestamp = remoteSettings.lastModified ? new Date(remoteSettings.lastModified).getTime() : 0;
+          const localTimestamp = localSettings?.lastModified ? new Date(localSettings.lastModified).getTime() : 0;
+
+          if (remoteTimestamp > localTimestamp) {
+            console.log("Found newer settings in the cloud, updating local state.");
+            const finalSettings = { ...remoteSettings, databaseSource: 'rtdb' as const };
+            setAppSettings(finalSettings);
+            await saveLocalSettings(finalSettings);
+          }
         }
       } catch (error) {
-        console.warn("Could not fetch remote settings on interval. Using local version.", error);
+        console.warn("Could not sync remote settings. Using local version.", error);
       }
     };
 
-    const initializeSettings = async () => {
+    const initializeAndSyncSettings = async () => {
       let localSettings = await getLocalSettings();
 
-      // Force RTDB on initialization
-      const dbSource = 'rtdb';
-      
       if (!localSettings) {
         localSettings = {
           authorizedUsers: [],
@@ -213,25 +184,33 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           enabledSheets: TARGET_SHEETS,
           lockAssetList: true,
           appMode: 'management',
-          databaseSource: dbSource,
+          databaseSource: 'rtdb',
         };
       } else {
-        localSettings.databaseSource = dbSource;
+        localSettings.databaseSource = 'rtdb';
       }
       
-      await saveLocalSettings(localSettings);
       setAppSettings(localSettings);
+      await saveLocalSettings(localSettings);
       setSettingsLoaded(true);
+
+      // Immediately after setting local state, sync with remote
+      await syncRemoteSettings();
     };
-    
+
     if (!settingsLoaded) {
-        initializeSettings();
+      initializeAndSyncSettings();
     }
 
-    const interval = setInterval(fetchAndApplySettings, 30000);
-    return () => clearInterval(interval);
+    const interval = setInterval(syncRemoteSettings, 30000); // Poll every 30s
+    const handleFocus = () => syncRemoteSettings();
+    window.addEventListener('focus', handleFocus);
 
-  }, [isOnline, settingsLoaded, setAppSettings]);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener('focus', handleFocus);
+    };
+  }, [isOnline, settingsLoaded]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !settingsLoaded) return;
