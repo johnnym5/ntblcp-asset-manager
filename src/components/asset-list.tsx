@@ -516,6 +516,10 @@ export default function AssetList() {
       addNotification({ title: "Permission Denied", description: "You do not have permission to edit assets.", variant: "destructive" });
       return;
     }
+    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+      addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
+      return;
+    }
     setSelectedAsset(asset);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
@@ -606,10 +610,18 @@ export default function AssetList() {
       addNotification({ title: "Permission Denied", description: "You do not have permission to batch edit.", variant: "destructive" });
       return;
     }
+    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+        addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
+        return;
+    }
     setIsBatchEditOpen(true);
   }
   
   const handleSaveBatchEdit = async (data: BatchUpdateData) => {
+    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+        addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
+        return;
+    }
     const assetsToUpdateCount = selectedAssetIds.length;
     addNotification({ title: 'Batch Updating...', description: `Applying changes to ${assetsToUpdateCount} assets.` });
     
@@ -653,6 +665,16 @@ export default function AssetList() {
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
+    if (dataSource === 'cloud' && lockAssetList && isAdmin) {
+      const isNewAsset = !assets.some(a => a.id === assetToSave.id);
+      if (isNewAsset) {
+          addNotification({ title: "Add Disabled", description: "Cannot add new assets to the locked main list.", variant: "destructive" });
+      } else {
+          addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
+      }
+      return;
+    }
+
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
 
@@ -1498,6 +1520,10 @@ export default function AssetList() {
                                     <Select
                                       value={asset.verifiedStatus || 'Unverified'}
                                       onValueChange={async (status) => {
+                                        if (lockAssetList && isAdmin && dataSource === 'cloud') {
+                                            addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
+                                            return;
+                                        }
                                         const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
                                         await handleQuickSaveAsset(asset.id, {
                                             verifiedStatus: status as 'Verified' | 'Unverified',
@@ -1601,3 +1627,5 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
