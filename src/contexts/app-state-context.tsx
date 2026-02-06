@@ -138,9 +138,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const initializeSettings = async () => {
       let settings = await getLocalSettings();
-      let settingsModified = false;
 
       if (!settings) {
+        // If no settings exist, create a default, empty configuration.
+        // The first admin user will need to be added through the UI
+        // by an existing admin, or provisioned directly in the database
+        // for a first-time setup.
         settings = {
           authorizedUsers: [],
           sheetDefinitions: HEADER_DEFINITIONS,
@@ -148,31 +151,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           lockAssetList: true,
           appMode: 'management',
         };
-        settingsModified = true;
-      }
-      
-      const adminEmail = 'jegbase@gmail.com';
-      const adminExists = settings.authorizedUsers.some(u => u.email.toLowerCase() === adminEmail);
-
-      if (!adminExists) {
-        settings.authorizedUsers.push({
-          loginName: 'jegbase',
-          displayName: 'Jegbase Admin',
-          email: adminEmail,
-          password: 'password',
-          states: ['All'],
-          isAdmin: true,
-          isGuest: false,
-          canAddAssets: true,
-          canEditAssets: true,
-        });
-        settingsModified = true;
-      }
-      
-      if (settingsModified) {
         await saveLocalSettings(settings);
       }
-
       setAppSettings(settings);
     };
 

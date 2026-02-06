@@ -26,7 +26,6 @@ interface AuthContextType {
   authInitialized: boolean;
   login: (user: AuthorizedUser, state: string) => Promise<void>;
   logout: () => void;
-  updatePassword: (password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -105,19 +104,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const updatePassword = async (password: string) => {
-    if (!userProfile) return;
-
-    const newUsers = appSettings.authorizedUsers.map(u => 
-      u.loginName === userProfile.loginName ? { ...u, password } : u
-    );
-
-    setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
-    // No need to persist here if we assume `updateSettings` from user-management is the only way
-    // But since this is a user action, we should persist.
-    // This requires `updateSettings` in firestore.ts
-  };
-
   const logout = async () => {
     setLoading(true);
     localStorage.removeItem('ntblcp-user-profile');
@@ -126,7 +112,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.href = '/';
   };
 
-  const value = { userProfile, loading, profileSetupComplete, login, logout, updatePassword, authInitialized };
+  const value = { userProfile, loading, profileSetupComplete, login, logout, authInitialized };
 
   return (
     <AuthContext.Provider value={value}>
