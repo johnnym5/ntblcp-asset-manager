@@ -40,22 +40,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { setAssets, appSettings, setAppSettings } = useAppState();
 
   useEffect(() => {
+    // Do not attempt to validate a user until the authorized user list has loaded from the database.
+    if (appSettings.authorizedUsers.length === 0) {
+      // If there's no saved profile, we can stop loading. Otherwise, wait for the user list.
+      const savedProfile = localStorage.getItem('ntblcp-user-profile');
+      if (!savedProfile) {
+        setLoading(false);
+        setAuthInitialized(true);
+      }
+      return;
+    }
+
     try {
         const savedProfile = localStorage.getItem('ntblcp-user-profile');
         if (savedProfile) {
             const profile: LocalUserProfile = JSON.parse(savedProfile);
+            // Now that we have the user list, find the corresponding authorized user.
             const authorizedUser = appSettings.authorizedUsers.find(u => u.loginName === profile.loginName);
             
             if (authorizedUser) {
+                // User is valid, set their profile and mark setup as complete.
                 setUserProfile(profile);
                 setProfileSetupComplete(true);
             } else {
+                // The user saved in localStorage is no longer in the authorized list. Log them out.
                 localStorage.removeItem('ntblcp-user-profile');
             }
         }
     } catch (e) {
         console.error("Failed to load user profile from local storage", e);
     } finally {
+        // In all cases, once this logic runs, authentication is initialized and loading is complete.
         setLoading(false);
         setAuthInitialized(true);
     }
