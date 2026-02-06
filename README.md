@@ -1,6 +1,6 @@
-# NTBLCP Asset Manager
+# Asset Manager
 
-A full-featured, offline-first Asset Management Web App for NTBLCP, built with Next.js, Tailwind CSS, and Firebase.
+A full-featured, offline-first Asset Management Web App, built with Next.js, Tailwind CSS, and Firebase.
 
 ## Application Features & Overview
 

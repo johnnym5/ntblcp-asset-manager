@@ -148,12 +148,12 @@ export function ColumnCustomizationSheet({
         <SheetHeader>
           <SheetTitle>Customize Sheet Layout</SheetTitle>
           <SheetDescription>
-            Rename the sheet, reorder fields, and edit labels. Changes here affect the asset form layout.
+            Reorder fields and edit their labels. To prevent data loss, renaming a sheet is disabled.
           </SheetDescription>
         </SheetHeader>
         <div className="px-1 py-4">
             <Label htmlFor="sheet-name" className="text-sm font-medium">Sheet Name</Label>
-            <Input id="sheet-name" value={editedName} onChange={(e) => setEditedName(e.target.value)} className="mt-1" />
+            <Input id="sheet-name" value={editedName} onChange={(e) => setEditedName(e.target.value)} className="mt-1" disabled />
         </div>
         <div className="flex-grow overflow-hidden flex flex-col">
           <div className="flex items-center px-4 py-2 border-y font-medium text-sm bg-muted/50">

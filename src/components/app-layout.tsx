@@ -230,7 +230,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Left Side */}
         <div className="flex items-center gap-2">
             <Boxes className="h-5 w-5 text-primary" />
-            <span className="text-lg font-semibold hidden sm:inline-block">NTBLCP Asset Manager</span>
+            <span className="text-lg font-semibold hidden sm:inline-block">Asset Manager</span>
         </div>
         
         {/* Right Side */}
