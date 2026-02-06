@@ -12,15 +12,7 @@ import {
   SheetClose,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
-import { Check, Dot } from 'lucide-react';
+import { Check } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
@@ -83,47 +75,47 @@ const FilterSection = ({ title, options, selected, onChange }: {
     <div className="space-y-2">
       <Label className="font-semibold">{title}</Label>
       <div className="rounded-md border">
-        <Command>
-          <CommandInput placeholder={`Filter ${title.toLowerCase()}...`} />
-          <CommandList>
-            <ScrollArea className="h-[150px]">
-              <CommandEmpty>No results found.</CommandEmpty>
-              <CommandGroup>
-                {options.map((option) => {
-                  const isSelected = selected.includes(option.value);
-                  return (
-                    <CommandItem
-                      key={option.value}
-                      onSelect={() => handleSelect(option.value)}
-                      className="cursor-pointer"
-                    >
-                      <div className="flex items-center justify-between w-full">
-                        <div className="flex items-center">
-                          <div
-                            className={cn(
-                              "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
-                              isSelected
-                                ? "bg-primary text-primary-foreground"
-                                : "opacity-50 [&_svg]:invisible"
-                            )}
-                          >
-                            <Check className={cn("h-4 w-4")} />
-                          </div>
-                          <span>{option.label}</span>
+        <ScrollArea className="h-[150px]">
+          <div className="p-1">
+            {options.length > 0 ? (
+              options.map((option) => {
+                const isSelected = selected.includes(option.value);
+                return (
+                  <div
+                    key={option.value}
+                    onClick={() => handleSelect(option.value)}
+                    className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
+                  >
+                    <div className="flex w-full items-center justify-between">
+                      <div className="flex items-center">
+                        <div
+                          className={cn(
+                            'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
+                            isSelected
+                              ? 'bg-primary text-primary-foreground'
+                              : 'opacity-50 [&_svg]:invisible'
+                          )}
+                        >
+                          <Check className={cn('h-4 w-4')} />
                         </div>
-                        {option.count !== undefined && (
-                           <span className="ml-2 text-xs text-muted-foreground font-mono bg-muted/50 px-1.5 py-0.5 rounded-sm">
-                            {option.count}
-                          </span>
-                        )}
+                        <span>{option.label}</span>
                       </div>
-                    </CommandItem>
-                  );
-                })}
-              </CommandGroup>
-            </ScrollArea>
-          </CommandList>
-        </Command>
+                      {option.count !== undefined && (
+                        <span className="ml-2 rounded-sm bg-muted/50 px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
+                          {option.count}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="py-6 text-center text-sm text-muted-foreground">
+                No options available.
+              </p>
+            )}
+          </div>
+        </ScrollArea>
       </div>
     </div>
   );

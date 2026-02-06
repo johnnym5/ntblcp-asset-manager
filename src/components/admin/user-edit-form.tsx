@@ -39,10 +39,10 @@ import type { AuthorizedUser } from '@/lib/types';
 import { NIGERIAN_STATES } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { ChevronsUpDown, Check } from 'lucide-react';
-import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from '../ui/command';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { Separator } from '../ui/separator';
+import { ScrollArea } from '../ui/scroll-area';
 
 const userFormSchema = z.object({
   displayName: z.string().min(2, 'Display name must be at least 2 characters.'),
@@ -269,37 +269,41 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                         </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                        <Command>
-                            <CommandList>
-                                <CommandEmpty>No state found.</CommandEmpty>
-                                <CommandGroup>
-                                    {NIGERIAN_STATES.map((state) => (
-                                    <CommandItem
-                                        value={state}
-                                        key={state}
-                                        onSelect={() => {
-                                            const selectedStates = field.value || [];
-                                            const isSelected = selectedStates.includes(state);
-                                            form.setValue(
-                                                "states",
-                                                isSelected ? selectedStates.filter(s => s !== state) : [...selectedStates, state]
-                                            );
-                                        }}
+                           <ScrollArea className="h-[200px]">
+                              <div className="p-1">
+                                {NIGERIAN_STATES.map((state) => {
+                                  const isSelected = (field.value || []).includes(state);
+                                  return (
+                                    <div
+                                      key={state}
+                                      onClick={() => {
+                                        const selectedStates = field.value || [];
+                                        const isCurrentlySelected = selectedStates.includes(state);
+                                        form.setValue(
+                                          "states",
+                                          isCurrentlySelected
+                                            ? selectedStates.filter(s => s !== state)
+                                            : [...selectedStates, state]
+                                        );
+                                      }}
+                                      className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
                                     >
-                                        <Check
+                                      <div
                                         className={cn(
-                                            "mr-2 h-4 w-4",
-                                            (field.value || []).includes(state)
-                                            ? "opacity-100"
-                                            : "opacity-0"
+                                          "mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary",
+                                          isSelected
+                                            ? "bg-primary text-primary-foreground"
+                                            : "opacity-50 [&_svg]:invisible"
                                         )}
-                                        />
-                                        {state}
-                                    </CommandItem>
-                                    ))}
-                                </CommandGroup>
-                            </CommandList>
-                        </Command>
+                                      >
+                                        <Check className={cn("h-4 w-4")} />
+                                      </div>
+                                      {state}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </ScrollArea>
                         </PopoverContent>
                     </Popover>
                     <div className="flex flex-wrap gap-1 pt-1">
