@@ -124,25 +124,26 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
         
         let disabled = initialIsReadOnly;
 
-        if (!disabled) { // Only check permissions if the form isn't in read-only mode
-            if (!isAdmin) {
-                const canEdit = !!userProfile?.canEditAssets;
+        if (!disabled && !isAdmin) { // If not already readonly and not an admin
+            if (appSettings.appMode === 'management') {
+                // In management mode, non-admins can't edit anything.
+                disabled = true;
+            } else if (appSettings.appMode === 'verification') {
                 const canVerify = !!userProfile?.canVerifyAssets;
-                const isVerificationField = ['verifiedStatus', 'remarks', 'condition'].includes(fieldName);
-                const isVerifiedDateField = fieldName === 'verifiedDate';
-
-                if (isVerificationField) {
+                if (['verifiedStatus', 'remarks', 'condition'].includes(fieldName)) {
+                    // In verification mode, check if the user has permission for verification fields.
                     disabled = !canVerify;
-                } else if (isVerifiedDateField) {
-                    disabled = true; // Always disable direct editing of verified date, it's automatic.
-                }
-                else {
-                    disabled = !canEdit;
+                } else {
+                    // All other fields are disabled for non-admins in verification mode.
+                    disabled = true;
                 }
             }
         }
 
-        // Also keep original special locks
+        // Special locks that apply regardless of mode
+        if (fieldName === 'verifiedDate') {
+            disabled = true;
+        }
         if ((fieldName === 'location' && !isAdmin) || (fieldName === 'category' && !!asset)) {
             disabled = true;
         }

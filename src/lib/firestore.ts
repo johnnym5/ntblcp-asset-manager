@@ -61,9 +61,11 @@ export async function updateSettings(settings: Partial<AppSettings>) {
 
   // Write to Firestore
   const settingsRef = doc(firestoreDb, 'config', 'settings');
-  setDoc(settingsRef, settingsWithTimestamp, { merge: true }).catch(async (serverError) => {
+  try {
+    await setDoc(settingsRef, settingsWithTimestamp, { merge: true });
+  } catch (serverError) {
     handleFirestoreError(serverError, { path: settingsRef.path, operation: 'update' });
-  });
+  }
   
   // Write to Realtime DB
   const rtdbSettingsRef = ref(rtdbInstance, 'config/settings');
