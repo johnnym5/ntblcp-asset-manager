@@ -1,17 +1,16 @@
-
 // Import the necessary functions from the Firebase SDKs.
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getDatabase, type Database } from "firebase/database";
 
-// Your web app's Firebase configuration is now empty to disconnect the app.
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyDhBbeiAZGWzCHQXbbTcNXdsIT_6Gz3qJU",
+  authDomain: "ntblcp-asset-manager.firebaseapp.com",
+  projectId: "ntblcp-asset-manager",
+  storageBucket: "ntblcp-asset-manager.appspot.com",
+  messagingSenderId: "573481845773",
+  appId: "1:573481845773:web:5040ae77a51681c05bc144"
 };
 
 
