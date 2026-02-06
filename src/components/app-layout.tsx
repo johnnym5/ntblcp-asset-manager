@@ -374,7 +374,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Center Search */}
         <div className="w-full md:flex-1 md:order-2 md:px-4">
             {pathname === '/' && (
-                <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+                <div className="relative flex items-center w-full h-10 rounded-full border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
                     <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
                     <Input
                         type="search"
