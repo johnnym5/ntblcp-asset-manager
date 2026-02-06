@@ -1374,7 +1374,7 @@ export default function AssetList() {
                         </SelectContent>
                       </Select>
                     )}
-                    <div className="flex items-center justify-start gap-4">
+                    <div className="flex items-center justify-between gap-4">
                       <div className="flex items-center space-x-2">
                         <Label htmlFor="select-all-categories" className="text-sm font-medium whitespace-nowrap">Select All</Label>
                         <Checkbox
@@ -1798,3 +1798,5 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
