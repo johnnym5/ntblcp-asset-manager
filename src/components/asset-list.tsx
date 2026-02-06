@@ -1170,11 +1170,9 @@ export default function AssetList() {
     });
 
     if (data.hide && isAdmin) {
-        const newSettings = { 
-          ...appSettings,
-          enabledSheets: appSettings.enabledSheets.filter(sheet => !selectedCategories.includes(sheet))
-        };
-        // await updateSettings(newSettings);
+        const newEnabledSheets = appSettings.enabledSheets.filter(sheet => !selectedCategories.includes(sheet));
+        setAppSettings(prev => ({ ...prev, enabledSheets: newEnabledSheets }));
+        await updateSettings({ enabledSheets: newEnabledSheets });
         addNotification({ title: 'Sheets Hidden', description: `${selectedCategories.length} categories have been hidden from view.`});
         setSelectedCategories([]);
     }
@@ -1936,6 +1934,8 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
 
     
 
