@@ -1,12 +1,11 @@
 
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
-import type { Asset, UserProfile, AppSettings } from './types';
+import type { Asset, AppSettings } from './types';
 
 const DB_NAME = 'ntblcp-asset-db';
 const DB_VERSION = 4; // Incremented version
 const ASSET_STORE_NAME = 'assets';
 const OFFLINE_ASSET_STORE_NAME = 'offline-assets';
-const USER_PROFILE_STORE_NAME = 'userProfile';
 const SETTINGS_STORE_NAME = 'settings';
 
 interface AssetDB extends DBSchema {
@@ -17,10 +16,6 @@ interface AssetDB extends DBSchema {
   [OFFLINE_ASSET_STORE_NAME]: {
     key: string;
     value: Asset;
-  };
-  [USER_PROFILE_STORE_NAME]: {
-    key: string;
-    value: UserProfile;
   };
   [SETTINGS_STORE_NAME]: {
     key: string;
@@ -41,11 +36,6 @@ const getDb = (): Promise<IDBPDatabase<AssetDB>> | null => {
                 if (oldVersion < 1) {
                   if (!db.objectStoreNames.contains(ASSET_STORE_NAME)) {
                       db.createObjectStore(ASSET_STORE_NAME, { keyPath: 'id' });
-                  }
-                }
-                if (oldVersion < 2) {
-                  if (!db.objectStoreNames.contains(USER_PROFILE_STORE_NAME)) {
-                    db.createObjectStore(USER_PROFILE_STORE_NAME, { keyPath: 'uid' });
                   }
                 }
                 if (oldVersion < 3) {
@@ -164,40 +154,3 @@ export const saveLocalSettings = async (settings: AppSettings): Promise<void> =>
     console.error("Failed to save settings to IndexedDB", error);
   }
 };
-
-
-// --- USER PROFILE FUNCTIONS ---
-
-export const saveLocalUserProfile = async (profile: UserProfile): Promise<void> => {
-  const dbp = getDb();
-  if (!dbp) return;
-  try {
-    const db = await dbp;
-    await db.put(USER_PROFILE_STORE_NAME, profile);
-  } catch (error) {
-    console.error("Failed to save user profile to IndexedDB", error);
-  }
-};
-
-export const getLocalUserProfile = async (uid: string): Promise<UserProfile | undefined> => {
-  const dbp = getDb();
-  if (!dbp) return undefined;
-  try {
-    const db = await dbp;
-    return await db.get(USER_PROFILE_STORE_NAME, uid);
-  } catch (error) {
-    console.error("Failed to get user profile from IndexedDB", error);
-    return undefined;
-  }
-}
-
-export const clearLocalUserProfile = async (): Promise<void> => {
-  const dbp = getDb();
-  if (!dbp) return;
-  try {
-    const db = await dbp;
-    await db.clear(USER_PROFILE_STORE_NAME);
-  } catch (error) {
-    console.error("Failed to clear user profile from IndexedDB", error);
-  }
-}

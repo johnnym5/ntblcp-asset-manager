@@ -30,7 +30,6 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  FileDown,
   MoreHorizontal,
   Loader2,
   Trash2,
@@ -50,7 +49,6 @@ import {
   Database,
   PlusCircle,
   ScanSearch,
-  Library,
   CloudOff,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
@@ -918,23 +916,6 @@ export default function AssetList() {
     setIsImporting(false);
   };
   
-  const handleExportClick = useCallback(() => {
-    if (displayedAssets.length === 0) {
-      addNotification({ title: "No Data to Export", description: "There are no assets matching the current filters." });
-      return;
-    }
-    try {
-      const exportPrefix = userProfile?.state || 'user-export';
-      const fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-
-      exportToExcel(displayedAssets, appSettings.sheetDefinitions, fileName);
-      addNotification({ title: "Export Successful" });
-    } catch(error) {
-      console.error("Export Error:", error);
-      addNotification({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
-    }
-  }, [displayedAssets, userProfile, appSettings]);
-
   const handleTravelReport = useCallback(() => setIsTravelReportOpen(true), []);
   
   const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
@@ -1003,7 +984,6 @@ export default function AssetList() {
         onScanAndImport: () => setIsImportScanOpen(true),
         onClearAll: handleClearAllClick,
         onTravelReport: handleTravelReport,
-        onExport: handleExportClick,
         isImporting,
     });
     return () => setDataActions({});
@@ -1013,7 +993,6 @@ export default function AssetList() {
     handleImportClick, 
     handleClearAllClick, 
     handleTravelReport,
-    handleExportClick,
     isImporting
   ]);
 
