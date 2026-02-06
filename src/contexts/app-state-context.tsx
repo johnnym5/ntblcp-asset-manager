@@ -98,6 +98,41 @@ interface AppStateContextType {
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
+// This custom hook manages the AppSettings state while ensuring the databaseSource
+// preference is persisted to localStorage for immediate access on app load.
+const useAppSettingsWithPersistence = (): [AppSettings, Dispatch<SetStateAction<AppSettings>>] => {
+  const [appSettings, _setAppSettings] = useState<AppSettings>(() => {
+    // On initial load, prioritize the database source from localStorage.
+    const initialDbSource = (typeof window !== 'undefined' ? localStorage.getItem('ntblcp-db-source') : 'firestore') as 'firestore' | 'rtdb' || 'firestore';
+    return {
+      authorizedUsers: [],
+      sheetDefinitions: HEADER_DEFINITIONS,
+      enabledSheets: TARGET_SHEETS,
+      lockAssetList: true,
+      appMode: 'management',
+      databaseSource: initialDbSource,
+    };
+  });
+
+  const setAppSettings: Dispatch<SetStateAction<AppSettings>> = (newSettingsAction) => {
+    _setAppSettings(prevState => {
+      const resolvedSettings = typeof newSettingsAction === 'function' ? newSettingsAction(prevState) : newSettingsAction;
+      
+      // Whenever settings are updated, persist the databaseSource to localStorage.
+      if (typeof window !== 'undefined' && resolvedSettings.databaseSource) {
+        if (localStorage.getItem('ntblcp-db-source') !== resolvedSettings.databaseSource) {
+          localStorage.setItem('ntblcp-db-source', resolvedSettings.databaseSource);
+        }
+      }
+      
+      return resolvedSettings;
+    });
+  };
+
+  return [appSettings, setAppSettings];
+};
+
+
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
@@ -123,14 +158,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'sn', direction: 'asc' });
 
-  const [appSettings, setAppSettings] = useState<AppSettings>({
-    authorizedUsers: [],
-    sheetDefinitions: HEADER_DEFINITIONS,
-    enabledSheets: TARGET_SHEETS,
-    lockAssetList: true,
-    appMode: 'management',
-    databaseSource: 'firestore',
-  });
+  const [appSettings, setAppSettings] = useAppSettingsWithPersistence();
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
@@ -200,26 +228,29 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       let localSettings = await getLocalSettings();
 
       if (!localSettings) {
+        const initialDbSource = (localStorage.getItem('ntblcp-db-source') as 'firestore' | 'rtdb') || 'firestore';
         localSettings = {
           authorizedUsers: [],
           sheetDefinitions: HEADER_DEFINITIONS,
           enabledSheets: TARGET_SHEETS,
           lockAssetList: true,
           appMode: 'management',
-          databaseSource: 'firestore',
+          databaseSource: initialDbSource,
         };
         await saveLocalSettings(localSettings);
       }
       setAppSettings(localSettings);
-      setSettingsLoaded(true); // Settings are loaded, now we can start polling
+      setSettingsLoaded(true);
     };
     
-    initializeSettings();
+    if (!settingsLoaded) {
+        initializeSettings();
+    }
 
-    const interval = setInterval(fetchAndApplySettings, 30000); // Poll every 30 seconds
+    const interval = setInterval(fetchAndApplySettings, 30000);
     return () => clearInterval(interval);
 
-  }, [isOnline, settingsLoaded]); // Rerun if online status changes or on initial load
+  }, [isOnline, settingsLoaded, setAppSettings]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !settingsLoaded) return;
