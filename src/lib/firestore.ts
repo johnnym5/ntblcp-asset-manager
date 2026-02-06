@@ -212,6 +212,55 @@ export async function batchDeleteAssetsRTDB(assetIds: string[]) {
 }
 
 
+// --- DUAL-DB SYNC FUNCTIONS ---
+
+export async function synchronizeDatabases(): Promise<{ toFirestoreCount: number; toRTDBCount: number }> {
+    addNotification({ title: "Syncing cloud databases..." });
+
+    // 1. Get both datasets
+    const firestoreAssets = await getAssets();
+    const rtdbAssets = await getAssetsRTDB();
+
+    const firestoreMap = new Map(firestoreAssets.map(a => [a.id, a]));
+    const rtdbMap = new Map(rtdbAssets.map(a => [a.id, a]));
+    const allIds = new Set([...firestoreMap.keys(), ...rtdbMap.keys()]);
+
+    const toFirestore: Asset[] = [];
+    const toRTDB: Asset[] = [];
+
+    // 2. Compare assets
+    for (const id of allIds) {
+        const fsAsset = firestoreMap.get(id);
+        const rtdbAsset = rtdbMap.get(id);
+
+        if (fsAsset && !rtdbAsset) {
+            toRTDB.push(fsAsset);
+        } else if (!fsAsset && rtdbAsset) {
+            toFirestore.push(rtdbAsset);
+        } else if (fsAsset && rtdbAsset) {
+            const fsTime = new Date(fsAsset.lastModified || 0).getTime();
+            const rtdbTime = new Date(rtdbAsset.lastModified || 0).getTime();
+            
+            // Add a 1-second buffer to prevent sync loops from minor time differences
+            if (fsTime > rtdbTime + 1000) {
+                toRTDB.push(fsAsset);
+            } else if (rtdbTime > fsTime + 1000) {
+                toFirestore.push(rtdbAsset);
+            }
+        }
+    }
+
+    // 3. Execute updates if necessary
+    if (toFirestore.length > 0) {
+        await batchSetAssets(toFirestore);
+    }
+    if (toRTDB.length > 0) {
+        await batchSetAssetsRTDB(toRTDB);
+    }
+
+    return { toFirestoreCount: toFirestore.length, toRTDBCount: toRTDB.length };
+}
+
 // --- Legacy RTDB Copy Function ---
 export async function copyAssetsToRealtimeDB(): Promise<void> {
     const rtdbInstance = rtdb;

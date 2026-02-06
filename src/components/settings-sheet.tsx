@@ -36,7 +36,7 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Rocket, Download, Cloud, Flame } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, RefreshCw, Download, Cloud, Flame } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
@@ -58,7 +58,12 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, dataActions, databaseSource, setDatabaseSource } = useAppState();
+  const { 
+    appSettings, setAppSettings, 
+    dataActions, 
+    databaseSource, setDatabaseSource,
+    setManualBackendSyncTrigger, isSyncing,
+  } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -68,7 +73,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
-  const [isCopying, setIsCopying] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -82,9 +86,8 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const hasChanges = useMemo(() => {
     if (!draftSettings) return false;
     const settingsChanged = JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
-    const dbSourceChanged = appSettings.databaseSource !== databaseSource;
-    return settingsChanged || dbSourceChanged;
-  }, [appSettings, draftSettings, databaseSource]);
+    return settingsChanged;
+  }, [appSettings, draftSettings]);
   
   const calculatedChanges = useMemo(() => {
     if (!draftSettings || !appSettings) return [];
@@ -110,11 +113,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
       changes.push(`Sheet definitions (headers/columns) will be updated.`);
     }
-    if (appSettings.databaseSource !== databaseSource) {
-      changes.push(`Primary database will be switched to: ${databaseSource === 'firestore' ? 'Cloud Firestore' : 'Realtime DB'}.`);
+    if (draftSettings.databaseSource !== appSettings.databaseSource) {
+      changes.push(`Primary database will be switched to: ${draftSettings.databaseSource === 'firestore' ? 'Cloud Firestore' : 'Realtime DB'}.`);
     }
     return changes;
-  }, [draftSettings, appSettings, databaseSource]);
+  }, [draftSettings, appSettings]);
 
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
@@ -205,7 +208,12 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const handleConfirmSave = async () => {
     if (!draftSettings) return;
     try {
-      const finalSettings = { ...draftSettings, databaseSource };
+      const finalSettings = { ...draftSettings };
+      
+      // The databaseSource is now handled directly by its own state setter,
+      // but we save it as part of the overall settings blob.
+      finalSettings.databaseSource = databaseSource;
+
       await updateSettings(finalSettings);
       await saveLocalSettings(finalSettings);
       setAppSettings(finalSettings); // Update global state
@@ -220,16 +228,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
-  
-    const handleCopyToRTDB = async () => {
-    if (typeof window !== 'undefined' && !window.navigator.onLine) {
-      toast({ title: 'Offline', description: 'This action requires an internet connection.', variant: 'destructive' });
-      return;
-    }
-    setIsCopying(true);
-    await dataActions.onCopyToRTDB?.();
-    setIsCopying(false);
-  };
 
   if (!draftSettings) {
     return (
@@ -358,13 +356,13 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                     <div className="rounded-lg border p-4 space-y-3">
                          <div className="flex items-center justify-between pt-1">
                             <div className="space-y-1">
-                              <Label htmlFor="app-mode" className="text-sm font-medium">Primary Database</Label>
+                              <Label htmlFor="database-source" className="text-sm font-medium">Primary Database</Label>
                               <p className="text-xs text-muted-foreground">
                                 Select the main database for all asset operations.
                               </p>
                             </div>
                              <Select value={databaseSource} onValueChange={(value) => setDatabaseSource(value as DatabaseSource)}>
-                              <SelectTrigger className="w-[180px]">
+                              <SelectTrigger id="database-source" className="w-[180px]">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent>
@@ -401,10 +399,10 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                                 </Button>
                             )}
                             <Separator />
-                            <p className="text-xs text-muted-foreground pt-2">Advanced test operations. Use with caution.</p>
-                            <Button variant="outline" className="w-full justify-start" onClick={handleCopyToRTDB} disabled={isCopying}>
-                                {isCopying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Rocket className="mr-2 h-4 w-4" />}
-                                Copy Assets to Realtime DB
+                            <p className="text-xs text-muted-foreground pt-2">Advanced operations. Use with caution.</p>
+                            <Button variant="outline" className="w-full justify-start" onClick={() => setManualBackendSyncTrigger(c => c + 1)} disabled={isSyncing}>
+                                {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                                Sync Databases
                             </Button>
                             <Separator />
                             {dataActions.onClearAll && (

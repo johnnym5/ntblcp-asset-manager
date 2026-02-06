@@ -1,13 +1,14 @@
 
 'use client';
 
-import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo, useRef } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
-import { getSettings } from '@/lib/firestore';
+import { getSettings, synchronizeDatabases } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
+import { addNotification } from '@/hooks/use-notifications';
 
 
 export interface SortConfig {
@@ -40,8 +41,8 @@ interface AppStateContextType {
   setGlobalStateFilter: Dispatch<SetStateAction<string>>;
   itemsPerPage: number;
   setItemsPerPage: Dispatch<SetStateAction<number>>;
-  assetSource: 'cloud' | 'local_locked';
-  setAssetSource: Dispatch<SetStateAction<'cloud' | 'local_locked'>>;
+  dataSource: 'cloud' | 'local_locked';
+  setDataSource: Dispatch<SetStateAction<'cloud' | 'local_locked'>>;
   databaseSource: DatabaseSource;
   setDatabaseSource: Dispatch<SetStateAction<DatabaseSource>>;
   
@@ -77,6 +78,8 @@ interface AppStateContextType {
   setManualDownloadTrigger: Dispatch<SetStateAction<number>>;
   manualUploadTrigger: number;
   setManualUploadTrigger: Dispatch<SetStateAction<number>>;
+  manualBackendSyncTrigger: number;
+  setManualBackendSyncTrigger: Dispatch<SetStateAction<number>>;
   isSyncing: boolean;
   setIsSyncing: Dispatch<SetStateAction<boolean>>;
 
@@ -124,54 +127,49 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     enabledSheets: TARGET_SHEETS,
     lockAssetList: true,
     appMode: 'management',
+    databaseSource: 'firestore',
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
   const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
+  const [manualBackendSyncTrigger, setManualBackendSyncTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   
   const [unreadInboxCount, setUnreadInboxCount] = useState(0);
 
-  const [assetSource, setAssetSource] = useState<'cloud' | 'local_locked'>('cloud');
+  const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
   const [databaseSource, setDatabaseSource] = useState<DatabaseSource>('firestore');
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [dataActions, setDataActions] = useState<DataActions>({});
+  
+  const isInitialMount = useRef(true);
 
 
   useEffect(() => {
     const initializeSettings = async () => {
-      // 1. Load local settings first for a fast offline-first experience.
       let localSettings = await getLocalSettings();
-
-      if (!localSettings) {
-        localSettings = {
-          authorizedUsers: [],
-          sheetDefinitions: HEADER_DEFINITIONS,
-          enabledSheets: TARGET_SHEETS,
-          lockAssetList: true,
-          appMode: 'management',
-        };
-        await saveLocalSettings(localSettings);
+      if (localSettings) {
+        setAppSettings(localSettings);
+        setDatabaseSource(localSettings.databaseSource || 'firestore');
+      } else {
+        await saveLocalSettings(appSettings);
       }
-      setAppSettings(localSettings);
       setSettingsLoaded(true);
 
-      // 2. After loading local settings, try to fetch the latest from the cloud.
       if (isOnline) {
         try {
           const remoteSettings = await getSettings();
           if (remoteSettings && JSON.stringify(remoteSettings) !== JSON.stringify(localSettings)) {
-            console.log("Found newer settings in Firestore, updating local state.");
             setAppSettings(remoteSettings);
+            setDatabaseSource(remoteSettings.databaseSource || 'firestore');
             await saveLocalSettings(remoteSettings);
           }
         } catch (error) {
-          console.warn("Could not fetch remote settings. Using local version.", error);
+          console.warn("Could not fetch remote settings.", error);
         }
       }
     };
-
     initializeSettings();
   }, [isOnline]);
 
@@ -180,6 +178,40 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
     }
   }, [isOnline]);
+  
+  useEffect(() => {
+    const performBackendSync = async () => {
+        if (!isOnline) {
+          addNotification({ title: 'Offline', description: 'Cannot sync cloud databases while offline.', variant: 'destructive'});
+          return;
+        }
+        setIsSyncing(true);
+        addNotification({ title: 'Syncing Cloud Databases...', description: 'Checking for latest data between Firestore and Realtime DB.' });
+        try {
+            const { toFirestoreCount, toRTDBCount } = await synchronizeDatabases();
+            addNotification({ title: 'Cloud Sync Complete', description: `${toFirestoreCount} updates for Firestore, ${toRTDBCount} for Realtime DB.` });
+            setManualDownloadTrigger(c => c + 1); // Trigger a download to get latest state
+        } catch (e) {
+            addNotification({ title: 'Cloud Sync Failed', description: (e as Error).message, variant: 'destructive' });
+            setIsSyncing(false); // Ensure syncing is false on error
+        }
+        // isSyncing will be set to false by the download trigger's effect in asset-list
+    };
+
+    if (isInitialMount.current) {
+        isInitialMount.current = false;
+    } else {
+        if(manualBackendSyncTrigger > 0) {
+            performBackendSync();
+        }
+    }
+  }, [manualBackendSyncTrigger, isOnline]);
+  
+  useEffect(() => {
+      if (!settingsLoaded) return; // Don't trigger on initial load
+      // This effect only runs when the databaseSource is changed by the user
+      setManualBackendSyncTrigger(c => c + 1);
+  }, [databaseSource, settingsLoaded]);
 
   useEffect(() => {
     if (appSettings.appMode === 'management') {
@@ -206,9 +238,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     settingsLoaded,
     manualDownloadTrigger, setManualDownloadTrigger,
     manualUploadTrigger, setManualUploadTrigger,
+    manualBackendSyncTrigger, setManualBackendSyncTrigger,
     isSyncing, setIsSyncing,
     unreadInboxCount, setUnreadInboxCount,
-    assetSource, setAssetSource,
+    dataSource, setDataSource,
     databaseSource, setDatabaseSource,
     assetToView, setAssetToView,
     dataActions, setDataActions,
