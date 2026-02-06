@@ -1837,16 +1837,19 @@ export default function AssetList() {
                       </CardHeader>
                       <CardContent className="p-4 pt-0" onClick={() => handleViewAsset(asset)}>
                           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                              {(currentSheetDefinition?.displayFields || []).map(field => {
-                                  if (['id', 'category', 'description', 'verifiedStatus', 'syncStatus', 'pendingChanges', 'changeSubmittedBy', 'approvalStatus'].includes(field.key)) return null;
-                                  const value = asset[field.key];
-                                  if (value === null || value === undefined || String(value).trim() === '') return null;
-                                  return (
-                                      <div key={field.key} className="space-y-1">
-                                          <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
-                                          <p className="text-sm font-medium truncate">{String(value)}</p>
-                                      </div>
-                                  )
+                              {quickViewFields.map(field => {
+                                // Exclude fields that are already displayed in the card's header or have dedicated controls.
+                                if (['description', 'category', 'verifiedStatus'].includes(field.key)) return null;
+                                
+                                const value = asset[field.key];
+                                if (value === null || value === undefined || String(value).trim() === '') return null;
+                                
+                                return (
+                                    <div key={field.key} className="space-y-1">
+                                        <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
+                                        <p className="text-sm font-medium truncate">{String(value)}</p>
+                                    </div>
+                                )
                               })}
                           </div>
                           {appSettings.appMode === 'verification' && (
@@ -1933,6 +1936,8 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
 
     
 
