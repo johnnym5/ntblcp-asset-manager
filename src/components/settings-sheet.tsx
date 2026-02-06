@@ -73,7 +73,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (isOpen) {
       if (savedDraft) {
         setDraftSettings(JSON.parse(savedDraft));
-        // Optional: Add a toast to notify user that their draft was restored
+        toast({ title: 'Draft Restored', description: 'Your unsaved settings have been restored.'});
       } else {
         setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
       }
@@ -81,7 +81,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       setDraftSettings(null);
       localStorage.removeItem('ntblcp-settings-draft');
     }
-  }, [isOpen, appSettings]);
+  }, [isOpen, appSettings, toast]);
   
   useEffect(() => {
     if (draftSettings) {
@@ -223,6 +223,37 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       setIsConfirmOpen(false);
       onOpenChange(false);
     }
+  };
+
+  const handleSheetDefinitionSave = (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
+    if (!draftSettings) return;
+
+    let newSheetDefinitions = { ...draftSettings.sheetDefinitions };
+    let newEnabledSheets = [...draftSettings.enabledSheets];
+
+    if (applyToAll) {
+      for (const sheetName in newSheetDefinitions) {
+        newSheetDefinitions[sheetName] = {
+          ...newSheetDefinitions[sheetName],
+          displayFields: newDefinition.displayFields.map(f => ({...f})),
+          headers: newDefinition.headers,
+        };
+      }
+      toast({ title: "Layout Applied to All", description: "The new column layout has been staged for all sheets. Click 'Save Changes' to confirm." });
+    } else {
+      newSheetDefinitions[newDefinition.name] = newDefinition;
+      if (originalName && originalName !== newDefinition.name) {
+        delete newSheetDefinitions[originalName];
+        newEnabledSheets = newEnabledSheets.map(s => s === originalName ? newDefinition.name : s);
+      }
+      toast({ title: "Sheet Layout Staged", description: `Changes for '${newDefinition.name}' are ready to be saved.` });
+    }
+    
+    setDraftSettings(prev => prev ? ({
+      ...prev,
+      sheetDefinitions: newSheetDefinitions,
+      enabledSheets: newEnabledSheets,
+    }) : null);
   };
   
   const isAdmin = userProfile?.isAdmin || false;
@@ -409,6 +440,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           onOpenChange={setIsSheetFormOpen}
           sheetDefinition={sheetToEdit}
           originalSheetName={originalSheetName}
+          onSave={handleSheetDefinitionSave}
         />
       )}
 
@@ -437,5 +469,3 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     </>
   );
 }
-
-    

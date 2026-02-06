@@ -17,9 +17,6 @@ import { Label } from '@/components/ui/label';
 import { ScrollArea } from './ui/scroll-area';
 import { ArrowDown, ArrowUp, GripVertical, PlusCircle } from 'lucide-react';
 import type { SheetDefinition, DisplayField, Asset } from '@/lib/types';
-import { useAppState } from '@/contexts/app-state-context';
-import { updateSettings } from '@/lib/firestore';
-import { useToast } from '@/hooks/use-toast';
 import { Input } from './ui/input';
 import {
   Select,
@@ -29,13 +26,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { HEADER_ALIASES } from '@/lib/constants';
-import { saveLocalSettings } from '@/lib/idb';
 
 interface ColumnCustomizationSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   sheetDefinition: SheetDefinition;
   originalSheetName: string | null;
+  onSave: (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => void;
 }
 
 export function ColumnCustomizationSheet({
@@ -43,11 +40,10 @@ export function ColumnCustomizationSheet({
   onOpenChange,
   sheetDefinition,
   originalSheetName,
+  onSave,
 }: ColumnCustomizationSheetProps) {
   const [editedName, setEditedName] = useState('');
   const [editedFields, setEditedFields] = useState<DisplayField[]>([]);
-  const { appSettings, setAppSettings } = useAppState();
-  const { toast } = useToast();
   const [fieldToAdd, setFieldToAdd] = useState('');
 
   useEffect(() => {
@@ -105,85 +101,16 @@ export function ColumnCustomizationSheet({
     }
   };
   
-  const handleApplyToOne = async () => {
+  const handleSaveChanges = (applyToAll: boolean) => {
     const newDefinition: SheetDefinition = {
       ...sheetDefinition,
       name: editedName,
       headers: editedFields.map(f => f.label),
       displayFields: editedFields,
     };
-    
-    const newSheetDefinitions = {
-        ...appSettings.sheetDefinitions,
-        [newDefinition.name]: newDefinition,
-    };
-
-    if (originalSheetName && originalSheetName !== newDefinition.name) {
-        delete newSheetDefinitions[originalSheetName];
-    }
-    
-    try {
-        const settingsToSave = { 
-            sheetDefinitions: newSheetDefinitions,
-        };
-        await updateSettings(settingsToSave);
-
-        const newEnabledSheets = appSettings.enabledSheets.map(s => s === originalSheetName ? newDefinition.name : s);
-        
-        const newAppSettings = { 
-            ...appSettings, 
-            sheetDefinitions: newSheetDefinitions,
-            enabledSheets: newEnabledSheets,
-            lastModified: new Date().toISOString()
-        };
-        
-        setAppSettings(newAppSettings);
-        await saveLocalSettings(newAppSettings);
-        
-        toast({ title: "Sheet Layout Saved", description: `Layout for '${newDefinition.name}' has been updated.`});
-        onOpenChange(false);
-    } catch (e) {
-        toast({ title: "Error", description: "Could not save settings to the database.", variant: "destructive" });
-    }
+    onSave(originalSheetName, newDefinition, applyToAll);
+    onOpenChange(false);
   };
-
-  const handleApplyToAll = async () => {
-    if (typeof window !== 'undefined' && !navigator.onLine) {
-      toast({ title: 'Offline', description: 'This action requires an internet connection.', variant: 'destructive' });
-      return;
-    }
-    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
-    const templateFields = editedFields;
-
-    for (const sheetName in newSheetDefinitions) {
-        newSheetDefinitions[sheetName] = {
-            ...newSheetDefinitions[sheetName],
-            displayFields: templateFields.map(f => ({...f})),
-            headers: templateFields.map(f => f.label),
-        };
-    }
-    
-    try {
-        const settingsToSave = { 
-            sheetDefinitions: newSheetDefinitions,
-        };
-        await updateSettings(settingsToSave);
-        
-        const newAppSettings = { 
-            ...appSettings, 
-            ...settingsToSave, 
-            lastModified: new Date().toISOString() 
-        };
-        setAppSettings(newAppSettings);
-        await saveLocalSettings(newAppSettings);
-        
-        toast({ title: "Layout Applied", description: "Column settings have been applied to all sheets for all users."});
-        onOpenChange(false);
-    } catch (e) {
-        toast({ title: "Error", description: "Could not save settings to the database.", variant: "destructive" });
-    }
-  };
-
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -267,13 +194,11 @@ export function ColumnCustomizationSheet({
             <Button variant="outline">Cancel</Button>
           </SheetClose>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleApplyToAll}>Apply Layout to All Sheets</Button>
-            <Button onClick={handleApplyToOne}>Apply to This Sheet</Button>
+            <Button variant="secondary" onClick={() => handleSaveChanges(true)}>Apply Layout to All Sheets</Button>
+            <Button onClick={() => handleSaveChanges(false)}>Apply to This Sheet</Button>
           </div>
         </SheetFooter>
       </SheetContent>
     </Sheet>
   );
 }
-
-    
