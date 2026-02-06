@@ -1,6 +1,6 @@
 
 import * as XLSX from 'xlsx';
-import type { Asset, AppSettings, SheetDefinition, DisplayField } from './types';
+import type { Asset, AppSettings, SheetDefinition } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, IHVN_SUB_SHEET_DEFINITIONS } from './constants';
 import { Timestamp } from 'firebase/firestore';
@@ -20,7 +20,6 @@ const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[], sta
         const normalizedRow = row.map(normalizeHeader);
         const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
         
-        // Use a more robust matching threshold
         if (matchCount / normalizedDefinitiveHeaders.length >= 0.7) {
             return i;
         }
@@ -82,8 +81,8 @@ const parseRows = (headerRow: any[], jsonData: any[][], category: string): { ass
             let fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
             
             if(category.startsWith('IHVN')) {
-                if(normalizedHeader === 'LOCATION') fieldName = 'location'; // Use LOCATION as the main location field.
-                if(normalizedHeader === 'STATE') fieldName = undefined; // Ignore the STATE column to avoid conflicts.
+                if(normalizedHeader === 'LOCATION') fieldName = 'location';
+                if(normalizedHeader === 'STATE') fieldName = undefined;
                 if(normalizedHeader === 'LOCATION/USER') fieldName = 'assignee';
             }
             
@@ -110,14 +109,78 @@ const parseRows = (headerRow: any[], jsonData: any[][], category: string): { ass
     return { assets, rowsParsed };
 }
 
+const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
+    const keys = Object.keys(b) as (keyof Asset)[];
+    for (const key of keys) {
+        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState'].includes(key)) {
+            continue;
+        }
+        const valA = String(a[key] ?? '').trim();
+        const valB = String(b[key] ?? '').trim();
+        if (valA !== valB) return true;
+    }
+    return false;
+};
+
+export interface ScannedSheetInfo {
+  sheetName: string;
+  definitionName: string;
+  rowCount: number;
+}
+
+export async function scanExcelFile(
+  fileOrBuffer: File | ArrayBuffer,
+  appSettings: AppSettings,
+): Promise<{ scannedSheets: ScannedSheetInfo[], errors: string[] }> {
+    const { sheetDefinitions } = appSettings;
+    const scannedSheets: ScannedSheetInfo[] = [];
+    const errors: string[] = [];
+
+    try {
+        const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
+        const workbook = XLSX.read(buffer, { type: 'array' });
+
+        for (const sheetName of workbook.SheetNames) {
+            const sheet = workbook.Sheets[sheetName];
+            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
+            
+            for (const defName in sheetDefinitions) {
+                const definition = sheetDefinitions[defName];
+                const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers);
+
+                if (headerRowIndex !== -1) {
+                    const dataRows = sheetData.slice(headerRowIndex + 1);
+                    const rowCount = dataRows.filter(row => Array.isArray(row) && row.some(cell => cell !== null && String(cell).trim() !== '')).length;
+                    
+                    scannedSheets.push({
+                        sheetName: sheetName,
+                        definitionName: defName,
+                        rowCount: rowCount,
+                    });
+                    
+                    break; 
+                }
+            }
+        }
+        if (scannedSheets.length === 0) {
+            errors.push("No matching asset sheets were found in this workbook based on the current settings.");
+        }
+
+    } catch (e) {
+        console.error("Error scanning Excel file:", e);
+        errors.push(e instanceof Error ? e.message : "An unknown error occurred during scanning.");
+    }
+
+    return { scannedSheets, errors };
+}
 
 export async function parseExcelFile(
     fileOrBuffer: File | ArrayBuffer, 
     appSettings: AppSettings, 
     existingAssets: Asset[],
-    singleSheetName?: string
+    sheetsToImport?: ScannedSheetInfo[]
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
-    const { sheetDefinitions } = appSettings;
+    const { sheetDefinitions, enabledSheets } = appSettings;
     
     const result: { assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] } = {
         assets: [],
@@ -125,79 +188,93 @@ export async function parseExcelFile(
         skipped: 0,
         errors: [],
     };
+    let parsedAssets: Asset[] = [];
 
     try {
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, cellText: false });
-        
-        const isIHVNImport = singleSheetName === 'IHVN-GF N-THRIP' || (!singleSheetName && appSettings.enabledSheets.includes('IHVN-GF N-THRIP'));
-        let ihvnMasterSheetName: string | undefined;
 
-        if (isIHVNImport) {
-            ihvnMasterSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader('IHVN-GF N-THRIP')));
-            if (ihvnMasterSheetName) {
-                const sheet = workbook.Sheets[ihvnMasterSheetName];
-                const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
-                let currentPos = 0;
-                
-                 for (const subSheetName in IHVN_SUB_SHEET_DEFINITIONS) {
-                    const headers = IHVN_SUB_SHEET_DEFINITIONS[subSheetName];
-                    const headerRowIndex = findHeaderRowIndex(sheetData, headers, currentPos);
+        const processList: ScannedSheetInfo[] = sheetsToImport 
+            ? sheetsToImport 
+            : enabledSheets.map(defName => {
+                const actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader(defName)));
+                return actualSheetName ? { sheetName: actualSheetName, definitionName: defName, rowCount: 0 } : null;
+            }).filter(Boolean) as ScannedSheetInfo[];
 
-                    if (headerRowIndex !== -1) {
-                        const headerRow = sheetData[headerRowIndex];
-                        const groupData = sheetData.slice(headerRowIndex + 1);
-                        const { assets: parsedGroupAssets, rowsParsed } = parseRows(headerRow, groupData, 'IHVN-GF N-THRIP');
-                        result.assets.push(...parsedGroupAssets);
-                        currentPos = headerRowIndex + rowsParsed + 1;
-                    }
-                }
-            } else if (singleSheetName === 'IHVN-GF N-THRIP') {
-                 result.errors.push(`Could not find a sheet named "IHVN-GF N-THRIP" in the file.`);
-            }
-        }
-
-        const sheetNamesToProcess = singleSheetName
-            ? (singleSheetName === 'IHVN-GF N-THRIP' ? [] : [singleSheetName])
-            : Object.keys(sheetDefinitions).filter(sheetName => appSettings.enabledSheets.includes(sheetName) && sheetName !== 'IHVN-GF N-THRIP');
-
-        for (const targetSheetName of sheetNamesToProcess) {
-            const definition = sheetDefinitions[targetSheetName];
+        for (const { sheetName, definitionName } of processList) {
+            const definition = sheetDefinitions[definitionName];
             if (!definition) {
-                 if(singleSheetName) result.errors.push(`No definition found for sheet: "${targetSheetName}".`);
-                 continue;
-            }
-            
-            const actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader(targetSheetName)));
-
-            if (!actualSheetName || actualSheetName === ihvnMasterSheetName) {
-                if (singleSheetName && actualSheetName !== ihvnMasterSheetName) result.errors.push(`Could not find a sheet with the name: "${targetSheetName}".`);
+                result.errors.push(`No definition found for sheet: "${definitionName}".`);
                 continue;
             }
 
-            const sheet = workbook.Sheets[actualSheetName];
+            // Handle IHVN special case
+            if (definitionName === 'IHVN-GF N-THRIP') {
+                 const sheet = workbook.Sheets[sheetName];
+                 const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+                 let currentPos = 0;
+                 for (const subSheetName in IHVN_SUB_SHEET_DEFINITIONS) {
+                    const headers = IHVN_SUB_SHEET_DEFINITIONS[subSheetName];
+                    const headerRowIndex = findHeaderRowIndex(sheetData, headers, currentPos);
+                    if (headerRowIndex !== -1) {
+                        const headerRow = sheetData[headerRowIndex];
+                        const { assets: parsedGroupAssets, rowsParsed } = parseRows(headerRow, sheetData.slice(headerRowIndex + 1), 'IHVN-GF N-THRIP');
+                        parsedAssets.push(...parsedGroupAssets);
+                        currentPos = headerRowIndex + rowsParsed + 1;
+                    }
+                }
+                continue;
+            }
+
+            // Standard sheet processing
+            const sheet = workbook.Sheets[sheetName];
+            if (!sheet) {
+                result.errors.push(`Could not find sheet named "${sheetName}" in the workbook.`);
+                continue;
+            }
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
-            
             const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers);
 
             if (headerRowIndex === -1) {
-                result.errors.push(`Could not find a valid header row in sheet: "${actualSheetName}".`);
+                result.errors.push(`Could not find a valid header row in sheet: "${sheetName}".`);
                 continue;
             }
             
             const headerRow = sheetData[headerRowIndex];
             const jsonData = sheetData.slice(headerRowIndex + 1);
-            const { assets: parsedSheetAssets } = parseRows(headerRow, jsonData, targetSheetName);
-            result.assets.push(...parsedSheetAssets);
+            const { assets: parsedSheetAssets } = parseRows(headerRow, jsonData, definitionName);
+            parsedAssets.push(...parsedSheetAssets);
+        }
+        
+        const existingAssetMap = new Map(existingAssets.map(a => [`${a.sn || ''}-${a.assetIdCode || ''}-${a.description || ''}`.toLowerCase(), a.id]));
+
+        for (const parsedAsset of parsedAssets) {
+            const assetKey = `${parsedAsset.sn || ''}-${parsedAsset.assetIdCode || ''}-${parsedAsset.description || ''}`.toLowerCase();
+            if (existingAssetMap.has(assetKey)) {
+                const existingId = existingAssetMap.get(assetKey)!;
+                const existingAsset = existingAssets.find(a => a.id === existingId)!;
+                if (haveAssetDetailsChanged(existingAsset, parsedAsset)) {
+                     result.updatedAssets.push({ ...existingAsset, ...parsedAsset });
+                } else {
+                     result.skipped++;
+                }
+            } else {
+                 if (!appSettings.lockAssetList) {
+                    result.assets.push(parsedAsset);
+                 } else {
+                    result.skipped++;
+                 }
+            }
+        }
+        
+        if (result.assets.length === 0 && result.updatedAssets.length === 0 && result.errors.length === 0) {
+             result.errors.push(`No data to import. Check sheet names and headers.`);
         }
 
-        if (result.assets.length === 0 && result.errors.length === 0) {
-            result.errors.push(`No data found to import. Check if sheet names in the file match the enabled sheets in Settings.`);
-        }
     } catch (e) {
         console.error("Error parsing Excel file:", e);
         if (e instanceof Error && e.message.includes('permission')) {
-             result.errors.push('The requested file could not be read, typically due to permission problems.');
+             result.errors.push('The requested file could not be read.');
         } else {
              result.errors.push(e instanceof Error ? e.message : "An unknown error occurred during parsing.");
         }
@@ -205,8 +282,6 @@ export async function parseExcelFile(
     
     return result;
 }
-
-
 
 export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, SheetDefinition>, fileName: string): void {
     const workbook = XLSX.utils.book_new();
@@ -270,7 +345,6 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
     }
 }
 
-
 export async function parseExcelForTemplate(file: File): Promise<SheetDefinition[]> {
   const templates: SheetDefinition[] = [];
   const buffer = await file.arrayBuffer();
@@ -292,25 +366,10 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
         if (matchCount > 5) {
             const headerRow = row.map(h => String(h || '').trim()).filter(h => h);
             
-            const displayFields: DisplayField[] = headerRow.map(header => {
-              const normalized = normalizeHeader(header);
-              for (const key in HEADER_ALIASES) {
-                if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES].map(a => normalizeHeader(a)).includes(normalized)) {
-                  return {
-                    key: key as keyof Asset,
-                    label: header,
-                    table: ['S/N', 'DESCRIPTION', 'ASSET ID CODE', 'ASSIGNEE', 'VERIFIED STATUS'].includes(normalized),
-                    quickView: true,
-                  };
-                }
-              }
-              return null;
-            }).filter(Boolean) as DisplayField[];
-
             templates.push({
                 name: sheetName,
                 headers: headerRow,
-                displayFields: displayFields,
+                displayFields: [], // Let the main app generate default display fields
             });
             break; 
         }

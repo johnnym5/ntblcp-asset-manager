@@ -36,12 +36,12 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library, Wrench, PlaneTakeoff, Info, Save } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library, Wrench, PlaneTakeoff, Info, Save, ScanSearch } from 'lucide-react';
 import { SheetDefinitionForm } from './sheet-definition-form';
 import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
-import { SingleSheetImportDialog } from './single-sheet-import-dialog';
+import { ImportScannerDialog } from './single-sheet-import-dialog';
 import { saveLocalSettings } from '@/lib/idb';
 
 interface SettingsSheetProps {
@@ -58,7 +58,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
-  const [isSingleSheetImportOpen, setIsSingleSheetImportOpen] = useState(false);
+  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -250,8 +250,8 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                       <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting || isGuest}>
                          <Library className="mr-2 h-4 w-4" /> Import Full FAR
                       </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => setIsSingleSheetImportOpen(true)} disabled={dataActions?.isImporting || isGuest}>
-                        <SheetIcon className="mr-2 h-4 w-4" /> Import from Single Sheet
+                      <Button variant="outline" className="w-full justify-start" onClick={() => setIsImportScanOpen(true)} disabled={dataActions?.isImporting || isGuest}>
+                        <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
                       </Button>
                       <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || isGuest}>
                         <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
@@ -363,9 +363,9 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
         sheet={sheetToEdit}
       />
 
-      <SingleSheetImportDialog
-        isOpen={isSingleSheetImportOpen}
-        onOpenChange={setIsSingleSheetImportOpen}
+      <ImportScannerDialog
+        isOpen={isImportScanOpen}
+        onOpenChange={setIsImportScanOpen}
       />
 
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
