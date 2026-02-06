@@ -3,9 +3,9 @@
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
-import type { Asset, AppSettings } from '@/lib/types';
+import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
-import { getSettings } from '@/lib/firestore';
+import { getSettings, updateSettings } from '@/lib/firestore';
 
 
 export interface SortConfig {
@@ -136,18 +136,52 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
 
   useEffect(() => {
-    const fetchSettings = async () => {
+    const fetchAndEnsureAdmin = async () => {
       const settingsFromDb = await getSettings();
-      if (settingsFromDb) {
-        setAppSettings(prev => ({
-          ...prev,
-          ...settingsFromDb,
-          authorizedUsers: settingsFromDb.authorizedUsers || [],
-          enabledSheets: settingsFromDb.enabledSheets || [],
-        }));
+      const currentUsers = settingsFromDb?.authorizedUsers || [];
+      const adminEmail = 'jegbase@gmail.com';
+      
+      const adminIndex = currentUsers.findIndex(u => u.email.toLowerCase() === adminEmail);
+      let usersModified = false;
+
+      if (adminIndex !== -1) {
+        // User exists, ensure they are admin
+        if (!currentUsers[adminIndex].isAdmin) {
+          currentUsers[adminIndex] = { ...currentUsers[adminIndex], isAdmin: true, states: ['All'] };
+          usersModified = true;
+        }
+      } else {
+        // User doesn't exist, add them as admin
+        currentUsers.push({
+          loginName: 'jegbase',
+          displayName: 'Jegbase Admin',
+          email: adminEmail,
+          password: 'password',
+          states: ['All'],
+          isAdmin: true,
+          isGuest: false,
+          canAddAssets: true,
+          canEditAssets: true,
+        });
+        usersModified = true;
       }
+      
+      if (usersModified) {
+        await updateSettings({ authorizedUsers: currentUsers });
+      }
+      
+      setAppSettings(prev => ({
+        ...prev,
+        ...(settingsFromDb || {}),
+        authorizedUsers: currentUsers,
+        sheetDefinitions: settingsFromDb?.sheetDefinitions || HEADER_DEFINITIONS,
+        enabledSheets: settingsFromDb?.enabledSheets || TARGET_SHEETS,
+        lockAssetList: settingsFromDb?.lockAssetList ?? true,
+        autoSyncEnabled: settingsFromDb?.autoSyncEnabled ?? true,
+      }));
     };
-    fetchSettings();
+
+    fetchAndEnsureAdmin();
   }, []);
 
   useEffect(() => {
