@@ -5,7 +5,7 @@ import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
-import { getSettings, updateSettings } from '@/lib/firestore';
+import { getSettings } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 
 
@@ -135,28 +135,39 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     const initializeSettings = async () => {
-      let settings = await getLocalSettings();
+      // 1. Load local settings first for a fast offline-first experience.
+      let localSettings = await getLocalSettings();
 
-      if (!settings) {
-        // If no settings exist, create a default, empty configuration.
-        // The first admin user will need to be added through the UI
-        // by an existing admin, or provisioned directly in the database
-        // for a first-time setup.
-        settings = {
+      if (!localSettings) {
+        localSettings = {
           authorizedUsers: [],
           sheetDefinitions: HEADER_DEFINITIONS,
           enabledSheets: TARGET_SHEETS,
           lockAssetList: true,
           appMode: 'management',
         };
-        await saveLocalSettings(settings);
+        await saveLocalSettings(localSettings);
       }
-      setAppSettings(settings);
+      setAppSettings(localSettings);
       setSettingsLoaded(true);
+
+      // 2. After loading local settings, try to fetch the latest from the cloud.
+      if (isOnline) {
+        try {
+          const remoteSettings = await getSettings();
+          if (remoteSettings && JSON.stringify(remoteSettings) !== JSON.stringify(localSettings)) {
+            console.log("Found newer settings in Firestore, updating local state.");
+            setAppSettings(remoteSettings);
+            await saveLocalSettings(remoteSettings);
+          }
+        } catch (error) {
+          console.warn("Could not fetch remote settings. Using local version.", error);
+        }
+      }
     };
 
     initializeSettings();
-  }, []);
+  }, [isOnline]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
