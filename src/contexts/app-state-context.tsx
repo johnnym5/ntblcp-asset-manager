@@ -102,15 +102,14 @@ const AppStateContext = createContext<AppStateContextType | undefined>(undefined
 // preference is persisted to localStorage for immediate access on app load.
 const useAppSettingsWithPersistence = (): [AppSettings, Dispatch<SetStateAction<AppSettings>>] => {
   const [appSettings, _setAppSettings] = useState<AppSettings>(() => {
-    // On initial load, prioritize the database source from localStorage.
-    const initialDbSource = (typeof window !== 'undefined' ? localStorage.getItem('ntblcp-db-source') : 'firestore') as 'firestore' | 'rtdb' || 'firestore';
+    // Force RTDB as the primary database to resolve post-deployment issues.
     return {
       authorizedUsers: [],
       sheetDefinitions: HEADER_DEFINITIONS,
       enabledSheets: TARGET_SHEETS,
       lockAssetList: true,
       appMode: 'management',
-      databaseSource: initialDbSource,
+      databaseSource: 'rtdb',
     };
   });
 
@@ -118,14 +117,12 @@ const useAppSettingsWithPersistence = (): [AppSettings, Dispatch<SetStateAction<
     _setAppSettings(prevState => {
       const resolvedSettings = typeof newSettingsAction === 'function' ? newSettingsAction(prevState) : newSettingsAction;
       
-      // Whenever settings are updated, persist the databaseSource to localStorage.
-      if (typeof window !== 'undefined' && resolvedSettings.databaseSource) {
-        if (localStorage.getItem('ntblcp-db-source') !== resolvedSettings.databaseSource) {
-          localStorage.setItem('ntblcp-db-source', resolvedSettings.databaseSource);
-        }
+      // Force databaseSource to RTDB and persist it to localStorage.
+      if (typeof window !== 'undefined') {
+        localStorage.setItem('ntblcp-db-source', 'rtdb');
       }
       
-      return resolvedSettings;
+      return {...resolvedSettings, databaseSource: 'rtdb'};
     });
   };
 
@@ -175,34 +172,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
 
   const triggerFailover = () => {
-    setIsInFailoverMode(true);
-    setAppSettings(prev => ({...prev, databaseSource: 'rtdb'}));
-    updateSettings({databaseSource: 'rtdb'});
+    // This function is now less relevant as we are hard-coding to RTDB.
+    // Kept for potential future use.
+    console.warn("Failover triggered, but the app is already locked to RTDB.");
   };
 
   useEffect(() => {
-    let recoveryInterval: NodeJS.Timeout | undefined;
-    if(isInFailoverMode) {
-        recoveryInterval = setInterval(async () => {
-           console.log("Attempting to recover primary database connection...");
-           try {
-             await getSettings(); // Lightweight check
-             console.log("Primary database is back online. Recovering...");
-             setIsInFailoverMode(false);
-             setAppSettings(prev => ({...prev, databaseSource: 'firestore'}));
-             updateSettings({databaseSource: 'firestore'});
-             // Optionally trigger a sync here
-             clearInterval(recoveryInterval);
-           } catch(e) {
-             console.log("Recovery check failed. Still in failover mode.");
-           }
-        }, 60000); // Check every 60 seconds
-    }
-    return () => {
-        if (recoveryInterval) {
-            clearInterval(recoveryInterval);
-        }
-    }
+    // This effect is now simplified as failover is not the primary mechanism.
   }, [isInFailoverMode]);
 
 
@@ -215,7 +191,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         const localSettings = await getLocalSettings();
         
         if (remoteSettings && remoteSettings.lastModified && (!localSettings || !localSettings.lastModified || new Date(remoteSettings.lastModified) > new Date(localSettings.lastModified))) {
-          console.log("Polling: Found newer settings in Firestore, updating local state.");
+          console.log("Polling: Found newer settings in the cloud, updating local state.");
           setAppSettings(remoteSettings);
           await saveLocalSettings(remoteSettings);
         }
@@ -227,18 +203,23 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     const initializeSettings = async () => {
       let localSettings = await getLocalSettings();
 
+      // Force RTDB on initialization
+      const dbSource = 'rtdb';
+      
       if (!localSettings) {
-        const initialDbSource = (localStorage.getItem('ntblcp-db-source') as 'firestore' | 'rtdb') || 'firestore';
         localSettings = {
           authorizedUsers: [],
           sheetDefinitions: HEADER_DEFINITIONS,
           enabledSheets: TARGET_SHEETS,
           lockAssetList: true,
           appMode: 'management',
-          databaseSource: initialDbSource,
+          databaseSource: dbSource,
         };
-        await saveLocalSettings(localSettings);
+      } else {
+        localSettings.databaseSource = dbSource;
       }
+      
+      await saveLocalSettings(localSettings);
       setAppSettings(localSettings);
       setSettingsLoaded(true);
     };

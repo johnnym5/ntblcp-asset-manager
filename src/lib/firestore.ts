@@ -1,4 +1,3 @@
-
 'use client';
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
@@ -39,17 +38,19 @@ const handleFirestoreError = (error: any, context: Omit<SecurityRuleContext, 're
 
 // --- App Settings (DUAL WRITE) ---
 export async function getSettings(): Promise<AppSettings | null> {
-    const db = checkConfig();
-    const settingsRef = doc(db, 'config', 'settings');
+    // FORCED to RTDB
+    const rtdbInstance = checkRTDBConfig();
+    const settingsRef = ref(rtdbInstance, 'config/settings');
     try {
-      const docSnap = await getDoc(settingsRef);
-      if (docSnap.exists()) {
-          return docSnap.data() as AppSettings;
-      }
-      return null;
+        const docSnap = await rtdbGet(settingsRef);
+        if (docSnap.exists()) {
+            return docSnap.val() as AppSettings;
+        }
+        return null;
     } catch (serverError) {
-        handleFirestoreError(serverError, { path: settingsRef.path, operation: 'get' });
-        return null; // Should not be reached due to throw in handler, but satisfies TS
+        // Even though it's RTDB, we can reuse the Firestore error concept for the UI
+        handleFirestoreError(serverError, { path: 'config/settings', operation: 'get' });
+        return null;
     }
 }
 
@@ -59,93 +60,56 @@ export async function updateSettings(settings: Partial<AppSettings>) {
   
   const settingsWithTimestamp = { ...settings, lastModified: new Date().toISOString() };
 
-  // Write to Firestore
-  const settingsRef = doc(firestoreDb, 'config', 'settings');
-  try {
-    await setDoc(settingsRef, settingsWithTimestamp, { merge: true });
-  } catch (serverError) {
-    handleFirestoreError(serverError, { path: settingsRef.path, operation: 'update' });
-  }
-  
-  // Write to Realtime DB
+  // We still write to both to keep them in sync for the future.
+  // RTDB is now the primary source of truth for reads.
   const rtdbSettingsRef = ref(rtdbInstance, 'config/settings');
   const existingSettings = await rtdbGet(rtdbSettingsRef).then(s => s.val() || {});
   const newRtdbSettings = { ...existingSettings, ...settingsWithTimestamp };
   await rtdbSet(rtdbSettingsRef, newRtdbSettings);
-}
 
-
-// --- Firestore Assets ---
-
-export async function getAssets(): Promise<Asset[]> {
-  const db = checkConfig();
-  const assetsCollectionRef = collection(db, 'assets');
-  const q = query(assetsCollectionRef);
+  // Write to Firestore as a backup
+  const settingsRef = doc(firestoreDb, 'config', 'settings');
   try {
-    const querySnapshot = await getDocs(q);
-    const fetchedAssets: Asset[] = [];
-    querySnapshot.forEach((doc) => {
-      fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
-    });
-    return fetchedAssets;
+    await setDoc(settingsRef, settingsWithTimestamp, { merge: true });
   } catch (serverError) {
-    handleFirestoreError(serverError, { path: assetsCollectionRef.path, operation: 'list' });
-    return []; // Should not be reached
+    console.warn("Firestore backup write for settings failed, but RTDB succeeded.", serverError);
+    // Don't throw error if primary (RTDB) succeeded.
   }
 }
 
+
+// --- Primary Assets API (Forced to RTDB) ---
+
+export async function getAssets(): Promise<Asset[]> {
+    return getAssetsRTDB();
+}
+
 export function updateAsset(asset: Asset) {
-  const db = checkConfig();
-  const assetRef = doc(db, 'assets', asset.id);
-  setDoc(assetRef, { ...asset, lastModified: new Date().toISOString() }, { merge: true })
-    .catch(async (serverError) => {
-      handleFirestoreError(serverError, { path: assetRef.path, operation: 'update' });
-  });
+    updateAssetRTDB(asset).catch(async (serverError) => {
+        handleFirestoreError(serverError, { path: `assets/${asset.id}`, operation: 'update' });
+    });
 }
 
 export function deleteAsset(assetId: string) {
-  const db = checkConfig();
-  const assetRef = doc(db, 'assets', assetId);
-  deleteDoc(assetRef).catch(async (serverError) => {
-     handleFirestoreError(serverError, { path: assetRef.path, operation: 'delete' });
-  });
+    deleteAssetRTDB(assetId).catch(async (serverError) => {
+        handleFirestoreError(serverError, { path: `assets/${assetId}`, operation: 'delete' });
+    });
 }
 
 export function batchSetAssets(assets: Asset[]) {
-    const db = checkConfig();
-    const assetsCollectionRef = collection(db, 'assets');
-    const batchSize = 500;
-    for (let i = 0; i < assets.length; i += batchSize) {
-        const batch = writeBatch(db);
-        const chunk = assets.slice(i, i + batchSize);
-        chunk.forEach((asset) => {
-            const docRef = doc(assetsCollectionRef, asset.id);
-            batch.set(docRef, { ...asset, lastModified: asset.lastModified || new Date().toISOString() });
-        });
-        batch.commit().catch(async (serverError) => {
-          handleFirestoreError(serverError, { path: assetsCollectionRef.path, operation: 'update' });
-        });
-    }
+    batchSetAssetsRTDB(assets).catch(async (serverError) => {
+        handleFirestoreError(serverError, { path: 'assets', operation: 'update' });
+    });
 }
 
 export function batchDeleteAssets(assetIds: string[]) {
-    const db = checkConfig();
-    const batchSize = 500;
-    for (let i = 0; i < assetIds.length; i += batchSize) {
-        const batch = writeBatch(db);
-        const chunk = assetIds.slice(i, i + batchSize);
-        chunk.forEach((assetId) => {
-            const docRef = doc(db, 'assets', assetId);
-            batch.delete(docRef);
-        });
-        batch.commit().catch(async (serverError) => {
-          handleFirestoreError(serverError, { path: 'assets', operation: 'delete' });
-        });
-    }
+    batchDeleteAssetsRTDB(assetIds).catch(async (serverError) => {
+        handleFirestoreError(serverError, { path: 'assets', operation: 'delete' });
+    });
 }
 
 
-// --- Realtime Database Assets ---
+// --- Realtime Database Assets (Implementations) ---
 
 export async function getAssetsRTDB(): Promise<Asset[]> {
     const db = checkRTDBConfig();
@@ -173,20 +137,22 @@ export async function deleteAssetRTDB(assetId: string) {
 
 export async function batchSetAssetsRTDB(assets: Asset[]) {
     const db = checkRTDBConfig();
+    const updates: { [key: string]: any } = {};
     for (const asset of assets) {
-        const assetRef = ref(db, `assets/${asset.id}`);
         const assetToSave = { ...asset, id: undefined, lastModified: asset.lastModified || new Date().toISOString() };
         delete (assetToSave as any).id;
-        await rtdbSet(assetRef, assetToSave);
+        updates[`/assets/${asset.id}`] = assetToSave;
     }
+    await rtdbSet(ref(db), updates);
 }
 
 export async function batchDeleteAssetsRTDB(assetIds: string[]) {
     const db = checkRTDBConfig();
+    const updates: { [key: string]: null } = {};
     for (const assetId of assetIds) {
-        const assetRef = ref(db, `assets/${assetId}`);
-        await rtdbSet(assetRef, null);
+        updates[`/assets/${assetId}`] = null;
     }
+    await rtdbSet(ref(db), updates);
 }
 
 
@@ -220,7 +186,7 @@ export async function synchronizeDatabases(): Promise<{ toFirestoreCount: number
 
 
     // --- SYNC ASSETS ---
-    const firestoreAssets = await getAssets();
+    const firestoreAssets = await getDocs(query(collection(firestoreDb, 'assets'))).then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Asset)));
     const rtdbAssets = await getAssetsRTDB();
 
     const firestoreMap = new Map(firestoreAssets.map(a => [a.id, a]));
@@ -254,7 +220,12 @@ export async function synchronizeDatabases(): Promise<{ toFirestoreCount: number
 
     // 3. Execute updates if necessary
     if (toFirestore.length > 0) {
-        await batchSetAssets(toFirestore);
+        const batch = writeBatch(firestoreDb);
+        toFirestore.forEach(asset => {
+            const docRef = doc(firestoreDb, 'assets', asset.id);
+            batch.set(docRef, asset);
+        });
+        await batch.commit();
     }
     if (toRTDB.length > 0) {
         await batchSetAssetsRTDB(toRTDB);
