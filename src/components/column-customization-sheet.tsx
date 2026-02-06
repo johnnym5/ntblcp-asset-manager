@@ -15,39 +15,12 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from './ui/scroll-area';
-import { ArrowDown, ArrowUp } from 'lucide-react';
-import type { SheetDefinition, DisplayField, Asset, AppSettings } from '@/lib/types';
+import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react';
+import type { SheetDefinition, DisplayField } from '@/lib/types';
 import { useAppState } from '@/contexts/app-state-context';
 import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { Separator } from './ui/separator';
-
-// A comprehensive list of all possible fields that can be displayed.
-const ALL_POSSIBLE_FIELDS: { key: keyof Asset; label: string }[] = [
-    { key: 'sn', label: 'S/N' },
-    { key: 'description', label: 'Description' },
-    { key: 'category', label: 'Category' },
-    { key: 'serialNumber', label: 'Serial Number' },
-    { key: 'assetIdCode', label: 'Asset ID Code' },
-    { key: 'location', label: 'Location' },
-    { key: 'lga', label: 'LGA' },
-    { key: 'assignee', label: 'Assignee' },
-    { key: 'condition', label: 'Condition' },
-    { key: 'remarks', label: 'Remarks' },
-    { key: 'verifiedStatus', label: 'Verified Status' },
-    { key: 'verifiedDate', label: 'Verified Date' },
-    { key: 'assetClass', label: 'Asset Class' },
-    { key: 'manufacturer', label: 'Manufacturer' },
-    { key: 'modelNumber', label: 'Model Number' },
-    { key: 'supplier', label: 'Supplier' },
-    { key: 'dateReceived', label: 'Date Received' },
-    { key: 'grant', label: 'Grant' },
-    { key: 'chasisNo', label: 'Chasis No' },
-    { key: 'engineNo', label: 'Engine No' },
-    { key: 'lastModified', label: 'Last Modified Date' },
-    { key: 'lastModifiedBy', label: 'Last Modified By' },
-];
-
+import { Input } from './ui/input';
 
 interface ColumnCustomizationSheetProps {
   isOpen: boolean;
@@ -62,27 +35,28 @@ export function ColumnCustomizationSheet({
   sheetDefinition,
   onSave,
 }: ColumnCustomizationSheetProps) {
-  const [fields, setFields] = useState<DisplayField[]>([]);
+  const [editedName, setEditedName] = useState('');
+  const [editedFields, setEditedFields] = useState<DisplayField[]>([]);
   const { appSettings, setAppSettings } = useAppState();
   const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && sheetDefinition) {
-      // Create a full list of fields, ensuring order is preserved and new fields are added at the end.
-      const definedFields = sheetDefinition.displayFields || [];
-      const definedFieldKeys = new Set(definedFields.map(f => f.key));
-      
-      const newFieldsToAdd = ALL_POSSIBLE_FIELDS
-        .filter(p => !definedFieldKeys.has(p.key))
-        .map(p => ({ key: p.key, label: p.label, table: false, quickView: false }));
-      
-      const fullFieldList = [...definedFields, ...newFieldsToAdd];
-      setFields(fullFieldList);
+      setEditedName(sheetDefinition.name);
+      setEditedFields(JSON.parse(JSON.stringify(sheetDefinition.displayFields || [])));
     }
   }, [isOpen, sheetDefinition]);
 
+  const handleLabelChange = (index: number, newLabel: string) => {
+    setEditedFields(currentFields => {
+      const newFields = [...currentFields];
+      newFields[index] = { ...newFields[index], label: newLabel };
+      return newFields;
+    });
+  };
+
   const handleToggle = (index: number, view: 'table' | 'quickView') => {
-    setFields(currentFields => {
+    setEditedFields(currentFields => {
       const newFields = [...currentFields];
       newFields[index] = { ...newFields[index], [view]: !newFields[index][view] };
       return newFields;
@@ -90,19 +64,21 @@ export function ColumnCustomizationSheet({
   };
 
   const handleMove = (index: number, direction: 'up' | 'down') => {
-    const newFields = [...fields];
+    const newFields = [...editedFields];
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
 
     if (targetIndex >= 0 && targetIndex < newFields.length) {
       [newFields[index], newFields[targetIndex]] = [newFields[targetIndex], newFields[index]];
-      setFields(newFields);
+      setEditedFields(newFields);
     }
   };
   
   const handleApplyToOne = () => {
     const newDefinition: SheetDefinition = {
       ...sheetDefinition,
-      displayFields: fields,
+      name: editedName,
+      headers: editedFields.map(f => f.label),
+      displayFields: editedFields,
     };
     onSave(newDefinition);
     onOpenChange(false);
@@ -114,12 +90,13 @@ export function ColumnCustomizationSheet({
       return;
     }
     const newSheetDefinitions = { ...appSettings.sheetDefinitions };
-    const templateFields = fields; // The currently configured fields become the template
+    const templateFields = editedFields;
 
     for (const sheetName in newSheetDefinitions) {
         newSheetDefinitions[sheetName] = {
             ...newSheetDefinitions[sheetName],
             displayFields: templateFields,
+            headers: templateFields.map(f => f.label),
         };
     }
     
@@ -138,43 +115,46 @@ export function ColumnCustomizationSheet({
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="w-full sm:max-w-2xl flex flex-col">
         <SheetHeader>
-          <SheetTitle>Customize Columns for '{sheetDefinition?.name}'</SheetTitle>
+          <SheetTitle>Customize Sheet Layout</SheetTitle>
           <SheetDescription>
-            Drag to reorder, or use switches to control visibility. Changes will affect all users.
+            Rename the sheet, reorder fields, and edit labels. Changes here affect the asset form layout.
           </SheetDescription>
         </SheetHeader>
+        <div className="px-1 py-4">
+            <Label htmlFor="sheet-name" className="text-sm font-medium">Sheet Name</Label>
+            <Input id="sheet-name" value={editedName} onChange={(e) => setEditedName(e.target.value)} className="mt-1" />
+        </div>
         <div className="flex-grow overflow-hidden flex flex-col">
-          <div className="flex items-center px-4 py-2 border-b font-medium text-sm">
+          <div className="flex items-center px-4 py-2 border-y font-medium text-sm bg-muted/50">
             <div className="w-16"></div>
-            <div className="flex-1">Field</div>
-            <div className="w-24 text-center">Table</div>
-            <div className="w-24 text-center">Quick View</div>
+            <div className="flex-1">Field Label (Header Name)</div>
+            <div className="w-24 text-center">In Table</div>
           </div>
           <ScrollArea className="flex-1">
             <div className="space-y-1 p-2">
-              {fields.map((field, index) => (
+              {editedFields.map((field, index) => (
                 <div key={field.key} className="flex items-center p-2 rounded-md hover:bg-muted/50">
-                  <div className="flex flex-col items-center w-16">
+                  <div className="flex flex-col items-center w-16 text-muted-foreground">
                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMove(index, 'up')} disabled={index === 0}>
                         <ArrowUp className="h-4 w-4" />
                     </Button>
-                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMove(index, 'down')} disabled={index === fields.length - 1}>
+                    <GripVertical className="h-4 w-4 my-1 cursor-grab" />
+                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMove(index, 'down')} disabled={index === editedFields.length - 1}>
                         <ArrowDown className="h-4 w-4" />
                     </Button>
                   </div>
-                  <div className="flex-1 text-sm font-medium">{field.label}</div>
+                  <div className="flex-1">
+                    <Input 
+                        value={field.label}
+                        onChange={(e) => handleLabelChange(index, e.target.value)}
+                        className="h-9"
+                    />
+                  </div>
                   <div className="w-24 flex justify-center">
                     <Switch
                       checked={field.table}
                       onCheckedChange={() => handleToggle(index, 'table')}
                       aria-label={`Show ${field.label} in table`}
-                    />
-                  </div>
-                  <div className="w-24 flex justify-center">
-                    <Switch
-                      checked={field.quickView}
-                      onCheckedChange={() => handleToggle(index, 'quickView')}
-                      aria-label={`Show ${field.label} in quick view`}
                     />
                   </div>
                 </div>
@@ -187,7 +167,7 @@ export function ColumnCustomizationSheet({
             <Button variant="outline">Cancel</Button>
           </SheetClose>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={handleApplyToAll}>Apply to All Sheets</Button>
+            <Button variant="secondary" onClick={handleApplyToAll}>Apply Layout to All Sheets</Button>
             <Button onClick={handleApplyToOne}>Apply to This Sheet</Button>
           </div>
         </SheetFooter>

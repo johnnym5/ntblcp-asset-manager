@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -29,64 +29,24 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import {
-  Accordion,
-  AccordionContent,
-  AccordionItem,
-  AccordionTrigger,
-} from "@/components/ui/accordion"
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { Asset, SheetDefinition } from "@/lib/types";
-import { AlertCircle, Loader2, FileText, Check, User, MapPin, Clock, Tag } from "lucide-react";
-import { TARGET_SHEETS } from "@/lib/constants";
-import { AssetChecklist } from "./asset-checklist";
+import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
+import { Loader2, FileText, Check } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
-import { addNotification } from "@/hooks/use-notifications";
-import { Label } from "./ui/label";
-import { Separator } from "./ui/separator";
 import { useAppState } from "@/contexts/app-state-context";
-import { cn } from "@/lib/utils";
 
-
-const assetFormSchema = z.object({
-  category: z.string({ required_error: "Please select a category." }),
-  description: z.string().min(1, "Description is required."),
-  serialNumber: z.string().optional(),
-  location: z.string().optional(),
-  condition: z.string().optional(),
-  remarks: z.string().optional(),
-  assignee: z.string().optional(),
-  verifiedStatus: z.string().optional(),
-  verifiedDate: z.string().optional(),
-  lga: z.string().optional(),
-  assetIdCode: z.string().optional(),
-  manufacturer: z.string().optional(),
-  // Advanced Fields
-  assetClass: z.string().optional(),
-  modelNumber: z.string().optional(),
-  supplier: z.string().optional(),
-  dateReceived: z.string().optional(),
-  grant: z.string().optional(),
-  chasisNo: z.string().optional(),
-  engineNo: z.string().optional(),
+const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
+  path: ['category'],
+  message: 'Category is required.',
+}).refine(data => !!data.description, {
+    path: ['description'],
+    message: 'Description is required.',
 });
 
+
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
-
-interface ReadOnlyFieldProps {
-  label: string;
-  value: React.ReactNode;
-}
-
-const ReadOnlyField: React.FC<ReadOnlyFieldProps> = ({ label, value }) => (
-    <div className="space-y-1">
-        <p className="text-xs font-medium text-muted-foreground">{label}</p>
-        <p className="text-sm">{value || <span className="text-muted-foreground/70">N/A</span>}</p>
-    </div>
-);
-
 
 interface AssetFormProps {
   isOpen: boolean;
@@ -97,55 +57,38 @@ interface AssetFormProps {
   isReadOnly: boolean;
 }
 
-export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, isReadOnly }: AssetFormProps) {
+export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
   const { appSettings } = useAppState();
-  const { sheetDefinitions } = appSettings;
   const isAdmin = userProfile?.isAdmin || false;
   
-  const defaultValues = {
-    category: '',
-    description: '',
-    serialNumber: '',
-    location: userProfile?.state || '',
-    condition: '',
-    remarks: '',
-    assignee: '',
-    verifiedStatus: 'Unverified',
-    verifiedDate: '',
-    lga: '',
-    assetIdCode: '',
-    manufacturer: '',
-    assetClass: '',
-    modelNumber: '',
-    supplier: '',
-    dateReceived: '',
-    grant: '',
-    chasisNo: '',
-    engineNo: '',
-  };
-
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
-    defaultValues: asset ? { ...asset, verifiedStatus: asset.verifiedStatus || 'Unverified' } : defaultValues,
     mode: 'onChange',
   });
   
-  const watchedValues = form.watch();
+  const currentCategory = form.watch('category');
+  const sheetDefinition = useMemo(() => {
+    if (!currentCategory) return null;
+    return appSettings.sheetDefinitions[currentCategory];
+  }, [currentCategory, appSettings.sheetDefinitions]);
 
   useEffect(() => {
     if (isOpen) {
-      if (asset) {
-        form.reset({
-          ...defaultValues,
-          ...asset,
-          location: asset.location ?? userProfile?.state ?? '',
-          verifiedStatus: asset.verifiedStatus === 'Discrepancy' ? 'Unverified' : (asset.verifiedStatus ?? 'Unverified'),
-        });
-      } else {
+        const defaultValues: AssetFormValues = {};
+        if (asset) {
+            Object.keys(asset).forEach(key => {
+                const k = key as keyof Asset;
+                defaultValues[k] = String(asset[k] ?? '');
+            });
+            if (!defaultValues.verifiedStatus) defaultValues.verifiedStatus = 'Unverified';
+            if (!defaultValues.location && userProfile?.state) defaultValues.location = userProfile.state;
+        } else {
+             if (userProfile?.state) defaultValues.location = userProfile.state;
+             defaultValues.verifiedStatus = 'Unverified';
+        }
         form.reset(defaultValues);
-      }
     }
   }, [isOpen, asset, form, userProfile]);
   
@@ -164,9 +107,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     try {
         const assetToSave: Asset = {
             id: asset?.id ?? crypto.randomUUID(),
-            ...asset,
+            ...(asset || {}),
             ...data,
-        };
+        } as Asset;
         await onSave(assetToSave);
         onOpenChange(false);
     } catch (e) {
@@ -176,7 +119,80 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     }
   };
   
-  // RENDER LOGIC
+    const renderField = (field: DisplayField) => {
+        const fieldName = field.key as keyof AssetFormValues;
+        const disabled = isReadOnly || (fieldName === 'location' && !isAdmin) || (fieldName === 'category' && !!asset);
+        
+        let component;
+        switch(fieldName) {
+            case 'category':
+                component = (
+                     <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                            {Object.keys(appSettings.sheetDefinitions).map(sheet => (
+                            <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                );
+                break;
+            case 'condition':
+                 component = (
+                    <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select condition" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                            <SelectItem value="New">New</SelectItem>
+                            <SelectItem value="Used- good condition">Used- good condition</SelectItem>
+                            <SelectItem value="Used but in good working condition">Used but in good working condition</SelectItem>
+                            <SelectItem value="Used but requires occasional repair">Used but requires occasional repair</SelectItem>
+                            <SelectItem value="Used but in poor condition">Used but in poor condition</SelectItem>
+                            <SelectItem value="Bad condition">Bad condition</SelectItem>
+                            <SelectItem value="F2: Major repairs required-poor condition">F2: Major repairs required-poor condition</SelectItem>
+                            <SelectItem value="Unsalvageable">Unsalvageable</SelectItem>
+                            <SelectItem value="Burnt">Burnt</SelectItem>
+                            <SelectItem value="Stolen">Stolen</SelectItem>
+                            <SelectItem value="Obsolete">Obsolete</SelectItem>
+                            <SelectItem value="Insurance settlement">Insurance settlement</SelectItem>
+                            <SelectItem value="Writeoff">Writeoff</SelectItem>
+                        </SelectContent>
+                    </Select>
+                );
+                break;
+            case 'verifiedStatus':
+                component = (
+                    <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
+                        <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
+                        <SelectContent>
+                            <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
+                            <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                        </SelectContent>
+                    </Select>
+                );
+                break;
+            case 'remarks':
+                 component = <FormControl><Textarea {...form.register(fieldName)} readOnly={isReadOnly} /></FormControl>;
+                 break;
+            default:
+                 component = <FormControl><Input {...form.register(fieldName)} readOnly={disabled} /></FormControl>;
+        }
+        
+        return (
+            <FormField
+                key={fieldName}
+                control={form.control}
+                name={fieldName}
+                render={() => (
+                <FormItem>
+                    <FormLabel>{field.label}</FormLabel>
+                    {component}
+                    <FormMessage />
+                </FormItem>
+                )}
+            />
+        );
+    };
+
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-4xl w-full flex flex-col">
@@ -186,207 +202,22 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
             {isReadOnly ? 'Viewing asset details.' : (asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
           </SheetDescription>
         </SheetHeader>
-        <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto pr-4 py-4">
-          <div className="md:col-span-2">
+        <div className="flex-1 overflow-y-auto pr-4 py-4">
             <Form {...form}>
               <form
                 id="asset-form"
                 onSubmit={form.handleSubmit(onSubmit)}
                 className="space-y-4 p-1"
               >
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name="category"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly || !!asset}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {TARGET_SHEETS.map(sheet => (
-                              <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Asset Description</FormLabel>
-                        <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                  )} />
-                </div>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <FormField control={form.control} name="serialNumber" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Serial Number</FormLabel>
-                      <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                  <FormField control={form.control} name="assetIdCode" render={({ field }) => (
-                    <FormItem>
-                        <FormLabel>Asset ID Code</FormLabel>
-                        <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
-                        <FormMessage />
-                    </FormItem>
-                  )} />
-                </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField control={form.control} name="location" render={({ field }) => (
-                    <FormItem>
-                      <FormLabel>Location</FormLabel>
-                      <FormControl><Input {...field} disabled={isReadOnly || !isAdmin} /></FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )} />
-                   <FormField control={form.control} name="lga" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>LGA</FormLabel>
-                            <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
-                </div>
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                   <FormField control={form.control} name="assignee" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>Assignee</FormLabel>
-                        <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )} />
-                    <FormField
-                      control={form.control}
-                      name="condition"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Condition</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select condition" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="New">New</SelectItem>
-                              <SelectItem value="Used- good condition">Used- good condition</SelectItem>
-                              <SelectItem value="Used but in good working condition">Used but in good working condition</SelectItem>
-                              <SelectItem value="Used but requires occasional repair">Used but requires occasional repair</SelectItem>
-                              <SelectItem value="Used but in poor condition">Used but in poor condition</SelectItem>
-                              <SelectItem value="Bad condition">Bad condition</SelectItem>
-                              <SelectItem value="F2: Major repairs required-poor condition">F2: Major repairs required-poor condition</SelectItem>
-                              <SelectItem value="Unsalvageable">Unsalvageable</SelectItem>
-                              <SelectItem value="Burnt">Burnt</SelectItem>
-                              <SelectItem value="Stolen">Stolen</SelectItem>
-                              <SelectItem value="Obsolete">Obsolete</SelectItem>
-                              <SelectItem value="Insurance settlement">Insurance settlement</SelectItem>
-                              <SelectItem value="Writeoff">Writeoff</SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                </div>
-                
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="manufacturer" render={({ field }) => (
-                        <FormItem>
-                            <FormLabel>Manufacturer</FormLabel>
-                            <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
-                            <FormMessage />
-                        </FormItem>
-                    )} />
-                    <FormField control={form.control} name="modelNumber" render={({ field }) => (
-                        <FormItem><FormLabel>Model Number</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                </div>
-                
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <FormField control={form.control} name="assetClass" render={({ field }) => (
-                        <FormItem><FormLabel>Asset Class</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
-                    )} />
-                    <FormField
-                      control={form.control}
-                      name="verifiedStatus"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Verified Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
-                            <FormControl>
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select status" />
-                              </SelectTrigger>
-                            </FormControl>
-                            <SelectContent>
-                              <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
-                              <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
-                            </SelectContent>
-                          </Select>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                </div>
-
-                <FormField control={form.control} name="remarks" render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Remarks/Comments</FormLabel>
-                    <FormControl><Textarea {...field} readOnly={isReadOnly} /></FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )} />
-
-                <Accordion type="single" collapsible className="w-full pt-4">
-                  <AccordionItem value="advanced">
-                    <AccordionTrigger>Advanced Information</AccordionTrigger>
-                    <AccordionContent className="pt-4 space-y-4">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <FormField control={form.control} name="engineNo" render={({ field }) => (
-                                <FormItem><FormLabel>Engine Number</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                           <FormField control={form.control} name="chasisNo" render={({ field }) => (
-                                <FormItem><FormLabel>Chasis Number</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                        </div>
-                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <FormField control={form.control} name="supplier" render={({ field }) => (
-                                <FormItem><FormLabel>Supplier</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                            <FormField control={form.control} name="grant" render={({ field }) => (
-                                <FormItem><FormLabel>Grant</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                        </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                           <FormField control={form.control} name="dateReceived" render={({ field }) => (
-                                <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
-                            )} />
-                           <ReadOnlyField label="Last Modified" value={asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
-                        </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                </Accordion>
-                
+               {!sheetDefinition ? (
+                    renderField({ key: 'category', label: 'Category', table: false, quickView: false })
+               ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {sheetDefinition.displayFields.map(field => renderField(field))}
+                    </div>
+               )}
               </form>
             </Form>
-          </div>
-          <div className="md:col-span-1 space-y-6">
-            <AssetChecklist values={watchedValues} />
-          </div>
         </div>
         <SheetFooter className="mt-auto pt-4 border-t">
           <SheetClose asChild>
@@ -403,3 +234,4 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     </Sheet>
   );
 }
+

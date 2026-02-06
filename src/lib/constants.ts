@@ -102,13 +102,47 @@ export const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   engineNo: ['ENGINE NO'],
   qty: ['QTY'],
   imei: ['IMEI (TABLETS & MOBILE PHONES)'],
+  verifiedStatus: ['VERIFIED STATUS'],
+  verifiedDate: ['VERIFIED DATE'],
+  lastModifiedBy: ['LAST MODIFIED BY'],
+  lastModified: ['LAST MODIFIED DATE'],
 };
 
 const defaultTableFields: (keyof Asset)[] = ['sn', 'assetIdCode', 'lga', 'assignee', 'verifiedStatus'];
 const vehicleTableFields: (keyof Asset)[] = ['sn', 'assetIdCode', 'lga', 'chasisNo', 'engineNo', 'assignee', 'verifiedStatus'];
 const ihvnTableFields: (keyof Asset)[] = ['sn', 'description', 'assetIdCode', 'serialNumber', 'location', 'site', 'assignee', 'verifiedStatus'];
 
-const ntblcpFarHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Suppliers', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ];
+// --- NTBLCP-TB-FAR Definition ---
+const ntblcpFarDisplayFields: DisplayField[] = [
+    { key: 'sn', label: 'S/N', table: true, quickView: true },
+    { key: 'location', label: 'Location', table: true, quickView: true },
+    { key: 'lga', label: 'LGA', table: true, quickView: true },
+    { key: 'assignee', label: 'Assignee', table: true, quickView: true },
+    { key: 'description', label: 'Asset Description', table: true, quickView: true },
+    { key: 'assetIdCode', label: 'Asset ID Code', table: true, quickView: true },
+    { key: 'assetClass', label: 'Asset Class', table: false, quickView: true },
+    { key: 'manufacturer', label: 'Manufacturer', table: false, quickView: true },
+    { key: 'modelNumber', label: 'Model Number', table: false, quickView: true },
+    { key: 'serialNumber', label: 'Serial Number', table: false, quickView: true },
+    { key: 'supplier', label: 'Suppliers', table: false, quickView: false },
+    { key: 'dateReceived', label: 'Date Purchased or Received', table: false, quickView: false },
+    { key: 'grnNo', label: 'Chq No / Goods Received Note No.', table: false, quickView: false },
+    { key: 'pvNo', label: 'PV No', table: false, quickView: false },
+    { key: 'costNgn', label: 'Purchase price (Naira)', table: false, quickView: false },
+    { key: 'costUsd', label: 'Purchase Price [USD)', table: false, quickView: false },
+    { key: 'funder', label: 'Funder', table: false, quickView: false },
+    { key: 'condition', label: 'Condition', table: false, quickView: true },
+    { key: 'remarks', label: 'Remarks', table: false, quickView: true },
+    { key: 'grant', label: 'GRANT', table: false, quickView: false },
+    { key: 'usefulLifeYears', label: 'Useful Life (Years)', table: false, quickView: false },
+    { key: 'verifiedStatus', label: 'Verified Status', table: true, quickView: true },
+    { key: 'verifiedDate', label: 'Verified Date', table: false, quickView: false },
+    { key: 'lastModifiedBy', label: 'Last Modified By', table: false, quickView: false },
+    { key: 'lastModified', label: 'Last Modified Date', table: true, quickView: false },
+];
+const ntblcpFarHeaders = ntblcpFarDisplayFields.map(f => f.label);
+
+
 const motorcycleHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Chasis no', 'Engine no', 'Suppliers', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)' ];
 const pdxHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Model Number', 'Serial Number', 'Supplier', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'Remarks', 'GRANT', 'Useful Life (Years)', 'IMEI (TABLETS & MOBILE PHONES)' ];
 const vehiclesIHVNHeaders = [ 'S/N', 'Location', 'LGA', 'Assignee', 'Asset Description', 'Asset ID Code', 'Asset Class', 'Manufacturer', 'Engine no', 'Chasis no', 'Suppliers', 'Date Purchased or  Received', 'Chq No / Goods Received Note No.', 'PV No', 'Purchase price (Naira)', 'Purchase Price [USD)', 'Funder', 'Condition', 'GRANT', 'Useful Life (Years)' ];
@@ -162,7 +196,7 @@ export const IHVN_SUB_SHEET_DEFINITIONS: Record<string, string[]> = {
 
 
 export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
-  'NTBLCP-TB-FAR': { name: 'NTBLCP-TB-FAR', headers: ntblcpFarHeaders, displayFields: createDisplayFields(ntblcpFarHeaders, defaultTableFields) },
+  'NTBLCP-TB-FAR': { name: 'NTBLCP-TB-FAR', headers: ntblcpFarHeaders, displayFields: ntblcpFarDisplayFields },
   'MOTORCYCLES-C19RM': { name: 'MOTORCYCLES-C19RM', headers: motorcycleHeaders, displayFields: createDisplayFields(motorcycleHeaders, vehicleTableFields) },
   'PDX-C19RM': { name: 'PDX-C19RM', headers: pdxHeaders, displayFields: createDisplayFields(pdxHeaders, defaultTableFields) },
   'TB LAMP-C19RM': { name: 'TB LAMP-C19RM', headers: pdxHeaders, displayFields: createDisplayFields(pdxHeaders, defaultTableFields) },

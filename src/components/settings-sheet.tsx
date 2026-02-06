@@ -37,12 +37,13 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
 import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library, Wrench, PlaneTakeoff, Info, Save, ScanSearch } from 'lucide-react';
-import { SheetDefinitionForm } from './sheet-definition-form';
+import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { ImportScannerDialog } from './single-sheet-import-dialog';
 import { saveLocalSettings } from '@/lib/idb';
+import { HEADER_ALIASES } from '@/lib/constants';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -123,7 +124,17 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   };
 
   const handleAddSheet = () => {
-    setSheetToEdit(null);
+    const newSheet: SheetDefinition = {
+      name: 'New Sheet',
+      headers: ['S/N', 'Description', 'Location'],
+      displayFields: [
+        { key: 'sn', label: 'S/N', table: true, quickView: true },
+        { key: 'description', label: 'Description', table: true, quickView: true },
+        { key: 'location', label: 'Location', table: true, quickView: true },
+        { key: 'verifiedStatus', label: 'Verified Status', table: true, quickView: true },
+      ]
+    };
+    setSheetToEdit(newSheet);
     setOriginalSheetName(null);
     setIsSheetFormOpen(true);
   };
@@ -313,7 +324,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                                 <Label htmlFor={`switch-${sheetName}`} className="text-sm pl-2 cursor-pointer">{sheetName}</Label>
                               </div>
                               <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditSheet(sheetName)}><Edit className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditSheet(sheetName)}><Wrench className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSheet(sheetName)}><Trash2 className="h-4 w-4" /></Button>
                               </div>
                             </div>
@@ -356,12 +367,14 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
         </SheetContent>
       </Sheet>
       
-      <SheetDefinitionForm
-        isOpen={isSheetFormOpen}
-        onOpenChange={setIsSheetFormOpen}
-        onSave={handleSaveSheet}
-        sheet={sheetToEdit}
-      />
+      {sheetToEdit && (
+        <ColumnCustomizationSheet
+          isOpen={isSheetFormOpen}
+          onOpenChange={setIsSheetFormOpen}
+          onSave={handleSaveSheet}
+          sheetDefinition={sheetToEdit}
+        />
+      )}
 
       <ImportScannerDialog
         isOpen={isImportScanOpen}
