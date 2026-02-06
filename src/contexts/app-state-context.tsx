@@ -3,12 +3,23 @@
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
-import { TARGET_SHEETS } from '@/lib/constants';
+import { TARGET_SHEETS, NIGERIAN_STATES, HEADER_DEFINITIONS } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
-import { HEADER_DEFINITIONS } from '@/lib/constants';
 import { getSettings, updateSettings } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
+
+const defaultStateUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
+  loginName: state.toLowerCase().replace(/\s|-/g, ''),
+  displayName: state,
+  password: '000000',
+  states: [state],
+  isAdmin: false,
+  isGuest: false,
+  canAddAssets: true,
+  canEditAssets: true,
+  canVerifyAssets: true,
+}));
 
 
 export interface SortConfig {
@@ -124,7 +135,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'sn', direction: 'asc' });
 
   const [appSettings, setAppSettings] = useState<AppSettings>({
-    authorizedUsers: [],
+    authorizedUsers: defaultStateUsers,
     sheetDefinitions: HEADER_DEFINITIONS,
     enabledSheets: TARGET_SHEETS,
     lockAssetList: true,
@@ -179,7 +190,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
       if (!localSettings) {
         localSettings = {
-          authorizedUsers: [],
+          authorizedUsers: defaultStateUsers,
           sheetDefinitions: HEADER_DEFINITIONS,
           enabledSheets: TARGET_SHEETS,
           lockAssetList: true,
