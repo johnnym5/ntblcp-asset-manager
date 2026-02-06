@@ -91,49 +91,6 @@ interface AppStateContextType {
   setAssetToView: Dispatch<SetStateAction<Asset | null>>;
 }
 
-const stateManagersToAdd = [
-  { state: 'Abia', displayName: 'Abia Asset Manager', password: 'Abia!72#vX' },
-  { state: 'Adamawa', displayName: 'Adamawa Asset Manager', password: 'Adam@94*nQ' },
-  { state: 'Akwa Ibom', displayName: 'Akwa Ibom Asset Manager', password: 'Akwa$11&mB' },
-  { state: 'Anambra', displayName: 'Anambra Asset Manager', password: 'Anam#85^kT' },
-  { state: 'Bauchi', displayName: 'Bauchi Asset Manager', password: 'Bauc%33(rZ' },
-  { state: 'Bayelsa', displayName: 'Bayelsa Asset Manager', password: 'Baye!62)pW' },
-  { state: 'Benue', displayName: 'Benue Asset Manager', password: 'Benu*48@dX' },
-  { state: 'Borno', displayName: 'Borno Asset Manager', password: 'Born&29#sL' },
-  { state: 'Cross River', displayName: 'Cross River Asset Manager', password: 'Cros#77!fM' },
-  { state: 'Delta', displayName: 'Delta Asset Manager', password: 'Delt$56^gH' },
-  { state: 'Ebonyi', displayName: 'Ebonyi Asset Manager', password: 'Ebon@42*vR' },
-  { state: 'Edo', displayName: 'Edo Asset Manager', password: 'EdoA!81(zQ' },
-  { state: 'Ekiti', displayName: 'Ekiti Asset Manager', password: 'Ekit%19&pX' },
-  { state: 'Enugu', displayName: 'Enugu Asset Manager', password: 'Enug#64@mN' },
-  { state: 'Gombe', displayName: 'Gombe Asset Manager', password: 'Gomb$37^rW' },
-  { state: 'Imo', displayName: 'Imo Asset Manager', password: 'ImoA*22#kL' },
-  { state: 'Jigawa', displayName: 'Jigawa Asset Manager', password: 'Jiga&93!bV' },
-  { state: 'Kaduna', displayName: 'Kaduna Asset Manager', password: 'Kadu#55(pT' },
-  { state: 'Kano', displayName: 'Kano Asset Manager', password: 'Kano$18@sR' },
-  { state: 'Katsina', displayName: 'Katsina Asset Manager', password: 'Kats%44*mZ' },
-  { state: 'Kebbi', displayName: 'Kebbi Asset Manager', password: 'Kebb!76^dX' },
-  { state: 'Kogi', displayName: 'Kogi Asset Manager', password: 'Kogi&31#vN' },
-  { state: 'Kwara', displayName: 'Kwara Asset Manager', password: 'Kwar#88!pG' },
-  { state: 'Lagos', displayName: 'Lagos Asset Manager', password: 'Lago$25(mT' },
-  { state: 'Nasarawa', displayName: 'Nasarawa Asset Manager', password: 'Nasa%69@bF' },
-  { state: 'Niger', displayName: 'Niger Asset Manager', password: 'Nige*52&rK' },
-  { state: 'Ogun', displayName: 'Ogun Asset Manager', password: 'Ogun#14^zX' },
-  { state: 'Ondo', displayName: 'Ondo Asset Manager', password: 'Ondo$97!hL' },
-  { state: 'Osun', displayName: 'Osun Asset Manager', password: 'Osun%38#kQ' },
-  { state: 'Oyo', displayName: 'Oyo Asset Manager', password: 'OyoA&21*vB' },
-  { state: 'Plateau', displayName: 'Plateau Asset Manager', password: 'Plat#59(rW' },
-  { state: 'Rivers', displayName: 'Rivers Asset Manager', password: 'Rive$46@nX' },
-  { state: 'Sokoto', displayName: 'Sokoto Asset Manager', password: 'Soko%73^mT' },
-  { state: 'Taraba', displayName: 'Taraba Asset Manager', password: 'Tara&12!kP' },
-  { state: 'Yobe', displayName: 'Yobe Asset Manager', password: 'Yobe#84*bG' },
-  { state: 'Zamfara', displayName: 'Zamfara Asset Manager', password: 'Zamf$66#rZ' },
-].map(m => ({
-  ...m,
-  email: m.displayName.toLowerCase().replace(/ /g, '.') + '@domain.com'
-}));
-
-
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
@@ -182,6 +139,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     const initializeSettings = async () => {
       let settings = await getLocalSettings();
+      let settingsModified = false;
 
       if (!settings) {
         settings = {
@@ -190,63 +148,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           enabledSheets: TARGET_SHEETS,
           lockAssetList: true,
         };
+        settingsModified = true;
       }
       
-      let currentUsers = settings.authorizedUsers || [];
-      let usersModified = false;
-      
-      const userMap = new Map(currentUsers.map(u => u.email.toLowerCase()));
-
-      stateManagersToAdd.forEach(manager => {
-          const loginName = manager.displayName.toLowerCase().replace(/\s+/g, '-');
-          const existingUser = currentUsers.find(u => u.email.toLowerCase() === manager.email.toLowerCase());
-
-          if (!existingUser) {
-              currentUsers.push({
-                  loginName: loginName,
-                  displayName: manager.displayName,
-                  email: manager.email,
-                  password: manager.password,
-                  states: [manager.state],
-                  isAdmin: false,
-                  isGuest: false,
-                  canAddAssets: true,
-                  canEditAssets: true,
-              });
-              usersModified = true;
-          } else {
-              const needsUpdate = 
-                  existingUser.displayName !== manager.displayName ||
-                  existingUser.password !== manager.password ||
-                  existingUser.loginName !== loginName ||
-                  JSON.stringify(existingUser.states.sort()) !== JSON.stringify([manager.state].sort());
-              
-              if (needsUpdate) {
-                  const userIndex = currentUsers.findIndex(u => u.email.toLowerCase() === manager.email.toLowerCase());
-                  if (userIndex !== -1) {
-                      currentUsers[userIndex] = {
-                          ...currentUsers[userIndex],
-                          loginName: loginName,
-                          displayName: manager.displayName,
-                          password: manager.password,
-                          states: [manager.state],
-                      };
-                      usersModified = true;
-                  }
-              }
-          }
-      });
-      
       const adminEmail = 'jegbase@gmail.com';
-      const adminIndex = currentUsers.findIndex(u => u.email.toLowerCase() === adminEmail);
+      const adminExists = settings.authorizedUsers.some(u => u.email.toLowerCase() === adminEmail);
 
-      if (adminIndex !== -1) {
-        if (!currentUsers[adminIndex].isAdmin || currentUsers[adminIndex].loginName !== 'jegbase') {
-          currentUsers[adminIndex] = { ...currentUsers[adminIndex], isAdmin: true, states: ['All'], loginName: 'jegbase' };
-          usersModified = true;
-        }
-      } else {
-        currentUsers.push({
+      if (!adminExists) {
+        settings.authorizedUsers.push({
           loginName: 'jegbase',
           displayName: 'Jegbase Admin',
           email: adminEmail,
@@ -257,11 +166,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           canAddAssets: true,
           canEditAssets: true,
         });
-        usersModified = true;
+        settingsModified = true;
       }
       
-      if (usersModified) {
-        settings.authorizedUsers = currentUsers;
+      if (settingsModified) {
         await saveLocalSettings(settings);
       }
 
