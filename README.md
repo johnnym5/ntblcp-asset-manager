@@ -1,6 +1,6 @@
-# Offline Asset Assist
+# NTBLCP Asset Manager
 
-A full-featured, offline-first Asset Management Web App for NTBLCP, built with Next.js, Tailwind CSS, and a local-first architecture.
+A full-featured, offline-first Asset Management Web App for NTBLCP, built with Next.js, Tailwind CSS, and Firebase.
 
 ## Application Features & Overview
 
@@ -9,92 +9,98 @@ This application is designed to solve the critical challenge of managing and ver
 ### Core Features
 
 *   **Offline-First by Default**: The application is built to work completely offline. All data is stored and managed in the browser's local database (IndexedDB), ensuring that work is never lost due to a lack of internet.
-*   **Role-Based Access**: A simple, passwordless login screen grants access based on a predefined list of users. Each user is locked to the assets of their assigned state(s), while admins can view all assets.
+*   **Role-Based Access & Approval Workflow**: A secure, password-based login system grants access based on user roles. Changes from non-admin users are submitted to an approval queue for an administrator to review, ensuring data integrity.
 *   **Dynamic Excel Import & Export**:
-    *   **Intelligent Import**: Parses complex Excel files containing multiple asset sheet formats, automatically detecting headers and mapping data to a unified structure. This works both online and offline.
-    *   **Structure-Preserving Export**: Exports data back into an Excel file that mirrors the original's column structure and naming conventions, with "Verified Status" and "Verified Date" appended at the end.
-*   **Advanced Data Management**:
-    *   **Smart Search**: A global search bar that understands multiple keywords to quickly find assets across all fields and categories.
-    *   **Filtering & Sorting**: Powerful popover filters for location, assignee, and status, along with multi-key sorting.
-    *   **Batch Editing**: Select multiple assets and apply changes (like updating location or status) to all of them in a single action.
-*   **Insightful Dashboard**:
-    *   The main dashboard provides a high-level overview of asset verification progress with clear, visual progress bars for both the overall status and individual asset categories.
-*   **Selective Sync**: Users can select one or more assets or entire categories and push only those specific items to the cloud database, providing granular control over data synchronization.
-
-### How It Works (Use Cases & Impact)
-
-*   **Impact**: This tool empowers field officers and administrators by providing a reliable, centralized system for asset management. It dramatically improves data accuracy, streamlines the verification process, and provides clear visibility into asset distribution, even in the most challenging offline environments.
-*   **Use Cases**:
-    *   **Field Verification**: An officer in a remote area can import a new list of assets from an Excel file, work entirely offline to update their status, and then selectively push only their updated records to the cloud once they regain connectivity.
-    *   **State Coordination**: A state coordinator can quickly get an overview of all assets within their state, track verification progress, and identify discrepancies.
-    *   **National Auditing**: An administrator can use the 'admin' view to see the complete national asset register, search across all records, and export comprehensive reports by category.
+    *   **Intelligent Import**: Parses complex Excel files, automatically detecting headers and mapping data to a unified structure. Imports are sandboxed in a "Locked Offline" store for review before merging.
+    *   **Structure-Preserving Export**: Exports data back into an Excel file that mirrors the original's column structure and naming conventions.
+*   **Advanced Data Management**: Features smart search, powerful filtering and sorting, and batch editing capabilities.
+*   **Insightful Dashboard**: Provides a high-level overview of asset verification progress with clear, visual progress bars.
+*   **Selective Sync with Confirmation**: Users can select one or more assets or entire categories and push/pull only those specific items to the cloud, with a clear confirmation step that summarizes all pending changes.
 
 ---
 
-## Deployment to Firebase App Hosting
+## 1. Local Development Setup
 
-This project is configured for deployment to Firebase App Hosting.
+Before you can run the app locally, you must provide your Firebase project's credentials.
 
-### Prerequisites
+### Step 1.1: Create `.env.local` file
 
-1.  **Install Firebase CLI**:
-    ```bash
-    npm install -g firebase-tools
+Create a file named `.env.local` in the root of the project by copying the `.env.example` file.
+
+```bash
+cp .env.example .env.local
+```
+
+### Step 1.2: Fill in your Firebase Credentials
+
+Open the new `.env.local` file and add your actual Firebase project credentials. You can find these values in your Firebase project's settings page in the Firebase Console.
+
+*   In the Firebase Console, go to **Project settings** (click the gear icon ⚙️).
+*   In the **General** tab, scroll down to the "Your apps" section.
+*   Select your web app and copy the corresponding configuration values into your `.env.local` file.
+
+### Step 1.3: Install Dependencies & Run
+
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.
+
+---
+
+## 2. Deployment to Firebase App Hosting
+
+This project is pre-configured for one-click deployment to Firebase App Hosting.
+
+### Step 2.1: Install the Firebase CLI
+
+If you haven't already, install the Firebase Command Line Interface (CLI).
+
+```bash
+npm install -g firebase-tools
+```
+
+### Step 2.2: Log in to Firebase
+
+Log in to your Firebase account through the CLI. This command will open a browser window for you to sign in.
+
+```bash
+firebase login
+```
+
+### Step 2.3: Set Your Firebase Project ID
+
+Your application needs to know which Firebase project to deploy to.
+
+1.  Open the `.firebaserc` file in your project's root directory.
+2.  Replace the placeholder project ID with your actual Firebase Project ID.
+
+    ```json
+    {
+      "projects": {
+        "default": "YOUR-FIREBASE-PROJECT-ID"
+      }
+    }
     ```
 
-2.  **Login to Firebase**:
-    ```bash
-    firebase login
-    ```
+### Step 2.4: Configure Environment Variables in Firebase
 
-3.  **Set Project ID**:
-    Open the `.firebaserc` file and replace the placeholder with your actual Firebase Project ID.
+Your deployed application needs your Firebase API keys to connect to the database and authentication services.
 
-4.  **Configure Environment Variables**:
-    In the Firebase Console, navigate to your project's App Hosting backend. In the settings, add the following environment variables. You can find these values in your Firebase project settings under "General".
+1.  Go to the [Firebase Console](https://console.firebase.google.com/).
+2.  Select your project (`YOUR-FIREBASE-PROJECT-ID`).
+3.  Navigate to the **App Hosting** page.
+4.  Select your backend, go to the **Settings** tab.
+5.  In the "Environment variables" section, add the same variables from your `.env.local` file (e.g., `NEXT_PUBLIC_FIREBASE_API_KEY`, etc.).
 
-    *   `NEXT_PUBLIC_FIREBASE_API_KEY`
-    *   `NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN`
-    *   `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-    *   `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`
-    *   `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID`
-    *   `NEXT_PUBLIC_FIREBASE_APP_ID`
+### Step 2.5: Deploy the Application
 
-### Deploy
-
-Once the prerequisites are met, deploy the app with a single command:
+Run this single command from your project's root directory.
 
 ```bash
 firebase deploy
 ```
 
-Firebase will build your Next.js application and deploy it. After the command completes, you can access your live application at the following URL:
-
-[https://globalassethub.web.app](https://globalassethub.web.app)
-
-## Getting Started (Local Development)
-
-**CRITICAL STEP:** Before you can run the app locally, you must provide your Firebase project's credentials.
-
-1.  **Create `.env` file**:
-    Create a file named `.env` in the root of the project.
-
-2.  **Fill in your credentials**:
-    Open the new `.env` file and add the following lines, replacing the placeholder values with your actual Firebase project credentials. You can find these values in your Firebase project's settings page in the Firebase Console. Under the "General" tab, find the "Your apps" section, select your web app, and copy the corresponding values.
-
-    ```
-    NEXT_PUBLIC_FIREBASE_API_KEY=YOUR_API_KEY
-    NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=YOUR_AUTH_DOMAIN
-    NEXT_PUBLIC_FIREBASE_PROJECT_ID=YOUR_PROJECT_ID
-    NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=YOUR_STORAGE_BUCKET
-    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=YOUR_MESSAGING_SENDER_ID
-    NEXT_PUBLIC_FIREBASE_APP_ID=YOUR_APP_ID
-    ```
-    **Note:** If you do not provide these credentials, the application will still run in a full offline mode, but any features that require a cloud connection (like downloading or uploading data) will fail with a configuration error.
-
-3.  **Run the development server**:
-    ```bash
-    npm run dev
-    ```
-
-Open [http://localhost:9002](http://localhost:9002) with your browser to see the result. To log in, use a name from the authorized user list (e.g., `admin`, `seyi`, or `guest`).
+This command will automatically build your Next.js application and deploy it to App Hosting. Your live application will be available at `https://<your-app-name>.web.app`.
