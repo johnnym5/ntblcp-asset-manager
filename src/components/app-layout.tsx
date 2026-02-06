@@ -65,6 +65,9 @@ import {
   X,
   Users,
   Inbox,
+  Library,
+  ScanSearch,
+  PlaneTakeoff,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -338,41 +341,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                   {pathname === '/' && dataActions.onImport && isAdmin && (
-                    <DropdownMenuSub>
-                      <DropdownMenuSubTrigger>
-                        <Database className="mr-2 h-4 w-4" />
-                        Data Management
-                      </DropdownMenuSubTrigger>
-                      <DropdownMenuPortal>
-                        <DropdownMenuSubContent>
-                          <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting}>
-                            <FileUp className="mr-2 h-4 w-4" />
-                            Import from Excel
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={dataActions.onExport}>
-                            <FileDown className="mr-2 h-4 w-4" />
-                            Export to Excel
-                          </DropdownMenuItem>
-                           <DropdownMenuItem onClick={dataActions.onAddAsset}>
-                            <PlusCircle className="mr-2 h-4 w-4" />
-                            Add New Asset
-                          </DropdownMenuItem>
-                          
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            className="text-destructive focus:bg-destructive/20 focus:text-destructive"
-                            onClick={dataActions.onClearAll}
-                            disabled={!dataActions.hasAssets || (isOnline && !dataActions.isAdmin)}
-                          >
-                            <Trash2 className="mr-2 h-4 w-4" />
-                            Clear All Assets
-                          </DropdownMenuItem>
-                          
-                        </DropdownMenuSubContent>
-                      </DropdownMenuPortal>
-                    </DropdownMenuSub>
-                  )}
                   {isAdmin && (
                     <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
                       <Settings className="mr-2 h-4 w-4"/>

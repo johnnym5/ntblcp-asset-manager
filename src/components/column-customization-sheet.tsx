@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -15,12 +15,20 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from './ui/scroll-area';
-import { ArrowDown, ArrowUp, GripVertical } from 'lucide-react';
-import type { SheetDefinition, DisplayField } from '@/lib/types';
+import { ArrowDown, ArrowUp, GripVertical, PlusCircle } from 'lucide-react';
+import type { SheetDefinition, DisplayField, Asset } from '@/lib/types';
 import { useAppState } from '@/contexts/app-state-context';
 import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from './ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { HEADER_ALIASES } from '@/lib/constants';
 
 interface ColumnCustomizationSheetProps {
   isOpen: boolean;
@@ -39,6 +47,7 @@ export function ColumnCustomizationSheet({
   const [editedFields, setEditedFields] = useState<DisplayField[]>([]);
   const { appSettings, setAppSettings } = useAppState();
   const { toast } = useToast();
+  const [fieldToAdd, setFieldToAdd] = useState('');
 
   useEffect(() => {
     if (isOpen && sheetDefinition) {
@@ -46,6 +55,28 @@ export function ColumnCustomizationSheet({
       setEditedFields(JSON.parse(JSON.stringify(sheetDefinition.displayFields || [])));
     }
   }, [isOpen, sheetDefinition]);
+
+  const allPossibleFieldKeys = useMemo(() => Object.keys(HEADER_ALIASES) as (keyof Asset)[], []);
+
+  const availableFields = useMemo(() => {
+      const currentKeys = new Set(editedFields.map(f => f.key));
+      return allPossibleFieldKeys.filter(key => !currentKeys.has(key));
+  }, [editedFields, allPossibleFieldKeys]);
+
+  const handleAddField = () => {
+      if (!fieldToAdd) return;
+      const key = fieldToAdd as keyof Asset;
+      const label = HEADER_ALIASES[key as keyof typeof HEADER_ALIASES]?.[0] || key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+      
+      const newField: DisplayField = {
+          key: key,
+          label: label,
+          table: false,
+          quickView: false,
+      };
+      setEditedFields(current => [...current, newField]);
+      setFieldToAdd('');
+  };
 
   const handleLabelChange = (index: number, newLabel: string) => {
     setEditedFields(currentFields => {
@@ -161,6 +192,24 @@ export function ColumnCustomizationSheet({
               ))}
             </div>
           </ScrollArea>
+        </div>
+        <div className="px-4 py-4 border-t">
+          <Label className="text-sm font-medium">Add New Field</Label>
+          <div className="flex items-center gap-2 mt-2">
+              <Select value={fieldToAdd} onValueChange={setFieldToAdd}>
+                  <SelectTrigger className="flex-1">
+                      <SelectValue placeholder="Select a field to add..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                      {availableFields.map(key => (
+                          <SelectItem key={key} value={key}>
+                              {HEADER_ALIASES[key as keyof typeof HEADER_ALIASES]?.[0] || key}
+                          </SelectItem>
+                      ))}
+                  </SelectContent>
+              </Select>
+              <Button onClick={handleAddField} disabled={!fieldToAdd}><PlusCircle className="mr-2 h-4 w-4" /> Add</Button>
+          </div>
         </div>
         <SheetFooter className="sm:justify-between items-center pt-4 border-t">
           <SheetClose asChild>

@@ -16,6 +16,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
+  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -46,6 +47,10 @@ import {
   Columns,
   Delete,
   PlaneTakeoff,
+  Database,
+  PlusCircle,
+  ScanSearch,
+  Library,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -80,6 +85,7 @@ import { addNotification } from "@/hooks/use-notifications";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { TravelReportDialog } from "./travel-report-dialog";
 import { ScrollArea } from "./ui/scroll-area";
+import { Separator } from "./ui/separator";
 
 
 /**
@@ -184,6 +190,7 @@ export default function AssetList() {
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
+  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
@@ -1202,25 +1209,43 @@ export default function AssetList() {
                 {isFiltered ? 'Filter Results' : 'Asset Dashboard'}
             </h2>
             <div className="flex items-center gap-2">
-              {selectedCategories.length > 0 && (
-                   <>
-                      <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
-                       <Button variant="outline" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
-                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
-                         {contextualButtonText}
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
-                          <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => handleExportClick(selectedCategories)}>
-                          <FileDown className="mr-2 h-4 w-4" /> Export
-                      </Button>
-                      <Button variant="destructive" size="sm" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
-                          {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                          Delete
-                      </Button>
-                  </>
+              {/* General Data Actions */}
+              {dataActions.onAddAsset && (
+                  <Button onClick={dataActions.onAddAsset} size="sm" disabled={!userProfile?.canAddAssets && !isAdmin}>
+                      <PlusCircle className="mr-2 h-4 w-4" /> Add Asset
+                  </Button>
               )}
+               <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                        <Button variant="outline" size="sm">
+                            <Database className="mr-2 h-4 w-4" /> More Actions
+                        </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                         <DropdownMenuLabel>Data Actions</DropdownMenuLabel>
+                         <DropdownMenuSeparator/>
+                        <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting || !isAdmin}>
+                            <Library className="mr-2 h-4 w-4" /> Import Full FAR
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIsImportScanOpen(true)} disabled={dataActions.isImporting || !isAdmin}>
+                            <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={dataActions.onExport} disabled={!dataActions.hasAssets}>
+                            <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={dataActions.onTravelReport}>
+                            <PlaneTakeoff className="mr-2 h-4 w-4" /> Travel Report
+                        </DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem
+                            className="text-destructive focus:bg-destructive/20"
+                            onClick={dataActions.onClearAll}
+                            disabled={!dataActions.hasAssets || !isAdmin}
+                        >
+                            <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
+                        </DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
             </div>
         </div>
         <Card>
@@ -1313,6 +1338,26 @@ export default function AssetList() {
                     {isFiltered && ` (Showing from a total of ${totalAssetsInScope})`}
                   </p>
               </CardContent>
+               {selectedCategories.length > 0 && (
+                <CardFooter className="bg-muted/50 p-2 border-t flex items-center gap-2">
+                    <span className="text-sm font-medium text-muted-foreground">{selectedCategories.length} selected</span>
+                    <Separator orientation="vertical" className="h-6"/>
+                    <Button variant="ghost" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
+                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
+                        {contextualButtonText}
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
+                        <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleExportClick(selectedCategories)}>
+                        <FileDown className="mr-2 h-4 w-4" /> Export Selection
+                    </Button>
+                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
+                        {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                        Delete
+                    </Button>
+                </CardFooter>
+            )}
           </Card>
         
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
@@ -1341,6 +1386,10 @@ export default function AssetList() {
         />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
         <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
+         <ImportScannerDialog
+            isOpen={isImportScanOpen}
+            onOpenChange={setIsImportScanOpen}
+        />
         <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -1586,5 +1635,6 @@ export default function AssetList() {
     
 
     
+
 
 
