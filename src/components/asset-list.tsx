@@ -193,10 +193,11 @@ export default function AssetList() {
     setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
     sortConfig, setSortConfig,
     appSettings, setAppSettings,
-    manualSyncTrigger, isSyncing, setIsSyncing,
+    manualDownloadTrigger,
+    manualUploadTrigger,
+    isSyncing, setIsSyncing,
     setDataActions,
     searchTerm,
-    autoSyncEnabled,
     assetToView, setAssetToView
   } = useAppState();
 
@@ -221,73 +222,64 @@ export default function AssetList() {
   }, [view]);
 
   // --- DATA LOADING & SYNC ---
-  const performSync = useCallback(async () => {
+  const performDownload = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
 
     setIsSyncing(true);
-    addNotification({ title: 'Syncing with cloud...' });
+    addNotification({ title: 'Downloading from cloud...' });
+
+    try {
+        const cloudAssets = await getAssets();
+        await saveAssets(cloudAssets.map(a => ({ ...a, syncStatus: 'synced' })));
+        setAssets(cloudAssets.map(a => ({ ...a, syncStatus: 'synced' })));
+        
+        addNotification({ title: 'Download Complete', description: `${cloudAssets.length} assets downloaded from the cloud.` });
+    } catch (error) {
+        console.error("Download failed:", error);
+        addNotification({
+          title: "Download Failed",
+          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during download.",
+          variant: 'destructive'
+        });
+        setIsOnline(false);
+    } finally {
+        setIsSyncing(false);
+    }
+  }, [isOnline, authInitialized, isGuest, setIsOnline, setAssets, setIsSyncing]);
+
+  const performUpload = useCallback(async () => {
+    if (!isOnline || !authInitialized || isGuest) return;
+
+    setIsSyncing(true);
+    addNotification({ title: 'Uploading changes...' });
 
     try {
         const localAssets = await getLocalAssetsFromDb();
-        const cloudAssets = await getAssets();
-        
-        const localMap = new Map(localAssets.map(a => [a.id, a]));
-        const cloudMap = new Map(cloudAssets.map(a => [a.id, a]));
-
-        const assetsToPush: Asset[] = [];
-        const assetsToPull: Asset[] = [];
-        const mergedAssetsMap = new Map(localMap);
-
-        // Iterate through all unique asset IDs from both sources
-        const allIds = new Set([...localMap.keys(), ...cloudMap.keys()]);
-
-        allIds.forEach(id => {
-            const local = localMap.get(id);
-            const cloud = cloudMap.get(id);
-
-            if (local && !cloud) {
-                // Exists locally, but not in cloud -> Push
-                assetsToPush.push(local);
-            } else if (!local && cloud) {
-                // Exists in cloud, but not locally -> Pull
-                assetsToPull.push(cloud);
-                mergedAssetsMap.set(id, { ...cloud, syncStatus: 'synced' });
-            } else if (local && cloud) {
-                // Exists in both, compare timestamps
-                const localDate = local.lastModified ? new Date(local.lastModified).getTime() : 0;
-                const cloudDate = cloud.lastModified ? new Date(cloud.lastModified).getTime() : 0;
-
-                if (localDate > cloudDate) {
-                    assetsToPush.push(local);
-                } else if (cloudDate > localDate) {
-                    assetsToPull.push(cloud);
-                    mergedAssetsMap.set(id, { ...cloud, syncStatus: 'synced' });
-                }
-            }
-        });
+        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
 
         if (assetsToPush.length > 0) {
-            await batchSetAssets(assetsToPush.map(a => ({...a, syncStatus: 'synced'})));
-            addNotification({ title: 'Data Pushed', description: `${assetsToPush.length} local changes synced to the cloud.` });
+            await batchSetAssets(assetsToPush);
+            
+            const localMap = new Map(localAssets.map(a => [a.id, a]));
+            assetsToPush.forEach(pushedAsset => {
+                const localVersion = localMap.get(pushedAsset.id);
+                if (localVersion) {
+                    localMap.set(pushedAsset.id, { ...localVersion, syncStatus: 'synced' });
+                }
+            });
+            const updatedLocalAssets = Array.from(localMap.values());
+            await saveAssets(updatedLocalAssets);
+            setAssets(updatedLocalAssets);
+
+            addNotification({ title: 'Upload Complete', description: `${assetsToPush.length} local changes uploaded to the cloud.` });
+        } else {
+            addNotification({ title: 'No Changes to Upload', description: 'Your local data is already in sync.' });
         }
-        
-        if (assetsToPull.length > 0) {
-            addNotification({ title: 'Data Pulled', description: `${assetsToPull.length} assets updated from the cloud.` });
-        }
-        
-        if(assetsToPush.length === 0 && assetsToPull.length === 0) {
-            addNotification({ title: 'Already Up-to-Date', description: 'Your local data is in sync with the cloud.' });
-        }
-        
-        const finalAssets = Array.from(mergedAssetsMap.values());
-        await saveAssets(finalAssets);
-        setAssets(finalAssets);
-        
     } catch (error) {
-        console.error("Sync failed:", error);
+        console.error("Upload failed:", error);
         addNotification({
-          title: "Sync Failed",
-          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during sync.",
+          title: "Upload Failed",
+          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during upload.",
           variant: 'destructive'
         });
         setIsOnline(false);
@@ -306,24 +298,26 @@ export default function AssetList() {
         setIsLoading(false);
 
         if (isOnline && authInitialized && !isGuest) {
-          await performSync();
+          await performDownload();
         }
     };
 
     if (authInitialized) {
         loadInitialData();
     }
-  }, [authInitialized, performSync, setAssets, isOnline, isGuest, setOfflineAssets]);
+  }, [authInitialized, isOnline, isGuest, setAssets, setOfflineAssets, performDownload]);
   
   useEffect(() => {
-    if (!isOnline) return;
-
-    const shouldSync = manualSyncTrigger > 0 || autoSyncEnabled;
-    
-    if (shouldSync && authInitialized && !isGuest && dataSource === 'cloud') {
-        performSync();
+    if (manualDownloadTrigger > 0) {
+        performDownload();
     }
-  }, [manualSyncTrigger, isOnline, autoSyncEnabled, authInitialized, performSync, isGuest, dataSource]);
+  }, [manualDownloadTrigger, performDownload]);
+  
+  useEffect(() => {
+    if (manualUploadTrigger > 0) {
+        performUpload();
+    }
+  }, [manualUploadTrigger, performUpload]);
   
   useEffect(() => {
     setStatusOptions([
@@ -863,9 +857,9 @@ export default function AssetList() {
     }
   };
   
-  const handleSelectiveSync = useCallback(async () => {
+  const handleSelectiveUpload = useCallback(async () => {
     if (!isOnline) {
-      addNotification({title: "Offline", description: "Cannot sync while offline.", variant: "destructive"});
+      addNotification({title: "Offline", description: "Cannot upload while offline.", variant: "destructive"});
       return;
     }
 
@@ -874,36 +868,38 @@ export default function AssetList() {
         return;
     }
 
-    const idsToSync = view === 'dashboard'
+    const idsToUpload = view === 'dashboard'
       ? selectedCategories.flatMap(cat => assetsByCategory[cat]?.map(a => a.id) || [])
       : selectedAssetIds;
 
-    if (idsToSync.length === 0) {
-      addNotification({title: "No Selection", description: "Please select assets or categories to sync."});
+    if (idsToUpload.length === 0) {
+      addNotification({title: "No Selection", description: "Please select assets or categories to upload."});
       return;
     }
     
     setIsSyncing(true);
     try {
-      addNotification({title: "Syncing selected items...", description: `Preparing to sync ${idsToSync.length} assets.`});
+      addNotification({title: "Uploading selected items...", description: `Preparing to upload ${idsToUpload.length} assets.`});
       const allLocalAssets = await getLocalAssetsFromDb();
-      const assetsToSync = allLocalAssets.filter(a => idsToSync.includes(a.id));
+      const assetsToUpload = allLocalAssets.filter(a => idsToUpload.includes(a.id) && a.syncStatus === 'local');
 
-      if (assetsToSync.length > 0) {
-        await batchSetAssets(assetsToSync);
+      if (assetsToUpload.length > 0) {
+        await batchSetAssets(assetsToUpload);
 
         const updatedLocalAssets = allLocalAssets.map(asset => 
-          idsToSync.includes(a.id) ? { ...asset, syncStatus: 'synced' as const } : asset
+          idsToUpload.includes(asset.id) ? { ...asset, syncStatus: 'synced' as const } : asset
         );
         await saveAssets(updatedLocalAssets);
         setAssets(updatedLocalAssets);
         
-        addNotification({title: "Selective Sync Complete", description: `${assetsToSync.length} assets have been synced to the cloud.`});
+        addNotification({title: "Selective Upload Complete", description: `${assetsToUpload.length} assets have been uploaded to the cloud.`});
+      } else {
+        addNotification({title: "No Changes to Upload", description: "Selected items have no local changes to upload."});
       }
 
     } catch(e) {
-      console.error("Selective sync failed", e);
-      addNotification({title: "Sync Failed", description: (e as Error).message, variant: "destructive"});
+      console.error("Selective upload failed", e);
+      addNotification({title: "Upload Failed", description: (e as Error).message, variant: "destructive"});
     } finally {
       setIsSyncing(false);
       setSelectedAssetIds([]);
@@ -939,7 +935,7 @@ export default function AssetList() {
         setAssets(Array.from(mainAssetsMap.values()));
         setOfflineAssets(remainingOfflineAssets);
 
-        addNotification({ title: 'Merge Complete', description: `${idsToMerge.length} assets merged to the main list and are ready for cloud sync.` });
+        addNotification({ title: 'Merge Complete', description: `${idsToMerge.length} assets merged to the main list and are ready for cloud upload.` });
         
     } catch (e) {
         addNotification({ title: 'Merge Failed', description: (e as Error).message, variant: 'destructive' });
@@ -1162,8 +1158,8 @@ export default function AssetList() {
     const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
     
-    const syncButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Sync to Cloud';
-    const SyncButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
+    const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
+    const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
 
     const mainCategories = Object.keys(assetsByCategory).sort((a,b) => a.localeCompare(b));
 
@@ -1178,9 +1174,9 @@ export default function AssetList() {
               {selectedCategories.length > 0 && (
                    <>
                       <span className="text-sm text-muted-foreground">{selectedCategories.length} selected</span>
-                       <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
-                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <SyncButtonIcon className="mr-2 h-4 w-4" />}
-                         {syncButtonText}
+                       <Button variant="outline" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
+                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
+                         {contextualButtonText}
                       </Button>
                       <Button variant="outline" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
                           <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
@@ -1357,8 +1353,8 @@ export default function AssetList() {
   );
   const areAllCategoryResultsSelected = categoryFilteredAssets.length > 0 && categoryFilteredAssets.every(a => selectedAssetIds.includes(a.id));
 
-  const syncButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Sync to Cloud';
-  const SyncButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
+  const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
+  const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
   
   const currentSheetDefinition = sheetDefinitions[currentCategory!];
   const tableFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.table) || [];
@@ -1383,9 +1379,9 @@ export default function AssetList() {
             {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
-                     <Button variant="outline" size="sm" onClick={handleSelectiveSync} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
-                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <SyncButtonIcon className="mr-2 h-4 w-4" />}
-                       {syncButtonText}
+                     <Button variant="outline" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
+                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
+                       {contextualButtonText}
                     </Button>
                      {selectedAssetIds.length === 1 && !isGuest && (
                         <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={!userProfile?.canEditAssets && !isAdmin}>

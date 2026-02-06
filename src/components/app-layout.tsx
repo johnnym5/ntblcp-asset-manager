@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -50,7 +51,8 @@ import {
   Check,
   ChevronsUpDown,
   Loader2,
-  RefreshCw,
+  CloudDownload,
+  CloudUpload,
   Database,
   FileDown,
   FileUp,
@@ -102,7 +104,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     locationOptions, assigneeOptions, statusOptions,
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
-    setManualSyncTrigger, isSyncing,
+    setManualDownloadTrigger,
+    setManualUploadTrigger,
+    isSyncing,
     dataActions,
     unreadInboxCount
   } = useAppState();
@@ -161,9 +165,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     });
   };
   
-  const handleManualSync = () => {
-    if (isSyncing) return;
-    setManualSyncTrigger(c => c + 1);
+  const handleManualDownload = () => {
+    if (isSyncing || !isOnline) return;
+    setManualDownloadTrigger(c => c + 1);
+  };
+  
+  const handleManualUpload = () => {
+    if (isSyncing || !isOnline) return;
+    setManualUploadTrigger(c => c + 1);
   };
 
   const handleNotificationsOpenChange = (open: boolean) => {
@@ -239,11 +248,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <TooltipProvider>
               <Tooltip>
                   <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleManualSync} disabled={isSyncing}>
-                          {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <RefreshCw className="h-5 w-5" />}
+                        <Button variant="outline" size="icon" onClick={handleManualDownload} disabled={isSyncing || !isOnline}>
+                          {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudDownload className="h-5 w-5" />}
                       </Button>
                   </TooltipTrigger>
-                  <TooltipContent><p>Sync Now</p></TooltipContent>
+                  <TooltipContent><p>Download from Cloud</p></TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                  <TooltipTrigger asChild>
+                        <Button variant="outline" size="icon" onClick={handleManualUpload} disabled={isSyncing || !isOnline}>
+                          {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudUpload className="h-5 w-5" />}
+                      </Button>
+                  </TooltipTrigger>
+                  <TooltipContent><p>Upload to Cloud</p></TooltipContent>
               </Tooltip>
             </TooltipProvider>
 
@@ -263,7 +283,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                                         : 'Application is running in offline mode.',
                                 });
                                 if (newIsOnline) {
-                                  setManualSyncTrigger(c => c + 1);
+                                  setManualDownloadTrigger(c => c + 1);
                                 }
                             }}
                             aria-label={`Switch to ${isOnline ? 'Online' : 'Online'} mode`}

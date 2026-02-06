@@ -67,8 +67,10 @@ interface AppStateContextType {
   setAppSettings: Dispatch<SetStateAction<AppSettings>>;
   
   // Sync Settings
-  manualSyncTrigger: number;
-  setManualSyncTrigger: Dispatch<SetStateAction<number>>;
+  manualDownloadTrigger: number;
+  setManualDownloadTrigger: Dispatch<SetStateAction<number>>;
+  manualUploadTrigger: number;
+  setManualUploadTrigger: Dispatch<SetStateAction<number>>;
   isSyncing: boolean;
   setIsSyncing: Dispatch<SetStateAction<boolean>>;
   
@@ -122,7 +124,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     autoSyncEnabled: true,
   });
 
-  const [manualSyncTrigger, setManualSyncTrigger] = useState(0);
+  const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
+  const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   const [dataActions, setDataActions] = useState<DataActions>({});
   
@@ -155,7 +158,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     statusOptions, setStatusOptions,
     sortConfig, setSortConfig,
     appSettings, setAppSettings,
-    manualSyncTrigger, setManualSyncTrigger,
+    manualDownloadTrigger, setManualDownloadTrigger,
+    manualUploadTrigger, setManualUploadTrigger,
     isSyncing, setIsSyncing,
     dataActions, setDataActions,
     unreadInboxCount, setUnreadInboxCount,
