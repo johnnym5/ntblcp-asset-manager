@@ -87,6 +87,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
 import { ImportScannerDialog } from "./single-sheet-import-dialog";
 import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-dialog";
+import { exportAssetsToJson } from "@/lib/json-export";
 
 
 /**
@@ -980,6 +981,22 @@ export default function AssetList() {
   }, [isOnline, isAdmin, setAssets, dataSource, setOfflineAssets]);
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
+  
+  const handleExportToJson = useCallback(() => {
+    try {
+        exportAssetsToJson(activeAssets);
+        addNotification({
+            title: 'Exporting to JSON',
+            description: `Your data is being downloaded as assets-export.json.`,
+        });
+    } catch (e) {
+        addNotification({
+            title: 'Export Failed',
+            description: e instanceof Error ? e.message : 'An unknown error occurred.',
+            variant: 'destructive',
+        });
+    }
+  }, [activeAssets]);
 
   useEffect(() => {
     setDataActions({
@@ -988,6 +1005,7 @@ export default function AssetList() {
         onScanAndImport: () => setIsImportScanOpen(true),
         onClearAll: handleClearAllClick,
         onTravelReport: handleTravelReport,
+        onExportToJson: handleExportToJson,
         isImporting,
     });
     return () => setDataActions({});
@@ -997,6 +1015,7 @@ export default function AssetList() {
     handleImportClick, 
     handleClearAllClick, 
     handleTravelReport,
+    handleExportToJson,
     isImporting
   ]);
 

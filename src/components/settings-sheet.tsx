@@ -36,7 +36,7 @@ import { copyAssetsToRealtimeDB, updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Rocket } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Rocket, Download } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
@@ -370,6 +370,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             {dataActions.onTravelReport && (
                                 <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
                                     <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
+                                </Button>
+                            )}
+                            {dataActions.onExportToJson && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExportToJson}>
+                                    <Download className="mr-2 h-4 w-4" /> Export All Data to JSON
                                 </Button>
                             )}
                             <Separator />
