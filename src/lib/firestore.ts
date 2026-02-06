@@ -5,7 +5,7 @@ import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc 
 import { db, isConfigValid, rtdb } from '@/lib/firebase';
 import type { Asset, AppSettings } from '@/lib/types';
 import { errorEmitter } from '@/lib/error-emitter';
-import { FirestorePermissionError } from '@/lib/errors';
+import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors';
 import { addNotification } from '@/hooks/use-notifications';
 import { ref, set as rtdbSet, get as rtdbGet } from 'firebase/database';
 import { getLocalAssets as getLocalAssetsFromDb } from './idb';
@@ -25,6 +25,18 @@ const checkRTDBConfig = () => {
     return rtdb;
 }
 
+const handleFirestoreError = (error: any, context: Omit<SecurityRuleContext, 'requestResourceData'>) => {
+    const failoverErrorCodes = ['permission-denied', 'resource-exhausted', 'unavailable', 'unauthenticated'];
+    if (failoverErrorCodes.includes(error?.code)) {
+        const permissionError = new FirestorePermissionError({
+            ...context,
+        });
+        errorEmitter.emit('permission-error', permissionError);
+    }
+    throw error;
+}
+
+
 // --- App Settings (DUAL WRITE) ---
 export async function getSettings(): Promise<AppSettings | null> {
     const db = checkConfig();
@@ -36,14 +48,8 @@ export async function getSettings(): Promise<AppSettings | null> {
       }
       return null;
     } catch (serverError) {
-        if ((serverError as any)?.code === 'permission-denied') {
-            const permissionError = new FirestorePermissionError({
-                path: settingsRef.path,
-                operation: 'get',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        }
-        throw serverError;
+        handleFirestoreError(serverError, { path: settingsRef.path, operation: 'get' });
+        return null; // Should not be reached due to throw in handler, but satisfies TS
     }
 }
 
@@ -56,12 +62,7 @@ export async function updateSettings(settings: Partial<AppSettings>) {
   // Write to Firestore
   const settingsRef = doc(firestoreDb, 'config', 'settings');
   setDoc(settingsRef, settingsWithTimestamp, { merge: true }).catch(async (serverError) => {
-    const permissionError = new FirestorePermissionError({
-        path: settingsRef.path,
-        operation: 'update',
-        requestResourceData: settings,
-    });
-    errorEmitter.emit('permission-error', permissionError);
+    handleFirestoreError(serverError, { path: settingsRef.path, operation: 'update' });
   });
   
   // Write to Realtime DB
@@ -86,14 +87,8 @@ export async function getAssets(): Promise<Asset[]> {
     });
     return fetchedAssets;
   } catch (serverError) {
-    if ((serverError as any)?.code === 'permission-denied') {
-      const permissionError = new FirestorePermissionError({
-          path: assetsCollectionRef.path,
-          operation: 'list',
-      });
-      errorEmitter.emit('permission-error', permissionError);
-    }
-    throw serverError;
+    handleFirestoreError(serverError, { path: assetsCollectionRef.path, operation: 'list' });
+    return []; // Should not be reached
   }
 }
 
@@ -102,12 +97,7 @@ export function updateAsset(asset: Asset) {
   const assetRef = doc(db, 'assets', asset.id);
   setDoc(assetRef, { ...asset, lastModified: new Date().toISOString() }, { merge: true })
     .catch(async (serverError) => {
-      const permissionError = new FirestorePermissionError({
-          path: assetRef.path,
-          operation: 'update',
-          requestResourceData: asset,
-      });
-      errorEmitter.emit('permission-error', permissionError);
+      handleFirestoreError(serverError, { path: assetRef.path, operation: 'update' });
   });
 }
 
@@ -115,11 +105,7 @@ export function deleteAsset(assetId: string) {
   const db = checkConfig();
   const assetRef = doc(db, 'assets', assetId);
   deleteDoc(assetRef).catch(async (serverError) => {
-    const permissionError = new FirestorePermissionError({
-        path: assetRef.path,
-        operation: 'delete',
-    });
-    errorEmitter.emit('permission-error', permissionError);
+     handleFirestoreError(serverError, { path: assetRef.path, operation: 'delete' });
   });
 }
 
@@ -135,12 +121,7 @@ export function batchSetAssets(assets: Asset[]) {
             batch.set(docRef, { ...asset, lastModified: asset.lastModified || new Date().toISOString() });
         });
         batch.commit().catch(async (serverError) => {
-          const permissionError = new FirestorePermissionError({
-              path: assetsCollectionRef.path,
-              operation: 'update',
-              requestResourceData: { note: `Batch update for ${chunk.length} assets.` }
-          });
-          errorEmitter.emit('permission-error', permissionError);
+          handleFirestoreError(serverError, { path: assetsCollectionRef.path, operation: 'update' });
         });
     }
 }
@@ -156,12 +137,7 @@ export function batchDeleteAssets(assetIds: string[]) {
             batch.delete(docRef);
         });
         batch.commit().catch(async (serverError) => {
-          const permissionError = new FirestorePermissionError({
-              path: 'assets',
-              operation: 'delete',
-              requestResourceData: { note: `Batch delete for ${chunk.length} assets.` }
-          });
-          errorEmitter.emit('permission-error', permissionError);
+          handleFirestoreError(serverError, { path: 'assets', operation: 'delete' });
         });
     }
 }

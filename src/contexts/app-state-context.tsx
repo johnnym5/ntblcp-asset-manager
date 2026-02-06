@@ -9,6 +9,7 @@ import { HEADER_DEFINITIONS } from '@/lib/constants';
 import { getSettings, synchronizeDatabases } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { addNotification } from '@/hooks/use-notifications';
+import { errorEmitter } from '@/lib/error-emitter';
 
 
 export interface SortConfig {
@@ -27,6 +28,8 @@ export interface DataActions {
 }
 
 export type DatabaseSource = 'firestore' | 'rtdb';
+
+const FAILOVER_CHECK_INTERVAL = 30000; // 30 seconds
 
 interface AppStateContextType {
   assets: Asset[];
@@ -144,6 +147,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [dataActions, setDataActions] = useState<DataActions>({});
   
   const isInitialMount = useRef(true);
+  const [isRecovering, setIsRecovering] = useState(false);
+  const recoveryIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
 
   useEffect(() => {
@@ -190,12 +195,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         try {
             const { toFirestoreCount, toRTDBCount } = await synchronizeDatabases();
             addNotification({ title: 'Cloud Sync Complete', description: `${toFirestoreCount} updates for Firestore, ${toRTDBCount} for Realtime DB.` });
-            setManualDownloadTrigger(c => c + 1); // Trigger a download to get latest state
+            setManualDownloadTrigger(c => c + 1);
         } catch (e) {
             addNotification({ title: 'Cloud Sync Failed', description: (e as Error).message, variant: 'destructive' });
-            setIsSyncing(false); // Ensure syncing is false on error
+            setIsSyncing(false);
         }
-        // isSyncing will be set to false by the download trigger's effect in asset-list
     };
 
     if (isInitialMount.current) {
@@ -208,8 +212,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   }, [manualBackendSyncTrigger, isOnline]);
   
   useEffect(() => {
-      if (!settingsLoaded) return; // Don't trigger on initial load
-      // This effect only runs when the databaseSource is changed by the user
+      if (!settingsLoaded || isInitialMount.current) return;
       setManualBackendSyncTrigger(c => c + 1);
   }, [databaseSource, settingsLoaded]);
 
@@ -218,6 +221,66 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       setSelectedStatuses([]);
     }
   }, [appSettings.appMode]);
+
+  useEffect(() => {
+    const handleFirestoreError = () => {
+        if (databaseSource === 'firestore' && !isRecovering && isOnline) {
+            console.warn("Firestore error detected. Failing over to Realtime Database.");
+            setDatabaseSource('rtdb');
+            addNotification({
+                title: 'Cloud Connection Issue',
+                description: 'Switched to backup database mode. Your work is safe.',
+                variant: 'destructive',
+            });
+        }
+    };
+
+    const unsubscribe = errorEmitter.on('permission-error', handleFirestoreError);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [databaseSource, isRecovering, isOnline]);
+
+  useEffect(() => {
+    const tryToRecover = async () => {
+        if (isRecovering) return;
+        console.log("Attempting to recover Firestore connection...");
+        setIsRecovering(true);
+        try {
+            await getSettings();
+            
+            console.log("Firestore connection recovered. Switching back to primary.");
+            setDatabaseSource('firestore');
+            addNotification({
+                title: 'Cloud Connection Restored',
+                description: 'Switched back to the primary database.',
+            });
+            setManualBackendSyncTrigger(c => c + 1);
+
+            if (recoveryIntervalRef.current) {
+                clearInterval(recoveryIntervalRef.current);
+                recoveryIntervalRef.current = null;
+            }
+        } catch (error) {
+            console.log("Firestore recovery check failed. Will try again.");
+        } finally {
+            setIsRecovering(false);
+        }
+    };
+
+    if (databaseSource === 'rtdb' && isOnline && !recoveryIntervalRef.current) {
+        recoveryIntervalRef.current = setInterval(tryToRecover, FAILOVER_CHECK_INTERVAL);
+    }
+
+    return () => {
+        if (recoveryIntervalRef.current) {
+            clearInterval(recoveryIntervalRef.current);
+            recoveryIntervalRef.current = null;
+        }
+    };
+  }, [databaseSource, isOnline, setManualBackendSyncTrigger, isRecovering]);
+
 
   const value = {
     assets, setAssets,

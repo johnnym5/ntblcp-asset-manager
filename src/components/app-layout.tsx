@@ -29,6 +29,8 @@ import {
   CheckCheck,
   X,
   Inbox,
+  Database,
+  Flame,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -75,6 +77,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setManualDownloadTrigger,
     setManualUploadTrigger,
     isSyncing,
+    databaseSource,
     dataActions,
     unreadInboxCount,
     setUnreadInboxCount
@@ -279,15 +282,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             }}
                             aria-label={`Switch to ${isOnline ? 'Online' : 'Online'} mode`}
                         >
-                            {isOnline ? (
-                                <Cloud className="h-5 w-5 text-green-500" />
+                           {isOnline ? (
+                                databaseSource === 'firestore' ? (
+                                    <Cloud className="h-5 w-5 text-green-500" />
+                                ) : (
+                                    <Flame className="h-5 w-5 text-orange-500" />
+                                )
                             ) : (
                                 <CloudOff className="h-5 w-5 text-red-500" />
                             )}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p>{isOnline ? 'Go Offline' : 'Go Online'}</p>
+                        <p>{isOnline 
+                            ? (databaseSource === 'firestore' ? 'Online (Primary DB)' : 'Online (Backup DB)')
+                            : 'Offline'
+                        }</p>
                     </TooltipContent>
                 </Tooltip>
             </TooltipProvider>
