@@ -3,14 +3,14 @@ import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getDatabase, type Database } from "firebase/database";
 
-// Your web app's Firebase configuration is now loaded from environment variables.
+// Your web app's Firebase configuration
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  apiKey: "AIzaSyDhBbeiAZGWzCHQXbbTcNXdsIT_6Gz3qJU",
+  authDomain: "ntblcp-asset-manager.firebaseapp.com",
+  projectId: "ntblcp-asset-manager",
+  storageBucket: "ntblcp-asset-manager.appspot.com",
+  messagingSenderId: "573481845773",
+  appId: "1:573481845773:web:5040ae77a51681c05bc144"
 };
 
 
