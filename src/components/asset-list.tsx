@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -160,6 +161,7 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[] }> =
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isFormReadOnly, setIsFormReadOnly] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
   const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
@@ -492,11 +494,23 @@ export default function AssetList() {
       return;
     }
     setSelectedAsset(undefined);
+    setIsFormReadOnly(false);
     setIsFormOpen(true);
   }, [lockAssetList, isAdmin, dataSource, userProfile]);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
+    setIsFormReadOnly(true);
+    setIsFormOpen(true);
+  };
+
+  const handleEditAsset = (asset: Asset) => {
+    if (!userProfile?.canEditAssets && !isAdmin) {
+      addNotification({ title: "Permission Denied", description: "You do not have permission to edit assets.", variant: "destructive" });
+      return;
+    }
+    setSelectedAsset(asset);
+    setIsFormReadOnly(false);
     setIsFormOpen(true);
   };
 
@@ -507,15 +521,6 @@ export default function AssetList() {
     }
   }, [assetToView, setAssetToView]);
 
-  const handleEditAsset = (asset: Asset) => {
-    if (!userProfile?.canEditAssets && !isAdmin) {
-      addNotification({ title: "Permission Denied", description: "You do not have permission to edit assets.", variant: "destructive" });
-      return;
-    }
-    setSelectedAsset(asset);
-    setIsFormOpen(true);
-  };
-  
   const handleDeleteConfirm = async () => {
     if (!assetToDelete) return;
 
@@ -1332,7 +1337,7 @@ export default function AssetList() {
           asset={selectedAsset} 
           onSave={handleSaveAsset}
           onQuickSave={handleQuickSaveAsset}
-          isReadOnly={!userProfile?.canEditAssets} 
+          isReadOnly={isFormReadOnly} 
         />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
         <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
@@ -1502,6 +1507,10 @@ export default function AssetList() {
                                   <DropdownMenu>
                                   <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
                                   <DropdownMenuContent align="end">
+                                      <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleViewAsset(asset); }}>
+                                          <FolderSearch className="mr-2 h-4 w-4" />
+                                          View Details
+                                      </DropdownMenuItem>
                                       <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }} disabled={!userProfile?.canEditAssets && !isAdmin}>
                                           <Edit className="mr-2 h-4 w-4" />
                                           Edit Full Details
@@ -1539,7 +1548,7 @@ export default function AssetList() {
           asset={selectedAsset} 
           onSave={handleSaveAsset} 
           onQuickSave={handleQuickSaveAsset}
-          isReadOnly={!userProfile?.canEditAssets}
+          isReadOnly={isFormReadOnly}
         />
         <AssetBatchEditForm 
             isOpen={isBatchEditOpen} 
@@ -1577,4 +1586,5 @@ export default function AssetList() {
     
 
     
+
 

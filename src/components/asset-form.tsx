@@ -181,9 +181,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-4xl w-full flex flex-col">
         <SheetHeader>
-          <SheetTitle>{asset ? `Edit Asset` : 'Add New Asset'}</SheetTitle>
+          <SheetTitle>{asset ? (isReadOnly ? 'View Asset Details' : 'Edit Asset') : 'Add New Asset'}</SheetTitle>
           <SheetDescription>
-            {asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.'}
+            {isReadOnly ? 'Viewing asset details.' : (asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 grid grid-cols-1 md:grid-cols-3 gap-6 overflow-y-auto pr-4 py-4">
@@ -201,7 +201,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value} disabled={!!asset}>
+                        <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly || !!asset}>
                           <FormControl>
                             <SelectTrigger>
                               <SelectValue placeholder="Select a category" />
@@ -223,7 +223,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Asset Description</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
+                        <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
                         <FormMessage />
                       </FormItem>
                   )} />
@@ -233,14 +233,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                    <FormField control={form.control} name="serialNumber" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Serial Number</FormLabel>
-                      <FormControl><Input {...field} /></FormControl>
+                      <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                   <FormField control={form.control} name="assetIdCode" render={({ field }) => (
                     <FormItem>
                         <FormLabel>Asset ID Code</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
+                        <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
                         <FormMessage />
                     </FormItem>
                   )} />
@@ -249,14 +249,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                   <FormField control={form.control} name="location" render={({ field }) => (
                     <FormItem>
                       <FormLabel>Location</FormLabel>
-                      <FormControl><Input {...field} disabled={!isAdmin} /></FormControl>
+                      <FormControl><Input {...field} disabled={isReadOnly || !isAdmin} /></FormControl>
                       <FormMessage />
                     </FormItem>
                   )} />
                    <FormField control={form.control} name="lga" render={({ field }) => (
                         <FormItem>
                             <FormLabel>LGA</FormLabel>
-                            <FormControl><Input {...field} /></FormControl>
+                            <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
@@ -265,7 +265,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                    <FormField control={form.control} name="assignee" render={({ field }) => (
                       <FormItem>
                         <FormLabel>Assignee</FormLabel>
-                        <FormControl><Input {...field} /></FormControl>
+                        <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
                         <FormMessage />
                       </FormItem>
                     )} />
@@ -275,7 +275,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Condition</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select condition" />
@@ -307,18 +307,18 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     <FormField control={form.control} name="manufacturer" render={({ field }) => (
                         <FormItem>
                             <FormLabel>Manufacturer</FormLabel>
-                            <FormControl><Input {...field} /></FormControl>
+                            <FormControl><Input {...field} readOnly={isReadOnly} /></FormControl>
                             <FormMessage />
                         </FormItem>
                     )} />
                     <FormField control={form.control} name="modelNumber" render={({ field }) => (
-                        <FormItem><FormLabel>Model Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Model Number</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
                     )} />
                 </div>
                 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <FormField control={form.control} name="assetClass" render={({ field }) => (
-                        <FormItem><FormLabel>Asset Class</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Asset Class</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
                     )} />
                     <FormField
                       control={form.control}
@@ -326,7 +326,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel>Verified Status</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value}>
+                          <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
                             <FormControl>
                               <SelectTrigger>
                                 <SelectValue placeholder="Select status" />
@@ -346,7 +346,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                 <FormField control={form.control} name="remarks" render={({ field }) => (
                   <FormItem>
                     <FormLabel>Remarks/Comments</FormLabel>
-                    <FormControl><Textarea {...field} /></FormControl>
+                    <FormControl><Textarea {...field} readOnly={isReadOnly} /></FormControl>
                     <FormMessage />
                   </FormItem>
                 )} />
@@ -357,23 +357,23 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
                     <AccordionContent className="pt-4 space-y-4">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <FormField control={form.control} name="engineNo" render={({ field }) => (
-                                <FormItem><FormLabel>Engine Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Engine Number</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
                             )} />
                            <FormField control={form.control} name="chasisNo" render={({ field }) => (
-                                <FormItem><FormLabel>Chasis Number</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Chasis Number</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
                             )} />
                         </div>
                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <FormField control={form.control} name="supplier" render={({ field }) => (
-                                <FormItem><FormLabel>Supplier</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Supplier</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
                             )} />
                             <FormField control={form.control} name="grant" render={({ field }) => (
-                                <FormItem><FormLabel>Grant</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Grant</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
                             )} />
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                            <FormField control={form.control} name="dateReceived" render={({ field }) => (
-                                <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} /></FormControl><FormMessage /></FormItem>
+                                <FormItem><FormLabel>Date Received</FormLabel><FormControl><Input {...field} readOnly={isReadOnly} /></FormControl><FormMessage /></FormItem>
                             )} />
                            <ReadOnlyField label="Last Modified" value={asset?.lastModified ? new Date(asset.lastModified).toLocaleString() : 'N/A'} />
                         </div>
@@ -392,10 +392,12 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, onQuickSave, is
           <SheetClose asChild>
             <Button variant="outline">Close</Button>
           </SheetClose>
-          <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
-              {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Save Changes
-          </Button>
+          {!isReadOnly && (
+            <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
+                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Save Changes
+            </Button>
+          )}
         </SheetFooter>
       </SheetContent>
     </Sheet>
