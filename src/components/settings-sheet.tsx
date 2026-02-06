@@ -236,10 +236,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
             </SheetDescription>
           </SheetHeader>
           <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-y-hidden">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
                 <TabsTrigger value="users" disabled={isGuest || !isAdmin}><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
                 <TabsTrigger value="sheets" disabled={isGuest || !isAdmin}><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
+                <TabsTrigger value="data" disabled={isGuest || !isAdmin}><Database className="mr-2 h-4 w-4" />Data</TabsTrigger>
             </TabsList>
             <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
@@ -288,36 +289,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                     </div>
                   </div>
                 )}
-                
-                <div className="space-y-4">
-                    <h3 className="text-lg font-medium">Data Management</h3>
-                    <div className="rounded-lg border p-4 space-y-3">
-                        <p className="text-sm text-muted-foreground">Import, export, or manage the asset database.</p>
-                        <Separator />
-                        <div className="space-y-2">
-                           {dataActions.onAddAsset && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
-                                </Button>
-                            )}
-                             {dataActions.onImport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onImport} disabled={dataActions.isImporting}>
-                                    <FileUp className="mr-2 h-4 w-4" /> Import from Excel
-                                </Button>
-                            )}
-                             {dataActions.onExport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport}>
-                                    <Download className="mr-2 h-4 w-4" /> Export to Excel
-                                </Button>
-                            )}
-                             {dataActions.onTravelReport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
-                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </div>
             </TabsContent>
             <TabsContent value="users" className="flex-1 overflow-y-auto pt-4 pr-2">
                 <div className="p-1">
@@ -360,6 +331,53 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                         <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import from File</Button>
                     </div>
                   </div>
+            </TabsContent>
+            <TabsContent value="data" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
+                <div>
+                    <h3 className="text-lg font-medium mb-4">Data Management</h3>
+                    <div className="rounded-lg border p-4 space-y-3">
+                        <p className="text-sm text-muted-foreground">Perform global data operations. These actions may affect the entire dataset.</p>
+                        <Separator />
+                        <div className="space-y-2">
+                           {dataActions.onAddAsset && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                                </Button>
+                            )}
+                             {dataActions.onImport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onImport} disabled={dataActions.isImporting}>
+                                    <FileUp className="mr-2 h-4 w-4" /> Import Full FAR
+                                </Button>
+                            )}
+                             {dataActions.onScanAndImport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport} disabled={dataActions.isImporting}>
+                                    <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
+                                </Button>
+                            )}
+                             {dataActions.onTravelReport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
+                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
+                                </Button>
+                            )}
+                             {dataActions.onExport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport}>
+                                    <Download className="mr-2 h-4 w-4" /> Export to Excel
+                                </Button>
+                            )}
+                             {dataActions.onExportToJson && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExportToJson}>
+                                    <Download className="mr-2 h-4 w-4" /> Export Full Backup (JSON)
+                                </Button>
+                            )}
+                            <Separator />
+                            {dataActions.onClearAll && (
+                                <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>
+                                    <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
             </TabsContent>
           </Tabs>
 
@@ -413,3 +431,5 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     </>
   );
 }
+
+    
