@@ -34,14 +34,12 @@ interface ColumnCustomizationSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   sheetDefinition: SheetDefinition;
-  onSave: (newDefinition: SheetDefinition) => void;
 }
 
 export function ColumnCustomizationSheet({
   isOpen,
   onOpenChange,
   sheetDefinition,
-  onSave,
 }: ColumnCustomizationSheetProps) {
   const [editedName, setEditedName] = useState('');
   const [editedFields, setEditedFields] = useState<DisplayField[]>([]);
@@ -105,14 +103,28 @@ export function ColumnCustomizationSheet({
   };
   
   const handleApplyToOne = () => {
+    if (typeof window !== 'undefined' && !navigator.onLine) {
+        toast({ title: 'Offline', description: 'Saving settings requires an internet connection.', variant: 'destructive' });
+        return;
+    }
     const newDefinition: SheetDefinition = {
       ...sheetDefinition,
       name: editedName,
       headers: editedFields.map(f => f.label),
       displayFields: editedFields,
     };
-    onSave(newDefinition);
-    onOpenChange(false);
+    const newSheetDefinitions = {
+        ...appSettings.sheetDefinitions,
+        [newDefinition.name]: newDefinition,
+    };
+    try {
+        updateSettings({ sheetDefinitions: newSheetDefinitions });
+        setAppSettings(prev => ({...prev, sheetDefinitions: newSheetDefinitions}));
+        toast({ title: "Layout Saved", description: `Column settings for ${newDefinition.name} have been saved for all users.`});
+        onOpenChange(false);
+    } catch (e) {
+        toast({ title: "Error", description: "Could not save settings to the database.", variant: "destructive" });
+    }
   }
 
   const handleApplyToAll = () => {

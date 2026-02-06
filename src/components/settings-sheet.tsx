@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -160,27 +161,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     delete newSheetDefinitions[sheetNameToDelete];
     const newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
     setDraftSettings(prev => prev ? ({ ...prev, sheetDefinitions: newSheetDefinitions, enabledSheets: newEnabledSheets }) : null);
-  };
-
-  const handleSaveSheet = (sheet: SheetDefinition) => {
-    if (!draftSettings) return;
-    const newSheetDefinitions = { ...draftSettings.sheetDefinitions };
-    let newEnabledSheets = [...draftSettings.enabledSheets];
-    
-    if (originalSheetName && originalSheetName !== sheet.name) {
-      delete newSheetDefinitions[originalSheetName];
-      newEnabledSheets = newEnabledSheets.map(s => s === originalSheetName ? sheet.name : s);
-    }
-    
-    if (!originalSheetName && !newEnabledSheets.includes(sheet.name)) {
-      newEnabledSheets.push(sheet.name);
-    }
-    
-    setDraftSettings(prev => prev ? ({ 
-        ...prev, 
-        sheetDefinitions: { ...newSheetDefinitions, [sheet.name]: sheet },
-        enabledSheets: newEnabledSheets
-    }) : null);
   };
 
   const handleImportTemplate = () => {
@@ -407,7 +387,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
         <ColumnCustomizationSheet
           isOpen={isSheetFormOpen}
           onOpenChange={setIsSheetFormOpen}
-          onSave={handleSaveSheet}
           sheetDefinition={sheetToEdit}
         />
       )}
@@ -442,5 +421,3 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     </>
   );
 }
-
-    
