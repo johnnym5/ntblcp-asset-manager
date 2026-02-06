@@ -297,7 +297,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </TooltipTrigger>
                     <TooltipContent>
                         <p>{isOnline 
-                            ? (appSettings.databaseSource === 'firestore' ? 'Online (Primary DB)' : 'Online (Backup DB)')
+                            ? (appSettings.databaseSource === 'firestore' ? 'Online (Firestore)' : 'Online (Realtime DB)')
                             : 'Offline'
                         }</p>
                     </TooltipContent>
