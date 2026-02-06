@@ -43,6 +43,13 @@ import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { ImportScannerDialog } from './single-sheet-import-dialog';
 import { saveLocalSettings } from '@/lib/idb';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -436,3 +443,5 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     </>
   );
 }
+
+    
