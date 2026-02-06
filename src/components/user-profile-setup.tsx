@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -42,27 +43,47 @@ export default function UserProfileSetup() {
 
   const handleLogin = () => {
     setError(null);
-    if (!email || !password) {
-        setError("Please enter both email and password.");
-        return;
+    if (!email) {
+      setError("Please enter an email address.");
+      return;
     }
+
     const user = appSettings.authorizedUsers.find(
-        u => u.email.toLowerCase() === email.toLowerCase().trim()
+      u => u.email.toLowerCase() === email.toLowerCase().trim()
     );
 
-    if (user && user.password === password) {
+    if (!user) {
+      setError("Invalid email or password.");
+      return;
+    }
+
+    // Handle guest login (no password needed)
+    if (user.isGuest) {
       setFoundUser(user);
       if (user.states.length === 1 && user.states[0] !== 'All') {
         setSelectedState(user.states[0]);
-        // Automatically log in if only one state
         handleConfirm(user, user.states[0]);
       } else if (user.isAdmin) {
         setSelectedState('All');
-        // Admin also logs in directly
         handleConfirm(user, 'All');
-      } else {
-        // User has multiple states, needs to select one.
-        // The UI will now show the state selector.
+      }
+      return; 
+    }
+    
+    // Handle normal user login (password is required)
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
+    if (user.password === password) {
+      setFoundUser(user);
+      if (user.states.length === 1 && user.states[0] !== 'All') {
+        setSelectedState(user.states[0]);
+        handleConfirm(user, user.states[0]);
+      } else if (user.isAdmin) {
+        setSelectedState('All');
+        handleConfirm(user, 'All');
       }
     } else {
       setError("Invalid email or password.");

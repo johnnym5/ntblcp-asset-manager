@@ -15,17 +15,6 @@ export interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
-export interface DataActions {
-  onImport?: () => void;
-  onExport?: () => void;
-  onAddAsset?: () => void;
-  onClearAll?: () => void;
-  onTravelReport?: () => void;
-  isImporting?: boolean;
-  isAdmin?: boolean;
-  hasAssets?: boolean;
-}
-
 interface AppStateContextType {
   assets: Asset[];
   setAssets: Dispatch<SetStateAction<Asset[]>>;
@@ -75,10 +64,6 @@ interface AppStateContextType {
   setManualUploadTrigger: Dispatch<SetStateAction<number>>;
   isSyncing: boolean;
   setIsSyncing: Dispatch<SetStateAction<boolean>>;
-  
-  // Data Actions
-  dataActions: DataActions;
-  setDataActions: Dispatch<SetStateAction<DataActions>>;
 
   // Inbox count for UI display
   unreadInboxCount: number;
@@ -128,7 +113,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
   const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [dataActions, setDataActions] = useState<DataActions>({});
   
   const [unreadInboxCount, setUnreadInboxCount] = useState(0);
   const [dismissedActivities, setDismissedActivities] = useState<string[]>([]);
@@ -204,7 +188,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     manualDownloadTrigger, setManualDownloadTrigger,
     manualUploadTrigger, setManualUploadTrigger,
     isSyncing, setIsSyncing,
-    dataActions, setDataActions,
     unreadInboxCount, setUnreadInboxCount,
     dismissedActivities, setDismissedActivities,
     dataSource, setDataSource,

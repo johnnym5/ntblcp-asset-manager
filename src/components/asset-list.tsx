@@ -205,8 +205,6 @@ export default function AssetList() {
     manualDownloadTrigger,
     manualUploadTrigger,
     isSyncing, setIsSyncing,
-    dataActions,
-    setDataActions,
     searchTerm,
     assetToView, setAssetToView
   } = useAppState();
@@ -750,7 +748,7 @@ export default function AssetList() {
 
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
-        addNotification({ title: "Import Notice", description: `${skipped} assets were skipped as they already exist.` });
+        addNotification({ title: "Import Notice", description: `${skipped} assets were skipped (either duplicates or because the list is locked).` });
     }
 
     const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
@@ -986,35 +984,6 @@ export default function AssetList() {
     }
   };
 
-
-  useEffect(() => {
-    const hasCurrentAssets = activeAssets.length > 0;
-    setDataActions({
-        onImport: handleImportClick,
-        onExport: () => handleExportClick(),
-        onAddAsset: handleAddAsset,
-        onClearAll: handleClearAllClick,
-        onTravelReport: handleTravelReport,
-        isImporting: isImporting,
-        isAdmin: isAdmin,
-        hasAssets: hasCurrentAssets,
-    });
-
-    return () => {
-        setDataActions({});
-    }
-  }, [
-      setDataActions, 
-      handleImportClick, 
-      handleExportClick, 
-      handleAddAsset, 
-      handleClearAllClick,
-      handleTravelReport,
-      isImporting, 
-      isAdmin, 
-      activeAssets.length
-  ]);
-  
   const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
     let assetsToUpdate: Asset[] = [];
     selectedCategories.forEach(category => {
@@ -1211,9 +1180,8 @@ export default function AssetList() {
                 {isFiltered ? 'Filter Results' : 'Asset Dashboard'}
             </h2>
             <div className="flex items-center gap-2">
-              {/* General Data Actions */}
-              {dataActions.onAddAsset && (
-                  <Button onClick={dataActions.onAddAsset} size="sm" disabled={!userProfile?.canAddAssets && !isAdmin}>
+              {(userProfile?.canAddAssets || isAdmin) && (
+                  <Button onClick={handleAddAsset} size="sm" >
                       <PlusCircle className="mr-2 h-4 w-4" /> Add Asset
                   </Button>
               )}
@@ -1226,23 +1194,23 @@ export default function AssetList() {
                     <DropdownMenuContent align="end">
                          <DropdownMenuLabel>Data Actions</DropdownMenuLabel>
                          <DropdownMenuSeparator/>
-                        <DropdownMenuItem onClick={dataActions.onImport} disabled={dataActions.isImporting || !isAdmin}>
+                        <DropdownMenuItem onClick={handleImportClick} disabled={isImporting || !isAdmin}>
                             <Library className="mr-2 h-4 w-4" /> Import Full FAR
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setIsImportScanOpen(true)} disabled={dataActions.isImporting || !isAdmin}>
+                        <DropdownMenuItem onClick={() => setIsImportScanOpen(true)} disabled={isImporting || !isAdmin}>
                             <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={dataActions.onExport} disabled={!dataActions.hasAssets}>
+                        <DropdownMenuItem onClick={() => handleExportClick()} disabled={activeAssets.length === 0}>
                             <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={dataActions.onTravelReport}>
+                        <DropdownMenuItem onClick={handleTravelReport}>
                             <PlaneTakeoff className="mr-2 h-4 w-4" /> Travel Report
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem
                             className="text-destructive focus:bg-destructive/20"
-                            onClick={dataActions.onClearAll}
-                            disabled={!dataActions.hasAssets || !isAdmin}
+                            onClick={handleClearAllClick}
+                            disabled={activeAssets.length === 0 || !isAdmin}
                         >
                             <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
                         </DropdownMenuItem>
@@ -1633,10 +1601,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
-
-    
-
-
-
