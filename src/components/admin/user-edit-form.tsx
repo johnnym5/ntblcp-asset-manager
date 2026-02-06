@@ -47,12 +47,17 @@ import { Separator } from '../ui/separator';
 const userFormSchema = z.object({
   displayName: z.string().min(2, 'Display name must be at least 2 characters.'),
   loginName: z.string().min(2, 'Login name must be at least 2 characters.').transform(v => v.toLowerCase().trim()),
+  email: z.string().email('Please enter a valid email.'),
   states: z.array(z.string()).min(1, 'At least one state must be selected.'),
   isAdmin: z.boolean(),
   isGuest: z.boolean(),
   password: z.string().optional(),
+  confirmPassword: z.string().optional(),
   canAddAssets: z.boolean(),
   canEditAssets: z.boolean(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: "Passwords don't match",
+  path: ["confirmPassword"],
 });
 
 type UserFormValues = z.infer<typeof userFormSchema>;
@@ -61,28 +66,31 @@ interface UserEditFormProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   user: AuthorizedUser | null;
-  onSave: (userToSave: AuthorizedUser, originalLoginName?: string) => Promise<void>;
+  onSave: (userToSave: Partial<AuthorizedUser>, originalLoginName?: string) => Promise<void>;
 }
 
 export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFormProps) {
   const { toast } = useToast();
   const [isSaving, setIsSaving] = useState(false);
 
+  const isEditing = !!user;
+
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
     defaultValues: {
       displayName: '',
       loginName: '',
+      email: '',
       states: [],
       isAdmin: false,
       isGuest: false,
-      password: '0000',
+      password: '',
+      confirmPassword: '',
       canAddAssets: false,
       canEditAssets: false,
     },
   });
   
-  const isEditing = !!user;
   const isAdminValue = form.watch('isAdmin');
 
   useEffect(() => {
@@ -91,10 +99,12 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
         form.reset({
           displayName: user.displayName,
           loginName: user.loginName,
+          email: user.email,
           states: user.states,
           isAdmin: user.isAdmin,
           isGuest: user.isGuest || false,
-          password: user.password || '0000',
+          password: '', // Always clear password for security
+          confirmPassword: '',
           canAddAssets: user.canAddAssets || false,
           canEditAssets: user.canEditAssets || false,
         });
@@ -102,14 +112,17 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
         form.reset({
           displayName: '',
           loginName: '',
+          email: '',
           states: [],
           isAdmin: false,
           isGuest: false,
-          password: '0000',
-          canAddAssets: false,
-          canEditAssets: false,
+          password: '',
+          confirmPassword: '',
+          canAddAssets: true,
+          canEditAssets: true,
         });
       }
+       form.clearErrors();
     }
   }, [isOpen, user, form]);
 
@@ -117,7 +130,6 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
     if (isAdminValue) {
       form.setValue('states', ['All']);
     } else {
-      // If states is ['All'] (because isAdmin was just toggled off), clear it.
       if (JSON.stringify(form.getValues('states')) === JSON.stringify(['All'])) {
         form.setValue('states', []);
       }
@@ -125,12 +137,30 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
   }, [isAdminValue, form]);
 
   const handleSubmit = async (data: UserFormValues) => {
+    form.clearErrors();
+
+    if (!isEditing && (!data.password || data.password.length < 6)) {
+        form.setError("password", { message: "Password of at least 6 characters is required for new users." });
+        return;
+    }
+    if (data.password && data.password.length > 0 && data.password.length < 6) {
+        form.setError("password", { message: "Password must be at least 6 characters." });
+        return;
+    }
+    if (data.password !== data.confirmPassword) {
+        form.setError("confirmPassword", { message: "Passwords do not match." });
+        return;
+    }
+
     setIsSaving(true);
-    const userToSave: AuthorizedUser = {
-      ...data,
-      password: data.password || '0000',
-      passwordChanged: user?.passwordChanged || false,
-    };
+    
+    const { confirmPassword, ...userToSaveData } = data;
+    const userToSave: Partial<AuthorizedUser> = userToSaveData;
+
+    if (!userToSave.password) {
+        delete userToSave.password; // Don't send empty password to save function
+    }
+
     await onSave(userToSave, user?.loginName);
     setIsSaving(false);
   };
@@ -159,35 +189,62 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                 </FormItem>
               )}
             />
-            <FormField
-              control={form.control}
-              name="loginName"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Login Name</FormLabel>
-                  <FormControl>
-                    <Input placeholder="john doe" {...field} />
-                  </FormControl>
-                   <FormDescription>
-                    This is the unique, lowercase name the user will enter to log in.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-             <FormField
-              control={form.control}
-              name="password"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Password</FormLabel>
-                  <FormControl>
-                    <Input type="text" {...field} />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+             <div className="grid grid-cols-2 gap-4">
+                <FormField
+                control={form.control}
+                name="loginName"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Login Name</FormLabel>
+                    <FormControl>
+                        <Input placeholder="jdoe" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+                <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                    <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                        <Input placeholder="jdoe@example.com" type="email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                    </FormItem>
+                )}
+                />
+             </div>
+             <div className="grid grid-cols-2 gap-4">
+                <FormField
+                    control={form.control}
+                    name="password"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Password</FormLabel>
+                        <FormControl>
+                            <Input type="password" placeholder={isEditing ? "Leave blank to keep" : "Min. 6 characters"} {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+                <FormField
+                    control={form.control}
+                    name="confirmPassword"
+                    render={({ field }) => (
+                        <FormItem>
+                        <FormLabel>Confirm Password</FormLabel>
+                        <FormControl>
+                            <Input type="password" {...field} />
+                        </FormControl>
+                        <FormMessage />
+                        </FormItem>
+                    )}
+                    />
+             </div>
             <FormField
                 control={form.control}
                 name="states"
@@ -245,7 +302,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                         </Command>
                         </PopoverContent>
                     </Popover>
-                    <div className="flex flex-wrap gap-1">
+                    <div className="flex flex-wrap gap-1 pt-1">
                         {(field.value || []).map(state => <Badge key={state} variant="secondary">{state}</Badge>)}
                     </div>
                     <FormMessage />

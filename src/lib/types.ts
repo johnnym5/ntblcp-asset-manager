@@ -51,6 +51,18 @@ export interface Asset {
   lastModifiedByState?: string; // state of user who last modified
 }
 
+export interface AuthorizedUser {
+  loginName: string;
+  displayName: string;
+  email: string;
+  password?: string;
+  states: string[];
+  isAdmin: boolean;
+  isGuest?: boolean;
+  canAddAssets?: boolean;
+  canEditAssets?: boolean;
+}
+
 
 export interface UserProfile {
   uid: string;
@@ -61,6 +73,31 @@ export interface UserProfile {
   // You can add other fields like 'state' or 'zone' if needed
   state?: string;
 }
+
+export interface DisplayField {
+  key: keyof Asset;
+  label: string;
+  table: boolean;
+  quickView: boolean;
+}
+
+export interface SheetDefinition {
+  name: string;
+  headers: string[];
+  displayFields: DisplayField[];
+  // Optional array of header keywords that can trigger the start of this sheet's data block
+  // Useful for files where multiple tables are in one sheet.
+  subSheetTriggers?: string[]; 
+}
+
+export interface AppSettings {
+  authorizedUsers: AuthorizedUser[];
+  sheetDefinitions: Record<string, SheetDefinition>;
+  enabledSheets: string[];
+  lockAssetList: boolean;
+  autoSyncEnabled: boolean;
+}
+
 
 // New types for detailed inbox
 export interface AssetChange {

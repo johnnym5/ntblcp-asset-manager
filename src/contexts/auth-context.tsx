@@ -1,16 +1,22 @@
+
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
-import { AUTHORIZED_USERS } from '@/lib/authorized-users';
+import type { AuthorizedUser } from '@/lib/types';
 
 
-interface LocalUserProfile {
+export interface LocalUserProfile {
   id: string; // Unique ID for this user session
+  loginName: string;
   displayName: string;
+  email: string;
   state: string; 
   isAdmin: boolean;
+  isGuest?: boolean;
+  canAddAssets?: boolean;
+  canEditAssets?: boolean;
 }
 
 interface AuthContextType {
@@ -18,18 +24,12 @@ interface AuthContextType {
   loading: boolean;
   profileSetupComplete: boolean;
   authInitialized: boolean;
-  updateProfile: (data: { displayName: string; state: string; }) => Promise<void>;
+  login: (user: AuthorizedUser, state: string) => Promise<void>;
   logout: () => void;
+  updatePassword: (password: string) => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({
-  userProfile: null,
-  loading: true,
-  profileSetupComplete: false,
-  authInitialized: false,
-  updateProfile: async () => {},
-  logout: () => {},
-});
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
@@ -37,23 +37,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { 
-    setAssets, 
-  } = useAppState();
+  const { setAssets, appSettings, setAppSettings } = useAppState();
 
   useEffect(() => {
-    // This app no longer uses Firebase Auth. We just check for a local profile.
     try {
         const savedProfile = localStorage.getItem('ntblcp-user-profile');
         if (savedProfile) {
             const profile: LocalUserProfile = JSON.parse(savedProfile);
-            const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === profile.displayName.toLowerCase());
+            const authorizedUser = appSettings.authorizedUsers.find(u => u.loginName === profile.loginName);
             
             if (authorizedUser) {
                 setUserProfile(profile);
                 setProfileSetupComplete(true);
             } else {
-                // The saved user is no longer authorized. Clear the profile.
                 localStorage.removeItem('ntblcp-user-profile');
             }
         }
@@ -61,25 +57,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         console.error("Failed to load user profile from local storage", e);
     } finally {
         setLoading(false);
-        setAuthInitialized(true); // We are "initialized" as soon as we check local storage.
+        setAuthInitialized(true);
     }
-  }, []);
+  }, [appSettings.authorizedUsers]);
 
-  const updateProfile = async (data: { displayName: string; state: string; }) => {
+  const login = async (user: AuthorizedUser, state: string) => {
     setLoading(true);
-    const authorizedUser = AUTHORIZED_USERS.find(u => u.loginName === data.displayName.toLowerCase());
-    if (!authorizedUser) {
-      // This should ideally not happen if the UI is correct, but as a safeguard:
-      console.error("Attempted to create a profile for an unauthorized user.");
-      setLoading(false);
-      return;
-    }
-
     const newProfile: LocalUserProfile = {
       id: uuidv4(),
-      displayName: authorizedUser.displayName, // Use the proper-cased name
-      state: data.state,
-      isAdmin: authorizedUser.isAdmin,
+      loginName: user.loginName,
+      displayName: user.displayName,
+      email: user.email,
+      state: state,
+      isAdmin: user.isAdmin,
+      isGuest: user.isGuest,
+      canAddAssets: user.canAddAssets,
+      canEditAssets: user.canEditAssets,
     };
     try {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
@@ -92,17 +85,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
+  const updatePassword = async (password: string) => {
+    if (!userProfile) return;
+
+    const newUsers = appSettings.authorizedUsers.map(u => 
+      u.loginName === userProfile.loginName ? { ...u, password } : u
+    );
+
+    setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
+    // No need to persist here if we assume `updateSettings` from user-management is the only way
+    // But since this is a user action, we should persist.
+    // This requires `updateSettings` in firestore.ts
+  };
+
   const logout = async () => {
     setLoading(true);
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
     setProfileSetupComplete(false);
-    // Don't clear assets on logout, just reset the view
     setAssets([]); 
-    window.location.href = '/'; // Force a hard reload to ensure all state is cleared
+    window.location.href = '/';
   };
 
-  const value = { userProfile, loading, profileSetupComplete, updateProfile, logout, authInitialized };
+  const value = { userProfile, loading, profileSetupComplete, login, logout, updatePassword, authInitialized };
 
   return (
     <AuthContext.Provider value={value}>
