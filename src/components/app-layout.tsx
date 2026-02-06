@@ -260,27 +260,31 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
         {/* Right Side */}
         <div className="flex items-center gap-2 sm:gap-4">
-            <TooltipProvider>
-              <Tooltip>
-                  <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleManualDownload} disabled={isSyncing}>
-                          {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudDownload className="h-5 w-5" />}
-                      </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Download from Cloud</p></TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            {isOnline && (
+              <>
+                <TooltipProvider>
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" onClick={handleManualDownload} disabled={isSyncing}>
+                              {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudDownload className="h-5 w-5" />}
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Download from Cloud</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
-            <TooltipProvider>
-              <Tooltip>
-                  <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" onClick={handleManualUpload} disabled={isSyncing}>
-                          {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudUpload className="h-5 w-5" />}
-                      </Button>
-                  </TooltipTrigger>
-                  <TooltipContent><p>Upload to Cloud</p></TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                <TooltipProvider>
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" onClick={handleManualUpload} disabled={isSyncing}>
+                              {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudUpload className="h-5 w-5" />}
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Upload to Cloud</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
+            )}
 
             <TooltipProvider>
                 <Tooltip>

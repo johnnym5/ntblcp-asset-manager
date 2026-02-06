@@ -258,7 +258,13 @@ export default function AssetList() {
         await saveAssets(finalAssets);
         setAssets(finalAssets);
         
-        addNotification({ title: 'Download Complete', description: `${newCount} new, ${overwrittenCount} updated. ${keptLocalCount} local changes kept.` });
+        if (newCount === 0 && overwrittenCount === 0 && keptLocalCount === 0 && cloudAssets.length > 0) {
+            addNotification({ title: 'Download Complete', description: `Your local data is already up-to-date.` });
+        } else if (newCount > 0 || overwrittenCount > 0 || keptLocalCount > 0) {
+            addNotification({ title: 'Download Complete', description: `${newCount} new, ${overwrittenCount} updated. ${keptLocalCount} local changes kept.` });
+        } else {
+            addNotification({ title: 'Nothing to Download', description: `No assets found in the cloud database.` });
+        }
     } catch (error) {
         console.error("Download failed:", error);
         addNotification({
@@ -313,10 +319,9 @@ export default function AssetList() {
     }
   }, [isOnline, authInitialized, isGuest, setIsOnline, setAssets, setIsSyncing]);
   
-  // Effect for initial data load from IndexedDB. This runs once when auth is ready.
+  // Effect for initial data load from IndexedDB. This runs once when component mounts.
   useEffect(() => {
     const loadInitialDataFromDb = async () => {
-      if (!authInitialized) return;
       setIsLoading(true);
       const localAssets = await getLocalAssetsFromDb();
       const localOfflineAssets = await getLockedOfflineAssets();
@@ -326,7 +331,7 @@ export default function AssetList() {
     };
 
     loadInitialDataFromDb();
-  }, [authInitialized, setAssets, setOfflineAssets]);
+  }, [setAssets, setOfflineAssets]);
 
   useEffect(() => {
     if (manualDownloadTrigger > 0) {
@@ -1572,3 +1577,4 @@ export default function AssetList() {
     
 
     
+
