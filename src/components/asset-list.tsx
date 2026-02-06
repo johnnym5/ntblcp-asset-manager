@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -1836,12 +1837,14 @@ export default function AssetList() {
                       </CardHeader>
                       <CardContent className="p-4 pt-0" onClick={() => handleViewAsset(asset)}>
                           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                              {quickViewFields.map(field => {
-                                  if (['description', 'category', 'verifiedStatus'].includes(field.key)) return null;
+                              {(currentSheetDefinition?.displayFields || []).map(field => {
+                                  if (['id', 'category', 'description', 'verifiedStatus', 'syncStatus', 'pendingChanges', 'changeSubmittedBy', 'approvalStatus'].includes(field.key)) return null;
+                                  const value = asset[field.key];
+                                  if (value === null || value === undefined || String(value).trim() === '') return null;
                                   return (
                                       <div key={field.key} className="space-y-1">
                                           <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
-                                          <p className="text-sm font-medium truncate">{String(asset[field.key] ?? 'N/A')}</p>
+                                          <p className="text-sm font-medium truncate">{String(value)}</p>
                                       </div>
                                   )
                               })}
@@ -1930,5 +1933,7 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
 
     
