@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
@@ -24,6 +25,8 @@ export interface DataActions {
   isImporting?: boolean;
 }
 
+export type DatabaseSource = 'firestore' | 'rtdb';
+
 interface AppStateContextType {
   assets: Asset[];
   setAssets: Dispatch<SetStateAction<Asset[]>>;
@@ -37,8 +40,10 @@ interface AppStateContextType {
   setGlobalStateFilter: Dispatch<SetStateAction<string>>;
   itemsPerPage: number;
   setItemsPerPage: Dispatch<SetStateAction<number>>;
-  dataSource: 'cloud' | 'local_locked';
-  setDataSource: Dispatch<SetStateAction<'cloud' | 'local_locked'>>;
+  assetSource: 'cloud' | 'local_locked';
+  setAssetSource: Dispatch<SetStateAction<'cloud' | 'local_locked'>>;
+  databaseSource: DatabaseSource;
+  setDatabaseSource: Dispatch<SetStateAction<DatabaseSource>>;
   
   // Filters
   selectedLocations: string[];
@@ -128,7 +133,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   
   const [unreadInboxCount, setUnreadInboxCount] = useState(0);
 
-  const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
+  const [assetSource, setAssetSource] = useState<'cloud' | 'local_locked'>('cloud');
+  const [databaseSource, setDatabaseSource] = useState<DatabaseSource>('firestore');
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [dataActions, setDataActions] = useState<DataActions>({});
 
@@ -202,7 +208,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     manualUploadTrigger, setManualUploadTrigger,
     isSyncing, setIsSyncing,
     unreadInboxCount, setUnreadInboxCount,
-    dataSource, setDataSource,
+    assetSource, setAssetSource,
+    databaseSource, setDatabaseSource,
     assetToView, setAssetToView,
     dataActions, setDataActions,
   };

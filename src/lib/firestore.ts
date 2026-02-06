@@ -7,7 +7,7 @@ import type { Asset, AppSettings } from '@/lib/types';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError } from '@/lib/errors';
 import { addNotification } from '@/hooks/use-notifications';
-import { ref, set } from 'firebase/database';
+import { ref, set as rtdbSet, get as rtdbGet } from 'firebase/database';
 import { getLocalAssets as getLocalAssetsFromDb } from './idb';
 
 
@@ -18,8 +18,14 @@ const checkConfig = () => {
     }
     return db;
 }
+const checkRTDBConfig = () => {
+    if (!isConfigValid || !rtdb) {
+        throw new Error("Firebase Realtime Database is not configured.");
+    }
+    return rtdb;
+}
 
-// --- App Settings ---
+// --- App Settings (DUAL WRITE) ---
 export async function getSettings(): Promise<AppSettings | null> {
     const db = checkConfig();
     const settingsRef = doc(db, 'config', 'settings');
@@ -41,10 +47,15 @@ export async function getSettings(): Promise<AppSettings | null> {
     }
 }
 
-export function updateSettings(settings: Partial<AppSettings>) {
-  const db = checkConfig();
-  const settingsRef = doc(db, 'config', 'settings');
-  setDoc(settingsRef, settings, { merge: true }).catch(async (serverError) => {
+export async function updateSettings(settings: Partial<AppSettings>) {
+  const firestoreDb = checkConfig();
+  const rtdbInstance = checkRTDBConfig();
+  
+  const settingsWithTimestamp = { ...settings, lastModified: new Date().toISOString() };
+
+  // Write to Firestore
+  const settingsRef = doc(firestoreDb, 'config', 'settings');
+  setDoc(settingsRef, settingsWithTimestamp, { merge: true }).catch(async (serverError) => {
     const permissionError = new FirestorePermissionError({
         path: settingsRef.path,
         operation: 'update',
@@ -52,16 +63,17 @@ export function updateSettings(settings: Partial<AppSettings>) {
     });
     errorEmitter.emit('permission-error', permissionError);
   });
+  
+  // Write to Realtime DB
+  const rtdbSettingsRef = ref(rtdbInstance, 'config/settings');
+  const existingSettings = await rtdbGet(rtdbSettingsRef).then(s => s.val() || {});
+  const newRtdbSettings = { ...existingSettings, ...settingsWithTimestamp };
+  await rtdbSet(rtdbSettingsRef, newRtdbSettings);
 }
 
 
-// --- Assets ---
+// --- Firestore Assets ---
 
-/**
- * Fetches all asset documents from Firestore once.
- * This is now the primary method for getting cloud data to avoid real-time listener costs.
- * @returns A promise that resolves with an array of assets.
- */
 export async function getAssets(): Promise<Asset[]> {
   const db = checkConfig();
   const assetsCollectionRef = collection(db, 'assets');
@@ -85,11 +97,6 @@ export async function getAssets(): Promise<Asset[]> {
   }
 }
 
-/**
- * Creates or updates an asset document in Firestore.
- * The document ID is the asset's own `id` property.
- * @param asset The asset object to save.
- */
 export function updateAsset(asset: Asset) {
   const db = checkConfig();
   const assetRef = doc(db, 'assets', asset.id);
@@ -104,10 +111,6 @@ export function updateAsset(asset: Asset) {
   });
 }
 
-/**
- * Deletes an asset document from Firestore.
- * @param assetId The ID of the asset to delete.
- */
 export function deleteAsset(assetId: string) {
   const db = checkConfig();
   const assetRef = doc(db, 'assets', assetId);
@@ -120,11 +123,6 @@ export function deleteAsset(assetId: string) {
   });
 }
 
-
-/**
- * Writes a large array of assets to Firestore in batches of 500.
- * @param assets The array of assets to write.
- */
 export function batchSetAssets(assets: Asset[]) {
     const db = checkConfig();
     const assetsCollectionRef = collection(db, 'assets');
@@ -134,7 +132,6 @@ export function batchSetAssets(assets: Asset[]) {
         const chunk = assets.slice(i, i + batchSize);
         chunk.forEach((asset) => {
             const docRef = doc(assetsCollectionRef, asset.id);
-            // Ensure lastModified is set on batch writes
             batch.set(docRef, { ...asset, lastModified: asset.lastModified || new Date().toISOString() });
         });
         batch.commit().catch(async (serverError) => {
@@ -148,11 +145,6 @@ export function batchSetAssets(assets: Asset[]) {
     }
 }
 
-
-/**
- * Deletes an array of assets from Firestore in batches.
- * @param assetIds The array of asset IDs to delete.
- */
 export function batchDeleteAssets(assetIds: string[]) {
     const db = checkConfig();
     const batchSize = 500;
@@ -174,6 +166,53 @@ export function batchDeleteAssets(assetIds: string[]) {
     }
 }
 
+
+// --- Realtime Database Assets ---
+
+export async function getAssetsRTDB(): Promise<Asset[]> {
+    const db = checkRTDBConfig();
+    const snapshot = await rtdbGet(ref(db, 'assets'));
+    if (snapshot.exists()) {
+        const data = snapshot.val();
+        return Object.keys(data).map(key => ({ id: key, ...data[key] }));
+    }
+    return [];
+}
+
+export async function updateAssetRTDB(asset: Asset) {
+    const db = checkRTDBConfig();
+    const assetRef = ref(db, `assets/${asset.id}`);
+    const assetToSave = { ...asset, id: undefined, lastModified: new Date().toISOString() };
+    delete (assetToSave as any).id; // Ensure ID is not nested
+    await rtdbSet(assetRef, assetToSave);
+}
+
+export async function deleteAssetRTDB(assetId: string) {
+    const db = checkRTDBConfig();
+    const assetRef = ref(db, `assets/${assetId}`);
+    await rtdbSet(assetRef, null);
+}
+
+export async function batchSetAssetsRTDB(assets: Asset[]) {
+    const db = checkRTDBConfig();
+    for (const asset of assets) {
+        const assetRef = ref(db, `assets/${asset.id}`);
+        const assetToSave = { ...asset, id: undefined, lastModified: asset.lastModified || new Date().toISOString() };
+        delete (assetToSave as any).id;
+        await rtdbSet(assetRef, assetToSave);
+    }
+}
+
+export async function batchDeleteAssetsRTDB(assetIds: string[]) {
+    const db = checkRTDBConfig();
+    for (const assetId of assetIds) {
+        const assetRef = ref(db, `assets/${assetId}`);
+        await rtdbSet(assetRef, null);
+    }
+}
+
+
+// --- Legacy RTDB Copy Function ---
 export async function copyAssetsToRealtimeDB(): Promise<void> {
     const rtdbInstance = rtdb;
     if (!isConfigValid || !db || !rtdbInstance) {
@@ -194,15 +233,14 @@ export async function copyAssetsToRealtimeDB(): Promise<void> {
             return;
         }
 
-        // Convert array to an object with IDs as keys for better RTDB structure
         const assetsObject = assets.reduce((acc, asset) => {
-            const { id, ...rest } = asset; // RTDB doesn't need the ID inside the object if it's the key
+            const { id, ...rest } = asset;
             acc[id] = rest;
             return acc;
         }, {} as { [key: string]: Omit<Asset, 'id'> });
 
         const dbRef = ref(rtdbInstance, 'assets');
-        await set(dbRef, assetsObject);
+        await rtdbSet(dbRef, assetsObject);
 
         addNotification({ title: 'Copy Successful', description: `${assets.length} assets have been copied to the Realtime Database.` });
     } catch (error) {

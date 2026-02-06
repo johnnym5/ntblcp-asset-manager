@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export interface Asset {
@@ -94,4 +95,6 @@ export interface AppSettings {
   enabledSheets: string[];
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
+  databaseSource?: 'firestore' | 'rtdb';
+  lastModified?: string;
 }

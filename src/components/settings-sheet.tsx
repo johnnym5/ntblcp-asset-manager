@@ -31,12 +31,12 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from './ui/separator';
-import { useAppState } from '@/contexts/app-state-context';
-import { copyAssetsToRealtimeDB, updateSettings } from '@/lib/firestore';
+import { useAppState, type DatabaseSource } from '@/contexts/app-state-context';
+import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Rocket, Download } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Rocket, Download, Cloud, Flame } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
@@ -58,7 +58,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, dataActions } = useAppState();
+  const { appSettings, setAppSettings, dataActions, databaseSource, setDatabaseSource } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -80,8 +80,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   }, [isOpen, appSettings]);
 
   const hasChanges = useMemo(() => {
-    return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
-  }, [appSettings, draftSettings]);
+    if (!draftSettings) return false;
+    const settingsChanged = JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
+    const dbSourceChanged = appSettings.databaseSource !== databaseSource;
+    return settingsChanged || dbSourceChanged;
+  }, [appSettings, draftSettings, databaseSource]);
   
   const calculatedChanges = useMemo(() => {
     if (!draftSettings || !appSettings) return [];
@@ -107,8 +110,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
       changes.push(`Sheet definitions (headers/columns) will be updated.`);
     }
+    if (appSettings.databaseSource !== databaseSource) {
+      changes.push(`Primary database will be switched to: ${databaseSource === 'firestore' ? 'Cloud Firestore' : 'Realtime DB'}.`);
+    }
     return changes;
-  }, [draftSettings, appSettings]);
+  }, [draftSettings, appSettings, databaseSource]);
 
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
@@ -122,7 +128,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (checked) {
       newEnabledSheets = [...draftSettings.enabledSheets, sheetName];
     } else {
-      newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetName);
+      newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
     }
     handleSettingChange('enabledSheets', newEnabledSheets);
   };
@@ -199,10 +205,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const handleConfirmSave = async () => {
     if (!draftSettings) return;
     try {
-      await updateSettings(draftSettings);
-      await saveLocalSettings(draftSettings);
-      setAppSettings(draftSettings); // Update global state
-      toast({ title: "Settings Saved", description: "Your changes have been applied to the database." });
+      const finalSettings = { ...draftSettings, databaseSource };
+      await updateSettings(finalSettings);
+      await saveLocalSettings(finalSettings);
+      setAppSettings(finalSettings); // Update global state
+      toast({ title: "Settings Saved", description: "Your changes have been applied." });
     } catch (e) {
       toast({ title: "Save Failed", description: "Could not save settings to the database.", variant: "destructive" });
     } finally {
@@ -220,7 +227,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       return;
     }
     setIsCopying(true);
-    await copyAssetsToRealtimeDB();
+    await dataActions.onCopyToRTDB?.();
     setIsCopying(false);
   };
 
@@ -349,7 +356,23 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                 <div>
                     <h3 className="text-lg font-medium mb-4">Data Management</h3>
                     <div className="rounded-lg border p-4 space-y-3">
-                        <p className="text-sm text-muted-foreground">Perform global data operations. These actions may affect the entire dataset.</p>
+                         <div className="flex items-center justify-between pt-1">
+                            <div className="space-y-1">
+                              <Label htmlFor="app-mode" className="text-sm font-medium">Primary Database</Label>
+                              <p className="text-xs text-muted-foreground">
+                                Select the main database for all asset operations.
+                              </p>
+                            </div>
+                             <Select value={databaseSource} onValueChange={(value) => setDatabaseSource(value as DatabaseSource)}>
+                              <SelectTrigger className="w-[180px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="firestore"><div className='flex items-center gap-2'><Cloud className="h-4 w-4 text-blue-500" /> Cloud Firestore</div></SelectItem>
+                                <SelectItem value="rtdb"><div className='flex items-center gap-2'><Flame className="h-4 w-4 text-orange-500" /> Realtime Database</div></SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
                         <Separator />
                         <div className="space-y-2">
                             {dataActions.onAddAsset && (
@@ -410,6 +433,13 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           isOpen={isSheetFormOpen}
           onOpenChange={setIsSheetFormOpen}
           sheetDefinition={sheetToEdit}
+          onSave={(newDef) => {
+            if (!draftSettings) return;
+             handleSettingChange('sheetDefinitions', {
+                ...draftSettings.sheetDefinitions,
+                [newDef.name]: newDef,
+             });
+          }}
         />
       )}
 
@@ -423,7 +453,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Changes</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to save these changes to the database? This will affect all users.
+              Are you sure you want to save these settings? This may affect all users.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {calculatedChanges.length > 0 && (
