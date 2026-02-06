@@ -31,12 +31,12 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from './ui/separator';
-import { useAppState, type DatabaseSource } from '@/contexts/app-state-context';
+import { useAppState } from '@/contexts/app-state-context';
 import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, RefreshCw, Download, Cloud, Flame } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
@@ -58,12 +58,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { 
-    appSettings, setAppSettings, 
-    dataActions, 
-    databaseSource, setDatabaseSource,
-    setManualBackendSyncTrigger, isSyncing,
-  } = useAppState();
+  const { appSettings, setAppSettings, dataActions } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -84,9 +79,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   }, [isOpen, appSettings]);
 
   const hasChanges = useMemo(() => {
-    if (!draftSettings) return false;
-    const settingsChanged = JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
-    return settingsChanged;
+    return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
   }, [appSettings, draftSettings]);
   
   const calculatedChanges = useMemo(() => {
@@ -113,9 +106,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
       changes.push(`Sheet definitions (headers/columns) will be updated.`);
     }
-    if (draftSettings.databaseSource !== appSettings.databaseSource) {
-      changes.push(`Primary database will be switched to: ${draftSettings.databaseSource === 'firestore' ? 'Cloud Firestore' : 'Realtime DB'}.`);
-    }
     return changes;
   }, [draftSettings, appSettings]);
 
@@ -131,7 +121,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (checked) {
       newEnabledSheets = [...draftSettings.enabledSheets, sheetName];
     } else {
-      newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
+      newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetName);
     }
     handleSettingChange('enabledSheets', newEnabledSheets);
   };
@@ -208,16 +198,10 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const handleConfirmSave = async () => {
     if (!draftSettings) return;
     try {
-      const finalSettings = { ...draftSettings };
-      
-      // The databaseSource is now handled directly by its own state setter,
-      // but we save it as part of the overall settings blob.
-      finalSettings.databaseSource = databaseSource;
-
-      await updateSettings(finalSettings);
-      await saveLocalSettings(finalSettings);
-      setAppSettings(finalSettings); // Update global state
-      toast({ title: "Settings Saved", description: "Your changes have been applied." });
+      await updateSettings(draftSettings);
+      await saveLocalSettings(draftSettings);
+      setAppSettings(draftSettings); // Update global state
+      toast({ title: "Settings Saved", description: "Your changes have been applied to the database." });
     } catch (e) {
       toast({ title: "Save Failed", description: "Could not save settings to the database.", variant: "destructive" });
     } finally {
@@ -228,7 +212,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
-
+  
   if (!draftSettings) {
     return (
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -354,23 +338,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                 <div>
                     <h3 className="text-lg font-medium mb-4">Data Management</h3>
                     <div className="rounded-lg border p-4 space-y-3">
-                         <div className="flex items-center justify-between pt-1">
-                            <div className="space-y-1">
-                              <Label htmlFor="database-source" className="text-sm font-medium">Primary Database</Label>
-                              <p className="text-xs text-muted-foreground">
-                                Select the main database for all asset operations.
-                              </p>
-                            </div>
-                             <Select value={databaseSource} onValueChange={(value) => setDatabaseSource(value as DatabaseSource)}>
-                              <SelectTrigger id="database-source" className="w-[180px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="firestore"><div className='flex items-center gap-2'><Cloud className="h-4 w-4 text-blue-500" /> Cloud Firestore</div></SelectItem>
-                                <SelectItem value="rtdb"><div className='flex items-center gap-2'><Flame className="h-4 w-4 text-orange-500" /> Realtime Database</div></SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
+                        <p className="text-sm text-muted-foreground">Perform global data operations. These actions may affect the entire dataset.</p>
                         <Separator />
                         <div className="space-y-2">
                             {dataActions.onAddAsset && (
@@ -393,17 +361,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                                     <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
                                 </Button>
                             )}
-                            {dataActions.onExportToJson && (
+                             {dataActions.onExportToJson && (
                                 <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExportToJson}>
                                     <Download className="mr-2 h-4 w-4" /> Export All Data to JSON
                                 </Button>
                             )}
-                            <Separator />
-                            <p className="text-xs text-muted-foreground pt-2">Advanced operations. Use with caution.</p>
-                            <Button variant="outline" className="w-full justify-start" onClick={() => setManualBackendSyncTrigger(c => c + 1)} disabled={isSyncing}>
-                                {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-                                Sync Databases
-                            </Button>
                             <Separator />
                             {dataActions.onClearAll && (
                                 <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>
@@ -451,7 +413,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Changes</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to save these settings? This may affect all users.
+              Are you sure you want to save these changes to the database? This will affect all users.
             </AlertDialogDescription>
           </AlertDialogHeader>
           {calculatedChanges.length > 0 && (

@@ -1,12 +1,18 @@
-import type { Asset } from './types';
+import type { Asset, AppSettings } from './types';
 import { saveAs } from 'file-saver';
 
-export function exportAssetsToJson(assets: Asset[], fileName: string = 'assets-export.json') {
-  if (!assets || assets.length === 0) {
-    throw new Error('No assets available to export.');
+export function exportFullBackupToJson(assets: Asset[], settings: AppSettings, fileName: string = 'ntblcp-full-backup.json') {
+  if ((!assets || assets.length === 0) && !settings) {
+    throw new Error('No data available to export.');
   }
 
-  const jsonString = JSON.stringify(assets, null, 2);
+  const exportData = {
+    timestamp: new Date().toISOString(),
+    settings: settings,
+    assets: assets,
+  };
+
+  const jsonString = JSON.stringify(exportData, null, 2);
   const blob = new Blob([jsonString], { type: 'application/json;charset=utf-8' });
 
   saveAs(blob, fileName);
