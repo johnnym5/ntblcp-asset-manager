@@ -99,7 +99,7 @@ export function ColumnCustomizationSheet({
     }
   };
   
-  const handleApplyToOne = async () => {
+  const handleApplyToOne = () => {
     const newDefinition: SheetDefinition = {
       ...sheetDefinition,
       displayFields: fields,
@@ -108,7 +108,7 @@ export function ColumnCustomizationSheet({
     onOpenChange(false);
   }
 
-  const handleApplyToAll = async () => {
+  const handleApplyToAll = () => {
     if (typeof window !== 'undefined' && !navigator.onLine) {
       toast({ title: 'Offline', description: 'This action requires an internet connection.', variant: 'destructive' });
       return;
@@ -124,7 +124,7 @@ export function ColumnCustomizationSheet({
     }
     
     try {
-        await updateSettings({ sheetDefinitions: newSheetDefinitions });
+        updateSettings({ sheetDefinitions: newSheetDefinitions });
         setAppSettings(prev => ({...prev, sheetDefinitions: newSheetDefinitions}));
         toast({ title: "Layout Applied", description: "Column settings have been applied to all sheets for all users."});
         onOpenChange(false);

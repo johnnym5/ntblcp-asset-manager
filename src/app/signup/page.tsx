@@ -62,7 +62,7 @@ export default function SignupPage() {
     },
   });
 
-  const onSubmit = async (data: SignupFormValues) => {
+  const onSubmit = (data: SignupFormValues) => {
     setIsSaving(true);
     setFormError(null);
 
@@ -97,7 +97,7 @@ export default function SignupPage() {
     const newUsers = [...authorizedUsers, newUser];
 
     try {
-      await updateSettings({ authorizedUsers: newUsers });
+      updateSettings({ authorizedUsers: newUsers });
       setAppSettings(prev => ({ ...prev, authorizedUsers: newUsers }));
       
       toast({

@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from '@/contexts/auth-context';
 import { AppStateProvider } from '@/contexts/app-state-context';
 import { Toaster } from '@/components/ui/toaster';
+import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 export const metadata: Metadata = {
   title: 'NTBLCP ASSET VERIFICATOR',
@@ -35,6 +36,7 @@ export default function RootLayout({
             <AuthProvider>
               {children}
               <Toaster />
+              <FirebaseErrorListener />
             </AuthProvider>
           </AppStateProvider>
         </ThemeProvider>

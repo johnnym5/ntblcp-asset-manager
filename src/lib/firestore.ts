@@ -3,21 +3,40 @@
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import type { Asset, AppSettings } from '@/lib/types';
-import type { User } from 'firebase/auth';
+import { errorEmitter } from '@/lib/error-emitter';
+import { FirestorePermissionError } from '@/lib/errors';
 
 // --- App Settings ---
 export async function getSettings(): Promise<AppSettings | null> {
     const settingsRef = doc(db, 'config', 'settings');
-    const docSnap = await getDoc(settingsRef);
-    if (docSnap.exists()) {
-        return docSnap.data() as AppSettings;
+    try {
+      const docSnap = await getDoc(settingsRef);
+      if (docSnap.exists()) {
+          return docSnap.data() as AppSettings;
+      }
+      return null;
+    } catch (serverError) {
+        if ((serverError as any)?.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: settingsRef.path,
+                operation: 'get',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        }
+        throw serverError;
     }
-    return null;
 }
 
-export async function updateSettings(settings: Partial<AppSettings>) {
+export function updateSettings(settings: Partial<AppSettings>) {
   const settingsRef = doc(db, 'config', 'settings');
-  await setDoc(settingsRef, settings, { merge: true });
+  setDoc(settingsRef, settings, { merge: true }).catch(async (serverError) => {
+    const permissionError = new FirestorePermissionError({
+        path: settingsRef.path,
+        operation: 'update',
+        requestResourceData: settings,
+    });
+    errorEmitter.emit('permission-error', permissionError);
+  });
 }
 
 
@@ -31,12 +50,23 @@ export async function updateSettings(settings: Partial<AppSettings>) {
 export async function getAssets(): Promise<Asset[]> {
   const assetsCollectionRef = collection(db, 'assets');
   const q = query(assetsCollectionRef);
-  const querySnapshot = await getDocs(q);
-  const fetchedAssets: Asset[] = [];
-  querySnapshot.forEach((doc) => {
-    fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
-  });
-  return fetchedAssets;
+  try {
+    const querySnapshot = await getDocs(q);
+    const fetchedAssets: Asset[] = [];
+    querySnapshot.forEach((doc) => {
+      fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+    });
+    return fetchedAssets;
+  } catch (serverError) {
+    if ((serverError as any)?.code === 'permission-denied') {
+      const permissionError = new FirestorePermissionError({
+          path: assetsCollectionRef.path,
+          operation: 'list',
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    }
+    throw serverError;
+  }
 }
 
 /**
@@ -44,18 +74,32 @@ export async function getAssets(): Promise<Asset[]> {
  * The document ID is the asset's own `id` property.
  * @param asset The asset object to save.
  */
-export async function updateAsset(asset: Asset) {
+export function updateAsset(asset: Asset) {
   const assetRef = doc(db, 'assets', asset.id);
-  await setDoc(assetRef, { ...asset, lastModified: new Date().toISOString() }, { merge: true });
+  setDoc(assetRef, { ...asset, lastModified: new Date().toISOString() }, { merge: true })
+    .catch(async (serverError) => {
+      const permissionError = new FirestorePermissionError({
+          path: assetRef.path,
+          operation: 'update',
+          requestResourceData: asset,
+      });
+      errorEmitter.emit('permission-error', permissionError);
+  });
 }
 
 /**
  * Deletes an asset document from Firestore.
  * @param assetId The ID of the asset to delete.
  */
-export async function deleteAsset(assetId: string) {
+export function deleteAsset(assetId: string) {
   const assetRef = doc(db, 'assets', assetId);
-  await deleteDoc(assetRef);
+  deleteDoc(assetRef).catch(async (serverError) => {
+    const permissionError = new FirestorePermissionError({
+        path: assetRef.path,
+        operation: 'delete',
+    });
+    errorEmitter.emit('permission-error', permissionError);
+  });
 }
 
 
@@ -63,7 +107,7 @@ export async function deleteAsset(assetId: string) {
  * Writes a large array of assets to Firestore in batches of 500.
  * @param assets The array of assets to write.
  */
-export async function batchSetAssets(assets: Asset[]) {
+export function batchSetAssets(assets: Asset[]) {
     const assetsCollectionRef = collection(db, 'assets');
     const batchSize = 500;
     for (let i = 0; i < assets.length; i += batchSize) {
@@ -74,7 +118,14 @@ export async function batchSetAssets(assets: Asset[]) {
             // Ensure lastModified is set on batch writes
             batch.set(docRef, { ...asset, lastModified: asset.lastModified || new Date().toISOString() });
         });
-        await batch.commit();
+        batch.commit().catch(async (serverError) => {
+          const permissionError = new FirestorePermissionError({
+              path: assetsCollectionRef.path,
+              operation: 'update',
+              requestResourceData: { note: `Batch update for ${chunk.length} assets.` }
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        });
     }
 }
 
@@ -83,7 +134,7 @@ export async function batchSetAssets(assets: Asset[]) {
  * Deletes an array of assets from Firestore in batches.
  * @param assetIds The array of asset IDs to delete.
  */
-export async function batchDeleteAssets(assetIds: string[]) {
+export function batchDeleteAssets(assetIds: string[]) {
     const batchSize = 500;
     for (let i = 0; i < assetIds.length; i += batchSize) {
         const batch = writeBatch(db);
@@ -92,6 +143,13 @@ export async function batchDeleteAssets(assetIds: string[]) {
             const docRef = doc(db, 'assets', assetId);
             batch.delete(docRef);
         });
-        await batch.commit();
+        batch.commit().catch(async (serverError) => {
+          const permissionError = new FirestorePermissionError({
+              path: 'assets',
+              operation: 'delete',
+              requestResourceData: { note: `Batch delete for ${chunk.length} assets.` }
+          });
+          errorEmitter.emit('permission-error', permissionError);
+        });
     }
 }
