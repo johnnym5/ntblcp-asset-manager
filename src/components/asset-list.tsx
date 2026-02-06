@@ -112,7 +112,7 @@ const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean 
     return false;
 };
 
-const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[] }> = ({ locationName, allAssets }) => {
+const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; appMode: 'management' | 'verification' }> = ({ locationName, allAssets, appMode }) => {
     const locationAssets = useMemo(() => {
         if (locationName === 'All') {
             return allAssets;
@@ -145,7 +145,7 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[] }> =
     const total = locationAssets.length;
     if (total === 0 && locationName !== 'All') {
         return (
-            <div className="flex justify-between items-center w-full">
+            <div className="flex justify-between items-center w-full p-2">
                 <span>{locationName}</span>
                 <span className="text-xs text-muted-foreground">0 assets</span>
             </div>
@@ -160,9 +160,13 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[] }> =
         <div className="flex flex-col w-full gap-1 p-2 rounded-md hover:bg-muted">
             <div className="flex justify-between items-center w-full text-sm">
                 <span>{displayName}</span>
-                <span className="text-xs font-mono">{verified}/{total} verified</span>
+                {appMode === 'verification' ? (
+                  <span className="text-xs font-mono">{verified}/{total} verified</span>
+                ) : (
+                  <span className="text-xs font-mono">{total} assets</span>
+                )}
             </div>
-            <Progress value={percentage} className="h-1.5" />
+            {appMode === 'verification' && <Progress value={percentage} className="h-1.5" />}
         </div>
     );
 };
@@ -914,29 +918,22 @@ export default function AssetList() {
     setIsImporting(false);
   };
   
-  const handleExportClick = useCallback((categoriesToExport?: string[]) => {
-    const categories = categoriesToExport && categoriesToExport.length > 0 ? categoriesToExport : Object.keys(assetsByCategory);
-    const assetsToExport = displayedAssets.filter(asset => categories.includes(asset.category));
-
-    if (assetsToExport.length === 0) {
-      addNotification({ title: "No Data to Export", description: "There are no assets in the selected categories." });
+  const handleExportClick = useCallback(() => {
+    if (displayedAssets.length === 0) {
+      addNotification({ title: "No Data to Export", description: "There are no assets matching the current filters." });
       return;
     }
     try {
       const exportPrefix = userProfile?.state || 'user-export';
-      let fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-      
-      if(categoriesToExport && categoriesToExport.length > 0){
-          fileName = `${exportPrefix}-${categoriesToExport.join('&')}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
-      }
+      const fileName = `${exportPrefix}-export-${new Date().toISOString().split('T')[0]}.xlsx`;
 
-      exportToExcel(assetsToExport, appSettings.sheetDefinitions, fileName);
+      exportToExcel(displayedAssets, appSettings.sheetDefinitions, fileName);
       addNotification({ title: "Export Successful" });
     } catch(error) {
       console.error("Export Error:", error);
       addNotification({ title: "Export Failed", description: error instanceof Error ? error.message : "An unknown error occurred.", variant: "destructive" });
     }
-  }, [displayedAssets, userProfile, assetsByCategory, appSettings]);
+  }, [displayedAssets, userProfile, appSettings]);
 
   const handleTravelReport = useCallback(() => setIsTravelReportOpen(true), []);
   
@@ -1006,6 +1003,7 @@ export default function AssetList() {
         onScanAndImport: () => setIsImportScanOpen(true),
         onClearAll: handleClearAllClick,
         onTravelReport: handleTravelReport,
+        onExport: handleExportClick,
         isImporting,
     });
     return () => setDataActions({});
@@ -1014,7 +1012,8 @@ export default function AssetList() {
     handleAddAsset, 
     handleImportClick, 
     handleClearAllClick, 
-    handleTravelReport, 
+    handleTravelReport,
+    handleExportClick,
     isImporting
   ]);
 
@@ -1310,10 +1309,12 @@ export default function AssetList() {
                       <div className="text-2xl font-bold">{total}</div>
                       <p className="text-xs text-muted-foreground">Total assets in this category</p>
                   </div>
-                  <div className="space-y-2">
-                      <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
-                      <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
-                  </div>
+                  {appSettings.appMode === 'verification' && (
+                    <div className="space-y-2">
+                        <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
+                        <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
+                    </div>
+                  )}
               </CardContent>
               <CardFooter className="pt-0 pb-4">
                 <Button variant="link" className="p-0 h-auto" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
@@ -1377,14 +1378,14 @@ export default function AssetList() {
                         <SelectContent>
                             <ScrollArea className="h-[400px]">
                                 <SelectItem value="All">
-                                    <LocationProgress locationName="All" allAssets={activeAssets} />
+                                    <LocationProgress locationName="All" allAssets={activeAssets} appMode={appSettings.appMode} />
                                 </SelectItem>
                                 <SelectSeparator />
                                 <SelectGroup>
                                     <SelectLabel>Special Locations</SelectLabel>
                                     {SPECIAL_LOCATIONS.map((loc) => (
                                         <SelectItem key={loc} value={loc} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
-                                            <LocationProgress locationName={loc} allAssets={activeAssets} />
+                                            <LocationProgress locationName={loc} allAssets={activeAssets} appMode={appSettings.appMode} />
                                         </SelectItem>
                                     ))}
                                 </SelectGroup>
@@ -1393,7 +1394,7 @@ export default function AssetList() {
                                     <SelectLabel>Zonal Stores</SelectLabel>
                                     {ZONAL_STORES.map((zone) => (
                                         <SelectItem key={zone} value={zone} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
-                                            <LocationProgress locationName={zone} allAssets={activeAssets} />
+                                            <LocationProgress locationName={zone} allAssets={activeAssets} appMode={appSettings.appMode} />
                                         </SelectItem>
                                     ))}
                                 </SelectGroup>
@@ -1402,7 +1403,7 @@ export default function AssetList() {
                                     <SelectLabel>States</SelectLabel>
                                     {NIGERIAN_STATES.map((state) => (
                                         <SelectItem key={state} value={state} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
-                                            <LocationProgress locationName={state} allAssets={activeAssets} />
+                                            <LocationProgress locationName={state} allAssets={activeAssets} appMode={appSettings.appMode} />
                                         </SelectItem>
                                     ))}
                                 </SelectGroup>
@@ -1425,11 +1426,20 @@ export default function AssetList() {
                   </div>
               </CardHeader>
                <CardContent className="pt-2 space-y-2">
-                  <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
-                  <p className="text-sm text-muted-foreground">
-                    <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{currentlyDisplayedAssets}</span> assets verified.
-                    {isFiltered && ` (Showing from a total of ${totalAssetsInScope})`}
-                  </p>
+                  {appSettings.appMode === 'verification' ? (
+                    <>
+                      <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
+                      <p className="text-sm text-muted-foreground">
+                        <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{currentlyDisplayedAssets}</span> assets verified.
+                        {isFiltered && ` (Showing from a total of ${totalAssetsInScope})`}
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      <span className="font-bold text-foreground">{currentlyDisplayedAssets}</span> assets loaded.
+                      {isFiltered && ` (Filtered from ${totalAssetsInScope} total)`}
+                    </p>
+                  )}
               </CardContent>
                {selectedCategories.length > 0 && (
                 <CardFooter className="bg-muted/50 p-2 border-t flex flex-wrap items-center gap-2">
@@ -1441,9 +1451,6 @@ export default function AssetList() {
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
                         <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
-                    </Button>
-                    <Button variant="ghost" size="sm" onClick={() => handleExportClick(selectedCategories)}>
-                        <FileDown className="mr-2 h-4 w-4" /> Export Selection
                     </Button>
                     <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
                         {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
