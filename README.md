@@ -98,3 +98,20 @@ firebase deploy
 ```
 
 This command will automatically build your Next.js application and deploy it to App Hosting. Your live application will be available at `https://<your-app-name>.web.app`.
+
+---
+
+## 3. Security Note: Emergency Super Admin
+
+**IMPORTANT:** For emergency access, a "super admin" user has been hardcoded into the application.
+
+*   **Username:** `admin`
+*   **Password:** `setup`
+
+This user account provides full administrative access and is intended for use **only if you are locked out** or cannot access the user database.
+
+For a production environment, it is highly recommended that you either:
+1.  Change the password for this user immediately after the first login.
+2.  Remove the hardcoded user entirely from `src/contexts/auth-context.tsx` and `src/components/user-profile-setup.tsx` once you have established your own administrative accounts.
+
+Leaving default, hardcoded credentials in a production application is a significant security risk.
