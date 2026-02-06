@@ -183,9 +183,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     const initializeSettings = async () => {
       let settings = await getLocalSettings();
 
-      let isInitialSetup = false;
       if (!settings) {
-        isInitialSetup = true;
         settings = {
           authorizedUsers: [],
           sheetDefinitions: HEADER_DEFINITIONS,
@@ -197,11 +195,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       let currentUsers = settings.authorizedUsers || [];
       let usersModified = false;
       
-      const userMap = new Map(currentUsers.map(u => [u.email.toLowerCase(), u]));
+      const userMap = new Map(currentUsers.map(u => u.email.toLowerCase()));
 
       stateManagersToAdd.forEach(manager => {
-          const loginName = manager.displayName.toLowerCase().replace(/ /g, '-');
-          const existingUser = userMap.get(manager.email.toLowerCase());
+          const loginName = manager.displayName.toLowerCase().replace(/\s+/g, '-');
+          const existingUser = currentUsers.find(u => u.email.toLowerCase() === manager.email.toLowerCase());
 
           if (!existingUser) {
               currentUsers.push({
@@ -265,10 +263,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       if (usersModified) {
         settings.authorizedUsers = currentUsers;
         await saveLocalSettings(settings);
-      }
-      
-      if (isInitialSetup && usersModified && typeof window !== 'undefined' && navigator.onLine) {
-        await updateSettings(settings);
       }
 
       setAppSettings(settings);
