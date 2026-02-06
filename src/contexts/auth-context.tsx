@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -36,28 +35,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { setAssets, appSettings, setAppSettings } = useAppState();
+  const { appSettings } = useAppState();
 
   useEffect(() => {
-    // If the authorized user list hasn't loaded yet, we can't make a decision.
-    // We must wait for it to be populated by the AppStateProvider.
-    if (appSettings.authorizedUsers.length === 0) {
-      // As a special case, if there's no saved profile in local storage,
-      // we know for sure the user is logged out, so we can initialize early.
-      if (!localStorage.getItem('ntblcp-user-profile')) {
-          setLoading(false);
-          setAuthInitialized(true);
-      }
-      // Otherwise, we wait for the user list to load before proceeding.
-      return;
-    }
-
-    // This part of the effect runs only after the authorized user list is available.
+    // This effect runs when the authorized user list is loaded or changed.
+    // It checks for a profile in local storage and validates it.
     try {
       const savedProfile = localStorage.getItem('ntblcp-user-profile');
       if (savedProfile) {
         const profile: LocalUserProfile = JSON.parse(savedProfile);
-        // Check if the user from local storage is still in the authorized list
+        
+        // Check if the user from local storage is still in the authorized list.
+        // This will correctly return undefined if appSettings.authorizedUsers is empty.
         const authorizedUser = appSettings.authorizedUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
@@ -65,14 +54,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUserProfile(profile);
           setProfileSetupComplete(true);
         } else {
-          // The user is no longer authorized, so clear their stale profile.
+          // The user is no longer authorized (or the list is empty), so clear their stale profile.
           localStorage.removeItem('ntblcp-user-profile');
+          setUserProfile(null);
+          setProfileSetupComplete(false);
         }
+      } else {
+        // No profile in local storage, ensure state is cleared.
+        setUserProfile(null);
+        setProfileSetupComplete(false);
       }
     } catch (e) {
       console.error("Failed to process user profile from local storage", e);
       // Clear potentially corrupted data
       localStorage.removeItem('ntblcp-user-profile');
+      setUserProfile(null);
+      setProfileSetupComplete(false);
     } finally {
       // Whether a user was found or not, we have completed the authentication check.
       setLoading(false);
