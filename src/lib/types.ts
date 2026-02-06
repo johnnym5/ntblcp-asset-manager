@@ -71,6 +71,7 @@ export interface AuthorizedUser {
   isGuest?: boolean;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
+  canVerifyAssets?: boolean;
 }
 
 export interface DisplayField {

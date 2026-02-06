@@ -68,12 +68,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
     mode: 'onChange',
   });
   
-  const isReadOnly = useMemo(() => {
-      if (isAdmin || initialIsReadOnly) return initialIsReadOnly;
-      if (appSettings.appMode === 'management') return true;
-      return false;
-  }, [isAdmin, initialIsReadOnly, appSettings.appMode]);
-  
   const currentCategory = form.watch('category');
   const sheetDefinition = useMemo(() => {
     if (!currentCategory) return null;
@@ -102,10 +96,10 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
   useEffect(() => {
     if (watchedStatusInForm === 'Verified' && !form.getValues('verifiedDate')) {
         form.setValue('verifiedDate', new Date().toLocaleDateString('en-CA'));
-    } else if (watchedStatusInForm !== 'Verified' && !isReadOnly) {
+    } else if (watchedStatusInForm !== 'Verified' && !initialIsReadOnly) {
         form.setValue('verifiedDate', '');
     }
-  }, [watchedStatusInForm, form, isReadOnly]);
+  }, [watchedStatusInForm, form, initialIsReadOnly]);
 
 
   const onSubmit = async (data: AssetFormValues) => {
@@ -128,10 +122,30 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
     const renderField = (field: DisplayField) => {
         const fieldName = field.key as keyof AssetFormValues;
         
-        const isManagementLock = !isAdmin && appSettings.appMode === 'management';
-        const isVerificationLock = !isAdmin && appSettings.appMode === 'verification' && !['verifiedStatus', 'remarks', 'condition'].includes(fieldName);
+        let disabled = initialIsReadOnly;
 
-        const disabled = isReadOnly || isManagementLock || isVerificationLock || (fieldName === 'location' && !isAdmin) || (fieldName === 'category' && !!asset);
+        if (!disabled) { // Only check permissions if the form isn't in read-only mode
+            if (!isAdmin) {
+                const canEdit = !!userProfile?.canEditAssets;
+                const canVerify = !!userProfile?.canVerifyAssets;
+                const isVerificationField = ['verifiedStatus', 'remarks', 'condition'].includes(fieldName);
+                const isVerifiedDateField = fieldName === 'verifiedDate';
+
+                if (isVerificationField) {
+                    disabled = !canVerify;
+                } else if (isVerifiedDateField) {
+                    disabled = true; // Always disable direct editing of verified date, it's automatic.
+                }
+                else {
+                    disabled = !canEdit;
+                }
+            }
+        }
+
+        // Also keep original special locks
+        if ((fieldName === 'location' && !isAdmin) || (fieldName === 'category' && !!asset)) {
+            disabled = true;
+        }
         
         let component;
         switch(fieldName) {
@@ -207,9 +221,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent className="sm:max-w-4xl w-full flex flex-col">
         <SheetHeader>
-          <SheetTitle>{asset ? (isReadOnly ? 'View Asset Details' : 'Edit Asset') : 'Add New Asset'}</SheetTitle>
+          <SheetTitle>{asset ? (initialIsReadOnly ? 'View Asset Details' : 'Edit Asset') : 'Add New Asset'}</SheetTitle>
           <SheetDescription>
-            {isReadOnly ? 'Viewing asset details.' : (asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
+            {initialIsReadOnly ? 'Viewing asset details.' : (asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto pr-4 py-4">
@@ -233,7 +247,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
           <SheetClose asChild>
             <Button variant="outline">Close</Button>
           </SheetClose>
-          {!isReadOnly && (
+          {!initialIsReadOnly && (
             <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes

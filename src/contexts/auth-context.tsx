@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -16,6 +17,7 @@ export interface LocalUserProfile {
   isGuest?: boolean;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
+  canVerifyAssets?: boolean;
 }
 
 interface AuthContextType {
@@ -39,6 +41,7 @@ const superAdmin: AuthorizedUser = {
   isGuest: false,
   canAddAssets: true,
   canEditAssets: true,
+  canVerifyAssets: true,
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -104,6 +107,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isGuest: user.isGuest,
       canAddAssets: user.canAddAssets,
       canEditAssets: user.canEditAssets,
+      canVerifyAssets: user.canVerifyAssets,
     };
     try {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));

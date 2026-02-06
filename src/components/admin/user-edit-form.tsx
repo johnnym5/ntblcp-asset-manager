@@ -55,6 +55,7 @@ const userFormSchema = z.object({
   confirmPassword: z.string().optional(),
   canAddAssets: z.boolean(),
   canEditAssets: z.boolean(),
+  canVerifyAssets: z.boolean(),
 }).refine((data) => data.password === data.confirmPassword, {
   message: "Passwords don't match",
   path: ["confirmPassword"],
@@ -88,6 +89,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
       confirmPassword: '',
       canAddAssets: false,
       canEditAssets: false,
+      canVerifyAssets: false,
     },
   });
   
@@ -107,6 +109,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
           confirmPassword: '',
           canAddAssets: user.canAddAssets || false,
           canEditAssets: user.canEditAssets || false,
+          canVerifyAssets: user.canVerifyAssets || false,
         });
       } else {
         form.reset({
@@ -120,6 +123,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
           confirmPassword: '',
           canAddAssets: true,
           canEditAssets: true,
+          canVerifyAssets: false,
         });
       }
        form.clearErrors();
@@ -385,6 +389,26 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                         <FormLabel>Allow Editing Assets</FormLabel>
                         <FormDescription>
                          User can modify existing asset records.
+                        </FormDescription>
+                    </div>
+                    <FormControl>
+                        <Switch
+                        checked={field.value}
+                        onCheckedChange={field.onChange}
+                        />
+                    </FormControl>
+                    </FormItem>
+                )}
+                />
+            <FormField
+                control={form.control}
+                name="canVerifyAssets"
+                render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-3 shadow-sm">
+                    <div className="space-y-0.5">
+                        <FormLabel>Allow Verifying Assets</FormLabel>
+                        <FormDescription>
+                         User can verify assets and update their status.
                         </FormDescription>
                     </div>
                     <FormControl>

@@ -217,7 +217,31 @@ export async function batchDeleteAssetsRTDB(assetIds: string[]) {
 export async function synchronizeDatabases(): Promise<{ toFirestoreCount: number; toRTDBCount: number }> {
     addNotification({ title: "Syncing cloud databases..." });
 
-    // 1. Get both datasets
+    const firestoreDb = checkConfig();
+    const rtdbInstance = checkRTDBConfig();
+
+    // --- SYNC SETTINGS ---
+    const firestoreSettings = await getDoc(doc(firestoreDb, 'config', 'settings')).then(d => d.exists() ? d.data() as AppSettings : null);
+    const rtdbSettingsSnapshot = await rtdbGet(ref(rtdbInstance, 'config/settings'));
+    const rtdbSettings = rtdbSettingsSnapshot.exists() ? rtdbSettingsSnapshot.val() as AppSettings : null;
+
+    if (firestoreSettings && !rtdbSettings) {
+        await rtdbSet(ref(rtdbInstance, 'config/settings'), firestoreSettings);
+    } else if (!firestoreSettings && rtdbSettings) {
+        await setDoc(doc(firestoreDb, 'config', 'settings'), rtdbSettings, { merge: true });
+    } else if (firestoreSettings && rtdbSettings) {
+        const fsTime = new Date(firestoreSettings.lastModified || 0).getTime();
+        const rtdbTime = new Date(rtdbSettings.lastModified || 0).getTime();
+
+        if (fsTime > rtdbTime + 1000) {
+            await rtdbSet(ref(rtdbInstance, 'config/settings'), firestoreSettings);
+        } else if (rtdbTime > fsTime + 1000) {
+            await setDoc(doc(firestoreDb, 'config', 'settings'), rtdbSettings, { merge: true });
+        }
+    }
+
+
+    // --- SYNC ASSETS ---
     const firestoreAssets = await getAssets();
     const rtdbAssets = await getAssetsRTDB();
 

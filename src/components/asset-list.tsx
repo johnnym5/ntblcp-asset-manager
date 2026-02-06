@@ -593,7 +593,7 @@ export default function AssetList() {
   };
 
   const handleEditAsset = (asset: Asset) => {
-    if (!userProfile?.canEditAssets && !isAdmin) {
+    if (!userProfile?.canEditAssets && !userProfile?.canVerifyAssets && !isAdmin) {
       addNotification({ title: "Permission Denied", description: "You do not have permission to edit assets.", variant: "destructive" });
       return;
     }
@@ -1592,7 +1592,7 @@ export default function AssetList() {
                        {contextualButtonText}
                     </Button>
                      {selectedAssetIds.length === 1 && !isGuest && (
-                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={!userProfile?.canEditAssets && !isAdmin}>
+                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={!userProfile?.canEditAssets && !userProfile?.canVerifyAssets && !isAdmin}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
                         </Button>
                     )}
@@ -1652,11 +1652,8 @@ export default function AssetList() {
                                     {field.key === 'verifiedStatus' && appSettings.appMode === 'verification' ? (
                                       <Select
                                         value={asset.verifiedStatus || 'Unverified'}
+                                        disabled={(!userProfile?.canVerifyAssets && !isAdmin) || (lockAssetList && isAdmin && dataSource === 'cloud')}
                                         onValueChange={async (status) => {
-                                          if (lockAssetList && isAdmin && dataSource === 'cloud') {
-                                              addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
-                                              return;
-                                          }
                                           const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
                                           await handleQuickSaveAsset(asset.id, {
                                               verifiedStatus: status as 'Verified' | 'Unverified',
@@ -1694,7 +1691,7 @@ export default function AssetList() {
                                             <FolderSearch className="mr-2 h-4 w-4" />
                                             View Details
                                         </DropdownMenuItem>
-                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }} disabled={!userProfile?.canEditAssets && !isAdmin}>
+                                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); handleEditAsset(asset); }} disabled={!userProfile?.canEditAssets && !userProfile?.canVerifyAssets && !isAdmin}>
                                             <Edit className="mr-2 h-4 w-4" />
                                             Edit Full Details
                                         </DropdownMenuItem>
@@ -1756,7 +1753,7 @@ export default function AssetList() {
                                     <DropdownMenuItem onClick={() => handleViewAsset(asset)}>
                                         <FolderSearch className="mr-2 h-4 w-4" /> View
                                     </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleEditAsset(asset)} disabled={!userProfile?.canEditAssets && !isAdmin}>
+                                    <DropdownMenuItem onClick={() => handleEditAsset(asset)} disabled={!userProfile?.canEditAssets && !userProfile?.canVerifyAssets && !isAdmin}>
                                         <Edit className="mr-2 h-4 w-4" /> Edit
                                     </DropdownMenuItem>
                                     <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={() => { setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20" disabled={!isAdmin}>
@@ -1783,11 +1780,8 @@ export default function AssetList() {
                                 <p className="text-xs font-medium text-muted-foreground mb-1">Verified Status</p>
                                 <Select
                                     value={asset.verifiedStatus || 'Unverified'}
+                                    disabled={(!userProfile?.canVerifyAssets && !isAdmin) || (lockAssetList && isAdmin && dataSource === 'cloud')}
                                     onValueChange={async (status) => {
-                                      if (lockAssetList && isAdmin && dataSource === 'cloud') {
-                                          addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
-                                          return;
-                                      }
                                       const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
                                       await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate, remarks: asset.remarks, condition: asset.condition });
                                       addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
@@ -1862,5 +1856,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
