@@ -1,9 +1,25 @@
 'use client';
 
-import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query } from 'firebase/firestore';
+import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import type { Asset } from '@/lib/types';
+import type { Asset, AppSettings } from '@/lib/types';
 import type { User } from 'firebase/auth';
+
+// --- App Settings ---
+export async function getSettings(): Promise<AppSettings | null> {
+    const settingsRef = doc(db, 'config', 'settings');
+    const docSnap = await getDoc(settingsRef);
+    if (docSnap.exists()) {
+        return docSnap.data() as AppSettings;
+    }
+    return null;
+}
+
+export async function updateSettings(settings: Partial<AppSettings>) {
+  const settingsRef = doc(db, 'config', 'settings');
+  await setDoc(settingsRef, settings, { merge: true });
+}
+
 
 // --- Assets ---
 

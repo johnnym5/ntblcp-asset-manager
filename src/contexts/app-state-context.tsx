@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
@@ -6,6 +5,7 @@ import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
 import type { Asset, AppSettings } from '@/lib/types';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
+import { getSettings } from '@/lib/firestore';
 
 
 export interface SortConfig {
@@ -135,6 +135,20 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
 
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const settingsFromDb = await getSettings();
+      if (settingsFromDb) {
+        setAppSettings(prev => ({
+          ...prev,
+          ...settingsFromDb,
+          authorizedUsers: settingsFromDb.authorizedUsers || [],
+          enabledSheets: settingsFromDb.enabledSheets || [],
+        }));
+      }
+    };
+    fetchSettings();
+  }, []);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {

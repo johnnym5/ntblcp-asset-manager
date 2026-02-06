@@ -1,7 +1,7 @@
-
 'use client';
 
 import React, { useState, useEffect } from 'react';
+import Link from 'next/link';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -155,7 +155,7 @@ export default function UserProfileSetup() {
                 </div>
                 <AlertDialogFooter>
                     {isMultiStateUser ? (
-                        <Button className="w-full" onClick={() => handleConfirm(foundUser, selectedState)} disabled={isSaving || !selectedState}>
+                        <Button className="w-full" onClick={() => handleConfirm(foundUser!, selectedState)} disabled={isSaving || !selectedState}>
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                             Confirm and Continue
                         </Button>
@@ -166,6 +166,12 @@ export default function UserProfileSetup() {
                         </Button>
                     )}
                 </AlertDialogFooter>
+                 <div className="mt-4 text-center text-sm">
+                  Don&apos;t have an account?{" "}
+                  <Link href="/signup" className="underline font-medium text-primary">
+                    Sign up
+                  </Link>
+                </div>
             </AlertDialogContent>
             </AlertDialog>
         </div>
