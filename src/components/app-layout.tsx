@@ -31,6 +31,7 @@ import {
   Inbox,
   Database,
   Flame,
+  DatabaseZap,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -59,6 +60,7 @@ import { InboxSheet } from "./inbox-sheet";
 import { ScrollArea } from "./ui/scroll-area";
 import { saveAssets } from "@/lib/idb";
 import { sanitizeForFirestore } from "@/lib/excel-parser";
+import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -77,8 +79,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setManualDownloadTrigger,
     setManualUploadTrigger,
     isSyncing,
-    databaseSource,
-    dataActions,
+    appSettings,
     unreadInboxCount,
     setUnreadInboxCount
   } = useAppState();
@@ -86,6 +87,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isDbAdminOpen, setIsDbAdminOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
@@ -283,7 +285,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             aria-label={`Switch to ${isOnline ? 'Online' : 'Online'} mode`}
                         >
                            {isOnline ? (
-                                databaseSource === 'firestore' ? (
+                                appSettings.databaseSource === 'firestore' ? (
                                     <Cloud className="h-5 w-5 text-green-500" />
                                 ) : (
                                     <Flame className="h-5 w-5 text-orange-500" />
@@ -295,7 +297,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </TooltipTrigger>
                     <TooltipContent>
                         <p>{isOnline 
-                            ? (databaseSource === 'firestore' ? 'Online (Primary DB)' : 'Online (Backup DB)')
+                            ? (appSettings.databaseSource === 'firestore' ? 'Online (Primary DB)' : 'Online (Backup DB)')
                             : 'Offline'
                         }</p>
                     </TooltipContent>
@@ -329,7 +331,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       Settings
                     </DropdownMenuItem>
                   )}
-                  <DropdownMenuSeparator />
+
+                  {userProfile?.loginName === 'admin' && (
+                     <DropdownMenuItem onClick={() => setIsDbAdminOpen(true)}>
+                      <DatabaseZap className="mr-2 h-4 w-4"/>
+                      Database Admin
+                    </DropdownMenuItem>
+                  )}
                   
                   {isAdmin && (
                      <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
@@ -418,6 +426,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </motion.main>
       <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      {userProfile?.loginName === 'admin' && (
+        <DatabaseAdminDialog isOpen={isDbAdminOpen} onOpenChange={setIsDbAdminOpen} />
+      )}
       <AssetFilterSheet
         isOpen={isFilterSheetOpen}
         onOpenChange={setIsFilterSheetOpen}

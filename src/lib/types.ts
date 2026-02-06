@@ -96,6 +96,6 @@ export interface AppSettings {
   enabledSheets: string[];
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
-  databaseSource?: 'firestore' | 'rtdb';
+  databaseSource: 'firestore' | 'rtdb';
   lastModified?: string;
 }

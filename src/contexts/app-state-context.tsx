@@ -6,23 +6,13 @@ import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
-import { getSettings } from '@/lib/firestore';
+import { getSettings, updateSettings } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
   direction: 'asc' | 'desc';
-}
-
-export interface DataActions {
-  onImport?: () => void;
-  onScanAndImport?: () => void;
-  onExportToJson?: () => void;
-  onAddAsset?: () => void;
-  onClearAll?: () => void;
-  onTravelReport?: () => void;
-  isImporting?: boolean;
 }
 
 interface AppStateContextType {
@@ -83,8 +73,10 @@ interface AppStateContextType {
   // Cross-component communication
   assetToView: Asset | null;
   setAssetToView: Dispatch<SetStateAction<Asset | null>>;
-  dataActions: DataActions;
-  setDataActions: Dispatch<SetStateAction<DataActions>>;
+  
+  // Failover state
+  isInFailoverMode: boolean;
+  triggerFailover: () => void;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -120,6 +112,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     enabledSheets: TARGET_SHEETS,
     lockAssetList: true,
     appMode: 'management',
+    databaseSource: 'firestore',
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -131,12 +124,43 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
-  const [dataActions, setDataActions] = useState<DataActions>({});
+
+  const [isInFailoverMode, setIsInFailoverMode] = useState(false);
+
+  const triggerFailover = () => {
+    setIsInFailoverMode(true);
+    setAppSettings(prev => ({...prev, databaseSource: 'rtdb'}));
+    updateSettings({databaseSource: 'rtdb'});
+  };
+
+  useEffect(() => {
+    let recoveryInterval: NodeJS.Timeout | undefined;
+    if(isInFailoverMode) {
+        recoveryInterval = setInterval(async () => {
+           console.log("Attempting to recover primary database connection...");
+           try {
+             await getSettings(); // Lightweight check
+             console.log("Primary database is back online. Recovering...");
+             setIsInFailoverMode(false);
+             setAppSettings(prev => ({...prev, databaseSource: 'firestore'}));
+             updateSettings({databaseSource: 'firestore'});
+             // Optionally trigger a sync here
+             clearInterval(recoveryInterval);
+           } catch(e) {
+             console.log("Recovery check failed. Still in failover mode.");
+           }
+        }, 60000); // Check every 60 seconds
+    }
+    return () => {
+        if (recoveryInterval) {
+            clearInterval(recoveryInterval);
+        }
+    }
+  }, [isInFailoverMode]);
 
 
   useEffect(() => {
     const initializeSettings = async () => {
-      // 1. Load local settings first for a fast offline-first experience.
       let localSettings = await getLocalSettings();
 
       if (!localSettings) {
@@ -146,13 +170,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           enabledSheets: TARGET_SHEETS,
           lockAssetList: true,
           appMode: 'management',
+          databaseSource: 'firestore',
         };
         await saveLocalSettings(localSettings);
       }
       setAppSettings(localSettings);
       setSettingsLoaded(true);
 
-      // 2. After loading local settings, try to fetch the latest from the cloud.
       if (isOnline) {
         try {
           const remoteSettings = await getSettings();
@@ -205,7 +229,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     unreadInboxCount, setUnreadInboxCount,
     dataSource, setDataSource,
     assetToView, setAssetToView,
-    dataActions, setDataActions,
+    isInFailoverMode, triggerFailover,
   };
 
   return (

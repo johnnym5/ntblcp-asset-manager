@@ -30,7 +30,6 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from './ui/separator';
 import { useAppState } from '@/contexts/app-state-context';
 import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -41,7 +40,6 @@ import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
-import { ImportScannerDialog } from './single-sheet-import-dialog';
 import { saveLocalSettings } from '@/lib/idb';
 import {
   Select,
@@ -58,14 +56,13 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, dataActions } = useAppState();
+  const { appSettings, setAppSettings } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
-  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
@@ -238,11 +235,10 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
             </SheetDescription>
           </SheetHeader>
           <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-y-hidden">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
                 <TabsTrigger value="users" disabled={isGuest || !isAdmin}><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
                 <TabsTrigger value="sheets" disabled={isGuest || !isAdmin}><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
-                <TabsTrigger value="data" disabled={isGuest || !isAdmin}><Database className="mr-2 h-4 w-4" />Data</TabsTrigger>
             </TabsList>
             <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
@@ -266,8 +262,8 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                           <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
                           <p className="text-xs text-muted-foreground">
                             {draftSettings.appMode === 'management'
-                              ? 'Management: Data is locked for non-admins.'
-                              : 'Verification: Users can update status/remarks.'
+                              ? 'Management: Full data editing rights.'
+                              : 'Verification: Limited to status & remarks updates.'
                             }
                           </p>
                         </div>
@@ -334,48 +330,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                     </div>
                   </div>
             </TabsContent>
-             <TabsContent value="data" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
-                <div>
-                    <h3 className="text-lg font-medium mb-4">Data Management</h3>
-                    <div className="rounded-lg border p-4 space-y-3">
-                        <p className="text-sm text-muted-foreground">Perform global data operations. These actions may affect the entire dataset.</p>
-                        <Separator />
-                        <div className="space-y-2">
-                            {dataActions.onAddAsset && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
-                                </Button>
-                            )}
-                            {dataActions.onImport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onImport} disabled={dataActions.isImporting}>
-                                    <FileUp className="mr-2 h-4 w-4" /> Import Full FAR
-                                </Button>
-                            )}
-                            {dataActions.onScanAndImport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport} disabled={dataActions.isImporting}>
-                                    <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
-                                </Button>
-                            )}
-                            {dataActions.onTravelReport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
-                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
-                                </Button>
-                            )}
-                             {dataActions.onExportToJson && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExportToJson}>
-                                    <Download className="mr-2 h-4 w-4" /> Export All Data to JSON
-                                </Button>
-                            )}
-                            <Separator />
-                            {dataActions.onClearAll && (
-                                <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </TabsContent>
           </Tabs>
 
           <SheetFooter className="mt-auto pt-4 border-t sm:justify-between">
@@ -402,11 +356,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           }}
         />
       )}
-
-      <ImportScannerDialog
-        isOpen={isImportScanOpen}
-        onOpenChange={setIsImportScanOpen}
-      />
 
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
         <AlertDialogContent>
