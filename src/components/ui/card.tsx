@@ -10,10 +10,11 @@ const Card = React.forwardRef<
   <motion.div
     ref={ref}
     className={cn(
-      "rounded-lg border bg-card/80 text-card-foreground shadow-lg backdrop-blur-sm transition-shadow duration-300 hover:shadow-primary/20",
+      "rounded-xl border bg-card/60 text-card-foreground shadow-xl backdrop-blur-lg transition-shadow duration-300 hover:shadow-primary/20",
       className
     )}
-    whileHover={{ y: -5, transition: { duration: 0.2 } }}
+    whileHover={{ y: -5, scale: 1.02 }}
+    transition={{ type: "spring", stiffness: 300, damping: 10 }}
     {...props}
   />
 ))
