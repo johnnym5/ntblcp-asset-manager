@@ -70,20 +70,14 @@ Log in to your Firebase account through the CLI. This command will open a browse
 firebase login
 ```
 
-### Step 2.3: Set Your Firebase Project ID
+### Step 2.3: Set Your Firebase Project
 
-Your application needs to know which Firebase project to deploy to.
+From your project's root directory, run the following command to associate your local project with your Firebase project.
 
-1.  Open the `.firebaserc` file in your project's root directory.
-2.  Replace the placeholder project ID with your actual Firebase Project ID.
-
-    ```json
-    {
-      "projects": {
-        "default": "YOUR-FIREBASE-PROJECT-ID"
-      }
-    }
-    ```
+```bash
+firebase use <YOUR_FIREBASE_PROJECT_ID>
+```
+Replace `<YOUR_FIREBASE_PROJECT_ID>` with your actual Firebase Project ID.
 
 ### Step 2.4: Configure Environment Variables in Firebase
 
