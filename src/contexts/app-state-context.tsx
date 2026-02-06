@@ -200,7 +200,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       if (isOnline) {
         try {
           const remoteSettings = await getSettings();
-          if (remoteSettings && JSON.stringify(remoteSettings) !== JSON.stringify(localSettings)) {
+          if (remoteSettings && remoteSettings.lastModified && (!localSettings.lastModified || new Date(remoteSettings.lastModified) > new Date(localSettings.lastModified))) {
             console.log("Found newer settings in Firestore, updating local state.");
             setAppSettings(remoteSettings);
             await saveLocalSettings(remoteSettings);
