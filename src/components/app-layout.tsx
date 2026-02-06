@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -118,7 +119,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isInboxOpen, setIsInboxOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
-  const { setTheme } = useTheme();
 
   useEffect(() => {
     setSearchTerm(debouncedSearchTerm);
@@ -213,7 +213,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Center */}
         <div className="flex-1 flex justify-center px-4">
             <div className="w-full max-w-lg">
-                {pathname === '/assets' && (
+                {pathname === '/' && (
                     <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
                         <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
                         <Input
@@ -338,7 +338,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                   {pathname === '/assets' && dataActions.onImport && isAdmin && (
+                   {pathname === '/' && dataActions.onImport && isAdmin && (
                     <DropdownMenuSub>
                       <DropdownMenuSubTrigger>
                         <Database className="mr-2 h-4 w-4" />
@@ -402,26 +402,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </span>
                     )}
                   </DropdownMenuItem>
-
-                  <DropdownMenuSub>
-                    <DropdownMenuSubTrigger>
-                      <Sun className="mr-2 h-4 w-4" />
-                      <span>Theme</span>
-                    </DropdownMenuSubTrigger>
-                    <DropdownMenuPortal>
-                      <DropdownMenuSubContent>
-                        <DropdownMenuItem onClick={() => setTheme('light')}>
-                          Light
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setTheme('dark')}>
-                          Dark
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setTheme('system')}>
-                          System
-                        </DropdownMenuItem>
-                      </DropdownMenuSubContent>
-                    </DropdownMenuPortal>
-                  </DropdownMenuSub>
 
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>
