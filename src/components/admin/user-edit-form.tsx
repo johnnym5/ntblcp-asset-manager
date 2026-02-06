@@ -105,8 +105,8 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
           states: user.states,
           isAdmin: user.isAdmin,
           isGuest: user.isGuest || false,
-          password: '', // Always clear password for security
-          confirmPassword: '',
+          password: user.password || '',
+          confirmPassword: user.password || '',
           canAddAssets: user.canAddAssets || false,
           canEditAssets: user.canEditAssets || false,
           canVerifyAssets: user.canVerifyAssets || false,

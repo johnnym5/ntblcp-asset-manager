@@ -39,10 +39,11 @@ const superAdmin: AuthorizedUser = {
   isGuest: false,
   canAddAssets: true,
   canEditAssets: true,
+  canVerifyAssets: true,
 };
 
 export default function UserProfileSetup() {
-  const [email, setEmail] = useState('');
+  const [loginName, setLoginName] = useState('');
   const [password, setPassword] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -55,18 +56,18 @@ export default function UserProfileSetup() {
 
   const handleLogin = () => {
     setError(null);
-    if (!email) {
-      setError("Please enter an email address.");
+    if (!loginName) {
+      setError("Please enter your login name.");
       return;
     }
 
     const allUsers = [...appSettings.authorizedUsers, superAdmin];
     const user = allUsers.find(
-      u => u.email.toLowerCase() === email.toLowerCase().trim()
+      u => u.loginName.toLowerCase() === loginName.toLowerCase().trim()
     );
 
     if (!user) {
-      setError("Invalid email or password.");
+      setError("Invalid login name or password.");
       return;
     }
 
@@ -99,7 +100,7 @@ export default function UserProfileSetup() {
         handleConfirm(user, 'All');
       }
     } else {
-      setError("Invalid email or password.");
+      setError("Invalid login name or password.");
       setFoundUser(null);
     }
   };
@@ -135,13 +136,13 @@ export default function UserProfileSetup() {
                 {!foundUser || isMultiStateUser ? (
                     <>
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="loginName">Login Name</Label>
                             <Input 
-                            id="email" 
-                            type="email"
-                            placeholder="user@example.com"
-                            value={email} 
-                            onChange={(e) => setEmail(e.target.value)}
+                            id="loginName" 
+                            type="text"
+                            placeholder="Enter your login name"
+                            value={loginName} 
+                            onChange={(e) => setLoginName(e.target.value)}
                             />
                         </div>
                         <div className="space-y-2">
