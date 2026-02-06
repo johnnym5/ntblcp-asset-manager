@@ -21,12 +21,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle, Check, FileText, Loader2, EyeOff } from 'lucide-react';
+import { AlertCircle, Check, FileText, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 
 export interface CategoryBatchUpdateData {
   status?: 'Verified' | 'Unverified';
-  hide?: boolean;
 }
 
 interface CategoryBatchEditFormProps {
@@ -49,13 +48,10 @@ export function CategoryBatchEditForm({
   const [applyStatus, setApplyStatus] = useState(false);
   const [status, setStatus] = useState<'Verified' | 'Unverified'>('Unverified');
 
-  const [applyHide, setApplyHide] = useState(false);
-
   const handleSubmit = async () => {
     setIsSaving(true);
     const updates: CategoryBatchUpdateData = {};
     if (applyStatus) updates.status = status;
-    if (applyHide && isAdmin) updates.hide = true;
 
     await onSave(updates);
     setIsSaving(false);
@@ -65,7 +61,6 @@ export function CategoryBatchEditForm({
   const resetForm = () => {
     setApplyStatus(false);
     setStatus('Unverified');
-    setApplyHide(false);
   }
 
   const handleOpenChange = (open: boolean) => {
@@ -75,7 +70,7 @@ export function CategoryBatchEditForm({
     onOpenChange(open);
   }
   
-  const canSave = applyStatus || (applyHide && isAdmin);
+  const canSave = applyStatus;
 
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
@@ -102,22 +97,6 @@ export function CategoryBatchEditForm({
               </Select>
             </div>
           </div>
-          {isAdmin && (
-            <div className="flex items-center space-x-4">
-                <Checkbox id="applyHide" checked={applyHide} onCheckedChange={(checked) => setApplyHide(!!checked)} />
-                <div className="w-full space-y-1">
-                    <Label htmlFor="applyHide" className={!applyHide ? 'text-muted-foreground' : ''}>
-                        <div className="flex items-center gap-2">
-                            <EyeOff className="h-4 w-4" />
-                            Hide Selected Sheets
-                        </div>
-                    </Label>
-                    <p className="text-xs text-muted-foreground">
-                        This will disable the sheets from being imported or displayed.
-                    </p>
-                </div>
-            </div>
-          )}
         </div>
         <SheetFooter>
           <SheetClose asChild>

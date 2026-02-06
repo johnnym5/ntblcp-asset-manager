@@ -44,7 +44,6 @@ import {
   CloudUpload,
   HardDrive,
   ArrowRightLeft,
-  Columns,
   Delete,
   PlaneTakeoff,
   Database,
@@ -82,7 +81,6 @@ import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettin
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, clearLockedOfflineAssets } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
-import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { TravelReportDialog } from "./travel-report-dialog";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
@@ -194,7 +192,6 @@ export default function AssetList() {
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
-  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
@@ -1150,14 +1147,6 @@ export default function AssetList() {
         assetsToUpdate.push(...(assetsByCategory[category] || []));
     });
 
-    if (data.hide && isAdmin) {
-        const newEnabledSheets = appSettings.enabledSheets.filter(sheet => !selectedCategories.includes(sheet));
-        setAppSettings(prev => ({ ...prev, enabledSheets: newEnabledSheets }));
-        await updateSettings({ enabledSheets: newEnabledSheets, lastModified: new Date().toISOString() });
-        addNotification({ title: 'Sheets Hidden', description: `${selectedCategories.length} categories have been hidden from view.`});
-        setSelectedCategories([]);
-    }
-
     if (data.status) {
         const assetsToUpdateCount = assetsToUpdate.length;
         addNotification({ title: 'Batch Updating Categories...', description: `Applying status to ${assetsToUpdateCount} assets.` });
@@ -1241,21 +1230,6 @@ export default function AssetList() {
     setSelectedCategories([]);
     setIsBatchDeleting(false);
   }
-
-  const handleSaveColumnSettings = async (newDefinition: SheetDefinition) => {
-    if (!currentCategory) return;
-    const newSettings = {
-      ...appSettings,
-      sheetDefinitions: {
-        ...appSettings.sheetDefinitions,
-        [currentCategory]: newDefinition,
-      },
-      lastModified: new Date().toISOString(),
-    };
-    setAppSettings(newSettings);
-    await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions, lastModified: newSettings.lastModified });
-    addNotification({ title: "Column settings saved", description: "Your changes have been saved." });
-  };
 
   const clearAllDialogDescription = useMemo(() => {
     let message = `This will permanently delete all asset records from the ${dataSource === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
@@ -1627,12 +1601,6 @@ export default function AssetList() {
                     <Label htmlFor="select-all-in-table-mobile" className="text-sm font-medium">Select All</Label>
                 </div>
             </div>
-             {isAdmin && currentCategory && (
-              <Button variant="outline" size="sm" onClick={() => setIsColumnSheetOpen(true)}>
-                <Columns className="mr-2 h-4 w-4" />
-                Edit Table
-              </Button>
-            )}
             {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
                     <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
@@ -1839,7 +1807,7 @@ export default function AssetList() {
                                     value={asset.verifiedStatus || 'Unverified'}
                                     onValueChange={async (status) => {
                                       if (lockAssetList && isAdmin && dataSource === 'cloud') {
-                                          addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
+                                          addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
                                           return;
                                       }
                                       const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
@@ -1905,14 +1873,6 @@ export default function AssetList() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-        {currentCategory && currentSheetDefinition && (
-          <ColumnCustomizationSheet 
-            isOpen={isColumnSheetOpen}
-            onOpenChange={setIsColumnSheetOpen}
-            sheetDefinition={currentSheetDefinition}
-            onSave={handleSaveColumnSettings}
-          />
-        )}
     </div>
   );
 }
