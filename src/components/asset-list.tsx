@@ -1286,47 +1286,9 @@ export default function AssetList() {
             <h2 className="text-2xl font-bold tracking-tight flex-1">
                 {isFiltered ? 'Filter Results' : 'Asset Dashboard'}
             </h2>
-            <div className="flex items-center gap-2">
-              {(userProfile?.canAddAssets || isAdmin) && (
-                  <Button onClick={handleAddAsset} size="sm" >
-                      <PlusCircle className="mr-2 h-4 w-4" /> Add Asset
-                  </Button>
-              )}
-               <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline" size="sm">
-                            <Database className="mr-2 h-4 w-4" /> More Actions
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                         <DropdownMenuLabel>Data Actions</DropdownMenuLabel>
-                         <DropdownMenuSeparator/>
-                        <DropdownMenuItem onClick={handleImportClick} disabled={isImporting || !isAdmin}>
-                            <Library className="mr-2 h-4 w-4" /> Import Full FAR
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => setIsImportScanOpen(true)} disabled={isImporting || !isAdmin}>
-                            <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => handleExportClick()} disabled={activeAssets.length === 0}>
-                            <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
-                        </DropdownMenuItem>
-                        <DropdownMenuItem onClick={handleTravelReport}>
-                            <PlaneTakeoff className="mr-2 h-4 w-4" /> Travel Report
-                        </DropdownMenuItem>
-                        <DropdownMenuSeparator />
-                        <DropdownMenuItem
-                            className="text-destructive focus:bg-destructive/20"
-                            onClick={handleClearAllClick}
-                            disabled={activeAssets.length === 0 || !isAdmin}
-                        >
-                            <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
-                        </DropdownMenuItem>
-                    </DropdownMenuContent>
-                </DropdownMenu>
-            </div>
         </div>
         <Card>
-             <CardHeader className="flex-row items-start justify-between">
+            <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div>
                     <CardTitle className="flex items-center gap-2">
                       <span>Verification Status</span>
@@ -1351,13 +1313,13 @@ export default function AssetList() {
                     </CardDescription>
                   </div>
                   
-                  <div className="flex items-center gap-4">
+                  <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:flex-row md:items-center">
                     {isAdmin && !isFiltered && (
                        <Select
                           value={globalStateFilter || 'All'}
                           onValueChange={(value) => setGlobalStateFilter(value)}
                       >
-                      <SelectTrigger className="w-full sm:w-[280px]">
+                      <SelectTrigger className="w-full md:w-[280px]">
                         <SelectValue placeholder="Select a location to filter..." />
                       </SelectTrigger>
                         <SelectContent>
@@ -1396,15 +1358,54 @@ export default function AssetList() {
                         </SelectContent>
                       </Select>
                     )}
-                    <div className="flex items-center space-x-2">
-                      <Label htmlFor="select-all-categories" className="text-sm font-medium">Select All</Label>
-                      <Checkbox
-                          id="select-all-categories"
-                          checked={areAllCategoriesSelected}
-                          onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)}
-                          aria-label="Select all categories"
-                          disabled={isGuest}
-                      />
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center space-x-2">
+                        <Label htmlFor="select-all-categories" className="text-sm font-medium whitespace-nowrap">Select All</Label>
+                        <Checkbox
+                            id="select-all-categories"
+                            checked={areAllCategoriesSelected}
+                            onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)}
+                            aria-label="Select all categories"
+                            disabled={isGuest}
+                        />
+                      </div>
+                      
+                      <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                              <Button variant="outline" size="sm">
+                                  <Database className="mr-2 h-4 w-4" /> Actions
+                              </Button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                              <DropdownMenuLabel>Data Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator/>
+                              {(userProfile?.canAddAssets || isAdmin) && (
+                                <DropdownMenuItem onClick={handleAddAsset}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                                </DropdownMenuItem>
+                              )}
+                              <DropdownMenuItem onClick={handleImportClick} disabled={isImporting || !isAdmin}>
+                                  <Library className="mr-2 h-4 w-4" /> Import Full FAR
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => setIsImportScanOpen(true)} disabled={isImporting || !isAdmin}>
+                                  <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleExportClick()} disabled={activeAssets.length === 0}>
+                                  <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={handleTravelReport}>
+                                  <PlaneTakeoff className="mr-2 h-4 w-4" /> Travel Report
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                  className="text-destructive focus:bg-destructive/20"
+                                  onClick={handleClearAllClick}
+                                  disabled={activeAssets.length === 0 || !isAdmin}
+                              >
+                                  <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
+                              </DropdownMenuItem>
+                          </DropdownMenuContent>
+                      </DropdownMenu>
                     </div>
                   </div>
               </CardHeader>
@@ -1718,6 +1719,8 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
 
     
 
