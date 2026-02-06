@@ -3,6 +3,7 @@
 
 import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,64 +11,24 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
-  DropdownMenuPortal,
 } from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from "@/components/ui/command";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
   Boxes,
   Settings,
   LogOut,
-  User,
   Search,
   Cloud,
   CloudOff,
   Filter,
   ArrowUpDown,
-  Check,
-  ChevronsUpDown,
   Loader2,
   CloudDownload,
   CloudUpload,
-  Database,
-  FileDown,
-  FileUp,
-  PlusCircle,
-  Trash2,
   Bell,
-  Sun,
-  Moon,
   CheckCheck,
   X,
-  Users,
   Inbox,
-  Library,
-  ScanSearch,
-  PlaneTakeoff,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -91,7 +52,6 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
-import { useTheme } from "next-themes";
 import { Separator } from "./ui/separator";
 import { InboxSheet } from "./inbox-sheet";
 
@@ -381,7 +341,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
         </div>
       </header>
-      <main className="flex-1 flex flex-col p-4 md:p-6 bg-muted/40">{children}</main>
+      <motion.main
+        className="flex-1 flex flex-col p-4 md:p-6 bg-muted/40"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: 'easeInOut' }}
+      >
+        {children}
+      </motion.main>
       <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
       <AssetFilterSheet
         isOpen={isFilterSheetOpen}

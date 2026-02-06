@@ -36,14 +36,13 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, FileDown, PlusCircle, Edit, Loader2, KeyRound, UserCog, Settings as SettingsIcon, SheetIcon, Library, Wrench, PlaneTakeoff, Info, Save, ScanSearch } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { ImportScannerDialog } from './single-sheet-import-dialog';
 import { saveLocalSettings } from '@/lib/idb';
-import { HEADER_ALIASES } from '@/lib/constants';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -52,7 +51,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { dataActions, appSettings, setAppSettings } = useAppState();
+  const { appSettings, setAppSettings } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -250,49 +249,25 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
             </SheetDescription>
           </SheetHeader>
           <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-y-hidden">
-            <TabsList className="grid w-full grid-cols-2">
+            <TabsList className="grid w-full grid-cols-3">
                 <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
-                <TabsTrigger value="account" disabled={isGuest}><UserCog className="mr-2 h-4 w-4" />Account</TabsTrigger>
+                <TabsTrigger value="users" disabled={isGuest || !isAdmin}><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
+                <TabsTrigger value="sheets" disabled={isGuest || !isAdmin}><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
             </TabsList>
             <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
-                  <h3 className="text-lg font-medium mb-4">Data Management</h3>
-                   <div className="rounded-lg border p-3 space-y-2">
-                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onImport} disabled={dataActions?.isImporting || isGuest}>
-                         <Library className="mr-2 h-4 w-4" /> Import Full FAR
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => setIsImportScanOpen(true)} disabled={dataActions?.isImporting || isGuest}>
-                        <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onExport} disabled={!dataActions?.hasAssets || isGuest}>
-                        <FileDown className="mr-2 h-4 w-4" /> Export Full FAR
-                      </Button>
-                      <Separator className="my-2"/>
-                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onTravelReport} disabled={isGuest}>
-                         <PlaneTakeoff className="mr-2 h-4 w-4" /> Travel Report
-                      </Button>
-                      <Separator className="my-2"/>
-                      <Button variant="outline" className="w-full justify-start" onClick={dataActions?.onAddAsset} disabled={isGuest}>
-                        <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
-                      </Button>
-                      <Button variant="destructive" className="w-full justify-start" onClick={dataActions?.onClearAll} disabled={!dataActions?.hasAssets || isGuest}>
-                        <Trash2 className="mr-2 h-4 w-4" /> Clear All Local Assets
-                      </Button>
-                    </div>
-                </div>
-              
-                <div>
                     <h3 className="text-lg font-medium mb-4">Appearance</h3>
-                    <div className="rounded-lg border p-3 flex justify-around">
-                        <Button variant="outline" size="icon" onClick={() => setTheme('light')}><Sun /></Button>
-                        <Button variant="outline" size="icon" onClick={() => setTheme('dark')}><Moon /></Button>
-                        <Button variant="outline" size="icon" onClick={() => setTheme('system')}><Database /></Button>
+                    <div className="rounded-lg border p-4 space-y-3">
+                        <Label className="flex items-center gap-2 text-sm font-medium"><Palette className="h-4 w-4" /> Theme</Label>
+                        <div className="flex justify-around">
+                            <Button variant="outline" size="sm" onClick={() => setTheme('light')}><Sun className="mr-2"/>Light</Button>
+                            <Button variant="outline" size="sm" onClick={() => setTheme('dark')}><Moon className="mr-2"/>Dark</Button>
+                            <Button variant="outline" size="sm" onClick={() => setTheme('system')}><Database className="mr-2"/>System</Button>
+                        </div>
                     </div>
                 </div>
 
                 {isAdmin && (
-                <>
-                  <Separator/>
                   <div>
                     <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
                     <div className="rounded-lg border p-3 space-y-4 divide-y">
@@ -305,8 +280,19 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                       </div>
                     </div>
                   </div>
-
-                  <div>
+                )}
+            </TabsContent>
+            <TabsContent value="users" className="flex-1 overflow-y-auto pt-4 pr-2">
+                <div className="p-1">
+                    <UserManagement 
+                    users={draftSettings.authorizedUsers}
+                    onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)}
+                    adminProfile={userProfile}
+                    />
+                </div>
+            </TabsContent>
+            <TabsContent value="sheets" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
+                 <div>
                     <h3 className="text-lg font-medium mb-4">Sheet Definitions</h3>
                     <div className="flex items-center justify-between mb-4">
                         <p className="text-sm font-medium">Toggle all sheets</p>
@@ -336,24 +322,12 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                         <Button variant="outline" className="w-full" onClick={handleAddSheet}><PlusCircle className="mr-2" /> Add Manually</Button>
                         <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import from File</Button>
                     </div>
-                  </div>
-                </>
-              )}
-
-            </TabsContent>
-            <TabsContent value="account" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
-                {isAdmin && (
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">User Management</h3>
-                    <div className="p-1">
-                      <UserManagement 
-                        users={draftSettings.authorizedUsers}
-                        onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)}
-                        adminProfile={userProfile}
-                      />
+                    <div className="mt-4">
+                        <Button variant="outline" className="w-full justify-start" onClick={() => setIsImportScanOpen(true)}>
+                            <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
+                        </Button>
                     </div>
                   </div>
-                )}
             </TabsContent>
           </Tabs>
 
