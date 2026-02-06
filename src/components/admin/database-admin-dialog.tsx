@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -155,20 +154,30 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
             <Card>
                 <CardHeader>
-                    <CardTitle>Synchronization</CardTitle>
-                    <CardDescription>Manually manage data consistency between cloud databases.</CardDescription>
+                    <CardTitle>Initial Data Deployment</CardTitle>
+                    <CardDescription>This will overwrite all data in the Realtime Database with the data stored locally on your device. Use this to populate the cloud for the first time.</CardDescription>
                 </CardHeader>
-                <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                     <Button variant="outline" onClick={handleSync} disabled={isSyncing}>
-                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitBranch className="mr-2 h-4 w-4" />}
-                        Sync Cloud Databases
-                    </Button>
-                     <Button variant="outline" onClick={handleCopyToRTDB} disabled={isCopying}>
-                        {isCopying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Copy className="mr-2 h-4 w-4" />}
-                        Copy Local to RTDB
+                <CardContent>
+                    <Button variant="outline" className="w-full justify-start" onClick={handleCopyToRTDB} disabled={isCopying}>
+                        {isCopying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlaneTakeoff className="mr-2 h-4 w-4" />}
+                        Deploy Local Database to RTDB
                     </Button>
                 </CardContent>
             </Card>
+
+            <Card>
+                <CardHeader>
+                    <CardTitle>Cloud-to-Cloud Sync</CardTitle>
+                    <CardDescription>Ensure data is consistent between Firestore and Realtime DB.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                     <Button variant="outline" className="w-full justify-start" onClick={handleSync} disabled={isSyncing}>
+                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitBranch className="mr-2 h-4 w-4" />}
+                        Sync Firestore and RTDB
+                    </Button>
+                </CardContent>
+            </Card>
+
 
             <Card>
                 <CardHeader>
