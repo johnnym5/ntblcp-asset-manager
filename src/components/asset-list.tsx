@@ -88,7 +88,6 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
 import { ImportScannerDialog } from "./single-sheet-import-dialog";
 import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-dialog";
-import { exportFullBackupToJson } from "@/lib/json-export";
 
 
 /**
@@ -985,22 +984,6 @@ export default function AssetList() {
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
-  const handleExportToJson = useCallback(() => {
-    try {
-        exportFullBackupToJson(activeAssets, appSettings);
-        addNotification({
-            title: 'Exporting Full Backup',
-            description: `Your data is being downloaded as ntblcp-full-backup.json.`,
-        });
-    } catch (e) {
-        addNotification({
-            title: 'Export Failed',
-            description: e instanceof Error ? e.message : 'An unknown error occurred.',
-            variant: 'destructive',
-        });
-    }
-  }, [activeAssets, appSettings]);
-
   const handleExport = useCallback(() => {
     try {
         const timestamp = new Date().toISOString().replace(/:/g, '-');
@@ -1025,7 +1008,6 @@ export default function AssetList() {
         onScanAndImport: () => setIsImportScanOpen(true),
         onClearAll: handleClearAllClick,
         onTravelReport: handleTravelReport,
-        onExportToJson: handleExportToJson,
         onExport: handleExport,
         isImporting,
     });
@@ -1036,7 +1018,6 @@ export default function AssetList() {
     handleImportClick, 
     handleClearAllClick, 
     handleTravelReport,
-    handleExportToJson,
     handleExport,
     isImporting
   ]);
@@ -1172,7 +1153,7 @@ export default function AssetList() {
     if (data.hide && isAdmin) {
         const newEnabledSheets = appSettings.enabledSheets.filter(sheet => !selectedCategories.includes(sheet));
         setAppSettings(prev => ({ ...prev, enabledSheets: newEnabledSheets }));
-        await updateSettings({ enabledSheets: newEnabledSheets });
+        await updateSettings({ enabledSheets: newEnabledSheets, lastModified: new Date().toISOString() });
         addNotification({ title: 'Sheets Hidden', description: `${selectedCategories.length} categories have been hidden from view.`});
         setSelectedCategories([]);
     }
@@ -1268,10 +1249,11 @@ export default function AssetList() {
       sheetDefinitions: {
         ...appSettings.sheetDefinitions,
         [currentCategory]: newDefinition,
-      }
+      },
+      lastModified: new Date().toISOString(),
     };
     setAppSettings(newSettings);
-    await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
+    await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions, lastModified: newSettings.lastModified });
     addNotification({ title: "Column settings saved", description: "Your changes have been saved." });
   };
 

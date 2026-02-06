@@ -20,7 +20,6 @@ export interface DataActions {
   onImport?: () => void;
   onScanAndImport?: () => void;
   onExport?: () => void;
-  onExportToJson?: () => void;
   onAddAsset?: () => void;
   onClearAll?: () => void;
   onTravelReport?: () => void;
@@ -180,6 +179,23 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
 
   useEffect(() => {
+    const fetchAndApplySettings = async () => {
+      if (!isOnline || !settingsLoaded) return;
+
+      try {
+        const remoteSettings = await getSettings();
+        const localSettings = await getLocalSettings();
+        
+        if (remoteSettings && remoteSettings.lastModified && (!localSettings || !localSettings.lastModified || new Date(remoteSettings.lastModified) > new Date(localSettings.lastModified))) {
+          console.log("Polling: Found newer settings in Firestore, updating local state.");
+          setAppSettings(remoteSettings);
+          await saveLocalSettings(remoteSettings);
+        }
+      } catch (error) {
+        console.warn("Could not fetch remote settings on interval. Using local version.", error);
+      }
+    };
+
     const initializeSettings = async () => {
       let localSettings = await getLocalSettings();
 
@@ -195,24 +211,15 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         await saveLocalSettings(localSettings);
       }
       setAppSettings(localSettings);
-      setSettingsLoaded(true);
-
-      if (isOnline) {
-        try {
-          const remoteSettings = await getSettings();
-          if (remoteSettings && remoteSettings.lastModified && (!localSettings.lastModified || new Date(remoteSettings.lastModified) > new Date(localSettings.lastModified))) {
-            console.log("Found newer settings in Firestore, updating local state.");
-            setAppSettings(remoteSettings);
-            await saveLocalSettings(remoteSettings);
-          }
-        } catch (error) {
-          console.warn("Could not fetch remote settings. Using local version.", error);
-        }
-      }
+      setSettingsLoaded(true); // Settings are loaded, now we can start polling
     };
-
+    
     initializeSettings();
-  }, [isOnline]);
+
+    const interval = setInterval(fetchAndApplySettings, 30000); // Poll every 30 seconds
+    return () => clearInterval(interval);
+
+  }, [isOnline, settingsLoaded]); // Rerun if online status changes or on initial load
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !settingsLoaded) return;

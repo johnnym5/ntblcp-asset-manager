@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -113,7 +114,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (!draftSettings) return;
     try {
       // Update DB first
-      await updateSettings({ authorizedUsers: newUsers });
+      await updateSettings({ authorizedUsers: newUsers, lastModified: new Date().toISOString() });
 
       // Update the main app state and local storage
       const newSettings: AppSettings = { ...appSettings, authorizedUsers: newUsers, lastModified: new Date().toISOString() };
@@ -212,10 +213,14 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
 
   const handleConfirmSave = async () => {
     if (!draftSettings) return;
+    
+    // Add timestamp to ensure propagation
+    const settingsToSave = { ...draftSettings, lastModified: new Date().toISOString() };
+
     try {
-      await updateSettings(draftSettings);
-      await saveLocalSettings(draftSettings);
-      setAppSettings(draftSettings); // Update global state
+      await updateSettings(settingsToSave);
+      await saveLocalSettings(settingsToSave);
+      setAppSettings(settingsToSave); // Update global state
       toast({ title: "Settings Saved", description: "Your changes have been applied to the database." });
     } catch (e) {
       toast({ title: "Save Failed", description: "Could not save settings to the database.", variant: "destructive" });
@@ -379,11 +384,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                              {dataActions.onExport && (
                                 <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport}>
                                     <Download className="mr-2 h-4 w-4" /> Export to Excel
-                                </Button>
-                            )}
-                             {dataActions.onExportToJson && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExportToJson}>
-                                    <Download className="mr-2 h-4 w-4" /> Export Full Backup (JSON)
                                 </Button>
                             )}
                             <Separator />

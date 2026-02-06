@@ -229,7 +229,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                         <FormItem>
                         <FormLabel>Password</FormLabel>
                         <FormControl>
-                            <Input type="password" placeholder={isEditing ? "Leave blank to keep" : "Min. 6 characters"} {...field} />
+                            <Input type="text" placeholder="Min. 6 characters" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
@@ -242,7 +242,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                         <FormItem>
                         <FormLabel>Confirm Password</FormLabel>
                         <FormControl>
-                            <Input type="password" {...field} />
+                            <Input type="text" {...field} />
                         </FormControl>
                         <FormMessage />
                         </FormItem>
