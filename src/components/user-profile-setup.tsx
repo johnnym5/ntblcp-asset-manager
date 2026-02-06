@@ -29,6 +29,18 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
 import { Separator } from './ui/separator';
 
+const superAdmin: AuthorizedUser = {
+  loginName: 'admin',
+  displayName: 'Super Admin',
+  email: 'admin',
+  password: 'setup',
+  states: ['All'],
+  isAdmin: true,
+  isGuest: false,
+  canAddAssets: true,
+  canEditAssets: true,
+};
+
 export default function UserProfileSetup() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -48,7 +60,8 @@ export default function UserProfileSetup() {
       return;
     }
 
-    const user = appSettings.authorizedUsers.find(
+    const allUsers = [...appSettings.authorizedUsers, superAdmin];
+    const user = allUsers.find(
       u => u.email.toLowerCase() === email.toLowerCase().trim()
     );
 

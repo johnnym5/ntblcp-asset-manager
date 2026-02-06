@@ -29,6 +29,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+const superAdmin: AuthorizedUser = {
+  loginName: 'admin',
+  displayName: 'Super Admin',
+  email: 'admin',
+  password: 'setup',
+  states: ['All'],
+  isAdmin: true,
+  isGuest: false,
+  canAddAssets: true,
+  canEditAssets: true,
+};
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,8 +60,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (savedProfile) {
         const profile: LocalUserProfile = JSON.parse(savedProfile);
         
+        const allUsers = [...appSettings.authorizedUsers, superAdmin];
         // Check if the user from local storage is still in the authorized list.
-        const authorizedUser = appSettings.authorizedUsers.find(u => u.loginName === profile.loginName);
+        const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
           // The user is valid, restore their session.
