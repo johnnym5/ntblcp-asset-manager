@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -27,7 +28,7 @@ import {
 
 interface UserManagementProps {
   users: AuthorizedUser[];
-  onUsersChange: (users: AuthorizedUser[]) => void;
+  onUsersChange: (users: AuthorizedUser[]) => Promise<void>;
   adminProfile: { loginName: string } | null;
 }
 
@@ -75,8 +76,7 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
       newUsers.push(userToSave as AuthorizedUser);
     }
     
-    onUsersChange(newUsers);
-    toast({ title: 'Staged Changes', description: `${userToSave.displayName} has been updated. Save settings to apply.` });
+    await onUsersChange(newUsers);
     setIsEditFormOpen(false);
   };
 
@@ -84,9 +84,8 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
     if (!userToDelete) return;
 
     const newUsers = users.filter(u => u.loginName !== userToDelete.loginName);
-    onUsersChange(newUsers);
+    await onUsersChange(newUsers);
     
-    toast({ title: 'Staged Changes', description: `${userToDelete.displayName} will be removed. Save settings to apply.` });
     setUserToDelete(null);
   };
   
@@ -139,13 +138,13 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
           <AlertDialogHeader>
             <AlertDialogTitle>Are you sure?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will stage <strong>{userToDelete?.displayName}</strong> for permanent removal from the system. This action cannot be undone once settings are saved.
+              This will permanently remove <strong>{userToDelete?.displayName}</strong> from the system. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive hover:bg-destructive/90">
-              Yes, stage for removal
+              Yes, remove user
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -153,3 +152,5 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
     </div>
   );
 }
+
+    

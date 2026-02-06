@@ -37,7 +37,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
 import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
-import type { SheetDefinition, AppSettings } from '@/lib/types';
+import type { SheetDefinition, AppSettings, AuthorizedUser } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { saveLocalSettings } from '@/lib/idb';
@@ -77,7 +77,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   }, [isOpen, appSettings]);
 
   const hasChanges = useMemo(() => {
-    return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
+    if (!draftSettings) return false;
+    // We don't consider user list changes here anymore, as they are saved directly.
+    const settingsA = { ...appSettings, authorizedUsers: [] };
+    const settingsB = { ...draftSettings, authorizedUsers: [] };
+    return JSON.stringify(settingsA) !== JSON.stringify(settingsB);
   }, [appSettings, draftSettings]);
   
   const calculatedChanges = useMemo(() => {
@@ -92,15 +96,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (draftSettings.lockAssetList !== appSettings.lockAssetList) {
         changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
     }
-    if (JSON.stringify(draftSettings.authorizedUsers) !== JSON.stringify(appSettings.authorizedUsers)) {
-        const originalUsers = new Set(appSettings.authorizedUsers.map(u => u.loginName));
-        const newUsers = new Set(draftSettings.authorizedUsers.map(u => u.loginName));
-        const added = draftSettings.authorizedUsers.filter(u => !originalUsers.has(u.loginName));
-        const removed = appSettings.authorizedUsers.filter(u => !newUsers.has(u.loginName));
-        if(added.length > 0) changes.push(`${added.length} user(s) will be added.`);
-        if(removed.length > 0) changes.push(`${removed.length} user(s) will be removed.`);
-        if (added.length === 0 && removed.length === 0) changes.push('User details will be updated.');
-    }
+    // No longer show user changes here as they are saved instantly.
     if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
       changes.push(`Sheet definitions (headers/columns) will be updated.`);
     }
@@ -112,6 +108,27 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (!draftSettings) return;
     setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
   };
+
+  const handleUsersChange = async (newUsers: AuthorizedUser[]) => {
+    if (!draftSettings) return;
+    try {
+      // Update DB first
+      await updateSettings({ authorizedUsers: newUsers });
+
+      // Update the main app state and local storage
+      const newSettings: AppSettings = { ...appSettings, authorizedUsers: newUsers, lastModified: new Date().toISOString() };
+      await saveLocalSettings(newSettings);
+      setAppSettings(newSettings);
+      
+      // Update draft settings to keep them in sync for other potential changes in the sheet.
+      setDraftSettings(prev => prev ? { ...prev, authorizedUsers: newUsers } : null);
+      
+      toast({ title: "User list updated", description: "The user list has been saved to the database." });
+    } catch (e) {
+      toast({ title: "Save Failed", description: "Could not save user list to the database.", variant: "destructive" });
+    }
+  };
+
 
   const handleToggleSheet = (sheetName: string, checked: boolean) => {
     if (!draftSettings) return;
@@ -294,7 +311,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                 <div className="p-1">
                     <UserManagement 
                     users={draftSettings.authorizedUsers}
-                    onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)}
+                    onUsersChange={handleUsersChange}
                     adminProfile={userProfile}
                     />
                 </div>
