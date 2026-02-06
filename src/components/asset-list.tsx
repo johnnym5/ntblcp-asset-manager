@@ -1365,7 +1365,7 @@ export default function AssetList() {
                     </CardDescription>
                   </div>
                   
-                  <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:flex-row md:items-center">
+                  <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:items-end">
                     {isAdmin && !isFiltered && (
                        <Select
                           value={globalStateFilter || 'All'}
@@ -1421,9 +1421,6 @@ export default function AssetList() {
                             disabled={isGuest}
                         />
                       </div>
-                       <Button variant="outline" size="sm" onClick={() => handleExportClick()} disabled={activeAssets.length === 0}>
-                            <FileDown className="mr-2 h-4 w-4" /> Export Displayed
-                        </Button>
                     </div>
                   </div>
               </CardHeader>
