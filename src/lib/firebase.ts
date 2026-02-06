@@ -4,7 +4,7 @@ import { getFirestore, type Firestore } from "firebase/firestore";
 import { getDatabase, type Database } from "firebase/database";
 
 // Your web app's Firebase configuration
-const firebaseConfig = {
+export const firebaseConfig = {
   apiKey: "AIzaSyDhBbeiAZGWzCHQXbbTcNXdsIT_6Gz3qJU",
   authDomain: "ntblcp-asset-manager.firebaseapp.com",
   projectId: "ntblcp-asset-manager",

@@ -8,6 +8,7 @@ import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
 import { getSettings, updateSettings } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
+import { firebaseConfig } from '@/lib/firebase';
 
 
 export interface SortConfig {
@@ -90,6 +91,10 @@ interface AppStateContextType {
   // Failover state
   isInFailoverMode: boolean;
   triggerFailover: () => void;
+
+  // Project Switch
+  showProjectSwitchDialog: boolean;
+  setShowProjectSwitchDialog: Dispatch<SetStateAction<boolean>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -140,6 +145,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [dataActions, setDataActions] = useState<DataActions>({});
 
   const [isInFailoverMode, setIsInFailoverMode] = useState(false);
+  const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
 
   const triggerFailover = () => {
     setIsInFailoverMode(true);
@@ -209,6 +215,21 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   }, [isOnline]);
 
   useEffect(() => {
+    if (typeof window !== 'undefined' && !settingsLoaded) return;
+
+    const currentProjectId = firebaseConfig.projectId;
+    const savedProjectId = localStorage.getItem('ntblcp-firebase-project-id');
+    
+    if (currentProjectId && savedProjectId && currentProjectId !== savedProjectId) {
+      setShowProjectSwitchDialog(true);
+    }
+    
+    if (currentProjectId) {
+      localStorage.setItem('ntblcp-firebase-project-id', currentProjectId);
+    }
+  }, [settingsLoaded]);
+
+  useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
     }
@@ -245,6 +266,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     assetToView, setAssetToView,
     dataActions, setDataActions,
     isInFailoverMode, triggerFailover,
+    showProjectSwitchDialog, setShowProjectSwitchDialog,
   };
 
   return (

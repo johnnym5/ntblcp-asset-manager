@@ -215,6 +215,8 @@ export default function AssetList() {
     searchTerm,
     assetToView, setAssetToView,
     setDataActions,
+    showProjectSwitchDialog,
+    setShowProjectSwitchDialog,
   } = useAppState();
 
   const { enabledSheets, lockAssetList, sheetDefinitions } = appSettings;
@@ -1290,6 +1292,17 @@ export default function AssetList() {
     }
   };
 
+  const handleConfirmProjectSwitch = async () => {
+    setShowProjectSwitchDialog(false);
+    addNotification({ title: 'Switching Projects...', description: 'Clearing all local data...' });
+    await clearLocalAssets();
+    await clearLockedOfflineAssets();
+    setAssets([]);
+    setOfflineAssets([]);
+    addNotification({ title: 'Local Data Cleared', description: 'Attempting to sync with new project.' });
+    handleDownloadScan();
+  };
+
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -1360,6 +1373,24 @@ export default function AssetList() {
 
     return (
       <div className="flex flex-col h-full gap-4">
+        <AlertDialog open={showProjectSwitchDialog} onOpenChange={setShowProjectSwitchDialog}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>New Firebase Project Detected</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        You've connected the app to a new Firebase project. To avoid data conflicts, it's highly recommended to clear your local data and sync fresh from the new project.
+                        <br/><br/>
+                        This will NOT affect any data in your old cloud project.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Keep Local Data</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmProjectSwitch}>
+                        Clear and Sync
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
         <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
         <Card>
             <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -1578,6 +1609,24 @@ export default function AssetList() {
 
   return (
     <div className="flex flex-col h-full gap-4">
+        <AlertDialog open={showProjectSwitchDialog} onOpenChange={setShowProjectSwitchDialog}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>New Firebase Project Detected</AlertDialogTitle>
+                    <AlertDialogDescription>
+                        You've connected the app to a new Firebase project. To avoid data conflicts, it's highly recommended to clear your local data and sync fresh from the new project.
+                        <br/><br/>
+                        This will NOT affect any data in your old cloud project.
+                    </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Keep Local Data</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleConfirmProjectSwitch}>
+                        Clear and Sync
+                    </AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
         <div className="flex flex-wrap items-center gap-2">
             <Button variant="outline" size="icon" onClick={() => { setView(backButtonTarget); setCurrentCategory(null); setSelectedAssetIds([]); }}>
                 <ArrowLeft className="h-4 w-4" />
