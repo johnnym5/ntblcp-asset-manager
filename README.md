@@ -90,6 +90,7 @@ Firebase will build your Next.js application and deploy it. After the command co
     NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=YOUR_MESSAGING_SENDER_ID
     NEXT_PUBLIC_FIREBASE_APP_ID=YOUR_APP_ID
     ```
+    **Note:** If you do not provide these credentials, the application will still run in a full offline mode, but any features that require a cloud connection (like downloading or uploading data) will fail with a configuration error.
 
 3.  **Run the development server**:
     ```bash

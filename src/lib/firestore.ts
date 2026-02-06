@@ -1,13 +1,22 @@
 'use client';
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, isConfigValid } from '@/lib/firebase';
 import type { Asset, AppSettings } from '@/lib/types';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError } from '@/lib/errors';
 
+// Helper function to ensure Firebase is properly configured before use.
+const checkConfig = () => {
+    if (!isConfigValid || !db) {
+        throw new Error("Firebase is not configured. For local development, please create and populate a .env file as described in the README.");
+    }
+    return db;
+}
+
 // --- App Settings ---
 export async function getSettings(): Promise<AppSettings | null> {
+    const db = checkConfig();
     const settingsRef = doc(db, 'config', 'settings');
     try {
       const docSnap = await getDoc(settingsRef);
@@ -28,6 +37,7 @@ export async function getSettings(): Promise<AppSettings | null> {
 }
 
 export function updateSettings(settings: Partial<AppSettings>) {
+  const db = checkConfig();
   const settingsRef = doc(db, 'config', 'settings');
   setDoc(settingsRef, settings, { merge: true }).catch(async (serverError) => {
     const permissionError = new FirestorePermissionError({
@@ -48,6 +58,7 @@ export function updateSettings(settings: Partial<AppSettings>) {
  * @returns A promise that resolves with an array of assets.
  */
 export async function getAssets(): Promise<Asset[]> {
+  const db = checkConfig();
   const assetsCollectionRef = collection(db, 'assets');
   const q = query(assetsCollectionRef);
   try {
@@ -75,6 +86,7 @@ export async function getAssets(): Promise<Asset[]> {
  * @param asset The asset object to save.
  */
 export function updateAsset(asset: Asset) {
+  const db = checkConfig();
   const assetRef = doc(db, 'assets', asset.id);
   setDoc(assetRef, { ...asset, lastModified: new Date().toISOString() }, { merge: true })
     .catch(async (serverError) => {
@@ -92,6 +104,7 @@ export function updateAsset(asset: Asset) {
  * @param assetId The ID of the asset to delete.
  */
 export function deleteAsset(assetId: string) {
+  const db = checkConfig();
   const assetRef = doc(db, 'assets', assetId);
   deleteDoc(assetRef).catch(async (serverError) => {
     const permissionError = new FirestorePermissionError({
@@ -108,6 +121,7 @@ export function deleteAsset(assetId: string) {
  * @param assets The array of assets to write.
  */
 export function batchSetAssets(assets: Asset[]) {
+    const db = checkConfig();
     const assetsCollectionRef = collection(db, 'assets');
     const batchSize = 500;
     for (let i = 0; i < assets.length; i += batchSize) {
@@ -135,6 +149,7 @@ export function batchSetAssets(assets: Asset[]) {
  * @param assetIds The array of asset IDs to delete.
  */
 export function batchDeleteAssets(assetIds: string[]) {
+    const db = checkConfig();
     const batchSize = 500;
     for (let i = 0; i < assetIds.length; i += batchSize) {
         const batch = writeBatch(db);
