@@ -1,21 +1,8 @@
 rules_version = '2';
-
 service cloud.firestore {
   match /databases/{database}/documents {
-    // This collection is not used in this version, but we'll keep a restrictive rule.
-    match /users/{userId} {
-      allow read, write: if false;
-    }
-
-    // Match the asset documents
-    match /assets/{assetId} {
-      // Everyone (even unauthenticated users) can read
-      allow read: if true;
-
-      // In this version, the app relies on local logic, so we allow writes
-      // but expect the app to control who can perform them.
-      // For a real-world scenario with auth, this would be more restrictive.
-      allow write: if true;
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }

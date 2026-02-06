@@ -76,13 +76,14 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
       states: [],
       isAdmin: false,
       isGuest: false,
-      password: '',
+      password: '0000',
       canAddAssets: false,
       canEditAssets: false,
     },
   });
   
   const isEditing = !!user;
+  const isAdminValue = form.watch('isAdmin');
 
   useEffect(() => {
     if (isOpen) {
@@ -111,6 +112,17 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
       }
     }
   }, [isOpen, user, form]);
+
+  useEffect(() => {
+    if (isAdminValue) {
+      form.setValue('states', ['All']);
+    } else {
+      // If states is ['All'] (because isAdmin was just toggled off), clear it.
+      if (JSON.stringify(form.getValues('states')) === JSON.stringify(['All'])) {
+        form.setValue('states', []);
+      }
+    }
+  }, [isAdminValue, form]);
 
   const handleSubmit = async (data: UserFormValues) => {
     setIsSaving(true);
@@ -186,6 +198,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                         <PopoverTrigger asChild>
                         <FormControl>
                             <Button
+                            disabled={isAdminValue}
                             variant="outline"
                             role="combobox"
                             className={cn(
@@ -193,14 +206,13 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                                 !field.value && "text-muted-foreground"
                             )}
                             >
-                            {field.value && field.value.length > 0 ? `${field.value.length} selected` : "Select states"}
+                            {field.value?.includes('All') ? 'All States (Admin)' : (field.value && field.value.length > 0 ? `${field.value.length} selected` : "Select states")}
                             <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
                             </Button>
                         </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
                         <Command>
-                            <CommandInput placeholder="Search states..." />
                             <CommandList>
                                 <CommandEmpty>No state found.</CommandEmpty>
                                 <CommandGroup>
