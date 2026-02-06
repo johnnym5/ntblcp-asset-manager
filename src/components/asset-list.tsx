@@ -86,6 +86,7 @@ import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { TravelReportDialog } from "./travel-report-dialog";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
+import { ImportScannerDialog } from "./single-sheet-import-dialog";
 
 
 /**
@@ -204,6 +205,7 @@ export default function AssetList() {
     manualDownloadTrigger,
     manualUploadTrigger,
     isSyncing, setIsSyncing,
+    dataActions,
     setDataActions,
     searchTerm,
     assetToView, setAssetToView
