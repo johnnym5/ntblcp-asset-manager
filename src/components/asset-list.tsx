@@ -100,7 +100,7 @@ import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-di
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
     const keys = Object.keys(b) as (keyof Asset)[];
     for (const key of keys) {
-        if (key === 'id' || key === 'syncStatus' || key === 'lastModified' || key === 'lastModifiedBy' || key === 'lastModifiedByState') {
+        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'approvalStatus', 'pendingChanges', 'changeSubmittedBy'].includes(key)) {
             continue;
         }
         const valA = String(a[key] ?? '').trim();
@@ -739,8 +739,9 @@ export default function AssetList() {
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
+    const isNewAsset = !assets.some(a => a.id === assetToSave.id);
+
     if (dataSource === 'cloud' && lockAssetList && isAdmin) {
-      const isNewAsset = !assets.some(a => a.id === assetToSave.id);
       if (isNewAsset) {
           addNotification({ title: "Add Disabled", description: "Cannot add new assets to the locked main list.", variant: "destructive" });
       } else {
@@ -752,14 +753,47 @@ export default function AssetList() {
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
 
-    if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
-      const finalAsset: Asset = sanitizeForFirestore({
-        ...assetToSave,
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: userProfile?.displayName,
-        lastModifiedByState: userProfile?.state,
-        syncStatus: dataSource === 'cloud' ? 'local' : undefined,
+    const changes: Partial<Asset> = {};
+    if (originalAsset) {
+      (Object.keys(assetToSave) as Array<keyof Asset>).forEach(key => {
+        if (haveAssetDetailsChanged({ [key]: originalAsset[key] }, { [key]: assetToSave[key] })) {
+          (changes as any)[key] = assetToSave[key];
+        }
       });
+    }
+
+    if (!originalAsset || Object.keys(changes).length > 0) {
+        let finalAsset: Asset = assetToSave;
+
+        if (isAdmin || isNewAsset) {
+            finalAsset = sanitizeForFirestore({
+                ...assetToSave,
+                lastModified: new Date().toISOString(),
+                lastModifiedBy: userProfile?.displayName,
+                lastModifiedByState: userProfile?.state,
+                syncStatus: dataSource === 'cloud' ? 'local' : undefined,
+                approvalStatus: undefined,
+                pendingChanges: undefined,
+                changeSubmittedBy: undefined,
+            });
+        } else {
+            // Non-admin user making a change
+            finalAsset = sanitizeForFirestore({
+                ...originalAsset!,
+                approvalStatus: 'pending',
+                pendingChanges: changes,
+                changeSubmittedBy: {
+                    displayName: userProfile?.displayName || 'Unknown',
+                    loginName: userProfile?.loginName || 'unknown',
+                    state: userProfile?.state || 'Unknown',
+                },
+                lastModified: new Date().toISOString(),
+                lastModifiedBy: userProfile?.displayName,
+                lastModifiedByState: userProfile?.state,
+                syncStatus: 'local',
+            });
+            addNotification({ title: 'Submitted for Approval', description: 'Your changes have been sent to an administrator for review.' });
+        }
       
       if (dataSource === 'cloud') {
         const currentAssets = await getLocalAssetsFromDb();
@@ -771,7 +805,9 @@ export default function AssetList() {
         }
         await saveAssets(currentAssets);
         setAssets(currentAssets);
-        addNotification({ title: 'Saved Locally', description: 'Changes will be synced with the cloud.' });
+        if (isAdmin || isNewAsset) {
+            addNotification({ title: 'Saved Locally', description: 'Changes will be synced with the cloud.' });
+        }
       } else {
         const currentOfflineAssets = await getLockedOfflineAssets();
         const existingIndex = currentOfflineAssets.findIndex(a => a.id === finalAsset.id);
@@ -1513,9 +1549,21 @@ export default function AssetList() {
             <Button variant="outline" size="icon" onClick={() => { setView(backButtonTarget); setCurrentCategory(null); setSelectedAssetIds([]); }}>
                 <ArrowLeft className="h-4 w-4" />
             </Button>
-            <h2 className="text-2xl font-bold tracking-tight flex-1">
-                {currentCategory}
-            </h2>
+            <div className="flex flex-1 items-center gap-4">
+                <h2 className="text-2xl font-bold tracking-tight">
+                    {currentCategory}
+                </h2>
+                <div className="md:hidden flex items-center space-x-2">
+                    <Checkbox
+                        id="select-all-in-table-mobile"
+                        checked={areAllCategoryResultsSelected}
+                        onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
+                        aria-label="Select all in this category"
+                        disabled={isGuest}
+                    />
+                    <Label htmlFor="select-all-in-table-mobile" className="text-sm font-medium">Select All</Label>
+                </div>
+            </div>
              {isAdmin && currentCategory && (
               <Button variant="outline" size="sm" onClick={() => setIsColumnSheetOpen(true)}>
                 <Columns className="mr-2 h-4 w-4" />
