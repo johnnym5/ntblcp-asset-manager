@@ -916,6 +916,36 @@ export default function AssetList() {
     }
   }, [activeAssets, sheetDefinitions]);
 
+  const handleExportSelection = useCallback(() => {
+    let assetsToExport: Asset[] = [];
+
+    if (view === 'dashboard') {
+        assetsToExport = selectedCategories.flatMap(cat => assetsByCategory[cat] || []);
+    } else if (view === 'table') {
+        assetsToExport = activeAssets.filter(a => selectedAssetIds.includes(a.id));
+    }
+
+    if (assetsToExport.length === 0) {
+      addNotification({ title: 'Nothing to Export', description: 'No items selected for export.', variant: 'destructive' });
+      return;
+    }
+
+    try {
+      const timestamp = new Date().toISOString().replace(/:/g, '-');
+      exportToExcel(assetsToExport, sheetDefinitions, `asset-selection-export-${timestamp}.xlsx`);
+      addNotification({
+        title: 'Exporting Selection',
+        description: `Your selection of ${assetsToExport.length} assets is being downloaded.`,
+      });
+    } catch (e) {
+      addNotification({
+        title: 'Export Failed',
+        description: e instanceof Error ? e.message : 'An unknown error occurred.',
+        variant: 'destructive',
+      });
+    }
+  }, [view, selectedCategories, assetsByCategory, selectedAssetIds, activeAssets, sheetDefinitions]);
+
   useEffect(() => {
     setDataActions({
         onAddAsset: handleAddAsset,
@@ -1371,10 +1401,6 @@ export default function AssetList() {
                       </Select>
                     )}
                     <div className="flex items-center justify-end gap-4 w-full">
-                      <Button variant="outline" size="sm" onClick={handleExport}>
-                          <Download className="mr-2 h-4 w-4" />
-                          Export to Excel
-                      </Button>
                       <div className="flex items-center space-x-2">
                         <Label htmlFor="select-all-categories" className="text-sm font-medium whitespace-nowrap">Select All</Label>
                         <Checkbox
@@ -1414,6 +1440,9 @@ export default function AssetList() {
                     </Button>
                     <Button variant="ghost" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
                         <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={handleExportSelection}>
+                        <Download className="mr-2 h-4 w-4" /> Export
                     </Button>
                     <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
                         {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
@@ -1581,6 +1610,9 @@ export default function AssetList() {
                             <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                         </Button>
                     )}
+                    <Button variant="outline" size="sm" onClick={handleExportSelection}>
+                        <Download className="mr-2 h-4 w-4" /> Export
+                    </Button>
                     <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting || isGuest || !isAdmin}>
                         {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                         Delete
