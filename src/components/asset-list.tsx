@@ -228,6 +228,8 @@ export default function AssetList() {
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
   
+  const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
+
   const specialLocations = useMemo(() => {
     if (!appSettings.locations) return SPECIAL_LOCATIONS.sort((a, b) => a.localeCompare(b));
     const defaultSpecial = new Set(SPECIAL_LOCATIONS);
@@ -1935,3 +1937,4 @@ export default function AssetList() {
     </div>
   );
 }
+
