@@ -172,14 +172,30 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     try {
       const templates = await parseExcelForTemplate(file);
       let currentDefs = { ...draftSettings.sheetDefinitions };
+      let sanitizedCount = 0;
       
       templates.forEach(template => {
-        currentDefs[template.name] = template;
+        const sanitizedName = template.name.replace(/[.$#\[\]/]/g, '_');
+        if (sanitizedName !== template.name) {
+            sanitizedCount++;
+        }
+        // If an existing unsanitized sheet definition is being overwritten, remove it.
+        if (sanitizedName !== template.name && currentDefs[template.name]) {
+            delete currentDefs[template.name];
+        }
+        template.name = sanitizedName;
+        currentDefs[sanitizedName] = template;
       });
       
       handleSettingChange('sheetDefinitions', currentDefs);
 
       toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added/updated in your draft.` });
+      if (sanitizedCount > 0) {
+        toast({
+            title: "Sheet Names Sanitized",
+            description: `${sanitizedCount} sheet name(s) were modified to remove invalid characters.`,
+        })
+      }
     } catch (error) {
       if (error instanceof Error && error.message.toLowerCase().includes('bad compressed size')) {
         toast({ title: 'Import Failed', description: "The selected file appears to be corrupt or is not a valid Excel (.xlsx) file.", variant: 'destructive' });

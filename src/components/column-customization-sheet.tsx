@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { HEADER_ALIASES } from '@/lib/constants';
+import { useToast } from '@/hooks/use-toast';
 
 interface ColumnCustomizationSheetProps {
   isOpen: boolean;
@@ -45,6 +46,7 @@ export function ColumnCustomizationSheet({
   const [editedName, setEditedName] = useState('');
   const [editedFields, setEditedFields] = useState<DisplayField[]>([]);
   const [fieldToAdd, setFieldToAdd] = useState('');
+  const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && sheetDefinition) {
@@ -102,9 +104,17 @@ export function ColumnCustomizationSheet({
   };
   
   const handleSaveChanges = (applyToAll: boolean) => {
+    const sanitizedName = editedName.replace(/[.$#\[\]/]/g, '_');
+    if (sanitizedName !== editedName) {
+      toast({
+        title: "Sheet Name Sanitized",
+        description: `The sheet name was changed to "${sanitizedName}" to remove invalid characters.`,
+      });
+    }
+
     const newDefinition: SheetDefinition = {
       ...sheetDefinition,
-      name: editedName,
+      name: sanitizedName,
       headers: editedFields.map(f => f.label),
       displayFields: editedFields,
     };
