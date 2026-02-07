@@ -228,8 +228,6 @@ export default function AssetList() {
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
   
-  const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
-
   const specialLocations = useMemo(() => {
     if (!appSettings.locations) return SPECIAL_LOCATIONS.sort((a, b) => a.localeCompare(b));
     const defaultSpecial = new Set(SPECIAL_LOCATIONS);
@@ -244,6 +242,14 @@ export default function AssetList() {
 
     return Array.from(defaultSpecial).sort((a,b) => a.localeCompare(b));
   }, [appSettings.locations]);
+
+  const clearAllDialogDescription = useMemo(() => {
+    let message = `This will permanently delete all asset records from the ${dataSource === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
+    if (isAdmin && isOnline && dataSource === 'cloud') {
+      message += " As an admin who is online, this will ALSO delete all assets from the cloud database, which cannot be undone."
+    }
+    return message;
+  }, [isAdmin, isOnline, dataSource]);
 
   useEffect(() => {
     setCurrentPage(1);
@@ -1359,14 +1365,6 @@ export default function AssetList() {
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
-
-  const clearAllDialogDescription = useMemo(() => {
-    let message = `This will permanently delete all asset records from the ${dataSource === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
-    if (isAdmin && isOnline && dataSource === 'cloud') {
-      message += " As an admin who is online, this will ALSO delete all assets from the cloud database, which cannot be undone."
-    }
-    return message;
-  }, [isAdmin, isOnline, dataSource]);
 
   const renderDashboardCard = (category: string, categoryAssets: Asset[]) => {
       const total = categoryAssets.length;
