@@ -1012,7 +1012,7 @@ export default function AssetList() {
       }
     } else {
       addNotification({ title: 'Clearing Offline Assets...', description: 'Removing all locked offline assets.' });
-      await clearLockedOfflineAssets();
+      await saveLockedOfflineAssets([]);
       setOfflineAssets([]);
       addNotification({ title: 'Offline Data Cleared', description: 'The locked offline store is now empty.' });
     }
@@ -1332,11 +1332,11 @@ export default function AssetList() {
         newSheetDefinitions[originalName] = newDefinition;
     }
 
-    const newSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions };
+    const newSettings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString() };
     setAppSettings(newSettings);
     
     try {
-        await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
+        await updateSettings(newSettings);
         await saveLocalSettings(newSettings);
         toast({ title: 'Layout updated', description: `Column layout changes have been saved.` });
     } catch (e) {
@@ -1870,6 +1870,7 @@ export default function AssetList() {
                                 <Select
                                     value={asset.verifiedStatus || 'Unverified'}
                                     onValueChange={async (status) => {
+                                      const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
                                       await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate, remarks: asset.remarks, condition: asset.condition });
                                       addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
                                     }}
@@ -1939,3 +1940,4 @@ export default function AssetList() {
     </div>
   );
 }
+
