@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -16,6 +15,7 @@ export interface LocalUserProfile {
   isGuest?: boolean;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
+  canVerifyAssets?: boolean;
 }
 
 interface AuthContextType {
@@ -38,6 +38,7 @@ const superAdmin: AuthorizedUser = {
   isGuest: false,
   canAddAssets: true,
   canEditAssets: true,
+  canVerifyAssets: true,
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -65,9 +66,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (authorizedUser) {
           // User is valid. Check if permissions need to be updated in the current session.
           const permissionsChanged =
-            profile.isAdmin !== authorizedUser.isAdmin ||
-            profile.canAddAssets !== authorizedUser.canAddAssets ||
-            profile.canEditAssets !== authorizedUser.canEditAssets;
+            (profile.isAdmin ?? false) !== (authorizedUser.isAdmin ?? false) ||
+            (profile.canAddAssets ?? false) !== (authorizedUser.canAddAssets ?? false) ||
+            (profile.canEditAssets ?? false) !== (authorizedUser.canEditAssets ?? false) ||
+            (profile.canVerifyAssets ?? false) !== (authorizedUser.canVerifyAssets ?? false);
 
           let currentSessionProfile = profile;
           if (permissionsChanged) {
@@ -77,6 +79,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               isAdmin: authorizedUser.isAdmin,
               canAddAssets: authorizedUser.canAddAssets,
               canEditAssets: authorizedUser.canEditAssets,
+              canVerifyAssets: authorizedUser.canVerifyAssets,
             };
             // And also update localStorage so it's correct for the next page load
             localStorage.setItem('ntblcp-user-profile', JSON.stringify(currentSessionProfile));
@@ -118,6 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isGuest: user.isGuest,
       canAddAssets: user.canAddAssets,
       canEditAssets: user.canEditAssets,
+      canVerifyAssets: user.canVerifyAssets,
     };
     try {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
