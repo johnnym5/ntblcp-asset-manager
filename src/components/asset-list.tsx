@@ -71,7 +71,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Progress } from "@/components/ui/progress";
 
 import { AssetForm } from "./asset-form";
-import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
+import type { Asset, AppSettings, SheetDefinition, DisplayField } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
@@ -1350,14 +1350,18 @@ export default function AssetList() {
     const newSheetDefinitions = { ...appSettings.sheetDefinitions };
     newSheetDefinitions[sheetName].isHidden = !newSheetDefinitions[sheetName].isHidden;
 
-    const newSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions };
+    const newSettings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString() };
+    
+    // Optimistic UI update
     setAppSettings(newSettings);
 
     try {
-        await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
+        await updateSettings(newSettings);
         await saveLocalSettings(newSettings);
-        toast({ title: 'Visibility Changed', description: `Sheet '${sheetName}' is now ${newSheetDefinitions[sheetName].isHidden ? 'hidden' : 'visible'}.` });
+        toast({ title: 'Visibility Changed', description: `Sheet '${sheetName}' is now ${newSettings.sheetDefinitions[sheetName].isHidden ? 'hidden' : 'visible'}.` });
     } catch (e) {
+        // Revert on failure
+        setAppSettings(appSettings);
         toast({ title: 'Error', description: 'Could not save visibility settings.', variant: 'destructive' });
     }
   };
@@ -1866,7 +1870,6 @@ export default function AssetList() {
                                 <Select
                                     value={asset.verifiedStatus || 'Unverified'}
                                     onValueChange={async (status) => {
-                                      const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
                                       await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate, remarks: asset.remarks, condition: asset.condition });
                                       addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
                                     }}
