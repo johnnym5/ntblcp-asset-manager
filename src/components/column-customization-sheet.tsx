@@ -123,7 +123,7 @@ export function ColumnCustomizationSheet({
         </SheetHeader>
         <div className="px-1 py-4">
             <Label htmlFor="sheet-name" className="text-sm font-medium">Sheet Name</Label>
-            <Input id="sheet-name" value={editedName} onChange={(e) => setEditedName(e.target.value)} className="mt-1" disabled />
+            <Input id="sheet-name" value={editedName} onChange={(e) => setEditedName(e.target.value)} className="mt-1" disabled={!!originalSheetName} />
         </div>
         <div className="flex-grow overflow-hidden flex flex-col">
           <div className="flex items-center px-4 py-2 border-y font-medium text-sm bg-muted/50">

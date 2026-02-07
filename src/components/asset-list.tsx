@@ -173,9 +173,7 @@ export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFormReadOnly, setIsFormReadOnly] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
-  const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const fileInputRef = useRef<HTMLInputElement>(null);
   const { userProfile, authInitialized } = useAuth();
   const { toast } = useToast();
 
@@ -876,50 +874,6 @@ export default function AssetList() {
     }
   };
 
-  const handleImportClick = useCallback(() => fileInputRef.current?.click(), []);
-
-  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    addNotification({ title: "Parsing file...", description: "Please wait..." });
-
-    // Enforce Sandbox-First Imports: All imports now go to the locked offline store first for review.
-    const baseAssets = await getLockedOfflineAssets();
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets);
-
-    errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
-    if (skipped > 0) {
-        addNotification({ title: "Import Notice", description: `${skipped} assets were skipped (either duplicates or because the list is locked).` });
-    }
-
-    const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
-        ...asset,
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: userProfile?.displayName,
-        lastModifiedByState: userProfile?.state,
-        syncStatus: undefined // No sync status for locked offline items
-    }));
-
-    if (allChanges.length > 0) {
-        const assetMap = new Map(baseAssets.map(a => [a.id, a]));
-        allChanges.forEach(a => assetMap.set(a.id, a));
-        const combinedAssets = Array.from(assetMap.values());
-        
-        await saveLockedOfflineAssets(combinedAssets);
-        setOfflineAssets(combinedAssets);
-        addNotification({ title: 'Imported to Locked Offline Store', description: `${allChanges.length} changes saved. Review and merge to main list when ready.` });
-        setDataSource('local_locked'); // Switch to the offline view to show the imported data
-        
-    } else if (errors.length === 0) {
-        addNotification({ title: "No Changes Detected", description: "No new or updated assets were found."});
-    }
-
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    setIsImporting(false);
-  };
-  
   const handleTravelReport = useCallback(() => setIsTravelReportOpen(true), []);
   
   const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
@@ -1001,22 +955,18 @@ export default function AssetList() {
   useEffect(() => {
     setDataActions({
         onAddAsset: handleAddAsset,
-        onImport: handleImportClick,
         onScanAndImport: () => setIsImportScanOpen(true),
         onClearAll: handleClearAllClick,
         onTravelReport: handleTravelReport,
         onExport: handleExport,
-        isImporting,
     });
     return () => setDataActions({});
   }, [
     setDataActions, 
     handleAddAsset, 
-    handleImportClick, 
     handleClearAllClick, 
     handleTravelReport,
     handleExport,
-    isImporting
   ]);
 
   const handleClearCategoryClick = useCallback((category: string) => {
@@ -1346,7 +1296,6 @@ export default function AssetList() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
-        <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
         <Card>
             <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className='flex-1'>

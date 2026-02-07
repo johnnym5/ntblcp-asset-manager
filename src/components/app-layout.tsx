@@ -304,6 +304,40 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Tooltip>
             </TooltipProvider>
             
+            {isAdmin && (
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button variant="ghost" size="icon" className="relative" onClick={() => setIsInboxOpen(true)}>
+                                <Inbox className="h-5 w-5" />
+                                {unreadInboxCount > 0 && (
+                                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white">
+                                        {unreadInboxCount}
+                                    </span>
+                                )}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent><p>Approval Queue</p></TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+            )}
+
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button variant="ghost" size="icon" className="relative" onClick={() => handleNotificationsOpenChange(true)}>
+                            <Bell className="h-5 w-5" />
+                            {unreadCount > 0 && (
+                            <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
+                                {unreadCount}
+                            </span>
+                            )}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent><p>Notifications</p></TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+
             {loading ? (
               <Skeleton className="h-10 w-10 rounded-full" />
             ) : (
@@ -338,28 +372,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       Database Admin
                     </DropdownMenuItem>
                   )}
-                  
-                  {isAdmin && (
-                     <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
-                      <Inbox className="mr-2 h-4 w-4" />
-                      <span>Approval Queue</span>
-                      {unreadInboxCount > 0 && (
-                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white">
-                          {unreadInboxCount}
-                        </span>
-                      )}
-                    </DropdownMenuItem>
-                  )}
-
-                  <DropdownMenuItem onClick={() => handleNotificationsOpenChange(true)}>
-                    <Bell className="mr-2 h-4 w-4" />
-                    <span>Notifications</span>
-                    {unreadCount > 0 && (
-                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
-                        {unreadCount}
-                      </span>
-                    )}
-                  </DropdownMenuItem>
 
                   <DropdownMenuSeparator />
                   <DropdownMenuItem onClick={handleLogout}>

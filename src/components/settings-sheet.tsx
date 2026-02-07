@@ -2,7 +2,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -39,9 +39,9 @@ import { useTheme } from 'next-themes';
 import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings, AuthorizedUser } from '@/lib/types';
-import { parseExcelForTemplate } from '@/lib/excel-parser';
+import { parseExcelForTemplate, parseExcelFile } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
-import { saveLocalSettings } from '@/lib/idb';
+import { saveLocalSettings, getLockedOfflineAssets, saveLockedOfflineAssets } from '@/lib/idb';
 import {
   Select,
   SelectContent,
@@ -50,6 +50,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Separator } from './ui/separator';
+import { addNotification } from '@/hooks/use-notifications';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -58,7 +59,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, dataActions } = useAppState();
+  const { appSettings, setAppSettings, dataActions, setOfflineAssets, setDataSource } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -67,19 +68,23 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const templateImportInputRef = React.useRef<HTMLInputElement>(null);
+  const assetImportInputRef = React.useRef<HTMLInputElement>(null);
+  const [isImporting, setIsImporting] = useState(false);
+
 
   useEffect(() => {
     const savedDraft = localStorage.getItem('ntblcp-settings-draft');
     if (isOpen) {
-      if (savedDraft) {
-        setDraftSettings(JSON.parse(savedDraft));
-      } else {
-        setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
-      }
+        if (savedDraft) {
+            setDraftSettings(JSON.parse(savedDraft));
+            // No toast on restore, it should feel seamless
+        } else {
+            setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
+        }
     } else {
-      setDraftSettings(null);
-      localStorage.removeItem('ntblcp-settings-draft');
+        setDraftSettings(null);
+        localStorage.removeItem('ntblcp-settings-draft');
     }
   }, [isOpen, appSettings]);
   
@@ -175,11 +180,13 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     setDraftSettings(prev => prev ? ({ ...prev, sheetDefinitions: newSheetDefinitions, enabledSheets: newEnabledSheets }) : null);
   };
 
-  const handleImportTemplate = () => {
-    fileInputRef.current?.click();
+  const handleTemplateImportClick = () => {
+    templateImportInputRef.current?.click();
   };
 
-  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAssetImportClick = useCallback(() => assetImportInputRef.current?.click(), []);
+
+  const handleTemplateFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!draftSettings) return;
     const file = event.target.files?.[0];
     if (!file) return;
@@ -203,9 +210,52 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     } catch (error) {
       toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
+      if (templateImportInputRef.current) templateImportInputRef.current.value = "";
     }
   };
+
+  const handleAssetFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!draftSettings) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsImporting(true);
+    addNotification({ title: "Parsing file...", description: "Please wait..." });
+
+    const baseAssets = await getLockedOfflineAssets();
+    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, draftSettings, baseAssets);
+
+    errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
+    if (skipped > 0) {
+        addNotification({ title: "Import Notice", description: `${skipped} assets were skipped (either duplicates or because the list is locked).` });
+    }
+
+    const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
+        ...asset,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: userProfile?.displayName,
+        lastModifiedByState: userProfile?.state,
+        syncStatus: undefined
+    }));
+
+    if (allChanges.length > 0) {
+        const assetMap = new Map(baseAssets.map(a => [a.id, a]));
+        allChanges.forEach(a => assetMap.set(a.id, a));
+        const combinedAssets = Array.from(assetMap.values());
+        
+        await saveLockedOfflineAssets(combinedAssets);
+        setOfflineAssets(combinedAssets);
+        addNotification({ title: 'Imported to Locked Offline Store', description: `${allChanges.length} changes saved. Review and merge to main list when ready.` });
+        setDataSource('local_locked');
+        
+    } else if (errors.length === 0) {
+        addNotification({ title: "No Changes Detected", description: "No new or updated assets were found."});
+    }
+
+    if (assetImportInputRef.current) assetImportInputRef.current.value = "";
+    setIsImporting(false);
+  };
+
 
   const handleConfirmSave = async () => {
     if (!draftSettings) return;
@@ -277,6 +327,8 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="w-full sm:max-w-xl flex flex-col">
+          <input type="file" ref={templateImportInputRef} onChange={handleTemplateFileImport} accept=".xlsx, .xls" className="hidden" />
+          <input type="file" ref={assetImportInputRef} onChange={handleAssetFileImport} accept=".xlsx, .xls" className="hidden" />
           <SheetHeader>
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
@@ -392,20 +444,17 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             <Separator />
                             
                             <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Manage Categories (Sheets)</Label>
-                             <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
                             <Button variant="outline" className="w-full justify-start" onClick={handleAddSheet}><PlusCircle className="mr-2 h-4 w-4" /> Add New Sheet Manually</Button>
-                            <Button variant="outline" className="w-full justify-start" onClick={handleImportTemplate}><FileUp className="mr-2 h-4 w-4" /> Import Sheet from File</Button>
+                            <Button variant="outline" className="w-full justify-start" onClick={handleTemplateImportClick}><FileUp className="mr-2 h-4 w-4" /> Import Sheet from File</Button>
                             
                             <Separator />
                             
                             <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Bulk Data Operations</Label>
-                            {dataActions.onImport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onImport} disabled={dataActions.isImporting}>
-                                    <FileUp className="mr-2 h-4 w-4" /> Update Assets from FAR
-                                </Button>
-                            )}
+                            <Button variant="outline" className="w-full justify-start" onClick={handleAssetImportClick} disabled={isImporting}>
+                                <FileUp className="mr-2 h-4 w-4" /> Update Assets from FAR
+                            </Button>
                             {dataActions.onScanAndImport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport} disabled={dataActions.isImporting}>
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport}>
                                     <ScanSearch className="mr-2 h-4 w-4" /> Scan &amp; Import Workbook
                                 </Button>
                             )}
