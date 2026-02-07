@@ -599,8 +599,8 @@ export default function AssetList() {
       addNotification({ title: "Permission Denied", description: "You do not have permission to edit assets.", variant: "destructive" });
       return;
     }
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
-        addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
+    if (lockAssetList && isAdmin && dataSource === 'cloud' && appSettings.appMode !== 'verification') {
+        addNotification({ title: "Edits Disabled", description: "The main asset list is locked for full edits. Switch to 'Locked Offline' to merge changes, or disable lock in settings.", variant: "destructive" });
         return;
     }
     setSelectedAsset(asset);
@@ -801,8 +801,8 @@ export default function AssetList() {
     const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
 
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
-      addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
+    if (lockAssetList && isAdmin && dataSource === 'cloud' && appSettings.appMode !== 'verification') {
+      addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes.", variant: "destructive" });
       return;
     }
 
@@ -1697,10 +1697,6 @@ export default function AssetList() {
                                 <Select
                                     value={asset.verifiedStatus || 'Unverified'}
                                     onValueChange={async (status) => {
-                                      if (lockAssetList && isAdmin && dataSource === 'cloud') {
-                                          addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
-                                          return;
-                                      }
                                       const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
                                       await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate, remarks: asset.remarks, condition: asset.condition });
                                       addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });

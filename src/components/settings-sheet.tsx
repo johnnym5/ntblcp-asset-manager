@@ -68,7 +68,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
-  const templateImportInputRef = React.useRef<HTMLInputElement>(null);
 
 
   useEffect(() => {
@@ -178,39 +177,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     setDraftSettings(prev => prev ? ({ ...prev, sheetDefinitions: newSheetDefinitions, enabledSheets: newEnabledSheets }) : null);
   };
 
-  const handleTemplateImportClick = () => {
-    templateImportInputRef.current?.click();
-  };
-
-  const handleTemplateFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!draftSettings) return;
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const templates = await parseExcelForTemplate(file);
-      let currentDefs = draftSettings.sheetDefinitions;
-      let currentEnabled = draftSettings.enabledSheets;
-      
-      templates.forEach(template => {
-        currentDefs[template.name] = template;
-        if (!currentEnabled.includes(template.name)) {
-          currentEnabled.push(template.name);
-        }
-      });
-      
-      handleSettingChange('sheetDefinitions', currentDefs);
-      handleSettingChange('enabledSheets', currentEnabled);
-
-      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added/updated in your draft.` });
-    } catch (error) {
-      toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
-    } finally {
-      if (templateImportInputRef.current) templateImportInputRef.current.value = "";
-    }
-  };
-
-
   const handleConfirmSave = async () => {
     if (!draftSettings) return;
     
@@ -287,7 +253,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="w-full sm:max-w-xl flex flex-col">
-          <input type="file" ref={templateImportInputRef} onChange={handleTemplateFileImport} accept=".xlsx, .xls" className="hidden" />
           <SheetHeader>
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
@@ -404,7 +369,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             
                             <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Manage Categories (Sheets)</Label>
                             <Button variant="outline" className="w-full justify-start" onClick={handleAddSheet}><PlusCircle className="mr-2 h-4 w-4" /> Add New Sheet Manually</Button>
-                            <Button variant="outline" className="w-full justify-start" onClick={handleTemplateImportClick}><FileUp className="mr-2 h-4 w-4" /> Import Sheet from File</Button>
                             
                             <Separator />
                             

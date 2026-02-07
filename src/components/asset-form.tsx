@@ -60,7 +60,7 @@ interface AssetFormProps {
 export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: initialIsReadOnly }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const { appSettings } = useAppState();
+  const { appSettings, dataSource } = useAppState();
   const isAdmin = userProfile?.isAdmin || false;
   
   const form = useForm<AssetFormValues>({
@@ -123,27 +123,45 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
         const fieldName = field.key as keyof AssetFormValues;
         
         let disabled = initialIsReadOnly;
+        const isVerificationField = ['verifiedStatus', 'remarks', 'condition'].includes(fieldName);
 
-        if (!disabled && !isAdmin) { // If not already readonly and not an admin
-            if (appSettings.appMode === 'management') {
-                // In management mode, non-admins can't edit anything.
-                disabled = true;
-            } else if (appSettings.appMode === 'verification') {
-                const canEdit = !!userProfile?.canEditAssets;
-                if (['verifiedStatus', 'remarks', 'condition'].includes(fieldName)) {
-                    disabled = !canEdit;
-                } else {
-                    // All other fields are disabled for non-admins in verification mode.
-                    disabled = true;
+        if (!disabled) { // Only apply locks if the form is in edit mode
+            if (isAdmin) {
+                // Admin is locked on cloud source based on settings
+                if (appSettings.lockAssetList && dataSource === 'cloud') {
+                    if (appSettings.appMode === 'verification') {
+                        // In verification mode, only allow editing verification fields.
+                        if (!isVerificationField) {
+                            disabled = true;
+                        }
+                    } else {
+                        // In management mode, lock everything.
+                        disabled = true;
+                    }
+                }
+            } else { // Non-admin logic is simpler
+                if (appSettings.appMode === 'management') {
+                    disabled = true; // Non-admins are always locked in management mode.
+                } else if (appSettings.appMode === 'verification') {
+                    // Non-admins can only edit verification fields in verification mode.
+                    if (!isVerificationField) {
+                        disabled = true;
+                    }
                 }
             }
         }
 
-        // Special locks that apply regardless of mode
+        // --- Final hardcoded locks ---
+        // These override any logic above.
         if (fieldName === 'verifiedDate') {
-            disabled = true;
+            disabled = true; // Always auto-set based on status.
         }
-        if ((fieldName === 'location' && !isAdmin) || (fieldName === 'category' && !!asset)) {
+        // Non-admins can never change location directly in the form.
+        if (fieldName === 'location' && !isAdmin) {
+            disabled = true; 
+        }
+        // Category of an existing asset cannot be changed.
+        if (fieldName === 'category' && !!asset) {
             disabled = true;
         }
         
