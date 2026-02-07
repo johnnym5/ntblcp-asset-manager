@@ -42,6 +42,7 @@ import {
 } from '@/components/ui/select';
 import { addNotification } from '@/hooks/use-notifications';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { ScrollArea } from '../ui/scroll-area';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -180,7 +181,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-w-2xl flex flex-col max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><DatabaseZap /> Database Administration</DialogTitle>
             <DialogDescription>
@@ -188,98 +189,100 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             </DialogDescription>
           </DialogHeader>
           
-          <div className="py-4 space-y-6">
+          <ScrollArea className="flex-1">
+            <div className="py-4 pr-6 space-y-6">
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Database Source</CardTitle>
-                    <CardDescription>Select the primary cloud database for the application.</CardDescription>
-                </CardHeader>
-                <CardContent className="flex items-center justify-between">
-                     <Select value={draftSettings.databaseSource} onValueChange={(value) => handleSettingChange('databaseSource', value)}>
-                      <SelectTrigger className="w-[180px]">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="firestore">Cloud Firestore</SelectItem>
-                        <SelectItem value="rtdb">Realtime Database</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <Button onClick={() => setIsConfirmOpen(true)} disabled={JSON.stringify(appSettings) === JSON.stringify(draftSettings)}>
-                        <Save className="mr-2 h-4 w-4"/>
-                        Save Preference
-                    </Button>
-                </CardContent>
-            </Card>
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Database Source</CardTitle>
+                      <CardDescription>Select the primary cloud database for the application.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="flex items-center justify-between">
+                      <Select value={draftSettings.databaseSource} onValueChange={(value) => handleSettingChange('databaseSource', value)}>
+                        <SelectTrigger className="w-[180px]">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="firestore">Cloud Firestore</SelectItem>
+                          <SelectItem value="rtdb">Realtime Database</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button onClick={() => setIsConfirmOpen(true)} disabled={JSON.stringify(appSettings) === JSON.stringify(draftSettings)}>
+                          <Save className="mr-2 h-4 w-4"/>
+                          Save Preference
+                      </Button>
+                  </CardContent>
+              </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Initial Data Deployment</CardTitle>
-                    <CardDescription>This will overwrite all data in the Realtime Database with the data stored locally on your device. Use this to populate the cloud for the first time.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                    <Button variant="outline" className="w-full justify-start" onClick={handleCopyToRTDB} disabled={isCopying}>
-                        {isCopying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlaneTakeoff className="mr-2 h-4 w-4" />}
-                        Deploy Local Database to RTDB
-                    </Button>
-                </CardContent>
-            </Card>
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Initial Data Deployment</CardTitle>
+                      <CardDescription>This will overwrite all data in the Realtime Database with the data stored locally on your device. Use this to populate the cloud for the first time.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      <Button variant="outline" className="w-full justify-start" onClick={handleCopyToRTDB} disabled={isCopying}>
+                          {isCopying ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlaneTakeoff className="mr-2 h-4 w-4" />}
+                          Deploy Local Database to RTDB
+                      </Button>
+                  </CardContent>
+              </Card>
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Cloud-to-Cloud Sync</CardTitle>
-                    <CardDescription>Ensure data is consistent between Firestore and Realtime DB.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                     <Button variant="outline" className="w-full justify-start" onClick={handleSync} disabled={isSyncing}>
-                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitBranch className="mr-2 h-4 w-4" />}
-                        Sync Firestore and RTDB
-                    </Button>
-                </CardContent>
-            </Card>
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Cloud-to-Cloud Sync</CardTitle>
+                      <CardDescription>Ensure data is consistent between Firestore and Realtime DB.</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                      <Button variant="outline" className="w-full justify-start" onClick={handleSync} disabled={isSyncing}>
+                          {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitBranch className="mr-2 h-4 w-4" />}
+                          Sync Firestore and RTDB
+                      </Button>
+                  </CardContent>
+              </Card>
 
 
-            <Card>
-                <CardHeader>
-                    <CardTitle>Backup & Restore</CardTitle>
-                    <CardDescription>Export data to a JSON file. Imports are handled via Excel files in Settings.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                     <Button variant="outline" className="w-full justify-start" onClick={() => exportFullBackupToJson(assets, appSettings)}>
-                        <Download className="mr-2 h-4 w-4" /> Export Full Backup (Assets & Settings)
-                    </Button>
-                    <Button variant="outline" className="w-full justify-start" onClick={() => exportAssetsToJson(assets)}>
-                        <Download className="mr-2 h-4 w-4" /> Export Assets Only
-                    </Button>
-                     <Button variant="outline" className="w-full justify-start" onClick={() => exportSettingsToJson(appSettings)}>
-                        <Download className="mr-2 h-4 w-4" /> Export Settings Only
-                    </Button>
-                </CardContent>
-            </Card>
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Backup & Restore</CardTitle>
+                      <CardDescription>Export data to a JSON file. Imports are handled via Excel files in Settings.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                      <Button variant="outline" className="w-full justify-start" onClick={() => exportFullBackupToJson(assets, appSettings)}>
+                          <Download className="mr-2 h-4 w-4" /> Export Full Backup (Assets & Settings)
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => exportAssetsToJson(assets)}>
+                          <Download className="mr-2 h-4 w-4" /> Export Assets Only
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => exportSettingsToJson(appSettings)}>
+                          <Download className="mr-2 h-4 w-4" /> Export Settings Only
+                      </Button>
+                  </CardContent>
+              </Card>
 
-            <Card className="border-destructive">
-                <CardHeader>
-                    <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle/> Danger Zone</CardTitle>
-                    <CardDescription>These actions are irreversible and will affect all data.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                    <Button variant="destructive" className="w-full justify-start" onClick={() => setIsClearFirestoreConfirmOpen(true)} disabled={isAnyClearing}>
-                        {isClearingFirestore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                        Clear Firestore Assets Only
-                    </Button>
-                    <Button variant="destructive" className="w-full justify-start" onClick={() => setIsClearRTDBConfirmOpen(true)} disabled={isAnyClearing}>
-                        {isClearingRTDB ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                        Clear Realtime DB Assets Only
-                    </Button>
-                    <Button variant="destructive" className="w-full justify-start" onClick={() => setIsClearAllConfirmOpen(true)} disabled={isAnyClearing}>
-                        {isClearingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                        Clear All Assets in ALL Databases
-                    </Button>
-                </CardContent>
-            </Card>
-          </div>
+              <Card className="border-destructive">
+                  <CardHeader>
+                      <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle/> Danger Zone</CardTitle>
+                      <CardDescription>These actions are irreversible and will affect all data.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                      <Button variant="destructive" className="w-full justify-start" onClick={() => setIsClearFirestoreConfirmOpen(true)} disabled={isAnyClearing}>
+                          {isClearingFirestore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                          Clear Firestore Assets Only
+                      </Button>
+                      <Button variant="destructive" className="w-full justify-start" onClick={() => setIsClearRTDBConfirmOpen(true)} disabled={isAnyClearing}>
+                          {isClearingRTDB ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                          Clear Realtime DB Assets Only
+                      </Button>
+                      <Button variant="destructive" className="w-full justify-start" onClick={() => setIsClearAllConfirmOpen(true)} disabled={isAnyClearing}>
+                          {isClearingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                          Clear All Assets in ALL Databases
+                      </Button>
+                  </CardContent>
+              </Card>
+            </div>
+          </ScrollArea>
 
-          <DialogFooter>
+          <DialogFooter className="mt-auto">
             <DialogClose asChild>
               <Button variant="outline">Close</Button>
             </DialogClose>

@@ -405,109 +405,108 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-2xl flex flex-col">
+        <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
           <SheetHeader>
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
               Manage application settings and preferences. Admin changes apply to all users.
             </SheetDescription>
           </SheetHeader>
-          <Tabs defaultValue="general" className="flex-1 flex flex-col">
-            <TabsList className="grid w-full grid-cols-5">
-                <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
-                <TabsTrigger value="users" disabled={isGuest || !isAdmin}><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
-                <TabsTrigger value="sheets" disabled={isGuest || !isAdmin}><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
-                <TabsTrigger value="locations" disabled={isGuest || !isAdmin}><MapPin className="mr-2 h-4 w-4" />Locations</TabsTrigger>
-                <TabsTrigger value="data" disabled={isGuest || !isAdmin}><Database className="mr-2 h-4 w-4" />Data</TabsTrigger>
-            </TabsList>
-            <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
-                <div>
-                    <h3 className="text-lg font-medium mb-4">Appearance</h3>
-                    <div className="rounded-lg border p-4 space-y-3">
-                        <Label className="flex items-center gap-2 text-sm font-medium"><Palette className="h-4 w-4" /> Theme</Label>
-                        <div className="flex justify-around">
-                            <Button variant="outline" size="sm" onClick={() => setTheme('light')}><Sun className="mr-2"/>Light</Button>
-                            <Button variant="outline" size="sm" onClick={() => setTheme('dark')}><Moon className="mr-2"/>Dark</Button>
-                            <Button variant="outline" size="sm" onClick={() => setTheme('system')}><Database className="mr-2"/>System</Button>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="space-y-4">
-                  <h3 className="text-lg font-medium">Security</h3>
-                  <div className="rounded-lg border p-4 space-y-4">
-                    <Label className="flex items-center gap-2 text-sm font-medium"><KeyRound className="h-4 w-4" /> Change Your Password</Label>
-                      <div className="space-y-2">
-                        <Label htmlFor="current-password">Current Password</Label>
-                        <Input id="current-password" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
-                      </div>
-                       <div className="space-y-2">
-                        <Label htmlFor="new-password">New Password</Label>
-                        <Input id="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
-                      </div>
-                       <div className="space-y-2">
-                        <Label htmlFor="confirm-new-password">Confirm New Password</Label>
-                        <Input id="confirm-new-password" type="password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} />
-                      </div>
-                      {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
-                      {passwordSuccess && <p className="text-sm text-green-600">{passwordSuccess}</p>}
-                      <Button size="sm" onClick={handleChangePassword}>Stage Password Change</Button>
-                      <p className="text-xs text-muted-foreground">Your password change will be saved when you click "Save Changes" at the bottom of the panel.</p>
-                  </div>
-                </div>
-
-                {isAdmin && (
+          <div className="flex-1 overflow-y-auto">
+            <Tabs defaultValue="general" className="p-1">
+              <TabsList className="grid w-full grid-cols-5 sticky top-0 bg-background z-10">
+                  <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
+                  <TabsTrigger value="users" disabled={isGuest || !isAdmin}><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
+                  <TabsTrigger value="sheets" disabled={isGuest || !isAdmin}><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
+                  <TabsTrigger value="locations" disabled={isGuest || !isAdmin}><MapPin className="mr-2 h-4 w-4" />Locations</TabsTrigger>
+                  <TabsTrigger value="data" disabled={isGuest || !isAdmin}><Database className="mr-2 h-4 w-4" />Data</TabsTrigger>
+              </TabsList>
+              <TabsContent value="general" className="pt-4 space-y-6">
                   <div>
-                    <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
-                    <div className="rounded-lg border p-3 space-y-4 divide-y">
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="space-y-1">
-                          <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
-                          <p className="text-xs text-muted-foreground">
-                            {draftSettings.appMode === 'management'
-                              ? 'Management: Full data editing rights.'
-                              : 'Verification: Limited to status &amp; remarks updates.'
-                            }
-                          </p>
-                        </div>
-                         <Select value={draftSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
-                          <SelectTrigger className="w-[150px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="management">Management</SelectItem>
-                            <SelectItem value="verification">Verification</SelectItem>
-                          </SelectContent>
-                        </Select>
+                      <h3 className="text-lg font-medium mb-4">Appearance</h3>
+                      <div className="rounded-lg border p-4 space-y-3">
+                          <Label className="flex items-center gap-2 text-sm font-medium"><Palette className="h-4 w-4" /> Theme</Label>
+                          <div className="flex justify-around">
+                              <Button variant="outline" size="sm" onClick={() => setTheme('light')}><Sun className="mr-2"/>Light</Button>
+                              <Button variant="outline" size="sm" onClick={() => setTheme('dark')}><Moon className="mr-2"/>Dark</Button>
+                              <Button variant="outline" size="sm" onClick={() => setTheme('system')}><Database className="mr-2"/>System</Button>
+                          </div>
                       </div>
-                      <div className="flex items-center justify-between pt-4">
-                        <div className="space-y-1">
-                          <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
-                          <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
+                  </div>
+
+                  <div className="space-y-4">
+                    <h3 className="text-lg font-medium">Security</h3>
+                    <div className="rounded-lg border p-4 space-y-4">
+                      <Label className="flex items-center gap-2 text-sm font-medium"><KeyRound className="h-4 w-4" /> Change Your Password</Label>
+                        <div className="space-y-2">
+                          <Label htmlFor="current-password">Current Password</Label>
+                          <Input id="current-password" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
                         </div>
-                        <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
-                      </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="new-password">New Password</Label>
+                          <Input id="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                          <Input id="confirm-new-password" type="password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} />
+                        </div>
+                        {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+                        {passwordSuccess && <p className="text-sm text-green-600">{passwordSuccess}</p>}
+                        <Button size="sm" onClick={handleChangePassword}>Stage Password Change</Button>
+                        <p className="text-xs text-muted-foreground">Your password change will be saved when you click "Save Changes" at the bottom of the panel.</p>
                     </div>
                   </div>
-                )}
-            </TabsContent>
-            <TabsContent value="users" className="flex-1 overflow-y-auto pt-4 pr-2">
-                <div className="p-1">
-                    <UserManagement 
-                    users={draftSettings.authorizedUsers}
-                    onUsersChange={handleUsersChange}
-                    adminProfile={userProfile}
-                    />
-                </div>
-            </TabsContent>
-            <TabsContent value="sheets" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
-                 <div>
+
+                  {isAdmin && (
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
+                      <div className="rounded-lg border p-3 space-y-4 divide-y">
+                        <div className="flex items-center justify-between pt-1">
+                          <div className="space-y-1">
+                            <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
+                            <p className="text-xs text-muted-foreground">
+                              {draftSettings.appMode === 'management'
+                                ? 'Management: Full data editing rights.'
+                                : 'Verification: Limited to status &amp; remarks updates.'
+                              }
+                            </p>
+                          </div>
+                          <Select value={draftSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
+                            <SelectTrigger className="w-[150px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="management">Management</SelectItem>
+                              <SelectItem value="verification">Verification</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="flex items-center justify-between pt-4">
+                          <div className="space-y-1">
+                            <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
+                            <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
+                          </div>
+                          <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+              </TabsContent>
+              <TabsContent value="users" className="pt-4">
+                  <UserManagement 
+                  users={draftSettings.authorizedUsers}
+                  onUsersChange={handleUsersChange}
+                  adminProfile={userProfile}
+                  />
+              </TabsContent>
+              <TabsContent value="sheets" className="pt-4 space-y-6">
+                  <div>
                     <h3 className="text-lg font-medium mb-4">Sheet Definitions &amp; Access</h3>
                     <div className="rounded-lg border p-3">
                         <div className="space-y-1">
                           {allSheetNames.map(sheetName => (
                             <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
-                               <Label className="text-sm pl-2 cursor-pointer flex-1">{sheetName}</Label>
+                                <Label className="text-sm pl-2 cursor-pointer flex-1">{sheetName}</Label>
                               <div className="flex items-center gap-1">
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleSheetVisibility(sheetName)}>
                                   {draftSettings.sheetDefinitions[sheetName].isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -526,85 +525,86 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                         <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import from File</Button>
                     </div>
                   </div>
-            </TabsContent>
-            <TabsContent value="locations" className="flex-1 flex flex-col overflow-hidden pt-4 space-y-4 pr-2">
-              <h3 className="text-lg font-medium px-1">Manage Locations</h3>
-              <div className="rounded-lg border p-3">
-                <div className="flex gap-2">
-                  <Input 
-                    placeholder="Enter new location name" 
-                    value={newLocation} 
-                    onChange={(e) => setNewLocation(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleAddNewLocation()}
-                  />
-                  <Button onClick={handleAddNewLocation} disabled={!newLocation.trim()}>Add</Button>
+              </TabsContent>
+              <TabsContent value="locations" className="pt-4 space-y-4">
+                <h3 className="text-lg font-medium">Manage Locations</h3>
+                <div className="rounded-lg border p-3">
+                  <div className="flex gap-2">
+                    <Input 
+                      placeholder="Enter new location name" 
+                      value={newLocation} 
+                      onChange={(e) => setNewLocation(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddNewLocation()}
+                    />
+                    <Button onClick={handleAddNewLocation} disabled={!newLocation.trim()}>Add</Button>
+                  </div>
                 </div>
-              </div>
-              <ScrollArea className="flex-1 rounded-lg border">
-                <div className="p-2 space-y-1">
-                  {(draftSettings.locations || []).map(location => (
-                    <div key={location} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md">
-                      <p className="text-sm">{location}</p>
-                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteLocation(location)}>
-                        <Trash2 className="h-4 w-4"/>
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </TabsContent>
-            <TabsContent value="data" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
-                <div>
-                    <h3 className="text-lg font-medium mb-4">Data &amp; Category Management</h3>
-                    <div className="rounded-lg border p-4 space-y-3">
-                        <p className="text-sm text-muted-foreground">Perform global data operations. These actions may affect the entire dataset.</p>
-                        <Separator />
-                        <div className="space-y-2">
+                <ScrollArea className="flex-1 rounded-lg border">
+                  <div className="p-2 space-y-1">
+                    {(draftSettings.locations || []).map(location => (
+                      <div key={location} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md">
+                        <p className="text-sm">{location}</p>
+                        <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteLocation(location)}>
+                          <Trash2 className="h-4 w-4"/>
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                </ScrollArea>
+              </TabsContent>
+              <TabsContent value="data" className="pt-4 space-y-6">
+                  <div>
+                      <h3 className="text-lg font-medium mb-4">Data &amp; Category Management</h3>
+                      <div className="rounded-lg border p-4 space-y-3">
+                          <p className="text-sm text-muted-foreground">Perform global data operations. These actions may affect the entire dataset.</p>
+                          <Separator />
+                          <div className="space-y-2">
 
-                            {dataActions.onAddAsset && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add Single Asset
-                                </Button>
-                            )}
-                            
-                            <Separator />
-                            
-                            <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Manage Categories (Sheets)</Label>
-                            <Button variant="outline" className="w-full justify-start" onClick={handleAddSheet}><PlusCircle className="mr-2 h-4 w-4" /> Add New Sheet Manually</Button>
-                            
-                            <Separator />
-                            
-                            <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Bulk Data Operations</Label>
-                            
-                            {dataActions.onScanAndImport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport}>
-                                    <ScanSearch className="mr-2 h-4 w-4" /> Scan &amp; Import Workbook
-                                </Button>
-                            )}
-                             {dataActions.onTravelReport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
-                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
-                                </Button>
-                            )}
-                             {dataActions.onExport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport}>
-                                    <Download className="mr-2 h-4 w-4" /> Export All Data to Excel
-                                </Button>
-                            )}
+                              {dataActions.onAddAsset && (
+                                  <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
+                                      <PlusCircle className="mr-2 h-4 w-4" /> Add Single Asset
+                                  </Button>
+                              )}
+                              
+                              <Separator />
+                              
+                              <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Manage Categories (Sheets)</Label>
+                              <Button variant="outline" className="w-full justify-start" onClick={handleAddSheet}><PlusCircle className="mr-2 h-4 w-4" /> Add New Sheet Manually</Button>
+                              
+                              <Separator />
+                              
+                              <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Bulk Data Operations</Label>
+                              
+                              {dataActions.onScanAndImport && (
+                                  <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport}>
+                                      <ScanSearch className="mr-2 h-4 w-4" /> Scan &amp; Import Workbook
+                                  </Button>
+                              )}
+                              {dataActions.onTravelReport && (
+                                  <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
+                                      <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
+                                  </Button>
+                              )}
+                              {dataActions.onExport && (
+                                  <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport}>
+                                      <Download className="mr-2 h-4 w-4" /> Export All Data to Excel
+                                  </Button>
+                              )}
 
-                            <Separator />
+                              <Separator />
 
-                            <Label className="text-xs font-semibold uppercase text-destructive px-1">Danger Zone</Label>
-                            {dataActions.onClearAll && (
-                                <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </TabsContent>
-          </Tabs>
+                              <Label className="text-xs font-semibold uppercase text-destructive px-1">Danger Zone</Label>
+                              {dataActions.onClearAll && (
+                                  <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>
+                                      <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
+                                  </Button>
+                              )}
+                          </div>
+                      </div>
+                  </div>
+              </TabsContent>
+            </Tabs>
+          </div>
 
           <SheetFooter className="mt-auto pt-4 border-t sm:justify-between">
             <SheetClose asChild><Button variant="outline">Cancel</Button></SheetClose>
