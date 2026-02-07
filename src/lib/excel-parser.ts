@@ -13,14 +13,14 @@ const normalizeHeader = (header: any): string => {
 const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[], startRow: number = 0): number => {
     const normalizedDefinitiveHeaders = definitiveHeaders.map(normalizeHeader);
     
-    for (let i = startRow; i < Math.min(sheetData.length, startRow + 25); i++) { // Search deeper
+    for (let i = startRow; i < Math.min(sheetData.length, startRow + 50); i++) { // Search deeper
         const row = sheetData[i];
         if (!Array.isArray(row) || row.length === 0) continue;
 
         const normalizedRow = row.map(normalizeHeader);
         const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
         
-        if (matchCount / normalizedDefinitiveHeaders.length >= 0.7) {
+        if (matchCount / definitiveHeaders.length >= 0.7) {
             return i;
         }
     }
@@ -145,26 +145,47 @@ export async function scanExcelFile(
             const sheet = workbook.Sheets[sheetName];
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
             
+            let bestMatch: { definitionName: string, headerRowIndex: number, score: number } | null = null;
+
+            // Find the best matching definition for the current sheet
             for (const defName in sheetDefinitions) {
                 const definition = sheetDefinitions[defName];
-                const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers);
+                const normalizedDefinitiveHeaders = definition.headers.map(normalizeHeader);
+                
+                if(normalizedDefinitiveHeaders.length === 0) continue;
+                
+                // Look for a matching header row within the first 50 rows of the sheet
+                for (let i = 0; i < Math.min(sheetData.length, 50); i++) {
+                    const row = sheetData[i];
+                    if (!Array.isArray(row) || row.length < normalizedDefinitiveHeaders.length * 0.5) continue;
 
-                if (headerRowIndex !== -1) {
-                    const dataRows = sheetData.slice(headerRowIndex + 1);
-                    const rowCount = dataRows.filter(row => Array.isArray(row) && row.some(cell => cell !== null && String(cell).trim() !== '')).length;
-                    const headers = sheetData[headerRowIndex].filter(h => h !== null).map(String);
-                    
-                    scannedSheets.push({
-                        sheetName: sheetName,
-                        definitionName: defName,
-                        rowCount: rowCount,
-                        headers: headers,
-                    });
-                    
-                    break; 
+                    const normalizedRow = row.map(normalizeHeader);
+                    const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
+                    const score = matchCount / normalizedDefinitiveHeaders.length;
+
+                    // If it's a good match and better than any previous match for this sheet, store it.
+                    if (score >= 0.7 && (!bestMatch || score > bestMatch.score)) {
+                        bestMatch = { definitionName: defName, headerRowIndex: i, score: score };
+                    }
                 }
             }
+
+            // If a best match was found for this sheet, add it to the results.
+            if (bestMatch) {
+                const { definitionName, headerRowIndex } = bestMatch;
+                const dataRows = sheetData.slice(headerRowIndex + 1);
+                const rowCount = dataRows.filter(row => Array.isArray(row) && row.some(cell => cell !== null && String(cell).trim() !== '')).length;
+                const headers = sheetData[headerRowIndex].filter(h => h !== null).map(String);
+                
+                scannedSheets.push({
+                    sheetName,
+                    definitionName,
+                    rowCount,
+                    headers,
+                });
+            }
         }
+
         if (scannedSheets.length === 0) {
             errors.push("No matching asset sheets were found in this workbook based on the current settings.");
         }
@@ -187,7 +208,7 @@ export async function parseExcelFile(
     existingAssets: Asset[],
     sheetsToImport?: ScannedSheetInfo[]
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
-    const { sheetDefinitions, enabledSheets } = appSettings;
+    const { sheetDefinitions } = appSettings;
     
     const result: { assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] } = {
         assets: [],
@@ -203,8 +224,11 @@ export async function parseExcelFile(
 
         const processList: ScannedSheetInfo[] = sheetsToImport 
             ? sheetsToImport 
-            : enabledSheets.map(defName => {
-                const actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader(defName)));
+            : Object.keys(sheetDefinitions).map(defName => {
+                const sheet = sheetDefinitions[defName];
+                // This logic is flawed if multiple workbook sheets match one definition name.
+                // It's kept for legacy flows, but the Scan->Select->Import flow is preferred.
+                const actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader(sheet.name)));
                 return actualSheetName ? { sheetName: actualSheetName, definitionName: defName, rowCount: 0, headers: [] } : null;
             }).filter(Boolean) as ScannedSheetInfo[];
 
