@@ -18,7 +18,6 @@ const defaultStateUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
   isGuest: false,
   canAddAssets: true,
   canEditAssets: true,
-  canVerifyAssets: true,
 }));
 
 
@@ -86,10 +85,6 @@ interface AppStateContextType {
   isSyncing: boolean;
   setIsSyncing: Dispatch<SetStateAction<boolean>>;
 
-  // Inbox count for UI display
-  unreadInboxCount: number;
-  setUnreadInboxCount: Dispatch<SetStateAction<number>>;
-
   // Cross-component communication
   assetToView: Asset | null;
   setAssetToView: Dispatch<SetStateAction<Asset | null>>;
@@ -146,8 +141,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
   
-  const [unreadInboxCount, setUnreadInboxCount] = useState(0);
-
   const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [dataActions, setDataActions] = useState<DataActions>({});
@@ -268,7 +261,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     manualDownloadTrigger, setManualDownloadTrigger,
     manualUploadTrigger, setManualUploadTrigger,
     isSyncing, setIsSyncing,
-    unreadInboxCount, setUnreadInboxCount,
     dataSource, setDataSource,
     assetToView, setAssetToView,
     dataActions, setDataActions,

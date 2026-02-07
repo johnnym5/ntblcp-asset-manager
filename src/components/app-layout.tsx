@@ -28,7 +28,6 @@ import {
   Bell,
   CheckCheck,
   X,
-  Inbox,
   Database,
   Flame,
   DatabaseZap,
@@ -56,10 +55,7 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/t
 import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
 import { Separator } from "./ui/separator";
-import { InboxSheet } from "./inbox-sheet";
 import { ScrollArea } from "./ui/scroll-area";
-import { saveAssets } from "@/lib/idb";
-import { sanitizeForFirestore } from "@/lib/excel-parser";
 import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
 
 
@@ -68,8 +64,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const { 
-    assets,
-    setAssets,
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
     sortConfig, setSortConfig,
@@ -80,8 +74,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setManualUploadTrigger,
     isSyncing,
     appSettings,
-    unreadInboxCount,
-    setUnreadInboxCount
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -90,7 +82,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isDbAdminOpen, setIsDbAdminOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isInboxOpen, setIsInboxOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
 
@@ -170,63 +161,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       setTimeout(() => markAllAsRead(), 500);
     }
   }
-
-  const handleApprove = async (assetId: string) => {
-    const assetToApprove = assets.find(a => a.id === assetId);
-    if (!assetToApprove || !assetToApprove.pendingChanges) return;
-
-    const approvedAsset = sanitizeForFirestore({
-        ...assetToApprove,
-        ...assetToApprove.pendingChanges,
-        approvalStatus: undefined,
-        pendingChanges: undefined,
-        changeSubmittedBy: undefined,
-        syncStatus: 'local',
-    });
-
-    const newAssets = assets.map(a => a.id === assetId ? approvedAsset : a);
-    setAssets(newAssets);
-    await saveAssets(newAssets);
-
-    addNotification({
-        title: "Change Approved",
-        description: `Changes for "${approvedAsset.description}" have been applied and will be synced.`
-    });
-  };
-
-  const handleReject = async (assetId: string) => {
-    const assetToReject = assets.find(a => a.id === assetId);
-    if (!assetToReject) return;
-
-    const rejectedAsset = {
-        ...assetToReject,
-        approvalStatus: undefined,
-        pendingChanges: undefined,
-        changeSubmittedBy: undefined,
-        syncStatus: 'local',
-    };
-    
-    const newAssets = assets.map(a => a.id === assetId ? rejectedAsset : a);
-    setAssets(newAssets);
-    await saveAssets(newAssets);
-
-    addNotification({
-        title: "Change Rejected",
-        description: `Pending changes for "${assetToReject.description}" have been discarded.`
-    });
-  };
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
-  const isAdmin = userProfile?.isAdmin || false;
-
-  useEffect(() => {
-    if (isAdmin) {
-      const pendingCount = assets.filter(a => a.approvalStatus === 'pending').length;
-      setUnreadInboxCount(pendingCount);
-    } else {
-      setUnreadInboxCount(0);
-    }
-  }, [assets, isAdmin, setUnreadInboxCount]);
 
   return (
     <div className="flex flex-col w-full min-h-screen">
@@ -304,24 +240,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Tooltip>
             </TooltipProvider>
             
-            {isAdmin && (
-                <TooltipProvider>
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <Button variant="ghost" size="icon" className="relative" onClick={() => setIsInboxOpen(true)}>
-                                <Inbox className="h-5 w-5" />
-                                {unreadInboxCount > 0 && (
-                                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white">
-                                        {unreadInboxCount}
-                                    </span>
-                                )}
-                            </Button>
-                        </TooltipTrigger>
-                        <TooltipContent><p>Approval Queue</p></TooltipContent>
-                    </Tooltip>
-                </TooltipProvider>
-            )}
-
             <TooltipProvider>
                 <Tooltip>
                     <TooltipTrigger asChild>
@@ -456,7 +374,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         missingFieldFilter={missingFieldFilter}
         setMissingFieldFilter={setMissingFieldFilter}
       />
-       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} onApprove={handleApprove} onReject={handleReject} />
        <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
         <SheetContent className="w-full sm:max-w-sm p-0 flex flex-col">
             <SheetHeader className="p-4">

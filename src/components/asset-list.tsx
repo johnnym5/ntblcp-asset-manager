@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -100,7 +99,7 @@ import { ColumnCustomizationSheet } from "./column-customization-sheet";
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
     const keys = Object.keys(b) as (keyof Asset)[];
     for (const key of keys) {
-        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'approvalStatus', 'pendingChanges', 'changeSubmittedBy'].includes(key)) {
+        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState'].includes(key)) {
             continue;
         }
         const valA = String(a[key] ?? '').trim();
@@ -596,7 +595,7 @@ export default function AssetList() {
   };
 
   const handleEditAsset = (asset: Asset) => {
-    if (!userProfile?.canEditAssets && !userProfile?.canVerifyAssets && !isAdmin) {
+    if (!userProfile?.canEditAssets && !isAdmin) {
       addNotification({ title: "Permission Denied", description: "You do not have permission to edit assets.", variant: "destructive" });
       return;
     }
@@ -749,61 +748,22 @@ export default function AssetList() {
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    const isNewAsset = !assets.some(a => a.id === assetToSave.id);
-
-    if (dataSource === 'cloud' && lockAssetList && isAdmin) {
-      if (isNewAsset) {
-          addNotification({ title: "Add Disabled", description: "Cannot add new assets to the locked main list.", variant: "destructive" });
-      } else {
-          addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
-      }
+    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+        addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
       return;
     }
 
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
 
-    const changes: Partial<Asset> = {};
-    if (originalAsset) {
-      (Object.keys(assetToSave) as Array<keyof Asset>).forEach(key => {
-        if (haveAssetDetailsChanged({ [key]: originalAsset[key] }, { [key]: assetToSave[key] })) {
-          (changes as any)[key] = assetToSave[key];
-        }
-      });
-    }
-
-    if (!originalAsset || Object.keys(changes).length > 0) {
-        let finalAsset: Asset = assetToSave;
-
-        if (isAdmin || isNewAsset) {
-            finalAsset = sanitizeForFirestore({
-                ...assetToSave,
-                lastModified: new Date().toISOString(),
-                lastModifiedBy: userProfile?.displayName,
-                lastModifiedByState: userProfile?.state,
-                syncStatus: dataSource === 'cloud' ? 'local' : undefined,
-                approvalStatus: undefined,
-                pendingChanges: undefined,
-                changeSubmittedBy: undefined,
-            });
-        } else {
-            // Non-admin user making a change
-            finalAsset = sanitizeForFirestore({
-                ...originalAsset!,
-                approvalStatus: 'pending',
-                pendingChanges: changes,
-                changeSubmittedBy: {
-                    displayName: userProfile?.displayName || 'Unknown',
-                    loginName: userProfile?.loginName || 'unknown',
-                    state: userProfile?.state || 'Unknown',
-                },
-                lastModified: new Date().toISOString(),
-                lastModifiedBy: userProfile?.displayName,
-                lastModifiedByState: userProfile?.state,
-                syncStatus: 'local',
-            });
-            addNotification({ title: 'Submitted for Approval', description: 'Your changes have been sent to an administrator for review.' });
-        }
+    if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
+        const finalAsset: Asset = sanitizeForFirestore({
+            ...assetToSave,
+            lastModified: new Date().toISOString(),
+            lastModifiedBy: userProfile?.displayName,
+            lastModifiedByState: userProfile?.state,
+            syncStatus: dataSource === 'cloud' ? 'local' : undefined,
+        });
       
       if (dataSource === 'cloud') {
         const currentAssets = await getLocalAssetsFromDb();
@@ -815,9 +775,7 @@ export default function AssetList() {
         }
         await saveAssets(currentAssets);
         setAssets(currentAssets);
-        if (isAdmin || isNewAsset) {
-            addNotification({ title: 'Saved Locally', description: 'Changes will be synced with the cloud.' });
-        }
+        addNotification({ title: 'Saved Locally', description: 'Changes will be synced with the cloud.' });
       } else {
         const currentOfflineAssets = await getLockedOfflineAssets();
         const existingIndex = currentOfflineAssets.findIndex(a => a.id === finalAsset.id);

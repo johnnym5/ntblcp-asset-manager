@@ -129,10 +129,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
                 // In management mode, non-admins can't edit anything.
                 disabled = true;
             } else if (appSettings.appMode === 'verification') {
-                const canVerify = !!userProfile?.canVerifyAssets;
+                const canEdit = !!userProfile?.canEditAssets;
                 if (['verifiedStatus', 'remarks', 'condition'].includes(fieldName)) {
-                    // In verification mode, check if the user has permission for verification fields.
-                    disabled = !canVerify;
+                    disabled = !canEdit;
                 } else {
                     // All other fields are disabled for non-admins in verification mode.
                     disabled = true;
