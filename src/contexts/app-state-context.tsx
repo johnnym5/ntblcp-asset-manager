@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
@@ -18,6 +17,7 @@ const defaultStateUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
   isGuest: false,
   canAddAssets: true,
   canEditAssets: true,
+  canVerifyAssets: true,
 }));
 
 
@@ -135,6 +135,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     databaseSource: 'rtdb',
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [isBrowserOnline, setIsBrowserOnline] = useState(true);
 
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
   const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
@@ -152,8 +153,25 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   };
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
+    
+    const handleOnline = () => setIsBrowserOnline(true);
+    const handleOffline = () => setIsBrowserOnline(false);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Set initial state
+    setIsBrowserOnline(navigator.onLine);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  useEffect(() => {
     const syncRemoteSettings = async () => {
-      if (!isOnline) return;
+      if (!isBrowserOnline) return;
 
       try {
         const remoteSettings = await getSettings();
@@ -223,7 +241,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [isOnline, settingsLoaded]);
+  }, [isBrowserOnline, settingsLoaded]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !settingsLoaded) return;
