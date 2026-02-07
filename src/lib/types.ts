@@ -61,6 +61,7 @@ export interface AuthorizedUser {
   isGuest?: boolean;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
+  canVerifyAssets?: boolean;
 }
 
 export interface DisplayField {
@@ -74,15 +75,13 @@ export interface SheetDefinition {
   name: string;
   headers: string[];
   displayFields: DisplayField[];
-  // Optional array of header keywords that can trigger the start of this sheet's data block
-  // Useful for files where multiple tables are in one sheet.
+  disabledFor?: string[]; // 'all' or list of loginNames
   subSheetTriggers?: string[]; 
 }
 
 export interface AppSettings {
   authorizedUsers: AuthorizedUser[];
   sheetDefinitions: Record<string, SheetDefinition>;
-  enabledSheets: string[];
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   databaseSource: 'firestore' | 'rtdb';

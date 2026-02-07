@@ -130,7 +130,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [appSettings, setAppSettings] = useState<AppSettings>({
     authorizedUsers: defaultStateUsers,
     sheetDefinitions: HEADER_DEFINITIONS,
-    enabledSheets: TARGET_SHEETS,
     lockAssetList: true,
     appMode: 'management',
     databaseSource: 'rtdb',
@@ -183,13 +182,25 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         localSettings = {
           authorizedUsers: defaultStateUsers,
           sheetDefinitions: HEADER_DEFINITIONS,
-          enabledSheets: TARGET_SHEETS,
           lockAssetList: true,
           appMode: 'management',
           databaseSource: 'rtdb',
         };
       } else {
         localSettings.databaseSource = 'rtdb';
+      }
+      
+      // Migration from old enabledSheets setting
+      if ((localSettings as any).enabledSheets) {
+        const enabledSheets = new Set((localSettings as any).enabledSheets);
+        Object.keys(localSettings.sheetDefinitions).forEach(sheetName => {
+          if (!enabledSheets.has(sheetName)) {
+            if (!localSettings!.sheetDefinitions[sheetName].disabledFor) {
+               localSettings!.sheetDefinitions[sheetName].disabledFor = ['all'];
+            }
+          }
+        });
+        delete (localSettings as any).enabledSheets;
       }
       
       setAppSettings(localSettings);

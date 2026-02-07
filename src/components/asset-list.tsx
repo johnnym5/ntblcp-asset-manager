@@ -221,7 +221,7 @@ export default function AssetList() {
     setShowProjectSwitchDialog,
   } = useAppState();
 
-  const { enabledSheets, lockAssetList, sheetDefinitions } = appSettings;
+  const { lockAssetList, sheetDefinitions } = appSettings;
 
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
@@ -595,7 +595,15 @@ export default function AssetList() {
   };
 
   const displayedAssets = useMemo(() => {
-    let results = allAssetsForFiltering.filter(asset => enabledSheets.includes(asset.category));
+    let results = allAssetsForFiltering.filter(asset => {
+      if (isAdmin) return true;
+      const def = sheetDefinitions[asset.category];
+      if (!def) return false;
+      const disabledFor = def.disabledFor || [];
+      if (disabledFor.includes('all')) return false;
+      if (userProfile && disabledFor.includes(userProfile.loginName)) return false;
+      return true;
+    });
 
     const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     if (hasFilters) {
@@ -621,7 +629,7 @@ export default function AssetList() {
     }
     
     return sortAssets(results, sortConfig);
-  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, sortConfig, enabledSheets]);
+  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, sortConfig, sheetDefinitions, isAdmin, userProfile]);
 
   const assetsByCategory = useMemo(() => {
     return displayedAssets.reduce((acc, asset) => {

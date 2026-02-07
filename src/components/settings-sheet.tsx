@@ -36,7 +36,7 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download, Users } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings, AuthorizedUser } from '@/lib/types';
 import { parseExcelForTemplate, parseExcelFile } from '@/lib/excel-parser';
@@ -51,6 +51,8 @@ import {
 } from '@/components/ui/select';
 import { Separator } from './ui/separator';
 import { addNotification } from '@/hooks/use-notifications';
+import { Checkbox } from './ui/checkbox';
+import { ScrollArea } from './ui/scroll-area';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -69,6 +71,9 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  
+  const [permissionSheetName, setPermissionSheetName] = useState<string | null>(null);
+  const [tempDisabledList, setTempDisabledList] = useState<string[]>([]);
 
 
   useEffect(() => {
@@ -76,7 +81,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (isOpen) {
         if (savedDraft) {
             setDraftSettings(JSON.parse(savedDraft));
-            // No toast on restore, it should feel seamless
         } else {
             setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
         }
@@ -103,9 +107,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (draftSettings.appMode !== appSettings.appMode) {
       changes.push(`App mode will be set to: ${draftSettings.appMode}.`);
     }
-    if (JSON.stringify(draftSettings.enabledSheets.sort()) !== JSON.stringify(appSettings.enabledSheets.sort())) {
-        changes.push(`Enabled sheets will be updated.`);
-    }
     if (draftSettings.lockAssetList !== appSettings.lockAssetList) {
         changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
     }
@@ -113,7 +114,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       changes.push('User list will be updated.');
     }
     if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
-      changes.push(`Sheet definitions (headers/columns) will be updated.`);
+      changes.push(`Sheet definitions (columns/permissions) will be updated.`);
     }
     return changes;
   }, [draftSettings, appSettings]);
@@ -127,24 +128,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const handleUsersChange = (newUsers: AuthorizedUser[]) => {
     if (!draftSettings) return;
     handleSettingChange('authorizedUsers', newUsers);
-  };
-
-
-  const handleToggleSheet = (sheetName: string, checked: boolean) => {
-    if (!draftSettings) return;
-    let newEnabledSheets;
-    if (checked) {
-      newEnabledSheets = [...draftSettings.enabledSheets, sheetName];
-    } else {
-      newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetName);
-    }
-    handleSettingChange('enabledSheets', newEnabledSheets);
-  };
-  
-  const handleToggleAll = (enable: boolean) => {
-    if (!draftSettings) return;
-    const allSheetNames = Object.keys(draftSettings.sheetDefinitions);
-    handleSettingChange('enabledSheets', enable ? allSheetNames : []);
   };
 
   const handleAddSheet = () => {
@@ -174,8 +157,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (!draftSettings) return;
     const newSheetDefinitions = { ...draftSettings.sheetDefinitions };
     delete newSheetDefinitions[sheetNameToDelete];
-    const newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
-    setDraftSettings(prev => prev ? ({ ...prev, sheetDefinitions: newSheetDefinitions, enabledSheets: newEnabledSheets }) : null);
+    setDraftSettings(prev => prev ? ({ ...prev, sheetDefinitions: newSheetDefinitions }) : null);
   };
   
   const handleImportTemplate = () => {
@@ -190,17 +172,12 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     try {
       const templates = await parseExcelForTemplate(file);
       let currentDefs = { ...draftSettings.sheetDefinitions };
-      let currentEnabled = [...draftSettings.enabledSheets];
       
       templates.forEach(template => {
         currentDefs[template.name] = template;
-        if (!currentEnabled.includes(template.name)) {
-          currentEnabled.push(template.name);
-        }
       });
       
       handleSettingChange('sheetDefinitions', currentDefs);
-      handleSettingChange('enabledSheets', currentEnabled);
 
       toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added/updated in your draft.` });
     } catch (error) {
@@ -236,7 +213,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     if (!draftSettings) return;
 
     let newSheetDefinitions = { ...draftSettings.sheetDefinitions };
-    let newEnabledSheets = [...draftSettings.enabledSheets];
 
     if (applyToAll) {
       for (const sheetName in newSheetDefinitions) {
@@ -249,15 +225,9 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       toast({ title: "Layout Applied to All", description: "The new column layout has been staged for all sheets. Click 'Save Changes' to confirm." });
     } else {
       if (originalName && originalName !== newDefinition.name) {
-          // If name changed, delete old and add new
           delete newSheetDefinitions[originalName];
-          newEnabledSheets = newEnabledSheets.filter(s => s !== originalName);
       }
       newSheetDefinitions[newDefinition.name] = newDefinition;
-
-      if (!newEnabledSheets.includes(newDefinition.name)) {
-        newEnabledSheets.push(newDefinition.name);
-      }
       
       toast({ title: "Sheet Layout Staged", description: `Changes for '${newDefinition.name}' are ready to be saved.` });
     }
@@ -265,9 +235,48 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     setDraftSettings(prev => prev ? ({
       ...prev,
       sheetDefinitions: newSheetDefinitions,
-      enabledSheets: newEnabledSheets,
     }) : null);
   };
+  
+  const openPermissionsDialog = (sheetName: string) => {
+    if (!draftSettings) return;
+    const sheet = draftSettings.sheetDefinitions[sheetName];
+    setTempDisabledList(sheet?.disabledFor || []);
+    setPermissionSheetName(sheetName);
+  };
+  
+  const handlePermissionSelection = (loginName: string, checked: boolean) => {
+    setTempDisabledList(prev => {
+        if (loginName === 'all') {
+            return checked ? ['all'] : [];
+        }
+        // If 'all' is selected, and a user is unchecked, remove 'all' and just have that user.
+        if (prev.includes('all') && !checked) {
+            return draftSettings?.authorizedUsers.filter(u => u.loginName !== loginName).map(u => u.loginName) || [];
+        }
+        
+        const newList = checked 
+            ? [...prev, loginName]
+            : prev.filter(name => name !== loginName);
+
+        // If all users are checked, consolidate to 'all'
+        const allUserLogins = draftSettings?.authorizedUsers.filter(u => !u.isAdmin).map(u => u.loginName) || [];
+        if (allUserLogins.length > 0 && newList.length === allUserLogins.length) {
+            return ['all'];
+        }
+        return newList;
+    });
+  };
+
+  const handleSavePermissions = () => {
+    if (!draftSettings || !permissionSheetName) return;
+
+    const newSheetDefinitions = { ...draftSettings.sheetDefinitions };
+    newSheetDefinitions[permissionSheetName].disabledFor = tempDisabledList;
+
+    handleSettingChange('sheetDefinitions', newSheetDefinitions);
+    setPermissionSheetName(null);
+  }
   
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
@@ -283,8 +292,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   }
 
   const allSheetNames = Object.keys(draftSettings.sheetDefinitions);
-  const allEnabled = allSheetNames.length > 0 && draftSettings.enabledSheets.length === allSheetNames.length;
-  const noneEnabled = draftSettings.enabledSheets.length === 0;
 
   return (
     <>
@@ -362,23 +369,14 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
             </TabsContent>
             <TabsContent value="sheets" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                  <div>
-                    <h3 className="text-lg font-medium mb-4">Sheet Definitions</h3>
-                    <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm font-medium">Toggle all sheets</p>
-                        <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(true)} disabled={allEnabled}>Enable All</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(false)} disabled={noneEnabled}>Disable All</Button>
-                        </div>
-                    </div>
+                    <h3 className="text-lg font-medium mb-4">Sheet Definitions &amp; Access</h3>
                     <div className="rounded-lg border p-3">
                         <div className="space-y-1">
                           {allSheetNames.map(sheetName => (
                             <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
-                              <div className="flex items-center">
-                                <Switch id={`switch-${sheetName}`} checked={draftSettings.enabledSheets.includes(sheetName)} onCheckedChange={(checked) => handleToggleSheet(sheetName, checked)}/>
-                                <Label htmlFor={`switch-${sheetName}`} className="text-sm pl-2 cursor-pointer">{sheetName}</Label>
-                              </div>
+                               <Label className="text-sm pl-2 cursor-pointer flex-1">{sheetName}</Label>
                               <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openPermissionsDialog(sheetName)}><Users className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditSheet(sheetName)}><Wrench className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSheet(sheetName)}><Trash2 className="h-4 w-4" /></Button>
                               </div>
@@ -464,6 +462,47 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           originalSheetName={originalSheetName}
           onSave={handleSheetDefinitionSave}
         />
+      )}
+      
+      {permissionSheetName && (
+         <AlertDialog open={!!permissionSheetName} onOpenChange={() => setPermissionSheetName(null)}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Sheet Permissions for '{permissionSheetName}'</AlertDialogTitle>
+                <AlertDialogDescription>
+                    Select which users should be **denied** access to this sheet. Admins always have access.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <ScrollArea className="h-[250px] rounded-md border">
+                  <div className="p-4 space-y-2">
+                       <div className="flex items-center space-x-2">
+                            <Checkbox 
+                                id="disable-for-all" 
+                                checked={tempDisabledList.includes('all')}
+                                onCheckedChange={(checked) => handlePermissionSelection('all', !!checked)}
+                            />
+                            <Label htmlFor="disable-for-all" className="font-bold">Disable for all non-admin users</Label>
+                       </div>
+                       <Separator />
+                       {draftSettings?.authorizedUsers.filter(u => !u.isAdmin).map(user => (
+                           <div key={user.loginName} className="flex items-center space-x-2">
+                                <Checkbox 
+                                    id={`disable-${user.loginName}`} 
+                                    checked={tempDisabledList.includes('all') || tempDisabledList.includes(user.loginName)}
+                                    onCheckedChange={(checked) => handlePermissionSelection(user.loginName, !!checked)}
+                                    disabled={tempDisabledList.includes('all')}
+                                />
+                                <Label htmlFor={`disable-${user.loginName}`}>{user.displayName}</Label>
+                           </div>
+                       ))}
+                  </div>
+              </ScrollArea>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <AlertDialogAction onClick={handleSavePermissions}>Save Permissions</AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+         </AlertDialog>
       )}
 
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
