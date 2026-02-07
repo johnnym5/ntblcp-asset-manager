@@ -81,7 +81,7 @@ import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-for
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings } from "@/lib/firestore";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, clearLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { TravelReportDialog } from "./travel-report-dialog";
@@ -1417,6 +1417,21 @@ export default function AssetList() {
     const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
     
+    const specialLocations = useMemo(() => {
+        if (!appSettings.locations) return SPECIAL_LOCATIONS.sort((a, b) => a.localeCompare(b));
+        const defaultSpecial = new Set(SPECIAL_LOCATIONS);
+        const states = new Set(NIGERIAN_STATES);
+        const zones = new Set(ZONAL_STORES);
+        
+        appSettings.locations.forEach(loc => {
+            if (!states.has(loc) && !zones.has(loc)) {
+                defaultSpecial.add(loc);
+            }
+        });
+
+        return Array.from(defaultSpecial).sort((a,b) => a.localeCompare(b));
+    }, [appSettings.locations]);
+    
     const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
     const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
 
@@ -1503,7 +1518,7 @@ export default function AssetList() {
                                 <SelectSeparator />
                                 <SelectGroup>
                                     <SelectLabel>Special Locations</SelectLabel>
-                                    {SPECIAL_LOCATIONS.map((loc) => (
+                                    {specialLocations.map((loc) => (
                                         <SelectItem key={loc} value={loc} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
                                             <LocationProgress locationName={loc} allAssets={activeAssets} appMode={appSettings.appMode} />
                                         </SelectItem>
@@ -1917,3 +1932,4 @@ export default function AssetList() {
   );
 }
 
+    
