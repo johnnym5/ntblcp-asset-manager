@@ -205,10 +205,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       
       setAppSettings(localSettings);
       await saveLocalSettings(localSettings);
-      setSettingsLoaded(true);
-
-      // Immediately after setting local state, sync with remote
+      
+      // Immediately after setting local state, sync with remote BEFORE settings are "loaded" for auth
       await syncRemoteSettings();
+      setSettingsLoaded(true);
     };
 
     if (!settingsLoaded) {
