@@ -171,7 +171,11 @@ export async function scanExcelFile(
 
     } catch (e) {
         console.error("Error scanning Excel file:", e);
-        errors.push(e instanceof Error ? e.message : "An unknown error occurred during scanning.");
+        if (e instanceof Error && e.message.toLowerCase().includes('bad compressed size')) {
+            errors.push("The selected file appears to be corrupt or is not a valid Excel (.xlsx) file. Please try re-saving the file or selecting a different one.");
+        } else {
+            errors.push(e instanceof Error ? e.message : "An unknown error occurred during scanning.");
+        }
     }
 
     return { scannedSheets, errors };
@@ -276,7 +280,9 @@ export async function parseExcelFile(
 
     } catch (e) {
         console.error("Error parsing Excel file:", e);
-        if (e instanceof Error && e.message.includes('permission')) {
+        if (e instanceof Error && e.message.toLowerCase().includes('bad compressed size')) {
+            result.errors.push("The selected file appears to be corrupt or is not a valid Excel (.xlsx) file. Please try re-saving the file or selecting a different one.");
+        } else if (e instanceof Error && e.message.includes('permission')) {
              result.errors.push('The requested file could not be read.');
         } else {
              result.errors.push(e instanceof Error ? e.message : "An unknown error occurred during parsing.");
@@ -410,5 +416,3 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
 
   return templates;
 }
-
-    

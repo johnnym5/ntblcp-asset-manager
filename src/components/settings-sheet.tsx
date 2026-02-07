@@ -68,6 +68,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
 
   useEffect(() => {
@@ -175,6 +176,42 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     delete newSheetDefinitions[sheetNameToDelete];
     const newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
     setDraftSettings(prev => prev ? ({ ...prev, sheetDefinitions: newSheetDefinitions, enabledSheets: newEnabledSheets }) : null);
+  };
+  
+  const handleImportTemplate = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!draftSettings) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const templates = await parseExcelForTemplate(file);
+      let currentDefs = { ...draftSettings.sheetDefinitions };
+      let currentEnabled = [...draftSettings.enabledSheets];
+      
+      templates.forEach(template => {
+        currentDefs[template.name] = template;
+        if (!currentEnabled.includes(template.name)) {
+          currentEnabled.push(template.name);
+        }
+      });
+      
+      handleSettingChange('sheetDefinitions', currentDefs);
+      handleSettingChange('enabledSheets', currentEnabled);
+
+      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added/updated in your draft.` });
+    } catch (error) {
+      if (error instanceof Error && error.message.toLowerCase().includes('bad compressed size')) {
+        toast({ title: 'Import Failed', description: "The selected file appears to be corrupt or is not a valid Excel (.xlsx) file.", variant: 'destructive' });
+      } else {
+        toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
+      }
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleConfirmSave = async () => {
@@ -348,6 +385,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             </div>
                           ))}
                         </div>
+                    </div>
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                        <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
+                        <Button variant="outline" className="w-full" onClick={handleAddSheet}><PlusCircle className="mr-2" /> Add Manually</Button>
+                        <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import from File</Button>
                     </div>
                   </div>
             </TabsContent>
