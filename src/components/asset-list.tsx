@@ -613,14 +613,18 @@ export default function AssetList() {
 
   const displayedAssets = useMemo(() => {
     let results = allAssetsForFiltering.filter(asset => {
-      // Super admin always has access
+      const def = sheetDefinitions[asset.category];
+      // Universal rule: if no definition or sheet is hidden, filter it out for everyone.
+      if (!def || def.isHidden) {
+          return false;
+      }
+      
+      // Super admin has access to all non-hidden sheets.
       if (userProfile?.loginName === 'admin') {
         return true;
       }
-
-      const def = sheetDefinitions[asset.category];
-      if (!def) return false;
-
+      
+      // For other users, check disabledFor permissions.
       const disabledFor = def.disabledFor || [];
 
       // Check if disabled for all non-admins
@@ -1931,5 +1935,7 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
 
     
