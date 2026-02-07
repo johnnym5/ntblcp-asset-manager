@@ -218,14 +218,16 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
       }
       
-      // Migration from old enabledSheets setting
+      // Migration from old enabledSheets setting to isHidden flag
       if ((localSettings as any).enabledSheets) {
         const enabledSheets = new Set((localSettings as any).enabledSheets);
         Object.keys(localSettings.sheetDefinitions).forEach(sheetName => {
+          // If a sheet was NOT in enabledSheets, it should now be hidden.
           if (!enabledSheets.has(sheetName)) {
-            if (!localSettings!.sheetDefinitions[sheetName].disabledFor) {
-               localSettings!.sheetDefinitions[sheetName].disabledFor = ['all'];
-            }
+            localSettings!.sheetDefinitions[sheetName].isHidden = true;
+          } else {
+            // Ensure it's not hidden if it was enabled
+            localSettings!.sheetDefinitions[sheetName].isHidden = false;
           }
         });
         delete (localSettings as any).enabledSheets;
