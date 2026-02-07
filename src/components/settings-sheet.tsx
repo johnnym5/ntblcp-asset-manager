@@ -69,8 +69,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const templateImportInputRef = React.useRef<HTMLInputElement>(null);
-  const assetImportInputRef = React.useRef<HTMLInputElement>(null);
-  const [isImporting, setIsImporting] = useState(false);
 
 
   useEffect(() => {
@@ -184,8 +182,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     templateImportInputRef.current?.click();
   };
 
-  const handleAssetImportClick = useCallback(() => assetImportInputRef.current?.click(), []);
-
   const handleTemplateFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
     if (!draftSettings) return;
     const file = event.target.files?.[0];
@@ -212,48 +208,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     } finally {
       if (templateImportInputRef.current) templateImportInputRef.current.value = "";
     }
-  };
-
-  const handleAssetFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!draftSettings) return;
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    setIsImporting(true);
-    addNotification({ title: "Parsing file...", description: "Please wait..." });
-
-    const baseAssets = await getLockedOfflineAssets();
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, draftSettings, baseAssets);
-
-    errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
-    if (skipped > 0) {
-        addNotification({ title: "Import Notice", description: `${skipped} assets were skipped (either duplicates or because the list is locked).` });
-    }
-
-    const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
-        ...asset,
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: userProfile?.displayName,
-        lastModifiedByState: userProfile?.state,
-        syncStatus: undefined
-    }));
-
-    if (allChanges.length > 0) {
-        const assetMap = new Map(baseAssets.map(a => [a.id, a]));
-        allChanges.forEach(a => assetMap.set(a.id, a));
-        const combinedAssets = Array.from(assetMap.values());
-        
-        await saveLockedOfflineAssets(combinedAssets);
-        setOfflineAssets(combinedAssets);
-        addNotification({ title: 'Imported to Locked Offline Store', description: `${allChanges.length} changes saved. Review and merge to main list when ready.` });
-        setDataSource('local_locked');
-        
-    } else if (errors.length === 0) {
-        addNotification({ title: "No Changes Detected", description: "No new or updated assets were found."});
-    }
-
-    if (assetImportInputRef.current) assetImportInputRef.current.value = "";
-    setIsImporting(false);
   };
 
 
@@ -291,11 +245,17 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       }
       toast({ title: "Layout Applied to All", description: "The new column layout has been staged for all sheets. Click 'Save Changes' to confirm." });
     } else {
-      newSheetDefinitions[newDefinition.name] = newDefinition;
       if (originalName && originalName !== newDefinition.name) {
-        delete newSheetDefinitions[originalName];
-        newEnabledSheets = newEnabledSheets.map(s => s === originalName ? newDefinition.name : s);
+          // If name changed, delete old and add new
+          delete newSheetDefinitions[originalName];
+          newEnabledSheets = newEnabledSheets.filter(s => s !== originalName);
       }
+      newSheetDefinitions[newDefinition.name] = newDefinition;
+
+      if (!newEnabledSheets.includes(newDefinition.name)) {
+        newEnabledSheets.push(newDefinition.name);
+      }
+      
       toast({ title: "Sheet Layout Staged", description: `Changes for '${newDefinition.name}' are ready to be saved.` });
     }
     
@@ -328,7 +288,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
         <SheetContent className="w-full sm:max-w-xl flex flex-col">
           <input type="file" ref={templateImportInputRef} onChange={handleTemplateFileImport} accept=".xlsx, .xls" className="hidden" />
-          <input type="file" ref={assetImportInputRef} onChange={handleAssetFileImport} accept=".xlsx, .xls" className="hidden" />
           <SheetHeader>
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
@@ -365,7 +324,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                           <p className="text-xs text-muted-foreground">
                             {draftSettings.appMode === 'management'
                               ? 'Management: Full data editing rights.'
-                              : 'Verification: Limited to status & remarks updates.'
+                              : 'Verification: Limited to status &amp; remarks updates.'
                             }
                           </p>
                         </div>
@@ -450,9 +409,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             <Separator />
                             
                             <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Bulk Data Operations</Label>
-                            <Button variant="outline" className="w-full justify-start" onClick={handleAssetImportClick} disabled={isImporting}>
-                                <FileUp className="mr-2 h-4 w-4" /> Update Assets from FAR
-                            </Button>
+                            
                             {dataActions.onScanAndImport && (
                                 <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport}>
                                     <ScanSearch className="mr-2 h-4 w-4" /> Scan &amp; Import Workbook
@@ -528,5 +485,3 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     </>
   );
 }
-
-    
