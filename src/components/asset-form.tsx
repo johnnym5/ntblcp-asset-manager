@@ -182,6 +182,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
                     </Select>
                 );
                 break;
+            case 'location':
+                component = <FormControl><Input {...form.register(fieldName)} readOnly={disabled} list="location-datalist" /></FormControl>;
+                break;
             case 'condition':
                  component = (
                     <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
@@ -248,6 +251,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
           </SheetDescription>
         </SheetHeader>
         <div className="flex-1 overflow-y-auto pr-4 py-4">
+            <datalist id="location-datalist">
+                {(appSettings.locations || []).map(loc => <option key={loc} value={loc} />)}
+            </datalist>
             <Form {...form}>
               <form
                 id="asset-form"

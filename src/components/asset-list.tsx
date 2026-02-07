@@ -51,6 +51,8 @@ import {
   CloudOff,
   Download,
   Columns,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -1324,6 +1326,24 @@ export default function AssetList() {
     }
   };
 
+  const handleToggleSheetVisibility = async (sheetName: string) => {
+    if (!isAdmin) return;
+
+    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
+    newSheetDefinitions[sheetName].isHidden = !newSheetDefinitions[sheetName].isHidden;
+
+    const newSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions };
+    setAppSettings(newSettings);
+
+    try {
+        await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
+        await saveLocalSettings(newSettings);
+        toast({ title: 'Visibility Changed', description: `Sheet '${sheetName}' is now ${newSheetDefinitions[sheetName].isHidden ? 'hidden' : 'visible'}.` });
+    } catch (e) {
+        toast({ title: 'Error', description: 'Could not save visibility settings.', variant: 'destructive' });
+    }
+  };
+
 
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
@@ -1334,9 +1354,10 @@ export default function AssetList() {
       const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
       const percentage = total > 0 ? (verified / total) * 100 : 0;
       const isSelected = selectedCategories.includes(category);
+      const isHidden = sheetDefinitions[category]?.isHidden;
       
       return (
-          <Card key={category} className={cn("hover:shadow-md transition-shadow flex flex-col", isSelected && "ring-2 ring-primary")}>
+          <Card key={category} className={cn("hover:shadow-md transition-shadow flex flex-col", isSelected && "ring-2 ring-primary", isHidden && "opacity-50")}>
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
                 <div className="flex-1">
                   <CardTitle className="text-sm font-medium pr-2">{category}</CardTitle>
@@ -1355,6 +1376,10 @@ export default function AssetList() {
                          <DropdownMenuItem onSelect={() => handleEditSheetLayout(category)} disabled={isGuest || !isAdmin}>
                           <Columns className="mr-2 h-4 w-4" />
                           Edit Layout
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onSelect={() => handleToggleSheetVisibility(category)} disabled={isGuest || !isAdmin}>
+                            {isHidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
+                            {isHidden ? 'Show Sheet' : 'Hide Sheet'}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={() => handleClearCategoryClick(category)} disabled={isGuest || !isAdmin} className="text-destructive focus:text-destructive">
@@ -1395,7 +1420,7 @@ export default function AssetList() {
     const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
     const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
 
-    const mainCategories = Object.keys(assetsByCategory).sort((a,b) => a.localeCompare(b));
+    const mainCategories = Object.keys(assetsByCategory).filter(cat => !sheetDefinitions[cat]?.isHidden).sort((a,b) => a.localeCompare(b));
 
     return (
       <div className="flex flex-col h-full gap-4">
@@ -1891,6 +1916,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-
-    

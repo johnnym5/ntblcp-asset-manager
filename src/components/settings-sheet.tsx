@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -36,7 +35,7 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download, Users } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download, Users, Eye, EyeOff, MapPin, KeyRound } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings, AuthorizedUser } from '@/lib/types';
 import { parseExcelForTemplate, parseExcelFile } from '@/lib/excel-parser';
@@ -54,6 +53,7 @@ import { addNotification } from '@/hooks/use-notifications';
 import { Checkbox } from './ui/checkbox';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
+import { Input } from './ui/input';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -75,6 +75,13 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   
   const [permissionSheetName, setPermissionSheetName] = useState<string | null>(null);
   const [tempDisabledList, setTempDisabledList] = useState<string[]>([]);
+  const [newLocation, setNewLocation] = useState('');
+  
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmNewPassword, setConfirmNewPassword] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [passwordSuccess, setPasswordSuccess] = useState('');
 
 
   useEffect(() => {
@@ -88,6 +95,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     } else {
         setDraftSettings(null);
         localStorage.removeItem('ntblcp-settings-draft');
+        setPasswordError('');
+        setPasswordSuccess('');
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmNewPassword('');
     }
   }, [isOpen, appSettings]);
   
@@ -112,10 +124,13 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
         changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
     }
     if (JSON.stringify(draftSettings.authorizedUsers) !== JSON.stringify(appSettings.authorizedUsers)) {
-      changes.push('User list will be updated.');
+      changes.push('User list or passwords will be updated.');
     }
     if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
       changes.push(`Sheet definitions (columns/permissions) will be updated.`);
+    }
+    if (JSON.stringify(draftSettings.locations) !== JSON.stringify(appSettings.locations)) {
+      changes.push('Location list will be updated.');
     }
     return changes;
   }, [draftSettings, appSettings]);
@@ -181,7 +196,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
         if (sanitizedName !== template.name) {
             sanitizedCount++;
         }
-        // If an existing unsanitized sheet definition is being overwritten, remove it.
         if (sanitizedName !== template.name && currentDefs[template.name]) {
             delete currentDefs[template.name];
         }
@@ -267,21 +281,18 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     setTempDisabledList(prev => {
         const isCurrentlyAll = prev.includes('all');
         const allNonAdminLogins = draftSettings?.authorizedUsers.filter(u => !u.isAdmin).map(u => u.loginName) || [];
-        const loginNameIsAdmin = draftSettings?.authorizedUsers.find(u => u.loginName === loginName)?.isAdmin;
+        const user = draftSettings?.authorizedUsers.find(u => u.loginName === loginName);
+        const loginNameIsAdmin = user?.isAdmin || user?.loginName === 'admin';
 
-        // This is for "Disable for all non-admin users"
         if (loginName === 'all') {
             if (checked) {
-                // Add 'all' but preserve any individually selected admins.
-                const admins = prev.filter(name => !allNonAdminLogins.includes(name) && name !== 'all');
+                const admins = prev.filter(name => allNonAdminLogins.includes(name) === false && name !== 'all');
                 return [...new Set(['all', ...admins])];
             } else {
-                // Just remove 'all', keep any individually selected admins.
                 return prev.filter(name => name !== 'all');
             }
         }
 
-        // --- Individual user selection logic ---
         let currentSelections = isCurrentlyAll && !loginNameIsAdmin
             ? [...allNonAdminLogins, ...prev.filter(name => !allNonAdminLogins.includes(name) && name !== 'all')] 
             : [...prev];
@@ -312,6 +323,69 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     handleSettingChange('sheetDefinitions', newSheetDefinitions);
     setPermissionSheetName(null);
   }
+
+  const handleToggleSheetVisibility = (sheetName: string) => {
+    if (!draftSettings) return;
+    const newSheetDefinitions = { ...draftSettings.sheetDefinitions };
+    newSheetDefinitions[sheetName].isHidden = !newSheetDefinitions[sheetName].isHidden;
+    handleSettingChange('sheetDefinitions', newSheetDefinitions);
+  };
+  
+  const handleAddNewLocation = () => {
+    if (!draftSettings || !newLocation.trim()) return;
+    const updatedLocations = [...(draftSettings.locations || []), newLocation.trim()];
+    handleSettingChange('locations', updatedLocations);
+    setNewLocation('');
+  };
+
+  const handleDeleteLocation = (locationToDelete: string) => {
+    if (!draftSettings) return;
+    const updatedLocations = (draftSettings.locations || []).filter(loc => loc !== locationToDelete);
+    handleSettingChange('locations', updatedLocations);
+  };
+  
+  const handleChangePassword = () => {
+    setPasswordError('');
+    setPasswordSuccess('');
+
+    if (!userProfile || !draftSettings) return;
+    if (newPassword.length < 6) {
+        setPasswordError("New password must be at least 6 characters.");
+        return;
+    }
+    if (newPassword !== confirmNewPassword) {
+        setPasswordError("New passwords do not match.");
+        return;
+    }
+
+    const allUsers = [...draftSettings.authorizedUsers, { loginName: 'admin', displayName: 'Super Admin', password: 'setup', states: ['All'], isAdmin: true }];
+    const userIndex = allUsers.findIndex(u => u.loginName === userProfile.loginName);
+    
+    if (userIndex === -1) {
+        setPasswordError("Could not find your user profile to update.");
+        return;
+    }
+
+    const user = allUsers[userIndex];
+    if (user.password !== currentPassword) {
+        setPasswordError("Your current password is not correct.");
+        return;
+    }
+    
+    // Create a new array and update the user
+    const updatedUsers = [...draftSettings.authorizedUsers];
+    const userToUpdateIndex = updatedUsers.findIndex(u => u.loginName === userProfile.loginName);
+    if(userToUpdateIndex > -1) {
+      updatedUsers[userToUpdateIndex].password = newPassword;
+      handleSettingChange('authorizedUsers', updatedUsers);
+      setPasswordSuccess("Password changed successfully! Click 'Save Changes' below to confirm.");
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmNewPassword('');
+    } else {
+        setPasswordError("An unexpected error occurred. Could not stage password change.");
+    }
+  };
   
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
@@ -331,7 +405,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-xl flex flex-col">
+        <SheetContent className="w-full sm:max-w-2xl flex flex-col">
           <SheetHeader>
             <SheetTitle>Settings</SheetTitle>
             <SheetDescription>
@@ -339,10 +413,11 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
             </SheetDescription>
           </SheetHeader>
           <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-y-hidden">
-            <TabsList className="grid w-full grid-cols-4">
+            <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
                 <TabsTrigger value="users" disabled={isGuest || !isAdmin}><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
                 <TabsTrigger value="sheets" disabled={isGuest || !isAdmin}><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
+                <TabsTrigger value="locations" disabled={isGuest || !isAdmin}><MapPin className="mr-2 h-4 w-4" />Locations</TabsTrigger>
                 <TabsTrigger value="data" disabled={isGuest || !isAdmin}><Database className="mr-2 h-4 w-4" />Data</TabsTrigger>
             </TabsList>
             <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
@@ -356,6 +431,29 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             <Button variant="outline" size="sm" onClick={() => setTheme('system')}><Database className="mr-2"/>System</Button>
                         </div>
                     </div>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-medium">Security</h3>
+                  <div className="rounded-lg border p-4 space-y-4">
+                    <Label className="flex items-center gap-2 text-sm font-medium"><KeyRound className="h-4 w-4" /> Change Your Password</Label>
+                      <div className="space-y-2">
+                        <Label htmlFor="current-password">Current Password</Label>
+                        <Input id="current-password" type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} />
+                      </div>
+                       <div className="space-y-2">
+                        <Label htmlFor="new-password">New Password</Label>
+                        <Input id="new-password" type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} />
+                      </div>
+                       <div className="space-y-2">
+                        <Label htmlFor="confirm-new-password">Confirm New Password</Label>
+                        <Input id="confirm-new-password" type="password" value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} />
+                      </div>
+                      {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
+                      {passwordSuccess && <p className="text-sm text-green-600">{passwordSuccess}</p>}
+                      <Button size="sm" onClick={handleChangePassword}>Stage Password Change</Button>
+                      <p className="text-xs text-muted-foreground">Your password change will be saved when you click "Save Changes" at the bottom of the panel.</p>
+                  </div>
                 </div>
 
                 {isAdmin && (
@@ -411,6 +509,9 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
                                <Label className="text-sm pl-2 cursor-pointer flex-1">{sheetName}</Label>
                               <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleSheetVisibility(sheetName)}>
+                                  {draftSettings.sheetDefinitions[sheetName].isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                </Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openPermissionsDialog(sheetName)}><Users className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditSheet(sheetName)}><Wrench className="h-4 w-4" /></Button>
                                 <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSheet(sheetName)}><Trash2 className="h-4 w-4" /></Button>
@@ -425,6 +526,32 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                         <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import from File</Button>
                     </div>
                   </div>
+            </TabsContent>
+            <TabsContent value="locations" className="flex-1 flex flex-col overflow-hidden pt-4 space-y-4 pr-2">
+              <h3 className="text-lg font-medium px-1">Manage Locations</h3>
+              <div className="rounded-lg border p-3">
+                <div className="flex gap-2">
+                  <Input 
+                    placeholder="Enter new location name" 
+                    value={newLocation} 
+                    onChange={(e) => setNewLocation(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleAddNewLocation()}
+                  />
+                  <Button onClick={handleAddNewLocation} disabled={!newLocation.trim()}>Add</Button>
+                </div>
+              </div>
+              <ScrollArea className="flex-1 rounded-lg border">
+                <div className="p-2 space-y-1">
+                  {(draftSettings.locations || []).map(location => (
+                    <div key={location} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md">
+                      <p className="text-sm">{location}</p>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteLocation(location)}>
+                        <Trash2 className="h-4 w-4"/>
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
             </TabsContent>
             <TabsContent value="data" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
@@ -505,7 +632,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Sheet Permissions for '{permissionSheetName}'</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Select which users should be **denied** access to this sheet. The 'super-admin' user always has access.
+                    Select which users should be **denied** access to this sheet. The super-admin user always has access.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <ScrollArea className="h-[250px] rounded-md border">
@@ -568,5 +695,3 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     </>
   );
 }
-
-    

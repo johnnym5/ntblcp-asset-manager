@@ -76,6 +76,7 @@ export interface SheetDefinition {
   headers: string[];
   displayFields: DisplayField[];
   disabledFor?: string[]; // 'all' or list of loginNames
+  isHidden?: boolean;
   subSheetTriggers?: string[]; 
 }
 
@@ -85,5 +86,6 @@ export interface AppSettings {
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   databaseSource: 'firestore' | 'rtdb';
+  locations?: string[];
   lastModified?: string;
 }

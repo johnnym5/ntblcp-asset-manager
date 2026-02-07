@@ -1,8 +1,9 @@
+
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
-import { TARGET_SHEETS, NIGERIAN_STATES, HEADER_DEFINITIONS } from '@/lib/constants';
+import { NIGERIAN_STATES, HEADER_DEFINITIONS, ZONAL_STORES, SPECIAL_LOCATIONS } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
 import { getSettings, updateSettings } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
@@ -102,6 +103,8 @@ interface AppStateContextType {
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
+const defaultInitialLocations = [...NIGERIAN_STATES, ...ZONAL_STORES, ...SPECIAL_LOCATIONS];
+
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
@@ -133,6 +136,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     lockAssetList: true,
     appMode: 'management',
     databaseSource: 'rtdb',
+    locations: defaultInitialLocations,
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isBrowserOnline, setIsBrowserOnline] = useState(true);
@@ -183,7 +187,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
           if (remoteTimestamp > localTimestamp) {
             console.log("Found newer settings in the cloud, updating local state.");
-            const finalSettings = { ...remoteSettings, databaseSource: 'rtdb' as const };
+            const finalSettings = { ...remoteSettings, databaseSource: 'rtdb' as const, locations: remoteSettings.locations || defaultInitialLocations };
             setAppSettings(finalSettings);
             await saveLocalSettings(finalSettings);
           }
@@ -203,9 +207,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           lockAssetList: true,
           appMode: 'management',
           databaseSource: 'rtdb',
+          locations: defaultInitialLocations,
         };
       } else {
         localSettings.databaseSource = 'rtdb';
+        if (!localSettings.locations) {
+          localSettings.locations = defaultInitialLocations;
+        }
       }
       
       // Migration from old enabledSheets setting
