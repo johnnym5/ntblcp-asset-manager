@@ -189,7 +189,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             </DialogDescription>
           </DialogHeader>
           
-          <ScrollArea className="flex-1">
+          <div className="flex-1 overflow-y-auto">
             <div className="py-4 pr-6 space-y-6">
 
               <Card>
@@ -280,7 +280,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                   </CardContent>
               </Card>
             </div>
-          </ScrollArea>
+          </div>
 
           <DialogFooter className="mt-auto">
             <DialogClose asChild>
