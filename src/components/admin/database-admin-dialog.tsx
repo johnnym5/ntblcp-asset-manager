@@ -56,8 +56,15 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [isClearing, setIsClearing] = useState(false);
+
+  const [isClearingAll, setIsClearingAll] = useState(false);
+  const [isClearingFirestore, setIsClearingFirestore] = useState(false);
+  const [isClearingRTDB, setIsClearingRTDB] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+
+  const [isClearAllConfirmOpen, setIsClearAllConfirmOpen] = useState(false);
+  const [isClearFirestoreConfirmOpen, setIsClearFirestoreConfirmOpen] = useState(false);
+  const [isClearRTDBConfirmOpen, setIsClearRTDBConfirmOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -99,21 +106,51 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       setIsSyncing(false);
   }
 
+  const handleClearFirestore = async () => {
+    setIsClearingFirestore(true);
+    setIsClearFirestoreConfirmOpen(false);
+    addNotification({ title: "Clearing Firestore...", description: "This may take a moment."});
+    try {
+        const firestoreAssets = await getAssetsFirestore();
+        if (firestoreAssets.length > 0) {
+            await batchDeleteAssetsFirestore(firestoreAssets.map(a => a.id));
+        }
+        addNotification({ title: "Firestore Cleared", description: "All assets in Cloud Firestore have been deleted."});
+    } catch (e) {
+        addNotification({ title: 'Firestore Clear Failed', description: (e as Error).message, variant: 'destructive'});
+    }
+    setIsClearingFirestore(false);
+  }
+
+  const handleClearRtdb = async () => {
+      setIsClearingRTDB(true);
+      setIsClearRTDBConfirmOpen(false);
+      addNotification({ title: "Clearing Realtime DB...", description: "This may take a moment."});
+      try {
+          const rtdbAssets = await getAssetsRTDB();
+          if (rtdbAssets.length > 0) {
+              await batchDeleteAssetsRTDB(rtdbAssets.map(a => a.id));
+          }
+          addNotification({ title: "Realtime DB Cleared", description: "All assets in Realtime Database have been deleted."});
+      } catch (e) {
+          addNotification({ title: 'Realtime DB Clear Failed', description: (e as Error).message, variant: 'destructive'});
+      }
+      setIsClearingRTDB(false);
+  }
+
   const handleClearAll = async () => {
-      setIsClearing(true);
+      setIsClearingAll(true);
+      setIsClearAllConfirmOpen(false);
       addNotification({ title: "Clearing All Databases...", description: "This may take a moment."});
       try {
-        // Clear local IndexedDB
         await clearLocalAssets();
         setAssets([]);
 
-        // Clear Cloud Firestore
         const firestoreAssets = await getAssetsFirestore();
         if (firestoreAssets.length > 0) {
             await batchDeleteAssetsFirestore(firestoreAssets.map(a => a.id));
         }
         
-        // Clear Realtime Database
         const rtdbAssets = await getAssetsRTDB();
         if (rtdbAssets.length > 0) {
             await batchDeleteAssetsRTDB(rtdbAssets.map(a => a.id));
@@ -123,7 +160,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       } catch (e) {
         addNotification({ title: 'Clear Failed', description: (e as Error).message, variant: 'destructive'});
       }
-      setIsClearing(false);
+      setIsClearingAll(false);
   }
 
   const handleCopyToRTDB = async () => {
@@ -137,6 +174,8 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   }
   
   if (!draftSettings) return null;
+
+  const isAnyClearing = isClearingAll || isClearingFirestore || isClearingRTDB;
 
   return (
     <>
@@ -223,9 +262,17 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                     <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle/> Danger Zone</CardTitle>
                     <CardDescription>These actions are irreversible and will affect all data.</CardDescription>
                 </CardHeader>
-                <CardContent>
-                    <Button variant="destructive" className="w-full justify-start" onClick={handleClearAll} disabled={isClearing}>
-                        {isClearing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                <CardContent className="space-y-2">
+                    <Button variant="destructive" className="w-full justify-start" onClick={() => setIsClearFirestoreConfirmOpen(true)} disabled={isAnyClearing}>
+                        {isClearingFirestore ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                        Clear Firestore Assets Only
+                    </Button>
+                    <Button variant="destructive" className="w-full justify-start" onClick={() => setIsClearRTDBConfirmOpen(true)} disabled={isAnyClearing}>
+                        {isClearingRTDB ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
+                        Clear Realtime DB Assets Only
+                    </Button>
+                    <Button variant="destructive" className="w-full justify-start" onClick={() => setIsClearAllConfirmOpen(true)} disabled={isAnyClearing}>
+                        {isClearingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
                         Clear All Assets in ALL Databases
                     </Button>
                 </CardContent>
@@ -253,6 +300,51 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             <AlertDialogAction onClick={handleConfirmSave}>Confirm & Save</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isClearFirestoreConfirmOpen} onOpenChange={setIsClearFirestoreConfirmOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Clear Firestore Assets?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      This will permanently delete all assets from Cloud Firestore. This is useful if the data is corrupt. You can re-sync from the Realtime Database afterwards.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearFirestore} className="bg-destructive hover:bg-destructive/90">Confirm & Clear Firestore</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isClearRTDBConfirmOpen} onOpenChange={setIsClearRTDBConfirmOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Clear Realtime DB Assets?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      This will permanently delete all assets from the Realtime Database. This is useful if the data is corrupt. You can re-sync from Firestore afterwards.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearRtdb} className="bg-destructive hover:bg-destructive/90">Confirm & Clear Realtime DB</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isClearAllConfirmOpen} onOpenChange={setIsClearAllConfirmOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Clear ALL Databases?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                      This is irreversible. It will delete all assets from your local device, from Cloud Firestore, AND from the Realtime Database.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleClearAll} className="bg-destructive hover:bg-destructive/90">Confirm & Delete Everything</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
       </AlertDialog>
     </>
   );
