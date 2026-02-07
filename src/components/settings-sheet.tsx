@@ -412,7 +412,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
               Manage application settings and preferences. Admin changes apply to all users.
             </SheetDescription>
           </SheetHeader>
-          <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-y-hidden">
+          <Tabs defaultValue="general" className="flex-1 flex flex-col">
             <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
                 <TabsTrigger value="users" disabled={isGuest || !isAdmin}><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
