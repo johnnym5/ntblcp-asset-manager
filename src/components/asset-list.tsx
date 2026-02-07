@@ -544,7 +544,6 @@ export default function AssetList() {
   }, [appSettings.appMode, setStatusOptions]);
 
   const allAssetsForFiltering = useMemo(() => {
-    const currentAssets = dataSource === 'cloud' ? assets : offlineAssets;
     if (isAdmin && globalStateFilter && globalStateFilter !== 'All') {
         const zones: Record<string, string[]> = NIGERIAN_ZONES;
         const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
@@ -552,7 +551,7 @@ export default function AssetList() {
 
         if (isZone) {
             const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-            return currentAssets.filter(asset => {
+            return activeAssets.filter(asset => {
                 const assetLocation = (asset.location || "").toLowerCase().trim();
                 return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
             });
@@ -560,12 +559,12 @@ export default function AssetList() {
         
         if (SPECIAL_LOCATIONS.includes(globalStateFilter)) {
             const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-            return currentAssets.filter(asset => (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter));
+            return activeAssets.filter(asset => (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter));
         }
 
         const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
         const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
-        return currentAssets.filter(asset => {
+        return activeAssets.filter(asset => {
             const assetLocation = (asset.location || "").toLowerCase().trim();
             const matchesState = assetLocation.startsWith(lowerCaseFilter);
             const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
@@ -575,15 +574,15 @@ export default function AssetList() {
     } else if (!isAdmin && userProfile?.state) {
         const lowerCaseFilter = userProfile.state.toLowerCase().trim();
         const capitalCity = NIGERIAN_STATE_CAPITALS[userProfile.state]?.toLowerCase().trim();
-        return currentAssets.filter(asset => {
+        return activeAssets.filter(asset => {
             const assetLocation = (asset.location || "").toLowerCase().trim();
             const matchesState = assetLocation.startsWith(lowerCaseFilter);
             const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
             return matchesState || matchesCapital;
         });
     }
-    return currentAssets;
-  }, [assets, offlineAssets, dataSource, globalStateFilter, isAdmin, userProfile?.state]);
+    return activeAssets;
+  }, [activeAssets, globalStateFilter, isAdmin, userProfile?.state]);
   
   useEffect(() => {
     const locations = new Map<string, number>();
@@ -1937,4 +1936,3 @@ export default function AssetList() {
     </div>
   );
 }
-
