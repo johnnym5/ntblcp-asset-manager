@@ -162,7 +162,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
         <DialogHeader>
           <DialogTitle>Scan and Import Workbook</DialogTitle>
           <DialogDescription>
-            Select an Excel file to scan for compatible asset sheets. Choose which sheets to import.
+            Select an Excel file to scan. The system will automatically match sheets to your templates, which you can then review and change before importing.
           </DialogDescription>
         </DialogHeader>
         <div className="py-4 space-y-4">
@@ -193,7 +193,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                 <CardDescription>
                   {isScanning 
                     ? "Scanning your workbook for asset data..." 
-                    : "Review the sheets found in your workbook below."}
+                    : "Review the automatic matches for the sheets found in your workbook."}
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -216,62 +216,60 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                        </div>
                     </div>
                     <Separator />
-                    <ScrollArea className="h-[200px] pr-3">
+                    <ScrollArea className="h-[250px] pr-3">
                       <div className="space-y-2 p-1">
                         {scanResults.map(result => (
                           <Collapsible key={result.sheetName} asChild>
-                            <div className="p-2 rounded-md border">
-                                <div className="flex items-start">
+                            <div className="p-3 rounded-md border bg-muted/50">
+                                <div className="flex items-center">
                                     <Checkbox
                                         id={`sheet-${result.sheetName}`}
-                                        className="mr-3 mt-1"
+                                        className="mr-3 mt-1 self-start"
                                         checked={selectedSheets.includes(result.sheetName)}
                                         onCheckedChange={(checked) => handleSelectSheet(result.sheetName, checked as boolean)}
                                     />
-                                    <div className="flex-1 grid grid-cols-2 gap-4 items-start">
-                                        <div>
-                                            <Label htmlFor={`sheet-${result.sheetName}`} className="font-medium cursor-pointer">{result.sheetName}</Label>
-                                            <p className="text-xs text-muted-foreground">
-                                                Found {result.rowCount} data rows.
-                                            </p>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <Label className="text-xs">Import as</Label>
-                                            <Select
-                                                value={result.definitionName}
-                                                onValueChange={(newDefName) => {
-                                                    const newScanResults = scanResults.map(r => 
-                                                        r.sheetName === result.sheetName 
-                                                            ? { ...r, definitionName: newDefName } 
-                                                            : r
-                                                    );
-                                                    setScanResults(newScanResults);
-                                                }}
-                                            >
-                                                <SelectTrigger className="h-8 text-xs">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {Object.keys(appSettings.sheetDefinitions).map(defName => (
-                                                        <SelectItem key={defName} value={defName} className="text-xs">{defName}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                    </div>
+                                    <Label htmlFor={`sheet-${result.sheetName}`} className="flex-1 cursor-pointer">
+                                        <p className="font-medium">{result.sheetName}</p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Found {result.rowCount} potential asset rows.
+                                        </p>
+                                    </Label>
                                     <CollapsibleTrigger asChild>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 ml-2">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8">
                                             <ChevronsUpDown className="h-4 w-4" />
                                             <span className="sr-only">View headers</span>
                                         </Button>
                                     </CollapsibleTrigger>
                                 </div>
-                                <CollapsibleContent>
-                                    <div className="pt-2 mt-2 border-t">
-                                        <p className="text-xs font-semibold text-muted-foreground mb-2">Headers Found:</p>
+                                <div className="pl-7 pt-3 space-y-1">
+                                    <Label className="text-xs font-semibold">Matched Template</Label>
+                                    <Select
+                                        value={result.definitionName}
+                                        onValueChange={(newDefName) => {
+                                            const newScanResults = scanResults.map(r => 
+                                                r.sheetName === result.sheetName 
+                                                    ? { ...r, definitionName: newDefName } 
+                                                    : r
+                                            );
+                                            setScanResults(newScanResults);
+                                        }}
+                                    >
+                                        <SelectTrigger className="h-9 text-sm">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {Object.keys(appSettings.sheetDefinitions).map(defName => (
+                                                <SelectItem key={defName} value={defName} className="text-sm">{defName}</SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <CollapsibleContent className="pt-3 mt-3 border-t">
+                                    <div className="pl-7">
+                                        <p className="text-xs font-semibold text-muted-foreground mb-2">Headers Found in File:</p>
                                         <div className="flex flex-wrap gap-1">
                                             {result.headers.map((header, i) => (
-                                                <Badge key={i} variant="secondary">{header}</Badge>
+                                                <Badge key={i} variant="secondary" className="font-normal">{header}</Badge>
                                             ))}
                                         </div>
                                     </div>
