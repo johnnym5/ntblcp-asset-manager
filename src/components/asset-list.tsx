@@ -596,12 +596,26 @@ export default function AssetList() {
 
   const displayedAssets = useMemo(() => {
     let results = allAssetsForFiltering.filter(asset => {
-      if (isAdmin) return true;
+      // Super admin always has access
+      if (userProfile?.loginName === 'admin') {
+        return true;
+      }
+
       const def = sheetDefinitions[asset.category];
       if (!def) return false;
+
       const disabledFor = def.disabledFor || [];
-      if (disabledFor.includes('all')) return false;
-      if (userProfile && disabledFor.includes(userProfile.loginName)) return false;
+
+      // Check if disabled for all non-admins
+      if (disabledFor.includes('all') && !userProfile?.isAdmin) {
+          return false;
+      }
+
+      // Check if disabled for the specific user
+      if (userProfile && disabledFor.includes(userProfile.loginName)) {
+          return false;
+      }
+      
       return true;
     });
 
@@ -1877,3 +1891,6 @@ export default function AssetList() {
     </div>
   );
 }
+
+
+    

@@ -53,6 +53,7 @@ import { Separator } from './ui/separator';
 import { addNotification } from '@/hooks/use-notifications';
 import { Checkbox } from './ui/checkbox';
 import { ScrollArea } from './ui/scroll-area';
+import { Badge } from './ui/badge';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -139,7 +140,8 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
         { key: 'description', label: 'Description', table: true, quickView: true },
         { key: 'location', label: 'Location', table: true, quickView: true },
         { key: 'verifiedStatus', label: 'Verified Status', table: true, quickView: true },
-      ]
+      ],
+      disabledFor: [],
     };
     setSheetToEdit(newSheet);
     setOriginalSheetName(null);
@@ -263,24 +265,41 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   
   const handlePermissionSelection = (loginName: string, checked: boolean) => {
     setTempDisabledList(prev => {
+        const isCurrentlyAll = prev.includes('all');
+        const allNonAdminLogins = draftSettings?.authorizedUsers.filter(u => !u.isAdmin).map(u => u.loginName) || [];
+        const loginNameIsAdmin = draftSettings?.authorizedUsers.find(u => u.loginName === loginName)?.isAdmin;
+
+        // This is for "Disable for all non-admin users"
         if (loginName === 'all') {
-            return checked ? ['all'] : [];
+            if (checked) {
+                // Add 'all' but preserve any individually selected admins.
+                const admins = prev.filter(name => !allNonAdminLogins.includes(name) && name !== 'all');
+                return [...new Set(['all', ...admins])];
+            } else {
+                // Just remove 'all', keep any individually selected admins.
+                return prev.filter(name => name !== 'all');
+            }
         }
-        // If 'all' is selected, and a user is unchecked, remove 'all' and just have that user.
-        if (prev.includes('all') && !checked) {
-            return draftSettings?.authorizedUsers.filter(u => u.loginName !== loginName).map(u => u.loginName) || [];
+
+        // --- Individual user selection logic ---
+        let currentSelections = isCurrentlyAll && !loginNameIsAdmin
+            ? [...allNonAdminLogins, ...prev.filter(name => !allNonAdminLogins.includes(name) && name !== 'all')] 
+            : [...prev];
+
+        if (checked) {
+            currentSelections = [...currentSelections, loginName];
+        } else {
+            currentSelections = currentSelections.filter(name => name !== loginName);
         }
         
-        const newList = checked 
-            ? [...prev, loginName]
-            : prev.filter(name => name !== loginName);
+        const selectedNonAdmins = currentSelections.filter(name => allNonAdminLogins.includes(name));
+        const adminSelections = currentSelections.filter(name => !allNonAdminLogins.includes(name));
 
-        // If all users are checked, consolidate to 'all'
-        const allUserLogins = draftSettings?.authorizedUsers.filter(u => !u.isAdmin).map(u => u.loginName) || [];
-        if (allUserLogins.length > 0 && newList.length === allUserLogins.length) {
-            return ['all'];
+        if (allNonAdminLogins.length > 0 && selectedNonAdmins.length === allNonAdminLogins.length) {
+            return [...new Set(['all', ...adminSelections])];
         }
-        return newList;
+
+        return [...new Set(currentSelections.filter(name => name !== 'all'))];
     });
   };
 
@@ -486,7 +505,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
               <AlertDialogHeader>
                 <AlertDialogTitle>Sheet Permissions for '{permissionSheetName}'</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Select which users should be **denied** access to this sheet. Admins always have access.
+                    Select which users should be **denied** access to this sheet. The 'super-admin' user always has access.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <ScrollArea className="h-[250px] rounded-md border">
@@ -500,15 +519,18 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                             <Label htmlFor="disable-for-all" className="font-bold">Disable for all non-admin users</Label>
                        </div>
                        <Separator />
-                       {draftSettings?.authorizedUsers.filter(u => !u.isAdmin).map(user => (
+                       {draftSettings?.authorizedUsers.filter(u => u.loginName !== 'admin').map(user => (
                            <div key={user.loginName} className="flex items-center space-x-2">
                                 <Checkbox 
                                     id={`disable-${user.loginName}`} 
-                                    checked={tempDisabledList.includes('all') || tempDisabledList.includes(user.loginName)}
+                                    checked={!user.isAdmin && tempDisabledList.includes('all') ? true : tempDisabledList.includes(user.loginName)}
                                     onCheckedChange={(checked) => handlePermissionSelection(user.loginName, !!checked)}
-                                    disabled={tempDisabledList.includes('all')}
+                                    disabled={!user.isAdmin && tempDisabledList.includes('all')}
                                 />
-                                <Label htmlFor={`disable-${user.loginName}`}>{user.displayName}</Label>
+                                <Label htmlFor={`disable-${user.loginName}`} className="flex items-center">
+                                  {user.displayName}
+                                  {user.isAdmin && <Badge variant="secondary" className="ml-2">Admin</Badge>}
+                                </Label>
                            </div>
                        ))}
                   </div>
@@ -546,3 +568,5 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     </>
   );
 }
+
+    
