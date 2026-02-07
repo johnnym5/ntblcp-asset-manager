@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -74,10 +75,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const handleConfirmSave = async () => {
     if (!draftSettings) return;
     try {
-      await updateSettings(draftSettings);
-      await saveLocalSettings(draftSettings);
-      setAppSettings(draftSettings);
-      toast({ title: "Database Preference Saved", description: `The app will now use ${draftSettings.databaseSource} on next load.` });
+      const settingsToSave: AppSettings = { ...draftSettings, lastModified: new Date().toISOString() };
+      await updateSettings(settingsToSave);
+      await saveLocalSettings(settingsToSave);
+      setAppSettings(settingsToSave);
+      toast({ title: "Database Preference Saved", description: `The app will now use ${settingsToSave.databaseSource} on next load.` });
     } catch (e) {
       toast({ title: "Save Failed", description: "Could not save settings to the database.", variant: "destructive" });
     } finally {
@@ -218,7 +220,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
           <AlertDialogHeader>
             <AlertDialogTitle>Save Database Preference?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will set the primary database to **{draftSettings.databaseSource}**. The application will use this database upon the next reload for all users.
+              This will set the primary database to **{draftSettings?.databaseSource}**. The application will use this database upon the next reload for all users.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

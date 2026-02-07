@@ -1,3 +1,4 @@
+
 'use client';
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
@@ -54,26 +55,25 @@ export async function getSettings(): Promise<AppSettings | null> {
     }
 }
 
-export async function updateSettings(settings: Partial<AppSettings>) {
+export async function updateSettings(settings: AppSettings) {
   const firestoreDb = checkConfig();
   const rtdbInstance = checkRTDBConfig();
+
+  // The 'settings' object passed in is now the complete and final version.
+  // It should completely overwrite the existing settings.
   
-  const settingsWithTimestamp = { ...settings, lastModified: new Date().toISOString() };
-
-  // We still write to both to keep them in sync for the future.
-  // RTDB is now the primary source of truth for reads.
+  // 1. Overwrite settings in Realtime Database (Primary)
   const rtdbSettingsRef = ref(rtdbInstance, 'config/settings');
-  const existingSettings = await rtdbGet(rtdbSettingsRef).then(s => s.val() || {});
-  const newRtdbSettings = { ...existingSettings, ...settingsWithTimestamp };
-  await rtdbSet(rtdbSettingsRef, newRtdbSettings);
+  await rtdbSet(rtdbSettingsRef, settings);
 
-  // Write to Firestore as a backup
+  // 2. Overwrite settings in Firestore (Backup)
   const settingsRef = doc(firestoreDb, 'config', 'settings');
   try {
-    await setDoc(settingsRef, settingsWithTimestamp, { merge: true });
+    // Using setDoc without merge options overwrites the document.
+    await setDoc(settingsRef, settings);
   } catch (serverError) {
     console.warn("Firestore backup write for settings failed, but RTDB succeeded.", serverError);
-    // Don't throw error if primary (RTDB) succeeded.
+    // We don't throw an error here because the primary (RTDB) write succeeded.
   }
 }
 
