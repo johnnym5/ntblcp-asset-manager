@@ -336,6 +336,14 @@ export default function AssetList() {
       }
   }, [syncSummary, setAssets, setIsSyncing]);
 
+  const handleSyncConfirm = () => {
+    if (syncSummary?.type === 'download') {
+      executeDownload();
+    } else if (syncSummary?.type === 'upload') {
+      executeUpload();
+    }
+  };
+
     const handleUploadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
 
@@ -1351,6 +1359,14 @@ export default function AssetList() {
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
+
+  const clearAllDialogDescription = useMemo(() => {
+    let message = `This will permanently delete all asset records from the ${dataSource === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
+    if (isAdmin && isOnline && dataSource === 'cloud') {
+      message += " As an admin who is online, this will ALSO delete all assets from the cloud database, which cannot be undone."
+    }
+    return message;
+  }, [isAdmin, isOnline, dataSource]);
 
   const renderDashboardCard = (category: string, categoryAssets: Asset[]) => {
       const total = categoryAssets.length;
