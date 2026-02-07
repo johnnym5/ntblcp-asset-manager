@@ -26,13 +26,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '../ui/separator';
 import { useAppState } from '@/contexts/app-state-context';
-import { synchronizeDatabases, copyAssetsToRealtimeDB, updateSettings } from '@/lib/firestore';
+import { synchronizeDatabases, copyAssetsToRealtimeDB, updateSettings, getAssetsFirestore, batchDeleteAssetsFirestore, getAssetsRTDB, batchDeleteAssetsRTDB } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Database, Trash2, FileUp, Save, ScanSearch, PlaneTakeoff, Download, DatabaseZap, GitBranch, Copy, AlertTriangle } from 'lucide-react';
 import type { AppSettings } from '@/lib/types';
-import { saveLocalSettings } from '@/lib/idb';
-import { exportFullBackupToJson } from '@/lib/json-export';
+import { saveLocalSettings, clearLocalAssets } from '@/lib/idb';
+import { exportFullBackupToJson, exportAssetsToJson, exportSettingsToJson } from '@/lib/json-export';
 import {
   Select,
   SelectContent,
@@ -50,7 +50,7 @@ interface DatabaseAdminDialogProps {
 
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, assets } = useAppState();
+  const { appSettings, setAppSettings, assets, setAssets } = useAppState();
   const { toast } = useToast();
   
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
@@ -101,9 +101,28 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   const handleClearAll = async () => {
       setIsClearing(true);
-      // This is a placeholder for the more complex logic that would live in asset-list or a dedicated hook
-      addNotification({ title: "Clearing All Data...", description: "This action is handled by the main asset list component.", variant: "destructive"});
-      // In a real scenario, you'd call a function from context like: `dataActions.onClearAll()`
+      addNotification({ title: "Clearing All Databases...", description: "This may take a moment."});
+      try {
+        // Clear local IndexedDB
+        await clearLocalAssets();
+        setAssets([]);
+
+        // Clear Cloud Firestore
+        const firestoreAssets = await getAssetsFirestore();
+        if (firestoreAssets.length > 0) {
+            await batchDeleteAssetsFirestore(firestoreAssets.map(a => a.id));
+        }
+        
+        // Clear Realtime Database
+        const rtdbAssets = await getAssetsRTDB();
+        if (rtdbAssets.length > 0) {
+            await batchDeleteAssetsRTDB(rtdbAssets.map(a => a.id));
+        }
+        
+        addNotification({ title: "All Databases Cleared", description: "Local and cloud asset stores are now empty."});
+      } catch (e) {
+        addNotification({ title: 'Clear Failed', description: (e as Error).message, variant: 'destructive'});
+      }
       setIsClearing(false);
   }
 
@@ -184,11 +203,17 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             <Card>
                 <CardHeader>
                     <CardTitle>Backup & Restore</CardTitle>
-                    <CardDescription>Export a full backup of all data to a JSON file.</CardDescription>
+                    <CardDescription>Export data to a JSON file. Imports are handled via Excel files in Settings.</CardDescription>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="space-y-2">
                      <Button variant="outline" className="w-full justify-start" onClick={() => exportFullBackupToJson(assets, appSettings)}>
-                        <Download className="mr-2 h-4 w-4" /> Export All Data to JSON
+                        <Download className="mr-2 h-4 w-4" /> Export Full Backup (Assets & Settings)
+                    </Button>
+                    <Button variant="outline" className="w-full justify-start" onClick={() => exportAssetsToJson(assets)}>
+                        <Download className="mr-2 h-4 w-4" /> Export Assets Only
+                    </Button>
+                     <Button variant="outline" className="w-full justify-start" onClick={() => exportSettingsToJson(appSettings)}>
+                        <Download className="mr-2 h-4 w-4" /> Export Settings Only
                     </Button>
                 </CardContent>
             </Card>

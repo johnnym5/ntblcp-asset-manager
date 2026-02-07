@@ -116,6 +116,38 @@ export function batchDeleteAssets(assetIds: string[]) {
     });
 }
 
+// --- Firestore Assets (Implementations) ---
+export async function getAssetsFirestore(): Promise<Asset[]> {
+    const db = checkConfig();
+    try {
+        const assetsCollectionRef = collection(db, 'assets');
+        const q = query(assetsCollectionRef);
+        const querySnapshot = await getDocs(q);
+        const fetchedAssets: Asset[] = [];
+        querySnapshot.forEach((doc) => {
+            fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+        });
+        return fetchedAssets;
+    } catch (serverError) {
+        handleFirestoreError(serverError, { path: 'assets', operation: 'list' });
+        return []; // return empty on error
+    }
+}
+
+export async function batchDeleteAssetsFirestore(assetIds: string[]) {
+    const db = checkConfig();
+    const batchSize = 500;
+    for (let i = 0; i < assetIds.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const chunk = assetIds.slice(i, i + batchSize);
+        chunk.forEach((assetId) => {
+            const docRef = doc(db, 'assets', assetId);
+            batch.delete(docRef);
+        });
+        await batch.commit(); // This might throw an error handled by caller
+    }
+}
+
 
 // --- Realtime Database Assets (Implementations) ---
 
@@ -194,7 +226,7 @@ export async function synchronizeDatabases(): Promise<{ toFirestoreCount: number
 
 
     // --- SYNC ASSETS ---
-    const firestoreAssets = await getDocs(query(collection(firestoreDb, 'assets'))).then(snap => snap.docs.map(d => ({ id: d.id, ...d.data() } as Asset)));
+    const firestoreAssets = await getAssetsFirestore();
     const rtdbAssets = await getAssetsRTDB();
 
     const firestoreMap = new Map(firestoreAssets.map(a => [a.id, a]));

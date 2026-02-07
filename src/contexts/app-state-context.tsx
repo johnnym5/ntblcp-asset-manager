@@ -187,7 +187,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
           if (remoteTimestamp > localTimestamp) {
             console.log("Found newer settings in the cloud, updating local state.");
-            const finalSettings = { ...remoteSettings, databaseSource: 'rtdb' as const, locations: remoteSettings.locations || defaultInitialLocations };
+            const finalSettings = { ...remoteSettings, locations: remoteSettings.locations || defaultInitialLocations };
             setAppSettings(finalSettings);
             await saveLocalSettings(finalSettings);
           }
@@ -210,7 +210,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           locations: defaultInitialLocations,
         };
       } else {
-        localSettings.databaseSource = 'rtdb';
+        if (!localSettings.databaseSource) {
+            localSettings.databaseSource = 'rtdb';
+        }
         if (!localSettings.locations) {
           localSettings.locations = defaultInitialLocations;
         }
