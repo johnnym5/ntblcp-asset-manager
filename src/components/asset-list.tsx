@@ -1284,27 +1284,11 @@ export default function AssetList() {
     setIsBatchDeleting(false);
   }
 
-  const clearAllDialogDescription = useMemo(() => {
-    let message = `This will permanently delete all asset records from the ${dataSource === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
-    if (isAdmin && isOnline && dataSource === 'cloud') {
-      message += " As an admin who is online, this will ALSO delete all assets from the cloud database, which cannot be undone."
-    }
-    return message;
-  }, [isAdmin, isOnline, dataSource]);
-
-  const handleSyncConfirm = () => {
-    if (syncSummary?.type === 'download') {
-        executeDownload();
-    } else if (syncSummary?.type === 'upload') {
-        executeUpload();
-    }
-  };
-
   const handleConfirmProjectSwitch = async () => {
     setShowProjectSwitchDialog(false);
     addNotification({ title: 'Switching Projects...', description: 'Clearing all local data...' });
     await clearLocalAssets();
-    await clearLockedOfflineAssets();
+    await saveLockedOfflineAssets([]);
     setAssets([]);
     setOfflineAssets([]);
     addNotification({ title: 'Local Data Cleared', description: 'Attempting to sync with new project.' });
@@ -1602,20 +1586,22 @@ export default function AssetList() {
             )}
           </Card>
         
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {mainCategories.length > 0 ? (
-              mainCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))
-            ) : (
-                 <div className="col-span-full text-center py-24 text-muted-foreground">
-                    <FolderSearch className="mx-auto h-12 w-12" />
-                    <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
-                    {searchTerm ? (
-                        <p className="mt-2 text-sm">Your search for "{searchTerm}" did not match any assets.</p>
-                    ) : (
-                        <p className="mt-2 text-sm">Import a file or add an asset to get started.</p>
-                    )}
-                </div>
-            )}
+        <div className="flex-1 overflow-y-auto">
+          <div className="grid gap-4 p-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {mainCategories.length > 0 ? (
+                mainCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))
+              ) : (
+                  <div className="col-span-full text-center py-24 text-muted-foreground">
+                      <FolderSearch className="mx-auto h-12 w-12" />
+                      <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
+                      {searchTerm ? (
+                          <p className="mt-2 text-sm">Your search for "{searchTerm}" did not match any assets.</p>
+                      ) : (
+                          <p className="mt-2 text-sm">Import a file or add an asset to get started.</p>
+                      )}
+                  </div>
+              )}
+          </div>
         </div>
         <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
         <AssetForm 
@@ -1935,7 +1921,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
-
-    
