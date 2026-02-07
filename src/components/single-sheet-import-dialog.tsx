@@ -17,6 +17,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Separator } from './ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Badge } from './ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface ImportScannerDialogProps {
   isOpen: boolean;
@@ -212,39 +219,64 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                     <ScrollArea className="h-[200px] pr-3">
                       <div className="space-y-2 p-1">
                         {scanResults.map(result => (
-                           <Collapsible key={result.sheetName} asChild>
-                              <div className="p-2 rounded-md border">
-                                  <div className="flex items-center">
-                                      <Checkbox
-                                          id={`sheet-${result.sheetName}`}
-                                          className="mr-3"
-                                          checked={selectedSheets.includes(result.sheetName)}
-                                          onCheckedChange={(checked) => handleSelectSheet(result.sheetName, checked as boolean)}
-                                      />
-                                      <Label htmlFor={`sheet-${result.sheetName}`} className="flex-1 cursor-pointer">
-                                          <p className="font-medium">{result.sheetName}</p>
-                                          <p className="text-xs text-muted-foreground">
-                                              Matched to <span className="font-semibold text-foreground/80">{result.definitionName}</span> &bull; Found {result.rowCount} data rows.
-                                          </p>
-                                      </Label>
-                                      <CollapsibleTrigger asChild>
-                                          <Button variant="ghost" size="icon" className="h-8 w-8">
-                                              <ChevronsUpDown className="h-4 w-4" />
-                                              <span className="sr-only">View headers</span>
-                                          </Button>
-                                      </CollapsibleTrigger>
-                                  </div>
-                                  <CollapsibleContent>
-                                      <div className="pt-2 mt-2 border-t">
-                                          <p className="text-xs font-semibold text-muted-foreground mb-2">Headers Found:</p>
-                                          <div className="flex flex-wrap gap-1">
-                                              {result.headers.map((header, i) => (
-                                                  <Badge key={i} variant="secondary">{header}</Badge>
-                                              ))}
-                                          </div>
-                                      </div>
-                                  </CollapsibleContent>
-                              </div>
+                          <Collapsible key={result.sheetName} asChild>
+                            <div className="p-2 rounded-md border">
+                                <div className="flex items-start">
+                                    <Checkbox
+                                        id={`sheet-${result.sheetName}`}
+                                        className="mr-3 mt-1"
+                                        checked={selectedSheets.includes(result.sheetName)}
+                                        onCheckedChange={(checked) => handleSelectSheet(result.sheetName, checked as boolean)}
+                                    />
+                                    <div className="flex-1 grid grid-cols-2 gap-4 items-start">
+                                        <div>
+                                            <Label htmlFor={`sheet-${result.sheetName}`} className="font-medium cursor-pointer">{result.sheetName}</Label>
+                                            <p className="text-xs text-muted-foreground">
+                                                Found {result.rowCount} data rows.
+                                            </p>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <Label className="text-xs">Import as</Label>
+                                            <Select
+                                                value={result.definitionName}
+                                                onValueChange={(newDefName) => {
+                                                    const newScanResults = scanResults.map(r => 
+                                                        r.sheetName === result.sheetName 
+                                                            ? { ...r, definitionName: newDefName } 
+                                                            : r
+                                                    );
+                                                    setScanResults(newScanResults);
+                                                }}
+                                            >
+                                                <SelectTrigger className="h-8 text-xs">
+                                                    <SelectValue />
+                                                </SelectTrigger>
+                                                <SelectContent>
+                                                    {Object.keys(appSettings.sheetDefinitions).map(defName => (
+                                                        <SelectItem key={defName} value={defName} className="text-xs">{defName}</SelectItem>
+                                                    ))}
+                                                </SelectContent>
+                                            </Select>
+                                        </div>
+                                    </div>
+                                    <CollapsibleTrigger asChild>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 ml-2">
+                                            <ChevronsUpDown className="h-4 w-4" />
+                                            <span className="sr-only">View headers</span>
+                                        </Button>
+                                    </CollapsibleTrigger>
+                                </div>
+                                <CollapsibleContent>
+                                    <div className="pt-2 mt-2 border-t">
+                                        <p className="text-xs font-semibold text-muted-foreground mb-2">Headers Found:</p>
+                                        <div className="flex flex-wrap gap-1">
+                                            {result.headers.map((header, i) => (
+                                                <Badge key={i} variant="secondary">{header}</Badge>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </CollapsibleContent>
+                            </div>
                           </Collapsible>
                         ))}
                       </div>
