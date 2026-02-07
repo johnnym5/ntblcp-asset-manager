@@ -366,7 +366,7 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
     const sheet = workbook.Sheets[sheetName];
     const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
     
-    for (let i = 0; i < Math.min(sheetData.length, 10); i++) {
+    for (let i = 0; i < Math.min(sheetData.length, 25); i++) {
         const row = sheetData[i];
         if (!Array.isArray(row)) continue;
         const normalizedRow = row.map(normalizeHeader);
