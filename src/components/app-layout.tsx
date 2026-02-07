@@ -165,7 +165,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
 
   return (
-    <div className="flex flex-col w-full min-h-screen">
+    <div className="flex flex-col w-full min-h-screen border-8 border-muted/50">
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:h-16 md:flex-nowrap md:py-0 md:px-6">
         
         {/* Left Side */}
@@ -348,7 +348,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
       <motion.main
-        className="flex-1 flex flex-col p-4 md:p-6 bg-muted/40"
+        className="flex-1 flex flex-col p-4 md:p-6 bg-muted/40 overflow-y-auto"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5, ease: 'easeInOut' }}
