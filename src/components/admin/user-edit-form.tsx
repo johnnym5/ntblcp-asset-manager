@@ -256,7 +256,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                         </FormControl>
                         </PopoverTrigger>
                         <PopoverContent className="w-[--radix-popover-trigger-width] p-0">
-                           <ScrollArea className="h-[200px]">
+                           <ScrollArea className="h-[250px]">
                               <div className="p-1">
                                 {NIGERIAN_STATES.map((state) => {
                                   const isSelected = (field.value || []).includes(state);

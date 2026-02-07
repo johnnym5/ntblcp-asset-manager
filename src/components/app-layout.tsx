@@ -359,7 +359,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                  {isAdmin && (
+                  {userProfile && (
                     <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
                       <Settings className="mr-2 h-4 w-4"/>
                       Settings
@@ -391,7 +391,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <Input
                         type="search"
                         placeholder="Search assets..."
-                        className="pl-10 pr-20 w-full h-full bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        className="pl-10 pr-20 w-full h-full bg-transparent border-none rounded-full focus-visible:ring-0 focus-visible:ring-offset-0"
                         value={localSearchTerm}
                         onChange={(e) => setLocalSearchTerm(e.target.value)}
                     />

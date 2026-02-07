@@ -50,6 +50,8 @@ import {
   PlusCircle,
   ScanSearch,
   CloudOff,
+  Download,
+  Columns,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -78,7 +80,7 @@ import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-for
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings } from "@/lib/firestore";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, clearLockedOfflineAssets } from "@/lib/idb";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, clearLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { TravelReportDialog } from "./travel-report-dialog";
@@ -86,6 +88,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
 import { ImportScannerDialog } from "./single-sheet-import-dialog";
 import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-dialog";
+import { ColumnCustomizationSheet } from "./column-customization-sheet";
 
 
 /**
@@ -194,6 +197,9 @@ export default function AssetList() {
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
   const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
+  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
+  const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
+  const [originalSheetNameToEdit, setOriginalSheetNameToEdit] = useState<string | null>(null);
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
@@ -1208,6 +1214,41 @@ export default function AssetList() {
     handleDownloadScan();
   };
 
+  const handleEditSheetLayout = (category: string) => {
+    setSheetToEdit(sheetDefinitions[category]);
+    setOriginalSheetNameToEdit(category);
+    setIsColumnSheetOpen(true);
+  };
+  
+  const handleSaveColumnLayout = async (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
+    if (!isAdmin) return;
+
+    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
+    if (applyToAll) {
+        Object.keys(newSheetDefinitions).forEach(sheetName => {
+            newSheetDefinitions[sheetName] = {
+                ...newSheetDefinitions[sheetName],
+                displayFields: newDefinition.displayFields.map(f => ({ ...f })),
+                headers: newDefinition.headers,
+            };
+        });
+    } else if (originalName) {
+        newSheetDefinitions[originalName] = newDefinition;
+    }
+
+    const newSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions };
+    setAppSettings(newSettings);
+    
+    try {
+        await updateSettings({ sheetDefinitions: newSettings.sheetDefinitions });
+        await saveLocalSettings(newSettings);
+        toast({ title: 'Layout updated', description: `Column layout changes have been saved.` });
+    } catch (e) {
+        toast({ title: 'Error', description: 'Could not save layout settings.', variant: 'destructive' });
+    }
+  };
+
+
   if (isLoading) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
@@ -1234,6 +1275,10 @@ export default function AssetList() {
                        <DropdownMenuItem onSelect={() => handleSelectCategory(category, !isSelected)} disabled={isGuest}>
                           <Checkbox className="mr-2 h-4 w-4" checked={isSelected}/>
                           {isSelected ? 'Deselect' : 'Select'}
+                        </DropdownMenuItem>
+                         <DropdownMenuItem onSelect={() => handleEditSheetLayout(category)} disabled={isGuest || !isAdmin}>
+                          <Columns className="mr-2 h-4 w-4" />
+                          Edit Layout
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={() => handleClearCategoryClick(category)} disabled={isGuest || !isAdmin} className="text-destructive focus:text-destructive">
@@ -1367,7 +1412,11 @@ export default function AssetList() {
                         </SelectContent>
                       </Select>
                     )}
-                    <div className="flex items-center justify-between gap-4">
+                    <div className="flex items-center justify-end gap-4 w-full">
+                      <Button variant="outline" size="sm" onClick={handleExport}>
+                          <Download className="mr-2 h-4 w-4" />
+                          Export to Excel
+                      </Button>
                       <div className="flex items-center space-x-2">
                         <Label htmlFor="select-all-categories" className="text-sm font-medium whitespace-nowrap">Select All</Label>
                         <Checkbox
@@ -1484,6 +1533,15 @@ export default function AssetList() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+        {sheetToEdit && originalSheetNameToEdit && (
+            <ColumnCustomizationSheet
+                isOpen={isColumnSheetOpen}
+                onOpenChange={setIsColumnSheetOpen}
+                sheetDefinition={sheetToEdit}
+                originalSheetName={originalSheetNameToEdit}
+                onSave={handleSaveColumnLayout}
+            />
+        )}
       </div>
     )
   }
