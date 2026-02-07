@@ -39,17 +39,25 @@ const handleFirestoreError = (error: any, context: Omit<SecurityRuleContext, 're
 
 // --- App Settings (DUAL WRITE) ---
 export async function getSettings(): Promise<AppSettings | null> {
-    // FORCED to RTDB
-    const rtdbInstance = checkRTDBConfig();
-    const settingsRef = ref(rtdbInstance, 'config/settings');
+    const firestoreDb = checkConfig(); // Use Firestore for reads
+    const settingsRef = doc(firestoreDb, 'config', 'settings');
     try {
-        const docSnap = await rtdbGet(settingsRef);
+        const docSnap = await getDoc(settingsRef);
         if (docSnap.exists()) {
-            return docSnap.val() as AppSettings;
+            return docSnap.data() as AppSettings;
+        }
+        // If Firestore settings are empty, try falling back to RTDB just in case.
+        const rtdbInstance = checkRTDBConfig();
+        const rtdbSettingsRef = ref(rtdbInstance, 'config/settings');
+        const rtdbSnap = await rtdbGet(rtdbSettingsRef);
+        if (rtdbSnap.exists()) {
+            const settings = rtdbSnap.val() as AppSettings;
+            // Write back to firestore to keep it in sync for next time
+            await setDoc(settingsRef, settings, { merge: true });
+            return settings;
         }
         return null;
     } catch (serverError) {
-        // Even though it's RTDB, we can reuse the Firestore error concept for the UI
         handleFirestoreError(serverError, { path: 'config/settings', operation: 'get' });
         return null;
     }
