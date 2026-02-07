@@ -91,10 +91,6 @@ interface AppStateContextType {
   setAssetToView: Dispatch<SetStateAction<Asset | null>>;
   dataActions: DataActions;
   setDataActions: Dispatch<SetStateAction<DataActions>>;
-  
-  // Failover state
-  isInFailoverMode: boolean;
-  triggerFailover: () => void;
 
   // Project Switch
   showProjectSwitchDialog: boolean;
@@ -149,12 +145,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [dataActions, setDataActions] = useState<DataActions>({});
 
-  const [isInFailoverMode, setIsInFailoverMode] = useState(false);
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
-
-  const triggerFailover = () => {
-    console.warn("Failover triggered, but the app is already locked to RTDB.");
-  };
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -305,7 +296,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     dataSource, setDataSource,
     assetToView, setAssetToView,
     dataActions, setDataActions,
-    isInFailoverMode, triggerFailover,
     showProjectSwitchDialog, setShowProjectSwitchDialog,
   };
 
