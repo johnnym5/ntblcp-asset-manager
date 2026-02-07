@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   MoreHorizontal,
   Loader2,
@@ -199,6 +199,8 @@ export default function AssetList() {
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetNameToEdit, setOriginalSheetNameToEdit] = useState<string | null>(null);
+  const [isDownloadWarningOpen, setIsDownloadWarningOpen] = useState(false);
+  const [numUnsynced, setNumUnsynced] = useState(0);
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
@@ -317,14 +319,57 @@ export default function AssetList() {
       }
   }, [syncSummary, setAssets, setIsSyncing]);
 
-  const handleDownloadScan = useCallback(async () => {
+    const handleUploadScan = useCallback(async () => {
+    if (!isOnline || !authInitialized || isGuest) return;
+
+    setIsSyncing(true);
+    addNotification({ title: 'Scanning for local changes...' });
+    
+    try {
+        const localAssets = await getLocalAssetsFromDb();
+        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
+
+        if (assetsToPush.length > 0) {
+            setSyncSummary({
+                newFromCloud: [],
+                updatedFromCloud: [],
+                keptLocal: [],
+                toUpload: assetsToPush,
+                type: 'upload',
+            });
+            setIsSyncConfirmOpen(true);
+        } else {
+            addNotification({ title: 'No Local Changes', description: 'Everything is already in sync with the cloud.' });
+        }
+    } catch (error) {
+        console.error("Upload scan failed:", error);
+        addNotification({
+          title: "Upload Scan Failed",
+          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred.",
+          variant: 'destructive'
+        });
+    } finally {
+        setIsSyncing(false);
+    }
+}, [isOnline, authInitialized, isGuest, setIsSyncing]);
+
+    const handleDownloadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
     setIsSyncing(true);
+
+    const localAssets = await getLocalAssetsFromDb();
+    const unsyncedAssets = localAssets.filter(a => a.syncStatus === 'local');
+    if (unsyncedAssets.length > 0) {
+      setNumUnsynced(unsyncedAssets.length);
+      setIsDownloadWarningOpen(true);
+      setIsSyncing(false);
+      return;
+    }
+
     addNotification({ title: 'Scanning for cloud changes...' });
 
     try {
         const cloudAssets = await getAssets();
-        const localAssets = await getLocalAssetsFromDb();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
         const summary: SyncSummary = {
@@ -372,40 +417,61 @@ export default function AssetList() {
     }
   }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing]);
   
-  const handleUploadScan = useCallback(async () => {
-    if (!isOnline || !authInitialized || isGuest) return;
-
+  const handleOverwriteDownload = useCallback(async () => {
+    setIsDownloadWarningOpen(false);
     setIsSyncing(true);
-    addNotification({ title: 'Scanning for local changes...' });
+    addNotification({ title: 'Scanning for cloud changes...' });
     
     try {
+        const cloudAssets = await getAssets();
         const localAssets = await getLocalAssetsFromDb();
-        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
+        const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
-        if (assetsToPush.length > 0) {
-            setSyncSummary({
-                newFromCloud: [],
-                updatedFromCloud: [],
-                keptLocal: [],
-                toUpload: assetsToPush,
-                type: 'upload',
-            });
-            setIsSyncConfirmOpen(true);
+        const summary: SyncSummary = {
+            newFromCloud: [],
+            updatedFromCloud: [],
+            keptLocal: [],
+            toUpload: [],
+            type: 'download',
+        };
+
+        for (const cloudAsset of cloudAssets) {
+            const localAsset = localAssetsMap.get(cloudAsset.id);
+            if (!localAsset) {
+                summary.newFromCloud.push(cloudAsset);
+            } else {
+                const cloudTimestamp = cloudAsset.lastModified ? new Date(cloudAsset.lastModified).getTime() : 0;
+                const localTimestamp = localAsset.lastModified ? new Date(localAsset.lastModified).getTime() : 0;
+
+                if (cloudTimestamp > localTimestamp) {
+                    summary.updatedFromCloud.push(cloudAsset);
+                }
+            }
+        }
+        
+        if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0) {
+            addNotification({ title: 'Already Up-to-Date', description: 'Your local data is already in sync with the cloud.' });
         } else {
-            addNotification({ title: 'No Local Changes', description: 'Everything is already in sync with the cloud.' });
+            setSyncSummary(summary);
+            setIsSyncConfirmOpen(true);
         }
     } catch (error) {
-        console.error("Upload scan failed:", error);
+        console.error("Forced download scan failed:", error);
         addNotification({
-          title: "Upload Scan Failed",
+          title: "Download Scan Failed",
           description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred.",
           variant: 'destructive'
         });
+        setIsOnline(false);
     } finally {
         setIsSyncing(false);
     }
-}, [isOnline, authInitialized, isGuest, setIsSyncing]);
-
+  }, [setIsSyncing, setIsOnline]);
+  
+  const handleUploadFirst = useCallback(() => {
+    setIsDownloadWarningOpen(false);
+    handleUploadScan();
+  }, [handleUploadScan]);
 
   // Effect for initial data load from IndexedDB. This runs once when component mounts.
   useEffect(() => {
@@ -802,7 +868,7 @@ export default function AssetList() {
     if (!asset) return;
 
     if (lockAssetList && isAdmin && dataSource === 'cloud' && appSettings.appMode !== 'verification') {
-      addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes.", variant: "destructive" });
+      addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
       return;
     }
 
@@ -1311,6 +1377,24 @@ export default function AssetList() {
 
     return (
       <div className="flex flex-col h-full gap-4">
+        <AlertDialog open={isDownloadWarningOpen} onOpenChange={setIsDownloadWarningOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unsynced Local Changes</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have {numUnsynced} local change(s) that have not been uploaded. 
+                  Downloading will overwrite these changes. What would you like to do?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <Button variant="outline" onClick={handleUploadFirst}>Upload First</Button>
+                <AlertDialogAction onClick={handleOverwriteDownload} className={buttonVariants({ variant: "destructive" })}>
+                  Discard & Download
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
         <AlertDialog open={showProjectSwitchDialog} onOpenChange={setShowProjectSwitchDialog}>
             <AlertDialogContent>
                 <AlertDialogHeader>
@@ -1556,6 +1640,24 @@ export default function AssetList() {
 
   return (
     <div className="flex flex-col h-full gap-4">
+         <AlertDialog open={isDownloadWarningOpen} onOpenChange={setIsDownloadWarningOpen}>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Unsynced Local Changes</AlertDialogTitle>
+                <AlertDialogDescription>
+                  You have {numUnsynced} local change(s) that have not been uploaded. 
+                  Downloading will overwrite these changes. What would you like to do?
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancel</AlertDialogCancel>
+                <Button variant="outline" onClick={handleUploadFirst}>Upload First</Button>
+                <AlertDialogAction onClick={handleOverwriteDownload} className={buttonVariants({ variant: "destructive" })}>
+                  Discard & Download
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
         <AlertDialog open={showProjectSwitchDialog} onOpenChange={setShowProjectSwitchDialog}>
             <AlertDialogContent>
                 <AlertDialogHeader>

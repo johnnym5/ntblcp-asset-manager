@@ -36,6 +36,7 @@ import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
 import { Loader2, FileText, Check } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
+import { cn, getStatusClasses } from "@/lib/utils";
 
 const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
   path: ['category'],
@@ -69,6 +70,8 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
   });
   
   const currentCategory = form.watch('category');
+  const watchedStatus = form.watch('verifiedStatus') as 'Verified' | 'Unverified';
+  
   const sheetDefinition = useMemo(() => {
     if (!currentCategory) return null;
     return appSettings.sheetDefinitions[currentCategory];
@@ -204,7 +207,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
             case 'verifiedStatus':
                 component = (
                     <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className={cn(getStatusClasses(watchedStatus))}><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
                         <SelectContent>
                             <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
                             <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>

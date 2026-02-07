@@ -23,6 +23,7 @@ import {
 } from '@/components/ui/select';
 import { AlertCircle, Check, FileText, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
+import { cn, getStatusClasses } from '@/lib/utils';
 
 export interface CategoryBatchUpdateData {
   status?: 'Verified' | 'Unverified';
@@ -87,7 +88,7 @@ export function CategoryBatchEditForm({
             <div className="w-full space-y-2">
               <Label htmlFor="status" className={!applyStatus ? 'text-muted-foreground' : ''}>Verified Status</Label>
               <Select onValueChange={(value) => setStatus(value as any)} value={status} disabled={!applyStatus}>
-                <SelectTrigger id="category-status-select">
+                <SelectTrigger id="category-status-select" className={cn(getStatusClasses(status))}>
                     <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
