@@ -85,30 +85,19 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
 
 
   useEffect(() => {
-    const savedDraft = localStorage.getItem('ntblcp-settings-draft');
     if (isOpen) {
-        if (savedDraft) {
-            setDraftSettings(JSON.parse(savedDraft));
-        } else {
-            setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
-        }
+        setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
     } else {
         setDraftSettings(null);
-        localStorage.removeItem('ntblcp-settings-draft');
         setPasswordError('');
         setPasswordSuccess('');
         setCurrentPassword('');
         setNewPassword('');
         setConfirmNewPassword('');
     }
-  }, [isOpen, appSettings]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isOpen]);
   
-  useEffect(() => {
-    if (draftSettings) {
-      localStorage.setItem('ntblcp-settings-draft', JSON.stringify(draftSettings));
-    }
-  }, [draftSettings]);
-
   const hasChanges = useMemo(() => {
     if (!draftSettings) return false;
     return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);

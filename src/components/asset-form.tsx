@@ -6,14 +6,14 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-  SheetClose,
-} from "@/components/ui/sheet";
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from "@/components/ui/dialog";
 import {
   Form,
   FormControl,
@@ -242,14 +242,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
     };
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="sm:max-w-4xl w-full flex flex-col">
-        <SheetHeader>
-          <SheetTitle>{asset ? (initialIsReadOnly ? 'View Asset Details' : 'Edit Asset') : 'Add New Asset'}</SheetTitle>
-          <SheetDescription>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-4xl w-full flex flex-col max-h-[95vh]">
+        <DialogHeader>
+          <DialogTitle>{asset ? (initialIsReadOnly ? 'View Asset Details' : 'Edit Asset') : 'Add New Asset'}</DialogTitle>
+          <DialogDescription>
             {initialIsReadOnly ? 'Viewing asset details.' : (asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
         <div className="flex-1 overflow-y-auto pr-4 py-4">
             <datalist id="location-datalist">
                 {(appSettings.locations || []).map(loc => <option key={loc} value={loc} />)}
@@ -270,18 +270,18 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
               </form>
             </Form>
         </div>
-        <SheetFooter className="mt-auto pt-4 border-t">
-          <SheetClose asChild>
+        <DialogFooter className="mt-auto pt-4 border-t">
+          <DialogClose asChild>
             <Button variant="outline">Close</Button>
-          </SheetClose>
+          </DialogClose>
           {!initialIsReadOnly && (
             <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
                 {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
             </Button>
           )}
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
