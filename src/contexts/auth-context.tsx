@@ -48,6 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authInitialized, setAuthInitialized] = useState(false);
   
   const { appSettings, settingsLoaded } = useAppState();
+  const authorizedUsersString = JSON.stringify(appSettings.authorizedUsers);
 
   useEffect(() => {
     if (!settingsLoaded) {
@@ -108,7 +109,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       setAuthInitialized(true);
     }
-  }, [settingsLoaded, appSettings.authorizedUsers]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [settingsLoaded, authorizedUsersString]);
 
   const login = async (user: AuthorizedUser, state: string) => {
     setLoading(true);
