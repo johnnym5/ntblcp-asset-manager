@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect } from 'react';
@@ -9,17 +10,16 @@ import UserProfileSetup from '@/components/user-profile-setup';
 import { useAppState } from '@/contexts/app-state-context';
 
 export default function Page() {
-  const { userProfile, profileSetupComplete, authInitialized } = useAuth();
+  const { userProfile, loading } = useAuth();
   const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    if (profileSetupComplete && userProfile) {
+    if (userProfile) {
       setGlobalStateFilter(userProfile.state || '');
     }
-  }, [profileSetupComplete, userProfile, setGlobalStateFilter]);
+  }, [userProfile, setGlobalStateFilter]);
 
-  // This is the main gatekeeper. We wait until auth state is fully resolved.
-  if (!authInitialized) {
+  if (loading) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -27,13 +27,10 @@ export default function Page() {
     );
   }
 
-  // After auth is initialized, we decide what to show.
-  if (!profileSetupComplete) {
+  if (!userProfile) {
     return <UserProfileSetup />;
   }
   
-  // If user is logged in and profile is set up, render the app directly.
-  // The AssetList component will handle loading data from IndexedDB.
   return (
     <AppLayout>
         <AssetList />

@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -22,8 +23,6 @@ export interface LocalUserProfile {
 interface AuthContextType {
   userProfile: LocalUserProfile | null;
   loading: boolean;
-  profileSetupComplete: boolean;
-  authInitialized: boolean;
   login: (user: AuthorizedUser, state: string) => Promise<void>;
   logout: () => void;
 }
@@ -45,25 +44,21 @@ const superAdmin: AuthorizedUser = {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [profileSetupComplete, setProfileSetupComplete] = useState(false);
-  const [authInitialized, setAuthInitialized] = useState(false);
   
   const { appSettings, settingsLoaded } = useAppState();
 
   useEffect(() => {
-    // Wait until settings are loaded from local DB or first-time setup
     if (!settingsLoaded) return;
 
+    setLoading(true);
     try {
       const savedProfileJSON = localStorage.getItem('ntblcp-user-profile');
       if (savedProfileJSON) {
         const savedProfile: LocalUserProfile = JSON.parse(savedProfileJSON);
         
-        // If there are no settings, we can't validate the user, so log them out.
         if (!appSettings) {
           localStorage.removeItem('ntblcp-user-profile');
           setUserProfile(null);
-          setProfileSetupComplete(false);
           return;
         }
 
@@ -85,24 +80,19 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           localStorage.setItem('ntblcp-user-profile', JSON.stringify(freshProfile));
           setUserProfile(freshProfile);
-          setProfileSetupComplete(true);
         } else {
           localStorage.removeItem('ntblcp-user-profile');
           setUserProfile(null);
-          setProfileSetupComplete(false);
         }
       } else {
         setUserProfile(null);
-        setProfileSetupComplete(false);
       }
     } catch (e) {
       console.error("Failed to process user profile from local storage", e);
       localStorage.removeItem('ntblcp-user-profile');
       setUserProfile(null);
-      setProfileSetupComplete(false);
     } finally {
       setLoading(false);
-      setAuthInitialized(true);
     }
   }, [settingsLoaded, appSettings]);
 
@@ -122,7 +112,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
-      setProfileSetupComplete(true);
     } catch(e) {
       console.error("Failed to save user profile", e);
     } finally {
@@ -134,7 +123,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
-    setProfileSetupComplete(false);
 
     try {
       await clearLocalAssets();
@@ -146,7 +134,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.href = '/';
   };
 
-  const value = { userProfile, loading, profileSetupComplete, login, logout, authInitialized };
+  const value = { userProfile, loading, login, logout };
 
   return (
     <AuthContext.Provider value={value}>
