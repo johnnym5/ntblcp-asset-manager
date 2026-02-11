@@ -92,6 +92,7 @@ import { Separator } from "./ui/separator";
 import { ImportScannerDialog } from "./single-sheet-import-dialog";
 import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-dialog";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
+import { AssetSummaryDashboard } from "./asset-summary-dashboard";
 
 
 /**
@@ -1612,6 +1613,9 @@ export default function AssetList() {
                 </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
+
+        <AssetSummaryDashboard />
+        
         <Card>
             <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
                   <div className='flex-1'>
