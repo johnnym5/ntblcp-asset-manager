@@ -1,16 +1,30 @@
-
 'use client';
 
-import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
+import {
+  createContext,
+  useContext,
+  useState,
+  type ReactNode,
+  type Dispatch,
+  type SetStateAction,
+  useEffect,
+  useMemo,
+  useCallback,
+} from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
-import { NIGERIAN_STATES, HEADER_DEFINITIONS, ZONAL_STORES, SPECIAL_LOCATIONS } from '@/lib/constants';
+import {
+  NIGERIAN_STATES,
+  HEADER_DEFINITIONS,
+  ZONAL_STORES,
+  SPECIAL_LOCATIONS,
+} from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
-import { getSettings } from '@/lib/firestore';
+import { getSettings as getSettingsFS } from '@/lib/firestore';
 import { getSettings as getSettingsRTDB } from '@/lib/database';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
 
-const defaultStateUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
+const defaultStateUsers: AuthorizedUser[] = NIGERIAN_STATES.map((state) => ({
   loginName: state.toLowerCase().replace(/\s|-/g, ''),
   displayName: state,
   password: '000000',
@@ -21,7 +35,6 @@ const defaultStateUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
   canEditAssets: true,
   canVerifyAssets: true,
 }));
-
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -43,7 +56,7 @@ interface AppStateContextType {
   setItemsPerPage: Dispatch<SetStateAction<number>>;
   dataSource: 'cloud' | 'local_locked';
   setDataSource: Dispatch<SetStateAction<'cloud' | 'local_locked'>>;
-  
+
   // Filters
   selectedLocations: string[];
   setSelectedLocations: Dispatch<SetStateAction<string[]>>;
@@ -53,7 +66,7 @@ interface AppStateContextType {
   setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
   missingFieldFilter: string;
   setMissingFieldFilter: Dispatch<SetStateAction<string>>;
-  
+
   // Filter Options
   locationOptions: OptionType[];
   setLocationOptions: Dispatch<SetStateAction<OptionType[]>>;
@@ -61,7 +74,7 @@ interface AppStateContextType {
   setAssigneeOptions: Dispatch<SetStateAction<OptionType[]>>;
   statusOptions: OptionType[];
   setStatusOptions: Dispatch<SetStateAction<OptionType[]>>;
-  
+
   // Sorting
   sortConfig: SortConfig | null;
   setSortConfig: Dispatch<SetStateAction<SortConfig | null>>;
@@ -70,7 +83,7 @@ interface AppStateContextType {
   appSettings: AppSettings;
   setAppSettings: Dispatch<SetStateAction<AppSettings>>;
   settingsLoaded: boolean;
-  
+
   // Sync Settings
   manualDownloadTrigger: number;
   setManualDownloadTrigger: Dispatch<SetStateAction<number>>;
@@ -102,7 +115,11 @@ interface AppStateContextType {
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
-const defaultInitialLocations = [...NIGERIAN_STATES, ...ZONAL_STORES, ...SPECIAL_LOCATIONS];
+const defaultInitialLocations = [
+  ...NIGERIAN_STATES,
+  ...ZONAL_STORES,
+  ...SPECIAL_LOCATIONS,
+];
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -117,17 +134,20 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [globalStateFilter, setGlobalStateFilter] = useState('All');
   const [itemsPerPage, setItemsPerPage] = useState(25);
-  
+
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
-  
+
   const [locationOptions, setLocationOptions] = useState<OptionType[]>([]);
   const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
   const [statusOptions, setStatusOptions] = useState<OptionType[]>([]);
-  
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'sn', direction: 'asc' });
+
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>({
+    key: 'sn',
+    direction: 'asc',
+  });
 
   const [appSettings, setAppSettings] = useState<AppSettings>({
     authorizedUsers: defaultStateUsers,
@@ -145,25 +165,32 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
   const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
-  
-  const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
+
+  const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>(
+    'cloud'
+  );
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialSettingsTab, setInitialSettingsTab] = useState('general');
 
-  const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
-  const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>('rtdb');
+  const [showProjectSwitchDialog, setShowProjectSwitchDialog] =
+    useState(false);
+  const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>(
+    'rtdb'
+  );
 
-  const [onRevertAsset, setOnRevertAsset] = useState<((assetId: string) => Promise<void>)>(() => async () => {});
+  const [onRevertAsset, setOnRevertAsset] = useState<
+    (assetId: string) => Promise<void>
+  >(() => async () => {});
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
+
     const handleOnline = () => setIsBrowserOnline(true);
     const handleOffline = () => setIsBrowserOnline(false);
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-    
+
     // Set initial state
     setIsBrowserOnline(navigator.onLine);
 
@@ -172,32 +199,39 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
+  
+  const syncRemoteSettings = useCallback(async () => {
+    if (!isBrowserOnline) return;
+
+    try {
+      const getCloudSettings =
+        activeDatabase === 'firestore' ? getSettingsFS : getSettingsRTDB;
+      const remoteSettings = await getCloudSettings();
+      const localSettings = await getLocalSettings();
+
+      if (remoteSettings) {
+        const remoteTimestamp = remoteSettings.lastModified
+          ? new Date(remoteSettings.lastModified).getTime()
+          : 0;
+        const localTimestamp = localSettings?.lastModified
+          ? new Date(localSettings.lastModified).getTime()
+          : 0;
+
+        if (remoteTimestamp > localTimestamp) {
+          const finalSettings = {
+            ...remoteSettings,
+            locations: remoteSettings.locations || defaultInitialLocations,
+          };
+          setAppSettings(finalSettings);
+          await saveLocalSettings(finalSettings);
+        }
+      }
+    } catch (error) {
+      console.warn('Could not sync remote settings. Using local version.', error);
+    }
+  }, [isBrowserOnline, activeDatabase]);
 
   useEffect(() => {
-    const syncRemoteSettings = async () => {
-      if (!isBrowserOnline) return;
-
-      try {
-        const getCloudSettings = activeDatabase === 'firestore' ? getSettings : getSettingsRTDB;
-        const remoteSettings = await getCloudSettings();
-        const localSettings = await getLocalSettings();
-
-        if (remoteSettings) {
-          const remoteTimestamp = remoteSettings.lastModified ? new Date(remoteSettings.lastModified).getTime() : 0;
-          const localTimestamp = localSettings?.lastModified ? new Date(localSettings.lastModified).getTime() : 0;
-
-          if (remoteTimestamp > localTimestamp) {
-            console.log("Found newer settings in the cloud, updating local state.");
-            const finalSettings = { ...remoteSettings, locations: remoteSettings.locations || defaultInitialLocations };
-            setAppSettings(finalSettings);
-            await saveLocalSettings(finalSettings);
-          }
-        }
-      } catch (error) {
-        console.warn("Could not sync remote settings. Using local version.", error);
-      }
-    };
-
     const initializeAndSyncSettings = async () => {
       let localSettings = await getLocalSettings();
 
@@ -217,11 +251,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           localSettings.locations = defaultInitialLocations;
         }
       }
-      
+
       // Migration from old enabledSheets setting to isHidden flag
       if ((localSettings as any).enabledSheets) {
         const enabledSheets = new Set((localSettings as any).enabledSheets);
-        Object.keys(localSettings.sheetDefinitions).forEach(sheetName => {
+        Object.keys(localSettings.sheetDefinitions).forEach((sheetName) => {
           // If a sheet was NOT in enabledSheets, it should now be hidden.
           if (!enabledSheets.has(sheetName)) {
             localSettings!.sheetDefinitions[sheetName].isHidden = true;
@@ -232,7 +266,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         });
         delete (localSettings as any).enabledSheets;
       }
-      
+
       setAppSettings(localSettings);
       if (localSettings.defaultDataSource) {
         setDataSource(localSettings.defaultDataSource);
@@ -241,7 +275,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         setActiveDatabase(localSettings.defaultDatabase);
       }
       await saveLocalSettings(localSettings);
-      
+
       // Immediately after setting local state, sync with remote BEFORE settings are "loaded" for auth
       await syncRemoteSettings();
       setSettingsLoaded(true);
@@ -250,7 +284,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     if (!settingsLoaded) {
       initializeAndSyncSettings();
     }
-
+    
     const interval = setInterval(syncRemoteSettings, 30000); // Poll every 30s
     const handleFocus = () => syncRemoteSettings();
     window.addEventListener('focus', handleFocus);
@@ -259,18 +293,19 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [isBrowserOnline, settingsLoaded, activeDatabase]);
+  }, [settingsLoaded, syncRemoteSettings]);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !settingsLoaded) return;
 
     const currentProjectId = firebaseConfig.projectId;
     const savedProjectId = localStorage.getItem('ntblcp-firebase-project-id');
-    
+
     if (currentProjectId && savedProjectId && currentProjectId !== savedProjectId) {
       setShowProjectSwitchDialog(true);
     }
-    
+
     if (currentProjectId) {
       localStorage.setItem('ntblcp-firebase-project-id', currentProjectId);
     }
@@ -289,32 +324,57 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   }, [appSettings.appMode, setSelectedStatuses]);
 
   const value = {
-    assets, setAssets,
-    offlineAssets, setOfflineAssets,
-    isOnline, setIsOnline,
-    searchTerm, setSearchTerm,
-    globalStateFilter, setGlobalStateFilter,
-    itemsPerPage, setItemsPerPage,
-    selectedLocations, setSelectedLocations,
-    selectedAssignees, setSelectedAssignees,
-    selectedStatuses, setSelectedStatuses,
-    missingFieldFilter, setMissingFieldFilter,
-    locationOptions, setLocationOptions,
-    assigneeOptions, setAssigneeOptions,
-    statusOptions, setStatusOptions,
-    sortConfig, setSortConfig,
-    appSettings, setAppSettings,
+    assets,
+    setAssets,
+    offlineAssets,
+    setOfflineAssets,
+    isOnline,
+    setIsOnline,
+    searchTerm,
+    setSearchTerm,
+    globalStateFilter,
+    setGlobalStateFilter,
+    itemsPerPage,
+    setItemsPerPage,
+    selectedLocations,
+    setSelectedLocations,
+    selectedAssignees,
+    setSelectedAssignees,
+    selectedStatuses,
+    setSelectedStatuses,
+    missingFieldFilter,
+    setMissingFieldFilter,
+    locationOptions,
+    setLocationOptions,
+    assigneeOptions,
+    setAssigneeOptions,
+    statusOptions,
+    setStatusOptions,
+    sortConfig,
+    setSortConfig,
+    appSettings,
+    setAppSettings,
     settingsLoaded,
-    manualDownloadTrigger, setManualDownloadTrigger,
-    manualUploadTrigger, setManualUploadTrigger,
-    isSyncing, setIsSyncing,
-    dataSource, setDataSource,
-    assetToView, setAssetToView,
-    isSettingsOpen, setIsSettingsOpen,
-    initialSettingsTab, setInitialSettingsTab,
-    showProjectSwitchDialog, setShowProjectSwitchDialog,
-    activeDatabase, setActiveDatabase,
-    onRevertAsset, setOnRevertAsset,
+    manualDownloadTrigger,
+    setManualDownloadTrigger,
+    manualUploadTrigger,
+    setManualUploadTrigger,
+    isSyncing,
+    setIsSyncing,
+    dataSource,
+    setDataSource,
+    assetToView,
+    setAssetToView,
+    isSettingsOpen,
+    setIsSettingsOpen,
+    initialSettingsTab,
+    setInitialSettingsTab,
+    showProjectSwitchDialog,
+    setShowProjectSwitchDialog,
+    activeDatabase,
+    setActiveDatabase,
+    onRevertAsset,
+    setOnRevertAsset,
   };
 
   return (
