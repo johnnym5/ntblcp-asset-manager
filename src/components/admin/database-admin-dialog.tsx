@@ -148,14 +148,14 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   
   const handleSyncDatabases = async () => {
     setIsProcessing(true);
-    addNotification({ title: 'Syncing Databases...', description: 'Copying data from Firestore to Realtime Database.' });
+    addNotification({ title: 'Syncing Databases...', description: 'Copying data from Realtime Database to Firestore.' });
     try {
-        const firestoreAssets = await getAssetsFS();
-        await batchSetAssetsRTDB(firestoreAssets);
-        const firestoreSettings = await updateSettingsFS();
-        if(firestoreSettings) await updateSettingsRTDB(firestoreSettings);
+        const rtdbAssets = await getAssetsRTDB();
+        await batchSetAssetsFS(rtdbAssets);
+        const rtdbSettings = await updateSettingsRTDB(appSettings);
+        if(rtdbSettings) await updateSettingsFS(rtdbSettings);
 
-        addNotification({ title: 'Sync Complete', description: 'Realtime Database has been updated with data from Firestore.' });
+        addNotification({ title: 'Sync Complete', description: 'Firestore has been updated with data from Realtime Database.' });
     } catch (e) {
         addNotification({ title: 'Sync Failed', description: (e as Error).message, variant: 'destructive'});
     }
@@ -164,10 +164,14 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   const handleClearFirestoreOnly = async () => {
     setIsProcessing(true);
-    addNotification({ title: "Clearing Firestore...", description: "This will remove all assets from the cloud database."});
+    addNotification({ title: "Clearing Firestore...", description: "This will remove all assets from the backup cloud database."});
     try {
       await clearFirestoreAssets();
-      addNotification({ title: "Cloud Database Cleared", description: "All assets have been removed from Firestore."});
+      if (appSettings.defaultDatabase === 'firestore') {
+        await clearLocalAssets();
+        setAssets([]);
+      }
+      addNotification({ title: "Backup Cloud Cleared", description: "All assets have been removed from Firestore."});
     } catch(e) {
       addNotification({ title: 'Firestore Clear Failed', description: (e as Error).message, variant: 'destructive'});
     }
@@ -176,10 +180,14 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   const handleClearRtdbOnly = async () => {
     setIsProcessing(true);
-    addNotification({ title: "Clearing Realtime DB...", description: "This will remove all assets from the backup cloud database."});
+    addNotification({ title: "Clearing Realtime DB...", description: "This will remove all assets from the primary cloud database."});
     try {
       await clearRtdbAssets();
-      addNotification({ title: "Backup Cloud Cleared", description: "All assets have been removed from Realtime DB."});
+      if (appSettings.defaultDatabase === 'rtdb') {
+        await clearLocalAssets();
+        setAssets([]);
+      }
+      addNotification({ title: "Primary Cloud Cleared", description: "All assets have been removed from Realtime DB."});
     } catch(e) {
       addNotification({ title: 'RTDB Clear Failed', description: (e as Error).message, variant: 'destructive'});
     }
@@ -296,8 +304,8 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                           <Select value={appSettings.defaultDatabase} onValueChange={(value) => handleSettingChange('defaultDatabase', value)}>
                               <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
                               <SelectContent>
-                                <SelectItem value="firestore">Firestore</SelectItem>
-                                <SelectItem value="rtdb">Realtime DB</SelectItem>
+                                <SelectItem value="rtdb">Realtime DB (Primary)</SelectItem>
+                                <SelectItem value="firestore">Firestore (Backup)</SelectItem>
                               </SelectContent>
                           </Select>
                       </div>
@@ -340,7 +348,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                         <Database className="mr-2 h-4 w-4" /> Scan & Import Workbook
                     </Button>
                    <Button variant="outline" className="w-full justify-start" onClick={handleSyncDatabases} disabled={isProcessing}>
-                      <RefreshCw className="mr-2 h-4 w-4" /> Sync Databases (Firestore to RTDB)
+                      <RefreshCw className="mr-2 h-4 w-4" /> Sync Databases (RTDB to Firestore)
                   </Button>
                 </CardContent>
               </Card>
@@ -354,11 +362,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_local', 'Clear Local Storage?', 'This will permanently delete all assets from THIS DEVICE ONLY (both main and offline stores). It will NOT affect the cloud database.')} disabled={isProcessing}>
                           <HardDrive className="mr-2 h-4 w-4" /> Clear Local Device Storage Only
                       </Button>
-                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_firestore', 'Clear Firestore?', 'This will permanently delete ALL assets from the primary cloud database (Firestore). It will NOT touch your local data or the backup DB.')} disabled={isProcessing}>
-                          <CloudOff className="mr-2 h-4 w-4" /> Clear Firestore Only
+                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_rtdb', 'Clear Realtime DB?', 'This will permanently delete ALL assets from the primary cloud database (RTDB). It will NOT touch your local data or the backup DB.')} disabled={isProcessing}>
+                          <CloudOff className="mr-2 h-4 w-4" /> Clear Realtime DB (Primary)
                       </Button>
-                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_rtdb', 'Clear Realtime DB?', 'This will permanently delete ALL assets from the backup cloud database (RTDB). It will NOT touch your local data or Firestore.')} disabled={isProcessing}>
-                          <CloudOff className="mr-2 h-4 w-4" /> Clear Realtime DB Only
+                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_firestore', 'Clear Firestore?', 'This will permanently delete ALL assets from the backup cloud database (Firestore). It will NOT touch your local data or the primary DB.')} disabled={isProcessing}>
+                          <CloudOff className="mr-2 h-4 w-4" /> Clear Firestore (Backup)
                       </Button>
                       <Separator />
                       <Button variant="destructive" className="w-full justify-start" onClick={() => openConfirmation('nuke_all', 'Nuke ALL Data?', 'This is the most destructive option. It will permanently delete ALL assets from your local device AND from BOTH cloud databases.')} disabled={isProcessing}>
@@ -397,3 +405,5 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     </>
   );
 }
+
+    
