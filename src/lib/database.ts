@@ -27,8 +27,6 @@ export async function getSettings(): Promise<AppSettings | null> {
 
 export async function updateSettings(settings: AppSettings) {
     const db = checkConfig();
-    const settingsRef = ref(db, 'config/settings');
-    
     const currentSettings = await getSettings();
     const settingsToSave: AppSettings = { ...settings };
     if (currentSettings) {
@@ -37,8 +35,8 @@ export async function updateSettings(settings: AppSettings) {
         const newHistory = [historyEntry, ...(currentSettings.settingsHistory || [])];
         settingsToSave.settingsHistory = newHistory.slice(0, 10);
     }
-    
-    await set(settingsRef, settingsToSave);
+    settingsToSave.lastModified = new Date().toISOString();
+    await set(ref(db, 'config/settings'), settingsToSave);
 }
 
 
@@ -68,7 +66,7 @@ export async function batchSetAssets(assets: Asset[]) {
     assets.forEach(asset => {
         // RTDB doesn't like 'undefined' values, so we stringify and parse to remove them.
         const cleanAsset = JSON.parse(JSON.stringify(asset));
-        updates[`/assets/${asset.id}`] = { ...cleanAsset, lastModified: asset.lastModified || new Date().toISOString() };
+        updates[`/assets/${asset.id}`] = { ...cleanAsset, lastModified: new Date().toISOString() };
     });
     await update(ref(db), updates);
 }

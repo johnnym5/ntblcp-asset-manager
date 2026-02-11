@@ -28,18 +28,15 @@ export async function getSettings(): Promise<AppSettings | null> {
 
 export async function updateSettings(settings: AppSettings) {
   const firestoreDb = checkConfig();
-  
   const currentSettings = await getSettings();
-
   const settingsToSave: AppSettings = { ...settings };
   if (currentSettings) {
       const historyEntry: HistoricalAppSettings = { ...currentSettings };
-      delete historyEntry.settingsHistory; // Prevent nested histories
-
+      delete historyEntry.settingsHistory; 
       const newHistory = [historyEntry, ...(currentSettings.settingsHistory || [])];
-      settingsToSave.settingsHistory = newHistory.slice(0, 10); // Keep only the last 10 versions
+      settingsToSave.settingsHistory = newHistory.slice(0, 10); 
   }
-  
+  settingsToSave.lastModified = new Date().toISOString();
   const settingsRef = doc(firestoreDb, 'config', 'settings');
   await setDoc(settingsRef, settingsToSave);
 }
@@ -81,7 +78,7 @@ export async function batchSetAssets(assets: Asset[]) {
         const chunk = assets.slice(i, i + batchSize);
         chunk.forEach((asset) => {
             const docRef = doc(assetsCollectionRef, asset.id);
-            batch.set(docRef, { ...asset, lastModified: asset.lastModified || new Date().toISOString() });
+            batch.set(docRef, { ...asset, lastModified: new Date().toISOString() });
         });
         await batch.commit();
     }
@@ -105,5 +102,7 @@ export async function clearAssets() {
     const db = checkConfig();
     const assetsSnapshot = await getDocs(collection(db, "assets"));
     const assetIds = assetsSnapshot.docs.map(doc => doc.id);
-    await batchDeleteAssets(assetIds);
+    if(assetIds.length > 0) {
+      await batchDeleteAssets(assetIds);
+    }
 }
