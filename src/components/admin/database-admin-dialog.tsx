@@ -215,9 +215,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     addNotification({ title: 'Syncing Databases...', description: 'Copying data from Realtime Database to Firestore.' });
     try {
         const rtdbAssets = await getAssetsRTDB();
-        await batchSetAssetsFS(rtdbAssets);
-        const rtdbSettings = await updateSettingsRTDB(appSettings);
-        if(rtdbSettings) await updateSettingsFS(rtdbSettings);
+        if (appSettings) {
+            await batchSetAssetsFS(rtdbAssets);
+            const rtdbSettings = await updateSettingsRTDB(appSettings);
+            if(rtdbSettings) await updateSettingsFS(rtdbSettings);
+        }
 
         addNotification({ title: 'Sync Complete', description: 'Firestore has been updated with data from Realtime Database.' });
     } catch (e) {
@@ -231,7 +233,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     addNotification({ title: "Clearing Firestore...", description: "This will remove all assets from the backup cloud database."});
     try {
       await clearFirestoreAssets();
-      if (appSettings.defaultDatabase === 'firestore') {
+      if (appSettings?.defaultDatabase === 'firestore') {
         await clearLocalAssets();
         setAssets([]);
       }
@@ -247,7 +249,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     addNotification({ title: "Clearing Realtime DB...", description: "This will remove all assets from the primary cloud database."});
     try {
       await clearRtdbAssets();
-      if (appSettings.defaultDatabase === 'rtdb') {
+      if (appSettings?.defaultDatabase === 'rtdb') {
         await clearLocalAssets();
         setAssets([]);
       }
@@ -294,7 +296,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   };
 
   const handleSettingChange = async (key: keyof AppSettings, value: any) => {
-    if (!userProfile) return;
+    if (!userProfile || !appSettings) return;
     
     const newSettings: AppSettings = {
         ...appSettings,
@@ -343,6 +345,21 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   if (userProfile?.loginName !== 'admin') {
     return null;
+  }
+  
+  if (!appSettings) {
+      return (
+         <Dialog open={isOpen} onOpenChange={onOpenChange}>
+            <DialogContent>
+                <DialogHeader>
+                    <DialogTitle>Loading...</DialogTitle>
+                </DialogHeader>
+                <div className="flex items-center justify-center p-8">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                </div>
+            </DialogContent>
+         </Dialog>
+      )
   }
 
   return (
@@ -527,6 +544,4 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     </>
   );
 }
-    
-
     
