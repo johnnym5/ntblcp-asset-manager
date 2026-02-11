@@ -59,6 +59,7 @@ const fieldsToFilter: { label: string, value: keyof Asset }[] = [
     { label: 'Condition', value: 'condition' },
     { label: 'Manufacturer', value: 'manufacturer' },
     { label: 'Model Number', value: 'modelNumber' },
+    { label: 'Engine Number', value: 'engineNo' },
     { label: 'Asset Class', value: 'assetClass' },
 ];
 

@@ -215,6 +215,7 @@ export default function AssetList() {
     itemsPerPage, setItemsPerPage,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     dateFilter,
+    setDateFilter,
     setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
     sortConfig, setSortConfig,
     appSettings, setAppSettings,
@@ -701,6 +702,9 @@ export default function AssetList() {
                         dateMatch = isToday(modifiedDate);
                     } else if (dateFilter === 'week') {
                         dateMatch = isThisWeek(modifiedDate, { weekStartsOn: 1 });
+                    } else if (dateFilter === 'new-week') {
+                        // Asset is "new" if it has no previous state and was modified this week.
+                        dateMatch = isThisWeek(modifiedDate, { weekStartsOn: 1 }) && !asset.previousState;
                     }
                 }
             }

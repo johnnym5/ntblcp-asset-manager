@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileWarning, History, BarChart2, CalendarClock, ChevronsUpDown } from 'lucide-react';
+import { FileWarning, History, BarChart2, CalendarClock, ChevronsUpDown, PlusCircle } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { useAppState } from '@/contexts/app-state-context';
@@ -86,13 +86,14 @@ export function AssetSummaryDashboard() {
 
 
     const summary = useMemo(() => {
-        if (!appSettings) return { withoutSerial: 0, withoutAssetId: 0, modifiedToday: 0, modifiedThisWeek: 0, withoutDescription: 0, withoutCategory: 0, withoutLocation: 0, withoutCondition: 0, withoutLga: 0, withoutAssignee: 0, withoutManufacturer: 0, withoutModelNumber: 0 };
+        if (!appSettings) return { withoutSerial: 0, withoutAssetId: 0, newThisWeek: 0, modifiedToday: 0, modifiedThisWeek: 0, withoutDescription: 0, withoutCategory: 0, withoutLocation: 0, withoutCondition: 0, withoutLga: 0, withoutAssignee: 0, withoutModelNumber: 0, withoutEngineNo: 0 };
         
         const visibleAssets = summaryAssets.filter(a => !appSettings?.sheetDefinitions[a.category]?.isHidden);
 
         return {
           withoutSerial: visibleAssets.filter(a => !a.sn && !a.serialNumber).length,
           withoutAssetId: visibleAssets.filter(a => !a.assetIdCode?.trim()).length,
+          newThisWeek: visibleAssets.filter(a => a.lastModified && !a.previousState && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length,
           modifiedToday: visibleAssets.filter(a => a.lastModified && isToday(parseISO(a.lastModified))).length,
           modifiedThisWeek: visibleAssets.filter(a => a.lastModified && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length,
           withoutDescription: visibleAssets.filter(a => !a.description?.trim()).length,
@@ -101,7 +102,7 @@ export function AssetSummaryDashboard() {
           withoutCondition: visibleAssets.filter(a => !a.condition?.trim()).length,
           withoutLga: visibleAssets.filter(a => !a.lga?.trim()).length,
           withoutAssignee: visibleAssets.filter(a => !a.assignee?.trim()).length,
-          withoutManufacturer: visibleAssets.filter(a => !a.manufacturer?.trim()).length,
+          withoutEngineNo: visibleAssets.filter(a => (a.category?.includes('Vehicle') || a.category?.includes('MOTORCYCLE')) && !a.engineNo).length,
           withoutModelNumber: visibleAssets.filter(a => !a.modelNumber?.trim()).length,
         };
     }, [summaryAssets, appSettings]);
@@ -115,7 +116,7 @@ export function AssetSummaryDashboard() {
         }
     };
 
-    const handleDateFilterClick = (filter: 'today' | 'week') => {
+    const handleDateFilterClick = (filter: 'today' | 'week' | 'new-week') => {
         setMissingFieldFilter('');
         if (dateFilter === filter) {
             setDateFilter(null);
@@ -217,13 +218,13 @@ export function AssetSummaryDashboard() {
                         isActive={missingFieldFilter === 'assignee'}
                     />
                      <StatCard
-                        title="Missing Manufacturer"
-                        value={summary.withoutManufacturer}
-                        description="Assets missing a manufacturer."
+                        title="Missing Engine No."
+                        value={summary.withoutEngineNo}
+                        description="Vehicles missing an engine number."
                         icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
-                        onAction={() => handleFilterClick('manufacturer')}
-                        actionLabel={missingFieldFilter === 'manufacturer' ? "Clear Filter" : "View Assets"}
-                        isActive={missingFieldFilter === 'manufacturer'}
+                        onAction={() => handleFilterClick('engineNo')}
+                        actionLabel={missingFieldFilter === 'engineNo' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'engineNo'}
                     />
                      <StatCard
                         title="Missing Model"
@@ -234,6 +235,17 @@ export function AssetSummaryDashboard() {
                         actionLabel={missingFieldFilter === 'modelNumber' ? "Clear Filter" : "View Assets"}
                         isActive={missingFieldFilter === 'modelNumber'}
                     />
+                     {summary.newThisWeek > 0 && (
+                        <StatCard
+                            title="New This Week"
+                            value={summary.newThisWeek}
+                            description="Assets added in the last 7 days."
+                            icon={<PlusCircle className="h-4 w-4 text-muted-foreground" />}
+                            onAction={() => handleDateFilterClick('new-week')}
+                            actionLabel={dateFilter === 'new-week' ? "Clear Filter" : "View Assets"}
+                            isActive={dateFilter === 'new-week'}
+                        />
+                    )}
                     <StatCard
                         title="Modified Today"
                         value={summary.modifiedToday}

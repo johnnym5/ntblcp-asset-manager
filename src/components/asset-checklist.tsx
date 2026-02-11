@@ -39,6 +39,7 @@ export function AssetChecklist({ values }: AssetChecklistProps) {
     { label: 'Assignee', completed: !!values.assignee, icon: <User className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Manufacturer', completed: !!values.manufacturer, icon: <Building className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Model Number', completed: !!values.modelNumber, icon: <Hash className="h-4 w-4 text-muted-foreground" /> },
+    { label: 'Engine Number', completed: !!values.engineNo, icon: <Hash className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Asset Class', completed: !!values.assetClass, icon: <ListTree className="h-4 w-4 text-muted-foreground" /> },
     { label: 'Remarks/Notes', completed: !!values.remarks, icon: <FileText className="h-4 w-4 text-muted-foreground" /> },
   ];
