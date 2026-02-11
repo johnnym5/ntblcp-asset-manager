@@ -286,17 +286,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     Settings
                   </DropdownMenuItem>
 
+                  {userProfile?.loginName === 'admin' && (
+                    <DropdownMenuItem onClick={() => setIsDbAdminOpen(true)}>
+                      <DatabaseZap className="mr-2 h-4 w-4"/>
+                      Database Admin
+                    </DropdownMenuItem>
+                  )}
+
                   {userProfile?.isAdmin && (
-                    <>
-                      <DropdownMenuItem onClick={() => setIsDbAdminOpen(true)}>
-                        <DatabaseZap className="mr-2 h-4 w-4"/>
-                        Database Admin
-                      </DropdownMenuItem>
-                       <DropdownMenuItem onClick={() => setIsActivityLogOpen(true)}>
-                        <History className="mr-2 h-4 w-4"/>
-                        Recent Activity
-                      </DropdownMenuItem>
-                    </>
+                    <DropdownMenuItem onClick={() => setIsActivityLogOpen(true)}>
+                      <History className="mr-2 h-4 w-4"/>
+                      Recent Activity
+                    </DropdownMenuItem>
                   )}
 
                   <DropdownMenuSeparator />
@@ -364,11 +365,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </motion.main>
       <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} initialTab={initialSettingsTab} />
+      {userProfile?.loginName === 'admin' && (
+        <DatabaseAdminDialog isOpen={isDbAdminOpen} onOpenChange={setIsDbAdminOpen} />
+      )}
       {userProfile?.isAdmin && (
-        <>
-          <DatabaseAdminDialog isOpen={isDbAdminOpen} onOpenChange={setIsDbAdminOpen} />
-          <ActivityLogSheet isOpen={isActivityLogOpen} onOpenChange={setIsActivityLogOpen} onRevert={onRevertAsset} />
-        </>
+        <ActivityLogSheet isOpen={isActivityLogOpen} onOpenChange={setIsActivityLogOpen} onRevert={onRevertAsset} />
       )}
       <AssetFilterSheet
         isOpen={isFilterSheetOpen}
