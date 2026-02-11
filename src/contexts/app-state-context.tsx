@@ -132,7 +132,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     sheetDefinitions: HEADER_DEFINITIONS,
     lockAssetList: true,
     appMode: 'management',
-    databaseSource: 'rtdb',
     locations: defaultInitialLocations,
     settingsHistory: [],
   });
@@ -200,14 +199,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           sheetDefinitions: HEADER_DEFINITIONS,
           lockAssetList: true,
           appMode: 'management',
-          databaseSource: 'rtdb',
           locations: defaultInitialLocations,
           settingsHistory: [],
         };
       } else {
-        if (!localSettings.databaseSource) {
-            localSettings.databaseSource = 'rtdb';
-        }
         if (!localSettings.locations) {
           localSettings.locations = defaultInitialLocations;
         }

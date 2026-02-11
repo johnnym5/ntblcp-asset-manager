@@ -29,7 +29,6 @@ import {
   CheckCheck,
   X,
   Database,
-  Flame,
   DatabaseZap,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
@@ -73,7 +72,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setManualDownloadTrigger,
     setManualUploadTrigger,
     isSyncing,
-    appSettings,
     isSettingsOpen,
     setIsSettingsOpen,
   } = useAppState();
@@ -223,21 +221,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             aria-label={`Switch to ${isOnline ? 'Online' : 'Online'} mode`}
                         >
                            {isOnline ? (
-                                appSettings.databaseSource === 'firestore' ? (
-                                    <Cloud className="h-5 w-5 text-green-500" />
-                                ) : (
-                                    <Flame className="h-5 w-5 text-orange-500" />
-                                )
+                                <Cloud className="h-5 w-5 text-green-500" />
                             ) : (
                                 <CloudOff className="h-5 w-5 text-red-500" />
                             )}
                         </Button>
                     </TooltipTrigger>
                     <TooltipContent>
-                        <p>{isOnline 
-                            ? (appSettings.databaseSource === 'firestore' ? 'Online (Firestore)' : 'Online (Realtime DB)')
-                            : 'Offline'
-                        }</p>
+                        <p>{isOnline ? 'Online (Firestore)' : 'Offline'}</p>
                     </TooltipContent>
                 </Tooltip>
             </TooltipProvider>

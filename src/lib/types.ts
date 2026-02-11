@@ -88,7 +88,6 @@ export interface AppSettings {
   sheetDefinitions: Record<string, SheetDefinition>;
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
-  databaseSource: 'firestore' | 'rtdb';
   locations?: string[];
   lastModified?: string;
   lastModifiedBy?: {
