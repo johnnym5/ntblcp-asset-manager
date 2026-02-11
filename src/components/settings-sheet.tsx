@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -619,7 +618,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
 
           <SheetFooter className="mt-auto pt-4 border-t sm:justify-between">
             <SheetClose asChild><Button variant="outline">Cancel</Button></SheetClose>
-            {isAdmin && (
+            {hasChanges && (
               <Button onClick={() => setIsConfirmOpen(true)} disabled={!hasChanges}>
                   <Save className="mr-2 h-4 w-4" />
                   Save Changes
@@ -710,5 +709,4 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     </>
   );
 }
-
     
