@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +23,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
-import { batchDeleteAssets } from '@/lib/firestore';
+import { batchDeleteAssets, batchSetAssets } from '@/lib/firestore';
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle } from 'lucide-react';
 import type { AppSettings, Asset } from '@/lib/types';
