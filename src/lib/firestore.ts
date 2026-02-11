@@ -6,6 +6,25 @@ import { db, isConfigValid } from '@/lib/firebase';
 import type { Asset, AppSettings, HistoricalAppSettings } from '@/lib/types';
 import { addNotification } from '@/hooks/use-notifications';
 
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            reject(new Error(`Operation timed out after ${ms / 1000} seconds.`));
+        }, ms);
+
+        promise.then(
+            (res) => {
+                clearTimeout(timeoutId);
+                resolve(res);
+            },
+            (err) => {
+                clearTimeout(timeoutId);
+                reject(err);
+            }
+        );
+    });
+};
+
 
 // Helper function to ensure Firebase is properly configured before use.
 const checkConfig = () => {
@@ -56,7 +75,7 @@ export async function getAssets(): Promise<Asset[]> {
     const db = checkConfig();
     const assetsCollectionRef = collection(db, 'assets');
     const q = query(assetsCollectionRef);
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await withTimeout(getDocs(q), 20000);
     const fetchedAssets: Asset[] = [];
     querySnapshot.forEach((doc) => {
         fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
@@ -86,7 +105,7 @@ export async function batchSetAssets(assets: Asset[]) {
         const chunk = assets.slice(i, i + batchSize);
         chunk.forEach((asset) => {
             const docRef = doc(assetsCollectionRef, asset.id);
-            batch.set(docRef, { ...asset, lastModified: new Date().toISOString() });
+            batch.set(docRef, { ...asset, lastModified: asset.lastModified || new Date().toISOString() });
         });
         await batch.commit();
     }
