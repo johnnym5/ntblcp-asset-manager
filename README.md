@@ -1,4 +1,4 @@
-fire# NTBLCP Asset Manager
+# NTBLCP Asset Manager
 
 A full-featured, offline-first Asset Management Web App, built with Next.js, Tailwind CSS, and Firebase.
 
@@ -33,11 +33,17 @@ cp .env.example .env.local
 
 ### Step 1.2: Fill in your Firebase Credentials
 
-Open the new `.env.local` file and add your actual Firebase project credentials. You can find these values in your Firebase project's settings page in the Firebase Console.
+Open the new `.env.local` file and add your actual Firebase project credentials.
 
-*   In the Firebase Console, go to **Project settings** (click the gear icon ⚙️).
-*   In the **General** tab, scroll down to the "Your apps" section.
-*   Select your web app and copy the corresponding configuration values into your `.env.local` file.
+1.  **Get Web App Config**:
+    *   In the Firebase Console, go to **Project settings** (click the gear icon ⚙️).
+    *   In the **General** tab, scroll down to the "Your apps" section.
+    *   Select your web app and copy the configuration values into your `.env.local` file.
+
+2.  **Get Realtime Database URL**:
+    *   In the Firebase Console, go to the **Realtime Database** section (under Build).
+    *   If you haven't created a database, create one in **locked mode** (the app's rules will overwrite this).
+    *   Copy the database URL (it looks like `https://<your-project-id>-default-rtdb.firebaseio.com`) and add it as the value for `NEXT_PUBLIC_FIREBASE_DATABASE_URL`.
 
 ### Step 1.3: Install Dependencies & Run
 
@@ -87,7 +93,7 @@ Your deployed application needs your Firebase API keys to connect to the databas
 2.  Select your project (`YOUR-FIREBASE-PROJECT-ID`).
 3.  Navigate to the **App Hosting** page.
 4.  Select your backend, go to the **Settings** tab.
-5.  In the "Environment variables" section, add the same variables from your `.env.local` file (e.g., `NEXT_PUBLIC_FIREBASE_API_KEY`, etc.).
+5.  In the "Environment variables" section, add all the variables from your `.env.local` file (e.g., `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_DATABASE_URL`, etc.).
 
 ### Step 2.5: Deploy the Application
 

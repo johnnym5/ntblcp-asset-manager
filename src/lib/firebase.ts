@@ -11,14 +11,15 @@ export const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  databaseURL: `https://${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseio.com`
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL
 };
 
 
 // Check if all essential keys are present and not placeholders
 export const isConfigValid = 
     firebaseConfig.apiKey &&
-    firebaseConfig.projectId;
+    firebaseConfig.projectId &&
+    firebaseConfig.databaseURL;
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
