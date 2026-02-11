@@ -1,4 +1,3 @@
-
 'use client';
 
 import { ref, get, set, remove, update, onValue } from 'firebase/database';
@@ -28,7 +27,9 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
 // Helper function to ensure Firebase is properly configured before use.
 const checkConfig = () => {
     if (!isConfigValid || !rtdb) {
-        throw new Error("Firebase Realtime Database is not configured. For local development, please create and populate a .env file as described in the README.");
+        // This warning is for developers who haven't set up their .env file.
+        // It prevents the app from crashing.
+        return null;
     }
     return rtdb;
 }
@@ -36,6 +37,7 @@ const checkConfig = () => {
 // --- App Settings ---
 export async function getSettings(): Promise<AppSettings | null> {
     const db = checkConfig();
+    if (!db) return null;
     const settingsRef = ref(db, 'config/settings');
     const snapshot = await get(settingsRef);
     if (snapshot.exists()) {
@@ -46,6 +48,7 @@ export async function getSettings(): Promise<AppSettings | null> {
 
 export async function updateSettings(settings: AppSettings) {
     const db = checkConfig();
+    if (!db) return;
     const currentSettings = await getSettings();
     const settingsToSave: AppSettings = { ...settings };
 
@@ -70,6 +73,7 @@ export async function updateSettings(settings: AppSettings) {
 
 export function onSettingsChange(callback: (settings: AppSettings) => void): () => void {
     const db = checkConfig();
+    if (!db) return () => {};
     const settingsRef = ref(db, 'config/settings');
     const unsubscribe = onValue(settingsRef, (snapshot) => {
         if (snapshot.exists()) {
@@ -84,6 +88,7 @@ export function onSettingsChange(callback: (settings: AppSettings) => void): () 
 
 export async function getAssets(): Promise<Asset[]> {
     const db = checkConfig();
+    if (!db) return [];
     const assetsRef = ref(db, 'assets');
     const snapshot = await withTimeout(get(assetsRef), 20000);
     if (snapshot.exists()) {
@@ -96,12 +101,14 @@ export async function getAssets(): Promise<Asset[]> {
 
 export async function deleteAsset(assetId: string) {
     const db = checkConfig();
+    if (!db) return;
     const assetRef = ref(db, `assets/${assetId}`);
     await remove(assetRef);
 }
 
 export async function batchSetAssets(assets: Asset[]) {
     const db = checkConfig();
+    if (!db) return;
     const updates: { [key: string]: any } = {};
     assets.forEach(asset => {
         // RTDB doesn't like 'undefined' values, so we stringify and parse to remove them.
@@ -113,6 +120,7 @@ export async function batchSetAssets(assets: Asset[]) {
 
 export async function batchDeleteAssets(assetIds: string[]) {
     const db = checkConfig();
+    if (!db) return;
     const updates: { [key: string]: null } = {};
     assetIds.forEach(id => {
         updates[`/assets/${id}`] = null;
@@ -122,6 +130,7 @@ export async function batchDeleteAssets(assetIds: string[]) {
 
 export async function clearAssets() {
     const db = checkConfig();
+    if (!db) return;
     const assetsRef = ref(db, 'assets');
     await remove(assetsRef);
 }

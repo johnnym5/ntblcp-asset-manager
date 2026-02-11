@@ -1,9 +1,8 @@
-
 'use client';
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
 import { db, isConfigValid } from '@/lib/firebase';
-import type { Asset, AppSettings, HistoricalAppSettings } from '@/lib/types';
+import type { Asset, AppSettings, HistoricalAppSettings } from './types';
 import { addNotification } from '@/hooks/use-notifications';
 
 const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
@@ -29,7 +28,9 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
 // Helper function to ensure Firebase is properly configured before use.
 const checkConfig = () => {
     if (!isConfigValid || !db) {
-        throw new Error("Firebase is not configured. For local development, please create and populate a .env file as described in the README.");
+        // This warning is for developers who haven't set up their .env file.
+        // It prevents the app from crashing.
+        return null;
     }
     return db;
 }
@@ -37,6 +38,7 @@ const checkConfig = () => {
 // --- App Settings ---
 export async function getSettings(): Promise<AppSettings | null> {
     const firestoreDb = checkConfig();
+    if (!firestoreDb) return null;
     const settingsRef = doc(firestoreDb, 'config', 'settings');
     const docSnap = await getDoc(settingsRef);
     if (docSnap.exists()) {
@@ -47,6 +49,7 @@ export async function getSettings(): Promise<AppSettings | null> {
 
 export async function updateSettings(settings: AppSettings) {
   const firestoreDb = checkConfig();
+  if (!firestoreDb) return;
   const currentSettings = await getSettings();
   const settingsToSave: AppSettings = { ...settings };
   if (currentSettings) {
@@ -73,6 +76,7 @@ export async function updateSettings(settings: AppSettings) {
 
 export async function getAssets(): Promise<Asset[]> {
     const db = checkConfig();
+    if (!db) return [];
     const assetsCollectionRef = collection(db, 'assets');
     const q = query(assetsCollectionRef);
     const querySnapshot = await withTimeout(getDocs(q), 20000);
@@ -85,12 +89,14 @@ export async function getAssets(): Promise<Asset[]> {
 
 export async function updateAsset(asset: Asset) {
     const db = checkConfig();
+    if (!db) return;
     const assetRef = doc(db, 'assets', asset.id);
     await setDoc(assetRef, { ...asset, lastModified: new Date().toISOString() }, { merge: true });
 }
 
 export async function deleteAsset(assetId: string) {
     const db = checkConfig();
+    if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
     await deleteDoc(assetRef);
 }
@@ -98,6 +104,7 @@ export async function deleteAsset(assetId: string) {
 
 export async function batchSetAssets(assets: Asset[]) {
     const db = checkConfig();
+    if (!db) return;
     const assetsCollectionRef = collection(db, 'assets');
     const batchSize = 500;
     for (let i = 0; i < assets.length; i += batchSize) {
@@ -113,6 +120,7 @@ export async function batchSetAssets(assets: Asset[]) {
 
 export async function batchDeleteAssets(assetIds: string[]) {
     const db = checkConfig();
+    if (!db) return;
     const batchSize = 500;
     for (let i = 0; i < assetIds.length; i += batchSize) {
         const batch = writeBatch(db);
@@ -127,6 +135,7 @@ export async function batchDeleteAssets(assetIds: string[]) {
 
 export async function clearAssets() {
     const db = checkConfig();
+    if (!db) return;
     const assetsSnapshot = await getDocs(collection(db, "assets"));
     const assetIds = assetsSnapshot.docs.map(doc => doc.id);
     if(assetIds.length > 0) {
