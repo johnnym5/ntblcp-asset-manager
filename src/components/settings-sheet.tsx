@@ -431,12 +431,13 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           </SheetHeader>
           <div className="flex-1 overflow-y-auto">
             <Tabs defaultValue={initialTab} value={activeTab} onValueChange={setActiveTab} className="p-1">
-              <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-3" : "grid-cols-1")}>
+              <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-4" : "grid-cols-1")}>
                   <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
                   {isAdmin && (
                     <>
                       <TabsTrigger value="users"><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
                       <TabsTrigger value="sheets"><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
+                      <TabsTrigger value="history"><History className="mr-2 h-4 w-4" />History</TabsTrigger>
                     </>
                   )}
               </TabsList>
@@ -488,40 +489,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                         </div>
                     </div>
                   )}
-
-                  {isAdmin && (
-                    <>
-                      <div>
-                        <h3 className="text-lg font-medium my-4 flex items-center gap-2"><History className="h-5 w-5" /> Settings History</h3>
-                        <div className="rounded-lg border p-3">
-                            <ScrollArea className="h-[200px]">
-                                {(draftSettings.settingsHistory && draftSettings.settingsHistory.length > 0) ? (
-                                    <div className="space-y-2">
-                                        {draftSettings.settingsHistory.map((historyItem, index) => (
-                                            <div key={index} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md">
-                                                <div>
-                                                    <p className="text-sm font-medium">
-                                                        Saved by: {historyItem.lastModifiedBy?.displayName || 'Unknown'}
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {formatDistanceToNow(new Date(historyItem.lastModified!), { addSuffix: true })}
-                                                    </p>
-                                                </div>
-                                                <Button size="sm" variant="ghost" onClick={() => handleRollback(historyItem)}>
-                                                   <RotateCcw className="mr-2 h-4 w-4" />
-                                                    Rollback
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-muted-foreground text-center py-8">No settings history available.</p>
-                                )}
-                            </ScrollArea>
-                        </div>
-                      </div>
-                    </>
-                  )}
               </TabsContent>
               {isAdmin && (
                 <>
@@ -556,6 +523,38 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                             <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
                             <Button variant="outline" className="w-full" onClick={handleAddSheet}><PlusCircle className="mr-2" /> Add Manually</Button>
                             <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import from File</Button>
+                        </div>
+                      </div>
+                  </TabsContent>
+                  <TabsContent value="history" className="pt-4">
+                     <div>
+                        <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><History className="h-5 w-5" /> Settings History</h3>
+                        <p className="text-sm text-muted-foreground mb-4">You can roll back to a previous version of your settings from the last 7 days. Rolling back will stage the changes; you still need to save them.</p>
+                        <div className="rounded-lg border p-3">
+                            <ScrollArea className="h-[400px]">
+                                {(draftSettings.settingsHistory && draftSettings.settingsHistory.length > 0) ? (
+                                    <div className="space-y-2">
+                                        {draftSettings.settingsHistory.map((historyItem, index) => (
+                                            <div key={index} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md">
+                                                <div>
+                                                    <p className="text-sm font-medium">
+                                                        Saved by: {historyItem.lastModifiedBy?.displayName || 'Unknown'}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {formatDistanceToNow(new Date(historyItem.lastModified!), { addSuffix: true })}
+                                                    </p>
+                                                </div>
+                                                <Button size="sm" variant="ghost" onClick={() => handleRollback(historyItem)}>
+                                                   <RotateCcw className="mr-2 h-4 w-4" />
+                                                    Rollback
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground text-center py-8">No settings history available within the last week.</p>
+                                )}
+                            </ScrollArea>
                         </div>
                       </div>
                   </TabsContent>
