@@ -2,14 +2,14 @@
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-  SheetClose,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 import {
   Tabs,
   TabsContent,
@@ -427,11 +427,11 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   
   if (!draftSettings) {
     return (
-      <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="flex items-center justify-center">
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="flex items-center justify-center">
           <Loader2 className="h-8 w-8 animate-spin" />
-        </SheetContent>
-      </Sheet>
+        </DialogContent>
+      </Dialog>
     );
   }
 
@@ -439,14 +439,14 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
 
   return (
     <>
-      <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-2xl flex flex-col h-full">
-          <SheetHeader>
-            <SheetTitle>Settings</SheetTitle>
-            <SheetDescription>
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="w-full sm:max-w-2xl flex flex-col max-h-[90vh]">
+          <DialogHeader>
+            <DialogTitle>Settings</DialogTitle>
+            <DialogDescription>
               Manage application settings and preferences. {isAdmin ? 'Admin changes apply to all users.' : ''}
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
           <div className="flex-1 overflow-y-auto">
             <Tabs defaultValue={initialTab} value={activeTab} onValueChange={setActiveTab} className="p-1">
               <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-4" : "grid-cols-1")}>
@@ -490,7 +490,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                         </div>
                         {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
                         {passwordSuccess && <p className="text-sm text-green-600">{passwordSuccess}</p>}
-                        <Button size="sm" onClick={handleChangePassword}>Stage Password Change</Button>
+                        <Button size="sm" onClick={handleChangePassword} disabled={isSaving}>Stage Password Change</Button>
                         <p className="text-xs text-muted-foreground">Your password change will be saved when you click "Save Changes" at the bottom of the panel.</p>
                     </div>
                   </div>
@@ -616,17 +616,17 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
             </Tabs>
           </div>
 
-          <SheetFooter className="mt-auto pt-4 border-t sm:justify-between">
-            <SheetClose asChild><Button variant="outline">Cancel</Button></SheetClose>
+          <DialogFooter className="mt-auto pt-4 border-t sm:justify-between">
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
             {hasChanges && (
               <Button onClick={() => setIsConfirmOpen(true)} disabled={!hasChanges}>
                   <Save className="mr-2 h-4 w-4" />
                   Save Changes
               </Button>
             )}
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       
       <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
 
