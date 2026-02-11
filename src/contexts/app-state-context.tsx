@@ -317,5 +317,3 @@ export const useAppState = (): AppStateContextType => {
   }
   return context;
 };
-
-    
