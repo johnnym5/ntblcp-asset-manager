@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -43,14 +42,6 @@ import { useAppState } from "@/contexts/app-state-context";
 import { Input } from "./ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
 import { SettingsSheet } from "./settings-sheet";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetFooter,
-  SheetClose,
-} from '@/components/ui/sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AssetFilterSheet } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
@@ -58,6 +49,7 @@ import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
 import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
 import { ActivityLogSheet } from "./admin/activity-log-sheet";
+import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -244,21 +236,77 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Tooltip>
             </TooltipProvider>
             
-            <TooltipProvider>
+            <Popover open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
+              <TooltipProvider>
                 <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button variant="ghost" size="icon" className="relative" onClick={() => handleNotificationsOpenChange(true)}>
-                            <Bell className="h-5 w-5" />
-                            {unreadCount > 0 && (
-                            <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
-                                {unreadCount}
-                            </span>
-                            )}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent><p>Notifications</p></TooltipContent>
+                  <TooltipTrigger asChild>
+                    <PopoverTrigger asChild>
+                      <Button variant="ghost" size="icon" className="relative">
+                        <Bell className="h-5 w-5" />
+                        {unreadCount > 0 && (
+                          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
+                            {unreadCount}
+                          </span>
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>Notifications</p>
+                  </TooltipContent>
                 </Tooltip>
-            </TooltipProvider>
+              </TooltipProvider>
+              <PopoverContent align="end" className="w-full sm:w-96 p-0 flex flex-col max-h-[80vh]">
+                <div className="p-4 border-b">
+                  <h3 className="font-semibold text-lg">Notifications</h3>
+                </div>
+                <ScrollArea className="flex-1">
+                  {notifications.length > 0 ? (
+                    notifications.map((notification, index) => (
+                      <div key={notification.id}>
+                        <div className="relative group p-4">
+                          <p className={cn("font-semibold mb-1 pr-8", !notification.read && "text-foreground", notification.read && "text-muted-foreground")}>
+                            {notification.title}
+                          </p>
+                          {notification.description && (
+                            <p className={cn("text-sm pr-8", !notification.read && "text-muted-foreground", notification.read && "text-muted-foreground/70")}>
+                              {notification.description}
+                            </p>
+                          )}
+                          {notification.action && <div className="mt-2">{notification.action}</div>}
+                          <p className="text-xs text-muted-foreground/80 mt-2">
+                            {formatDistanceToNow(notification.date, { addSuffix: true })}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="absolute top-3 right-3 h-6 w-6 text-muted-foreground opacity-0 group-hover:opacity-100"
+                            onClick={() => removeNotification(notification.id)}
+                            aria-label="Dismiss notification"
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {index < notifications.length - 1 && <Separator />}
+                      </div>
+                    ))
+                  ) : (
+                    <div className="flex flex-col items-center justify-center gap-2 text-center p-8 text-muted-foreground h-full">
+                      <CheckCheck className="h-8 w-8" />
+                      <p className="text-sm font-medium">You're all caught up!</p>
+                      <p className="text-xs">New notifications will appear here.</p>
+                    </div>
+                  )}
+                </ScrollArea>
+                {notifications.length > 0 && (
+                  <div className="p-4 border-t flex justify-end">
+                    <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => clearAll()}>
+                      Clear all
+                    </Button>
+                  </div>
+                )}
+              </PopoverContent>
+            </Popover>
 
             {loading ? (
               <Skeleton className="h-10 w-10 rounded-full" />
@@ -386,59 +434,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         missingFieldFilter={missingFieldFilter}
         setMissingFieldFilter={setMissingFieldFilter}
       />
-       <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
-        <SheetContent className="w-full sm:max-w-sm p-0 flex flex-col">
-            <SheetHeader className="p-4">
-                <SheetTitle>Notifications</SheetTitle>
-            </SheetHeader>
-            <Separator />
-            <ScrollArea className="flex-1">
-              {notifications.length > 0 ? (
-                notifications.map((notification, index) => (
-                  <div key={notification.id}>
-                    <div className="relative group p-4">
-                      <p className={cn("font-semibold mb-1 pr-8", !notification.read && "text-foreground", notification.read && "text-muted-foreground")}>
-                        {notification.title}
-                      </p>
-                      {notification.description && (
-                        <p className={cn("text-sm pr-8", !notification.read && "text-muted-foreground", notification.read && "text-muted-foreground/70")}>
-                          {notification.description}
-                        </p>
-                      )}
-                      {notification.action && <div className="mt-2">{notification.action}</div>}
-                      <p className="text-xs text-muted-foreground/80 mt-2">
-                        {formatDistanceToNow(notification.date, { addSuffix: true })}
-                      </p>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="absolute top-3 right-3 h-6 w-6 text-muted-foreground opacity-0 group-hover:opacity-100"
-                        onClick={() => removeNotification(notification.id)}
-                        aria-label="Dismiss notification"
-                      >
-                          <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                    {index < notifications.length - 1 && <Separator />}
-                  </div>
-                ))
-              ) : (
-                <div className="flex flex-col items-center justify-center gap-2 text-center p-8 text-muted-foreground h-full">
-                  <CheckCheck className="h-8 w-8" />
-                  <p className="text-sm font-medium">You're all caught up!</p>
-                  <p className="text-xs">New notifications will appear here.</p>
-                </div>
-              )}
-            </ScrollArea>
-            <SheetFooter className="p-4 border-t">
-              {notifications.length > 0 && (
-                <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => clearAll()}>
-                  Clear all
-                </Button>
-              )}
-            </SheetFooter>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
