@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
 import type { AuthorizedUser } from '@/lib/types';
+import { clearLocalAssets, clearLockedOfflineAssets } from '@/lib/idb';
 
 
 export interface LocalUserProfile {
@@ -66,17 +67,15 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           return;
         }
 
-        const allUsers = [...appSettings.authorizedUsers, superAdmin];
+        const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
         const authorizedUser = allUsers.find(u => u.loginName === savedProfile.loginName);
         
         if (authorizedUser) {
-           // Always rebuild the profile from the source of truth (appSettings)
-           // to ensure permissions are always up-to-date.
            const freshProfile: LocalUserProfile = {
               id: savedProfile.id || uuidv4(),
               loginName: authorizedUser.loginName,
               displayName: authorizedUser.displayName,
-              state: savedProfile.state, // The chosen state is session-specific, so we keep it.
+              state: savedProfile.state,
               isAdmin: authorizedUser.isAdmin,
               isGuest: authorizedUser.isGuest,
               canAddAssets: authorizedUser.canAddAssets,
@@ -88,7 +87,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUserProfile(freshProfile);
           setProfileSetupComplete(true);
         } else {
-          // User from storage is no longer in the authorized list.
           localStorage.removeItem('ntblcp-user-profile');
           setUserProfile(null);
           setProfileSetupComplete(false);
@@ -135,8 +133,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     setLoading(true);
     localStorage.removeItem('ntblcp-user-profile');
+    localStorage.removeItem('app-setup-complete');
     setUserProfile(null);
     setProfileSetupComplete(false);
+
+    try {
+      await clearLocalAssets();
+      await clearLockedOfflineAssets();
+    } catch (e) {
+      console.error("Failed to clear local databases on logout", e);
+    }
+
     window.location.href = '/';
   };
 

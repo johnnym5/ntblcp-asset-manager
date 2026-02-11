@@ -281,12 +281,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                  {userProfile?.loginName === 'admin' && (
+                  <DropdownMenuItem onClick={handleSettingsOpen}>
+                    <Settings className="mr-2 h-4 w-4"/>
+                    Settings
+                  </DropdownMenuItem>
+
+                  {userProfile?.isAdmin && (
                     <>
-                      <DropdownMenuItem onClick={handleSettingsOpen}>
-                        <Settings className="mr-2 h-4 w-4"/>
-                        Settings
-                      </DropdownMenuItem>
                       <DropdownMenuItem onClick={() => setIsDbAdminOpen(true)}>
                         <DatabaseZap className="mr-2 h-4 w-4"/>
                         Database Admin
@@ -363,7 +364,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {children}
       </motion.main>
       <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} initialTab={initialSettingsTab} />
-      {userProfile?.loginName === 'admin' && (
+      {userProfile?.isAdmin && (
         <>
           <DatabaseAdminDialog isOpen={isDbAdminOpen} onOpenChange={setIsDbAdminOpen} />
           <ActivityLogSheet isOpen={isActivityLogOpen} onOpenChange={setIsActivityLogOpen} onRevert={onRevertAsset} />

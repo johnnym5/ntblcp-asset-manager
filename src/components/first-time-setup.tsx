@@ -1,75 +1,190 @@
 'use client';
 
-import React, { useEffect, useState, useCallback } from 'react';
-import { Loader2, PartyPopper, AlertTriangle } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import React, { useState, useCallback } from 'react';
+import { Loader2, PartyPopper, AlertTriangle, Boxes } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Button } from './ui/button';
 import { getAssets as getAssetsRTDB, getSettings } from '@/lib/database';
 import { saveAssets, saveLocalSettings } from '@/lib/idb';
 import { addNotification } from '@/hooks/use-notifications';
-import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
+import type { AuthorizedUser } from '@/lib/types';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from './ui/separator';
+
+const superAdmin: AuthorizedUser = {
+  loginName: 'admin',
+  displayName: 'Super Admin',
+  password: 'setup',
+  states: ['All'],
+  isAdmin: true,
+  isGuest: false,
+  canAddAssets: true,
+  canEditAssets: true,
+  canVerifyAssets: true,
+};
 
 export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => void }) {
-  const [status, setStatus] = useState<'loading' | 'downloading' | 'finished' | 'error'>('loading');
-  const [error, setError] = useState<string | null>(null);
-  const [timeout, setTimeoutValue] = useState(20000); // Start with 20 seconds
+  const [step, setStep] = useState<'login' | 'downloading' | 'finished' | 'error'>('login');
+  
+  // Login State
+  const [loginName, setLoginName] = useState('');
+  const [password, setPassword] = useState('');
+  const [loginError, setLoginError] = useState<string | null>(null);
+  const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
+  const [selectedState, setSelectedState] = useState<string>('');
 
-  const performInitialSetup = useCallback(async () => {
-    setStatus('downloading');
-    setError(null);
+  // Download State
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const { login } = useAuth();
+
+  const handleLogin = async () => {
+    setLoginError(null);
+    if (!loginName) {
+      setLoginError("Please enter your login name.");
+      return;
+    }
+    
+    const remoteSettings = await getSettings();
+    if (!remoteSettings) {
+        setLoginError("Could not connect to the database to verify settings. Please check your internet connection.");
+        return;
+    }
+
+    const allUsers = [...remoteSettings.authorizedUsers, superAdmin];
+    const user = allUsers.find(
+      u => u.loginName.toLowerCase() === loginName.toLowerCase().trim()
+    );
+
+    if (!user || (user.password && user.password !== password)) {
+      setLoginError("Invalid login name or password.");
+      return;
+    }
+    
+    setFoundUser(user);
+    if (user.states.length === 1 && user.states[0] !== 'All') {
+        setSelectedState(user.states[0]);
+        await performInitialSetup(user, user.states[0], remoteSettings);
+    } else if (user.isAdmin) {
+        setSelectedState('All');
+        await performInitialSetup(user, 'All', remoteSettings);
+    }
+  };
+
+  const handleConfirmAndDownload = async () => {
+    if (!foundUser || !selectedState) return;
+    const remoteSettings = await getSettings();
+    if (!remoteSettings) {
+       setLoginError("Could not connect to the database. Please check internet connection.");
+       return;
+    }
+    await performInitialSetup(foundUser, selectedState, remoteSettings);
+  }
+
+  const performInitialSetup = useCallback(async (user: AuthorizedUser, state: string, settings: any) => {
+    setStep('downloading');
+    setDownloadError(null);
     
     try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), timeout);
-
-      // 1. Fetch Settings from the primary database (RTDB)
-      const settings = await getSettings();
-      if (!settings) {
-        throw new Error('No application settings found in the database. Please configure settings as an admin first.');
-      }
-
-      // 2. Fetch Assets from the primary database (RTDB)
-      const assets = await getAssetsRTDB();
-
-      clearTimeout(timeoutId);
-
-      // 3. Save both to local IndexedDB
+      await login(user, state);
       await saveLocalSettings(settings);
+      const assets = await getAssetsRTDB();
       await saveAssets(assets.map(a => ({...a, syncStatus: 'synced'})));
 
-      // 4. IMPORTANT: Set a persistent flag in localStorage to indicate setup is complete.
-      // This is the reliable way to prevent this component from running again.
       localStorage.setItem('app-setup-complete', 'true');
       
-      setStatus('finished');
+      setStep('finished');
       addNotification({ title: 'Setup Complete', description: 'Application data has been downloaded successfully.' });
 
     } catch (e: any) {
       console.error("First time setup failed:", e);
       let errorMessage = e.message || 'An unknown error occurred.';
-      if (e.name === 'AbortError') {
-        errorMessage = `The operation timed out after ${timeout / 1000} seconds. Your connection may be slow.`;
-      } else if (errorMessage.includes('auth/network-request-failed') || errorMessage.includes('net::ERR_INTERNET_DISCONNECTED')) {
+      if (errorMessage.includes('auth/network-request-failed') || errorMessage.includes('net::ERR_INTERNET_DISCONNECTED')) {
           errorMessage = "Could not connect to the database. Please check your internet connection and try again.";
       }
-      setError(errorMessage);
-      setStatus('error');
+      setDownloadError(errorMessage);
+      setStep('error');
     }
-  }, [timeout]);
+  }, [login]);
 
-  useEffect(() => {
-    // Automatically trigger the setup process when the component mounts.
-    performInitialSetup();
-  }, [performInitialSetup]);
-
-  const handleRetry = () => {
-    // Increase timeout and re-trigger the setup process by updating the dependency.
-    setTimeoutValue(current => current + 10000); 
+  const handleRetry = async () => {
+    if (!foundUser || !selectedState) {
+        setStep('login');
+        return;
+    };
+     const remoteSettings = await getSettings();
+     if (!remoteSettings) {
+        setDownloadError("Could not connect to the database. Please check internet connection.");
+        setStep('error');
+        return;
+     }
+    await performInitialSetup(foundUser, selectedState, remoteSettings);
   };
 
   const renderContent = () => {
-    switch (status) {
-      case 'loading':
+    switch (step) {
+      case 'login':
+        const isMultiStateUser = foundUser && foundUser.states.length > 1 && !foundUser.isAdmin;
+        return (
+          <>
+            <CardHeader className="text-center items-center">
+                <div className="p-3 bg-primary/10 rounded-full mb-2">
+                    <Boxes className="h-6 w-6 text-primary" />
+                </div>
+                <CardTitle>Welcome to Global Asset Hub</CardTitle>
+                <CardDescription>
+                   This is your first time using the app on this device. Please sign in to download your data.
+                </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+                {!isMultiStateUser ? (
+                    <>
+                        <div className="space-y-2">
+                            <Label htmlFor="loginName">Login Name</Label>
+                            <Input id="loginName" value={loginName} onChange={(e) => setLoginName(e.target.value)} />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <Input id="password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && handleLogin()} />
+                        </div>
+                    </>
+                ) : (
+                    <>
+                        <p className="text-sm text-center">Login successful, <b>{foundUser.displayName}</b>. Please select your location to continue.</p>
+                    </>
+                )}
+                {loginError && <p className="text-sm text-destructive text-center">{loginError}</p>}
+                {isMultiStateUser && (
+                    <>
+                        <Separator />
+                        <div className="space-y-2">
+                            <Label htmlFor="state">Select Your Location for this Session</Label>
+                            <Select onValueChange={setSelectedState} value={selectedState}>
+                                <SelectTrigger id="state"><SelectValue placeholder="Select a location..." /></SelectTrigger>
+                                <SelectContent>{foundUser.states.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}</SelectContent>
+                            </Select>
+                        </div>
+                    </>
+                )}
+            </CardContent>
+            <CardFooter>
+                 {isMultiStateUser ? (
+                    <Button className="w-full" onClick={handleConfirmAndDownload} disabled={!selectedState}>Continue to Download</Button>
+                 ) : (
+                    <Button className="w-full" onClick={handleLogin}>Sign In & Download</Button>
+                 )}
+            </CardFooter>
+          </>
+        );
       case 'downloading':
         return (
           <>
@@ -79,16 +194,11 @@ export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => voi
                 Setting Up Your Application
               </CardTitle>
               <CardDescription>
-                Please wait a moment while we download the latest assets and configuration. This only happens on the first run.
+                Please wait while we download the latest assets and configuration. This only happens once.
               </CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-muted-foreground space-y-4">
-                <p>
-                    <b>Welcome to the Global Asset Hub!</b> This application is designed for robust, offline-first asset management.
-                </p>
-                <p>
-                    During this one-time setup, we are downloading all necessary data to your device. Once complete, the app will load instantly, even without an internet connection. You can then manually sync your changes with the cloud when you're back online.
-                </p>
+             <CardContent className="text-sm text-muted-foreground space-y-4">
+                <p><b>Welcome to the Global Asset Hub!</b> Once complete, the app will load instantly, even without an internet connection.</p>
             </CardContent>
           </>
         );
@@ -99,7 +209,7 @@ export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => voi
               <PartyPopper className="h-12 w-12 text-green-500" />
               <CardTitle>You're All Set!</CardTitle>
               <CardDescription>
-                The application has been successfully configured and all data is now available offline.
+                The application has been successfully configured.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -115,17 +225,12 @@ export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => voi
                 <AlertTriangle />
                 Setup Failed
               </CardTitle>
-              <CardDescription>
-                We couldn't complete the initial setup. This can happen on a slow or unreliable network connection.
-              </CardDescription>
             </CardHeader>
             <CardContent className="space-y-4">
               <p className="text-sm text-destructive-foreground bg-destructive/90 p-4 rounded-md">
-                {error}
+                {downloadError}
               </p>
-              <Button className="w-full" onClick={handleRetry}>
-                Retry Download (Timeout: {(timeout + 10000) / 1000}s)
-              </Button>
+              <Button className="w-full" onClick={handleRetry}>Retry Download</Button>
             </CardContent>
           </>
         )
