@@ -213,7 +213,7 @@ export default function AssetList() {
     offlineAssets, setOfflineAssets, dataSource, setDataSource,
     globalStateFilter, setGlobalStateFilter,
     itemsPerPage, setItemsPerPage,
-    selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
+    selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, conditionFilter,
     dateFilter,
     setDateFilter,
     setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
@@ -266,7 +266,7 @@ export default function AssetList() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedCategories([]);
-  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, globalStateFilter, dataSource]);
+  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, globalStateFilter, dataSource, conditionFilter]);
   
   useEffect(() => {
     if (view === 'dashboard') {
@@ -683,12 +683,13 @@ export default function AssetList() {
       return true;
     });
 
-    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter || dateFilter;
+    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter || dateFilter || conditionFilter.length > 0;
     if (hasFilters) {
         results = results.filter(asset => {
             const locationMatch = selectedLocations.length === 0 || selectedLocations.includes(normalizeAssetLocation(asset.location));
             const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
             const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
+            const conditionMatch = conditionFilter.length === 0 || (asset.condition && conditionFilter.includes(asset.condition));
             
             const missingFieldMatch = !missingFieldFilter || !asset[missingFieldFilter as keyof Asset];
 
@@ -709,7 +710,7 @@ export default function AssetList() {
                 }
             }
 
-            return locationMatch && assigneeMatch && statusMatch && missingFieldMatch && dateMatch;
+            return locationMatch && assigneeMatch && statusMatch && missingFieldMatch && dateMatch && conditionMatch;
         });
     }
 
@@ -726,7 +727,7 @@ export default function AssetList() {
     }
     
     return sortAssets(results, sortConfig);
-  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, sortConfig, sheetDefinitions, isAdmin, userProfile]);
+  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, conditionFilter, sortConfig, sheetDefinitions, isAdmin, userProfile]);
 
   const assetsByCategory = useMemo(() => {
     return displayedAssets.reduce((acc, asset) => {
@@ -1591,7 +1592,7 @@ export default function AssetList() {
     const currentlyDisplayedAssets = displayedAssets.length;
     const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
     const verificationPercentage = currentlyDisplayedAssets > 0 ? (verifiedStateAssets / currentlyDisplayedAssets) * 100 : 0;
-    const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || dateFilter || missingFieldFilter;
+    const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || dateFilter || missingFieldFilter || conditionFilter.length > 0;
     const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
         
     const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
@@ -2048,8 +2049,7 @@ export default function AssetList() {
                                 <Select
                                     value={asset.verifiedStatus || 'Unverified'}
                                     onValueChange={async (status) => {
-                                      const verifiedDate = status === "Verified" ? new Date().toLocaleDateString("en-CA") : "";
-                                      await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate, remarks: asset.remarks, condition: asset.condition });
+                                      await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate: status === "Verified" ? new Date().toLocaleDateString("en-CA") : "", remarks: asset.remarks, condition: asset.condition });
                                       addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
                                     }}
                                   >

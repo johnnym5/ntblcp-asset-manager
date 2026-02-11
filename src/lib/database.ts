@@ -28,29 +28,11 @@ export async function getSettings(): Promise<AppSettings | null> {
     return null;
 }
 
-export async function updateSettings(settings: AppSettings) {
+export async function updateSettingsRTDB(settings: AppSettings) {
     const db = checkConfig();
     if (!db) return;
-    const currentSettings = await getSettings();
-    const settingsToSave: AppSettings = { ...settings };
-
-    if (currentSettings) {
-        const historyEntry: HistoricalAppSettings = { ...currentSettings };
-        delete historyEntry.settingsHistory;
-        
-        const oneWeekAgo = new Date();
-        oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-        const recentHistory = (currentSettings.settingsHistory || []).filter(h => {
-            return h.lastModified && new Date(h.lastModified) > oneWeekAgo;
-        });
-
-        const newHistory = [historyEntry, ...recentHistory];
-        settingsToSave.settingsHistory = newHistory.slice(0, 10);
-    }
-    
-    settingsToSave.lastModified = new Date().toISOString();
-    await set(ref(db, 'config/settings'), settingsToSave);
+    const settingsRef = ref(db, 'config/settings');
+    await set(settingsRef, settings);
 }
 
 export function onSettingsChange(callback: (settings: AppSettings | null) => void): () => void {

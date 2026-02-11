@@ -50,6 +50,8 @@ interface AppStateContextType {
   setMissingFieldFilter: Dispatch<SetStateAction<string>>;
   dateFilter: 'today' | 'week' | 'new-week' | null;
   setDateFilter: Dispatch<SetStateAction<'today' | 'week' | 'new-week' | null>>;
+  conditionFilter: string[];
+  setConditionFilter: Dispatch<SetStateAction<string[]>>;
 
   // Filter Options
   locationOptions: OptionType[];
@@ -118,6 +120,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
   const [dateFilter, setDateFilter] = useState<'today' | 'week' | 'new-week' | null>(null);
+  const [conditionFilter, setConditionFilter] = useState<string[]>([]);
 
   const [locationOptions, setLocationOptions] = useState<OptionType[]>([]);
   const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
@@ -260,6 +263,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setMissingFieldFilter,
     dateFilter,
     setDateFilter,
+    conditionFilter,
+    setConditionFilter,
     locationOptions,
     setLocationOptions,
     assigneeOptions,

@@ -38,7 +38,7 @@ const StatCard = ({ title, value, description, icon, onAction, actionLabel, isAc
 };
 
 export function AssetSummaryDashboard() {
-    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter, globalStateFilter } = useAppState();
+    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter, globalStateFilter, conditionFilter, setConditionFilter } = useAppState();
     const { userProfile } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     
@@ -110,6 +110,7 @@ export function AssetSummaryDashboard() {
     
     const handleFilterClick = (field: keyof Asset | '') => {
         setDateFilter(null);
+        setConditionFilter([]);
         if (missingFieldFilter === field) {
             setMissingFieldFilter(''); // Toggle off if active
         } else {
@@ -119,11 +120,28 @@ export function AssetSummaryDashboard() {
 
     const handleDateFilterClick = (filter: 'today' | 'week' | 'new-week') => {
         setMissingFieldFilter('');
+        setConditionFilter([]);
         if (dateFilter === filter) {
             setDateFilter(null);
         } else {
             setDateFilter(filter);
         }
+    };
+
+    const handleConditionFilterClick = (conditions: string[]) => {
+        setMissingFieldFilter('');
+        setDateFilter(null);
+        if (JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditions.sort())) {
+            setConditionFilter([]);
+        } else {
+            setConditionFilter(conditions);
+        }
+    };
+
+    const conditionGroups = {
+        unusable: ['Unsalvageable', 'Burnt', 'Stolen'],
+        badCondition: ['Bad condition', 'Used but in poor condition', 'F2: Major repairs required-poor condition'],
+        needsRepair: ['Used but requires occasional repair'],
     };
 
     if (!appSettings) return null;
@@ -153,6 +171,9 @@ export function AssetSummaryDashboard() {
                             value={summary.unusable}
                             description="Stolen, burnt, or unsalvageable."
                             icon={<AlertTriangle className="h-4 w-4 text-destructive" />}
+                            onAction={() => handleConditionFilterClick(conditionGroups.unusable)}
+                            actionLabel={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.unusable.sort()) ? "Clear Filter" : "View Assets"}
+                            isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.unusable.sort())}
                         />
                     )}
                     {summary.badCondition > 0 && (
@@ -161,6 +182,9 @@ export function AssetSummaryDashboard() {
                             value={summary.badCondition}
                             description="Assets in poor condition or needing major repair."
                             icon={<FileWarning className="h-4 w-4 text-yellow-500" />}
+                            onAction={() => handleConditionFilterClick(conditionGroups.badCondition)}
+                            actionLabel={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.badCondition.sort()) ? "Clear Filter" : "View Assets"}
+                            isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.badCondition.sort())}
                         />
                     )}
                      {summary.needsRepair > 0 && (
@@ -169,6 +193,9 @@ export function AssetSummaryDashboard() {
                             value={summary.needsRepair}
                             description="Assets that require occasional repair."
                             icon={<FileWarning className="h-4 w-4 text-orange-500" />}
+                            onAction={() => handleConditionFilterClick(conditionGroups.needsRepair)}
+                            actionLabel={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.needsRepair.sort()) ? "Clear Filter" : "View Assets"}
+                            isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.needsRepair.sort())}
                         />
                     )}
                     

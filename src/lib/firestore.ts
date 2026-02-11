@@ -30,25 +30,8 @@ export async function getSettings(): Promise<AppSettings | null> {
 export async function updateSettings(settings: AppSettings) {
   const firestoreDb = checkConfig();
   if (!firestoreDb) return;
-  const currentSettings = await getSettings();
-  const settingsToSave: AppSettings = { ...settings };
-  if (currentSettings) {
-      const historyEntry: HistoricalAppSettings = { ...currentSettings };
-      delete historyEntry.settingsHistory; 
-      
-      const oneWeekAgo = new Date();
-      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
-
-      const recentHistory = (currentSettings.settingsHistory || []).filter(h => {
-        return h.lastModified && new Date(h.lastModified) > oneWeekAgo;
-      });
-
-      const newHistory = [historyEntry, ...recentHistory];
-      settingsToSave.settingsHistory = newHistory.slice(0, 10); 
-  }
-  settingsToSave.lastModified = new Date().toISOString();
   const settingsRef = doc(firestoreDb, 'config', 'settings');
-  await setDoc(settingsRef, settingsToSave);
+  await setDoc(settingsRef, settings);
 }
 
 

@@ -222,7 +222,19 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   };
 
   const handleConfirmSave = async () => {
-    if (!draftSettings || !userProfile) return;
+    if (!draftSettings || !userProfile || !appSettings) return;
+
+    const historyEntry: HistoricalAppSettings = { ...appSettings };
+    delete historyEntry.settingsHistory;
+        
+    const oneWeekAgo = new Date();
+    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+
+    const recentHistory = (appSettings.settingsHistory || []).filter(h => {
+        return h.lastModified && new Date(h.lastModified) > oneWeekAgo;
+    });
+
+    const newHistory = [historyEntry, ...recentHistory];
     
     const settingsToSave: AppSettings = {
         ...draftSettings,
@@ -230,7 +242,8 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         lastModifiedBy: {
             displayName: userProfile.displayName,
             loginName: userProfile.loginName,
-        }
+        },
+        settingsHistory: newHistory.slice(0, 10),
     };
 
     const rtdbPromise = updateSettingsRTDB(settingsToSave);
