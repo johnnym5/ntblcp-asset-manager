@@ -56,9 +56,10 @@ interface AssetFormProps {
   onSave: (assetToSave: Asset) => Promise<void>;
   onQuickSave: (assetId: string, data: { remarks?: string; condition?: string; verifiedStatus?: 'Verified' | 'Unverified'; verifiedDate?: string; }) => Promise<void>;
   isReadOnly: boolean;
+  defaultCategory?: string;
 }
 
-export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: initialIsReadOnly }: AssetFormProps) {
+export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: initialIsReadOnly, defaultCategory }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
   const { appSettings, dataSource } = useAppState();
@@ -88,12 +89,13 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
             if (!defaultValues.verifiedStatus) defaultValues.verifiedStatus = 'Unverified';
             if (!defaultValues.location && userProfile?.state) defaultValues.location = userProfile.state;
         } else {
+             if (defaultCategory) defaultValues.category = defaultCategory;
              if (userProfile?.state) defaultValues.location = userProfile.state;
              defaultValues.verifiedStatus = 'Unverified';
         }
         form.reset(defaultValues);
     }
-  }, [isOpen, asset, form, userProfile]);
+  }, [isOpen, asset, form, userProfile, defaultCategory]);
   
   const watchedStatusInForm = form.watch('verifiedStatus');
   useEffect(() => {
@@ -164,7 +166,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
             disabled = true; 
         }
         // Category of an existing asset cannot be changed.
-        if (fieldName === 'category' && !!asset) {
+        if (fieldName === 'category' && !!asset?.id) { // check for asset.id to see if it is an existing asset
             disabled = true;
         }
         
@@ -245,9 +247,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-4xl w-full flex flex-col max-h-[95vh]">
         <DialogHeader>
-          <DialogTitle>{asset ? (initialIsReadOnly ? 'View Asset Details' : 'Edit Asset') : 'Add New Asset'}</DialogTitle>
+          <DialogTitle>{asset?.id ? (initialIsReadOnly ? 'View Asset Details' : 'Edit Asset') : 'Add New Asset'}</DialogTitle>
           <DialogDescription>
-            {initialIsReadOnly ? 'Viewing asset details.' : (asset ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
+            {initialIsReadOnly ? 'Viewing asset details.' : (asset?.id ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 overflow-y-auto pr-4 py-4">

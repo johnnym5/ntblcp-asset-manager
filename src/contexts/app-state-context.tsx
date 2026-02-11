@@ -30,7 +30,6 @@ export interface SortConfig {
 export interface DataActions {
   onScanAndImport?: () => void;
   onExport?: () => void;
-  onAddAsset?: () => void;
   onClearAll?: () => void;
   onTravelReport?: () => void;
 }
@@ -91,6 +90,8 @@ interface AppStateContextType {
   setAssetToView: Dispatch<SetStateAction<Asset | null>>;
   dataActions: DataActions;
   setDataActions: Dispatch<SetStateAction<DataActions>>;
+  isSettingsOpen: boolean;
+  setIsSettingsOpen: Dispatch<SetStateAction<boolean>>;
 
   // Project Switch
   showProjectSwitchDialog: boolean;
@@ -144,6 +145,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [dataActions, setDataActions] = useState<DataActions>({});
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
 
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
 
@@ -296,6 +298,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     dataSource, setDataSource,
     assetToView, setAssetToView,
     dataActions, setDataActions,
+    isSettingsOpen, setIsSettingsOpen,
     showProjectSwitchDialog, setShowProjectSwitchDialog,
   };
 

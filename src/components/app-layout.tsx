@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -73,11 +74,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setManualUploadTrigger,
     isSyncing,
     appSettings,
+    isSettingsOpen,
+    setIsSettingsOpen,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isDbAdminOpen, setIsDbAdminOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -116,6 +118,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       { key: 'category', label: 'Category' },
       { key: 'location', label: 'Location' },
       { key: 'verifiedDate', label: 'Verified Date' },
+      { key: 'lastModified', label: 'Last Modified' },
       { key: 'assetIdCode', label: 'Asset ID' },
   ];
 

@@ -548,19 +548,6 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                           <p className="text-sm text-muted-foreground">Perform global data operations. These actions may affect the entire dataset.</p>
                           <Separator />
                           <div className="space-y-2">
-
-                              {dataActions.onAddAsset && (
-                                  <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
-                                      <PlusCircle className="mr-2 h-4 w-4" /> Add Single Asset
-                                  </Button>
-                              )}
-                              
-                              <Separator />
-                              
-                              <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Manage Categories (Sheets)</Label>
-                              <Button variant="outline" className="w-full justify-start" onClick={handleAddSheet}><PlusCircle className="mr-2 h-4 w-4" /> Add New Sheet Manually</Button>
-                              
-                              <Separator />
                               
                               <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Bulk Data Operations</Label>
                               
