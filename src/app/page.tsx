@@ -7,22 +7,78 @@ import AssetList from '@/components/asset-list';
 import { Loader2 } from 'lucide-react';
 import UserProfileSetup from '@/components/user-profile-setup';
 import { useAppState } from '@/contexts/app-state-context';
-import { FirstTimeSetup } from '@/components/first-time-setup';
+import { getAssets as getAssetsRTDB } from '@/lib/database';
+import { saveAssets, getLocalAssets } from '@/lib/idb';
+import { Button } from '@/components/ui/button';
+
+const DataSetup = () => {
+    const [status, setStatus] = useState<'checking' | 'downloading' | 'ready' | 'error'>('checking');
+    const [error, setError] = useState<string | null>(null);
+
+    const performDownload = async () => {
+        setStatus('downloading');
+        setError(null);
+        try {
+            console.log("Starting initial database download...");
+            const assets = await getAssetsRTDB();
+            await saveAssets(assets.map(a => ({ ...a, syncStatus: 'synced' })));
+            localStorage.setItem('database-downloaded', 'true');
+            console.log("Database download complete.");
+            setStatus('ready');
+        } catch (e) {
+            console.error("Database download failed:", e);
+            setError(e instanceof Error ? e.message : 'An unknown error occurred.');
+            setStatus('error');
+        }
+    };
+
+    useEffect(() => {
+        const checkData = async () => {
+            const isDownloaded = localStorage.getItem('database-downloaded') === 'true';
+            if (isDownloaded) {
+                // To be extra sure, we can check if there are actual assets in IDB
+                const localAssets = await getLocalAssets();
+                if (localAssets.length > 0) {
+                    setStatus('ready');
+                    return;
+                }
+            }
+            // If flag is missing or db is empty, download.
+            await performDownload();
+        };
+        checkData();
+    }, []);
+
+    if (status === 'checking' || status === 'downloading') {
+        return (
+            <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background">
+                <Loader2 className="h-10 w-10 animate-spin text-primary" />
+                <p className="text-muted-foreground">Setting up your local database for offline access...</p>
+            </div>
+        );
+    }
+
+    if (status === 'error') {
+        return (
+            <div className="flex h-screen w-full flex-col items-center justify-center gap-4 bg-background p-8 text-center">
+                 <h2 className="text-xl font-semibold text-destructive">Download Failed</h2>
+                 <p className="text-muted-foreground">{error}</p>
+                 <Button onClick={performDownload}>Retry Download</Button>
+            </div>
+        );
+    }
+    
+    // if status is 'ready'
+    return (
+        <AppLayout>
+            <AssetList />
+        </AppLayout>
+    );
+};
 
 export default function Page() {
-  const { userProfile, loading: authLoading, profileSetupComplete } = useAuth();
-  const { setGlobalStateFilter, settingsLoaded, appSettings } = useAppState();
-  
-  // This state is crucial for preventing the setup screen from flashing on reload.
-  // We initialize to `null` to represent an undetermined state.
-  const [isSetupFlagPresent, setIsSetupFlagPresent] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    // This effect runs only on the client-side after hydration.
-    // It checks for the persistent flag that is set only after a successful first-time setup.
-    const setupComplete = localStorage.getItem('app-setup-complete') === 'true';
-    setIsSetupFlagPresent(setupComplete);
-  }, []);
+  const { userProfile, profileSetupComplete, authInitialized } = useAuth();
+  const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
     if (profileSetupComplete && userProfile) {
@@ -30,9 +86,8 @@ export default function Page() {
     }
   }, [profileSetupComplete, userProfile, setGlobalStateFilter]);
 
-  // While we wait for the client-side check of localStorage, show a loader.
-  // This prevents a flash of the wrong component.
-  if (isSetupFlagPresent === null) {
+  // This is the main gatekeeper. We wait until auth state is fully resolved.
+  if (!authInitialized) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -40,37 +95,11 @@ export default function Page() {
     );
   }
 
-  // If the flag is definitively not present, it's a true first-time run.
-  if (!isSetupFlagPresent) {
-    return <FirstTimeSetup onSetupComplete={() => window.location.reload()} />;
-  }
-  
-  // If the setup flag IS present, we proceed to the normal application flow.
-  // We still need to wait for settings from IDB and the user profile to be ready.
-  if (authLoading || !settingsLoaded) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  // Handle an edge case where the flag is present but settings are missing (e.g., cleared browser data)
-  if (settingsLoaded && !appSettings) {
-      // This is an inconsistent state. The best recovery is to force a re-setup.
-      localStorage.removeItem('app-setup-complete');
-      return <FirstTimeSetup onSetupComplete={() => window.location.reload()} />;
-  }
-
-  // If setup is done and data is loaded, check if the user needs to log in.
+  // After auth is initialized, we decide what to show.
   if (!profileSetupComplete) {
     return <UserProfileSetup />;
   }
-
-  // Finally, show the main application.
-  return (
-    <AppLayout>
-      <AssetList />
-    </AppLayout>
-  );
+  
+  // If user is logged in, we render the DataSetup component which handles the one-time download.
+  return <DataSetup />;
 }
