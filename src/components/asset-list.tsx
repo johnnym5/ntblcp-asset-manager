@@ -229,6 +229,9 @@ export default function AssetList() {
     setOnRevertAsset,
   } = useAppState();
 
+  if (!appSettings) {
+     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+  }
   const { lockAssetList, sheetDefinitions } = appSettings;
 
   const isAdmin = userProfile?.isAdmin || false;
@@ -1590,7 +1593,7 @@ export default function AssetList() {
     const currentlyDisplayedAssets = displayedAssets.length;
     const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
     const verificationPercentage = currentlyDisplayedAssets > 0 ? (verifiedStateAssets / currentlyDisplayedAssets) * 100 : 0;
-    const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
+    const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || dateFilter || missingFieldFilter;
     const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
         
     const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';

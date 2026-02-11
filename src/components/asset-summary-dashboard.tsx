@@ -10,6 +10,8 @@ import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { useAuth } from '@/contexts/auth-context';
+import { NIGERIAN_ZONES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from '@/lib/constants';
 
 const StatCard = ({ title, value, description, icon, onAction, actionLabel, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, actionLabel?: string, isActive?: boolean }) => {
     const cardContent = (
@@ -37,13 +39,56 @@ const StatCard = ({ title, value, description, icon, onAction, actionLabel, isAc
 };
 
 export function AssetSummaryDashboard() {
-    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter } = useAppState();
+    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter, globalStateFilter } = useAppState();
+    const { userProfile } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     
-    const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
+    const isAdmin = userProfile?.isAdmin;
+
+    const summaryAssets = useMemo(() => {
+        const activeAssets = dataSource === 'cloud' ? assets : offlineAssets;
+        if (isAdmin && globalStateFilter && globalStateFilter !== 'All') {
+            const isZone = ZONAL_STORES.includes(globalStateFilter);
+
+            if (isZone) {
+                const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
+                return activeAssets.filter(asset => {
+                    const assetLocation = (asset.location || "").toLowerCase().trim();
+                    return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
+                });
+            }
+            
+            if (SPECIAL_LOCATIONS.includes(globalStateFilter)) {
+                const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
+                return activeAssets.filter(asset => (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter));
+            }
+
+            const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
+            const capitalCity = NIGERIAN_STATE_CAPITALS[globalStateFilter]?.toLowerCase().trim();
+            return activeAssets.filter(asset => {
+                const assetLocation = (asset.location || "").toLowerCase().trim();
+                const matchesState = assetLocation.startsWith(lowerCaseFilter);
+                const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+                return matchesState || matchesCapital;
+            });
+        } else if (!isAdmin && userProfile?.state) {
+            const lowerCaseFilter = userProfile.state.toLowerCase().trim();
+            const capitalCity = NIGERIAN_STATE_CAPITALS[userProfile.state]?.toLowerCase().trim();
+            return activeAssets.filter(asset => {
+                const assetLocation = (asset.location || "").toLowerCase().trim();
+                const matchesState = assetLocation.startsWith(lowerCaseFilter);
+                const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+                return matchesState || matchesCapital;
+            });
+        }
+        return activeAssets;
+    }, [assets, offlineAssets, dataSource, globalStateFilter, isAdmin, userProfile?.state]);
+
 
     const summary = useMemo(() => {
-        const visibleAssets = activeAssets.filter(a => !appSettings?.sheetDefinitions[a.category]?.isHidden);
+        if (!appSettings) return { withoutSerial: 0, withoutAssetId: 0, modifiedToday: 0, modifiedThisWeek: 0, missingInfo: 0 };
+        
+        const visibleAssets = summaryAssets.filter(a => !appSettings?.sheetDefinitions[a.category]?.isHidden);
 
         const withoutSerial = visibleAssets.filter(a => !a.sn && !a.serialNumber).length;
         const withoutAssetId = visibleAssets.filter(a => !a.assetIdCode).length;
@@ -56,7 +101,7 @@ export function AssetSummaryDashboard() {
         }).length;
 
         return { withoutSerial, withoutAssetId, modifiedToday, modifiedThisWeek, missingInfo };
-    }, [activeAssets, appSettings]);
+    }, [summaryAssets, appSettings]);
     
     const handleFilterClick = (field: string) => {
         if (missingFieldFilter === field) {
@@ -74,13 +119,14 @@ export function AssetSummaryDashboard() {
         }
     };
 
+    if (!appSettings) return null;
+
     return (
         <Collapsible
             open={isOpen}
             onOpenChange={setIsOpen}
-            className="mb-4"
         >
-            <div className='flex items-center justify-between p-4 rounded-lg bg-card/80 border shadow-lg backdrop-blur-lg'>
+            <div className='flex items-center justify-between p-4 rounded-lg bg-card/80 border shadow-sm'>
                 <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
                     <BarChart2 className="h-5 w-5 text-primary" /> Asset Overview
                 </h3>

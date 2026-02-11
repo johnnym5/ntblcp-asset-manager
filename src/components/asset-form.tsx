@@ -37,6 +37,8 @@ import { Loader2, FileText, Check, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
 import { cn, getStatusClasses } from "@/lib/utils";
+import { AssetChecklist } from "./asset-checklist";
+import { ScrollArea } from "./ui/scroll-area";
 
 const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
   path: ['category'],
@@ -271,26 +273,33 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
             {initialIsReadOnly ? 'Viewing asset details.' : (asset?.id ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
           </DialogDescription>
         </DialogHeader>
-        <div className="flex-1 overflow-y-auto pr-4 py-4">
-            <datalist id="location-datalist">
-                {(appSettings.locations || []).map(loc => <option key={loc} value={loc} />)}
-            </datalist>
-            <Form {...form}>
-              <form
-                id="asset-form"
-                onSubmit={form.handleSubmit(onSubmit)}
-                className="space-y-4 p-1"
-              >
-               {!sheetDefinition ? (
-                    renderField({ key: 'category', label: 'Category', table: false, quickView: false })
-               ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {sheetDefinition.displayFields.map(field => renderField(field))}
-                    </div>
-               )}
-              </form>
-            </Form>
+
+        <div className="grid md:grid-cols-3 gap-x-8 flex-1 overflow-hidden">
+            <ScrollArea className="md:col-span-2 pr-4 py-4">
+                <datalist id="location-datalist">
+                    {(appSettings.locations || []).map(loc => <option key={loc} value={loc} />)}
+                </datalist>
+                <Form {...form}>
+                  <form
+                    id="asset-form"
+                    onSubmit={form.handleSubmit(onSubmit)}
+                    className="space-y-4 p-1"
+                  >
+                   {!sheetDefinition ? (
+                        renderField({ key: 'category', label: 'Category', table: false, quickView: false })
+                   ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {sheetDefinition.displayFields.map(field => renderField(field))}
+                        </div>
+                   )}
+                  </form>
+                </Form>
+            </ScrollArea>
+            <ScrollArea className="hidden md:block md:col-span-1 border-l pl-6 py-4">
+                <AssetChecklist values={form.watch()} />
+            </ScrollArea>
         </div>
+        
         <DialogFooter className="mt-auto pt-4 border-t sm:justify-between">
           {asset?.previousState && !initialIsReadOnly && (
             <Button
