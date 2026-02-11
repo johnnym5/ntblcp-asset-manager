@@ -28,7 +28,7 @@ import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle } from 'lucide-react';
 import type { AppSettings, Asset } from '@/lib/types';
 import { saveLocalSettings, clearLocalAssets, saveAssets, saveLockedOfflineAssets, getLocalAssets } from '@/lib/idb';
-import { exportFullBackupToJson } from '@/lib/json-export';
+import { exportFullBackupToJson, exportSettingsToJson, exportAssetsToJson } from '@/lib/json-export';
 import { addNotification } from '@/hooks/use-notifications';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 
@@ -155,15 +155,21 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
               <Card>
                   <CardHeader>
                       <CardTitle>Backup & Restore</CardTitle>
-                      <CardDescription>Export or import all assets and settings from a JSON file.</CardDescription>
+                      <CardDescription>Export or import all assets and settings.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">
                       <input type="file" ref={importFileRef} onChange={handleFileSelected} accept=".json" className="hidden" />
                       <Button variant="outline" className="w-full justify-start" onClick={handleImportFromJson}>
-                          <FileUp className="mr-2 h-4 w-4" /> Import from Backup (JSON)
+                          <FileUp className="mr-2 h-4 w-4" /> Import from Full Backup (JSON)
                       </Button>
                       <Button variant="outline" className="w-full justify-start" onClick={() => exportFullBackupToJson(assets, appSettings)}>
                           <Download className="mr-2 h-4 w-4" /> Export Full Backup (Assets & Settings)
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => exportSettingsToJson(appSettings)}>
+                          <Download className="mr-2 h-4 w-4" /> Export Settings Only
+                      </Button>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => exportAssetsToJson(assets)}>
+                          <Download className="mr-2 h-4 w-4" /> Export Assets Only
                       </Button>
                   </CardContent>
               </Card>
