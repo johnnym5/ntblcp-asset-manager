@@ -68,7 +68,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, activeDatabase, setDataSource } = useAppState();
+  const { appSettings, setAppSettings, setDataSource } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -227,22 +227,27 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         }
     };
 
-    try {
-      if (activeDatabase === 'firestore') {
-        await updateSettingsFS(settingsToSave);
-      } else {
-        await updateSettingsRTDB(settingsToSave);
-      }
-      
-      await saveLocalSettings(settingsToSave);
-      setAppSettings(settingsToSave); // Update global state
-      toast({ title: "Settings Saved", description: "Your changes have been applied to the database." });
-    } catch (e) {
-      toast({ title: "Save Failed", description: (e as Error).message || "Could not save settings to the database.", variant: "destructive" });
-    } finally {
-      setIsConfirmOpen(false);
-      onOpenChange(false);
+    const rtdbPromise = updateSettingsRTDB(settingsToSave);
+    const firestorePromise = updateSettingsFS(settingsToSave);
+
+    const results = await Promise.allSettled([rtdbPromise, firestorePromise]);
+
+    const rtdbSuccess = results[0].status === 'fulfilled';
+    const firestoreSuccess = results[1].status === 'fulfilled';
+
+    if (rtdbSuccess && firestoreSuccess) {
+      toast({ title: "Settings Saved", description: "Your changes have been applied to both cloud databases." });
+    } else {
+      toast({ title: "Cloud Save Incomplete", description: "Could not save settings to one or both cloud databases. Your changes are saved locally.", variant: "destructive" });
     }
+    
+    if (rtdbSuccess || firestoreSuccess) {
+      await saveLocalSettings(settingsToSave);
+      setAppSettings(settingsToSave);
+    }
+    
+    setIsConfirmOpen(false);
+    onOpenChange(false);
   };
 
   const handleSheetDefinitionSave = (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
@@ -426,13 +431,12 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           </SheetHeader>
           <div className="flex-1 overflow-y-auto">
             <Tabs defaultValue={initialTab} value={activeTab} onValueChange={setActiveTab} className="p-1">
-              <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-4" : "grid-cols-1")}>
+              <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-3" : "grid-cols-1")}>
                   <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
                   {isAdmin && (
                     <>
                       <TabsTrigger value="users"><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
                       <TabsTrigger value="sheets"><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
-                      <TabsTrigger value="locations"><MapPin className="mr-2 h-4 w-4" />Locations</TabsTrigger>
                     </>
                   )}
               </TabsList>
@@ -554,32 +558,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                             <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import from File</Button>
                         </div>
                       </div>
-                  </TabsContent>
-                  <TabsContent value="locations" className="pt-4 space-y-4">
-                    <h3 className="text-lg font-medium">Manage Locations</h3>
-                    <div className="rounded-lg border p-3">
-                      <div className="flex gap-2">
-                        <Input 
-                          placeholder="Enter new location name" 
-                          value={newLocation} 
-                          onChange={(e) => setNewLocation(e.target.value)}
-                          onKeyDown={(e) => e.key === 'Enter' && handleAddNewLocation()}
-                        />
-                        <Button onClick={handleAddNewLocation} disabled={!newLocation.trim()}>Add</Button>
-                      </div>
-                    </div>
-                    <ScrollArea className="flex-1 rounded-lg border">
-                      <div className="p-2 space-y-1">
-                        {(draftSettings.locations || []).map(location => (
-                          <div key={location} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md">
-                            <p className="text-sm">{location}</p>
-                            <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteLocation(location)}>
-                              <Trash2 className="h-4 w-4"/>
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
                   </TabsContent>
                 </>
               )}

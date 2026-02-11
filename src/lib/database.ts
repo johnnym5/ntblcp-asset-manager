@@ -3,7 +3,7 @@
 
 import { ref, get, set, remove, update } from 'firebase/database';
 import { rtdb, isConfigValid } from '@/lib/firebase';
-import type { Asset, AppSettings } from './types';
+import type { Asset, AppSettings, HistoricalAppSettings } from './types';
 import { addNotification } from '@/hooks/use-notifications';
 
 // Helper function to ensure Firebase is properly configured before use.
@@ -18,34 +18,27 @@ const checkConfig = () => {
 export async function getSettings(): Promise<AppSettings | null> {
     const db = checkConfig();
     const settingsRef = ref(db, 'config/settings');
-    try {
-        const snapshot = await get(settingsRef);
-        if (snapshot.exists()) {
-            return snapshot.val();
-        }
-        return null;
-    } catch (serverError) {
-        console.error("RTDB getSettings failed:", serverError);
-        addNotification({
-            title: "Could Not Load Cloud Settings (RTDB)",
-            description: "The application will use local settings. Some features may be unavailable.",
-            variant: "destructive"
-        });
-        return null;
+    const snapshot = await get(settingsRef);
+    if (snapshot.exists()) {
+        return snapshot.val();
     }
+    return null;
 }
 
 export async function updateSettings(settings: AppSettings) {
     const db = checkConfig();
     const settingsRef = ref(db, 'config/settings');
-    await set(settingsRef, settings).catch((error) => {
-        console.error("RTDB updateSettings failed:", error);
-        addNotification({
-            title: "Cloud Sync Failed (RTDB)",
-            description: "Settings were saved locally but could not be synced to the backup cloud database.",
-            variant: "destructive",
-        });
-    });
+    
+    const currentSettings = await getSettings();
+    const settingsToSave: AppSettings = { ...settings };
+    if (currentSettings) {
+        const historyEntry: HistoricalAppSettings = { ...currentSettings };
+        delete historyEntry.settingsHistory;
+        const newHistory = [historyEntry, ...(currentSettings.settingsHistory || [])];
+        settingsToSave.settingsHistory = newHistory.slice(0, 10);
+    }
+    
+    await set(settingsRef, settingsToSave);
 }
 
 
@@ -54,36 +47,19 @@ export async function updateSettings(settings: AppSettings) {
 export async function getAssets(): Promise<Asset[]> {
     const db = checkConfig();
     const assetsRef = ref(db, 'assets');
-    try {
-        const snapshot = await get(assetsRef);
-        if (snapshot.exists()) {
-            const data = snapshot.val();
-            // Firebase returns an object when fetching a collection, so we convert it to an array.
-            return Object.keys(data).map(key => ({ ...data[key], id: key }));
-        }
-        return [];
-    } catch (serverError) {
-        console.error("RTDB getAssets failed:", serverError);
-        addNotification({
-            title: "Could Not Load Cloud Assets (RTDB)",
-            description: "The application will use local data. Go online to sync.",
-            variant: "destructive"
-        });
-        return []; // return empty on error
+    const snapshot = await get(assetsRef);
+    if (snapshot.exists()) {
+        const data = snapshot.val();
+        // Firebase returns an object when fetching a collection, so we convert it to an array.
+        return Object.keys(data).map(key => ({ ...data[key], id: key }));
     }
+    return [];
 }
 
 export async function deleteAsset(assetId: string) {
     const db = checkConfig();
     const assetRef = ref(db, `assets/${assetId}`);
-    await remove(assetRef).catch((error) => {
-        console.error("RTDB deleteAsset failed:", error);
-        addNotification({
-            title: "Cloud Sync Failed (RTDB)",
-            description: "Deletion was successful locally but could not be synced to the backup cloud.",
-            variant: "destructive",
-        });
-    });
+    await remove(assetRef);
 }
 
 export async function batchSetAssets(assets: Asset[]) {
@@ -94,14 +70,7 @@ export async function batchSetAssets(assets: Asset[]) {
         const cleanAsset = JSON.parse(JSON.stringify(asset));
         updates[`/assets/${asset.id}`] = { ...cleanAsset, lastModified: asset.lastModified || new Date().toISOString() };
     });
-    await update(ref(db), updates).catch((error) => {
-        console.error("RTDB batchSetAssets failed:", error);
-        addNotification({
-            title: "Batch Cloud Sync Failed (RTDB)",
-            description: "Some changes were saved locally but could not be synced to the backup cloud.",
-            variant: "destructive",
-        });
-    });
+    await update(ref(db), updates);
 }
 
 export async function batchDeleteAssets(assetIds: string[]) {
@@ -110,14 +79,7 @@ export async function batchDeleteAssets(assetIds: string[]) {
     assetIds.forEach(id => {
         updates[`/assets/${id}`] = null;
     });
-    await update(ref(db), updates).catch((error) => {
-        console.error("RTDB batchDeleteAssets failed:", error);
-        addNotification({
-            title: "Batch Cloud Deletion Failed (RTDB)",
-            description: "Some deletions were successful locally but could not be synced to the backup cloud.",
-            variant: "destructive",
-        });
-    });
+    await update(ref(db), updates);
 }
 
 export async function clearAssets() {

@@ -133,7 +133,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     locations: defaultInitialLocations,
     settingsHistory: [],
     defaultDataSource: 'cloud',
-    defaultDatabase: 'firestore',
+    defaultDatabase: 'rtdb',
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isBrowserOnline, setIsBrowserOnline] = useState(true);
@@ -148,7 +148,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [initialSettingsTab, setInitialSettingsTab] = useState('general');
 
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
-  const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>('firestore');
+  const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>('rtdb');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -204,7 +204,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           locations: defaultInitialLocations,
           settingsHistory: [],
           defaultDataSource: 'cloud',
-          defaultDatabase: 'firestore',
+          defaultDatabase: 'rtdb',
         };
       } else {
         if (!localSettings.locations) {
