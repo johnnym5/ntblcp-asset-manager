@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -259,7 +260,7 @@ export function AssetSummaryDashboard() {
                         <StatCard
                             title="Missing Engine No."
                             value={summary.withoutEngineNo}
-                            description="Vehicles missing an engine number."
+                            description="Vehicles & Motorcycles missing an engine number."
                             icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
                             onAction={() => handleFilterClick('engineNo')}
                             actionLabel={missingFieldFilter === 'engineNo' ? "Clear Filter" : "View Assets"}
@@ -270,7 +271,7 @@ export function AssetSummaryDashboard() {
                         <StatCard
                             title="Missing Chasis No."
                             value={summary.withoutChasisNo}
-                            description="Vehicles missing a chasis number."
+                            description="Vehicles & Motorcycles missing a chasis number."
                             icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
                             onAction={() => handleFilterClick('chasisNo')}
                             actionLabel={missingFieldFilter === 'chasisNo' ? "Clear Filter" : "View Assets"}
