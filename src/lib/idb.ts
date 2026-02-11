@@ -74,6 +74,7 @@ export const saveAssets = async (assets: Asset[]): Promise<void> => {
   try {
     const db = await dbp;
     const tx = db.transaction(ASSET_STORE_NAME, 'readwrite');
+    await tx.store.clear();
     await Promise.all(assets.map(asset => tx.store.put(asset)));
     await tx.done;
   } catch (error) {
@@ -81,7 +82,7 @@ export const saveAssets = async (assets: Asset[]): Promise<void> => {
   }
 };
 
-export const clearAssets = async (): Promise<void> => {
+export const clearLocalAssets = async (): Promise<void> => {
   const dbp = getDb();
   if (!dbp) return; // Don't run on server
   try {
@@ -113,6 +114,7 @@ export const saveLockedOfflineAssets = async (assets: Asset[]): Promise<void> =>
   try {
     const db = await dbp;
     const tx = db.transaction(OFFLINE_ASSET_STORE_NAME, 'readwrite');
+    await tx.store.clear();
     await Promise.all(assets.map(asset => tx.store.put(asset)));
     await tx.done;
   } catch (error) {

@@ -23,14 +23,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
-import { batchDeleteAssets, batchSetAssets } from '@/lib/firestore';
+import { batchDeleteAssets, getAssets } from '@/lib/firestore';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle } from 'lucide-react';
+import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive } from 'lucide-react';
 import type { AppSettings, Asset } from '@/lib/types';
-import { saveLocalSettings, clearLocalAssets, saveAssets, saveLockedOfflineAssets, getLocalAssets } from '@/lib/idb';
+import { saveLocalSettings, clearLocalAssets, saveAssets, saveLockedOfflineAssets, getLocalAssets, getLockedOfflineAssets } from '@/lib/idb';
 import { exportFullBackupToJson, exportSettingsToJson, exportAssetsToJson } from '@/lib/json-export';
 import { addNotification } from '@/hooks/use-notifications';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Separator } from '../ui/separator';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -39,34 +40,15 @@ interface DatabaseAdminDialogProps {
 
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, assets, setAssets, setOfflineAssets, setIsSyncing } = useAppState();
+  const { appSettings, setAppSettings, assets, setAssets, offlineAssets, setOfflineAssets, setIsSyncing } = useAppState();
   
-  const [isClearingAll, setIsClearingAll] = useState(false);
-  const [isClearAllConfirmOpen, setIsClearAllConfirmOpen] = useState(false);
-  
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<string | null>(null);
+  const [confirmTitle, setConfirmTitle] = useState('');
+  const [confirmDescription, setConfirmDescription] = useState('');
+
   const importFileRef = useRef<HTMLInputElement>(null);
   const [backupToRestore, setBackupToRestore] = useState<{ settings: AppSettings, assets: Asset[] } | null>(null);
-  const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
-
-  const handleClearAll = async () => {
-      setIsClearingAll(true);
-      setIsClearAllConfirmOpen(false);
-      addNotification({ title: "Clearing All Databases...", description: "This may take a moment."});
-      try {
-        await clearLocalAssets();
-        setAssets([]);
-
-        const firestoreAssets = await getLocalAssets();
-        if (firestoreAssets.length > 0) {
-            await batchDeleteAssets(firestoreAssets.map(a => a.id));
-        }
-        
-        addNotification({ title: "All Databases Cleared", description: "Local and cloud asset stores are now empty."});
-      } catch (e) {
-        addNotification({ title: 'Clear Failed', description: (e as Error).message, variant: 'destructive'});
-      }
-      setIsClearingAll(false);
-  }
 
   const handleImportFromJson = () => {
     importFileRef.current?.click();
@@ -82,7 +64,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             const result = JSON.parse(e.target?.result as string);
             if (result && result.settings && Array.isArray(result.assets)) {
                 setBackupToRestore(result);
-                setIsRestoreConfirmOpen(true);
+                openConfirmation('restore', 'Restore from Backup?', 'This will overwrite all local and cloud data with the contents of the backup file. This action cannot be undone.');
             } else {
                 addNotification({ title: 'Invalid Backup File', description: 'The selected JSON file does not have the correct structure.', variant: 'destructive' });
             }
@@ -97,30 +79,23 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   
   const handleConfirmRestore = async () => {
     if (!backupToRestore) return;
-    setIsRestoreConfirmOpen(false);
-    setIsSyncing(true);
+    setIsProcessing(true);
     addNotification({ title: 'Restoring from backup...', description: 'This may take a moment.' });
     
     try {
         const { assets: restoredAssets, settings: restoredSettings } = backupToRestore;
-        
         const assetsToSync = restoredAssets.map(a => ({ ...a, syncStatus: 'local' as const }));
-
-        // 1. Overwrite local databases
+        
         await saveAssets(assetsToSync);
         await saveLockedOfflineAssets([]); 
         await saveLocalSettings(restoredSettings);
 
-        // 2. Update app state
         setAssets(assetsToSync);
         setOfflineAssets([]);
         setAppSettings(restoredSettings);
 
-        // 3. Push restored data to the cloud
         addNotification({ title: 'Local data restored', description: 'Uploading restored data to the cloud...' });
-        if (assetsToSync.length > 0) {
-            await batchSetAssets(assetsToSync);
-        }
+        if (assetsToSync.length > 0) await batchSetAssets(assetsToSync);
         
         const syncedAssets = assetsToSync.map(a => ({ ...a, syncStatus: 'synced' as const }));
         await saveAssets(syncedAssets);
@@ -131,11 +106,115 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     } catch (e) {
         addNotification({ title: 'Restore Failed', description: (e as Error).message, variant: 'destructive'});
     } finally {
-        setIsSyncing(false);
+        setIsProcessing(false);
         setBackupToRestore(null);
     }
   };
+
+  const handleMergeOffline = async () => {
+    setIsProcessing(true);
+    addNotification({ title: "Merging Offline Data...", description: "This may take a moment."});
+    try {
+        const mainAssets = await getLocalAssets();
+        const offline = await getLockedOfflineAssets();
+        if (offline.length === 0) {
+            addNotification({ title: 'Nothing to Merge', description: 'Your locked offline store is empty.'});
+            setIsProcessing(false);
+            return;
+        }
+
+        const mainAssetsMap = new Map(mainAssets.map(a => [a.id, a]));
+        offline.forEach(asset => {
+            mainAssetsMap.set(asset.id, { ...asset, syncStatus: 'local' });
+        });
+        
+        const mergedAssets = Array.from(mainAssetsMap.values());
+
+        await saveAssets(mergedAssets);
+        await saveLockedOfflineAssets([]);
+
+        setAssets(mergedAssets);
+        setOfflineAssets([]);
+
+        addNotification({ title: "Merge Complete", description: `${offline.length} assets from the offline store have been merged into the main list.` });
+    } catch (e) {
+      addNotification({ title: 'Merge Failed', description: (e as Error).message, variant: 'destructive'});
+    }
+    setIsProcessing(false);
+  };
+
+  const handleClearFirestoreOnly = async () => {
+    setIsProcessing(true);
+    addNotification({ title: "Clearing Firestore...", description: "This will remove all assets from the cloud database."});
+    try {
+      const firestoreAssets = await getAssets();
+      if (firestoreAssets.length > 0) {
+          await batchDeleteAssets(firestoreAssets.map(a => a.id));
+      }
+      addNotification({ title: "Cloud Database Cleared", description: "All assets have been removed from Firestore."});
+    } catch(e) {
+      addNotification({ title: 'Firestore Clear Failed', description: (e as Error).message, variant: 'destructive'});
+    }
+    setIsProcessing(false);
+  };
+
+  const handleClearLocalOnly = async () => {
+    setIsProcessing(true);
+    addNotification({ title: "Clearing Local Device...", description: "This will remove all assets from this device."});
+    try {
+        await clearLocalAssets();
+        await saveLockedOfflineAssets([]);
+        setAssets([]);
+        setOfflineAssets([]);
+        addNotification({ title: "Local Device Cleared", description: "All asset data has been removed from your browser."});
+    } catch (e) {
+         addNotification({ title: 'Local Clear Failed', description: (e as Error).message, variant: 'destructive'});
+    }
+    setIsProcessing(false);
+  };
   
+  const handleNukeAll = async () => {
+    setIsProcessing(true);
+    addNotification({ title: "Clearing ALL Databases...", description: "This may take a moment."});
+    try {
+      await clearLocalAssets();
+      await saveLockedOfflineAssets([]);
+      setAssets([]);
+      setOfflineAssets([]);
+      addNotification({ title: 'Local Device Cleared', description: 'Proceeding to clear cloud...'});
+
+      const firestoreAssets = await getAssets();
+      if (firestoreAssets.length > 0) {
+          await batchDeleteAssets(firestoreAssets.map(a => a.id));
+      }
+      addNotification({ title: "All Databases Cleared", description: "Local and cloud asset stores are now empty."});
+    } catch (e) {
+      addNotification({ title: 'Clear Failed', description: (e as Error).message, variant: 'destructive'});
+    }
+    setIsProcessing(false);
+  };
+  
+  const openConfirmation = (action: string, title: string, description: string) => {
+    setConfirmAction(action);
+    setConfirmTitle(title);
+    setConfirmDescription(description);
+  }
+  
+  const handleConfirmAction = () => {
+    if (!confirmAction) return;
+    const action = confirmAction;
+    setConfirmAction(null); // Close the dialog
+    
+    switch(action) {
+        case 'restore': handleConfirmRestore(); break;
+        case 'merge': handleMergeOffline(); break;
+        case 'clear_local': handleClearLocalOnly(); break;
+        case 'clear_firestore': handleClearFirestoreOnly(); break;
+        case 'nuke_all': handleNukeAll(); break;
+        default: break;
+    }
+  }
+
   if (userProfile?.loginName !== 'admin') {
     return null;
   }
@@ -143,11 +222,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-md flex flex-col">
+        <DialogContent className="max-w-lg flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><DatabaseZap /> Database Administration</DialogTitle>
             <DialogDescription>
-              Manage advanced database settings. Changes here are critical and can affect all users.
+              Perform advanced backup, restore, and data management operations. Use with caution.
             </DialogDescription>
           </DialogHeader>
           
@@ -159,30 +238,50 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                   </CardHeader>
                   <CardContent className="space-y-2">
                       <input type="file" ref={importFileRef} onChange={handleFileSelected} accept=".json" className="hidden" />
-                      <Button variant="outline" className="w-full justify-start" onClick={handleImportFromJson}>
+                      <Button variant="outline" className="w-full justify-start" onClick={handleImportFromJson} disabled={isProcessing}>
                           <FileUp className="mr-2 h-4 w-4" /> Import from Full Backup (JSON)
                       </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => exportFullBackupToJson(assets, appSettings)}>
+                      <Separator />
+                      <Button variant="outline" className="w-full justify-start" onClick={() => exportFullBackupToJson(assets, appSettings)} disabled={isProcessing}>
                           <Download className="mr-2 h-4 w-4" /> Export Full Backup (Assets & Settings)
                       </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => exportSettingsToJson(appSettings)}>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => exportSettingsToJson(appSettings)} disabled={isProcessing}>
                           <Download className="mr-2 h-4 w-4" /> Export Settings Only
                       </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => exportAssetsToJson(assets)}>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => exportAssetsToJson(assets)} disabled={isProcessing}>
                           <Download className="mr-2 h-4 w-4" /> Export Assets Only
                       </Button>
                   </CardContent>
               </Card>
 
+              <Card>
+                <CardHeader>
+                  <CardTitle>Data Management</CardTitle>
+                  <CardDescription>Perform actions on local and cloud data stores.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button variant="outline" className="w-full justify-start" onClick={() => openConfirmation('merge', 'Merge Offline Data?', 'This will merge all assets from your "Locked Offline" store into the main list. Offline edits will overwrite main list data. This cannot be undone.')} disabled={isProcessing}>
+                      <GitMerge className="mr-2 h-4 w-4" /> Merge Offline Store to Main List
+                  </Button>
+                </CardContent>
+              </Card>
+
               <Card className="border-destructive">
                   <CardHeader>
                       <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle/> Danger Zone</CardTitle>
-                      <CardDescription>This action is irreversible and will affect all data.</CardDescription>
+                      <CardDescription>These irreversible actions can result in data loss.</CardDescription>
                   </CardHeader>
-                  <CardContent>
-                      <Button variant="destructive" className="w-full justify-start" onClick={() => setIsClearAllConfirmOpen(true)} disabled={isClearingAll}>
-                          {isClearingAll ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                          Clear All Assets in ALL Databases
+                  <CardContent className="space-y-2">
+                      <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_local', 'Clear Local Storage?', 'This will permanently delete all assets from THIS DEVICE ONLY (both main and offline stores). It will NOT affect the cloud database.')} disabled={isProcessing}>
+                          <HardDrive className="mr-2 h-4 w-4" /> Clear Local Device Storage Only
+                      </Button>
+                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_firestore', 'Clear Cloud Storage?', 'This will permanently delete ALL assets from the cloud (Firestore). It will affect ALL users but will NOT touch your local data.')} disabled={isProcessing}>
+                          <CloudOff className="mr-2 h-4 w-4" /> Clear Cloud Storage Only (Firestore)
+                      </Button>
+                      <Separator />
+                      <Button variant="destructive" className="w-full justify-start" onClick={() => openConfirmation('nuke_all', 'Nuke ALL Data?', 'This is the most destructive option. It will permanently delete ALL assets from your local device AND from the cloud database.')} disabled={isProcessing}>
+                          {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseZap className="mr-2 h-4 w-4" />}
+                          Nuke ALL Data (Local & Cloud)
                       </Button>
                   </CardContent>
               </Card>
@@ -196,34 +295,19 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         </DialogContent>
       </Dialog>
       
-      <AlertDialog open={isRestoreConfirmOpen} onOpenChange={setIsRestoreConfirmOpen}>
+      <AlertDialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
           <AlertDialogContent>
               <AlertDialogHeader>
-                  <AlertDialogTitle>Restore from Backup?</AlertDialogTitle>
+                  <AlertDialogTitle>{confirmTitle}</AlertDialogTitle>
                   <AlertDialogDescription>
-                     This will overwrite all local and cloud data with the contents of the backup file. This action cannot be undone. Are you sure you want to proceed?
+                     {confirmDescription}
                   </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setBackupToRestore(null)}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleConfirmRestore} className="bg-destructive hover:bg-destructive/90">
-                      Yes, Overwrite and Restore
+                  <AlertDialogAction onClick={handleConfirmAction} className="bg-destructive hover:bg-destructive/90">
+                      Yes, Continue
                   </AlertDialogAction>
-              </AlertDialogFooter>
-          </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={isClearAllConfirmOpen} onOpenChange={setIsClearAllConfirmOpen}>
-          <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Clear ALL Databases?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                      This is irreversible. It will delete all assets from your local device and from Cloud Firestore.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                  <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleClearAll} className="bg-destructive hover:bg-destructive/90">Confirm & Delete Everything</AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
