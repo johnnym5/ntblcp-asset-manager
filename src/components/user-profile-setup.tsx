@@ -126,7 +126,7 @@ export default function UserProfileSetup() {
                     <div className="p-3 bg-primary/10 rounded-full mb-2">
                         <Boxes className="h-6 w-6 text-primary" />
                     </div>
-                    <AlertDialogTitle>NTBLCP Asset Manager</AlertDialogTitle>
+                    <AlertDialogTitle>Global Asset Hub</AlertDialogTitle>
                     <AlertDialogDescription>
                         Please sign in to continue.
                     </AlertDialogDescription>

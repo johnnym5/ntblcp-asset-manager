@@ -1,4 +1,4 @@
-# NTBLCP Asset Manager
+# Global Asset Hub
 
 A full-featured, offline-first Asset Management Web App, built with Next.js, Tailwind CSS, and Firebase.
 
@@ -21,31 +21,9 @@ This application is designed to solve the critical challenge of managing and ver
 
 ## 1. Local Development Setup
 
-Before you can run the app locally, you must provide your Firebase project's credentials.
+The Firebase project configuration is embedded directly into the application, so no extra setup is required for local development.
 
-### Step 1.1: Create `.env.local` file
-
-Create a file named `.env.local` in the root of the project by copying the `.env.example` file.
-
-```bash
-cp .env.example .env.local
-```
-
-### Step 1.2: Fill in your Firebase Credentials
-
-Open the new `.env.local` file and add your actual Firebase project credentials.
-
-1.  **Get Web App Config**:
-    *   In the Firebase Console, go to **Project settings** (click the gear icon ⚙️).
-    *   In the **General** tab, scroll down to the "Your apps" section.
-    *   Select your web app and copy the configuration values into your `.env.local` file.
-
-2.  **Get Realtime Database URL**:
-    *   In the Firebase Console, go to the **Realtime Database** section (under Build).
-    *   If you haven't created a database, create one in **locked mode** (the app's rules will overwrite this).
-    *   Copy the database URL (it looks like `https://<your-project-id>-default-rtdb.firebaseio.com`) and add it as the value for `NEXT_PUBLIC_FIREBASE_DATABASE_URL`.
-
-### Step 1.3: Install Dependencies & Run
+### Install Dependencies & Run
 
 ```bash
 npm install
@@ -81,19 +59,12 @@ firebase login
 From your project's root directory, run the following command to associate your local project with your Firebase project.
 
 ```bash
-firebase use <YOUR_FIREBASE_PROJECT_ID>
+firebase use globalassethub
 ```
-Replace `<YOUR_FIREBASE_PROJECT_ID>` with your actual Firebase Project ID.
 
 ### Step 2.4: Configure Environment Variables in Firebase
 
-Your deployed application needs your Firebase API keys to connect to the database and authentication services.
-
-1.  Go to the [Firebase Console](https://console.firebase.google.com/).
-2.  Select your project (`YOUR-FIREBASE-PROJECT-ID`).
-3.  Navigate to the **App Hosting** page.
-4.  Select your backend, go to the **Settings** tab.
-5.  In the "Environment variables" section, add all the variables from your `.env.local` file (e.g., `NEXT_PUBLIC_FIREBASE_API_KEY`, `NEXT_PUBLIC_FIREBASE_DATABASE_URL`, etc.).
+The application's Firebase configuration is hardcoded, so no environment variables need to be set in the Firebase Console for App Hosting.
 
 ### Step 2.5: Deploy the Application
 

@@ -3,15 +3,15 @@ import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getDatabase, type Database } from 'firebase/database';
 
-// Your web app's Firebase configuration is now loaded from environment variables.
+// Your web app's Firebase configuration
 export const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL
+  apiKey: "AIzaSyBoU-iXGO0600841daa1LZzSlfRuZojXxA",
+  authDomain: "globalassethub.firebaseapp.com",
+  databaseURL: "https://globalassethub-default-rtdb.firebaseio.com",
+  projectId: "globalassethub",
+  storageBucket: "globalassethub.appspot.com",
+  messagingSenderId: "296731745587",
+  appId: "1:296731745587:web:d3df3d38247e2b3073b246"
 };
 
 
@@ -37,7 +37,7 @@ if (typeof window !== 'undefined') {
     }
   } else {
     // This warning helps developers who haven't set up their .env file.
-    console.warn("Firebase configuration is missing or incomplete. Online features will be disabled. Please create and populate a .env.local file for local development as described in the README.");
+    console.error("Firebase configuration is missing or incomplete. Online features will be disabled.");
   }
 }
 
