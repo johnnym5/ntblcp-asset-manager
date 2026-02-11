@@ -50,6 +50,9 @@ export interface Asset {
   lastModified?: string; // ISO 8601 date string
   lastModifiedBy?: string; // displayName of user who last modified
   lastModifiedByState?: string; // state of user who last modified
+
+  // Client-side undo buffer
+  previousState?: Partial<Asset>;
 }
 
 export interface AuthorizedUser {

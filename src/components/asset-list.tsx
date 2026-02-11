@@ -81,8 +81,8 @@ import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings } from "@/lib/firestore";
-import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB } from "@/lib/database";
+import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings, clearAssets as clearFirestoreAssets } from "@/lib/firestore";
+import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
@@ -103,7 +103,7 @@ import { ColumnCustomizationSheet } from "./column-customization-sheet";
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
     const keys = Object.keys(b) as (keyof Asset)[];
     for (const key of keys) {
-        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState'].includes(key)) {
+        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState'].includes(key)) {
             continue;
         }
         const valA = String(a[key] ?? '').trim();
@@ -904,12 +904,24 @@ export default function AssetList() {
     const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
 
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
+        let previousState: Partial<Asset> | undefined = undefined;
+        if (originalAsset) {
+            previousState = {};
+            for(const key in assetToSave) {
+                const k = key as keyof Asset;
+                if(originalAsset[k] !== assetToSave[k]) {
+                    (previousState as any)[k] = originalAsset[k];
+                }
+            }
+        }
+
         const finalAsset: Asset = sanitizeForFirestore({
             ...assetToSave,
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName,
             lastModifiedByState: userProfile?.state,
             syncStatus: dataSource === 'cloud' ? 'local' : undefined,
+            previousState: Object.keys(previousState || {}).length > 0 ? previousState : undefined,
         });
       
       if (dataSource === 'cloud') {

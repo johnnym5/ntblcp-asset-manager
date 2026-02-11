@@ -33,7 +33,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
-import { Loader2, FileText, Check } from "lucide-react";
+import { Loader2, FileText, Check, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
 import { cn, getStatusClasses } from "@/lib/utils";
@@ -121,6 +121,25 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
         // Error toast is handled by the caller
     } finally {
         setIsSaving(false);
+    }
+  };
+
+  const handleRollback = async () => {
+    if (!asset || !asset.previousState) return;
+
+    setIsSaving(true);
+    try {
+      const rolledBackAsset: Asset = {
+        ...asset,
+        ...asset.previousState, // Apply the old values
+        previousState: undefined, // Clear the history
+      };
+      await onSave(rolledBackAsset); // Use the existing save function
+      onOpenChange(false);
+    } catch (e) {
+      // Error is handled by the caller
+    } finally {
+      setIsSaving(false);
     }
   };
   
@@ -272,20 +291,32 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
               </form>
             </Form>
         </div>
-        <DialogFooter className="mt-auto pt-4 border-t">
-          <DialogClose asChild>
-            <Button variant="outline">Close</Button>
-          </DialogClose>
-          {!initialIsReadOnly && (
-            <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
-                {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Save Changes
+        <DialogFooter className="mt-auto pt-4 border-t sm:justify-between">
+          {asset?.previousState && !initialIsReadOnly && (
+            <Button
+              variant="ghost"
+              type="button"
+              className="text-destructive hover:text-destructive justify-start"
+              onClick={handleRollback}
+              disabled={isSaving}
+            >
+              <RotateCcw className="mr-2 h-4 w-4" />
+              Undo Last Change
             </Button>
           )}
+          <div className="flex sm:justify-end gap-2">
+            <DialogClose asChild>
+              <Button variant="outline">Close</Button>
+            </DialogClose>
+            {!initialIsReadOnly && (
+              <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
+                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Save Changes
+              </Button>
+            )}
+          </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
-
-    

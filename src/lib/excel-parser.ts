@@ -42,9 +42,6 @@ export const sanitizeForFirestore = <T extends object>(obj: T): T => {
     const sanitizedObj: { [key: string]: any } = {};
     for (const key in obj) {
         const value = (obj as any)[key];
-        if (key === 'previousState') {
-            continue; 
-        }
         if (value !== undefined) {
             if (value instanceof Date) {
                 sanitizedObj[key] = Timestamp.fromDate(value);
@@ -56,8 +53,8 @@ export const sanitizeForFirestore = <T extends object>(obj: T): T => {
     return sanitizedObj as T;
 };
 
-const parseRows = (headerRow: any[], jsonData: any[][], category: string): { assets: Asset[], rowsParsed: number } => {
-    const assets: Asset[] = [];
+const parseRows = (headerRow: any[], jsonData: any[][], category: string): { assets: Partial<Asset>[], rowsParsed: number } => {
+    const assets: Partial<Asset>[] = [];
     let rowsParsed = 0;
 
     for (const row of jsonData) {
@@ -98,11 +95,10 @@ const parseRows = (headerRow: any[], jsonData: any[][], category: string): { ass
         });
         
         if (hasData && (assetObject.description || assetObject.assetIdCode || assetObject.serialNumber)) {
-           const newAsset: Asset = { 
-                id: uuidv4(), 
+           const newAsset: Partial<Asset> = { 
                 ...assetObject, 
                 verifiedStatus: 'Unverified',
-            } as Asset;
+            };
             assets.push(newAsset);
         }
     }
@@ -112,7 +108,7 @@ const parseRows = (headerRow: any[], jsonData: any[][], category: string): { ass
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
     const keys = Object.keys(b) as (keyof Asset)[];
     for (const key of keys) {
-        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState'].includes(key)) {
+        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState'].includes(key)) {
             continue;
         }
         const valA = String(a[key] ?? '').trim();
@@ -216,7 +212,7 @@ export async function parseExcelFile(
         skipped: 0,
         errors: [],
     };
-    let parsedAssets: Asset[] = [];
+    let parsedAssets: Partial<Asset>[] = [];
 
     try {
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
@@ -291,7 +287,7 @@ export async function parseExcelFile(
                 }
             } else {
                  if (!appSettings.lockAssetList) {
-                    result.assets.push(parsedAsset);
+                    result.assets.push({ ...parsedAsset, id: uuidv4() } as Asset);
                  } else {
                     result.skipped++;
                  }
