@@ -1,5 +1,5 @@
 
-import type { Asset, SheetDefinition, DisplayField } from "./types";
+import type { Asset, SheetDefinition, DisplayField, AppSettings, AuthorizedUser } from "./types";
 
 export const TARGET_SHEETS = [
   'NTBLCP-TB-FAR',
@@ -195,7 +195,7 @@ export const IHVN_SUB_SHEET_DEFINITIONS: Record<string, string[]> = {
 };
 
 
-export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
+const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
   'NTBLCP-TB-FAR': { name: 'NTBLCP-TB-FAR', headers: ntblcpFarHeaders, displayFields: ntblcpFarDisplayFields },
   'MOTORCYCLES-C19RM': { name: 'MOTORCYCLES-C19RM', headers: motorcycleHeaders, displayFields: createDisplayFields(motorcycleHeaders, vehicleTableFields) },
   'PDX-C19RM': { name: 'PDX-C19RM', headers: pdxHeaders, displayFields: createDisplayFields(pdxHeaders, defaultTableFields) },
@@ -213,6 +213,32 @@ export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
   }
 };
     
+const defaultStateUsers: AuthorizedUser[] = NIGERIAN_STATES.map((state) => ({
+  loginName: state.toLowerCase().replace(/\s|-/g, ''),
+  displayName: state,
+  password: '000000',
+  states: [state],
+  isAdmin: false,
+  isGuest: false,
+  canAddAssets: true,
+  canEditAssets: true,
+  canVerifyAssets: true,
+}));
 
-    
+const defaultInitialLocations = [
+  ...NIGERIAN_STATES,
+  ...ZONAL_STORES,
+  ...SPECIAL_LOCATIONS,
+];
+
+export const DEFAULT_APP_SETTINGS: AppSettings = {
+  authorizedUsers: defaultStateUsers,
+  sheetDefinitions: HEADER_DEFINITIONS,
+  lockAssetList: true,
+  appMode: 'management',
+  locations: defaultInitialLocations,
+  settingsHistory: [],
+  defaultDataSource: 'cloud',
+  defaultDatabase: 'rtdb',
+};
 

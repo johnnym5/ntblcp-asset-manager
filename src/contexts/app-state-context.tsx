@@ -13,28 +13,11 @@ import {
   useCallback,
 } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
-import {
-  NIGERIAN_STATES,
-  HEADER_DEFINITIONS,
-  ZONAL_STORES,
-  SPECIAL_LOCATIONS,
-} from '@/lib/constants';
+import { DEFAULT_APP_SETTINGS } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
 import { onSettingsChange } from '@/lib/database';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
-
-const defaultStateUsers: AuthorizedUser[] = NIGERIAN_STATES.map((state) => ({
-  loginName: state.toLowerCase().replace(/\s|-/g, ''),
-  displayName: state,
-  password: '000000',
-  states: [state],
-  isAdmin: false,
-  isGuest: false,
-  canAddAssets: true,
-  canEditAssets: true,
-  canVerifyAssets: true,
-}));
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -115,12 +98,6 @@ interface AppStateContextType {
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
-const defaultInitialLocations = [
-  ...NIGERIAN_STATES,
-  ...ZONAL_STORES,
-  ...SPECIAL_LOCATIONS,
-];
-
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
@@ -149,16 +126,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     direction: 'asc',
   });
 
-  const [appSettings, setAppSettings] = useState<AppSettings>({
-    authorizedUsers: defaultStateUsers,
-    sheetDefinitions: HEADER_DEFINITIONS,
-    lockAssetList: true,
-    appMode: 'management',
-    locations: defaultInitialLocations,
-    settingsHistory: [],
-    defaultDataSource: 'cloud',
-    defaultDatabase: 'rtdb',
-  });
+  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isBrowserOnline, setIsBrowserOnline] = useState(true);
 
@@ -205,19 +173,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       let localSettings = await getLocalSettings();
 
       if (!localSettings) {
-        localSettings = {
-          authorizedUsers: defaultStateUsers,
-          sheetDefinitions: HEADER_DEFINITIONS,
-          lockAssetList: true,
-          appMode: 'management',
-          locations: defaultInitialLocations,
-          settingsHistory: [],
-          defaultDataSource: 'cloud',
-          defaultDatabase: 'rtdb',
-        };
+        localSettings = DEFAULT_APP_SETTINGS;
       } else {
         if (!localSettings.locations) {
-          localSettings.locations = defaultInitialLocations;
+          localSettings.locations = DEFAULT_APP_SETTINGS.locations;
         }
       }
       
@@ -247,7 +206,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
             // Update if remote is newer OR if the content is different (for manual edits without timestamp change)
             if (remoteTimestamp > localTimestamp || JSON.stringify(remoteSettings) !== JSON.stringify(currentSettings)) {
-              const finalSettings = { ...remoteSettings, locations: remoteSettings.locations || defaultInitialLocations };
+              const finalSettings = { ...remoteSettings, locations: remoteSettings.locations || DEFAULT_APP_SETTINGS.locations };
               
               if (JSON.stringify(finalSettings) !== JSON.stringify(currentSettings)) {
                 saveLocalSettings(finalSettings);
