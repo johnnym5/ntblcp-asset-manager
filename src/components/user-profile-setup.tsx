@@ -59,6 +59,12 @@ export default function UserProfileSetup() {
       setError("Please enter your login name.");
       return;
     }
+    
+    // appSettings could be null if the initial sync fails.
+    if (!appSettings) {
+        setError("Application settings are not available. Cannot log in.");
+        return;
+    }
 
     const allUsers = [...appSettings.authorizedUsers, superAdmin];
     const user = allUsers.find(
@@ -116,6 +122,14 @@ export default function UserProfileSetup() {
   };
   
   const isMultiStateUser = foundUser && foundUser.states.length > 1 && !foundUser.isAdmin;
+  
+  if (!appSettings) {
+     return (
+        <div className="flex h-screen w-full items-center justify-center bg-background">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+        </div>
+    );
+  }
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">

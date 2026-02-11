@@ -13,7 +13,6 @@ import {
   useCallback,
 } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
-import { DEFAULT_APP_SETTINGS } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
 import { onSettingsChange } from '@/lib/database';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
@@ -63,8 +62,8 @@ interface AppStateContextType {
   setSortConfig: Dispatch<SetStateAction<SortConfig | null>>;
 
   // App Settings
-  appSettings: AppSettings;
-  setAppSettings: Dispatch<SetStateAction<AppSettings>>;
+  appSettings: AppSettings | null; // Can be null initially
+  setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
   settingsLoaded: boolean;
 
   // Sync Settings
@@ -126,7 +125,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     direction: 'asc',
   });
 
-  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_APP_SETTINGS);
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isBrowserOnline, setIsBrowserOnline] = useState(true);
 
@@ -166,69 +165,48 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-
-  // Effect 1: One-time initialization from local storage
+  
+  // This effect loads settings from local DB. It does NOT fetch from cloud.
+  // The FirstTimeSetup component is responsible for the initial cloud fetch.
   useEffect(() => {
     const initializeSettings = async () => {
-      let localSettings = await getLocalSettings();
-
-      if (!localSettings) {
-        localSettings = DEFAULT_APP_SETTINGS;
-      } else {
-        if (!localSettings.locations) {
-          localSettings.locations = DEFAULT_APP_SETTINGS.locations;
-        }
-      }
-      
+      const localSettings = await getLocalSettings();
       setAppSettings(localSettings);
-      if (localSettings.defaultDataSource) {
+      if (localSettings?.defaultDataSource) {
         setDataSource(localSettings.defaultDataSource);
       }
-      if (localSettings.defaultDatabase) {
+      if (localSettings?.defaultDatabase) {
         setActiveDatabase(localSettings.defaultDatabase);
       }
-      await saveLocalSettings(localSettings);
       setSettingsLoaded(true);
     };
     
     initializeSettings();
   }, []);
 
-  // Effect 2: Real-time synchronization with remote settings from RTDB
+  // Real-time listener for remote settings changes
   useEffect(() => {
     if (!settingsLoaded || !isBrowserOnline) return;
 
-    const handleRemoteSettingsUpdate = (remoteSettings: AppSettings) => {
-       setAppSettings(currentSettings => {
-          if (remoteSettings) {
-            const remoteTimestamp = remoteSettings.lastModified ? new Date(remoteSettings.lastModified).getTime() : 0;
-            const localTimestamp = currentSettings.lastModified ? new Date(currentSettings.lastModified).getTime() : 0;
-
-            // Update if remote is newer OR if the content is different (for manual edits without timestamp change)
-            if (remoteTimestamp > localTimestamp || JSON.stringify(remoteSettings) !== JSON.stringify(currentSettings)) {
-              const finalSettings = { ...remoteSettings, locations: remoteSettings.locations || DEFAULT_APP_SETTINGS.locations };
-              
-              if (JSON.stringify(finalSettings) !== JSON.stringify(currentSettings)) {
-                saveLocalSettings(finalSettings);
-                return finalSettings;
-              }
-            }
-          }
-          return currentSettings;
-        });
+    const handleRemoteSettingsUpdate = (remoteSettings: AppSettings | null) => {
+       if (remoteSettings) {
+         setAppSettings(currentSettings => {
+           if (!currentSettings || JSON.stringify(remoteSettings) !== JSON.stringify(currentSettings)) {
+              saveLocalSettings(remoteSettings);
+              return remoteSettings;
+           }
+           return currentSettings;
+         });
+       }
     };
     
-    // Listen to RTDB for settings changes
     const unsubscribe = onSettingsChange(handleRemoteSettingsUpdate);
-
     return () => {
-        if (unsubscribe) {
-            unsubscribe();
-        }
+        if (unsubscribe) unsubscribe();
     };
   }, [settingsLoaded, isBrowserOnline]);
 
-  // Effect 3: Project ID check for user notification
+  // Project ID check
   useEffect(() => {
     if (typeof window !== 'undefined' && settingsLoaded) {
         const currentProjectId = firebaseConfig.projectId;
@@ -244,7 +222,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [settingsLoaded]);
 
-
   useEffect(() => {
     if (typeof window !== 'undefined') {
       localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
@@ -252,10 +229,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   }, [isOnline]);
 
   useEffect(() => {
-    if (appSettings.appMode === 'management') {
+    if (appSettings && appSettings.appMode === 'management') {
       setSelectedStatuses([]);
     }
-  }, [appSettings.appMode, setSelectedStatuses]);
+  }, [appSettings, setSelectedStatuses]);
 
   const value = {
     assets,

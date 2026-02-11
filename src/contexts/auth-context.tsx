@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -48,24 +49,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [authInitialized, setAuthInitialized] = useState(false);
   
   const { appSettings, settingsLoaded } = useAppState();
-  const authorizedUsersString = JSON.stringify(appSettings.authorizedUsers);
 
   useEffect(() => {
-    if (!settingsLoaded) {
-      // Don't validate auth until the app settings (and thus authorized users) have been loaded.
-      return;
-    }
+    // Wait until settings are loaded from local DB or first-time setup
+    if (!settingsLoaded) return;
 
     try {
       const savedProfile = localStorage.getItem('ntblcp-user-profile');
       if (savedProfile) {
         const profile: LocalUserProfile = JSON.parse(savedProfile);
         
+        // If there are no settings, we can't validate the user, so log them out.
+        if (!appSettings) {
+          localStorage.removeItem('ntblcp-user-profile');
+          setUserProfile(null);
+          setProfileSetupComplete(false);
+          return;
+        }
+
         const allUsers = [...appSettings.authorizedUsers, superAdmin];
         const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
-          // User is valid. Check if permissions need to be updated in the current session.
           const permissionsChanged =
             (profile.isAdmin ?? false) !== (authorizedUser.isAdmin ?? false) ||
             (profile.canAddAssets ?? false) !== (authorizedUser.canAddAssets ?? false) ||
@@ -74,7 +79,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           let currentSessionProfile = profile;
           if (permissionsChanged) {
-            // Permissions have changed in the main settings, so we update the active session profile
             currentSessionProfile = {
               ...profile,
               isAdmin: authorizedUser.isAdmin,
@@ -82,35 +86,29 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               canEditAssets: authorizedUser.canEditAssets,
               canVerifyAssets: authorizedUser.canVerifyAssets,
             };
-            // And also update localStorage so it's correct for the next page load
             localStorage.setItem('ntblcp-user-profile', JSON.stringify(currentSessionProfile));
           }
           setUserProfile(currentSessionProfile);
           setProfileSetupComplete(true);
         } else {
-          // The user is no longer authorized (or the list is empty), so clear their stale profile.
           localStorage.removeItem('ntblcp-user-profile');
           setUserProfile(null);
           setProfileSetupComplete(false);
         }
       } else {
-        // No profile in local storage, ensure state is cleared.
         setUserProfile(null);
         setProfileSetupComplete(false);
       }
     } catch (e) {
       console.error("Failed to process user profile from local storage", e);
-      // Clear potentially corrupted data
       localStorage.removeItem('ntblcp-user-profile');
       setUserProfile(null);
       setProfileSetupComplete(false);
     } finally {
-      // Whether a user was found or not, we have completed the authentication check.
       setLoading(false);
       setAuthInitialized(true);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [settingsLoaded, authorizedUsersString]);
+  }, [settingsLoaded, appSettings]);
 
   const login = async (user: AuthorizedUser, state: string) => {
     setLoading(true);
