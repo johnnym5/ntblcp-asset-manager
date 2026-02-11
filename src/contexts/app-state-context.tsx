@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -191,7 +192,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
-    // Set initial state
     setIsBrowserOnline(navigator.onLine);
 
     return () => {
@@ -199,40 +199,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
-  
-  const syncRemoteSettings = useCallback(async () => {
-    if (!isBrowserOnline) return;
 
-    try {
-      const getCloudSettings =
-        activeDatabase === 'firestore' ? getSettingsFS : getSettingsRTDB;
-      const remoteSettings = await getCloudSettings();
-      const localSettings = await getLocalSettings();
-
-      if (remoteSettings) {
-        const remoteTimestamp = remoteSettings.lastModified
-          ? new Date(remoteSettings.lastModified).getTime()
-          : 0;
-        const localTimestamp = localSettings?.lastModified
-          ? new Date(localSettings.lastModified).getTime()
-          : 0;
-
-        if (remoteTimestamp > localTimestamp) {
-          const finalSettings = {
-            ...remoteSettings,
-            locations: remoteSettings.locations || defaultInitialLocations,
-          };
-          setAppSettings(finalSettings);
-          await saveLocalSettings(finalSettings);
-        }
-      }
-    } catch (error) {
-      console.warn('Could not sync remote settings. Using local version.', error);
-    }
-  }, [isBrowserOnline, activeDatabase]);
-
+  // Effect 1: One-time initialization from local storage
   useEffect(() => {
-    const initializeAndSyncSettings = async () => {
+    const initializeSettings = async () => {
       let localSettings = await getLocalSettings();
 
       if (!localSettings) {
@@ -256,11 +226,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       if ((localSettings as any).enabledSheets) {
         const enabledSheets = new Set((localSettings as any).enabledSheets);
         Object.keys(localSettings.sheetDefinitions).forEach((sheetName) => {
-          // If a sheet was NOT in enabledSheets, it should now be hidden.
           if (!enabledSheets.has(sheetName)) {
             localSettings!.sheetDefinitions[sheetName].isHidden = true;
           } else {
-            // Ensure it's not hidden if it was enabled
             localSettings!.sheetDefinitions[sheetName].isHidden = false;
           }
         });
@@ -275,41 +243,69 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         setActiveDatabase(localSettings.defaultDatabase);
       }
       await saveLocalSettings(localSettings);
-
-      // Immediately after setting local state, sync with remote BEFORE settings are "loaded" for auth
-      await syncRemoteSettings();
       setSettingsLoaded(true);
     };
-
-    if (!settingsLoaded) {
-      initializeAndSyncSettings();
-    }
     
-    const interval = setInterval(syncRemoteSettings, 30000); // Poll every 30s
-    const handleFocus = () => syncRemoteSettings();
-    window.addEventListener('focus', handleFocus);
+    initializeSettings();
+  }, []); // Run only ONCE on mount
+
+  // Effect 2: Ongoing synchronization with remote settings
+  useEffect(() => {
+    if (!settingsLoaded || !isBrowserOnline) return;
+
+    const syncRemoteSettings = async () => {
+      try {
+        const getCloudSettings = activeDatabase === 'firestore' ? getSettingsFS : getSettingsRTDB;
+        const remoteSettings = await getCloudSettings();
+        
+        setAppSettings(currentSettings => {
+          if (remoteSettings) {
+            const remoteTimestamp = remoteSettings.lastModified ? new Date(remoteSettings.lastModified).getTime() : 0;
+            const localTimestamp = currentSettings.lastModified ? new Date(currentSettings.lastModified).getTime() : 0;
+
+            if (remoteTimestamp > localTimestamp) {
+              const finalSettings = { ...remoteSettings, locations: remoteSettings.locations || defaultInitialLocations };
+              if (JSON.stringify(finalSettings) !== JSON.stringify(currentSettings)) {
+                saveLocalSettings(finalSettings);
+                return finalSettings;
+              }
+            }
+          }
+          return currentSettings;
+        });
+
+      } catch (error) {
+        console.warn('Could not sync remote settings. Using local version.', error);
+      }
+    };
+    
+    syncRemoteSettings(); // Initial sync
+    
+    const interval = setInterval(syncRemoteSettings, 30000);
+    window.addEventListener('focus', syncRemoteSettings);
 
     return () => {
       clearInterval(interval);
-      window.removeEventListener('focus', handleFocus);
+      window.removeEventListener('focus', syncRemoteSettings);
     };
-  }, [settingsLoaded, syncRemoteSettings]);
+  }, [settingsLoaded, isBrowserOnline, activeDatabase]);
 
-
+  // Effect 3: Project ID check for user notification
   useEffect(() => {
-    if (typeof window !== 'undefined' && !settingsLoaded) return;
+    if (typeof window !== 'undefined' && settingsLoaded) {
+        const currentProjectId = firebaseConfig.projectId;
+        const savedProjectId = localStorage.getItem('ntblcp-firebase-project-id');
 
-    const currentProjectId = firebaseConfig.projectId;
-    const savedProjectId = localStorage.getItem('ntblcp-firebase-project-id');
+        if (currentProjectId && savedProjectId && currentProjectId !== savedProjectId) {
+            setShowProjectSwitchDialog(true);
+        }
 
-    if (currentProjectId && savedProjectId && currentProjectId !== savedProjectId) {
-      setShowProjectSwitchDialog(true);
-    }
-
-    if (currentProjectId) {
-      localStorage.setItem('ntblcp-firebase-project-id', currentProjectId);
+        if (currentProjectId) {
+            localStorage.setItem('ntblcp-firebase-project-id', currentProjectId);
+        }
     }
   }, [settingsLoaded]);
+
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
