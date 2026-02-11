@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -55,9 +54,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     if (!settingsLoaded) return;
 
     try {
-      const savedProfile = localStorage.getItem('ntblcp-user-profile');
-      if (savedProfile) {
-        const profile: LocalUserProfile = JSON.parse(savedProfile);
+      const savedProfileJSON = localStorage.getItem('ntblcp-user-profile');
+      if (savedProfileJSON) {
+        const savedProfile: LocalUserProfile = JSON.parse(savedProfileJSON);
         
         // If there are no settings, we can't validate the user, so log them out.
         if (!appSettings) {
@@ -68,29 +67,28 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
 
         const allUsers = [...appSettings.authorizedUsers, superAdmin];
-        const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
+        const authorizedUser = allUsers.find(u => u.loginName === savedProfile.loginName);
         
         if (authorizedUser) {
-          const permissionsChanged =
-            (profile.isAdmin ?? false) !== (authorizedUser.isAdmin ?? false) ||
-            (profile.canAddAssets ?? false) !== (authorizedUser.canAddAssets ?? false) ||
-            (profile.canEditAssets ?? false) !== (authorizedUser.canEditAssets ?? false) ||
-            (profile.canVerifyAssets ?? false) !== (authorizedUser.canVerifyAssets ?? false);
-
-          let currentSessionProfile = profile;
-          if (permissionsChanged) {
-            currentSessionProfile = {
-              ...profile,
+           // Always rebuild the profile from the source of truth (appSettings)
+           // to ensure permissions are always up-to-date.
+           const freshProfile: LocalUserProfile = {
+              id: savedProfile.id || uuidv4(),
+              loginName: authorizedUser.loginName,
+              displayName: authorizedUser.displayName,
+              state: savedProfile.state, // The chosen state is session-specific, so we keep it.
               isAdmin: authorizedUser.isAdmin,
+              isGuest: authorizedUser.isGuest,
               canAddAssets: authorizedUser.canAddAssets,
               canEditAssets: authorizedUser.canEditAssets,
               canVerifyAssets: authorizedUser.canVerifyAssets,
-            };
-            localStorage.setItem('ntblcp-user-profile', JSON.stringify(currentSessionProfile));
-          }
-          setUserProfile(currentSessionProfile);
+           };
+
+          localStorage.setItem('ntblcp-user-profile', JSON.stringify(freshProfile));
+          setUserProfile(freshProfile);
           setProfileSetupComplete(true);
         } else {
+          // User from storage is no longer in the authorized list.
           localStorage.removeItem('ntblcp-user-profile');
           setUserProfile(null);
           setProfileSetupComplete(false);

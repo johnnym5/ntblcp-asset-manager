@@ -56,7 +56,7 @@ export default function Page() {
   }
 
   // Handle an edge case where the flag is present but settings are missing (e.g., cleared browser data)
-  if (!appSettings) {
+  if (settingsLoaded && !appSettings) {
       // This is an inconsistent state. The best recovery is to force a re-setup.
       localStorage.removeItem('app-setup-complete');
       return <FirstTimeSetup onSetupComplete={() => window.location.reload()} />;
