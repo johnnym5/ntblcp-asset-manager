@@ -78,6 +78,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
   const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
   
   const [permissionSheetName, setPermissionSheetName] = useState<string | null>(null);
   const [tempDisabledList, setTempDisabledList] = useState<string[]>([]);
@@ -222,50 +223,55 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
 
   const handleConfirmSave = async () => {
     if (!draftSettings || !userProfile || !appSettings) return;
+    setIsSaving(true);
+    try {
+      const historyEntry: HistoricalAppSettings = { ...appSettings };
+      delete historyEntry.settingsHistory;
+          
+      const oneWeekAgo = new Date();
+      oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
 
-    const historyEntry: HistoricalAppSettings = { ...appSettings };
-    delete historyEntry.settingsHistory;
-        
-    const oneWeekAgo = new Date();
-    oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
+      const recentHistory = (appSettings.settingsHistory || []).filter(h => {
+          return h.lastModified && new Date(h.lastModified) > oneWeekAgo;
+      });
 
-    const recentHistory = (appSettings.settingsHistory || []).filter(h => {
-        return h.lastModified && new Date(h.lastModified) > oneWeekAgo;
-    });
+      const newHistory = [historyEntry, ...recentHistory];
+      
+      const settingsToSave: AppSettings = {
+          ...draftSettings,
+          lastModified: new Date().toISOString(),
+          lastModifiedBy: {
+              displayName: userProfile.displayName,
+              loginName: userProfile.loginName,
+          },
+          settingsHistory: newHistory.slice(0, 10),
+      };
 
-    const newHistory = [historyEntry, ...recentHistory];
-    
-    const settingsToSave: AppSettings = {
-        ...draftSettings,
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: {
-            displayName: userProfile.displayName,
-            loginName: userProfile.loginName,
-        },
-        settingsHistory: newHistory.slice(0, 10),
-    };
+      const rtdbPromise = updateSettingsRTDB(settingsToSave);
+      const firestorePromise = updateSettingsFS(settingsToSave);
 
-    const rtdbPromise = updateSettingsRTDB(settingsToSave);
-    const firestorePromise = updateSettingsFS(settingsToSave);
+      const results = await Promise.allSettled([rtdbPromise, firestorePromise]);
 
-    const results = await Promise.allSettled([rtdbPromise, firestorePromise]);
+      const rtdbSuccess = results[0].status === 'fulfilled';
+      const firestoreSuccess = results[1].status === 'fulfilled';
 
-    const rtdbSuccess = results[0].status === 'fulfilled';
-    const firestoreSuccess = results[1].status === 'fulfilled';
-
-    if (rtdbSuccess && firestoreSuccess) {
-      toast({ title: "Settings Saved", description: "Your changes have been applied to both cloud databases." });
-    } else {
-      toast({ title: "Cloud Save Incomplete", description: "Could not save settings to one or both cloud databases. Your changes are saved locally.", variant: "destructive" });
+      if (rtdbSuccess && firestoreSuccess) {
+        toast({ title: "Settings Saved", description: "Your changes have been applied to both cloud databases." });
+      } else {
+        toast({ title: "Cloud Save Incomplete", description: "Could not save settings to one or both cloud databases. Your changes are saved locally.", variant: "destructive" });
+      }
+      
+      if (rtdbSuccess || firestoreSuccess) {
+        await saveLocalSettings(settingsToSave);
+        setAppSettings(settingsToSave);
+      }
+    } catch(e) {
+      toast({ title: "Save Failed", description: (e as Error).message || "Could not save settings.", variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+      setIsConfirmOpen(false);
+      onOpenChange(false);
     }
-    
-    if (rtdbSuccess || firestoreSuccess) {
-      await saveLocalSettings(settingsToSave);
-      setAppSettings(settingsToSave);
-    }
-    
-    setIsConfirmOpen(false);
-    onOpenChange(false);
   };
 
   const handleSheetDefinitionSave = (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
@@ -619,8 +625,8 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           <DialogFooter className="mt-auto pt-4 border-t sm:justify-between">
             <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
             {hasChanges && (
-              <Button onClick={() => setIsConfirmOpen(true)} disabled={!hasChanges}>
-                  <Save className="mr-2 h-4 w-4" />
+              <Button onClick={() => setIsConfirmOpen(true)} disabled={!hasChanges || isSaving}>
+                  {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   Save Changes
               </Button>
             )}
@@ -702,7 +708,9 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           )}
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSave}>Confirm &amp; Save</AlertDialogAction>
+            <AlertDialogAction onClick={handleConfirmSave} disabled={isSaving}>
+              {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Confirm & Save'}
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
