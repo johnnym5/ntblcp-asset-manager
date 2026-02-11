@@ -37,6 +37,8 @@ export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => voi
       await saveLocalSettings(settings);
       await saveAssets(assets.map(a => ({...a, syncStatus: 'synced'})));
 
+      // 4. IMPORTANT: Set a persistent flag in localStorage to indicate setup is complete.
+      // This is the reliable way to prevent this component from running again.
       localStorage.setItem('app-setup-complete', 'true');
       
       setStatus('finished');
@@ -56,12 +58,13 @@ export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => voi
   }, [timeout]);
 
   useEffect(() => {
+    // Automatically trigger the setup process when the component mounts.
     performInitialSetup();
   }, [performInitialSetup]);
 
   const handleRetry = () => {
-    setTimeoutValue(current => current + 10000); // Add 10 seconds to timeout
-    // The useEffect watching performInitialSetup will re-run with the new timeout.
+    // Increase timeout and re-trigger the setup process by updating the dependency.
+    setTimeoutValue(current => current + 10000); 
   };
 
   const renderContent = () => {
