@@ -4,7 +4,7 @@
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileWarning, History, BarChart2, CalendarClock, ChevronsUpDown, PlusCircle } from 'lucide-react';
+import { FileWarning, History, BarChart2, CalendarClock, ChevronsUpDown, PlusCircle, AlertTriangle } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { useAppState } from '@/contexts/app-state-context';
@@ -86,7 +86,7 @@ export function AssetSummaryDashboard() {
 
 
     const summary = useMemo(() => {
-        if (!appSettings) return { withoutSerial: 0, withoutAssetId: 0, newThisWeek: 0, modifiedToday: 0, modifiedThisWeek: 0, withoutDescription: 0, withoutCategory: 0, withoutLocation: 0, withoutCondition: 0, withoutLga: 0, withoutAssignee: 0, withoutModelNumber: 0, withoutEngineNo: 0 };
+        if (!appSettings) return { withoutSerial: 0, withoutAssetId: 0, newThisWeek: 0, modifiedToday: 0, modifiedThisWeek: 0, withoutLocation: 0, withoutCondition: 0, withoutLga: 0, withoutAssignee: 0, withoutModelNumber: 0, withoutEngineNo: 0, unusable: 0, badCondition: 0, needsRepair: 0 };
         
         const visibleAssets = summaryAssets.filter(a => !appSettings?.sheetDefinitions[a.category]?.isHidden);
 
@@ -96,14 +96,15 @@ export function AssetSummaryDashboard() {
           newThisWeek: visibleAssets.filter(a => a.lastModified && !a.previousState && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length,
           modifiedToday: visibleAssets.filter(a => a.lastModified && isToday(parseISO(a.lastModified))).length,
           modifiedThisWeek: visibleAssets.filter(a => a.lastModified && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length,
-          withoutDescription: visibleAssets.filter(a => !a.description?.trim()).length,
-          withoutCategory: visibleAssets.filter(a => !a.category?.trim()).length,
           withoutLocation: visibleAssets.filter(a => !a.location?.trim()).length,
           withoutCondition: visibleAssets.filter(a => !a.condition?.trim()).length,
           withoutLga: visibleAssets.filter(a => !a.lga?.trim()).length,
           withoutAssignee: visibleAssets.filter(a => !a.assignee?.trim()).length,
           withoutEngineNo: visibleAssets.filter(a => (a.category?.includes('Vehicle') || a.category?.includes('MOTORCYCLE')) && !a.engineNo).length,
           withoutModelNumber: visibleAssets.filter(a => !a.modelNumber?.trim()).length,
+          unusable: visibleAssets.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen'].includes(a.condition)).length,
+          badCondition: visibleAssets.filter(a => a.condition && ['Bad condition', 'Used but in poor condition', 'F2: Major repairs required-poor condition'].includes(a.condition)).length,
+          needsRepair: visibleAssets.filter(a => a.condition === 'Used but requires occasional repair').length,
         };
     }, [summaryAssets, appSettings]);
     
@@ -145,6 +146,33 @@ export function AssetSummaryDashboard() {
             </div>
             <CollapsibleContent className="p-4 pt-0 mt-4">
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                    {/* New Condition Cards */}
+                    {summary.unusable > 0 && (
+                        <StatCard
+                            title="Unusable Assets"
+                            value={summary.unusable}
+                            description="Stolen, burnt, or unsalvageable."
+                            icon={<AlertTriangle className="h-4 w-4 text-destructive" />}
+                        />
+                    )}
+                    {summary.badCondition > 0 && (
+                         <StatCard
+                            title="Bad Condition"
+                            value={summary.badCondition}
+                            description="Assets in poor condition or needing major repair."
+                            icon={<FileWarning className="h-4 w-4 text-yellow-500" />}
+                        />
+                    )}
+                     {summary.needsRepair > 0 && (
+                         <StatCard
+                            title="Needs Repair"
+                            value={summary.needsRepair}
+                            description="Assets that require occasional repair."
+                            icon={<FileWarning className="h-4 w-4 text-orange-500" />}
+                        />
+                    )}
+                    
+                    {/* Existing Cards */}
                     <StatCard
                         title="Missing S/N"
                         value={summary.withoutSerial}
@@ -162,24 +190,6 @@ export function AssetSummaryDashboard() {
                         onAction={() => handleFilterClick('assetIdCode')}
                         actionLabel={missingFieldFilter === 'assetIdCode' ? "Clear Filter" : "View Assets"}
                         isActive={missingFieldFilter === 'assetIdCode'}
-                    />
-                    <StatCard
-                        title="Missing Description"
-                        value={summary.withoutDescription}
-                        description="Assets without a description."
-                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
-                        onAction={() => handleFilterClick('description')}
-                        actionLabel={missingFieldFilter === 'description' ? "Clear Filter" : "View Assets"}
-                        isActive={missingFieldFilter === 'description'}
-                    />
-                    <StatCard
-                        title="Missing Category"
-                        value={summary.withoutCategory}
-                        description="Assets without a category."
-                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
-                        onAction={() => handleFilterClick('category')}
-                        actionLabel={missingFieldFilter === 'category' ? "Clear Filter" : "View Assets"}
-                        isActive={missingFieldFilter === 'category'}
                     />
                      <StatCard
                         title="Missing Location"
