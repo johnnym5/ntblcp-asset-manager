@@ -9,9 +9,10 @@ export const firebaseConfig = {
   authDomain: "globalassethub.firebaseapp.com",
   databaseURL: "https://globalassethub-default-rtdb.firebaseio.com",
   projectId: "globalassethub",
-  storageBucket: "globalassethub.appspot.com",
+  storageBucket: "globalassethub.firebasestorage.app",
   messagingSenderId: "296731745587",
-  appId: "1:296731745587:web:d3df3d38247e2b3073b246"
+  appId: "1:296731745587:web:91f0e8a28ca497e973b246",
+  measurementId: "G-N9SBKMTCQ0"
 };
 
 
