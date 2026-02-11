@@ -5,26 +5,6 @@ import { db, isConfigValid } from '@/lib/firebase';
 import type { Asset, AppSettings, HistoricalAppSettings } from './types';
 import { addNotification } from '@/hooks/use-notifications';
 
-const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
-    return new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-            reject(new Error(`Operation timed out after ${ms / 1000} seconds.`));
-        }, ms);
-
-        promise.then(
-            (res) => {
-                clearTimeout(timeoutId);
-                resolve(res);
-            },
-            (err) => {
-                clearTimeout(timeoutId);
-                reject(err);
-            }
-        );
-    });
-};
-
-
 // Helper function to ensure Firebase is properly configured before use.
 const checkConfig = () => {
     if (!isConfigValid || !db) {
@@ -79,7 +59,7 @@ export async function getAssets(): Promise<Asset[]> {
     if (!db) return [];
     const assetsCollectionRef = collection(db, 'assets');
     const q = query(assetsCollectionRef);
-    const querySnapshot = await withTimeout(getDocs(q), 20000);
+    const querySnapshot = await getDocs(q);
     const fetchedAssets: Asset[] = [];
     querySnapshot.forEach((doc) => {
         fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);

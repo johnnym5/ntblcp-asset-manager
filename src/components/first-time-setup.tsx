@@ -1,8 +1,7 @@
-
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { Loader2, PartyPopper } from 'lucide-react';
+import React, { useEffect, useState, useCallback } from 'react';
+import { Loader2, PartyPopper, AlertTriangle } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { getAssets as getAssetsRTDB, getSettings } from '@/lib/database';
@@ -10,44 +9,69 @@ import { saveAssets, saveLocalSettings } from '@/lib/idb';
 import { useAppState } from '@/contexts/app-state-context';
 import { addNotification } from '@/hooks/use-notifications';
 
+const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
+    return new Promise((resolve, reject) => {
+        const timeoutId = setTimeout(() => {
+            reject(new Error(`The initial connection to the database timed out after ${ms / 1000} seconds.`));
+        }, ms);
+
+        promise.then(
+            (res) => {
+                clearTimeout(timeoutId);
+                resolve(res);
+            },
+            (err) => {
+                clearTimeout(timeoutId);
+                reject(err);
+            }
+        );
+    });
+};
+
 export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => void }) {
   const [status, setStatus] = useState<'loading' | 'downloading' | 'finished' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const { setAppSettings, setAssets } = useAppState();
+  const [timeoutDuration, setTimeoutDuration] = useState(20000); // Start with 20 seconds
+
+  const performInitialSetup = useCallback(async () => {
+    setStatus('downloading');
+    setError(null);
+    try {
+      // 1. Fetch Settings from the primary database (RTDB)
+      const settings = await withTimeout(getSettings(), timeoutDuration);
+      if (!settings) {
+        throw new Error('No application settings found in the database. Please configure settings as an admin first.');
+      }
+
+      // 2. Fetch Assets from the primary database (RTDB)
+      const assets = await withTimeout(getAssetsRTDB(), timeoutDuration);
+
+      // 3. Save both to local IndexedDB
+      await saveLocalSettings(settings);
+      await saveAssets(assets.map(a => ({...a, syncStatus: 'synced'})));
+
+      // 4. Update the application's global state
+      setAppSettings(settings);
+      setAssets(assets.map(a => ({...a, syncStatus: 'synced'})));
+
+      setStatus('finished');
+      addNotification({ title: 'Setup Complete', description: 'Application data has been downloaded successfully.' });
+
+    } catch (e: any) {
+      console.error("First time setup failed:", e);
+      setError(e.message || 'An unknown error occurred during setup. Please check your internet connection and Firebase configuration.');
+      setStatus('error');
+    }
+  }, [setAppSettings, setAssets, timeoutDuration]);
 
   useEffect(() => {
-    const performInitialSetup = async () => {
-      setStatus('downloading');
-      try {
-        // 1. Fetch Settings from the primary database (RTDB)
-        const settings = await getSettings();
-        if (!settings) {
-          throw new Error('No application settings found in the database. Please configure settings as an admin first.');
-        }
-
-        // 2. Fetch Assets from the primary database (RTDB)
-        const assets = await getAssetsRTDB();
-
-        // 3. Save both to local IndexedDB
-        await saveLocalSettings(settings);
-        await saveAssets(assets.map(a => ({...a, syncStatus: 'synced'})));
-
-        // 4. Update the application's global state
-        setAppSettings(settings);
-        setAssets(assets.map(a => ({...a, syncStatus: 'synced'})));
-
-        setStatus('finished');
-        addNotification({ title: 'Setup Complete', description: 'Application data has been downloaded successfully.' });
-
-      } catch (e: any) {
-        console.error("First time setup failed:", e);
-        setError(e.message || 'An unknown error occurred during setup. Please check your internet connection and Firebase configuration.');
-        setStatus('error');
-      }
-    };
-
     performInitialSetup();
-  }, [setAppSettings, setAssets]);
+  }, [performInitialSetup]);
+
+  const handleRetry = () => {
+    setTimeoutDuration(prev => prev + 10000); // Add 10 seconds
+  };
 
   const renderContent = () => {
     switch (status) {
@@ -93,13 +117,21 @@ export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => voi
         return (
           <>
             <CardHeader>
-              <CardTitle className="text-destructive">Setup Failed</CardTitle>
+              <CardTitle className="text-destructive flex items-center gap-2">
+                <AlertTriangle />
+                Setup Failed
+              </CardTitle>
               <CardDescription>
-                We couldn't complete the initial setup.
+                We couldn't complete the initial setup. This can happen on a slow or unreliable network connection.
               </CardDescription>
             </CardHeader>
-            <CardContent className="text-sm text-destructive-foreground bg-destructive/90 p-4 rounded-md">
-              <p>{error}</p>
+            <CardContent className="space-y-4">
+              <p className="text-sm text-destructive-foreground bg-destructive/90 p-4 rounded-md">
+                {error}
+              </p>
+              <Button className="w-full" onClick={handleRetry}>
+                Retry Download (+10s timeout)
+              </Button>
             </CardContent>
           </>
         )
