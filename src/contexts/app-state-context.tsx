@@ -6,6 +6,7 @@ import type { OptionType } from '@/components/asset-filter-sheet';
 import { NIGERIAN_STATES, HEADER_DEFINITIONS, ZONAL_STORES, SPECIAL_LOCATIONS } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
 import { getSettings } from '@/lib/firestore';
+import { getSettings as getSettingsRTDB } from '@/lib/database';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
 
@@ -25,13 +26,6 @@ const defaultStateUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
   direction: 'asc' | 'desc';
-}
-
-export interface DataActions {
-  onScanAndImport?: () => void;
-  onExport?: () => void;
-  onClearAll?: () => void;
-  onTravelReport?: () => void;
 }
 
 interface AppStateContextType {
@@ -88,8 +82,6 @@ interface AppStateContextType {
   // Cross-component communication
   assetToView: Asset | null;
   setAssetToView: Dispatch<SetStateAction<Asset | null>>;
-  dataActions: DataActions;
-  setDataActions: Dispatch<SetStateAction<DataActions>>;
   isSettingsOpen: boolean;
   setIsSettingsOpen: Dispatch<SetStateAction<boolean>>;
   initialSettingsTab: string;
@@ -152,7 +144,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   
   const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
-  const [dataActions, setDataActions] = useState<DataActions>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialSettingsTab, setInitialSettingsTab] = useState('general');
 
@@ -181,7 +172,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       if (!isBrowserOnline) return;
 
       try {
-        const remoteSettings = await getSettings();
+        const getCloudSettings = activeDatabase === 'firestore' ? getSettings : getSettingsRTDB;
+        const remoteSettings = await getCloudSettings();
         const localSettings = await getLocalSettings();
 
         if (remoteSettings) {
@@ -261,7 +253,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       clearInterval(interval);
       window.removeEventListener('focus', handleFocus);
     };
-  }, [isBrowserOnline, settingsLoaded]);
+  }, [isBrowserOnline, settingsLoaded, activeDatabase]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && !settingsLoaded) return;
@@ -312,7 +304,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     isSyncing, setIsSyncing,
     dataSource, setDataSource,
     assetToView, setAssetToView,
-    dataActions, setDataActions,
     isSettingsOpen, setIsSettingsOpen,
     initialSettingsTab, setInitialSettingsTab,
     showProjectSwitchDialog, setShowProjectSwitchDialog,

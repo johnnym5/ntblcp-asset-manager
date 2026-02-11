@@ -23,15 +23,23 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
-import { batchDeleteAssets, getAssets } from '@/lib/firestore';
+import { getAssets as getAssetsFS, batchDeleteAssets as batchDeleteAssetsFS, clearAssets as clearFirestoreAssets } from '@/lib/firestore';
+import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, clearAssets as clearRtdbAssets } from '@/lib/database';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive } from 'lucide-react';
+import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive, Database, RefreshCw } from 'lucide-react';
 import type { AppSettings, Asset } from '@/lib/types';
 import { saveLocalSettings, clearLocalAssets, saveAssets, saveLockedOfflineAssets, getLocalAssets, getLockedOfflineAssets } from '@/lib/idb';
 import { exportFullBackupToJson, exportSettingsToJson, exportAssetsToJson } from '@/lib/json-export';
 import { addNotification } from '@/hooks/use-notifications';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Separator } from '../ui/separator';
+import { useToast } from '@/hooks/use-toast';
+import { updateSettings as updateSettingsFS } from '@/lib/firestore';
+import { updateSettings as updateSettingsRTDB } from '@/lib/database';
+import { Label } from '../ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Switch } from '../ui/switch';
+import { ImportScannerDialog } from '../single-sheet-import-dialog';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -41,11 +49,13 @@ interface DatabaseAdminDialogProps {
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
   const { appSettings, setAppSettings, assets, setAssets, offlineAssets, setOfflineAssets, setIsSyncing } = useAppState();
+  const { toast } = useToast();
   
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmDescription, setConfirmDescription] = useState('');
+  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
 
   const importFileRef = useRef<HTMLInputElement>(null);
   const [backupToRestore, setBackupToRestore] = useState<{ settings: AppSettings, assets: Asset[] } | null>(null);
@@ -64,7 +74,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             const result = JSON.parse(e.target?.result as string);
             if (result && result.settings && Array.isArray(result.assets)) {
                 setBackupToRestore(result);
-                openConfirmation('restore', 'Restore from Backup?', 'This will overwrite all local and cloud data with the contents of the backup file. This action cannot be undone.');
+                openConfirmation('restore', 'Restore from Backup?', 'This will overwrite all local data with the contents of the backup file. You can then sync this to the cloud. This action cannot be undone.');
             } else {
                 addNotification({ title: 'Invalid Backup File', description: 'The selected JSON file does not have the correct structure.', variant: 'destructive' });
             }
@@ -94,14 +104,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         setOfflineAssets([]);
         setAppSettings(restoredSettings);
 
-        addNotification({ title: 'Local data restored', description: 'Uploading restored data to the cloud...' });
-        if (assetsToSync.length > 0) await batchSetAssets(assetsToSync);
-        
-        const syncedAssets = assetsToSync.map(a => ({ ...a, syncStatus: 'synced' as const }));
-        await saveAssets(syncedAssets);
-        setAssets(syncedAssets);
-
-        addNotification({ title: 'Restore Complete', description: 'Your application has been restored from the backup file.' });
+        addNotification({ title: 'Local data restored', description: 'You can now manually upload the restored data to the cloud.' });
 
     } catch (e) {
         addNotification({ title: 'Restore Failed', description: (e as Error).message, variant: 'destructive'});
@@ -142,21 +145,46 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     }
     setIsProcessing(false);
   };
+  
+  const handleSyncDatabases = async () => {
+    setIsProcessing(true);
+    addNotification({ title: 'Syncing Databases...', description: 'Copying data from Firestore to Realtime Database.' });
+    try {
+        const firestoreAssets = await getAssetsFS();
+        await batchSetAssetsRTDB(firestoreAssets);
+        const firestoreSettings = await updateSettingsFS();
+        if(firestoreSettings) await updateSettingsRTDB(firestoreSettings);
+
+        addNotification({ title: 'Sync Complete', description: 'Realtime Database has been updated with data from Firestore.' });
+    } catch (e) {
+        addNotification({ title: 'Sync Failed', description: (e as Error).message, variant: 'destructive'});
+    }
+    setIsProcessing(false);
+  };
 
   const handleClearFirestoreOnly = async () => {
     setIsProcessing(true);
     addNotification({ title: "Clearing Firestore...", description: "This will remove all assets from the cloud database."});
     try {
-      const firestoreAssets = await getAssets();
-      if (firestoreAssets.length > 0) {
-          await batchDeleteAssets(firestoreAssets.map(a => a.id));
-      }
+      await clearFirestoreAssets();
       addNotification({ title: "Cloud Database Cleared", description: "All assets have been removed from Firestore."});
     } catch(e) {
       addNotification({ title: 'Firestore Clear Failed', description: (e as Error).message, variant: 'destructive'});
     }
     setIsProcessing(false);
   };
+
+  const handleClearRtdbOnly = async () => {
+    setIsProcessing(true);
+    addNotification({ title: "Clearing Realtime DB...", description: "This will remove all assets from the backup cloud database."});
+    try {
+      await clearRtdbAssets();
+      addNotification({ title: "Backup Cloud Cleared", description: "All assets have been removed from Realtime DB."});
+    } catch(e) {
+      addNotification({ title: 'RTDB Clear Failed', description: (e as Error).message, variant: 'destructive'});
+    }
+    setIsProcessing(false);
+  }
 
   const handleClearLocalOnly = async () => {
     setIsProcessing(true);
@@ -183,15 +211,40 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       setOfflineAssets([]);
       addNotification({ title: 'Local Device Cleared', description: 'Proceeding to clear cloud...'});
 
-      const firestoreAssets = await getAssets();
-      if (firestoreAssets.length > 0) {
-          await batchDeleteAssets(firestoreAssets.map(a => a.id));
-      }
-      addNotification({ title: "All Databases Cleared", description: "Local and cloud asset stores are now empty."});
+      await clearFirestoreAssets();
+      await clearRtdbAssets();
+
+      addNotification({ title: "All Databases Cleared", description: "Local and all cloud asset stores are now empty."});
     } catch (e) {
       addNotification({ title: 'Clear Failed', description: (e as Error).message, variant: 'destructive'});
     }
     setIsProcessing(false);
+  };
+
+  const handleSettingChange = async (key: keyof AppSettings, value: any) => {
+    if (!userProfile) return;
+    
+    const newSettings: AppSettings = {
+        ...appSettings,
+        [key]: value,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: {
+            displayName: userProfile.displayName,
+            loginName: userProfile.loginName,
+        }
+    };
+    
+    setAppSettings(newSettings); // Optimistic update
+    
+    try {
+        await updateSettingsFS(newSettings);
+        await updateSettingsRTDB(newSettings);
+        await saveLocalSettings(newSettings);
+        toast({ title: 'Setting Saved', description: 'Your change has been saved to the cloud.' });
+    } catch (e) {
+        toast({ title: "Save Failed", description: (e as Error).message || "Could not save settings.", variant: "destructive" });
+        setAppSettings(appSettings); // Revert on failure
+    }
   };
   
   const openConfirmation = (action: string, title: string, description: string) => {
@@ -210,6 +263,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         case 'merge': handleMergeOffline(); break;
         case 'clear_local': handleClearLocalOnly(); break;
         case 'clear_firestore': handleClearFirestoreOnly(); break;
+        case 'clear_rtdb': handleClearRtdbOnly(); break;
         case 'nuke_all': handleNukeAll(); break;
         default: break;
     }
@@ -231,6 +285,39 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
           </DialogHeader>
           
           <div className="flex-1 space-y-4">
+              <Card>
+                  <CardHeader>
+                      <CardTitle>Global Settings</CardTitle>
+                      <CardDescription>Changes here are saved instantly and affect all users.</CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                      <div className="flex items-center justify-between">
+                          <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
+                          <Select value={appSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
+                              <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="management">Management</SelectItem>
+                                <SelectItem value="verification">Verification</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+                      <div className="flex items-center justify-between">
+                          <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
+                          <Switch id="lock-assets" checked={appSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
+                      </div>
+                      <div className="flex items-center justify-between">
+                          <Label htmlFor="default-db" className="text-sm font-medium">Default Cloud DB</Label>
+                          <Select value={appSettings.defaultDatabase} onValueChange={(value) => handleSettingChange('defaultDatabase', value)}>
+                              <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="firestore">Firestore</SelectItem>
+                                <SelectItem value="rtdb">Realtime DB</SelectItem>
+                              </SelectContent>
+                          </Select>
+                      </div>
+                  </CardContent>
+              </Card>
+
               <Card>
                   <CardHeader>
                       <CardTitle>Backup & Restore</CardTitle>
@@ -261,7 +348,13 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                 </CardHeader>
                 <CardContent className="space-y-2">
                   <Button variant="outline" className="w-full justify-start" onClick={() => openConfirmation('merge', 'Merge Offline Data?', 'This will merge all assets from your "Locked Offline" store into the main list. Offline edits will overwrite main list data. This cannot be undone.')} disabled={isProcessing}>
-                      <GitMerge className="mr-2 h-4 w-4" /> Merge Offline Store to Main List
+                      <GitMerge className="mr-2 h-4 w-4" /> Import from Offline Store
+                  </Button>
+                   <Button variant="outline" className="w-full justify-start" onClick={() => setIsImportScanOpen(true)}>
+                        <Database className="mr-2 h-4 w-4" /> Scan & Import Workbook
+                    </Button>
+                   <Button variant="outline" className="w-full justify-start" onClick={handleSyncDatabases} disabled={isProcessing}>
+                      <RefreshCw className="mr-2 h-4 w-4" /> Sync Databases (Firestore to RTDB)
                   </Button>
                 </CardContent>
               </Card>
@@ -275,11 +368,14 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_local', 'Clear Local Storage?', 'This will permanently delete all assets from THIS DEVICE ONLY (both main and offline stores). It will NOT affect the cloud database.')} disabled={isProcessing}>
                           <HardDrive className="mr-2 h-4 w-4" /> Clear Local Device Storage Only
                       </Button>
-                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_firestore', 'Clear Cloud Storage?', 'This will permanently delete ALL assets from the cloud (Firestore). It will affect ALL users but will NOT touch your local data.')} disabled={isProcessing}>
-                          <CloudOff className="mr-2 h-4 w-4" /> Clear Cloud Storage Only (Firestore)
+                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_firestore', 'Clear Firestore?', 'This will permanently delete ALL assets from the primary cloud database (Firestore). It will NOT touch your local data or the backup DB.')} disabled={isProcessing}>
+                          <CloudOff className="mr-2 h-4 w-4" /> Clear Firestore Only
+                      </Button>
+                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_rtdb', 'Clear Realtime DB?', 'This will permanently delete ALL assets from the backup cloud database (RTDB). It will NOT touch your local data or Firestore.')} disabled={isProcessing}>
+                          <CloudOff className="mr-2 h-4 w-4" /> Clear Realtime DB Only
                       </Button>
                       <Separator />
-                      <Button variant="destructive" className="w-full justify-start" onClick={() => openConfirmation('nuke_all', 'Nuke ALL Data?', 'This is the most destructive option. It will permanently delete ALL assets from your local device AND from the cloud database.')} disabled={isProcessing}>
+                      <Button variant="destructive" className="w-full justify-start" onClick={() => openConfirmation('nuke_all', 'Nuke ALL Data?', 'This is the most destructive option. It will permanently delete ALL assets from your local device AND from BOTH cloud databases.')} disabled={isProcessing}>
                           {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseZap className="mr-2 h-4 w-4" />}
                           Nuke ALL Data (Local & Cloud)
                       </Button>
@@ -311,6 +407,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
+      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
     </>
   );
 }

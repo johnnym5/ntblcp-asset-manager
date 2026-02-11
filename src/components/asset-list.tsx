@@ -74,7 +74,7 @@ import { Progress } from "@/components/ui/progress";
 import { AssetForm } from "./asset-form";
 import type { Asset, AppSettings, SheetDefinition, DisplayField } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
+import { exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
@@ -82,6 +82,7 @@ import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-for
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings } from "@/lib/firestore";
+import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
@@ -219,10 +220,10 @@ export default function AssetList() {
     isSyncing, setIsSyncing,
     searchTerm,
     assetToView, setAssetToView,
-    setDataActions,
     showProjectSwitchDialog,
     setShowProjectSwitchDialog,
     setIsSettingsOpen,
+    activeDatabase
   } = useAppState();
 
   const { lockAssetList, sheetDefinitions } = appSettings;
@@ -314,9 +315,10 @@ export default function AssetList() {
 
       try {
           const { toUpload: assetsToPush } = syncSummary;
+          const batchSet = activeDatabase === 'firestore' ? batchSetAssets : batchSetAssetsRTDB;
 
           if (assetsToPush.length > 0) {
-              await batchSetAssets(assetsToPush);
+              await batchSet(assetsToPush);
               
               const localAssets = await getLocalAssetsFromDb();
               const localMap = new Map(localAssets.map(a => [a.id, a]));
@@ -344,7 +346,7 @@ export default function AssetList() {
           setIsSyncConfirmOpen(false);
           setSyncSummary(null);
       }
-  }, [syncSummary, setAssets, setIsSyncing]);
+  }, [syncSummary, setAssets, setIsSyncing, activeDatabase]);
 
   const handleSyncConfirm = () => {
     if (syncSummary?.type === 'download') {
@@ -404,7 +406,8 @@ export default function AssetList() {
     addNotification({ title: 'Scanning for cloud changes...' });
 
     try {
-        const cloudAssets = await getAssets();
+        const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
+        const cloudAssets = await getCloudAssets();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
         const summary: SyncSummary = {
@@ -450,7 +453,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing]);
+  }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing, activeDatabase]);
   
   const handleOverwriteDownload = useCallback(async () => {
     setIsDownloadWarningOpen(false);
@@ -458,7 +461,8 @@ export default function AssetList() {
     addNotification({ title: 'Scanning for cloud changes...' });
     
     try {
-        const cloudAssets = await getAssets();
+        const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
+        const cloudAssets = await getCloudAssets();
         const localAssets = await getLocalAssetsFromDb();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
@@ -501,7 +505,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [setIsSyncing, setIsOnline]);
+  }, [setIsSyncing, setIsOnline, activeDatabase]);
   
   const handleUploadFirst = useCallback(() => {
     setIsDownloadWarningOpen(false);
@@ -773,7 +777,8 @@ export default function AssetList() {
   
       if (isOnline) {
         try {
-          await deleteAsset(assetToDelete.id);
+          const deleteCloudAsset = activeDatabase === 'firestore' ? deleteAsset : deleteAssetRTDB;
+          await deleteCloudAsset(assetToDelete.id);
           addNotification({ title: 'Deleted from Cloud', description: 'Asset also removed from the central database.' });
         } catch (e) {
           addNotification({ title: 'Cloud Deletion Failed', description: 'Could not delete from cloud.', variant: 'destructive'});
@@ -810,7 +815,8 @@ export default function AssetList() {
   
       if (isOnline) {
           try {
-              await batchDeleteAssets(selectedAssetIds);
+              const batchDeleteCloudAssets = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
+              await batchDeleteCloudAssets(selectedAssetIds);
               addNotification({ title: 'Assets Deleted from Cloud', description: `Successfully removed ${assetsToDeleteCount} assets.` });
           } catch (e) {
               addNotification({ title: 'Error', description: 'Could not delete all selected assets from the cloud.', variant: 'destructive' });
@@ -1017,11 +1023,8 @@ export default function AssetList() {
       if (isOnline && isAdmin) {
           addNotification({ title: 'Clearing Cloud Database...', description: `This will remove all assets.` });
           try {
-              const allAssetsInCloud = await getAssets();
-              if (allAssetsInCloud.length > 0) {
-                  const idsToDelete = allAssetsInCloud.map((a) => a.id);
-                  await batchDeleteAssets(idsToDelete);
-              }
+              const cloudClear = activeDatabase === 'firestore' ? clearFirestoreAssets : clearRtdbAssets;
+              await cloudClear();
               addNotification({ title: 'All Cloud Assets Cleared', description: 'The application is now in a clean state.' });
           } catch (e) {
               addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
@@ -1036,7 +1039,7 @@ export default function AssetList() {
 
     setSelectedAssetIds([]);
 
-  }, [isOnline, isAdmin, setAssets, dataSource, setOfflineAssets]);
+  }, [isOnline, isAdmin, setAssets, dataSource, setOfflineAssets, activeDatabase]);
 
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
@@ -1087,22 +1090,6 @@ export default function AssetList() {
     }
   }, [view, selectedCategories, assetsByCategory, selectedAssetIds, activeAssets, sheetDefinitions]);
 
-  useEffect(() => {
-    setDataActions({
-        onAddAsset: handleAddAsset,
-        onScanAndImport: () => setIsImportScanOpen(true),
-        onClearAll: handleClearAllClick,
-        onTravelReport: handleTravelReport,
-        onExport: handleExport,
-    });
-    return () => setDataActions({});
-  }, [
-    setDataActions, 
-    handleAddAsset, 
-    handleClearAllClick, 
-    handleTravelReport,
-    handleExport,
-  ]);
 
   const handleClearCategoryClick = useCallback((category: string) => {
     setCategoryToDelete(category);
@@ -1129,7 +1116,8 @@ export default function AssetList() {
 
     if (isOnline) {
       try {
-        await batchDeleteAssets(idsToDelete);
+        const batchDelete = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
+        await batchDelete(idsToDelete);
         addNotification({ title: 'Cloud Data Deleted', description: `Category data has also been removed from the cloud.` });
       } catch (e) {
         addNotification({ title: 'Cloud Deletion Failed', description: `Could not remove category from cloud.`, variant: 'destructive'});
@@ -1164,7 +1152,8 @@ export default function AssetList() {
       const assetsToUpload = allLocalAssets.filter(a => idsToUpload.includes(a.id) && a.syncStatus === 'local');
 
       if (assetsToUpload.length > 0) {
-        await batchSetAssets(assetsToUpload);
+        const batchSet = activeDatabase === 'firestore' ? batchSetAssets : batchSetAssetsRTDB;
+        await batchSet(assetsToUpload);
 
         const updatedLocalAssets = allLocalAssets.map(asset => 
           idsToUpload.includes(asset.id) ? { ...asset, syncStatus: 'synced' as const } : asset
@@ -1185,7 +1174,7 @@ export default function AssetList() {
       setSelectedAssetIds([]);
       setSelectedCategories([]);
     }
-  }, [isOnline, view, selectedCategories, selectedAssetIds, assetsByCategory, setIsSyncing, setAssets, dataSource]);
+  }, [isOnline, view, selectedCategories, selectedAssetIds, assetsByCategory, setIsSyncing, setAssets, dataSource, activeDatabase]);
 
   const handleCopyToOffline = useCallback(async () => {
     if (dataSource !== 'cloud') {
@@ -1374,7 +1363,8 @@ export default function AssetList() {
   
       if (isOnline) {
           try {
-              await batchDeleteAssets(idsToDelete);
+              const batchDelete = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
+              await batchDelete(idsToDelete);
               addNotification({ title: 'Categories Deleted', description: `Successfully removed ${idsToDelete.length} assets.` });
           } catch (e) {
               addNotification({ title: 'Error', description: 'Could not delete all assets from cloud.', variant: 'destructive' });
@@ -2054,4 +2044,3 @@ export default function AssetList() {
     </div>
   );
 }
-

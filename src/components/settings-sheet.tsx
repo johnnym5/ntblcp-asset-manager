@@ -31,7 +31,8 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useAppState } from '@/contexts/app-state-context';
-import { updateSettings } from '@/lib/firestore';
+import { updateSettings as updateSettingsFS } from '@/lib/firestore';
+import { updateSettings as updateSettingsRTDB } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
@@ -56,6 +57,7 @@ import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
+import { TravelReportDialog } from './travel-report-dialog';
 
 
 interface SettingsSheetProps {
@@ -66,7 +68,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, dataActions, setOfflineAssets, setDataSource } = useAppState();
+  const { appSettings, setAppSettings, activeDatabase, setDataSource } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -87,6 +89,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   const [confirmNewPassword, setConfirmNewPassword] = useState('');
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
+  const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
 
 
   useEffect(() => {
@@ -112,15 +115,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   const calculatedChanges = useMemo(() => {
     if (!draftSettings || !appSettings) return [];
     const changes: string[] = [];
-    if (draftSettings.appMode !== appSettings.appMode) {
-      changes.push(`App mode will be set to: ${draftSettings.appMode}.`);
-    }
-    if (draftSettings.lockAssetList !== appSettings.lockAssetList) {
-        changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
-    }
-    if (draftSettings.defaultDataSource !== appSettings.defaultDataSource) {
-        changes.push(`Default data source will be set to: ${draftSettings.defaultDataSource === 'cloud' ? 'Cloud Synced' : 'Locked Offline'}.`);
-    }
     if (JSON.stringify(draftSettings.authorizedUsers) !== JSON.stringify(appSettings.authorizedUsers)) {
       changes.push('User list or passwords will be updated.');
     }
@@ -234,7 +228,12 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     };
 
     try {
-      await updateSettings(settingsToSave);
+      if (activeDatabase === 'firestore') {
+        await updateSettingsFS(settingsToSave);
+      } else {
+        await updateSettingsRTDB(settingsToSave);
+      }
+      
       await saveLocalSettings(settingsToSave);
       setAppSettings(settingsToSave); // Update global state
       toast({ title: "Settings Saved", description: "Your changes have been applied to the database." });
@@ -427,14 +426,13 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           </SheetHeader>
           <div className="flex-1 overflow-y-auto">
             <Tabs defaultValue={initialTab} value={activeTab} onValueChange={setActiveTab} className="p-1">
-              <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-5" : "grid-cols-1")}>
+              <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-4" : "grid-cols-1")}>
                   <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
                   {isAdmin && (
                     <>
                       <TabsTrigger value="users"><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
                       <TabsTrigger value="sheets"><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
                       <TabsTrigger value="locations"><MapPin className="mr-2 h-4 w-4" />Locations</TabsTrigger>
-                      <TabsTrigger value="data"><Database className="mr-2 h-4 w-4" />Data</TabsTrigger>
                     </>
                   )}
               </TabsList>
@@ -474,17 +472,15 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                     </div>
                   </div>
 
-                  {draftSettings.appMode === 'verification' && (
+                  {appSettings.appMode === 'verification' && (
                     <div>
                         <h3 className="text-lg font-medium mb-4">Reports</h3>
                         <div className="rounded-lg border p-4 space-y-3">
                             <Label className="flex items-center gap-2 text-sm font-medium"><PlaneTakeoff className="h-4 w-4" /> Travel Report</Label>
                             <p className="text-sm text-muted-foreground">Generate a Word document summary of asset verification activities for a specific location.</p>
-                            {dataActions.onTravelReport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
-                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Generate Travel Report
-                                </Button>
-                            )}
+                            <Button variant="outline" className="w-full justify-start" onClick={() => setIsTravelReportOpen(true)}>
+                                <PlaneTakeoff className="mr-2 h-4 w-4" /> Generate Travel Report
+                            </Button>
                         </div>
                     </div>
                   )}
@@ -585,89 +581,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                       </div>
                     </ScrollArea>
                   </TabsContent>
-                  <TabsContent value="data" className="pt-4 space-y-6">
-                      <div>
-                        <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
-                        <div className="rounded-lg border p-3 space-y-4 divide-y">
-                          <div className="flex items-center justify-between pt-1">
-                            <div className="space-y-1">
-                              <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
-                              <p className="text-xs text-muted-foreground">
-                                {draftSettings.appMode === 'management'
-                                  ? 'Management: Full data editing rights.'
-                                  : 'Verification: Limited to status &amp; remarks updates.'
-                                }
-                              </p>
-                            </div>
-                            <Select value={draftSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
-                              <SelectTrigger className="w-[150px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="management">Management</SelectItem>
-                                <SelectItem value="verification">Verification</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex items-center justify-between pt-4">
-                            <div className="space-y-1">
-                              <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
-                              <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
-                            </div>
-                            <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
-                          </div>
-                          <div className="flex items-center justify-between pt-4">
-                            <div className="space-y-1">
-                                <Label htmlFor="default-data-source">Default Data Source on Startup</Label>
-                                <p className="text-xs text-muted-foreground">Choose which data source the app loads by default.</p>
-                            </div>
-                            <Select 
-                              value={draftSettings.defaultDataSource || 'cloud'} 
-                              onValueChange={(value) => handleSettingChange('defaultDataSource', value)}
-                            >
-                              <SelectTrigger id="default-data-source" className="w-[180px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="cloud">Cloud Synced (Main)</SelectItem>
-                                <SelectItem value="local_locked">Locked Offline</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                          <h3 className="text-lg font-medium mb-4">Data &amp; Category Management</h3>
-                          <div className="rounded-lg border p-4 space-y-3">
-                              <p className="text-sm text-muted-foreground">Perform global data operations. These actions may affect the entire dataset.</p>
-                              <Separator />
-                              <div className="space-y-2">
-                                  
-                                  <Label className="text-xs font-semibold uppercase text-muted-foreground px-1">Bulk Data Operations</Label>
-                                  
-                                  {dataActions.onScanAndImport && (
-                                      <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport}>
-                                          <ScanSearch className="mr-2 h-4 w-4" /> Scan &amp; Import Workbook
-                                      </Button>
-                                  )}
-                                  {dataActions.onExport && (
-                                      <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport}>
-                                          <Download className="mr-2 h-4 w-4" /> Export All Data to Excel
-                                      </Button>
-                                  )}
-
-                                  <Separator />
-
-                                  <Label className="text-xs font-semibold uppercase text-destructive px-1">Danger Zone</Label>
-                                  {dataActions.onClearAll && (
-                                      <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>
-                                          <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
-                                      </Button>
-                                  )}
-                              </div>
-                          </div>
-                      </div>
-                  </TabsContent>
                 </>
               )}
             </Tabs>
@@ -685,6 +598,8 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         </SheetContent>
       </Sheet>
       
+      <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
+
       {sheetToEdit && (
         <ColumnCustomizationSheet
           isOpen={isSheetFormOpen}
