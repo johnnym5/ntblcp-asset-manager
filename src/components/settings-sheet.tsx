@@ -118,6 +118,9 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     if (draftSettings.lockAssetList !== appSettings.lockAssetList) {
         changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
     }
+    if (draftSettings.defaultDataSource !== appSettings.defaultDataSource) {
+        changes.push(`Default data source will be set to: ${draftSettings.defaultDataSource === 'cloud' ? 'Cloud Synced' : 'Locked Offline'}.`);
+    }
     if (JSON.stringify(draftSettings.authorizedUsers) !== JSON.stringify(appSettings.authorizedUsers)) {
       changes.push('User list or passwords will be updated.');
     }
@@ -489,38 +492,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                   {isAdmin && (
                     <>
                       <div>
-                        <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
-                        <div className="rounded-lg border p-3 space-y-4 divide-y">
-                          <div className="flex items-center justify-between pt-1">
-                            <div className="space-y-1">
-                              <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
-                              <p className="text-xs text-muted-foreground">
-                                {draftSettings.appMode === 'management'
-                                  ? 'Management: Full data editing rights.'
-                                  : 'Verification: Limited to status &amp; remarks updates.'
-                                }
-                              </p>
-                            </div>
-                            <Select value={draftSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
-                              <SelectTrigger className="w-[150px]">
-                                <SelectValue />
-                              </SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="management">Management</SelectItem>
-                                <SelectItem value="verification">Verification</SelectItem>
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex items-center justify-between pt-4">
-                            <div className="space-y-1">
-                              <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
-                              <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
-                            </div>
-                            <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
-                          </div>
-                        </div>
-                      </div>
-                      <div>
                         <h3 className="text-lg font-medium my-4 flex items-center gap-2"><History className="h-5 w-5" /> Settings History</h3>
                         <div className="rounded-lg border p-3">
                             <ScrollArea className="h-[200px]">
@@ -615,6 +586,56 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                     </ScrollArea>
                   </TabsContent>
                   <TabsContent value="data" className="pt-4 space-y-6">
+                      <div>
+                        <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
+                        <div className="rounded-lg border p-3 space-y-4 divide-y">
+                          <div className="flex items-center justify-between pt-1">
+                            <div className="space-y-1">
+                              <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
+                              <p className="text-xs text-muted-foreground">
+                                {draftSettings.appMode === 'management'
+                                  ? 'Management: Full data editing rights.'
+                                  : 'Verification: Limited to status &amp; remarks updates.'
+                                }
+                              </p>
+                            </div>
+                            <Select value={draftSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
+                              <SelectTrigger className="w-[150px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="management">Management</SelectItem>
+                                <SelectItem value="verification">Verification</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="flex items-center justify-between pt-4">
+                            <div className="space-y-1">
+                              <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
+                              <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
+                            </div>
+                            <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
+                          </div>
+                          <div className="flex items-center justify-between pt-4">
+                            <div className="space-y-1">
+                                <Label htmlFor="default-data-source">Default Data Source on Startup</Label>
+                                <p className="text-xs text-muted-foreground">Choose which data source the app loads by default.</p>
+                            </div>
+                            <Select 
+                              value={draftSettings.defaultDataSource || 'cloud'} 
+                              onValueChange={(value) => handleSettingChange('defaultDataSource', value)}
+                            >
+                              <SelectTrigger id="default-data-source" className="w-[180px]">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="cloud">Cloud Synced (Main)</SelectItem>
+                                <SelectItem value="local_locked">Locked Offline</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                        </div>
+                      </div>
                       <div>
                           <h3 className="text-lg font-medium mb-4">Data &amp; Category Management</h3>
                           <div className="rounded-lg border p-4 space-y-3">

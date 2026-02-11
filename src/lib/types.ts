@@ -89,6 +89,7 @@ export interface AppSettings {
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   locations?: string[];
+  defaultDataSource?: 'cloud' | 'local_locked';
   lastModified?: string;
   lastModifiedBy?: {
     displayName: string;

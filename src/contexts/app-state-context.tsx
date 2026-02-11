@@ -136,6 +136,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     appMode: 'management',
     locations: defaultInitialLocations,
     settingsHistory: [],
+    defaultDataSource: 'cloud',
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isBrowserOnline, setIsBrowserOnline] = useState(true);
@@ -204,6 +205,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           appMode: 'management',
           locations: defaultInitialLocations,
           settingsHistory: [],
+          defaultDataSource: 'cloud',
         };
       } else {
         if (!localSettings.locations) {
@@ -227,6 +229,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       }
       
       setAppSettings(localSettings);
+      if (localSettings.defaultDataSource) {
+        setDataSource(localSettings.defaultDataSource);
+      }
       await saveLocalSettings(localSettings);
       
       // Immediately after setting local state, sync with remote BEFORE settings are "loaded" for auth
