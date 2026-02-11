@@ -9,43 +9,23 @@ import { saveAssets, saveLocalSettings } from '@/lib/idb';
 import { useAppState } from '@/contexts/app-state-context';
 import { addNotification } from '@/hooks/use-notifications';
 
-const withTimeout = <T,>(promise: Promise<T>, ms: number): Promise<T> => {
-    return new Promise((resolve, reject) => {
-        const timeoutId = setTimeout(() => {
-            reject(new Error(`The initial connection to the database timed out after ${ms / 1000} seconds.`));
-        }, ms);
-
-        promise.then(
-            (res) => {
-                clearTimeout(timeoutId);
-                resolve(res);
-            },
-            (err) => {
-                clearTimeout(timeoutId);
-                reject(err);
-            }
-        );
-    });
-};
-
 export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => void }) {
   const [status, setStatus] = useState<'loading' | 'downloading' | 'finished' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
   const { setAppSettings, setAssets } = useAppState();
-  const [timeoutDuration, setTimeoutDuration] = useState(20000); // Start with 20 seconds
 
   const performInitialSetup = useCallback(async () => {
     setStatus('downloading');
     setError(null);
     try {
       // 1. Fetch Settings from the primary database (RTDB)
-      const settings = await withTimeout(getSettings(), timeoutDuration);
+      const settings = await getSettings();
       if (!settings) {
         throw new Error('No application settings found in the database. Please configure settings as an admin first.');
       }
 
       // 2. Fetch Assets from the primary database (RTDB)
-      const assets = await withTimeout(getAssetsRTDB(), timeoutDuration);
+      const assets = await getAssetsRTDB();
 
       // 3. Save both to local IndexedDB
       await saveLocalSettings(settings);
@@ -60,17 +40,21 @@ export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => voi
 
     } catch (e: any) {
       console.error("First time setup failed:", e);
-      setError(e.message || 'An unknown error occurred during setup. Please check your internet connection and Firebase configuration.');
+      let errorMessage = e.message || 'An unknown error occurred.';
+      if (errorMessage.includes('auth/network-request-failed') || errorMessage.includes('net::ERR_INTERNET_DISCONNECTED')) {
+          errorMessage = "Could not connect to the database. Please check your internet connection and try again.";
+      }
+      setError(errorMessage);
       setStatus('error');
     }
-  }, [setAppSettings, setAssets, timeoutDuration]);
+  }, [setAppSettings, setAssets]);
 
   useEffect(() => {
     performInitialSetup();
   }, [performInitialSetup]);
 
   const handleRetry = () => {
-    setTimeoutDuration(prev => prev + 10000); // Add 10 seconds
+    performInitialSetup();
   };
 
   const renderContent = () => {
@@ -130,7 +114,7 @@ export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => voi
                 {error}
               </p>
               <Button className="w-full" onClick={handleRetry}>
-                Retry Download (+10s timeout)
+                Retry Download
               </Button>
             </CardContent>
           </>

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -8,28 +7,14 @@ import AssetList from '@/components/asset-list';
 import { Loader2 } from 'lucide-react';
 import UserProfileSetup from '@/components/user-profile-setup';
 import { useAppState } from '@/contexts/app-state-context';
-import { getLocalSettings } from '@/lib/idb';
 import { FirstTimeSetup } from '@/components/first-time-setup';
 
 export default function Page() {
   const { userProfile, loading: authLoading, profileSetupComplete } = useAuth();
-  const { setGlobalStateFilter, settingsLoaded } = useAppState();
-
-  // New state to track if this is the first run
-  const [isFirstRun, setIsFirstRun] = useState<boolean | null>(null);
-
-  useEffect(() => {
-    const checkFirstRun = async () => {
-      // Check if settings exist in IndexedDB. If not, it's a first run.
-      const localSettings = await getLocalSettings();
-      setIsFirstRun(localSettings === null);
-    };
-
-    // Only check once settings from the context have tried to load.
-    if (settingsLoaded) {
-      checkFirstRun();
-    }
-  }, [settingsLoaded]);
+  const { setGlobalStateFilter, settingsLoaded, appSettings } = useAppState();
+  
+  // This state is just to force a re-render after setup is done *in the same session*.
+  const [setupSessionComplete, setSetupSessionComplete] = useState(false);
 
   useEffect(() => {
     if (profileSetupComplete && userProfile) {
@@ -37,13 +22,14 @@ export default function Page() {
     }
   }, [profileSetupComplete, userProfile, setGlobalStateFilter]);
 
-  // Handle the completion of the first-time setup
   const handleSetupComplete = () => {
-    setIsFirstRun(false);
+    // When setup is done, AppStateProvider will have new appSettings.
+    // This state flip forces the page component to re-evaluate its logic.
+    setSetupSessionComplete(true);
   };
 
-  // Loading state while we determine if it's a first run
-  if (isFirstRun === null || !settingsLoaded) {
+  // While we wait for settings to be loaded from IDB
+  if (!settingsLoaded) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
@@ -51,8 +37,8 @@ export default function Page() {
     );
   }
 
-  // If it's the first run, show the setup component
-  if (isFirstRun) {
+  // If settings have been checked and are null, it's a first run.
+  if (!appSettings && !setupSessionComplete) {
     return <FirstTimeSetup onSetupComplete={handleSetupComplete} />;
   }
   

@@ -1,14 +1,14 @@
-
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileWarning, History, BarChart2, CalendarClock, AlertCircle } from 'lucide-react';
+import { FileWarning, History, BarChart2, CalendarClock, AlertCircle, ChevronsUpDown } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 const StatCard = ({ title, value, description, icon, onAction, actionLabel, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, actionLabel?: string, isActive?: boolean }) => {
     return (
@@ -32,6 +32,8 @@ const StatCard = ({ title, value, description, icon, onAction, actionLabel, isAc
 
 export function AssetSummaryDashboard() {
     const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter } = useAppState();
+    const [isOpen, setIsOpen] = useState(false);
+    
     const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
 
     const summary = useMemo(() => {
@@ -57,46 +59,62 @@ export function AssetSummaryDashboard() {
     };
 
     return (
-        <div className="mb-6">
-            <h3 className="text-lg font-semibold tracking-tight mb-3 flex items-center gap-2 text-muted-foreground"><BarChart2 className="h-5 w-5" /> Asset Overview</h3>
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
-                <StatCard
-                    title="Missing S/N"
-                    value={summary.withoutSerial}
-                    description="Assets without a serial number."
-                    icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
-                    onAction={() => handleFilterClick('serialNumber')}
-                    actionLabel={missingFieldFilter === 'serialNumber' ? "Clear Filter" : "View Assets"}
-                    isActive={missingFieldFilter === 'serialNumber'}
-                />
-                 <StatCard
-                    title="Missing Asset ID"
-                    value={summary.withoutAssetId}
-                    description="Assets missing an Asset ID code."
-                    icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
-                    onAction={() => handleFilterClick('assetIdCode')}
-                    actionLabel={missingFieldFilter === 'assetIdCode' ? "Clear Filter" : "View Assets"}
-                    isActive={missingFieldFilter === 'assetIdCode'}
-                />
-                 <StatCard
-                    title="Incomplete Records"
-                    value={summary.missingInfo}
-                    description="Assets missing description, category, location, or condition."
-                    icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />}
-                />
-                <StatCard
-                    title="Modified Today"
-                    value={summary.modifiedToday}
-                    description="Assets created or updated today."
-                    icon={<CalendarClock className="h-4 w-4 text-muted-foreground" />}
-                />
-                <StatCard
-                    title="Modified This Week"
-                    value={summary.modifiedThisWeek}
-                    description="Assets created or updated in the last 7 days."
-                    icon={<History className="h-4 w-4 text-muted-foreground" />}
-                />
-            </div>
-        </div>
+        <Collapsible
+            open={isOpen}
+            onOpenChange={setIsOpen}
+            className="mb-6 border rounded-lg bg-card/60 shadow-xl backdrop-blur-lg"
+        >
+            <CollapsibleTrigger asChild>
+                <div className='flex items-center justify-between p-4 cursor-pointer'>
+                    <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+                        <BarChart2 className="h-5 w-5 text-primary" /> Asset Overview
+                    </h3>
+                    <Button variant="ghost" size="sm" className="w-9 p-0">
+                        <ChevronsUpDown className="h-4 w-4" />
+                        <span className="sr-only">Toggle</span>
+                    </Button>
+                </div>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="p-4 pt-0">
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                    <StatCard
+                        title="Missing S/N"
+                        value={summary.withoutSerial}
+                        description="Assets without a serial number."
+                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('serialNumber')}
+                        actionLabel={missingFieldFilter === 'serialNumber' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'serialNumber'}
+                    />
+                    <StatCard
+                        title="Missing Asset ID"
+                        value={summary.withoutAssetId}
+                        description="Assets missing an Asset ID code."
+                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('assetIdCode')}
+                        actionLabel={missingFieldFilter === 'assetIdCode' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'assetIdCode'}
+                    />
+                    <StatCard
+                        title="Incomplete Records"
+                        value={summary.missingInfo}
+                        description="Assets missing description, category, location, or condition."
+                        icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />}
+                    />
+                    <StatCard
+                        title="Modified Today"
+                        value={summary.modifiedToday}
+                        description="Assets created or updated today."
+                        icon={<CalendarClock className="h-4 w-4 text-muted-foreground" />}
+                    />
+                    <StatCard
+                        title="Modified This Week"
+                        value={summary.modifiedThisWeek}
+                        description="Assets created or updated in the last 7 days."
+                        icon={<History className="h-4 w-4 text-muted-foreground" />}
+                    />
+                </div>
+            </CollapsibleContent>
+        </Collapsible>
     )
 }
