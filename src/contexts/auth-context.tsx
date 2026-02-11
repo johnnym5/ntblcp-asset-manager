@@ -12,7 +12,7 @@ export interface LocalUserProfile {
   id: string; // Unique ID for this user session
   loginName: string;
   displayName: string;
-  state: string; 
+  state: string;
   isAdmin: boolean;
   isGuest?: boolean;
   canAddAssets?: boolean;
@@ -23,6 +23,8 @@ export interface LocalUserProfile {
 interface AuthContextType {
   userProfile: LocalUserProfile | null;
   loading: boolean;
+  profileSetupComplete: boolean;
+  authInitialized: boolean;
   login: (user: AuthorizedUser, state: string) => Promise<void>;
   logout: () => void;
 }
@@ -44,24 +46,21 @@ const superAdmin: AuthorizedUser = {
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [profileSetupComplete, setProfileSetupComplete] = useState(false);
+  const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { appSettings, settingsLoaded } = useAppState();
+  const { appSettings, settingsLoaded, setAssets, setOfflineAssets } = useAppState();
 
   useEffect(() => {
-    if (!settingsLoaded) return;
+    if (!settingsLoaded || !appSettings) {
+      return;
+    }
 
-    setLoading(true);
     try {
       const savedProfileJSON = localStorage.getItem('ntblcp-user-profile');
       if (savedProfileJSON) {
         const savedProfile: LocalUserProfile = JSON.parse(savedProfileJSON);
         
-        if (!appSettings) {
-          localStorage.removeItem('ntblcp-user-profile');
-          setUserProfile(null);
-          return;
-        }
-
         const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
         const authorizedUser = allUsers.find(u => u.loginName === savedProfile.loginName);
         
@@ -80,19 +79,24 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
           localStorage.setItem('ntblcp-user-profile', JSON.stringify(freshProfile));
           setUserProfile(freshProfile);
+          setProfileSetupComplete(true);
         } else {
           localStorage.removeItem('ntblcp-user-profile');
           setUserProfile(null);
+          setProfileSetupComplete(false);
         }
       } else {
         setUserProfile(null);
+        setProfileSetupComplete(false);
       }
     } catch (e) {
       console.error("Failed to process user profile from local storage", e);
       localStorage.removeItem('ntblcp-user-profile');
       setUserProfile(null);
+      setProfileSetupComplete(false);
     } finally {
       setLoading(false);
+      setAuthInitialized(true);
     }
   }, [settingsLoaded, appSettings]);
 
@@ -112,6 +116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
+      setProfileSetupComplete(true);
     } catch(e) {
       console.error("Failed to save user profile", e);
     } finally {
@@ -123,10 +128,13 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     setLoading(true);
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
+    setProfileSetupComplete(false);
 
     try {
       await clearLocalAssets();
       await clearLockedOfflineAssets();
+      setAssets([]);
+      setOfflineAssets([]);
     } catch (e) {
       console.error("Failed to clear local databases on logout", e);
     }
@@ -134,7 +142,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.href = '/';
   };
 
-  const value = { userProfile, loading, login, logout };
+  const value = { userProfile, loading, login, logout, authInitialized, profileSetupComplete };
 
   return (
     <AuthContext.Provider value={value}>

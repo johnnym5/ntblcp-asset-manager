@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect } from 'react';
@@ -10,14 +9,14 @@ import UserProfileSetup from '@/components/user-profile-setup';
 import { useAppState } from '@/contexts/app-state-context';
 
 export default function Page() {
-  const { userProfile, loading } = useAuth();
+  const { userProfile, loading, profileSetupComplete } = useAuth();
   const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    if (userProfile) {
+    if (userProfile && profileSetupComplete) {
       setGlobalStateFilter(userProfile.state || '');
     }
-  }, [userProfile, setGlobalStateFilter]);
+  }, [userProfile, profileSetupComplete, setGlobalStateFilter]);
 
   if (loading) {
     return (
@@ -27,7 +26,7 @@ export default function Page() {
     );
   }
 
-  if (!userProfile) {
+  if (!profileSetupComplete) {
     return <UserProfileSetup />;
   }
   
