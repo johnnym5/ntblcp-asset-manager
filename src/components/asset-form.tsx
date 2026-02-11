@@ -165,8 +165,8 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
         if (fieldName === 'location' && !isAdmin) {
             disabled = true; 
         }
-        // Category of an existing asset cannot be changed.
-        if (fieldName === 'category' && !!asset?.id) { // check for asset.id to see if it is an existing asset
+        // Category of an existing asset cannot be changed. For new assets, it's also locked if coming from a category view.
+        if (fieldName === 'category' && (!!asset?.id || (!!defaultCategory && !asset?.id))) {
             disabled = true;
         }
         
@@ -287,3 +287,5 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
     </Dialog>
   );
 }
+
+    

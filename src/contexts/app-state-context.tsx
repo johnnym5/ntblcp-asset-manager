@@ -92,6 +92,8 @@ interface AppStateContextType {
   setDataActions: Dispatch<SetStateAction<DataActions>>;
   isSettingsOpen: boolean;
   setIsSettingsOpen: Dispatch<SetStateAction<boolean>>;
+  initialSettingsTab: string;
+  setInitialSettingsTab: Dispatch<SetStateAction<string>>;
 
   // Project Switch
   showProjectSwitchDialog: boolean;
@@ -146,6 +148,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [dataActions, setDataActions] = useState<DataActions>({});
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [initialSettingsTab, setInitialSettingsTab] = useState('general');
 
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
 
@@ -270,7 +273,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     if (appSettings.appMode === 'management') {
       setSelectedStatuses([]);
     }
-  }, [appSettings.appMode]);
+  }, [appSettings.appMode, setSelectedStatuses]);
 
   const value = {
     assets, setAssets,
@@ -296,6 +299,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     assetToView, setAssetToView,
     dataActions, setDataActions,
     isSettingsOpen, setIsSettingsOpen,
+    initialSettingsTab, setInitialSettingsTab,
     showProjectSwitchDialog, setShowProjectSwitchDialog,
   };
 
@@ -313,3 +317,5 @@ export const useAppState = (): AppStateContextType => {
   }
   return context;
 };
+
+    

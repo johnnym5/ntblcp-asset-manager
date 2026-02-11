@@ -74,6 +74,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isSyncing,
     isSettingsOpen,
     setIsSettingsOpen,
+    initialSettingsTab,
+    setInitialSettingsTab
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -163,6 +165,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
+
+  const handleSettingsOpen = () => {
+    setInitialSettingsTab('general');
+    setIsSettingsOpen(true);
+  }
 
   return (
     <div className="flex flex-col w-full h-screen border-8 border-muted/50">
@@ -271,7 +278,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuSeparator />
                   
                   {userProfile && (
-                    <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
+                    <DropdownMenuItem onClick={handleSettingsOpen}>
                       <Settings className="mr-2 h-4 w-4"/>
                       Settings
                     </DropdownMenuItem>
@@ -348,7 +355,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       >
         {children}
       </motion.main>
-      <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} initialTab={initialSettingsTab} />
       {userProfile?.loginName === 'admin' && (
         <DatabaseAdminDialog isOpen={isDbAdminOpen} onOpenChange={setIsDbAdminOpen} />
       )}
@@ -423,3 +430,5 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
+
+    
