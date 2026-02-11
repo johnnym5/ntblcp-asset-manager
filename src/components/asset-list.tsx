@@ -53,6 +53,7 @@ import {
   Columns,
   Eye,
   EyeOff,
+  Copy,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -704,7 +705,7 @@ export default function AssetList() {
       return;
     }
     if (lockAssetList && isAdmin && dataSource === 'cloud') {
-      addNotification({ title: "Asset List Locked", description: "Adding new assets to the main list is disabled. Switch to 'Locked Offline' source to add.", variant: "destructive" });
+      addNotification({ title: "Asset List Locked", description: "Adding new assets to the main list is disabled. Switch to 'Locked Offline' to add.", variant: "destructive" });
       return;
     }
     setSelectedAsset(undefined);
@@ -1169,6 +1170,82 @@ export default function AssetList() {
       setSelectedCategories([]);
     }
   }, [isOnline, view, selectedCategories, selectedAssetIds, assetsByCategory, setIsSyncing, setAssets, dataSource]);
+
+  const handleCopyToOffline = useCallback(async () => {
+    if (dataSource !== 'cloud') {
+      addNotification({ title: 'Invalid Operation', description: 'Can only copy from the main list to the offline store.', variant: 'destructive' });
+      return;
+    }
+
+    const idsToCopy = view === 'dashboard'
+      ? selectedCategories.flatMap(cat => assetsByCategory[cat]?.map(a => a.id) || [])
+      : selectedAssetIds;
+      
+    if (idsToCopy.length === 0) {
+      addNotification({ title: 'No Selection', description: 'Please select assets or categories to copy.' });
+      return;
+    }
+
+    setIsSyncing(true);
+    addNotification({ title: 'Copying to Offline...', description: `Preparing to copy ${idsToCopy.length} assets.` });
+    
+    try {
+      const assetsToCopy = assets.filter(a => idsToCopy.includes(a.id));
+      const existingOfflineAssets = await getLockedOfflineAssets();
+      const offlineAssetsMap = new Map(existingOfflineAssets.map(a => [a.id, a]));
+      
+      let copiedCount = 0;
+      let skippedCount = 0;
+
+      assetsToCopy.forEach(assetToCopy => {
+        const existingOfflineAsset = offlineAssetsMap.get(assetToCopy.id);
+        if (existingOfflineAsset) {
+          const mainTimestamp = assetToCopy.lastModified ? new Date(assetToCopy.lastModified).getTime() : 0;
+          const offlineTimestamp = existingOfflineAsset.lastModified ? new Date(existingOfflineAsset.lastModified).getTime() : 0;
+
+          if (mainTimestamp > offlineTimestamp) {
+            offlineAssetsMap.set(assetToCopy.id, { ...assetToCopy, syncStatus: undefined });
+            copiedCount++;
+          } else {
+            skippedCount++;
+          }
+        } else {
+          offlineAssetsMap.set(assetToCopy.id, { ...assetToCopy, syncStatus: undefined });
+          copiedCount++;
+        }
+      });
+      
+      const newOfflineAssets = Array.from(offlineAssetsMap.values());
+      await saveLockedOfflineAssets(newOfflineAssets);
+      setOfflineAssets(newOfflineAssets);
+      
+      let description = `${copiedCount} assets copied to the Locked Offline store.`;
+      if (skippedCount > 0) {
+        description += ` ${skippedCount} assets were skipped to preserve newer offline edits.`;
+      }
+      addNotification({ title: 'Copy Complete', description });
+      
+      setDataSource('local_locked');
+
+    } catch(e) {
+      console.error("Copy to offline failed", e);
+      addNotification({ title: "Copy Failed", description: (e as Error).message, variant: "destructive" });
+    } finally {
+      setIsSyncing(false);
+      setSelectedAssetIds([]);
+      setSelectedCategories([]);
+    }
+  }, [
+    dataSource, 
+    view, 
+    selectedCategories, 
+    selectedAssetIds, 
+    assets, 
+    assetsByCategory,
+    setIsSyncing, 
+    setOfflineAssets, 
+    setDataSource
+  ]);
   
   const handleMergeToMainList = async () => {
     const idsToMerge = view === 'dashboard'
@@ -1591,6 +1668,10 @@ export default function AssetList() {
                         {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
                         {contextualButtonText}
                     </Button>
+                    <Button variant="ghost" size="sm" onClick={handleCopyToOffline} disabled={isSyncing || dataSource !== 'cloud'}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy to Offline
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
                         <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
                     </Button>
@@ -1773,6 +1854,10 @@ export default function AssetList() {
                       {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
                        {contextualButtonText}
                     </Button>
+                    <Button variant="outline" size="sm" onClick={handleCopyToOffline} disabled={isSyncing || dataSource !== 'cloud'}>
+                        <Copy className="mr-2 h-4 w-4" />
+                        Copy to Offline
+                    </Button>
                      {selectedAssetIds.length === 1 && !isGuest && (
                         <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={!userProfile?.canEditAssets && !isAdmin}>
                             <Edit className="mr-2 h-4 w-4" /> Edit
@@ -1941,3 +2026,6 @@ export default function AssetList() {
   );
 }
 
+
+
+    
