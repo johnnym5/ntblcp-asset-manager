@@ -471,6 +471,21 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                     </div>
                   </div>
 
+                  {draftSettings.appMode === 'verification' && (
+                    <div>
+                        <h3 className="text-lg font-medium mb-4">Reports</h3>
+                        <div className="rounded-lg border p-4 space-y-3">
+                            <Label className="flex items-center gap-2 text-sm font-medium"><PlaneTakeoff className="h-4 w-4" /> Travel Report</Label>
+                            <p className="text-sm text-muted-foreground">Generate a Word document summary of asset verification activities for a specific location.</p>
+                            {dataActions.onTravelReport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
+                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Generate Travel Report
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                  )}
+
                   {isAdmin && (
                     <>
                       <div>
@@ -614,11 +629,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                           <ScanSearch className="mr-2 h-4 w-4" /> Scan &amp; Import Workbook
                                       </Button>
                                   )}
-                                  {dataActions.onTravelReport && (
-                                      <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
-                                          <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
-                                      </Button>
-                                  )}
                                   {dataActions.onExport && (
                                       <Button variant="outline" className="w-full justify-start" onClick={dataActions.onExport}>
                                           <Download className="mr-2 h-4 w-4" /> Export All Data to Excel
@@ -733,5 +743,3 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     </>
   );
 }
-
-    
