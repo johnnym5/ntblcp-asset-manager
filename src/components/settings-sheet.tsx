@@ -35,9 +35,9 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download, Users, Eye, EyeOff, MapPin, KeyRound } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download, Users, Eye, EyeOff, MapPin, KeyRound, History, RotateCcw } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
-import type { SheetDefinition, AppSettings, AuthorizedUser } from '@/lib/types';
+import type { SheetDefinition, AppSettings, AuthorizedUser, HistoricalAppSettings } from '@/lib/types';
 import { parseExcelForTemplate, parseExcelFile } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { saveLocalSettings, getLockedOfflineAssets, saveLockedOfflineAssets } from '@/lib/idb';
@@ -54,6 +54,8 @@ import { Checkbox } from './ui/checkbox';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
+import { formatDistanceToNow } from 'date-fns';
+
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -213,9 +215,16 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   };
 
   const handleConfirmSave = async () => {
-    if (!draftSettings) return;
+    if (!draftSettings || !userProfile) return;
     
-    const settingsToSave: AppSettings = { ...draftSettings, lastModified: new Date().toISOString() };
+    const settingsToSave: AppSettings = {
+        ...draftSettings,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: {
+            displayName: userProfile.displayName,
+            loginName: userProfile.loginName,
+        }
+    };
 
     try {
       await updateSettings(settingsToSave);
@@ -223,7 +232,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       setAppSettings(settingsToSave); // Update global state
       toast({ title: "Settings Saved", description: "Your changes have been applied to the database." });
     } catch (e) {
-      toast({ title: "Save Failed", description: "Could not save settings to the database.", variant: "destructive" });
+      toast({ title: "Save Failed", description: (e as Error).message || "Could not save settings to the database.", variant: "destructive" });
     } finally {
       setIsConfirmOpen(false);
       onOpenChange(false);
@@ -376,6 +385,15 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
     }
   };
   
+  const handleRollback = (historicalSettings: HistoricalAppSettings) => {
+    const settingsToRestore: AppSettings = {
+        ...historicalSettings,
+        settingsHistory: draftSettings?.settingsHistory, // Keep the current history intact
+    };
+    setDraftSettings(settingsToRestore);
+    toast({ title: 'Rollback Staged', description: 'The selected historical settings have been loaded. Review and save changes to apply.' });
+  };
+  
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
   
@@ -410,7 +428,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                   <TabsTrigger value="locations" disabled={isGuest || !isAdmin}><MapPin className="mr-2 h-4 w-4" />Locations</TabsTrigger>
                   <TabsTrigger value="data" disabled={isGuest || !isAdmin}><Database className="mr-2 h-4 w-4" />Data</TabsTrigger>
               </TabsList>
-              <TabsContent value="general" className="pt-4 space-y-6">
+               <TabsContent value="general" className="pt-4 space-y-6">
                   <div>
                       <h3 className="text-lg font-medium mb-4">Appearance</h3>
                       <div className="rounded-lg border p-4 space-y-3">
@@ -478,6 +496,38 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                           <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
                         </div>
                       </div>
+                    </div>
+                  )}
+
+                   {isAdmin && (
+                    <div>
+                        <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><History className="h-5 w-5" /> Settings History</h3>
+                        <div className="rounded-lg border p-3">
+                            <ScrollArea className="h-[200px]">
+                                {(draftSettings.settingsHistory && draftSettings.settingsHistory.length > 0) ? (
+                                    <div className="space-y-2">
+                                        {draftSettings.settingsHistory.map((historyItem, index) => (
+                                            <div key={index} className="flex items-center justify-between p-2 hover:bg-muted/50 rounded-md">
+                                                <div>
+                                                    <p className="text-sm font-medium">
+                                                        Saved by: {historyItem.lastModifiedBy?.displayName || 'Unknown'}
+                                                    </p>
+                                                    <p className="text-xs text-muted-foreground">
+                                                        {formatDistanceToNow(new Date(historyItem.lastModified!), { addSuffix: true })}
+                                                    </p>
+                                                </div>
+                                                <Button size="sm" variant="ghost" onClick={() => handleRollback(historyItem)}>
+                                                   <RotateCcw className="mr-2 h-4 w-4" />
+                                                    Rollback
+                                                </Button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                ) : (
+                                    <p className="text-sm text-muted-foreground text-center py-8">No settings history available.</p>
+                                )}
+                            </ScrollArea>
+                        </div>
                     </div>
                   )}
               </TabsContent>

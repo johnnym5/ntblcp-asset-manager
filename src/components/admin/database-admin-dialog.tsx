@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -26,12 +26,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Separator } from '../ui/separator';
 import { useAppState } from '@/contexts/app-state-context';
-import { synchronizeDatabases, copyAssetsToRealtimeDB, updateSettings, getAssetsFirestore, batchDeleteAssetsFirestore, getAssetsRTDB, batchDeleteAssetsRTDB } from '@/lib/firestore';
+import { synchronizeDatabases, copyAssetsToRealtimeDB, updateSettings, getAssetsFirestore, batchDeleteAssetsFirestore, getAssetsRTDB, batchDeleteAssetsRTDB, batchSetAssets } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Database, Trash2, FileUp, Save, ScanSearch, PlaneTakeoff, Download, DatabaseZap, GitBranch, Copy, AlertTriangle } from 'lucide-react';
-import type { AppSettings } from '@/lib/types';
-import { saveLocalSettings, clearLocalAssets } from '@/lib/idb';
+import type { AppSettings, Asset } from '@/lib/types';
+import { saveLocalSettings, clearLocalAssets, saveAssets, saveLockedOfflineAssets } from '@/lib/idb';
 import { exportFullBackupToJson, exportAssetsToJson, exportSettingsToJson } from '@/lib/json-export';
 import {
   Select,
@@ -51,12 +51,12 @@ interface DatabaseAdminDialogProps {
 
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, assets, setAssets } = useAppState();
+  const { appSettings, setAppSettings, assets, setAssets, setOfflineAssets, setIsSyncing } = useAppState();
   const { toast } = useToast();
   
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSyncingDb, setIsSyncingDb] = useState(false);
 
   const [isClearingAll, setIsClearingAll] = useState(false);
   const [isClearingFirestore, setIsClearingFirestore] = useState(false);
@@ -66,6 +66,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const [isClearAllConfirmOpen, setIsClearAllConfirmOpen] = useState(false);
   const [isClearFirestoreConfirmOpen, setIsClearFirestoreConfirmOpen] = useState(false);
   const [isClearRTDBConfirmOpen, setIsClearRTDBConfirmOpen] = useState(false);
+  
+  const importFileRef = useRef<HTMLInputElement>(null);
+  const [backupToRestore, setBackupToRestore] = useState<{ settings: AppSettings, assets: Asset[] } | null>(null);
+  const [isRestoreConfirmOpen, setIsRestoreConfirmOpen] = useState(false);
+
 
   useEffect(() => {
     if (isOpen) {
@@ -96,7 +101,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   };
 
   const handleSync = async () => {
-      setIsSyncing(true);
+      setIsSyncingDb(true);
       addNotification({ title: 'Cloud Sync Initialized', description: 'Comparing and updating both cloud databases...'});
       try {
         const { toFirestoreCount, toRTDBCount } = await synchronizeDatabases();
@@ -104,7 +109,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       } catch (e) {
         addNotification({ title: 'Cloud Sync Failed', description: (e as Error).message, variant: 'destructive'});
       }
-      setIsSyncing(false);
+      setIsSyncingDb(false);
   }
 
   const handleClearFirestore = async () => {
@@ -169,6 +174,77 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       await copyAssetsToRealtimeDB();
       setIsCopying(false);
   }
+
+  const handleImportFromJson = () => {
+    importFileRef.current?.click();
+  };
+
+  const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+        try {
+            const result = JSON.parse(e.target?.result as string);
+            if (result && result.settings && Array.isArray(result.assets)) {
+                setBackupToRestore(result);
+                setIsRestoreConfirmOpen(true);
+            } else {
+                toast({ title: 'Invalid Backup File', description: 'The selected JSON file does not have the correct structure.', variant: 'destructive' });
+            }
+        } catch (error) {
+            toast({ title: 'Invalid JSON', description: 'Could not parse the selected file.', variant: 'destructive' });
+        } finally {
+             if (importFileRef.current) importFileRef.current.value = "";
+        }
+    };
+    reader.readAsText(file);
+  };
+  
+  const handleConfirmRestore = async () => {
+    if (!backupToRestore) return;
+    setIsRestoreConfirmOpen(false);
+    setIsSyncing(true);
+    addNotification({ title: 'Restoring from backup...', description: 'This may take a moment.' });
+    
+    try {
+        const { assets: restoredAssets, settings: restoredSettings } = backupToRestore;
+        
+        // Mark all restored assets for sync
+        const assetsToSync = restoredAssets.map(a => ({ ...a, syncStatus: 'local' as const }));
+
+        // 1. Overwrite local databases
+        await saveAssets(assetsToSync);
+        await saveLockedOfflineAssets([]); // Clear locked assets on restore
+        await saveLocalSettings(restoredSettings);
+
+        // 2. Update app state
+        setAssets(assetsToSync);
+        setOfflineAssets([]);
+        setAppSettings(restoredSettings);
+
+        // 3. Push restored data to the cloud
+        addNotification({ title: 'Local data restored', description: 'Uploading restored data to the cloud...' });
+        await updateSettings(restoredSettings);
+        if (assetsToSync.length > 0) {
+            await batchSetAssets(assetsToSync);
+        }
+        
+        // 4. Mark local assets as synced after successful upload
+        const syncedAssets = assetsToSync.map(a => ({ ...a, syncStatus: 'synced' as const }));
+        await saveAssets(syncedAssets);
+        setAssets(syncedAssets);
+
+        addNotification({ title: 'Restore Complete', description: 'Your application has been restored from the backup file.' });
+
+    } catch (e) {
+        addNotification({ title: 'Restore Failed', description: (e as Error).message, variant: 'destructive'});
+    } finally {
+        setIsSyncing(false);
+        setBackupToRestore(null);
+    }
+  };
   
   if (userProfile?.loginName !== 'admin') {
     return null;
@@ -233,8 +309,8 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                       <CardDescription>Ensure data is consistent between Firestore and Realtime DB.</CardDescription>
                   </CardHeader>
                   <CardContent>
-                      <Button variant="outline" className="w-full justify-start" onClick={handleSync} disabled={isSyncing}>
-                          {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitBranch className="mr-2 h-4 w-4" />}
+                      <Button variant="outline" className="w-full justify-start" onClick={handleSync} disabled={isSyncingDb}>
+                          {isSyncingDb ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <GitBranch className="mr-2 h-4 w-4" />}
                           Sync Firestore and RTDB
                       </Button>
                   </CardContent>
@@ -244,17 +320,15 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
               <Card>
                   <CardHeader>
                       <CardTitle>Backup & Restore</CardTitle>
-                      <CardDescription>Export data to a JSON file. Imports are handled via Excel files in Settings.</CardDescription>
+                      <CardDescription>Export or import all assets and settings from a JSON file.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">
+                      <input type="file" ref={importFileRef} onChange={handleFileSelected} accept=".json" className="hidden" />
+                      <Button variant="outline" className="w-full justify-start" onClick={handleImportFromJson}>
+                          <FileUp className="mr-2 h-4 w-4" /> Import from Backup (JSON)
+                      </Button>
                       <Button variant="outline" className="w-full justify-start" onClick={() => exportFullBackupToJson(assets, appSettings)}>
                           <Download className="mr-2 h-4 w-4" /> Export Full Backup (Assets & Settings)
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => exportAssetsToJson(assets)}>
-                          <Download className="mr-2 h-4 w-4" /> Export Assets Only
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => exportSettingsToJson(appSettings)}>
-                          <Download className="mr-2 h-4 w-4" /> Export Settings Only
                       </Button>
                   </CardContent>
               </Card>
@@ -303,6 +377,23 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             <AlertDialogAction onClick={handleConfirmSave}>Confirm & Save</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
+      </AlertDialog>
+      
+      <AlertDialog open={isRestoreConfirmOpen} onOpenChange={setIsRestoreConfirmOpen}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Restore from Backup?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                     This will overwrite all local and cloud data with the contents of the backup file. This action cannot be undone. Are you sure you want to proceed?
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setBackupToRestore(null)}>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmRestore} className="bg-destructive hover:bg-destructive/90">
+                      Yes, Overwrite and Restore
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={isClearFirestoreConfirmOpen} onOpenChange={setIsClearFirestoreConfirmOpen}>

@@ -80,6 +80,9 @@ export interface SheetDefinition {
   subSheetTriggers?: string[]; 
 }
 
+// A version of AppSettings that doesn't have a history property, to prevent infinite recursion.
+export interface HistoricalAppSettings extends Omit<AppSettings, 'settingsHistory'> {}
+
 export interface AppSettings {
   authorizedUsers: AuthorizedUser[];
   sheetDefinitions: Record<string, SheetDefinition>;
@@ -88,4 +91,9 @@ export interface AppSettings {
   databaseSource: 'firestore' | 'rtdb';
   locations?: string[];
   lastModified?: string;
+  lastModifiedBy?: {
+    displayName: string;
+    loginName: string;
+  };
+  settingsHistory?: HistoricalAppSettings[];
 }

@@ -134,6 +134,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     appMode: 'management',
     databaseSource: 'rtdb',
     locations: defaultInitialLocations,
+    settingsHistory: [],
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isBrowserOnline, setIsBrowserOnline] = useState(true);
@@ -201,6 +202,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           appMode: 'management',
           databaseSource: 'rtdb',
           locations: defaultInitialLocations,
+          settingsHistory: [],
         };
       } else {
         if (!localSettings.databaseSource) {

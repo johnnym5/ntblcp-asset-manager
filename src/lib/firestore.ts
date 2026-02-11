@@ -3,7 +3,7 @@
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
 import { db, isConfigValid, rtdb } from '@/lib/firebase';
-import type { Asset, AppSettings } from '@/lib/types';
+import type { Asset, AppSettings, HistoricalAppSettings } from '@/lib/types';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors';
 import { addNotification } from '@/hooks/use-notifications';
@@ -66,22 +66,29 @@ export async function getSettings(): Promise<AppSettings | null> {
 export async function updateSettings(settings: AppSettings) {
   const firestoreDb = checkConfig();
   const rtdbInstance = checkRTDBConfig();
+  
+  // Fetch the current settings to archive them before overwriting.
+  const currentSettings = await getSettings();
 
-  // The 'settings' object passed in is now the complete and final version.
-  // It should completely overwrite the existing settings.
+  const settingsToSave: AppSettings = { ...settings };
+  if (currentSettings) {
+      const historyEntry: HistoricalAppSettings = { ...currentSettings };
+      delete historyEntry.settingsHistory; // Prevent nested histories
+
+      const newHistory = [historyEntry, ...(currentSettings.settingsHistory || [])];
+      settingsToSave.settingsHistory = newHistory.slice(0, 10); // Keep only the last 10 versions
+  }
   
   // 1. Overwrite settings in Realtime Database (Primary)
   const rtdbSettingsRef = ref(rtdbInstance, 'config/settings');
-  await rtdbSet(rtdbSettingsRef, settings);
+  await rtdbSet(rtdbSettingsRef, settingsToSave);
 
   // 2. Overwrite settings in Firestore (Backup)
   const settingsRef = doc(firestoreDb, 'config', 'settings');
   try {
-    // Using setDoc without merge options overwrites the document.
-    await setDoc(settingsRef, settings);
+    await setDoc(settingsRef, settingsToSave);
   } catch (serverError) {
     console.warn("Firestore backup write for settings failed, but RTDB succeeded.", serverError);
-    // We don't throw an error here because the primary (RTDB) write succeeded.
   }
 }
 
