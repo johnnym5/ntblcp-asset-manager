@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -12,10 +11,11 @@ import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useAuth } from '@/contexts/auth-context';
 import { NIGERIAN_STATE_CAPITALS, SPECIAL_LOCATIONS, ZONAL_STORES } from '@/lib/constants';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 const StatCard = ({ title, value, description, icon, onAction, actionLabel, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, actionLabel?: string, isActive?: boolean }) => {
     const cardContent = (
-        <Card className={cn("transition-colors", isActive ? "bg-primary/10 border-primary" : "hover:bg-muted/50")}>
+        <Card className={cn("transition-colors w-60 shrink-0", isActive ? "bg-primary/10 border-primary" : "hover:bg-muted/50")}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{title}</CardTitle>
                 {icon}
@@ -165,7 +165,8 @@ export function AssetSummaryDashboard() {
                 </CollapsibleTrigger>
             </div>
             <CollapsibleContent className="p-4 pt-0 mt-4">
-                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
+                <ScrollArea>
+                    <div className="flex space-x-4 pb-4">
                     {/* New Condition Cards */}
                     {summary.unusable > 0 && (
                         <StatCard
@@ -316,7 +317,9 @@ export function AssetSummaryDashboard() {
                         actionLabel={dateFilter === 'week' ? "Clear Filter" : "View Assets"}
                         isActive={dateFilter === 'week'}
                     />
-                </div>
+                    </div>
+                    <ScrollBar orientation="horizontal" />
+                </ScrollArea>
             </CollapsibleContent>
         </Collapsible>
     )
