@@ -15,7 +15,7 @@ const inter = Inter({
 });
 
 export const metadata: Metadata = {
-  title: 'Global Asset Hub',
+  title: 'NTBLCP Asset Manager',
   description: 'A full-featured, offline-first web app to manage assets efficiently.',
   manifest: '/manifest.json',
   icons: null,

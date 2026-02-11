@@ -5,14 +5,13 @@ import { getDatabase, type Database } from 'firebase/database';
 
 // Your web app's Firebase configuration
 export const firebaseConfig = {
-  apiKey: "AIzaSyBoU-iXGO0600841daa1LZzSlfRuZojXxA",
-  authDomain: "globalassethub.firebaseapp.com",
-  databaseURL: "https://globalassethub-default-rtdb.firebaseio.com",
-  projectId: "globalassethub",
-  storageBucket: "globalassethub.firebasestorage.app",
-  messagingSenderId: "296731745587",
-  appId: "1:296731745587:web:91f0e8a28ca497e973b246",
-  measurementId: "G-N9SBKMTCQ0"
+  apiKey: "AIzaSyB9O662zXyyJkhtle1snkNLapre3_Sa3rc",
+  authDomain: "ntblcp-asset-manager-k7hy1.firebaseapp.com",
+  databaseURL: "https://ntblcp-asset-manager-k7hy1-default-rtdb.firebaseio.com",
+  projectId: "ntblcp-asset-manager-k7hy1",
+  storageBucket: "ntblcp-asset-manager-k7hy1.firebasestorage.app",
+  messagingSenderId: "45027293772",
+  appId: "1:45027293772:web:0116cfaa586d17fa4c52e9"
 };
 
 

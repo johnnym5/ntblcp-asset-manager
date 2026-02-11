@@ -1,4 +1,4 @@
-# Global Asset Hub
+# NTBLCP Asset Manager
 
 A full-featured, offline-first Asset Management Web App, built with Next.js, Tailwind CSS, and Firebase.
 
@@ -59,7 +59,7 @@ firebase login
 From your project's root directory, run the following command to associate your local project with your Firebase project.
 
 ```bash
-firebase use globalassethub
+firebase use ntblcp-asset-manager-k7hy1
 ```
 
 ### Step 2.4: Deploy the Application
@@ -70,7 +70,7 @@ Run this single command from your project's root directory.
 firebase deploy
 ```
 
-This command will automatically build your Next.js application and deploy it to App Hosting. Your live application will be available at `https://globalassethub.web.app`.
+This command will automatically build your Next.js application and deploy it to App Hosting. Your live application will be available at `https://ntblcp-asset-manager-k7hy1.web.app`.
 
 ---
 
