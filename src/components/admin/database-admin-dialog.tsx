@@ -290,21 +290,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                       <CardTitle>Global Settings</CardTitle>
                       <CardDescription>Changes here are saved instantly and affect all users.</CardDescription>
                   </CardHeader>
-                  <CardContent className="space-y-4">
-                      <div className="flex items-center justify-between">
-                          <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
-                          <Select value={appSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
-                              <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-                              <SelectContent>
-                                <SelectItem value="management">Management</SelectItem>
-                                <SelectItem value="verification">Verification</SelectItem>
-                              </SelectContent>
-                          </Select>
-                      </div>
-                      <div className="flex items-center justify-between">
-                          <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
-                          <Switch id="lock-assets" checked={appSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
-                      </div>
+                  <CardContent className="space-y-4 pt-6">
                       <div className="flex items-center justify-between">
                           <Label htmlFor="default-db" className="text-sm font-medium">Default Cloud DB</Label>
                           <Select value={appSettings.defaultDatabase} onValueChange={(value) => handleSettingChange('defaultDatabase', value)}>

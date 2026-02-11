@@ -124,6 +124,12 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     if (JSON.stringify(draftSettings.locations) !== JSON.stringify(appSettings.locations)) {
       changes.push('Location list will be updated.');
     }
+    if (draftSettings.appMode !== appSettings.appMode) {
+      changes.push(`App mode will be set to: ${draftSettings.appMode}.`);
+    }
+    if (draftSettings.lockAssetList !== appSettings.lockAssetList) {
+        changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
+    }
     return changes;
   }, [draftSettings, appSettings]);
 
@@ -487,6 +493,41 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                 <PlaneTakeoff className="mr-2 h-4 w-4" /> Generate Travel Report
                             </Button>
                         </div>
+                    </div>
+                  )}
+
+                  {isAdmin && (
+                    <div>
+                      <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
+                      <div className="rounded-lg border p-4 space-y-4 divide-y">
+                          <div className="flex items-center justify-between pt-1">
+                              <div className="space-y-1">
+                                  <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
+                                  <p className="text-xs text-muted-foreground">
+                                  {draftSettings.appMode === 'management'
+                                      ? 'Management: Data is locked for non-admins.'
+                                      : 'Verification: Users can update status/remarks.'
+                                  }
+                                  </p>
+                              </div>
+                              <Select value={draftSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
+                                  <SelectTrigger className="w-[150px]">
+                                  <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                  <SelectItem value="management">Management</SelectItem>
+                                  <SelectItem value="verification">Verification</SelectItem>
+                                  </SelectContent>
+                              </Select>
+                          </div>
+                          <div className="flex items-center justify-between pt-4">
+                              <div className="space-y-1">
+                                  <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
+                                  <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
+                              </div>
+                              <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
+                          </div>
+                      </div>
                     </div>
                   )}
               </TabsContent>
