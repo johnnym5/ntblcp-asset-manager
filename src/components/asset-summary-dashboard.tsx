@@ -88,6 +88,7 @@ export function AssetSummaryDashboard() {
         if (!appSettings) return { withoutSerial: 0, withoutAssetId: 0, newThisWeek: 0, modifiedToday: 0, modifiedThisWeek: 0, withoutLocation: 0, withoutCondition: 0, withoutLga: 0, withoutAssignee: 0, withoutModelNumber: 0, withoutEngineNo: 0, withoutChasisNo: 0, unusable: 0, badCondition: 0, needsRepair: 0 };
         
         const visibleAssets = summaryAssets.filter(a => !appSettings?.sheetDefinitions[a.category]?.isHidden);
+        const vehicleCategories = ['Vehicles-TB (IHVN)', 'MOTORCYCLES-C19RM'];
 
         return {
           withoutSerial: visibleAssets.filter(a => !a.sn && !a.serialNumber).length,
@@ -99,8 +100,8 @@ export function AssetSummaryDashboard() {
           withoutCondition: visibleAssets.filter(a => !a.condition?.trim()).length,
           withoutLga: visibleAssets.filter(a => !a.lga?.trim()).length,
           withoutAssignee: visibleAssets.filter(a => !a.assignee?.trim()).length,
-          withoutEngineNo: visibleAssets.filter(a => (a.category?.includes('Vehicle') || a.category?.includes('MOTORCYCLE')) && !a.engineNo).length,
-          withoutChasisNo: visibleAssets.filter(a => (a.category?.includes('Vehicle') || a.category?.includes('MOTORCYCLE')) && !a.chasisNo).length,
+          withoutEngineNo: visibleAssets.filter(a => vehicleCategories.includes(a.category) && !a.engineNo).length,
+          withoutChasisNo: visibleAssets.filter(a => vehicleCategories.includes(a.category) && !a.chasisNo).length,
           withoutModelNumber: visibleAssets.filter(a => !a.modelNumber?.trim()).length,
           unusable: visibleAssets.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen'].includes(a.condition)).length,
           badCondition: visibleAssets.filter(a => a.condition && ['Bad condition', 'Used but in poor condition', 'F2: Major repairs required-poor condition'].includes(a.condition)).length,
@@ -254,24 +255,28 @@ export function AssetSummaryDashboard() {
                         actionLabel={missingFieldFilter === 'assignee' ? "Clear Filter" : "View Assets"}
                         isActive={missingFieldFilter === 'assignee'}
                     />
-                     <StatCard
-                        title="Missing Engine No."
-                        value={summary.withoutEngineNo}
-                        description="Vehicles missing an engine number."
-                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
-                        onAction={() => handleFilterClick('engineNo')}
-                        actionLabel={missingFieldFilter === 'engineNo' ? "Clear Filter" : "View Assets"}
-                        isActive={missingFieldFilter === 'engineNo'}
-                    />
-                     <StatCard
-                        title="Missing Chasis No."
-                        value={summary.withoutChasisNo}
-                        description="Vehicles missing a chasis number."
-                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
-                        onAction={() => handleFilterClick('chasisNo')}
-                        actionLabel={missingFieldFilter === 'chasisNo' ? "Clear Filter" : "View Assets"}
-                        isActive={missingFieldFilter === 'chasisNo'}
-                    />
+                     {summary.withoutEngineNo > 0 && (
+                        <StatCard
+                            title="Missing Engine No."
+                            value={summary.withoutEngineNo}
+                            description="Vehicles missing an engine number."
+                            icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                            onAction={() => handleFilterClick('engineNo')}
+                            actionLabel={missingFieldFilter === 'engineNo' ? "Clear Filter" : "View Assets"}
+                            isActive={missingFieldFilter === 'engineNo'}
+                        />
+                     )}
+                     {summary.withoutChasisNo > 0 && (
+                        <StatCard
+                            title="Missing Chasis No."
+                            value={summary.withoutChasisNo}
+                            description="Vehicles missing a chasis number."
+                            icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                            onAction={() => handleFilterClick('chasisNo')}
+                            actionLabel={missingFieldFilter === 'chasisNo' ? "Clear Filter" : "View Assets"}
+                            isActive={missingFieldFilter === 'chasisNo'}
+                        />
+                     )}
                      <StatCard
                         title="Missing Model"
                         value={summary.withoutModelNumber}
