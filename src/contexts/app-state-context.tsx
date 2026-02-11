@@ -20,8 +20,7 @@ import {
   SPECIAL_LOCATIONS,
 } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
-import { getSettings as getSettingsFS } from '@/lib/firestore';
-import { getSettings as getSettingsRTDB } from '@/lib/database';
+import { onSettingsChange } from '@/lib/database';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
 
@@ -221,20 +220,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           localSettings.locations = defaultInitialLocations;
         }
       }
-
-      // Migration from old enabledSheets setting to isHidden flag
-      if ((localSettings as any).enabledSheets) {
-        const enabledSheets = new Set((localSettings as any).enabledSheets);
-        Object.keys(localSettings.sheetDefinitions).forEach((sheetName) => {
-          if (!enabledSheets.has(sheetName)) {
-            localSettings!.sheetDefinitions[sheetName].isHidden = true;
-          } else {
-            localSettings!.sheetDefinitions[sheetName].isHidden = false;
-          }
-        });
-        delete (localSettings as any).enabledSheets;
-      }
-
+      
       setAppSettings(localSettings);
       if (localSettings.defaultDataSource) {
         setDataSource(localSettings.defaultDataSource);
@@ -247,24 +233,22 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     };
     
     initializeSettings();
-  }, []); // Run only ONCE on mount
+  }, []);
 
-  // Effect 2: Ongoing synchronization with remote settings
+  // Effect 2: Real-time synchronization with remote settings from RTDB
   useEffect(() => {
     if (!settingsLoaded || !isBrowserOnline) return;
 
-    const syncRemoteSettings = async () => {
-      try {
-        const getCloudSettings = activeDatabase === 'firestore' ? getSettingsFS : getSettingsRTDB;
-        const remoteSettings = await getCloudSettings();
-        
-        setAppSettings(currentSettings => {
+    const handleRemoteSettingsUpdate = (remoteSettings: AppSettings) => {
+       setAppSettings(currentSettings => {
           if (remoteSettings) {
             const remoteTimestamp = remoteSettings.lastModified ? new Date(remoteSettings.lastModified).getTime() : 0;
             const localTimestamp = currentSettings.lastModified ? new Date(currentSettings.lastModified).getTime() : 0;
 
-            if (remoteTimestamp > localTimestamp) {
+            // Update if remote is newer OR if the content is different (for manual edits without timestamp change)
+            if (remoteTimestamp > localTimestamp || JSON.stringify(remoteSettings) !== JSON.stringify(currentSettings)) {
               const finalSettings = { ...remoteSettings, locations: remoteSettings.locations || defaultInitialLocations };
+              
               if (JSON.stringify(finalSettings) !== JSON.stringify(currentSettings)) {
                 saveLocalSettings(finalSettings);
                 return finalSettings;
@@ -273,22 +257,17 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           }
           return currentSettings;
         });
-
-      } catch (error) {
-        console.warn('Could not sync remote settings. Using local version.', error);
-      }
     };
     
-    syncRemoteSettings(); // Initial sync
-    
-    const interval = setInterval(syncRemoteSettings, 30000);
-    window.addEventListener('focus', syncRemoteSettings);
+    // Listen to RTDB for settings changes
+    const unsubscribe = onSettingsChange(handleRemoteSettingsUpdate);
 
     return () => {
-      clearInterval(interval);
-      window.removeEventListener('focus', syncRemoteSettings);
+        if (unsubscribe) {
+            unsubscribe();
+        }
     };
-  }, [settingsLoaded, isBrowserOnline, activeDatabase]);
+  }, [settingsLoaded, isBrowserOnline]);
 
   // Effect 3: Project ID check for user notification
   useEffect(() => {

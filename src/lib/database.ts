@@ -1,7 +1,7 @@
 
 'use client';
 
-import { ref, get, set, remove, update } from 'firebase/database';
+import { ref, get, set, remove, update, onValue } from 'firebase/database';
 import { rtdb, isConfigValid } from '@/lib/firebase';
 import type { Asset, AppSettings, HistoricalAppSettings } from './types';
 import { addNotification } from '@/hooks/use-notifications';
@@ -47,6 +47,17 @@ export async function updateSettings(settings: AppSettings) {
     
     settingsToSave.lastModified = new Date().toISOString();
     await set(ref(db, 'config/settings'), settingsToSave);
+}
+
+export function onSettingsChange(callback: (settings: AppSettings) => void): () => void {
+    const db = checkConfig();
+    const settingsRef = ref(db, 'config/settings');
+    const unsubscribe = onValue(settingsRef, (snapshot) => {
+        if (snapshot.exists()) {
+            callback(snapshot.val());
+        }
+    });
+    return unsubscribe;
 }
 
 
