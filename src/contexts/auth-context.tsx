@@ -133,7 +133,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const logout = async () => {
     setLoading(true);
     localStorage.removeItem('ntblcp-user-profile');
-    localStorage.removeItem('database-downloaded');
     setUserProfile(null);
     setProfileSetupComplete(false);
 
