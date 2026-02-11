@@ -30,6 +30,7 @@ import {
   X,
   Database,
   DatabaseZap,
+  History,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -56,6 +57,7 @@ import type { Asset } from "@/lib/types";
 import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
 import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
+import { ActivityLogSheet } from "./admin/activity-log-sheet";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -75,7 +77,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isSettingsOpen,
     setIsSettingsOpen,
     initialSettingsTab,
-    setInitialSettingsTab
+    setInitialSettingsTab,
+    onRevertAsset,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -83,6 +86,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isDbAdminOpen, setIsDbAdminOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
 
@@ -277,18 +281,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />
                   
-                  {userProfile && (
-                    <DropdownMenuItem onClick={handleSettingsOpen}>
-                      <Settings className="mr-2 h-4 w-4"/>
-                      Settings
-                    </DropdownMenuItem>
-                  )}
-
                   {userProfile?.loginName === 'admin' && (
-                     <DropdownMenuItem onClick={() => setIsDbAdminOpen(true)}>
-                      <DatabaseZap className="mr-2 h-4 w-4"/>
-                      Database Admin
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem onClick={handleSettingsOpen}>
+                        <Settings className="mr-2 h-4 w-4"/>
+                        Settings
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => setIsDbAdminOpen(true)}>
+                        <DatabaseZap className="mr-2 h-4 w-4"/>
+                        Database Admin
+                      </DropdownMenuItem>
+                       <DropdownMenuItem onClick={() => setIsActivityLogOpen(true)}>
+                        <History className="mr-2 h-4 w-4"/>
+                        Recent Activity
+                      </DropdownMenuItem>
+                    </>
                   )}
 
                   <DropdownMenuSeparator />
@@ -357,7 +364,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </motion.main>
       <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} initialTab={initialSettingsTab} />
       {userProfile?.loginName === 'admin' && (
-        <DatabaseAdminDialog isOpen={isDbAdminOpen} onOpenChange={setIsDbAdminOpen} />
+        <>
+          <DatabaseAdminDialog isOpen={isDbAdminOpen} onOpenChange={setIsDbAdminOpen} />
+          <ActivityLogSheet isOpen={isActivityLogOpen} onOpenChange={setIsActivityLogOpen} onRevert={onRevertAsset} />
+        </>
       )}
       <AssetFilterSheet
         isOpen={isFilterSheetOpen}
@@ -430,5 +440,3 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
-    

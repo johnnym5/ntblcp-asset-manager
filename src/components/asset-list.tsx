@@ -83,7 +83,7 @@ import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings, clearAssets as clearFirestoreAssets } from "@/lib/firestore";
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { TravelReportDialog } from "./travel-report-dialog";
@@ -223,7 +223,8 @@ export default function AssetList() {
     showProjectSwitchDialog,
     setShowProjectSwitchDialog,
     setIsSettingsOpen,
-    activeDatabase
+    activeDatabase,
+    setOnRevertAsset,
   } = useAppState();
 
   const { lockAssetList, sheetDefinitions } = appSettings;
@@ -996,6 +997,40 @@ export default function AssetList() {
       }
     }
   };
+
+  const handleRevertAsset = useCallback(async (assetId: string) => {
+    const assetToRevert = activeAssets.find(a => a.id === assetId);
+    if (!assetToRevert || !assetToRevert.previousState) {
+        toast({ title: "Cannot Revert", description: "No previous state found for this asset.", variant: "destructive" });
+        return;
+    }
+
+    const rolledBackAsset: Asset = sanitizeForFirestore({
+      ...assetToRevert,
+      ...assetToRevert.previousState, // Apply the old values
+      previousState: undefined, // Clear the history for this state
+      lastModified: new Date().toISOString(),
+      lastModifiedBy: userProfile?.displayName,
+      lastModifiedByState: userProfile?.state,
+      syncStatus: 'local',
+    });
+
+    const currentAssets = await getLocalAssetsFromDb();
+    const assetIndex = currentAssets.findIndex(a => a.id === assetId);
+    if (assetIndex > -1) {
+        currentAssets[assetIndex] = rolledBackAsset;
+        await saveAssets(currentAssets);
+        setAssets(currentAssets);
+        toast({ title: "Asset Reverted", description: `"${rolledBackAsset.description}" has been restored to its previous state.` });
+    }
+  }, [activeAssets, userProfile, setAssets, toast]);
+
+  useEffect(() => {
+    setOnRevertAsset(() => handleRevertAsset);
+    return () => {
+        setOnRevertAsset(() => async () => {});
+    }
+  }, [handleRevertAsset, setOnRevertAsset]);
 
   const handleTravelReport = useCallback(() => setIsTravelReportOpen(true), []);
   

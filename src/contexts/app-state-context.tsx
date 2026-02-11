@@ -94,6 +94,10 @@ interface AppStateContextType {
   // Active Database
   activeDatabase: 'firestore' | 'rtdb';
   setActiveDatabase: Dispatch<SetStateAction<'firestore' | 'rtdb'>>;
+
+  // Asset Actions
+  onRevertAsset: (assetId: string) => Promise<void>;
+  setOnRevertAsset: Dispatch<SetStateAction<(assetId: string) => Promise<void>>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -149,6 +153,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
   const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>('rtdb');
+
+  const [onRevertAsset, setOnRevertAsset] = useState<((assetId: string) => Promise<void>)>(() => async () => {});
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -308,6 +314,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     initialSettingsTab, setInitialSettingsTab,
     showProjectSwitchDialog, setShowProjectSwitchDialog,
     activeDatabase, setActiveDatabase,
+    onRevertAsset, setOnRevertAsset,
   };
 
   return (
