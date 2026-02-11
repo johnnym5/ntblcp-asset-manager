@@ -62,11 +62,7 @@ From your project's root directory, run the following command to associate your 
 firebase use globalassethub
 ```
 
-### Step 2.4: Configure Environment Variables in Firebase
-
-The application's Firebase configuration is hardcoded, so no environment variables need to be set in the Firebase Console for App Hosting.
-
-### Step 2.5: Deploy the Application
+### Step 2.4: Deploy the Application
 
 Run this single command from your project's root directory.
 
@@ -74,7 +70,7 @@ Run this single command from your project's root directory.
 firebase deploy
 ```
 
-This command will automatically build your Next.js application and deploy it to App Hosting. Your live application will be available at `https://<your-app-name>.web.app`.
+This command will automatically build your Next.js application and deploy it to App Hosting. Your live application will be available at `https://globalassethub.web.app`.
 
 ---
 
