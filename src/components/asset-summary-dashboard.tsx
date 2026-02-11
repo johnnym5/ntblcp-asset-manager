@@ -11,44 +11,51 @@ import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 
 const StatCard = ({ title, value, description, icon, onAction, actionLabel, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, actionLabel?: string, isActive?: boolean }) => {
-    return (
-        <Card className={cn("transition-colors", isActive ? "bg-primary/10 border-primary" : "")}>
+    const cardContent = (
+        <Card className={cn("transition-colors", isActive ? "bg-primary/10 border-primary" : "hover:bg-muted/50")}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-sm font-medium">{title}</CardTitle>
                 {icon}
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold">{value}</div>
-                <p className="text-xs text-muted-foreground h-10">
+                <p className="text-xs text-muted-foreground h-8">
                     {description}
                 </p>
-                {onAction && actionLabel && (
-                     <Button variant="link" size="sm" className="p-0 h-auto mt-2" onClick={onAction}>{actionLabel}</Button>
+                {actionLabel && (
+                     <div className="text-xs text-primary font-semibold mt-2">{actionLabel}</div>
                 )}
             </CardContent>
         </Card>
-    )
+    );
+
+    if (onAction) {
+        return <button onClick={onAction} className="text-left w-full h-full">{cardContent}</button>;
+    }
+    return cardContent;
 };
 
 export function AssetSummaryDashboard() {
-    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter } = useAppState();
+    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings } = useAppState();
     const [isOpen, setIsOpen] = useState(false);
     
     const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
 
     const summary = useMemo(() => {
-        const withoutSerial = activeAssets.filter(a => !a.sn && !a.serialNumber).length;
-        const withoutAssetId = activeAssets.filter(a => !a.assetIdCode).length;
-        const modifiedToday = activeAssets.filter(a => a.lastModified && isToday(parseISO(a.lastModified))).length;
-        const modifiedThisWeek = activeAssets.filter(a => a.lastModified && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length;
+        const visibleAssets = activeAssets.filter(a => !appSettings?.sheetDefinitions[a.category]?.isHidden);
+
+        const withoutSerial = visibleAssets.filter(a => !a.sn && !a.serialNumber).length;
+        const withoutAssetId = visibleAssets.filter(a => !a.assetIdCode).length;
+        const modifiedToday = visibleAssets.filter(a => a.lastModified && isToday(parseISO(a.lastModified))).length;
+        const modifiedThisWeek = visibleAssets.filter(a => a.lastModified && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length;
 
         const criticalInfoFields: (keyof Asset)[] = ['description', 'category', 'location', 'condition'];
-        const missingInfo = activeAssets.filter(asset => {
+        const missingInfo = visibleAssets.filter(asset => {
             return criticalInfoFields.some(field => !asset[field] || String(asset[field]).trim() === '');
         }).length;
 
         return { withoutSerial, withoutAssetId, modifiedToday, modifiedThisWeek, missingInfo };
-    }, [activeAssets]);
+    }, [activeAssets, appSettings]);
     
     const handleFilterClick = (field: keyof Asset | '') => {
         if (missingFieldFilter === field) {
@@ -62,20 +69,20 @@ export function AssetSummaryDashboard() {
         <Collapsible
             open={isOpen}
             onOpenChange={setIsOpen}
-            className="mb-6 border rounded-lg bg-card/60 shadow-xl backdrop-blur-lg"
+            className="mb-4"
         >
-            <CollapsibleTrigger asChild>
-                <div className='flex items-center justify-between p-4 cursor-pointer'>
-                    <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
-                        <BarChart2 className="h-5 w-5 text-primary" /> Asset Overview
-                    </h3>
+            <div className='flex items-center justify-between p-4 rounded-lg bg-card/80 border shadow-lg backdrop-blur-lg'>
+                <h3 className="text-lg font-semibold tracking-tight flex items-center gap-2">
+                    <BarChart2 className="h-5 w-5 text-primary" /> Asset Overview
+                </h3>
+                <CollapsibleTrigger asChild>
                     <Button variant="ghost" size="sm" className="w-9 p-0">
                         <ChevronsUpDown className="h-4 w-4" />
                         <span className="sr-only">Toggle</span>
                     </Button>
-                </div>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="p-4 pt-0">
+                </CollapsibleTrigger>
+            </div>
+            <CollapsibleContent className="p-4 pt-0 mt-4">
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
                     <StatCard
                         title="Missing S/N"

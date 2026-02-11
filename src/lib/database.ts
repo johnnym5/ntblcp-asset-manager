@@ -10,6 +10,7 @@ const checkConfig = () => {
     if (!isConfigValid || !rtdb) {
         // This warning is for developers who haven't set up their .env file.
         // It prevents the app from crashing.
+        console.warn("Firebase Realtime Database is not configured. For local development, please create and populate a .env file as described in the README.");
         return null;
     }
     return rtdb;
@@ -52,14 +53,19 @@ export async function updateSettings(settings: AppSettings) {
     await set(ref(db, 'config/settings'), settingsToSave);
 }
 
-export function onSettingsChange(callback: (settings: AppSettings) => void): () => void {
+export function onSettingsChange(callback: (settings: AppSettings | null) => void): () => void {
     const db = checkConfig();
     if (!db) return () => {};
     const settingsRef = ref(db, 'config/settings');
     const unsubscribe = onValue(settingsRef, (snapshot) => {
         if (snapshot.exists()) {
             callback(snapshot.val());
+        } else {
+            callback(null);
         }
+    }, (error) => {
+        console.error("Error listening to settings changes:", error);
+        callback(null);
     });
     return unsubscribe;
 }

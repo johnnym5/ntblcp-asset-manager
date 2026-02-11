@@ -81,7 +81,7 @@ import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings, clearAssets as clearFirestoreAssets } from "@/lib/firestore";
+import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
@@ -223,7 +223,6 @@ export default function AssetList() {
     assetToView, setAssetToView,
     showProjectSwitchDialog,
     setShowProjectSwitchDialog,
-    setIsSettingsOpen,
     activeDatabase,
     setOnRevertAsset,
   } = useAppState();
@@ -1071,7 +1070,7 @@ export default function AssetList() {
       if (isOnline && isAdmin) {
           addNotification({ title: 'Clearing Cloud Database...', description: `This will remove all assets.` });
           try {
-              const cloudClear = activeDatabase === 'firestore' ? clearFirestoreAssets : clearRtdbAssets;
+              const cloudClear = activeDatabase === 'firestore' ? clearAssetsFS : clearRtdbAssets;
               await cloudClear();
               addNotification({ title: 'All Cloud Assets Cleared', description: 'The application is now in a clean state.' });
           } catch (e) {
@@ -1467,7 +1466,7 @@ export default function AssetList() {
     setAppSettings(newSettings);
     
     try {
-        await updateSettings(newSettings);
+        await updateSettingsFS(newSettings);
         await saveLocalSettings(newSettings);
         toast({ title: 'Layout updated', description: `Column layout changes have been saved.` });
     } catch (e) {
@@ -1487,7 +1486,7 @@ export default function AssetList() {
     setAppSettings(newSettings);
 
     try {
-        await updateSettings(newSettings);
+        await updateSettingsFS(newSettings);
         await saveLocalSettings(newSettings);
         toast({ title: 'Visibility Changed', description: `Sheet '${sheetName}' is now ${newSettings.sheetDefinitions[sheetName].isHidden ? 'hidden' : 'visible'}.` });
     } catch (e) {
