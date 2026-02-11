@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -40,6 +40,9 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Switch } from '../ui/switch';
 import { ImportScannerDialog } from '../single-sheet-import-dialog';
+import { get, ref, set, remove } from 'firebase/database';
+import { rtdb } from '@/lib/firebase';
+import { Textarea } from '../ui/textarea';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -59,6 +62,67 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   const importFileRef = useRef<HTMLInputElement>(null);
   const [backupToRestore, setBackupToRestore] = useState<{ settings: AppSettings, assets: Asset[] } | null>(null);
+
+  // State for Database Browser
+  const [browserPath, setBrowserPath] = useState<string | null>(null);
+  const [browserData, setBrowserData] = useState('');
+  const [isBrowserLoading, setIsBrowserLoading] = useState(false);
+  const [browserError, setBrowserError] = useState<string | null>(null);
+  const [confirmDeletePath, setConfirmDeletePath] = useState<string | null>(null);
+
+
+  const handlePathSelect = useCallback(async (path: string) => {
+    if (!rtdb) {
+      toast({ title: 'Database Not Connected', description: 'Firebase Realtime Database is not available.', variant: 'destructive' });
+      return;
+    }
+    setBrowserPath(path);
+    setIsBrowserLoading(true);
+    setBrowserError(null);
+    setBrowserData('');
+    try {
+        const dataRef = ref(rtdb, path);
+        const snapshot = await get(dataRef);
+        if (snapshot.exists()) {
+            setBrowserData(JSON.stringify(snapshot.val(), null, 2));
+        } else {
+            setBrowserData('// No data exists at this path. You can add some and save.');
+        }
+    } catch (e) {
+        setBrowserError((e as Error).message);
+        toast({ title: 'Error Fetching Data', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+        setIsBrowserLoading(false);
+    }
+  }, [toast]);
+
+  const handleBrowserSave = useCallback(async () => {
+    if (!browserPath || !rtdb) return;
+    setBrowserError(null);
+    try {
+        const dataToSave = JSON.parse(browserData);
+        await set(ref(rtdb, browserPath), dataToSave);
+        toast({ title: 'Data Saved', description: `Data at ${browserPath} has been updated.` });
+    } catch (e) {
+        const errorMessage = 'Invalid JSON: ' + (e as Error).message;
+        setBrowserError(errorMessage);
+        toast({ title: 'Save Failed', description: errorMessage, variant: 'destructive' });
+    }
+  }, [browserPath, browserData, toast]);
+
+  const handlePathDelete = useCallback(async () => {
+    if (!confirmDeletePath || !rtdb) return;
+    try {
+        await remove(ref(rtdb, confirmDeletePath));
+        toast({ title: 'Path Deleted', description: `Successfully deleted ${confirmDeletePath}` });
+        setBrowserPath(null);
+        setBrowserData('');
+    } catch (e) {
+        toast({ title: 'Delete Failed', description: (e as Error).message, variant: 'destructive' });
+    } finally {
+        setConfirmDeletePath(null);
+    }
+  }, [confirmDeletePath, toast]);
 
   const handleImportFromJson = () => {
     importFileRef.current?.click();
@@ -284,7 +348,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-lg flex flex-col">
+        <DialogContent className="max-w-4xl flex flex-col max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><DatabaseZap /> Database Administration</DialogTitle>
             <DialogDescription>
@@ -292,7 +356,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             </DialogDescription>
           </DialogHeader>
           
-          <div className="flex-1 space-y-4">
+          <div className="flex-1 space-y-4 overflow-y-auto pr-2">
               <Card>
                   <CardHeader>
                       <CardTitle>Global Settings</CardTitle>
@@ -310,6 +374,46 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                           </Select>
                       </div>
                   </CardContent>
+              </Card>
+
+              <Card>
+                <CardHeader>
+                    <CardTitle>Database Browser</CardTitle>
+                    <CardDescription>Directly view and edit data in the Realtime Database. Be careful, changes are live.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                    <div className="flex gap-2">
+                        <Button variant={browserPath === '/config' ? 'default' : 'outline'} onClick={() => handlePathSelect('/config')}>Config</Button>
+                        <Button variant={browserPath === '/assets' ? 'default' : 'outline'} onClick={() => handlePathSelect('/assets')}>Assets</Button>
+                    </div>
+                    {browserPath && (
+                        <div className="space-y-2">
+                            <Label>Editing path: <span className="font-mono p-1 bg-muted rounded-md text-xs">{browserPath}</span></Label>
+                            <div className="relative">
+                                <Textarea
+                                    value={browserData}
+                                    onChange={(e) => setBrowserData(e.target.value)}
+                                    rows={15}
+                                    placeholder={isBrowserLoading ? "Loading data..." : "Select a path to view data."}
+                                    disabled={isBrowserLoading}
+                                    className="font-mono text-xs"
+                                />
+                                {isBrowserLoading && (
+                                    <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
+                                        <Loader2 className="h-8 w-8 animate-spin" />
+                                    </div>
+                                )}
+                            </div>
+                             {browserError && <p className="text-sm text-destructive">{browserError}</p>}
+                             <div className="flex justify-between items-center">
+                                <Button onClick={handleBrowserSave} disabled={isBrowserLoading}>Save Changes</Button>
+                                <Button variant="destructive" onClick={() => setConfirmDeletePath(browserPath)} disabled={isBrowserLoading}>
+                                    <Trash2 className="mr-2 h-4 w-4" /> Delete Path
+                                </Button>
+                             </div>
+                        </div>
+                    )}
+                </CardContent>
               </Card>
 
               <Card>
@@ -401,9 +505,28 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
+      
+       <AlertDialog open={!!confirmDeletePath} onOpenChange={() => setConfirmDeletePath(null)}>
+          <AlertDialogContent>
+              <AlertDialogHeader>
+                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                     This will permanently delete the entire path <span className="font-mono p-1 bg-muted rounded-md text-xs">{confirmDeletePath}</span> and all data within it from the Realtime Database. This action cannot be undone.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handlePathDelete} className="bg-destructive hover:bg-destructive/90">
+                      Yes, Delete Path
+                  </AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
+
       <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
     </>
   );
 }
+    
 
     
