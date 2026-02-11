@@ -4,14 +4,14 @@
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileWarning, History, BarChart2, CalendarClock, AlertCircle, ChevronsUpDown } from 'lucide-react';
+import { FileWarning, History, BarChart2, CalendarClock, ChevronsUpDown } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
 import { useAuth } from '@/contexts/auth-context';
-import { NIGERIAN_ZONES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from '@/lib/constants';
+import { NIGERIAN_STATE_CAPITALS, SPECIAL_LOCATIONS, ZONAL_STORES } from '@/lib/constants';
 
 const StatCard = ({ title, value, description, icon, onAction, actionLabel, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, actionLabel?: string, isActive?: boolean }) => {
     const cardContent = (
@@ -86,24 +86,28 @@ export function AssetSummaryDashboard() {
 
 
     const summary = useMemo(() => {
-        if (!appSettings) return { withoutSerial: 0, withoutAssetId: 0, modifiedToday: 0, modifiedThisWeek: 0, missingInfo: 0 };
+        if (!appSettings) return { withoutSerial: 0, withoutAssetId: 0, modifiedToday: 0, modifiedThisWeek: 0, withoutDescription: 0, withoutCategory: 0, withoutLocation: 0, withoutCondition: 0, withoutLga: 0, withoutAssignee: 0, withoutManufacturer: 0, withoutModelNumber: 0 };
         
         const visibleAssets = summaryAssets.filter(a => !appSettings?.sheetDefinitions[a.category]?.isHidden);
 
-        const withoutSerial = visibleAssets.filter(a => !a.sn && !a.serialNumber).length;
-        const withoutAssetId = visibleAssets.filter(a => !a.assetIdCode).length;
-        const modifiedToday = visibleAssets.filter(a => a.lastModified && isToday(parseISO(a.lastModified))).length;
-        const modifiedThisWeek = visibleAssets.filter(a => a.lastModified && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length;
-
-        const criticalInfoFields: (keyof Asset)[] = ['description', 'category', 'location', 'condition'];
-        const missingInfo = visibleAssets.filter(asset => {
-            return criticalInfoFields.some(field => !asset[field] || String(asset[field]).trim() === '');
-        }).length;
-
-        return { withoutSerial, withoutAssetId, modifiedToday, modifiedThisWeek, missingInfo };
+        return {
+          withoutSerial: visibleAssets.filter(a => !a.sn && !a.serialNumber).length,
+          withoutAssetId: visibleAssets.filter(a => !a.assetIdCode?.trim()).length,
+          modifiedToday: visibleAssets.filter(a => a.lastModified && isToday(parseISO(a.lastModified))).length,
+          modifiedThisWeek: visibleAssets.filter(a => a.lastModified && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length,
+          withoutDescription: visibleAssets.filter(a => !a.description?.trim()).length,
+          withoutCategory: visibleAssets.filter(a => !a.category?.trim()).length,
+          withoutLocation: visibleAssets.filter(a => !a.location?.trim()).length,
+          withoutCondition: visibleAssets.filter(a => !a.condition?.trim()).length,
+          withoutLga: visibleAssets.filter(a => !a.lga?.trim()).length,
+          withoutAssignee: visibleAssets.filter(a => !a.assignee?.trim()).length,
+          withoutManufacturer: visibleAssets.filter(a => !a.manufacturer?.trim()).length,
+          withoutModelNumber: visibleAssets.filter(a => !a.modelNumber?.trim()).length,
+        };
     }, [summaryAssets, appSettings]);
     
-    const handleFilterClick = (field: string) => {
+    const handleFilterClick = (field: keyof Asset | '') => {
+        setDateFilter(null);
         if (missingFieldFilter === field) {
             setMissingFieldFilter(''); // Toggle off if active
         } else {
@@ -112,6 +116,7 @@ export function AssetSummaryDashboard() {
     };
 
     const handleDateFilterClick = (filter: 'today' | 'week') => {
+        setMissingFieldFilter('');
         if (dateFilter === filter) {
             setDateFilter(null);
         } else {
@@ -138,7 +143,7 @@ export function AssetSummaryDashboard() {
                 </CollapsibleTrigger>
             </div>
             <CollapsibleContent className="p-4 pt-0 mt-4">
-                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+                <div className="grid grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6">
                     <StatCard
                         title="Missing S/N"
                         value={summary.withoutSerial}
@@ -158,13 +163,76 @@ export function AssetSummaryDashboard() {
                         isActive={missingFieldFilter === 'assetIdCode'}
                     />
                     <StatCard
-                        title="Incomplete Records"
-                        value={summary.missingInfo}
-                        description="Assets missing description, category, location, or condition."
-                        icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />}
-                        onAction={() => handleFilterClick('any_critical')}
-                        actionLabel={missingFieldFilter === 'any_critical' ? "Clear Filter" : "View Assets"}
-                        isActive={missingFieldFilter === 'any_critical'}
+                        title="Missing Description"
+                        value={summary.withoutDescription}
+                        description="Assets without a description."
+                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('description')}
+                        actionLabel={missingFieldFilter === 'description' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'description'}
+                    />
+                    <StatCard
+                        title="Missing Category"
+                        value={summary.withoutCategory}
+                        description="Assets without a category."
+                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('category')}
+                        actionLabel={missingFieldFilter === 'category' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'category'}
+                    />
+                     <StatCard
+                        title="Missing Location"
+                        value={summary.withoutLocation}
+                        description="Assets missing a location."
+                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('location')}
+                        actionLabel={missingFieldFilter === 'location' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'location'}
+                    />
+                     <StatCard
+                        title="Missing Condition"
+                        value={summary.withoutCondition}
+                        description="Assets missing a condition."
+                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('condition')}
+                        actionLabel={missingFieldFilter === 'condition' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'condition'}
+                    />
+                     <StatCard
+                        title="Missing LGA"
+                        value={summary.withoutLga}
+                        description="Assets missing an LGA."
+                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('lga')}
+                        actionLabel={missingFieldFilter === 'lga' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'lga'}
+                    />
+                     <StatCard
+                        title="Missing Assignee"
+                        value={summary.withoutAssignee}
+                        description="Assets missing an assignee."
+                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('assignee')}
+                        actionLabel={missingFieldFilter === 'assignee' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'assignee'}
+                    />
+                     <StatCard
+                        title="Missing Manufacturer"
+                        value={summary.withoutManufacturer}
+                        description="Assets missing a manufacturer."
+                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('manufacturer')}
+                        actionLabel={missingFieldFilter === 'manufacturer' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'manufacturer'}
+                    />
+                     <StatCard
+                        title="Missing Model"
+                        value={summary.withoutModelNumber}
+                        description="Assets missing a model number."
+                        icon={<FileWarning className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('modelNumber')}
+                        actionLabel={missingFieldFilter === 'modelNumber' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'modelNumber'}
                     />
                     <StatCard
                         title="Modified Today"

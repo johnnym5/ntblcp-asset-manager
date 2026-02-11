@@ -1,3 +1,4 @@
+
 "use client";
 
 import React from 'react';
@@ -49,12 +50,16 @@ interface AssetFilterSheetProps {
 const fieldsToFilter: { label: string, value: keyof Asset }[] = [
     { label: 'S/N', value: 'sn' },
     { label: 'Serial Number', value: 'serialNumber' },
+    { label: 'Asset ID Code', value: 'assetIdCode' },
+    { label: 'Description', value: 'description' },
+    { label: 'Category', value: 'category' },
     { label: 'Location', value: 'location' },
+    { label: 'LGA', value: 'lga' },
     { label: 'Assignee', value: 'assignee' },
     { label: 'Condition', value: 'condition' },
-    { label: 'Asset ID Code', value: 'assetIdCode' },
     { label: 'Manufacturer', value: 'manufacturer' },
-    { label: 'LGA', value: 'lga' },
+    { label: 'Model Number', value: 'modelNumber' },
+    { label: 'Asset Class', value: 'assetClass' },
 ];
 
 const FilterSection = ({ title, options, selected, onChange }: {
@@ -137,12 +142,13 @@ export function AssetFilterSheet({
   setMissingFieldFilter,
 }: AssetFilterSheetProps) {
   
-  const { appSettings } = useAppState();
+  const { appSettings, setDateFilter } = useAppState();
   const handleClearAll = () => {
     setSelectedLocations([]);
     setSelectedAssignees([]);
     setSelectedStatuses([]);
     setMissingFieldFilter('');
+    setDateFilter(null);
   };
 
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
@@ -184,7 +190,7 @@ export function AssetFilterSheet({
           <Separator />
            <div className="space-y-3">
             <Label className="font-semibold">Find Assets with Missing Fields</Label>
-            <RadioGroup value={missingFieldFilter} onValueChange={setMissingFieldFilter}>
+            <RadioGroup value={missingFieldFilter} onValueChange={(value) => { setMissingFieldFilter(value); setDateFilter(null);}}>
               <ScrollArea className="h-[150px] rounded-md border p-2">
                 <div className="space-y-1">
                  <div className="flex items-center space-x-2 p-1">

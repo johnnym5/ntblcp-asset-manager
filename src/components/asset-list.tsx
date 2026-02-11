@@ -689,13 +689,7 @@ export default function AssetList() {
             const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
             const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
             
-            const criticalInfoFields: (keyof Asset)[] = ['description', 'category', 'location', 'condition'];
-            const isMissingCritical = criticalInfoFields.some(field => !asset[field] || String(asset[field]).trim() === '');
-            
-            const missingFieldMatch = !missingFieldFilter || 
-                                      (missingFieldFilter === 'any_critical' 
-                                          ? isMissingCritical
-                                          : !asset[missingFieldFilter as keyof Asset]);
+            const missingFieldMatch = !missingFieldFilter || !asset[missingFieldFilter as keyof Asset];
 
             let dateMatch = true;
             if (dateFilter) {
