@@ -90,6 +90,7 @@ export interface AppSettings {
   appMode: 'management' | 'verification';
   locations?: string[];
   defaultDataSource?: 'cloud' | 'local_locked';
+  defaultDatabase?: 'firestore' | 'rtdb';
   lastModified?: string;
   lastModifiedBy?: {
     displayName: string;

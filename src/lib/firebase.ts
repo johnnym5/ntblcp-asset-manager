@@ -1,6 +1,7 @@
 // Import the necessary functions from the Firebase SDKs.
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getDatabase, type Database } from 'firebase/database';
 
 // Your web app's Firebase configuration is now loaded from environment variables.
 export const firebaseConfig = {
@@ -10,6 +11,7 @@ export const firebaseConfig = {
   storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
   messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
+  databaseURL: `https://${process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID}.firebaseio.com`
 };
 
 
@@ -20,6 +22,7 @@ export const isConfigValid =
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
+let rtdb: Database | undefined;
 
 // Initialize Firebase only on the client side and if config is valid
 if (typeof window !== 'undefined') {
@@ -27,6 +30,7 @@ if (typeof window !== 'undefined') {
     try {
       app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
       db = getFirestore(app);
+      rtdb = getDatabase(app);
     } catch (e) {
       console.error("Firebase initialization error:", e);
     }
@@ -37,4 +41,4 @@ if (typeof window !== 'undefined') {
 }
 
 // Export the initialized services for use throughout the app.
-export { app, db };
+export { app, db, rtdb };

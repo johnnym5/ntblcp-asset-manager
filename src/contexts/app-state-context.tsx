@@ -5,7 +5,7 @@ import { createContext, useContext, useState, type ReactNode, type Dispatch, typ
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { NIGERIAN_STATES, HEADER_DEFINITIONS, ZONAL_STORES, SPECIAL_LOCATIONS } from '@/lib/constants';
 import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
-import { getSettings, updateSettings } from '@/lib/firestore';
+import { getSettings } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
 
@@ -98,6 +98,10 @@ interface AppStateContextType {
   // Project Switch
   showProjectSwitchDialog: boolean;
   setShowProjectSwitchDialog: Dispatch<SetStateAction<boolean>>;
+
+  // Active Database
+  activeDatabase: 'firestore' | 'rtdb';
+  setActiveDatabase: Dispatch<SetStateAction<'firestore' | 'rtdb'>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -137,6 +141,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     locations: defaultInitialLocations,
     settingsHistory: [],
     defaultDataSource: 'cloud',
+    defaultDatabase: 'firestore',
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isBrowserOnline, setIsBrowserOnline] = useState(true);
@@ -152,6 +157,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [initialSettingsTab, setInitialSettingsTab] = useState('general');
 
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
+  const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>('firestore');
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -206,6 +212,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           locations: defaultInitialLocations,
           settingsHistory: [],
           defaultDataSource: 'cloud',
+          defaultDatabase: 'firestore',
         };
       } else {
         if (!localSettings.locations) {
@@ -231,6 +238,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       setAppSettings(localSettings);
       if (localSettings.defaultDataSource) {
         setDataSource(localSettings.defaultDataSource);
+      }
+      if (localSettings.defaultDatabase) {
+        setActiveDatabase(localSettings.defaultDatabase);
       }
       await saveLocalSettings(localSettings);
       
@@ -306,6 +316,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     isSettingsOpen, setIsSettingsOpen,
     initialSettingsTab, setInitialSettingsTab,
     showProjectSwitchDialog, setShowProjectSwitchDialog,
+    activeDatabase, setActiveDatabase,
   };
 
   return (
