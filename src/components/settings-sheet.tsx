@@ -32,7 +32,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useAppState } from '@/contexts/app-state-context';
 import { updateSettings as updateSettingsFS } from '@/lib/firestore';
-import { updateSettings as updateSettingsRTDB } from '@/lib/database';
+import { updateSettingsRTDB } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
@@ -710,3 +710,5 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     </>
   );
 }
+
+    
