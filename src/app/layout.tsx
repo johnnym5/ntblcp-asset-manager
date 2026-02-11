@@ -18,6 +18,7 @@ export const metadata: Metadata = {
   title: 'Global Asset Hub',
   description: 'A full-featured, offline-first web app to manage assets efficiently.',
   manifest: '/manifest.json',
+  icons: null,
 };
 
 export default function RootLayout({
