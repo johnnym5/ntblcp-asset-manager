@@ -4,8 +4,8 @@
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
 import { db, isConfigValid } from '@/lib/firebase';
 import type { Asset, AppSettings, HistoricalAppSettings } from '@/lib/types';
-import { errorEmitter } from '@/lib/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors';
+import { addNotification } from '@/hooks/use-notifications';
+
 
 // Helper function to ensure Firebase is properly configured before use.
 const checkConfig = () => {
@@ -14,18 +14,6 @@ const checkConfig = () => {
     }
     return db;
 }
-
-const handleFirestoreError = (error: any, context: Omit<SecurityRuleContext, 'requestResourceData'>) => {
-    const failoverErrorCodes = ['permission-denied', 'resource-exhausted', 'unavailable', 'unauthenticated'];
-    if (failoverErrorCodes.includes(error?.code)) {
-        const permissionError = new FirestorePermissionError({
-            ...context,
-        });
-        errorEmitter.emit('permission-error', permissionError);
-    }
-    throw error;
-}
-
 
 // --- App Settings ---
 export async function getSettings(): Promise<AppSettings | null> {
@@ -38,7 +26,12 @@ export async function getSettings(): Promise<AppSettings | null> {
         }
         return null;
     } catch (serverError) {
-        handleFirestoreError(serverError, { path: 'config/settings', operation: 'get' });
+        console.error("Firestore getSettings failed:", serverError);
+        addNotification({
+            title: "Could Not Load Cloud Settings",
+            description: "The application will use local settings. Some features may be unavailable.",
+            variant: "destructive"
+        });
         return null;
     }
 }
@@ -58,7 +51,14 @@ export async function updateSettings(settings: AppSettings) {
   }
   
   const settingsRef = doc(firestoreDb, 'config', 'settings');
-  await setDoc(settingsRef, settingsToSave);
+  setDoc(settingsRef, settingsToSave).catch((error) => {
+    console.error("Firestore updateSettings failed:", error);
+    addNotification({
+      title: "Cloud Sync Failed",
+      description: "Settings were saved locally but could not be synced to the cloud.",
+      variant: "destructive",
+    });
+  });
 }
 
 
@@ -76,7 +76,12 @@ export async function getAssets(): Promise<Asset[]> {
         });
         return fetchedAssets;
     } catch (serverError) {
-        handleFirestoreError(serverError, { path: 'assets', operation: 'list' });
+        console.error("Firestore getAssets failed:", serverError);
+        addNotification({
+            title: "Could Not Load Cloud Assets",
+            description: "The application will use local data. Go online to sync.",
+            variant: "destructive"
+        });
         return []; // return empty on error
     }
 }
@@ -84,28 +89,28 @@ export async function getAssets(): Promise<Asset[]> {
 export async function updateAsset(asset: Asset) {
     const db = checkConfig();
     const assetRef = doc(db, 'assets', asset.id);
-    try {
-        await setDoc(assetRef, { ...asset, lastModified: new Date().toISOString() }, { merge: true });
-    } catch (serverError) {
-        handleFirestoreError(serverError, {
-            path: assetRef.path,
-            operation: 'update',
-            requestResourceData: asset,
+    setDoc(assetRef, { ...asset, lastModified: new Date().toISOString() }, { merge: true })
+        .catch((error) => {
+          console.error("Firestore updateAsset failed:", error);
+          addNotification({
+            title: "Cloud Sync Failed",
+            description: `Changes to "${asset.description}" were saved locally but could not be synced.`,
+            variant: "destructive",
+          });
         });
-    }
 }
 
 export async function deleteAsset(assetId: string) {
     const db = checkConfig();
     const assetRef = doc(db, 'assets', assetId);
-    try {
-        await deleteDoc(assetRef);
-    } catch(serverError) {
-        handleFirestoreError(serverError, {
-            path: assetRef.path,
-            operation: 'delete',
+    deleteDoc(assetRef).catch((error) => {
+        console.error("Firestore deleteAsset failed:", error);
+        addNotification({
+            title: "Cloud Sync Failed",
+            description: "Deletion was successful locally but could not be synced.",
+            variant: "destructive",
         });
-    }
+    });
 }
 
 
@@ -120,14 +125,14 @@ export async function batchSetAssets(assets: Asset[]) {
             const docRef = doc(assetsCollectionRef, asset.id);
             batch.set(docRef, { ...asset, lastModified: asset.lastModified || new Date().toISOString() });
         });
-        try {
-            await batch.commit();
-        } catch(serverError) {
-             handleFirestoreError(serverError, {
-                path: assetsCollectionRef.path,
-                operation: 'update',
+        batch.commit().catch((error) => {
+            console.error("Firestore batchSetAssets failed:", error);
+            addNotification({
+                title: "Batch Cloud Sync Failed",
+                description: "Some changes were saved locally but could not be synced.",
+                variant: "destructive",
             });
-        }
+        });
     }
 }
 
@@ -141,6 +146,13 @@ export async function batchDeleteAssets(assetIds: string[]) {
             const docRef = doc(db, 'assets', assetId);
             batch.delete(docRef);
         });
-        await batch.commit(); // This might throw an error handled by caller
+        batch.commit().catch((error) => {
+            console.error("Firestore batchDeleteAssets failed:", error);
+            addNotification({
+                title: "Batch Cloud Deletion Failed",
+                description: "Some deletions were successful locally but could not be synced.",
+                variant: "destructive",
+            });
+        });
     }
 }
