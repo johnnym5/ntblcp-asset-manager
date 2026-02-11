@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -60,6 +59,7 @@ const fieldsToFilter: { label: string, value: keyof Asset }[] = [
     { label: 'Manufacturer', value: 'manufacturer' },
     { label: 'Model Number', value: 'modelNumber' },
     { label: 'Engine Number', value: 'engineNo' },
+    { label: 'Chasis Number', value: 'chasisNo' },
     { label: 'Asset Class', value: 'assetClass' },
 ];
 
