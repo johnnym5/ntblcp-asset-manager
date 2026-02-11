@@ -7,16 +7,17 @@ import AssetList from '@/components/asset-list';
 import { Loader2 } from 'lucide-react';
 import UserProfileSetup from '@/components/user-profile-setup';
 import { useAppState } from '@/contexts/app-state-context';
+import InitialSetup from '@/components/initial-setup';
 
 export default function Page() {
-  const { userProfile, loading, profileSetupComplete } = useAuth();
+  const { userProfile, loading, profileSetupComplete, initialSetupPending } = useAuth();
   const { setGlobalStateFilter } = useAppState();
 
   useEffect(() => {
-    if (userProfile && profileSetupComplete) {
+    if (userProfile && (profileSetupComplete || initialSetupPending)) {
       setGlobalStateFilter(userProfile.state || '');
     }
-  }, [userProfile, profileSetupComplete, setGlobalStateFilter]);
+  }, [userProfile, profileSetupComplete, initialSetupPending, setGlobalStateFilter]);
 
   if (loading) {
     return (
@@ -24,6 +25,10 @@ export default function Page() {
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
+  }
+
+  if (initialSetupPending) {
+    return <InitialSetup />;
   }
 
   if (!profileSetupComplete) {
