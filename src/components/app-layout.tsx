@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -43,12 +44,12 @@ import { Input } from "./ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
 import { SettingsSheet } from "./settings-sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import { AssetFilterSheet } from "./asset-filter-sheet";
+import { AssetFilterDialog } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
 import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
 import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
-import { ActivityLogSheet } from "./admin/activity-log-sheet";
+import { ActivityLogDialog } from "./admin/activity-log-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 
 
@@ -76,9 +77,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
   const [isDbAdminOpen, setIsDbAdminOpen] = useState(false);
-  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isActivityLogOpen, setIsActivityLogOpen] = useState(false);
+  const [isActivityLogDialogOpen, setIsActivityLogDialogOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
 
@@ -342,7 +343,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   )}
 
                   {userProfile?.isAdmin && (
-                    <DropdownMenuItem onClick={() => setIsActivityLogOpen(true)}>
+                    <DropdownMenuItem onClick={() => setIsActivityLogDialogOpen(true)}>
                       <History className="mr-2 h-4 w-4"/>
                       Recent Activity
                     </DropdownMenuItem>
@@ -391,7 +392,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             </DropdownMenuContent>
                         </DropdownMenu>
 
-                         <Button variant="ghost" size="icon" className="h-8 w-8 relative" onClick={() => setIsFilterSheetOpen(true)}>
+                         <Button variant="ghost" size="icon" className="h-8 w-8 relative" onClick={() => setIsFilterDialogOpen(true)}>
                             <Filter className="h-4 w-4" />
                             {activeFilterCount > 0 && (
                                 <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
@@ -417,11 +418,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <DatabaseAdminDialog isOpen={isDbAdminOpen} onOpenChange={setIsDbAdminOpen} />
       )}
       {userProfile?.isAdmin && (
-        <ActivityLogSheet isOpen={isActivityLogOpen} onOpenChange={setIsActivityLogOpen} onRevert={onRevertAsset} />
+        <ActivityLogDialog isOpen={isActivityLogDialogOpen} onOpenChange={setIsActivityLogDialogOpen} onRevert={onRevertAsset} />
       )}
-      <AssetFilterSheet
-        isOpen={isFilterSheetOpen}
-        onOpenChange={setIsFilterSheetOpen}
+      <AssetFilterDialog
+        isOpen={isFilterDialogOpen}
+        onOpenChange={setIsFilterDialogOpen}
         locationOptions={locationOptions}
         selectedLocations={selectedLocations}
         setSelectedLocations={setSelectedLocations}

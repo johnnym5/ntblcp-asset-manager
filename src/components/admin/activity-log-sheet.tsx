@@ -3,14 +3,14 @@
 
 import React, { useState } from 'react';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-  SheetClose,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { ScrollArea } from '../ui/scroll-area';
@@ -34,7 +34,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface ActivityLogSheetProps {
+interface ActivityLogDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onRevert: (assetId: string) => Promise<void>;
@@ -51,7 +51,7 @@ const ChangeDetail = ({ label, oldValue, newValue }: { label: string, oldValue?:
     );
 };
 
-export function ActivityLogSheet({ isOpen, onOpenChange, onRevert }: ActivityLogSheetProps) {
+export function ActivityLogDialog({ isOpen, onOpenChange, onRevert }: ActivityLogDialogProps) {
   const { assets } = useAppState();
   const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
   const [isConfirmRevertOpen, setIsConfirmRevertOpen] = useState(false);
@@ -106,14 +106,14 @@ export function ActivityLogSheet({ isOpen, onOpenChange, onRevert }: ActivityLog
 
   return (
     <>
-      <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-3xl flex flex-col">
-          <SheetHeader className="p-6 pb-4">
-            <SheetTitle className="flex items-center gap-2"><History /> Recent Activity</SheetTitle>
-            <SheetDescription>
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="max-w-3xl flex flex-col max-h-[90vh]">
+          <DialogHeader className="p-6 pb-4">
+            <DialogTitle className="flex items-center gap-2"><History /> Recent Activity</DialogTitle>
+            <DialogDescription>
               Review changes made to assets across the system. You can revert the last change for any asset here.
-            </SheetDescription>
-          </SheetHeader>
+            </DialogDescription>
+          </DialogHeader>
           <ScrollArea className="flex-1 px-6 py-4">
             {Object.keys(activitiesByUser).length > 0 ? (
               <Accordion type="multiple" className="w-full space-y-2">
@@ -212,16 +212,16 @@ export function ActivityLogSheet({ isOpen, onOpenChange, onRevert }: ActivityLog
               </div>
             )}
           </ScrollArea>
-          <SheetFooter className="p-6 pt-4 border-t sm:justify-between">
+          <DialogFooter className="p-6 pt-4 border-t sm:justify-between">
             <Button variant="destructive" disabled={selectedAssetIds.length === 0} onClick={() => setIsConfirmRevertOpen(true)}>
               <RotateCcw className="mr-2 h-4 w-4" /> Revert ({selectedAssetIds.length}) Selected
             </Button>
-            <SheetClose asChild>
+            <DialogClose asChild>
               <Button variant="outline">Close</Button>
-            </SheetClose>
-          </SheetFooter>
-        </SheetContent>
-      </Sheet>
+            </DialogClose>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={isConfirmRevertOpen} onOpenChange={setIsConfirmRevertOpen}>
           <AlertDialogContent>

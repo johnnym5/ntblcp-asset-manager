@@ -1,15 +1,16 @@
+
 "use client";
 
 import React from 'react';
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetFooter,
-  SheetClose,
-} from '@/components/ui/sheet';
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+  DialogClose,
+} from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Check } from 'lucide-react';
 import { cn } from "@/lib/utils";
@@ -26,7 +27,7 @@ export interface OptionType {
   count?: number;
 }
 
-interface AssetFilterSheetProps {
+interface AssetFilterDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   
@@ -127,7 +128,7 @@ const FilterSection = ({ title, options, selected, onChange }: {
   );
 };
 
-export function AssetFilterSheet({
+export function AssetFilterDialog({
   isOpen,
   onOpenChange,
   locationOptions,
@@ -141,7 +142,7 @@ export function AssetFilterSheet({
   setSelectedStatuses,
   missingFieldFilter,
   setMissingFieldFilter,
-}: AssetFilterSheetProps) {
+}: AssetFilterDialogProps) {
   
   const { appSettings, setDateFilter } = useAppState();
   const handleClearAll = () => {
@@ -155,14 +156,14 @@ export function AssetFilterSheet({
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
 
   return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="flex flex-col">
-        <SheetHeader>
-          <SheetTitle>Filter Assets</SheetTitle>
-          <SheetDescription>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
+      <DialogContent className="flex flex-col max-h-[90vh]">
+        <DialogHeader>
+          <DialogTitle>Filter Assets</DialogTitle>
+          <DialogDescription>
             Refine the asset list by selecting criteria below.
-          </SheetDescription>
-        </SheetHeader>
+          </DialogDescription>
+        </DialogHeader>
         <div className="flex-1 space-y-6 overflow-y-auto pr-2 py-4">
           <FilterSection
             title="Location"
@@ -209,15 +210,15 @@ export function AssetFilterSheet({
             </RadioGroup>
           </div>
         </div>
-        <SheetFooter className="mt-auto pt-4 border-t">
+        <DialogFooter className="mt-auto pt-4 border-t">
            <Button variant="outline" onClick={handleClearAll} disabled={activeFilterCount === 0}>
             Clear All Filters
           </Button>
-          <SheetClose asChild>
+          <DialogClose asChild>
             <Button>Done</Button>
-          </SheetClose>
-        </SheetFooter>
-      </SheetContent>
-    </Sheet>
+          </DialogClose>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
