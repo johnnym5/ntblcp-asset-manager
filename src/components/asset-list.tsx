@@ -82,7 +82,7 @@ import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-for
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings } from "@/lib/firestore";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets } from "@/lib/idb";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { TravelReportDialog } from "./travel-report-dialog";
@@ -222,6 +222,7 @@ export default function AssetList() {
     setDataActions,
     showProjectSwitchDialog,
     setShowProjectSwitchDialog,
+    setIsSettingsOpen,
   } = useAppState();
 
   const { lockAssetList, sheetDefinitions } = appSettings;
@@ -610,19 +611,34 @@ export default function AssetList() {
 
   const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
     if (!config) return assetsToSort;
+
+    const dateFields = new Set(['lastModified', 'verifiedDate', 'dateReceived']);
+
     return [...assetsToSort].sort((a, b) => {
+        const aVal = a[config.key];
+        const bVal = b[config.key];
+
+        if (config.key && dateFields.has(config.key)) {
+            const dateA = aVal ? new Date(aVal as string).getTime() : 0;
+            const dateB = bVal ? new Date(bVal as string).getTime() : 0;
+            if (dateA < dateB) return config.direction === 'asc' ? 1 : -1;
+            if (dateA > dateB) return config.direction === 'asc' ? -1 : 1;
+            return 0;
+        }
+
         if (config.key === 'sn') {
-            const numA = Number(a.sn) || 0;
-            const numB = Number(b.sn) || 0;
+            const numA = Number(aVal) || 0;
+            const numB = Number(bVal) || 0;
             if (numA < numB) return config.direction === 'asc' ? -1 : 1;
             if (numA > numB) return config.direction === 'asc' ? 1 : -1;
             return 0;
         }
         
-        const aVal = a[config.key] ?? '';
-        const bVal = b[config.key] ?? '';
-        if (aVal < bVal) return config.direction === 'asc' ? -1 : 1;
-        if (aVal > bVal) return config.direction === 'asc' ? 1 : -1;
+        const strA = String(aVal ?? '').toLowerCase();
+        const strB = String(bVal ?? '').toLowerCase();
+
+        if (strA < strB) return config.direction === 'asc' ? -1 : 1;
+        if (strA > strB) return config.direction === 'asc' ? 1 : -1;
         return 0;
     });
   };
@@ -1630,6 +1646,11 @@ export default function AssetList() {
                         </SelectContent>
                       </Select>
                     )}
+                     {isAdmin && !lockAssetList && (
+                        <Button variant="outline" className="w-full md:w-auto" onClick={() => setIsSettingsOpen(true)}>
+                            <PlusCircle className="mr-2 h-4 w-4" /> Add or Manage Sheets
+                        </Button>
+                    )}
                     <div className="flex items-center justify-end gap-4 w-full">
                       <div className="flex items-center space-x-2">
                         <Label htmlFor="select-all-categories" className="text-sm font-medium whitespace-nowrap">Select All</Label>
@@ -1710,7 +1731,8 @@ export default function AssetList() {
           asset={selectedAsset} 
           onSave={handleSaveAsset}
           onQuickSave={handleQuickSaveAsset}
-          isReadOnly={isFormReadOnly} 
+          isReadOnly={isFormReadOnly}
+          defaultCategory={currentCategory || undefined}
         />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
         <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
@@ -1836,16 +1858,22 @@ export default function AssetList() {
                 <h2 className="text-2xl font-bold tracking-tight">
                     {currentCategory}
                 </h2>
-                <div className="flex items-center space-x-2">
-                    <Checkbox
-                        id="select-all-in-table-mobile"
-                        checked={areAllCategoryResultsSelected}
-                        onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
-                        aria-label="Select all in this category"
-                        disabled={isGuest}
-                    />
-                    <Label htmlFor="select-all-in-table-mobile" className="text-sm font-medium">Select All</Label>
-                </div>
+                {(!lockAssetList || dataSource === 'local_locked') && (userProfile?.canAddAssets || isAdmin) && (
+                  <Button variant="outline" size="sm" onClick={handleAddAsset}>
+                    <PlusCircle className="mr-2 h-4 w-4"/>
+                    Add Asset
+                  </Button>
+                )}
+            </div>
+            <div className="flex items-center space-x-2">
+                <Checkbox
+                    id="select-all-in-table-mobile"
+                    checked={areAllCategoryResultsSelected}
+                    onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
+                    aria-label="Select all in this category"
+                    disabled={isGuest}
+                />
+                <Label htmlFor="select-all-in-table-mobile" className="text-sm font-medium">Select All</Label>
             </div>
             {selectedAssetIds.length > 0 && (
                 <div className="flex items-center gap-2">
@@ -2000,6 +2028,7 @@ export default function AssetList() {
           onSave={handleSaveAsset} 
           onQuickSave={handleQuickSaveAsset}
           isReadOnly={isFormReadOnly}
+          defaultCategory={currentCategory || undefined}
         />
         <AssetBatchEditForm 
             isOpen={isBatchEditOpen} 
@@ -2025,7 +2054,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-
-
-    
