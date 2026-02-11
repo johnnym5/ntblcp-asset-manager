@@ -1929,7 +1929,7 @@ export default function AssetList() {
                           </div>
                           <div className="flex-1 min-w-0" onClick={() => handleViewAsset(asset)}>
                               <CardTitle className="text-base truncate">{asset.description || 'No Description'}</CardTitle>
-                              <CardDescription className="flex items-center gap-2">
+                              <CardDescription className="flex items-center gap-2 truncate">
                                   {asset.syncStatus === 'local' && (
                                       <TooltipProvider>
                                           <Tooltip>
@@ -1970,7 +1970,7 @@ export default function AssetList() {
                                 if (value === null || value === undefined || String(value).trim() === '') return null;
                                 
                                 return (
-                                    <div key={field.key} className="space-y-1">
+                                    <div key={field.key} className="space-y-1 overflow-hidden">
                                         <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
                                         <p className="text-sm font-medium truncate">{String(value)}</p>
                                     </div>
@@ -2054,3 +2054,4 @@ export default function AssetList() {
     </div>
   );
 }
+
