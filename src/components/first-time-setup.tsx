@@ -6,18 +6,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { getAssets as getAssetsRTDB, getSettings } from '@/lib/database';
 import { saveAssets, saveLocalSettings } from '@/lib/idb';
-import { useAppState } from '@/contexts/app-state-context';
 import { addNotification } from '@/hooks/use-notifications';
+import { useAppState } from '@/contexts/app-state-context';
 
 export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => void }) {
   const [status, setStatus] = useState<'loading' | 'downloading' | 'finished' | 'error'>('loading');
   const [error, setError] = useState<string | null>(null);
-  const { setAppSettings, setAssets } = useAppState();
+  const [timeout, setTimeoutValue] = useState(20000); // Start with 20 seconds
 
   const performInitialSetup = useCallback(async () => {
     setStatus('downloading');
     setError(null);
+    
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), timeout);
+
       // 1. Fetch Settings from the primary database (RTDB)
       const settings = await getSettings();
       if (!settings) {
@@ -27,34 +31,37 @@ export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => voi
       // 2. Fetch Assets from the primary database (RTDB)
       const assets = await getAssetsRTDB();
 
+      clearTimeout(timeoutId);
+
       // 3. Save both to local IndexedDB
       await saveLocalSettings(settings);
       await saveAssets(assets.map(a => ({...a, syncStatus: 'synced'})));
 
-      // 4. Update the application's global state
-      setAppSettings(settings);
-      setAssets(assets.map(a => ({...a, syncStatus: 'synced'})));
-
+      localStorage.setItem('app-setup-complete', 'true');
+      
       setStatus('finished');
       addNotification({ title: 'Setup Complete', description: 'Application data has been downloaded successfully.' });
 
     } catch (e: any) {
       console.error("First time setup failed:", e);
       let errorMessage = e.message || 'An unknown error occurred.';
-      if (errorMessage.includes('auth/network-request-failed') || errorMessage.includes('net::ERR_INTERNET_DISCONNECTED')) {
+      if (e.name === 'AbortError') {
+        errorMessage = `The operation timed out after ${timeout / 1000} seconds. Your connection may be slow.`;
+      } else if (errorMessage.includes('auth/network-request-failed') || errorMessage.includes('net::ERR_INTERNET_DISCONNECTED')) {
           errorMessage = "Could not connect to the database. Please check your internet connection and try again.";
       }
       setError(errorMessage);
       setStatus('error');
     }
-  }, [setAppSettings, setAssets]);
+  }, [timeout]);
 
   useEffect(() => {
     performInitialSetup();
   }, [performInitialSetup]);
 
   const handleRetry = () => {
-    performInitialSetup();
+    setTimeoutValue(current => current + 10000); // Add 10 seconds to timeout
+    // The useEffect watching performInitialSetup will re-run with the new timeout.
   };
 
   const renderContent = () => {
@@ -114,7 +121,7 @@ export function FirstTimeSetup({ onSetupComplete }: { onSetupComplete: () => voi
                 {error}
               </p>
               <Button className="w-full" onClick={handleRetry}>
-                Retry Download
+                Retry Download (Timeout: {(timeout + 10000) / 1000}s)
               </Button>
             </CardContent>
           </>

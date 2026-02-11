@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import AppLayout from '@/components/app-layout';
 import AssetList from '@/components/asset-list';
@@ -12,21 +12,12 @@ import { FirstTimeSetup } from '@/components/first-time-setup';
 export default function Page() {
   const { userProfile, loading: authLoading, profileSetupComplete } = useAuth();
   const { setGlobalStateFilter, settingsLoaded, appSettings } = useAppState();
-  
-  // This state is just to force a re-render after setup is done *in the same session*.
-  const [setupSessionComplete, setSetupSessionComplete] = useState(false);
 
   useEffect(() => {
     if (profileSetupComplete && userProfile) {
       setGlobalStateFilter(userProfile.state || '');
     }
   }, [profileSetupComplete, userProfile, setGlobalStateFilter]);
-
-  const handleSetupComplete = () => {
-    // When setup is done, AppStateProvider will have new appSettings.
-    // This state flip forces the page component to re-evaluate its logic.
-    setSetupSessionComplete(true);
-  };
 
   // While we wait for settings to be loaded from IDB
   if (!settingsLoaded) {
@@ -37,9 +28,9 @@ export default function Page() {
     );
   }
 
-  // If settings have been checked and are null, it's a first run.
-  if (!appSettings && !setupSessionComplete) {
-    return <FirstTimeSetup onSetupComplete={handleSetupComplete} />;
+  // If settings have been checked and are confirmed to be null, it's a first run.
+  if (!appSettings) {
+    return <FirstTimeSetup onSetupComplete={() => window.location.reload()} />;
   }
   
   // If not the first run, proceed with the normal auth flow
