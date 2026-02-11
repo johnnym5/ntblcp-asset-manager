@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -36,7 +37,7 @@ const StatCard = ({ title, value, description, icon, onAction, actionLabel, isAc
 };
 
 export function AssetSummaryDashboard() {
-    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings } = useAppState();
+    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter } = useAppState();
     const [isOpen, setIsOpen] = useState(false);
     
     const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
@@ -57,11 +58,19 @@ export function AssetSummaryDashboard() {
         return { withoutSerial, withoutAssetId, modifiedToday, modifiedThisWeek, missingInfo };
     }, [activeAssets, appSettings]);
     
-    const handleFilterClick = (field: keyof Asset | '') => {
+    const handleFilterClick = (field: string) => {
         if (missingFieldFilter === field) {
             setMissingFieldFilter(''); // Toggle off if active
         } else {
             setMissingFieldFilter(field);
+        }
+    };
+
+    const handleDateFilterClick = (filter: 'today' | 'week') => {
+        if (dateFilter === filter) {
+            setDateFilter(null);
+        } else {
+            setDateFilter(filter);
         }
     };
 
@@ -107,18 +116,27 @@ export function AssetSummaryDashboard() {
                         value={summary.missingInfo}
                         description="Assets missing description, category, location, or condition."
                         icon={<AlertCircle className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleFilterClick('any_critical')}
+                        actionLabel={missingFieldFilter === 'any_critical' ? "Clear Filter" : "View Assets"}
+                        isActive={missingFieldFilter === 'any_critical'}
                     />
                     <StatCard
                         title="Modified Today"
                         value={summary.modifiedToday}
                         description="Assets created or updated today."
                         icon={<CalendarClock className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleDateFilterClick('today')}
+                        actionLabel={dateFilter === 'today' ? "Clear Filter" : "View Assets"}
+                        isActive={dateFilter === 'today'}
                     />
                     <StatCard
                         title="Modified This Week"
                         value={summary.modifiedThisWeek}
                         description="Assets created or updated in the last 7 days."
                         icon={<History className="h-4 w-4 text-muted-foreground" />}
+                        onAction={() => handleDateFilterClick('week')}
+                        actionLabel={dateFilter === 'week' ? "Clear Filter" : "View Assets"}
+                        isActive={dateFilter === 'week'}
                     />
                 </div>
             </CollapsibleContent>

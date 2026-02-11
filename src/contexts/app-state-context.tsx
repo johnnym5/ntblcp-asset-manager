@@ -48,6 +48,8 @@ interface AppStateContextType {
   setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
   missingFieldFilter: string;
   setMissingFieldFilter: Dispatch<SetStateAction<string>>;
+  dateFilter: 'today' | 'week' | null;
+  setDateFilter: Dispatch<SetStateAction<'today' | 'week' | null>>;
 
   // Filter Options
   locationOptions: OptionType[];
@@ -115,6 +117,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState<'today' | 'week' | null>(null);
 
   const [locationOptions, setLocationOptions] = useState<OptionType[]>([]);
   const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
@@ -255,6 +258,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setSelectedStatuses,
     missingFieldFilter,
     setMissingFieldFilter,
+    dateFilter,
+    setDateFilter,
     locationOptions,
     setLocationOptions,
     assigneeOptions,

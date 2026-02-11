@@ -93,6 +93,7 @@ import { ImportScannerDialog } from "./single-sheet-import-dialog";
 import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-dialog";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { AssetSummaryDashboard } from "./asset-summary-dashboard";
+import { isToday, isThisWeek, parseISO } from 'date-fns';
 
 
 /**
@@ -213,6 +214,7 @@ export default function AssetList() {
     globalStateFilter, setGlobalStateFilter,
     itemsPerPage, setItemsPerPage,
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
+    dateFilter,
     setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
     sortConfig, setSortConfig,
     appSettings, setAppSettings,
@@ -260,7 +262,7 @@ export default function AssetList() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedCategories([]);
-  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, globalStateFilter, dataSource]);
+  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, globalStateFilter, dataSource]);
   
   useEffect(() => {
     if (view === 'dashboard') {
@@ -677,14 +679,36 @@ export default function AssetList() {
       return true;
     });
 
-    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
+    const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter || dateFilter;
     if (hasFilters) {
         results = results.filter(asset => {
             const locationMatch = selectedLocations.length === 0 || selectedLocations.includes(normalizeAssetLocation(asset.location));
             const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
             const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
-            const missingFieldMatch = !missingFieldFilter || !asset[missingFieldFilter as keyof Asset];
-            return locationMatch && assigneeMatch && statusMatch && missingFieldMatch;
+            
+            const criticalInfoFields: (keyof Asset)[] = ['description', 'category', 'location', 'condition'];
+            const isMissingCritical = criticalInfoFields.some(field => !asset[field] || String(asset[field]).trim() === '');
+            
+            const missingFieldMatch = !missingFieldFilter || 
+                                      (missingFieldFilter === 'any_critical' 
+                                          ? isMissingCritical
+                                          : !asset[missingFieldFilter as keyof Asset]);
+
+            let dateMatch = true;
+            if (dateFilter) {
+                if (!asset.lastModified) {
+                    dateMatch = false;
+                } else {
+                    const modifiedDate = parseISO(asset.lastModified);
+                    if (dateFilter === 'today') {
+                        dateMatch = isToday(modifiedDate);
+                    } else if (dateFilter === 'week') {
+                        dateMatch = isThisWeek(modifiedDate, { weekStartsOn: 1 });
+                    }
+                }
+            }
+
+            return locationMatch && assigneeMatch && statusMatch && missingFieldMatch && dateMatch;
         });
     }
 
@@ -701,7 +725,7 @@ export default function AssetList() {
     }
     
     return sortAssets(results, sortConfig);
-  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, sortConfig, sheetDefinitions, isAdmin, userProfile]);
+  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, sortConfig, sheetDefinitions, isAdmin, userProfile]);
 
   const assetsByCategory = useMemo(() => {
     return displayedAssets.reduce((acc, asset) => {
