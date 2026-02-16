@@ -39,7 +39,7 @@ const StatCard = ({ title, value, description, icon, onAction, actionLabel, isAc
 };
 
 export function AssetSummaryDashboard() {
-    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter, globalStateFilter, conditionFilter, setConditionFilter } = useAppState();
+    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter, globalStateFilter, conditionFilter, setConditionFilter, activeGrantId } = useAppState();
     const { userProfile } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     
@@ -86,9 +86,16 @@ export function AssetSummaryDashboard() {
 
 
     const summary = useMemo(() => {
-        if (!appSettings) return { withoutSerial: 0, withoutAssetId: 0, newThisWeek: 0, modifiedToday: 0, modifiedThisWeek: 0, withoutLocation: 0, withoutCondition: 0, withoutLga: 0, withoutAssignee: 0, withoutModelNumber: 0, withoutEngineNo: 0, withoutChasisNo: 0, unusable: 0, badCondition: 0, needsRepair: 0 };
+        if (!appSettings || !appSettings.grants) return { withoutSerial: 0, withoutAssetId: 0, newThisWeek: 0, modifiedToday: 0, modifiedThisWeek: 0, withoutLocation: 0, withoutCondition: 0, withoutLga: 0, withoutAssignee: 0, withoutModelNumber: 0, withoutEngineNo: 0, withoutChasisNo: 0, unusable: 0, badCondition: 0, needsRepair: 0 };
         
-        const visibleAssets = summaryAssets.filter(a => !appSettings?.sheetDefinitions[a.category]?.isHidden);
+        const activeGrant = appSettings.grants.find(g => g.id === activeGrantId);
+        const sheetDefinitions = activeGrant?.sheetDefinitions || {};
+
+        const visibleAssets = summaryAssets.filter(a => {
+            if (!a.category) return false;
+            return !sheetDefinitions[a.category]?.isHidden
+        });
+        
         const vehicleCategories = ['Vehicles-TB (IHVN)', 'MOTORCYCLES-C19RM'];
 
         return {
@@ -101,14 +108,14 @@ export function AssetSummaryDashboard() {
           withoutCondition: visibleAssets.filter(a => !a.condition?.trim()).length,
           withoutLga: visibleAssets.filter(a => !a.lga?.trim()).length,
           withoutAssignee: visibleAssets.filter(a => !a.assignee?.trim()).length,
-          withoutEngineNo: visibleAssets.filter(a => vehicleCategories.includes(a.category) && !a.engineNo).length,
-          withoutChasisNo: visibleAssets.filter(a => vehicleCategories.includes(a.category) && !a.chasisNo).length,
+          withoutEngineNo: visibleAssets.filter(a => a.category && vehicleCategories.includes(a.category) && !a.engineNo).length,
+          withoutChasisNo: visibleAssets.filter(a => a.category && vehicleCategories.includes(a.category) && !a.chasisNo).length,
           withoutModelNumber: visibleAssets.filter(a => !a.modelNumber?.trim()).length,
           unusable: visibleAssets.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen'].includes(a.condition)).length,
           badCondition: visibleAssets.filter(a => a.condition && ['Bad condition', 'Used but in poor condition', 'F2: Major repairs required-poor condition'].includes(a.condition)).length,
           needsRepair: visibleAssets.filter(a => a.condition === 'Used but requires occasional repair').length,
         };
-    }, [summaryAssets, appSettings]);
+    }, [summaryAssets, appSettings, activeGrantId]);
     
     const handleFilterClick = (field: keyof Asset | '') => {
         setDateFilter(null);
