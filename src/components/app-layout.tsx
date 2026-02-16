@@ -198,7 +198,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Boxes className="h-5 w-5 text-primary" />
                 <span className="text-lg font-semibold hidden sm:inline-block">Asset Manager</span>
             </div>
-            {appSettings && appSettings.grants.length > 1 && (
+            {appSettings && appSettings.grants && appSettings.grants.length > 1 && (
               <div className="flex items-center gap-2">
                 <Briefcase className="h-4 w-4 text-muted-foreground" />
                 <Select value={activeGrantId || ''} onValueChange={handleActiveGrantChange}>
