@@ -74,13 +74,42 @@ This command will automatically build your Next.js application and deploy it to 
 
 ---
 
-## 3. Security Note: Default Super Admin
+## 3. Data Privacy & Security
 
-A "super admin" user is hardcoded into the application for initial setup and access.
+This section outlines the application's data handling practices and highlights critical security considerations for a production environment.
+
+### Data Storage
+
+*   **Local (Client-Side)**: The application uses the browser's **IndexedDB** to store all asset data and settings. This enables full offline functionality. This data is private to the user's device and browser profile and is not accessible by other websites.
+*   **Cloud (Firebase)**: When online, the app syncs with **Firebase Realtime Database** (primary) and **Cloud Firestore** (backup). All data, including user credentials and asset information, is stored in these cloud databases.
+
+### **CRITICAL: Security Weaknesses in the Current Version**
+
+The current codebase is a prototype and **is NOT secure for production use** without significant modifications. The following are known vulnerabilities:
+
+1.  **Open Database Rules**: The Firebase security rules (`firestore.rules`) are configured to allow open read and write access to the entire database (`allow read, write: if true;`). This means **anyone** with your Firebase project credentials can read, modify, or delete all of your data.
+2.  **Plaintext Passwords**: User passwords are **stored in plaintext** in the Firebase database within the `config/settings` document. This is a major security risk. If your database is compromised, all user passwords will be exposed.
+
+### Recommendations for Production Deployment
+
+Before deploying this application to a production environment with real data, it is **essential** to address the security issues above:
+
+*   **Implement Strict Security Rules**: Rewrite your `firestore.rules` file to enforce proper access control.
+    *   Only authenticated users should be able to read or write data.
+    *   Implement role-based access (e.g., only admins can write to the `config` document).
+    *   Use rules to validate data integrity on write operations.
+*   **Use Firebase Authentication**: The current custom user management system should be replaced with **Firebase Authentication**. This service provides a secure, managed solution for user sign-up, sign-in, and password management, including industry-standard password hashing and recovery flows.
+*   **Review Data Collection**: Ensure you are only collecting and storing data that is necessary for the application's functionality. Avoid storing sensitive Personally Identifiable Information (PII) unless absolutely required and properly secured.
+
+---
+
+## 4. Initial Setup & Default Credentials
+
+A "super admin" user is hardcoded into the application for initial setup and emergency access.
 
 *   **Login Name:** `admin`
 *   **Password:** `setup`
 
-This account provides full administrative access. It is highly recommended that you change this password or remove the hardcoded user once you have established your own administrative accounts.
+This account provides full administrative access. It is highly recommended that you change this password or remove the hardcoded user from the code (`src/components/user-profile-setup.tsx`) once you have established your own administrative accounts using the in-app user management tools.
 
 Leaving default, hardcoded credentials in a production application is a significant security risk.
