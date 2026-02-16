@@ -4,21 +4,22 @@ import React, { useEffect, useState } from 'react';
 import { Loader2, ServerCrash } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
-import { getAssets as getAssetsFS } from '@/lib/firestore';
-import { getAssets as getAssetsRTDB } from '@/lib/database';
-import { saveAssets } from '@/lib/idb';
+import { getAssets as getAssetsFS, getSettings as getSettingsFS } from '@/lib/firestore';
+import { getAssets as getAssetsRTDB, getSettings as getSettingsRTDB } from '@/lib/database';
+import { saveAssets, saveLocalSettings } from '@/lib/idb';
 import { addNotification } from '@/hooks/use-notifications';
 import { Button } from './ui/button';
 
 export default function InitialSetup() {
     const { completeInitialSetup } = useAuth();
-    const { setAssets, activeDatabase } = useAppState();
+    const { setAssets, setAppSettings, activeDatabase } = useAppState();
     const [error, setError] = useState<string | null>(null);
 
     const performSetup = async () => {
         setError(null);
         addNotification({ title: 'Setting up your device...', description: 'Downloading the asset database for offline use. This may take a moment.' });
         try {
+            // Fetch Assets
             const getCloudAssets = activeDatabase === 'firestore' ? getAssetsFS : getAssetsRTDB;
             const cloudAssets = await getCloudAssets();
 
@@ -29,6 +30,15 @@ export default function InitialSetup() {
             
             await saveAssets(assetsToSave);
             setAssets(assetsToSave);
+
+            // Also fetch the latest settings
+            const getCloudSettings = activeDatabase === 'firestore' ? getSettingsFS : getSettingsRTDB;
+            const cloudSettings = await getCloudSettings();
+            if (cloudSettings) {
+                await saveLocalSettings(cloudSettings);
+                setAppSettings(cloudSettings); // Update app state
+            }
+            
             addNotification({ title: 'Setup Complete!', description: 'Your local database is ready.' });
             completeInitialSetup();
         } catch (e) {

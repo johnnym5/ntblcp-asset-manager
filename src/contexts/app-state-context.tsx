@@ -225,14 +225,17 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
     const handleRemoteSettingsUpdate = (remoteSettings: AppSettings | null) => {
        if (remoteSettings) {
-         setAppSettings(async currentSettings => {
-           const migratedRemoteSettings = await migrateSettings(remoteSettings);
-           if (!currentSettings || JSON.stringify(migratedRemoteSettings) !== JSON.stringify(currentSettings)) {
-              saveLocalSettings(migratedRemoteSettings!);
-              return migratedRemoteSettings;
-           }
-           return currentSettings;
-         });
+         const remoteTimestamp = remoteSettings.lastModified ? new Date(remoteSettings.lastModified).getTime() : 0;
+         const localTimestamp = appSettings?.lastModified ? new Date(appSettings.lastModified).getTime() : 0;
+
+         if (!appSettings || remoteTimestamp > localTimestamp) {
+            migrateSettings(remoteSettings).then(migrated => {
+              if (migrated) {
+                saveLocalSettings(migrated);
+                setAppSettings(migrated);
+              }
+            });
+         }
        }
     };
     
@@ -240,7 +243,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return () => {
         if (unsubscribe) unsubscribe();
     };
-  }, [settingsLoaded, isBrowserOnline, migrateSettings]);
+  }, [settingsLoaded, isBrowserOnline, migrateSettings, appSettings]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && settingsLoaded) {
