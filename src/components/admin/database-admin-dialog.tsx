@@ -339,7 +339,9 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         toast({ title: 'Setting Saved', description: 'Your change has been saved to the cloud.' });
     } catch (e) {
         toast({ title: "Save Failed", description: (e as Error).message || "Could not save settings.", variant: "destructive" });
-        setAppSettings(appSettings); // Revert on failure
+        if (appSettings) {
+            setAppSettings(appSettings); // Revert on failure
+        }
     }
   };
   
@@ -396,24 +398,26 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
           </DialogHeader>
           
           <div className="flex-1 space-y-4 overflow-y-auto pr-2">
-              <Card>
-                  <CardHeader>
-                      <CardTitle>Global Settings</CardTitle>
-                      <CardDescription>Changes here are saved instantly and affect all users.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-4 pt-6">
-                      <div className="flex items-center justify-between">
-                          <Label htmlFor="default-db" className="text-sm font-medium">Default Cloud DB</Label>
-                          <Select value={appSettings.defaultDatabase} onValueChange={(value) => handleSettingChange('defaultDatabase', value)}>
-                              <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-                              <SelectContent>
+              {appSettings && (
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Global Settings</CardTitle>
+                        <CardDescription>Changes here are saved instantly and affect all users.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-4 pt-6">
+                        <div className="flex items-center justify-between">
+                            <Label htmlFor="default-db" className="text-sm font-medium">Default Cloud DB</Label>
+                            <Select value={appSettings.defaultDatabase} onValueChange={(value) => handleSettingChange('defaultDatabase', value)}>
+                                <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
+                                <SelectContent>
                                 <SelectItem value="rtdb">Realtime DB (Primary)</SelectItem>
                                 <SelectItem value="firestore">Firestore (Backup)</SelectItem>
-                              </SelectContent>
-                          </Select>
-                      </div>
-                  </CardContent>
-              </Card>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </CardContent>
+                </Card>
+              )}
 
               <Card>
                 <CardHeader>
@@ -466,13 +470,31 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                           <FileUp className="mr-2 h-4 w-4" /> Import from Full Backup (JSON)
                       </Button>
                       <Separator />
-                      <Button variant="outline" className="w-full justify-start" onClick={() => exportFullBackupToJson(assets, appSettings)} disabled={isProcessing}>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => {
+                        try {
+                          exportFullBackupToJson(assets, appSettings);
+                        } catch (e) {
+                          addNotification({ title: 'Export Failed', description: (e as Error).message, variant: 'destructive' });
+                        }
+                      }} disabled={isProcessing}>
                           <Download className="mr-2 h-4 w-4" /> Export Full Backup (Assets & Settings)
                       </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => exportSettingsToJson(appSettings)} disabled={isProcessing}>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => {
+                        try {
+                          exportSettingsToJson(appSettings);
+                        } catch (e) {
+                          addNotification({ title: 'Export Failed', description: (e as Error).message, variant: 'destructive' });
+                        }
+                      }} disabled={isProcessing}>
                           <Download className="mr-2 h-4 w-4" /> Export Settings Only
                       </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => exportAssetsToJson(assets)} disabled={isProcessing}>
+                      <Button variant="outline" className="w-full justify-start" onClick={() => {
+                        try {
+                          exportAssetsToJson(assets);
+                        } catch (e) {
+                          addNotification({ title: 'Export Failed', description: (e as Error).message, variant: 'destructive' });
+                        }
+                      }} disabled={isProcessing}>
                           <Download className="mr-2 h-4 w-4" /> Export Assets Only
                       </Button>
                   </CardContent>
@@ -569,3 +591,5 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     </>
   );
 }
+
+    
