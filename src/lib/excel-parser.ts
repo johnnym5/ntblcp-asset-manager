@@ -1,6 +1,6 @@
 
 import * as XLSX from 'xlsx';
-import type { Asset, AppSettings, SheetDefinition, DisplayField } from './types';
+import type { Asset, SheetDefinition, DisplayField } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, IHVN_SUB_SHEET_DEFINITIONS } from './constants';
 import { Timestamp } from 'firebase/firestore';
@@ -127,9 +127,8 @@ export interface ScannedSheetInfo {
 
 export async function scanExcelFile(
   fileOrBuffer: File | ArrayBuffer,
-  appSettings: AppSettings,
+  sheetDefinitions: Record<string, SheetDefinition>,
 ): Promise<{ scannedSheets: ScannedSheetInfo[], errors: string[] }> {
-    const { sheetDefinitions } = appSettings;
     const scannedSheets: ScannedSheetInfo[] = [];
     const errors: string[] = [];
 
@@ -200,11 +199,11 @@ export async function scanExcelFile(
 
 export async function parseExcelFile(
     fileOrBuffer: File | ArrayBuffer, 
-    appSettings: AppSettings, 
+    sheetDefinitions: Record<string, SheetDefinition>,
+    lockAssetList: boolean,
     existingAssets: Asset[],
     sheetsToImport?: ScannedSheetInfo[]
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
-    const { sheetDefinitions } = appSettings;
     
     const result: { assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] } = {
         assets: [],
@@ -222,8 +221,6 @@ export async function parseExcelFile(
             ? sheetsToImport 
             : Object.keys(sheetDefinitions).map(defName => {
                 const sheet = sheetDefinitions[defName];
-                // This logic is flawed if multiple workbook sheets match one definition name.
-                // It's kept for legacy flows, but the Scan->Select->Import flow is preferred.
                 const actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader(sheet.name)));
                 return actualSheetName ? { sheetName: actualSheetName, definitionName: defName, rowCount: 0, headers: [] } : null;
             }).filter(Boolean) as ScannedSheetInfo[];
@@ -286,7 +283,7 @@ export async function parseExcelFile(
                      result.skipped++;
                 }
             } else {
-                 if (!appSettings.lockAssetList) {
+                 if (!lockAssetList) {
                     result.assets.push({ ...parsedAsset, id: uuidv4() } as Asset);
                  } else {
                     result.skipped++;

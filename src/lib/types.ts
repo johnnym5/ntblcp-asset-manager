@@ -1,9 +1,9 @@
-
 import type { Timestamp } from 'firebase/firestore';
 
 export interface Asset {
   id: string;
   category: string;
+  grantId?: string; // Project ID
   
   // Core fields
   sn?: string;
@@ -90,12 +90,22 @@ export interface SheetDefinition {
   subSheetTriggers?: string[]; 
 }
 
+export interface Grant {
+    id: string;
+    name: string;
+    sheetDefinitions: Record<string, SheetDefinition>;
+}
+
 // A version of AppSettings that doesn't have a history property, to prevent infinite recursion.
-export interface HistoricalAppSettings extends Omit<AppSettings, 'settingsHistory'> {}
+export interface HistoricalAppSettings extends Omit<AppSettings, 'settingsHistory' | 'grants'> {
+    grants: Omit<Grant, 'sheetDefinitions'>[]; // Don't store the massive sheet defs in history
+}
 
 export interface AppSettings {
+  grants: Grant[];
+  activeGrantId: string | null;
+
   authorizedUsers: AuthorizedUser[];
-  sheetDefinitions: Record<string, SheetDefinition>;
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   locations?: string[];

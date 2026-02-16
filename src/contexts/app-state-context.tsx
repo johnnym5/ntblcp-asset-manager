@@ -13,10 +13,11 @@ import {
   useCallback,
 } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
-import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
+import type { Asset, AppSettings, Grant, AuthorizedUser } from '@/lib/types';
 import { onSettingsChange } from '@/lib/database';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
+import { addNotification } from '@/hooks/use-notifications';
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -69,6 +70,8 @@ interface AppStateContextType {
   appSettings: AppSettings | null; // Can be null initially
   setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
   settingsLoaded: boolean;
+  activeGrantId: string | null;
+  setActiveGrantId: Dispatch<SetStateAction<string | null>>;
 
   // Sync Settings
   manualDownloadTrigger: number;
@@ -134,6 +137,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isBrowserOnline, setIsBrowserOnline] = useState(true);
+  const [activeGrantId, setActiveGrantId] = useState<string | null>(null);
 
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
   const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
@@ -172,12 +176,39 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     };
   }, []);
   
-  // This effect loads settings from local DB. It does NOT fetch from cloud.
-  // The FirstTimeSetup component is responsible for the initial cloud fetch.
+  const migrateSettings = useCallback(async (settings: AppSettings | null): Promise<AppSettings | null> => {
+      if (settings && !(settings as any).grants) {
+        addNotification({ title: "Migrating Settings...", description: "Updating your settings to the new multi-project structure." });
+        const grantId = 'default-grant';
+        const defaultGrant: Grant = {
+            id: grantId,
+            name: 'Default Project',
+            sheetDefinitions: (settings as any).sheetDefinitions || {},
+        };
+        const migratedSettings: AppSettings = {
+            ...settings,
+            grants: [defaultGrant],
+            activeGrantId: grantId,
+        };
+        delete (migratedSettings as any).sheetDefinitions;
+        await saveLocalSettings(migratedSettings);
+        return migratedSettings;
+      }
+      return settings;
+  }, []);
+  
+  // This effect loads settings from local DB and potentially migrates them.
   useEffect(() => {
     const initializeSettings = async () => {
-      const localSettings = await getLocalSettings();
+      let localSettings = await getLocalSettings();
+      localSettings = await migrateSettings(localSettings);
+
       setAppSettings(localSettings);
+      if (localSettings?.activeGrantId) {
+        setActiveGrantId(localSettings.activeGrantId);
+      } else if (localSettings?.grants && localSettings.grants.length > 0) {
+        setActiveGrantId(localSettings.grants[0].id);
+      }
       if (localSettings?.defaultDataSource) {
         setDataSource(localSettings.defaultDataSource);
       }
@@ -188,7 +219,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     };
     
     initializeSettings();
-  }, []);
+  }, [migrateSettings]);
 
   // Real-time listener for remote settings changes
   useEffect(() => {
@@ -196,10 +227,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
     const handleRemoteSettingsUpdate = (remoteSettings: AppSettings | null) => {
        if (remoteSettings) {
-         setAppSettings(currentSettings => {
-           if (!currentSettings || JSON.stringify(remoteSettings) !== JSON.stringify(currentSettings)) {
-              saveLocalSettings(remoteSettings);
-              return remoteSettings;
+         setAppSettings(async currentSettings => {
+           const migratedRemoteSettings = await migrateSettings(remoteSettings);
+           if (!currentSettings || JSON.stringify(migratedRemoteSettings) !== JSON.stringify(currentSettings)) {
+              saveLocalSettings(migratedRemoteSettings!);
+              return migratedRemoteSettings;
            }
            return currentSettings;
          });
@@ -210,7 +242,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return () => {
         if (unsubscribe) unsubscribe();
     };
-  }, [settingsLoaded, isBrowserOnline]);
+  }, [settingsLoaded, isBrowserOnline, migrateSettings]);
 
   // Project ID check
   useEffect(() => {
@@ -276,6 +308,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     appSettings,
     setAppSettings,
     settingsLoaded,
+    activeGrantId,
+    setActiveGrantId,
     manualDownloadTrigger,
     setManualDownloadTrigger,
     manualUploadTrigger,

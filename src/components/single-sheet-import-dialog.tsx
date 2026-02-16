@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
@@ -31,7 +32,7 @@ interface ImportScannerDialogProps {
 }
 
 export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialogProps) {
-  const { appSettings, setOfflineAssets, setDataSource } = useAppState();
+  const { appSettings, setOfflineAssets, setDataSource, activeGrantId } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   
@@ -45,15 +46,19 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  const activeGrant = useMemo(() => {
+    return appSettings?.grants.find(g => g.id === activeGrantId);
+  }, [appSettings, activeGrantId]);
+
   useEffect(() => {
-    if (file) {
+    if (file && activeGrant) {
       const performScan = async () => {
         setIsScanning(true);
         setScanResults([]);
         setScanErrors([]);
         setSelectedSheets([]);
         
-        const { scannedSheets, errors } = await scanExcelFile(file, appSettings);
+        const { scannedSheets, errors } = await scanExcelFile(file, activeGrant.sheetDefinitions);
         
         if (errors.length > 0) {
           setScanErrors(errors);
@@ -67,7 +72,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
       };
       performScan();
     }
-  }, [file, appSettings]);
+  }, [file, activeGrant]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -78,7 +83,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
   };
 
   const handleImport = async () => {
-    if (!file || selectedSheets.length === 0) {
+    if (!file || selectedSheets.length === 0 || !appSettings || !activeGrant) {
       toast({ title: 'Nothing to Import', description: 'Please select a file and at least one sheet to import.', variant: 'destructive' });
       return;
     }
@@ -89,7 +94,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
     const baseAssets = await getLockedOfflineAssets();
     const sheetsToImport = scanResults.filter(r => selectedSheets.includes(r.sheetName));
 
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets, sheetsToImport);
+    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, activeGrant.sheetDefinitions, appSettings.lockAssetList, baseAssets, sheetsToImport);
 
     errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
     if (skipped > 0) {
@@ -98,6 +103,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
 
     const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
       ...asset,
+      grantId: activeGrantId,
       lastModified: new Date().toISOString(),
       lastModifiedBy: userProfile?.displayName,
       lastModifiedByState: userProfile?.state,
@@ -206,7 +212,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                    </div>
                 )}
                 
-                {scanResults.length > 0 && !isScanning && (
+                {scanResults.length > 0 && !isScanning && activeGrant && (
                   <div className="space-y-2">
                     <div className="flex items-center justify-between p-2">
                        <Label className="font-semibold">Found {scanResults.length} compatible sheets</Label>
@@ -258,7 +264,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {Object.keys(appSettings.sheetDefinitions).map(defName => (
+                                            {Object.keys(activeGrant.sheetDefinitions).map(defName => (
                                                 <SelectItem key={defName} value={defName} className="text-sm">{defName}</SelectItem>
                                             ))}
                                         </SelectContent>

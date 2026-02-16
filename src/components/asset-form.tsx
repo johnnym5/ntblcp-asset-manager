@@ -65,7 +65,7 @@ interface AssetFormProps {
 export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: initialIsReadOnly, defaultCategory }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const { appSettings, dataSource } = useAppState();
+  const { appSettings, dataSource, activeGrantId } = useAppState();
   const isAdmin = userProfile?.isAdmin || false;
   
   const form = useForm<AssetFormValues>({
@@ -75,11 +75,15 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
   
   const currentCategory = form.watch('category');
   const watchedStatus = form.watch('verifiedStatus') as 'Verified' | 'Unverified';
+
+  const grant = useMemo(() => {
+    return appSettings?.grants?.find(g => g.id === activeGrantId);
+  }, [appSettings, activeGrantId]);
   
   const sheetDefinition = useMemo(() => {
-    if (!currentCategory || !appSettings?.sheetDefinitions) return null;
-    return appSettings.sheetDefinitions[currentCategory];
-  }, [currentCategory, appSettings?.sheetDefinitions]);
+    if (!currentCategory || !grant?.sheetDefinitions) return null;
+    return grant.sheetDefinitions[currentCategory];
+  }, [currentCategory, grant]);
 
   useEffect(() => {
     if (isOpen) {
@@ -115,6 +119,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
     try {
         const assetToSave: Asset = {
             id: asset?.id ?? crypto.randomUUID(),
+            grantId: activeGrantId || undefined,
             ...(asset || {}),
             ...data,
         } as Asset;
@@ -195,11 +200,12 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
         let component;
         switch(fieldName) {
             case 'category':
+                const categoryOptions = grant?.sheetDefinitions ? Object.keys(grant.sheetDefinitions) : [];
                 component = (
                      <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl>
                         <SelectContent>
-                            {appSettings && appSettings.sheetDefinitions && Object.keys(appSettings.sheetDefinitions).map(sheet => (
+                            {categoryOptions.map(sheet => (
                             <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
                             ))}
                         </SelectContent>
