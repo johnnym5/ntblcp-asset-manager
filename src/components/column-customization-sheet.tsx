@@ -45,7 +45,7 @@ export function ColumnCustomizationSheet({
 }: ColumnCustomizationSheetProps) {
   const [editedName, setEditedName] = useState('');
   const [editedFields, setEditedFields] = useState<DisplayField[]>([]);
-  const [fieldToAdd, setFieldToAdd] = useState('');
+  const [customLabel, setCustomLabel] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -54,27 +54,40 @@ export function ColumnCustomizationSheet({
       setEditedFields(JSON.parse(JSON.stringify(sheetDefinition.displayFields || [])));
     }
   }, [isOpen, sheetDefinition]);
-
-  const allPossibleFieldKeys = useMemo(() => Object.keys(HEADER_ALIASES) as (keyof Asset)[], []);
-
-  const availableFields = useMemo(() => {
-      const currentKeys = new Set(editedFields.map(f => f.key));
-      return allPossibleFieldKeys.filter(key => !currentKeys.has(key));
-  }, [editedFields, allPossibleFieldKeys]);
-
+  
   const handleAddField = () => {
-      if (!fieldToAdd) return;
-      const key = fieldToAdd as keyof Asset;
-      const label = HEADER_ALIASES[key as keyof typeof HEADER_ALIASES]?.[0] || key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
-      
-      const newField: DisplayField = {
-          key: key,
-          label: label,
-          table: false,
-          quickView: false,
-      };
-      setEditedFields(current => [...current, newField]);
-      setFieldToAdd('');
+    if (!customLabel.trim()) {
+        toast({
+            title: 'Invalid Label',
+            description: 'Custom field label cannot be empty.',
+            variant: 'destructive',
+        });
+        return;
+    }
+
+    const customFieldKeys: (keyof Asset)[] = ['customField1', 'customField2', 'customField3', 'customField4', 'customField5'];
+    const usedCustomKeys = new Set(editedFields.map(f => f.key).filter(k => customFieldKeys.includes(k as keyof Asset)));
+    
+    const availableCustomField = customFieldKeys.find(k => !usedCustomKeys.has(k));
+
+    if (!availableCustomField) {
+        toast({
+            title: 'No Custom Fields Available',
+            description: 'You have used all 5 available custom fields for this sheet.',
+            variant: 'destructive',
+        });
+        return;
+    }
+    
+    const newField: DisplayField = {
+        key: availableCustomField,
+        label: customLabel.trim(),
+        table: true,
+        quickView: true,
+    };
+
+    setEditedFields(current => [...current, newField]);
+    setCustomLabel('');
   };
 
   const handleLabelChange = (index: number, newLabel: string) => {
@@ -182,21 +195,14 @@ export function ColumnCustomizationSheet({
           </ScrollArea>
         </div>
         <div className="px-4 py-4 border-t">
-          <Label className="text-sm font-medium">Add New Field</Label>
+          <Label className="text-sm font-medium">Add Custom Field</Label>
           <div className="flex items-center gap-2 mt-2">
-              <Select value={fieldToAdd} onValueChange={setFieldToAdd}>
-                  <SelectTrigger className="flex-1">
-                      <SelectValue placeholder="Select a field to add..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                      {availableFields.map(key => (
-                          <SelectItem key={key} value={key}>
-                              {HEADER_ALIASES[key as keyof typeof HEADER_ALIASES]?.[0] || key}
-                          </SelectItem>
-                      ))}
-                  </SelectContent>
-              </Select>
-              <Button onClick={handleAddField} disabled={!fieldToAdd}><PlusCircle className="mr-2 h-4 w-4" /> Add</Button>
+            <Input
+              placeholder="Enter new header label..."
+              value={customLabel}
+              onChange={(e) => setCustomLabel(e.target.value)}
+            />
+            <Button onClick={handleAddField}><PlusCircle className="mr-2 h-4 w-4" /> Add</Button>
           </div>
         </div>
         <SheetFooter className="sm:justify-between items-center pt-4 border-t">

@@ -50,7 +50,7 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
   };
 
   const handleSaveUser = async (userToSave: Partial<AuthorizedUser>, originalLoginName?: string) => {
-    let newUsers = [...users];
+    let newUsers = [...(users || [])];
     
     const findIndex = originalLoginName 
       ? newUsers.findIndex(u => u.loginName === originalLoginName)
@@ -79,7 +79,7 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
   const handleDeleteUser = async () => {
     if (!userToDelete) return;
 
-    const newUsers = users.filter(u => u.loginName !== userToDelete.loginName);
+    const newUsers = (users || []).filter(u => u.loginName !== userToDelete.loginName);
     await onUsersChange(newUsers);
     
     setUserToDelete(null);
@@ -103,7 +103,7 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
             </TableRow>
           </TableHeader>
           <TableBody>
-            {users.map(user => (
+            {users && users.map(user => (
               <TableRow key={user.loginName}>
                 <TableCell className="font-medium">{user.displayName}</TableCell>
                 <TableCell className="text-muted-foreground">{user.loginName}</TableCell>
@@ -148,5 +148,3 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
     </div>
   );
 }
-
-    

@@ -63,6 +63,22 @@ export const ZONAL_STORES = Object.keys(NIGERIAN_ZONES);
 
 export const SPECIAL_LOCATIONS = ["FCMS", "NTBLCP"];
 
+export const ASSET_CONDITIONS = [
+    "New",
+    "Used- good condition",
+    "Used but in good working condition",
+    "Used but requires occasional repair",
+    "Used but in poor condition",
+    "Bad condition",
+    "F2: Major repairs required-poor condition",
+    "Unsalvageable",
+    "Burnt",
+    "Stolen",
+    "Obsolete",
+    "Insurance settlement",
+    "Writeoff",
+];
+
 export const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   sn: ['S/N'],
   description: ['DESCRIPTION', 'ASSET DESCRIPTION'],
@@ -94,6 +110,11 @@ export const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   verifiedDate: ['VERIFIED DATE'],
   lastModifiedBy: ['LAST MODIFIED BY'],
   lastModified: ['LAST MODIFIED DATE'],
+  customField1: ['Custom 1'],
+  customField2: ['Custom 2'],
+  customField3: ['Custom 3'],
+  customField4: ['Custom 4'],
+  customField5: ['Custom 5'],
 };
 
 export const IHVN_SUB_SHEET_DEFINITIONS: Record<string, string[]> = {

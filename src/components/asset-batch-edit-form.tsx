@@ -26,6 +26,7 @@ import { AlertCircle, Check, FileText, Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn, getStatusClasses } from '@/lib/utils';
+import { ASSET_CONDITIONS } from '@/lib/constants';
 
 export interface BatchUpdateData {
   location?: string;
@@ -51,7 +52,7 @@ export function AssetBatchEditForm({
   const { userProfile } = useAuth();
   const { appSettings } = useAppState();
   const isAdmin = userProfile?.isAdmin || false;
-  const isVerificationMode = appSettings.appMode === 'verification';
+  const isVerificationMode = appSettings?.appMode === 'verification';
 
   const [applyLocation, setApplyLocation] = useState(false);
   const [location, setLocation] = useState('');
@@ -131,19 +132,7 @@ export function AssetBatchEditForm({
                     <SelectValue placeholder="Select condition" />
                 </SelectTrigger>
                 <SelectContent>
-                    <SelectItem value="New">New</SelectItem>
-                    <SelectItem value="Used- good condition">Used- good condition</SelectItem>
-                    <SelectItem value="Used but in good working condition">Used but in good working condition</SelectItem>
-                    <SelectItem value="Used but requires occasional repair">Used but requires occasional repair</SelectItem>
-                    <SelectItem value="Used but in poor condition">Used but in poor condition</SelectItem>
-                    <SelectItem value="Bad condition">Bad condition</SelectItem>
-                    <SelectItem value="F2: Major repairs required-poor condition">F2: Major repairs required-poor condition</SelectItem>
-                    <SelectItem value="Unsalvageable">Unsalvageable</SelectItem>
-                    <SelectItem value="Burnt">Burnt</SelectItem>
-                    <SelectItem value="Stolen">Stolen</SelectItem>
-                    <SelectItem value="Obsolete">Obsolete</SelectItem>
-                    <SelectItem value="Insurance settlement">Insurance settlement</SelectItem>
-                    <SelectItem value="Writeoff">Writeoff</SelectItem>
+                    {ASSET_CONDITIONS.map(cond => <SelectItem key={cond} value={cond}>{cond}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>

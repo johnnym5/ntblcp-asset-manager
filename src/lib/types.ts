@@ -53,6 +53,13 @@ export interface Asset {
 
   // Client-side undo buffer
   previousState?: Partial<Asset>;
+
+  // Custom fields
+  customField1?: string;
+  customField2?: string;
+  customField3?: string;
+  customField4?: string;
+  customField5?: string;
 }
 
 export interface AuthorizedUser {

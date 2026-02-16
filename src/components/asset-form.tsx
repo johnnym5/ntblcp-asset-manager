@@ -39,6 +39,7 @@ import { useAppState } from "@/contexts/app-state-context";
 import { cn, getStatusClasses } from "@/lib/utils";
 import { AssetChecklist } from "./asset-checklist";
 import { ScrollArea } from "./ui/scroll-area";
+import { ASSET_CONDITIONS } from "@/lib/constants";
 
 const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
   path: ['category'],
@@ -76,9 +77,9 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
   const watchedStatus = form.watch('verifiedStatus') as 'Verified' | 'Unverified';
   
   const sheetDefinition = useMemo(() => {
-    if (!currentCategory) return null;
+    if (!currentCategory || !appSettings?.sheetDefinitions) return null;
     return appSettings.sheetDefinitions[currentCategory];
-  }, [currentCategory, appSettings.sheetDefinitions]);
+  }, [currentCategory, appSettings?.sheetDefinitions]);
 
   useEffect(() => {
     if (isOpen) {
@@ -151,7 +152,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
         let disabled = initialIsReadOnly;
         const isVerificationField = ['verifiedStatus', 'remarks', 'condition'].includes(fieldName);
 
-        if (!disabled) { // Only apply locks if the form is in edit mode
+        if (!disabled && appSettings) { // Only apply locks if the form is in edit mode
             if (isAdmin) {
                 // Admin is locked on cloud source based on settings
                 if (appSettings.lockAssetList && dataSource === 'cloud') {
@@ -198,7 +199,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
                      <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl>
                         <SelectContent>
-                            {Object.keys(appSettings.sheetDefinitions).map(sheet => (
+                            {appSettings && appSettings.sheetDefinitions && Object.keys(appSettings.sheetDefinitions).map(sheet => (
                             <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
                             ))}
                         </SelectContent>
@@ -213,19 +214,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
                     <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
                         <FormControl><SelectTrigger><SelectValue placeholder="Select condition" /></SelectTrigger></FormControl>
                         <SelectContent>
-                            <SelectItem value="New">New</SelectItem>
-                            <SelectItem value="Used- good condition">Used- good condition</SelectItem>
-                            <SelectItem value="Used but in good working condition">Used but in good working condition</SelectItem>
-                            <SelectItem value="Used but requires occasional repair">Used but requires occasional repair</SelectItem>
-                            <SelectItem value="Used but in poor condition">Used but in poor condition</SelectItem>
-                            <SelectItem value="Bad condition">Bad condition</SelectItem>
-                            <SelectItem value="F2: Major repairs required-poor condition">F2: Major repairs required-poor condition</SelectItem>
-                            <SelectItem value="Unsalvageable">Unsalvageable</SelectItem>
-                            <SelectItem value="Burnt">Burnt</SelectItem>
-                            <SelectItem value="Stolen">Stolen</SelectItem>
-                            <SelectItem value="Obsolete">Obsolete</SelectItem>
-                            <SelectItem value="Insurance settlement">Insurance settlement</SelectItem>
-                            <SelectItem value="Writeoff">Writeoff</SelectItem>
+                            {ASSET_CONDITIONS.map(cond => <SelectItem key={cond} value={cond}>{cond}</SelectItem>)}
                         </SelectContent>
                     </Select>
                 );
@@ -277,7 +266,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
         <div className="grid md:grid-cols-3 gap-x-8 flex-1 overflow-hidden">
             <ScrollArea className="md:col-span-2 pr-4 py-4">
                 <datalist id="location-datalist">
-                    {(appSettings.locations || []).map(loc => <option key={loc} value={loc} />)}
+                    {(appSettings?.locations || []).map(loc => <option key={loc} value={loc} />)}
                 </datalist>
                 <Form {...form}>
                   <form

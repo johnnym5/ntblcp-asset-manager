@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -313,7 +314,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   const handlePermissionSelection = (loginName: string, checked: boolean) => {
     setTempDisabledList(prev => {
         const isCurrentlyAll = prev.includes('all');
-        const allNonAdminLogins = draftSettings?.authorizedUsers.filter(u => !u.isAdmin).map(u => u.loginName) || [];
+        const allNonAdminLogins = (draftSettings?.authorizedUsers || []).filter(u => !u.isAdmin).map(u => u.loginName);
         const user = draftSettings?.authorizedUsers.find(u => u.loginName === loginName);
         const loginNameIsAdmin = user?.isAdmin || user?.loginName === 'admin';
 
@@ -391,7 +392,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         return;
     }
 
-    const allUsers = [...draftSettings.authorizedUsers, { loginName: 'admin', displayName: 'Super Admin', password: 'setup', states: ['All'], isAdmin: true }];
+    const allUsers = [...(draftSettings.authorizedUsers || []), { loginName: 'admin', displayName: 'Super Admin', password: 'setup', states: ['All'], isAdmin: true }];
     const userIndex = allUsers.findIndex(u => u.loginName === userProfile.loginName);
     
     if (userIndex === -1) {
@@ -406,7 +407,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     }
     
     // Create a new array and update the user
-    const updatedUsers = [...draftSettings.authorizedUsers];
+    const updatedUsers = [...(draftSettings.authorizedUsers || [])];
     const userToUpdateIndex = updatedUsers.findIndex(u => u.loginName === userProfile.loginName);
     if(userToUpdateIndex > -1) {
       updatedUsers[userToUpdateIndex].password = newPassword;
@@ -441,7 +442,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     );
   }
 
-  const allSheetNames = Object.keys(draftSettings.sheetDefinitions);
+  const allSheetNames = draftSettings.sheetDefinitions ? Object.keys(draftSettings.sheetDefinitions) : [];
 
   return (
     <>
@@ -501,7 +502,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                     </div>
                   </div>
 
-                  {appSettings.appMode === 'verification' && (
+                  {appSettings?.appMode === 'verification' && (
                     <div>
                         <h3 className="text-lg font-medium mb-4">Reports</h3>
                         <div className="rounded-lg border p-4 space-y-3">
@@ -599,9 +600,11 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                                     <p className="text-sm font-medium">
                                                         Saved by: {historyItem.lastModifiedBy?.displayName || 'Unknown'}
                                                     </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        {formatDistanceToNow(new Date(historyItem.lastModified!), { addSuffix: true })}
-                                                    </p>
+                                                    {historyItem.lastModified && (
+                                                      <p className="text-xs text-muted-foreground">
+                                                          {formatDistanceToNow(new Date(historyItem.lastModified), { addSuffix: true })}
+                                                      </p>
+                                                    )}
                                                 </div>
                                                 <Button size="sm" variant="ghost" onClick={() => handleRollback(historyItem)}>
                                                    <RotateCcw className="mr-2 h-4 w-4" />
@@ -646,7 +649,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         />
       )}
       
-      {permissionSheetName && (
+      {permissionSheetName && draftSettings?.authorizedUsers && (
          <AlertDialog open={!!permissionSheetName} onOpenChange={() => setPermissionSheetName(null)}>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -666,7 +669,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                             <Label htmlFor="disable-for-all" className="font-bold">Disable for all non-admin users</Label>
                        </div>
                        <Separator />
-                       {draftSettings?.authorizedUsers.filter(u => u.loginName !== 'admin').map(user => (
+                       {draftSettings.authorizedUsers.filter(u => u.loginName !== 'admin').map(user => (
                            <div key={user.loginName} className="flex items-center space-x-2">
                                 <Checkbox 
                                     id={`disable-${user.loginName}`} 
@@ -717,4 +720,3 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     </>
   );
 }
-    
