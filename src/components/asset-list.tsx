@@ -94,6 +94,7 @@ import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-di
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { AssetSummaryDashboard } from "./asset-summary-dashboard";
 import { isToday, isThisWeek, parseISO } from 'date-fns';
+import { AssetFilterDialog } from "./asset-filter-sheet";
 
 
 /**
@@ -207,16 +208,21 @@ export default function AssetList() {
   const [originalSheetNameToEdit, setOriginalSheetNameToEdit] = useState<string | null>(null);
   const [isDownloadWarningOpen, setIsDownloadWarningOpen] = useState(false);
   const [numUnsynced, setNumUnsynced] = useState(0);
+  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
     offlineAssets, setOfflineAssets, dataSource, setDataSource,
     globalStateFilter, setGlobalStateFilter,
     itemsPerPage, setItemsPerPage,
-    selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, conditionFilter,
-    dateFilter,
-    setDateFilter,
-    setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
+    selectedLocations, setSelectedLocations,
+    selectedAssignees, setSelectedAssignees,
+    selectedStatuses, setSelectedStatuses,
+    missingFieldFilter, setMissingFieldFilter,
+    dateFilter, setDateFilter,
+    locationOptions, setLocationOptions,
+    assigneeOptions, setAssigneeOptions,
+    statusOptions, setStatusOptions,
     sortConfig, setSortConfig,
     appSettings, setAppSettings,
     manualDownloadTrigger,
@@ -229,6 +235,8 @@ export default function AssetList() {
     activeDatabase,
     setOnRevertAsset,
     activeGrantId,
+    conditionFilter, setConditionFilter,
+    conditionOptions, setConditionOptions
   } = useAppState();
 
   const grant = useMemo(() => {
@@ -608,7 +616,14 @@ export default function AssetList() {
         locations.set(normalized, (locations.get(normalized) || 0) + 1);
       }
     });
-    setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })).sort((a, b) => (b.count || 0) - (a.count || 0)));
+
+    NIGERIAN_STATES.forEach(state => {
+      if(!locations.has(state)) {
+        locations.set(state, 0);
+      }
+    });
+    
+    setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })).sort((a, b) => a.label.localeCompare(b.label)));
 
     const assigneeMap = new Map<string, number>();
     allAssetsForFiltering.forEach(asset => {
@@ -620,7 +635,18 @@ export default function AssetList() {
       }
     });
     setAssigneeOptions(Array.from(assigneeMap.entries()).map(([a, count]) => ({ label: a, value: a, count })).sort((a,b) => a.label.localeCompare(b.label)));
-  }, [allAssetsForFiltering, setLocationOptions, setAssigneeOptions]);
+
+    const conditionMap = new Map<string, number>();
+    allAssetsForFiltering.forEach(asset => {
+        if (asset.condition) {
+            const conditionName = asset.condition.trim();
+            if (conditionName) {
+                conditionMap.set(conditionName, (conditionMap.get(conditionName) || 0) + 1);
+            }
+        }
+    });
+    setConditionOptions(Array.from(conditionMap.entries()).map(([c, count]) => ({ label: c, value: c, count })).sort((a,b) => a.label.localeCompare(b.label)));
+  }, [allAssetsForFiltering, setLocationOptions, setAssigneeOptions, setConditionOptions]);
 
 
   const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
@@ -1121,9 +1147,10 @@ export default function AssetList() {
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
   
   const handleExport = useCallback(() => {
+    if(!appSettings) return;
     try {
         const timestamp = new Date().toISOString().replace(/:/g, '-');
-        exportToExcel(activeAssets, sheetDefinitions, `assets-export-${timestamp}.xlsx`);
+        exportToExcel(activeAssets, appSettings.sheetDefinitions, `assets-export-${timestamp}.xlsx`);
         addNotification({
             title: 'Exporting to Excel',
             description: `Your data is being downloaded as assets-export-${timestamp}.xlsx`,
@@ -1135,9 +1162,10 @@ export default function AssetList() {
             variant: 'destructive',
         });
     }
-  }, [activeAssets, sheetDefinitions]);
+  }, [activeAssets, appSettings]);
 
   const handleExportSelection = useCallback(() => {
+    if(!appSettings) return;
     let assetsToExport: Asset[] = [];
 
     if (view === 'dashboard') {
@@ -1153,7 +1181,7 @@ export default function AssetList() {
 
     try {
       const timestamp = new Date().toISOString().replace(/:/g, '-');
-      exportToExcel(assetsToExport, sheetDefinitions, `asset-selection-export-${timestamp}.xlsx`);
+      exportToExcel(assetsToExport, appSettings.sheetDefinitions, `asset-selection-export-${timestamp}.xlsx`);
       addNotification({
         title: 'Exporting Selection',
         description: `Your selection of ${assetsToExport.length} assets is being downloaded.`,
@@ -1165,7 +1193,7 @@ export default function AssetList() {
         variant: 'destructive',
       });
     }
-  }, [view, selectedCategories, assetsByCategory, selectedAssetIds, activeAssets, sheetDefinitions]);
+  }, [view, selectedCategories, assetsByCategory, selectedAssetIds, activeAssets, appSettings]);
 
 
   const handleClearCategoryClick = useCallback((category: string) => {
@@ -1471,6 +1499,7 @@ export default function AssetList() {
   };
 
   const handleEditSheetLayout = (category: string) => {
+    if(!sheetDefinitions) return;
     setSheetToEdit(sheetDefinitions[category]);
     setOriginalSheetNameToEdit(category);
     setIsColumnSheetOpen(true);
@@ -1505,9 +1534,9 @@ export default function AssetList() {
   };
 
   const handleToggleSheetVisibility = async (sheetName: string) => {
-    if (!isAdmin || !appSettings) return;
+    if (!isAdmin || !appSettings || !appSettings.sheetDefinitions) return;
 
-    const newSheetDefinitions = { ...(appSettings.sheetDefinitions || {}) };
+    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
     newSheetDefinitions[sheetName].isHidden = !newSheetDefinitions[sheetName].isHidden;
 
     const newSettings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString() };
@@ -1536,7 +1565,7 @@ export default function AssetList() {
       const verified = categoryAssets.filter(a => a.verifiedStatus === 'Verified').length;
       const percentage = total > 0 ? (verified / total) * 100 : 0;
       const isSelected = selectedCategories.includes(category);
-      const isHidden = sheetDefinitions[category]?.isHidden;
+      const isHidden = sheetDefinitions?.[category]?.isHidden;
       
       return (
           <Card key={category} className={cn("hover:shadow-md transition-shadow flex flex-col", isSelected && "ring-2 ring-primary", isHidden && "opacity-50")}>
@@ -1602,7 +1631,7 @@ export default function AssetList() {
     const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
     const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
 
-    const mainCategories = Object.keys(assetsByCategory).filter(cat => !sheetDefinitions[cat]?.isHidden).sort((a,b) => a.localeCompare(b));
+    const mainCategories = Object.keys(assetsByCategory).filter(cat => !sheetDefinitions?.[cat]?.isHidden).sort((a,b) => a.localeCompare(b));
 
     return (
       <div className="flex flex-col h-full gap-4">
@@ -1871,7 +1900,7 @@ export default function AssetList() {
   const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
   const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
   
-  const currentSheetDefinition = sheetDefinitions[currentCategory!];
+  const currentSheetDefinition = sheetDefinitions?.[currentCategory!];
   
   let quickViewFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.quickView) || [];
 

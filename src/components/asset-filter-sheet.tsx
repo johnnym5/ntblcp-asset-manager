@@ -43,6 +43,10 @@ interface AssetFilterDialogProps {
   selectedStatuses: string[];
   setSelectedStatuses: React.Dispatch<React.SetStateAction<string[]>>;
 
+  conditionOptions: OptionType[];
+  selectedConditions: string[];
+  setSelectedConditions: React.Dispatch<React.SetStateAction<string[]>>;
+
   missingFieldFilter: string;
   setMissingFieldFilter: React.Dispatch<React.SetStateAction<string>>;
 }
@@ -140,6 +144,9 @@ export function AssetFilterDialog({
   statusOptions,
   selectedStatuses,
   setSelectedStatuses,
+  conditionOptions,
+  selectedConditions,
+  setSelectedConditions,
   missingFieldFilter,
   setMissingFieldFilter,
 }: AssetFilterDialogProps) {
@@ -149,11 +156,12 @@ export function AssetFilterDialog({
     setSelectedLocations([]);
     setSelectedAssignees([]);
     setSelectedStatuses([]);
+    setSelectedConditions([]);
     setMissingFieldFilter('');
     setDateFilter(null);
   };
 
-  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
+  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + selectedConditions.length + (missingFieldFilter ? 1 : 0);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -178,7 +186,14 @@ export function AssetFilterDialog({
             selected={selectedAssignees}
             onChange={setSelectedAssignees}
           />
-          {appSettings.appMode === 'verification' && (
+          <Separator />
+          <FilterSection
+            title="Condition"
+            options={conditionOptions}
+            selected={selectedConditions}
+            onChange={setSelectedConditions}
+          />
+          {appSettings?.appMode === 'verification' && (
             <>
               <Separator />
               <FilterSection

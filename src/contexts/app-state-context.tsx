@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -61,6 +60,8 @@ interface AppStateContextType {
   setAssigneeOptions: Dispatch<SetStateAction<OptionType[]>>;
   statusOptions: OptionType[];
   setStatusOptions: Dispatch<SetStateAction<OptionType[]>>;
+  conditionOptions: OptionType[];
+  setConditionOptions: Dispatch<SetStateAction<OptionType[]>>;
 
   // Sorting
   sortConfig: SortConfig | null;
@@ -128,6 +129,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [locationOptions, setLocationOptions] = useState<OptionType[]>([]);
   const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
   const [statusOptions, setStatusOptions] = useState<OptionType[]>([]);
+  const [conditionOptions, setConditionOptions] = useState<OptionType[]>([]);
 
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({
     key: 'sn',
@@ -310,6 +312,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setAssigneeOptions,
     statusOptions,
     setStatusOptions,
+    conditionOptions,
+    setConditionOptions,
     sortConfig,
     setSortConfig,
     appSettings,
