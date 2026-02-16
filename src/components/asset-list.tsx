@@ -814,6 +814,9 @@ export default function AssetList() {
     }
   }, [assetToView, setAssetToView]);
 
+  const handleTravelReport = useCallback(() => setIsTravelReportOpen(true), []);
+  const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
+
   useEffect(() => {
     setDataActions({
         onAddAsset: handleAddAsset,
@@ -1095,8 +1098,6 @@ export default function AssetList() {
     }
   }, [handleRevertAsset, setOnRevertAsset]);
 
-  const handleTravelReport = useCallback(() => setIsTravelReportOpen(true), []);
-  
   const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
     if (checked) {
       setSelectedAssetIds(allFilteredAssets.map(a => a.id));
@@ -1151,8 +1152,6 @@ export default function AssetList() {
 
   }, [isOnline, isAdmin, setAssets, dataSource, setOfflineAssets, activeDatabase]);
 
-  const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
-  
   const handleExport = useCallback(() => {
     if(!appSettings) return;
     try {
@@ -1753,11 +1752,6 @@ export default function AssetList() {
                             </ScrollArea>
                         </SelectContent>
                       </Select>
-                    )}
-                     {isAdmin && !appSettings.lockAssetList && dataActions.onScanAndImport && (
-                        <Button variant="outline" className="w-full md:w-auto" onClick={dataActions.onScanAndImport}>
-                            <PlusCircle className="mr-2 h-4 w-4" /> Add or Manage Sheets
-                        </Button>
                     )}
                     <div className="flex items-center justify-end gap-4 w-full">
                       <div className="flex items-center space-x-2">
