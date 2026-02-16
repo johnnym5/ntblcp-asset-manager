@@ -127,7 +127,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     if (JSON.stringify(draftSettings.authorizedUsers) !== JSON.stringify(appSettings.authorizedUsers)) {
       changes.push('User list or passwords will be updated.');
     }
-    if (JSON.stringify(draftSettings.grants) !== JSON.stringify(appSettings.grants)) {
+    if (JSON.stringify(draftSettings.grants || []) !== JSON.stringify(appSettings.grants || [])) {
       changes.push(`Project list, names, or sheet definitions will be updated.`);
     }
     if (draftSettings.appMode !== appSettings.appMode) {
@@ -176,7 +176,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   const handleDeleteSheet = (sheetNameToDelete: string, grantId: string) => {
     if (!draftSettings) return;
 
-    const newGrants = draftSettings.grants.map(g => {
+    const newGrants = (draftSettings.grants || []).map(g => {
         if (g.id === grantId) {
             const newSheetDefinitions = { ...g.sheetDefinitions };
             delete newSheetDefinitions[sheetNameToDelete];
@@ -203,7 +203,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
       const templates = await parseExcelForTemplate(file);
       let sanitizedCount = 0;
       
-      const newGrants = draftSettings.grants.map(g => {
+      const newGrants = (draftSettings.grants || []).map(g => {
           if (g.id === grantId) {
             let currentDefs = { ...(g.sheetDefinitions || {}) };
 
@@ -248,8 +248,8 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     setIsSaving(true);
     
     // Handle asset deletion for deleted grants
-    const originalGrantIds = new Set(appSettings.grants.map(g => g.id));
-    const newGrantIds = new Set(draftSettings.grants.map(g => g.id));
+    const originalGrantIds = new Set((appSettings.grants || []).map(g => g.id));
+    const newGrantIds = new Set((draftSettings.grants || []).map(g => g.id));
     const deletedGrantIds = [...originalGrantIds].filter(id => !newGrantIds.has(id));
 
     if (deletedGrantIds.length > 0) {
@@ -279,7 +279,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     
     // Save settings
     try {
-      const historyEntry: HistoricalAppSettings = { ...appSettings, grants: appSettings.grants.map(g => ({ id: g.id, name: g.name })) };
+      const historyEntry: HistoricalAppSettings = { ...appSettings, grants: (appSettings.grants || []).map(g => ({ id: g.id, name: g.name })) };
       delete historyEntry.settingsHistory;
           
       const oneWeekAgo = new Date();
@@ -412,7 +412,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   const handleSavePermissions = (grantId: string) => {
     if (!draftSettings || !permissionSheetName) return;
 
-    const newGrants = draftSettings.grants.map(g => {
+    const newGrants = (draftSettings.grants || []).map(g => {
         if (g.id === grantId) {
             const newSheetDefinitions = { ...g.sheetDefinitions };
             if (newSheetDefinitions[permissionSheetName]) {
@@ -430,7 +430,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   const handleToggleSheetVisibility = (sheetName: string, grantId: string) => {
     if (!draftSettings) return;
 
-    const newGrants = draftSettings.grants.map(g => {
+    const newGrants = (draftSettings.grants || []).map(g => {
         if (g.id === grantId) {
             const newSheetDefinitions = { ...g.sheetDefinitions };
             if (newSheetDefinitions[sheetName]) {
@@ -490,8 +490,8 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     const settingsToRestore: AppSettings = {
         ...appSettings,
         ...historicalSettings,
-        grants: historicalSettings.grants.map(hg => {
-            const fullGrant = appSettings.grants.find(g => g.id === hg.id);
+        grants: (historicalSettings.grants || []).map(hg => {
+            const fullGrant = (appSettings.grants || []).find(g => g.id === hg.id);
             return fullGrant || { ...hg, sheetDefinitions: {} };
         }),
         settingsHistory: draftSettings?.settingsHistory,
@@ -507,7 +507,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
       name: newGrantName.trim(),
       sheetDefinitions: {},
     };
-    const updatedGrants = [...draftSettings.grants, newGrant];
+    const updatedGrants = [...(draftSettings.grants || []), newGrant];
     handleSettingChange('grants', updatedGrants);
     setNewGrantName('');
   };
@@ -527,7 +527,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
       handleCancelRename();
       return;
     }
-    const updatedGrants = draftSettings.grants.map(g =>
+    const updatedGrants = (draftSettings.grants || []).map(g =>
       g.id === editingGrantId ? { ...g, name: editingGrantName.trim() } : g
     );
     handleSettingChange('grants', updatedGrants);
@@ -536,7 +536,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
 
   const handleDeleteGrant = () => {
     if (!draftSettings || !grantToDelete) return;
-    const updatedGrants = draftSettings.grants.filter(g => g.id !== grantToDelete.id);
+    const updatedGrants = (draftSettings.grants || []).filter(g => g.id !== grantToDelete.id);
     let newActiveGrantId = draftSettings.activeGrantId;
     if (draftSettings.activeGrantId === grantToDelete.id) {
       newActiveGrantId = updatedGrants[0]?.id || null;
@@ -667,7 +667,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                     <Separator />
                     <ScrollArea className="h-[400px] pr-2">
                         <div className="space-y-4">
-                        {draftSettings.grants?.map(grant => (
+                        {(draftSettings.grants || []).map(grant => (
                             <Collapsible key={grant.id} className="border rounded-lg bg-background" defaultOpen={grant.id === draftSettings.activeGrantId}>
                             <div className="flex items-center p-2 border-b">
                                 <CollapsibleTrigger asChild>
@@ -701,7 +701,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                             <Button size="sm" variant="outline" onClick={() => handleSettingChange('activeGrantId', grant.id)}>Set Active</Button>
                                         )}
                                         <Button size="sm" variant="ghost" onClick={() => handleStartRenameGrant(grant)}>Rename</Button>
-                                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setGrantToDelete(grant)} disabled={draftSettings.grants.length <= 1}>Delete</Button>
+                                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => setGrantToDelete(grant)} disabled={(draftSettings.grants || []).length <= 1}>Delete</Button>
                                       </>
                                     )}
                                 </div>
@@ -827,7 +827,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                             <Label htmlFor="disable-for-all" className="font-bold">Disable for all non-admin users</Label>
                        </div>
                        <Separator />
-                       {draftSettings.authorizedUsers.filter(u => u.loginName !== 'admin').map(user => (
+                       {(draftSettings.authorizedUsers || []).filter(u => u.loginName !== 'admin').map(user => (
                            <div key={user.loginName} className="flex items-center space-x-2">
                                 <Checkbox 
                                     id={`disable-${user.loginName}`} 
