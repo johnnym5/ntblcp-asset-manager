@@ -47,7 +47,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const activeGrant = useMemo(() => {
-    return appSettings?.grants.find(g => g.id === activeGrantId);
+    return appSettings?.grants?.find(g => g.id === activeGrantId);
   }, [appSettings, activeGrantId]);
 
   useEffect(() => {
