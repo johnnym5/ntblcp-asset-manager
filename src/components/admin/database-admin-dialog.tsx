@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useCallback } from 'react';
@@ -23,8 +22,8 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
-import { getAssets as getAssetsFS, batchDeleteAssets as batchDeleteAssetsFS, clearAssets as clearFirestoreAssets } from '@/lib/firestore';
-import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, clearAssets as clearRtdbAssets } from '@/lib/database';
+import { getAssets as getAssetsFS, batchSetAssets as batchSetAssetsFS, batchDeleteAssets as batchDeleteAssetsFS, clearAssets as clearFirestoreAssets, getSettings as getSettingsFS, updateSettings as updateSettingsFS } from '@/lib/firestore';
+import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, clearAssets as clearRtdbAssets, getSettings as getSettingsRTDB, updateSettings as updateSettingsRTDB } from '@/lib/database';
 import { useAuth } from '@/contexts/auth-context';
 import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive, Database, RefreshCw } from 'lucide-react';
 import type { AppSettings, Asset } from '@/lib/types';
@@ -34,8 +33,6 @@ import { addNotification } from '@/hooks/use-notifications';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Separator } from '../ui/separator';
 import { useToast } from '@/hooks/use-toast';
-import { updateSettings as updateSettingsFS } from '@/lib/firestore';
-import { updateSettings as updateSettingsRTDB } from '@/lib/database';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Switch } from '../ui/switch';
@@ -210,18 +207,42 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     setIsProcessing(false);
   };
   
-  const handleSyncDatabases = async () => {
+  const handleSyncRtdbToFirestore = async () => {
     setIsProcessing(true);
-    addNotification({ title: 'Syncing Databases...', description: 'Copying data from Realtime Database to Firestore.' });
+    addNotification({ title: 'Syncing: RTDB -> Firestore', description: 'Copying data from Realtime Database to Firestore.' });
     try {
         const rtdbAssets = await getAssetsRTDB();
-        if (appSettings) {
+        const rtdbSettings = await getSettingsRTDB();
+
+        if (rtdbAssets && rtdbAssets.length > 0) {
             await batchSetAssetsFS(rtdbAssets);
-            const rtdbSettings = await updateSettingsRTDB(appSettings);
-            if(rtdbSettings) await updateSettingsFS(rtdbSettings);
+        }
+        if (rtdbSettings) {
+            await updateSettingsFS(rtdbSettings);
         }
 
         addNotification({ title: 'Sync Complete', description: 'Firestore has been updated with data from Realtime Database.' });
+    } catch (e) {
+        addNotification({ title: 'Sync Failed', description: (e as Error).message, variant: 'destructive'});
+    }
+    setIsProcessing(false);
+  };
+  
+  const handleSyncFirestoreToRtdb = async () => {
+    setIsProcessing(true);
+    addNotification({ title: 'Syncing: Firestore -> RTDB', description: 'Copying data from Firestore to Realtime Database.' });
+    try {
+        const firestoreAssets = await getAssetsFS();
+        const firestoreSettings = await getSettingsFS();
+
+        if (firestoreAssets && firestoreAssets.length > 0) {
+            await batchSetAssetsRTDB(firestoreAssets);
+        }
+        if (firestoreSettings) {
+            await updateSettingsRTDB(firestoreSettings);
+        }
+
+        addNotification({ title: 'Sync Complete', description: 'Realtime Database has been updated with data from Firestore.' });
     } catch (e) {
         addNotification({ title: 'Sync Failed', description: (e as Error).message, variant: 'destructive'});
     }
@@ -468,8 +489,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                    <Button variant="outline" className="w-full justify-start" onClick={() => setIsImportScanOpen(true)}>
                         <Database className="mr-2 h-4 w-4" /> Scan & Import Workbook
                     </Button>
-                   <Button variant="outline" className="w-full justify-start" onClick={handleSyncDatabases} disabled={isProcessing}>
-                      <RefreshCw className="mr-2 h-4 w-4" /> Sync Databases (RTDB to Firestore)
+                   <Button variant="outline" className="w-full justify-start" onClick={handleSyncRtdbToFirestore} disabled={isProcessing}>
+                      <RefreshCw className="mr-2 h-4 w-4" /> Sync RTDB to Firestore
+                  </Button>
+                  <Button variant="outline" className="w-full justify-start" onClick={handleSyncFirestoreToRtdb} disabled={isProcessing}>
+                      <RefreshCw className="mr-2 h-4 w-4" /> Sync Firestore to RTDB
                   </Button>
                 </CardContent>
               </Card>
@@ -544,4 +568,3 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     </>
   );
 }
-    
