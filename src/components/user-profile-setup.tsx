@@ -66,7 +66,7 @@ export default function UserProfileSetup() {
         return;
     }
 
-    const allUsers = [...appSettings.authorizedUsers, superAdmin];
+    const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
     const user = allUsers.find(
       u => u.loginName.toLowerCase() === loginName.toLowerCase().trim()
     );

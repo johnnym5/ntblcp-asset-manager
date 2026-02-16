@@ -228,12 +228,15 @@ export default function AssetList() {
     setShowProjectSwitchDialog,
     activeDatabase,
     setOnRevertAsset,
+    activeGrantId,
   } = useAppState();
 
-  if (!appSettings) {
-     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
-  }
-  const { lockAssetList, sheetDefinitions } = appSettings;
+  const grant = useMemo(() => {
+    return appSettings?.grants?.find(g => g.id === activeGrantId);
+  }, [appSettings, activeGrantId]);
+
+  const sheetDefinitions = useMemo(() => grant?.sheetDefinitions || {}, [grant]);
+
 
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
@@ -241,7 +244,7 @@ export default function AssetList() {
   const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
 
   const specialLocations = useMemo(() => {
-    if (!appSettings.locations) return SPECIAL_LOCATIONS.sort((a, b) => a.localeCompare(b));
+    if (!appSettings?.locations) return SPECIAL_LOCATIONS.sort((a, b) => a.localeCompare(b));
     const defaultSpecial = new Set(SPECIAL_LOCATIONS);
     const states = new Set(NIGERIAN_STATES);
     const zones = new Set(ZONAL_STORES);
@@ -253,7 +256,7 @@ export default function AssetList() {
     });
 
     return Array.from(defaultSpecial).sort((a,b) => a.localeCompare(b));
-  }, [appSettings.locations]);
+  }, [appSettings?.locations]);
 
   const clearAllDialogDescription = useMemo(() => {
     let message = `This will permanently delete all asset records from the ${dataSource === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
@@ -546,7 +549,7 @@ export default function AssetList() {
   }, [manualUploadTrigger, handleUploadScan]);
   
   useEffect(() => {
-    if (appSettings.appMode === 'verification') {
+    if (appSettings?.appMode === 'verification') {
         setStatusOptions([
             { value: "Verified", label: "Verified" },
             { value: "Unverified", label: "Unverified" },
@@ -554,7 +557,7 @@ export default function AssetList() {
     } else {
         setStatusOptions([]);
     }
-  }, [appSettings.appMode, setStatusOptions]);
+  }, [appSettings?.appMode, setStatusOptions]);
 
   const allAssetsForFiltering = useMemo(() => {
     if (isAdmin && globalStateFilter && globalStateFilter !== 'All') {
@@ -656,7 +659,8 @@ export default function AssetList() {
 
   const displayedAssets = useMemo(() => {
     let results = allAssetsForFiltering.filter(asset => {
-      const def = sheetDefinitions[asset.category];
+      if (!asset.category) return false;
+      const def = sheetDefinitions?.[asset.category];
       // Universal rule: if no definition or sheet is hidden, filter it out for everyone.
       if (!def || def.isHidden) {
           return false;
@@ -727,7 +731,7 @@ export default function AssetList() {
     }
     
     return sortAssets(results, sortConfig);
-  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, conditionFilter, sortConfig, sheetDefinitions, isAdmin, userProfile]);
+  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, conditionFilter, sortConfig, sheetDefinitions, userProfile]);
 
   const assetsByCategory = useMemo(() => {
     return displayedAssets.reduce((acc, asset) => {
@@ -751,14 +755,14 @@ export default function AssetList() {
       addNotification({ title: "Permission Denied", description: "You do not have permission to add new assets.", variant: "destructive" });
       return;
     }
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
       addNotification({ title: "Asset List Locked", description: "Adding new assets to the main list is disabled. Switch to 'Locked Offline' to add.", variant: "destructive" });
       return;
     }
     setSelectedAsset(undefined);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  }, [lockAssetList, isAdmin, dataSource, userProfile]);
+  }, [appSettings?.lockAssetList, isAdmin, dataSource, userProfile]);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -771,7 +775,7 @@ export default function AssetList() {
       addNotification({ title: "Permission Denied", description: "You do not have permission to edit assets.", variant: "destructive" });
       return;
     }
-    if (lockAssetList && isAdmin && dataSource === 'cloud' && appSettings.appMode !== 'verification') {
+    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud' && appSettings.appMode !== 'verification') {
         addNotification({ title: "Edits Disabled", description: "The main asset list is locked for full edits. Switch to 'Locked Offline' to merge changes, or disable lock in settings.", variant: "destructive" });
         return;
     }
@@ -791,7 +795,7 @@ export default function AssetList() {
     if (!assetToDelete) return;
 
     if (dataSource === 'cloud') {
-      if (lockAssetList && isAdmin) {
+      if (appSettings?.lockAssetList && isAdmin) {
         addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
         setIsDeleteDialogOpen(false);
         return;
@@ -824,7 +828,7 @@ export default function AssetList() {
   };
 
   const handleBatchDelete = async () => {
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
         addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
         return;
     }
@@ -867,7 +871,7 @@ export default function AssetList() {
       addNotification({ title: "Permission Denied", description: "You do not have permission to batch edit.", variant: "destructive" });
       return;
     }
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
         addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
         return;
     }
@@ -875,7 +879,7 @@ export default function AssetList() {
   }
   
   const handleSaveBatchEdit = async (data: BatchUpdateData) => {
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
         addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
         return;
     }
@@ -922,7 +926,7 @@ export default function AssetList() {
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
         addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
       return;
     }
@@ -987,7 +991,7 @@ export default function AssetList() {
     const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
 
-    if (lockAssetList && isAdmin && dataSource === 'cloud' && appSettings.appMode !== 'verification') {
+    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud' && appSettings.appMode !== 'verification') {
       addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
       return;
     }
@@ -1096,7 +1100,7 @@ export default function AssetList() {
       if (isOnline && isAdmin) {
           addNotification({ title: 'Clearing Cloud Database...', description: `This will remove all assets.` });
           try {
-              const cloudClear = activeDatabase === 'firestore' ? clearAssetsFS : clearRtdbAssets;
+              const cloudClear = activeDatabase === 'firestore' ? clearRtdbAssets : clearRtdbAssets;
               await cloudClear();
               addNotification({ title: 'All Cloud Assets Cleared', description: 'The application is now in a clean state.' });
           } catch (e) {
@@ -1420,7 +1424,7 @@ export default function AssetList() {
 
     if (idsToDelete.length === 0) return;
 
-    if (lockAssetList && isAdmin && dataSource === 'cloud') {
+    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
         addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
         return;
     }
@@ -1473,7 +1477,7 @@ export default function AssetList() {
   };
   
   const handleSaveColumnLayout = async (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
-    if (!isAdmin) return;
+    if (!isAdmin || !appSettings) return;
 
     const newSheetDefinitions = { ...appSettings.sheetDefinitions };
     if (applyToAll) {
@@ -1501,9 +1505,9 @@ export default function AssetList() {
   };
 
   const handleToggleSheetVisibility = async (sheetName: string) => {
-    if (!isAdmin) return;
+    if (!isAdmin || !appSettings) return;
 
-    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
+    const newSheetDefinitions = { ...(appSettings.sheetDefinitions || {}) };
     newSheetDefinitions[sheetName].isHidden = !newSheetDefinitions[sheetName].isHidden;
 
     const newSettings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString() };
@@ -1514,7 +1518,7 @@ export default function AssetList() {
     try {
         await updateSettingsFS(newSettings);
         await saveLocalSettings(newSettings);
-        toast({ title: 'Visibility Changed', description: `Sheet '${sheetName}' is now ${newSettings.sheetDefinitions[sheetName].isHidden ? 'hidden' : 'visible'}.` });
+        toast({ title: 'Visibility Changed', description: `Sheet '${sheetName}' is now ${newSheetDefinitions[sheetName].isHidden ? 'hidden' : 'visible'}.` });
     } catch (e) {
         // Revert on failure
         setAppSettings(appSettings);
@@ -1523,7 +1527,7 @@ export default function AssetList() {
   };
 
 
-  if (isLoading) {
+  if (isLoading || !appSettings) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
@@ -1712,8 +1716,8 @@ export default function AssetList() {
                         </SelectContent>
                       </Select>
                     )}
-                     {isAdmin && !lockAssetList && (
-                        <Button variant="outline" className="w-full md:w-auto" onClick={() => setIsSettingsOpen(true)}>
+                     {isAdmin && !appSettings.lockAssetList && (
+                        <Button variant="outline" className="w-full md:w-auto" onClick={() => setIsImportScanOpen(true)}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Add or Manage Sheets
                         </Button>
                     )}
@@ -1871,7 +1875,7 @@ export default function AssetList() {
   
   let quickViewFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.quickView) || [];
 
-  if (appSettings.appMode === 'management') {
+  if (appSettings?.appMode === 'management') {
     quickViewFields = quickViewFields.filter(f => f.key !== 'verifiedStatus');
   }
   
@@ -1924,7 +1928,7 @@ export default function AssetList() {
                 <h2 className="text-2xl font-bold tracking-tight">
                     {currentCategory}
                 </h2>
-                {(!lockAssetList || dataSource === 'local_locked') && (userProfile?.canAddAssets || isAdmin) && (
+                {(!appSettings?.lockAssetList || dataSource === 'local_locked') && (userProfile?.canAddAssets || isAdmin) && (
                   <Button variant="outline" size="sm" onClick={handleAddAsset}>
                     <PlusCircle className="mr-2 h-4 w-4"/>
                     Add Asset
@@ -2043,7 +2047,7 @@ export default function AssetList() {
                                 )
                               })}
                           </div>
-                          {appSettings.appMode === 'verification' && (
+                          {appSettings?.appMode === 'verification' && (
                             <div className="mt-4" onClick={e => e.stopPropagation()}>
                                 <p className="text-xs font-medium text-muted-foreground mb-1">Verified Status</p>
                                 <Select

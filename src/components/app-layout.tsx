@@ -172,7 +172,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       const newSettings = { ...appSettings, activeGrantId: grantId };
       setAppSettings(newSettings);
       await saveLocalSettings(newSettings);
-      addNotification({ title: "Project Switched", description: `You are now working in the "${appSettings.grants.find(g => g.id === grantId)?.name}" project.` });
+      addNotification({ title: "Project Switched", description: `You are now working in the "${appSettings.grants?.find(g => g.id === grantId)?.name}" project.` });
     }
   };
   
