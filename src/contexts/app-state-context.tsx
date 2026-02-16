@@ -13,10 +13,13 @@ import {
 } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import type { Asset, AppSettings, Grant, AuthorizedUser } from '@/lib/types';
-import { onSettingsChange } from '@/lib/database';
+import { onSettingsChange, updateSettingsRTDB } from '@/lib/database';
+import { updateSettings as updateSettingsFS } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
 import { addNotification } from '@/hooks/use-notifications';
+import { v4 as uuidv4 } from 'uuid';
+import { NIGERIAN_STATES } from '@/lib/constants';
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -217,6 +220,51 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       let localSettings = await getLocalSettings();
       localSettings = await migrateSettings(localSettings);
 
+      if (!localSettings) {
+        addNotification({ title: 'First-Time Setup', description: 'Creating default settings and user accounts for each state.' });
+        
+        const grantId = uuidv4();
+        const defaultGrant: Grant = {
+            id: grantId,
+            name: 'Default Project',
+            sheetDefinitions: {},
+        };
+
+        const defaultUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
+            loginName: state.toLowerCase().replace(/[\s-]/g, ''),
+            displayName: `${state} User`,
+            states: [state],
+            isAdmin: false,
+            canAddAssets: true,
+            canEditAssets: true,
+            canVerifyAssets: true,
+            password: 'password',
+        }));
+        
+        const newSettings: AppSettings = {
+            grants: [defaultGrant],
+            activeGrantId: grantId,
+            authorizedUsers: defaultUsers,
+            lockAssetList: false,
+            appMode: 'verification',
+            lastModified: new Date().toISOString(),
+        };
+
+        setAppSettings(newSettings);
+        setActiveGrantId(newSettings.activeGrantId);
+        setSettingsLoaded(true);
+        
+        await saveLocalSettings(newSettings);
+        
+        if (isBrowserOnline) {
+            await Promise.allSettled([
+                updateSettingsRTDB(newSettings),
+                updateSettingsFS(newSettings)
+            ]);
+        }
+        return; 
+      }
+
       setAppSettings(localSettings);
       if (localSettings?.activeGrantId) {
         setActiveGrantId(localSettings.activeGrantId);
@@ -233,7 +281,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     };
     
     initializeSettings();
-  }, [migrateSettings]);
+  }, [migrateSettings, isBrowserOnline]);
 
   useEffect(() => {
     if (!settingsLoaded || !isBrowserOnline) return;
