@@ -21,9 +21,31 @@ This application is designed to solve the critical challenge of managing and ver
 
 ## 1. Local Development Setup
 
-The Firebase project configuration is embedded directly into the application, so no extra setup is required for local development.
+Before you can run the app locally, you must provide your Firebase project's credentials.
 
-### Install Dependencies & Run
+### Step 1.1: Create `.env.local` file
+
+Create a file named `.env.local` in the root of the project by copying the `.env.example` file if it exists, or creating a new one.
+
+### Step 1.2: Fill in your Firebase Credentials
+
+Open the new `.env.local` file and add your actual Firebase project credentials. You can find these values in your Firebase project's settings page in the Firebase Console.
+
+*   In the Firebase Console, go to **Project settings** (click the gear icon ⚙️).
+*   In the **General** tab, scroll down to the "Your apps" section.
+*   Select your web app and copy the corresponding configuration values into your `.env.local` file. The file should look like this:
+
+```
+NEXT_PUBLIC_FIREBASE_API_KEY=AIza...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://your-project.firebaseio.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=12345...
+NEXT_PUBLIC_FIREBASE_APP_ID=1:12345...:web:...
+```
+
+### Step 1.3: Install Dependencies & Run
 
 ```bash
 npm install
@@ -56,10 +78,10 @@ firebase login
 
 ### Step 2.3: Set Your Firebase Project
 
-From your project's root directory, run the following command to associate your local project with your Firebase project.
+From your project's root directory, run the following command to associate your local project with your Firebase project. Replace `<YOUR_FIREBASE_PROJECT_ID>` with your actual Firebase Project ID.
 
 ```bash
-firebase use ntblcp-asset-manager-k7hy1
+firebase use <YOUR_FIREBASE_PROJECT_ID>
 ```
 
 ### Step 2.4: Deploy the Application
@@ -70,7 +92,7 @@ Run this single command from your project's root directory.
 firebase deploy
 ```
 
-This command will automatically build your Next.js application and deploy it to App Hosting. Your live application will be available at `https://ntblcp-asset-manager-k7hy1.web.app`.
+This command will automatically build your Next.js application and deploy it to App Hosting. Your live application will be available at `https://<your-app-name>.web.app`.
 
 ---
 

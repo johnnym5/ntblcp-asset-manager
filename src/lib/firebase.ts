@@ -3,23 +3,22 @@ import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getDatabase, type Database } from 'firebase/database';
 
-// Your web app's Firebase configuration
+// Your web app's Firebase configuration is now loaded from environment variables.
 export const firebaseConfig = {
-  apiKey: "AIzaSyB9O662zXyyJkhtle1snkNLapre3_Sa3rc",
-  authDomain: "ntblcp-asset-manager-k7hy1.firebaseapp.com",
-  databaseURL: "https://ntblcp-asset-manager-k7hy1-default-rtdb.firebaseio.com",
-  projectId: "ntblcp-asset-manager-k7hy1",
-  storageBucket: "ntblcp-asset-manager-k7hy1.firebasestorage.app",
-  messagingSenderId: "45027293772",
-  appId: "1:45027293772:web:0116cfaa586d17fa4c52e9"
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
 
 // Check if all essential keys are present and not placeholders
 export const isConfigValid = 
     firebaseConfig.apiKey &&
-    firebaseConfig.projectId &&
-    firebaseConfig.databaseURL;
+    firebaseConfig.projectId;
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
@@ -37,7 +36,7 @@ if (typeof window !== 'undefined') {
     }
   } else {
     // This warning helps developers who haven't set up their .env file.
-    console.error("Firebase configuration is missing or incomplete. Online features will be disabled.");
+    console.warn("Firebase configuration is missing or incomplete. Online features will be disabled. Please create and populate a .env file for local development as described in the README.");
   }
 }
 
