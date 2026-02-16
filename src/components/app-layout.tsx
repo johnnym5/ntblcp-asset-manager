@@ -31,6 +31,7 @@ import {
   Database,
   DatabaseZap,
   History,
+  Briefcase,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -51,6 +52,13 @@ import { ScrollArea } from "./ui/scroll-area";
 import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
 import { ActivityLogDialog } from "./admin/activity-log-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -64,6 +72,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
     locationOptions, assigneeOptions, statusOptions,
     setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
+    conditionOptions, conditionFilter, setConditionFilter,
     setManualDownloadTrigger,
     setManualUploadTrigger,
     isSyncing,
@@ -74,6 +83,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     onRevertAsset,
     appSettings,
     activeGrantId,
+    setActiveGrantId,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -110,6 +120,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const getUserName = () => {
     return userProfile?.displayName || "User";
   }
+  
+  const handleActiveGrantChange = (grantId: string) => {
+    setActiveGrantId(grantId);
+  };
 
   const sortableFields: { key: keyof Asset, label: string }[] = [
       { key: 'sn', label: 'S/N' },
@@ -166,7 +180,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
 
   const handleSettingsOpen = () => {
-    setInitialSettingsTab('general');
+    setInitialSettingsTab('projects');
     setIsSettingsOpen(true);
   }
 
@@ -436,9 +450,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         statusOptions={statusOptions}
         selectedStatuses={selectedStatuses}
         setSelectedStatuses={setSelectedStatuses}
+        conditionOptions={conditionOptions}
+        selectedConditions={conditionFilter}
+        setSelectedConditions={setConditionFilter}
         missingFieldFilter={missingFieldFilter}
         setMissingFieldFilter={setMissingFieldFilter}
       />
     </div>
   );
 }
+
+    
