@@ -197,7 +197,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       return settings;
   }, []);
   
-  // This effect loads settings from local DB and potentially migrates them.
   useEffect(() => {
     const initializeSettings = async () => {
       let localSettings = await getLocalSettings();
@@ -221,7 +220,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     initializeSettings();
   }, [migrateSettings]);
 
-  // Real-time listener for remote settings changes
   useEffect(() => {
     if (!settingsLoaded || !isBrowserOnline) return;
 
@@ -244,7 +242,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     };
   }, [settingsLoaded, isBrowserOnline, migrateSettings]);
 
-  // Project ID check
   useEffect(() => {
     if (typeof window !== 'undefined' && settingsLoaded) {
         const currentProjectId = firebaseConfig.projectId;
@@ -271,6 +268,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       setSelectedStatuses([]);
     }
   }, [appSettings, setSelectedStatuses]);
+
+  useEffect(() => {
+      if (appSettings?.activeGrantId && activeGrantId !== appSettings.activeGrantId) {
+          setActiveGrantId(appSettings.activeGrantId);
+      }
+  }, [appSettings?.activeGrantId, activeGrantId]);
+
 
   const value = {
     assets,
