@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useCallback } from 'react';
@@ -26,7 +25,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { getAssets as getAssetsFS, batchSetAssets as batchSetAssetsFS, batchDeleteAssets as batchDeleteAssetsFS, clearAssets as clearFirestoreAssets, getSettings as getSettingsFS, updateSettings as updateSettingsFS } from '@/lib/firestore';
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, clearAssets as clearRtdbAssets, getSettings as getSettingsRTDB, updateSettings as updateSettingsRTDB } from '@/lib/database';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive, Database, RefreshCw } from 'lucide-react';
+import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive, RefreshCw } from 'lucide-react';
 import type { AppSettings, Asset } from '@/lib/types';
 import { saveLocalSettings, clearLocalAssets, saveAssets, saveLockedOfflineAssets, getLocalAssets, getLockedOfflineAssets } from '@/lib/idb';
 import { exportFullBackupToJson, exportSettingsToJson, exportAssetsToJson } from '@/lib/json-export';
@@ -37,7 +36,6 @@ import { useToast } from '@/hooks/use-toast';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Switch } from '../ui/switch';
-import { ImportScannerDialog } from '../single-sheet-import-dialog';
 import { get, ref, set, remove } from 'firebase/database';
 import { rtdb } from '@/lib/firebase';
 import { Textarea } from '../ui/textarea';
@@ -56,7 +54,6 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmDescription, setConfirmDescription] = useState('');
-  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
 
   const importFileRef = useRef<HTMLInputElement>(null);
   const [backupToRestore, setBackupToRestore] = useState<{ settings: AppSettings, assets: Asset[] } | null>(null);
@@ -461,7 +458,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
               <Card>
                   <CardHeader>
-                      <CardTitle>Backup & Restore</CardTitle>
+                      <CardTitle>Backup &amp; Restore</CardTitle>
                       <CardDescription>Export or import all assets and settings.</CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-2">
@@ -477,7 +474,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                           addNotification({ title: 'Export Failed', description: (e as Error).message, variant: 'destructive' });
                         }
                       }} disabled={isProcessing}>
-                          <Download className="mr-2 h-4 w-4" /> Export Full Backup (Assets & Settings)
+                          <Download className="mr-2 h-4 w-4" /> Export Full Backup (Assets &amp; Settings)
                       </Button>
                       <Button variant="outline" className="w-full justify-start" onClick={() => {
                         try {
@@ -509,9 +506,6 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                   <Button variant="outline" className="w-full justify-start" onClick={() => openConfirmation('merge', 'Merge Offline Data?', 'This will merge all assets from your "Locked Offline" store into the main list. Offline edits will overwrite main list data. This cannot be undone.')} disabled={isProcessing}>
                       <GitMerge className="mr-2 h-4 w-4" /> Import from Offline Store
                   </Button>
-                   <Button variant="outline" className="w-full justify-start" onClick={() => setIsImportScanOpen(true)}>
-                        <Database className="mr-2 h-4 w-4" /> Scan & Import Workbook
-                    </Button>
                    <Button variant="outline" className="w-full justify-start" onClick={handleSyncRtdbToFirestore} disabled={isProcessing}>
                       <RefreshCw className="mr-2 h-4 w-4" /> Sync RTDB to Firestore
                   </Button>
@@ -539,7 +533,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                       <Separator />
                       <Button variant="destructive" className="w-full justify-start" onClick={() => openConfirmation('nuke_all', 'Nuke ALL Data?', 'This is the most destructive option. It will permanently delete ALL assets from your local device AND from BOTH cloud databases.')} disabled={isProcessing}>
                           {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseZap className="mr-2 h-4 w-4" />}
-                          Nuke ALL Data (Local & Cloud)
+                          Nuke ALL Data (Local &amp; Cloud)
                       </Button>
                   </CardContent>
               </Card>
@@ -586,10 +580,6 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
-
-      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
     </>
   );
 }
-
-    

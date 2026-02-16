@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -13,13 +12,14 @@ import {
 } from '@/components/ui/alert-dialog';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import type { Asset } from '@/lib/types';
-import { CloudUpload, Edit, Plus, Save } from 'lucide-react';
+import { CloudUpload, Edit, Plus, Save, Trash2 } from 'lucide-react';
 
 export interface SyncSummary {
   newFromCloud: Asset[];
   updatedFromCloud: Asset[];
   keptLocal: Asset[];
   toUpload: Asset[];
+  deletedOnCloud?: Asset[];
   type: 'download' | 'upload';
 }
 
@@ -52,7 +52,7 @@ export function SyncConfirmationDialog({ isOpen, onOpenChange, onConfirm, summar
   if (!summary) return null;
   
   const isDownload = summary.type === 'download';
-  const totalDownloadChanges = summary.newFromCloud.length + summary.updatedFromCloud.length;
+  const totalDownloadChanges = (summary.newFromCloud?.length || 0) + (summary.updatedFromCloud?.length || 0) + (summary.deletedOnCloud?.length || 0);
 
   return (
     <AlertDialog open={isOpen} onOpenChange={onOpenChange}>
@@ -70,6 +70,7 @@ export function SyncConfirmationDialog({ isOpen, onOpenChange, onConfirm, summar
                         <SummarySection title="New Assets from Cloud" assets={summary.newFromCloud} color="text-blue-600 dark:text-blue-400" icon={<Plus />} />
                         <SummarySection title="Assets to be Updated" assets={summary.updatedFromCloud} color="text-yellow-600 dark:text-yellow-400" icon={<Edit />} />
                         <SummarySection title="Local Changes to Keep (Newer)" assets={summary.keptLocal} color="text-green-600 dark:text-green-400" icon={<Save />} />
+                        <SummarySection title="Assets to be Removed Locally" assets={summary.deletedOnCloud || []} color="text-red-600 dark:text-red-400" icon={<Trash2 />} />
                     </>
                 ) : (
                     <SummarySection title="Local Changes to Upload" assets={summary.toUpload} color="text-purple-600 dark:text-purple-400" icon={<CloudUpload />} />
@@ -86,5 +87,3 @@ export function SyncConfirmationDialog({ isOpen, onOpenChange, onConfirm, summar
     </AlertDialog>
   );
 }
-
-    
