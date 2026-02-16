@@ -31,7 +31,6 @@ import {
   Database,
   DatabaseZap,
   History,
-  Briefcase,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -52,8 +51,6 @@ import { ScrollArea } from "./ui/scroll-area";
 import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
 import { ActivityLogDialog } from "./admin/activity-log-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "./ui/select";
-import { saveLocalSettings } from "@/lib/idb";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -75,8 +72,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     initialSettingsTab,
     setInitialSettingsTab,
     onRevertAsset,
-    appSettings, setAppSettings,
-    activeGrantId, setActiveGrantId,
+    appSettings,
+    activeGrantId,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -165,16 +162,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       setTimeout(() => markAllAsRead(), 500);
     }
   }
-
-  const handleActiveGrantChange = async (grantId: string) => {
-    setActiveGrantId(grantId);
-    if (appSettings) {
-      const newSettings = { ...appSettings, activeGrantId: grantId };
-      setAppSettings(newSettings);
-      await saveLocalSettings(newSettings);
-      addNotification({ title: "Project Switched", description: `You are now working in the "${appSettings.grants?.find(g => g.id === grantId)?.name}" project.` });
-    }
-  };
   
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
 
@@ -182,11 +169,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setInitialSettingsTab('general');
     setIsSettingsOpen(true);
   }
-
-  const activeGrantName = useMemo(() => {
-    if (!appSettings || !activeGrantId) return 'Loading...';
-    return appSettings.grants?.find(g => g.id === activeGrantId)?.name || 'Default Project';
-  }, [appSettings, activeGrantId]);
 
   return (
     <div className="flex flex-col w-full h-screen border-8 border-muted/50">
@@ -198,21 +180,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Boxes className="h-5 w-5 text-primary" />
                 <span className="text-lg font-semibold hidden sm:inline-block">Asset Manager</span>
             </div>
-            {appSettings && appSettings.grants && appSettings.grants.length > 1 && (
-              <div className="flex items-center gap-2">
-                <Briefcase className="h-4 w-4 text-muted-foreground" />
-                <Select value={activeGrantId || ''} onValueChange={handleActiveGrantChange}>
-                  <SelectTrigger className="w-[180px] h-9 text-sm font-medium">
-                    <SelectValue placeholder="Select project..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {appSettings.grants.map(grant => (
-                      <SelectItem key={grant.id} value={grant.id}>{grant.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
         </div>
         
         {/* Right Side */}
