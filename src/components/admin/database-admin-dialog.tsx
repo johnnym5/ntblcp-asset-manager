@@ -39,6 +39,7 @@ import { Switch } from '../ui/switch';
 import { get, ref, set, remove } from 'firebase/database';
 import { rtdb } from '@/lib/firebase';
 import { Textarea } from '../ui/textarea';
+import { Input } from '../ui/input';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -64,6 +65,17 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const [isBrowserLoading, setIsBrowserLoading] = useState(false);
   const [browserError, setBrowserError] = useState<string | null>(null);
   const [confirmDeletePath, setConfirmDeletePath] = useState<string | null>(null);
+  const [dbSearchTerm, setDbSearchTerm] = useState('');
+  const [dbReplaceTerm, setDbReplaceTerm] = useState('');
+
+  const handleReplaceAll = useCallback(() => {
+    if (!dbSearchTerm) {
+        toast({ title: 'Search term is empty', description: 'Please enter a term to search for.', variant: 'destructive' });
+        return;
+    }
+    setBrowserData(currentData => currentData.replaceAll(dbSearchTerm, dbReplaceTerm));
+    toast({ title: 'Replaced All', description: `Replaced all occurrences of "${dbSearchTerm}".` });
+  }, [dbSearchTerm, dbReplaceTerm, toast]);
 
 
   const handlePathSelect = useCallback(async (path: string) => {
@@ -429,6 +441,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                     {browserPath && (
                         <div className="space-y-2">
                             <Label>Editing path: <span className="font-mono p-1 bg-muted rounded-md text-xs">{browserPath}</span></Label>
+                             <div className="flex items-center gap-2">
+                                <Input placeholder="Find..." value={dbSearchTerm} onChange={e => setDbSearchTerm(e.target.value)} />
+                                <Input placeholder="Replace with..." value={dbReplaceTerm} onChange={e => setDbReplaceTerm(e.target.value)} />
+                                <Button onClick={handleReplaceAll} variant="outline">Replace All</Button>
+                            </div>
                             <div className="relative">
                                 <Textarea
                                     value={browserData}

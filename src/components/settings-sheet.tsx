@@ -106,7 +106,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   useEffect(() => {
     if (isOpen) {
         setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
-        setActiveTab(initialTab || 'projects');
+        setActiveTab(initialTab || 'general');
     } else {
         setDraftSettings(null);
         setPasswordError('');
@@ -281,7 +281,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     // Save settings
     try {
       const historyEntry: HistoricalAppSettings = { ...appSettings, grants: (appSettings.grants || []).map(g => ({ id: g.id, name: g.name })) };
-      delete historyEntry.settingsHistory;
+      delete (historyEntry as any).settingsHistory;
           
       const oneWeekAgo = new Date();
       oneWeekAgo.setDate(oneWeekAgo.getDate() - 7);
@@ -487,16 +487,22 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   };
   
   const handleRollback = (historicalSettings: HistoricalAppSettings) => {
-    if (!appSettings) return;
+    if (!appSettings || !draftSettings) return;
+
+    const grantsToRestore = (historicalSettings.grants || []).map(historicGrant => {
+        const currentFullGrant = (appSettings.grants || []).find(g => g.id === historicGrant.id);
+        // If we find the full grant in the current settings, use it to preserve sheet defs.
+        // Otherwise, it's a restored grant, so it starts with no defs.
+        return currentFullGrant || { ...historicGrant, sheetDefinitions: {} };
+    });
+
     const settingsToRestore: AppSettings = {
-        ...appSettings,
-        ...historicalSettings,
-        grants: (historicalSettings.grants || []).map(hg => {
-            const fullGrant = (appSettings.grants || []).find(g => g.id === hg.id);
-            return fullGrant || { ...hg, sheetDefinitions: {} };
-        }),
-        settingsHistory: draftSettings?.settingsHistory,
+        ...appSettings, // start with current settings to get history etc.
+        ...historicalSettings, // overwrite with historical data
+        grants: grantsToRestore, // use the re-hydrated grants
+        settingsHistory: appSettings.settingsHistory, // Ensure we keep the full, current history
     };
+
     setDraftSettings(settingsToRestore);
     toast({ title: 'Rollback Staged', description: 'The selected historical settings have been loaded. Review and save changes to apply.' });
   };
@@ -669,7 +675,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                     <ScrollArea className="h-[400px] pr-2">
                         <div className="space-y-4">
                         {(draftSettings.grants || []).map(grant => (
-                            <Collapsible key={grant.id} className="border rounded-lg bg-background" defaultOpen={grant.id === draftSettings.activeGrantId}>
+                            <Collapsible key={grant.id} className="border rounded-lg bg-background">
                             <div className="flex items-center p-2 border-b">
                                 <CollapsibleTrigger asChild>
                                     <div className="flex-1 flex items-center gap-2 cursor-pointer p-2">

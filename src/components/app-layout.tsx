@@ -180,7 +180,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
 
   const handleSettingsOpen = () => {
-    setInitialSettingsTab('projects');
+    setInitialSettingsTab('general');
     setIsSettingsOpen(true);
   }
 
@@ -275,7 +275,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
-              <PopoverContent align="end" className="w-full sm:w-96 p-0 flex flex-col max-h-[80vh]">
+              <PopoverContent align="end" className="w-full sm:w-96 p-0 flex flex-col max-h-[80vh] overflow-hidden">
                 <div className="p-4 border-b">
                   <h3 className="font-semibold text-lg">Notifications</h3>
                 </div>
