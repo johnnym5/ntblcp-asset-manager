@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -236,11 +237,14 @@ export default function AssetList() {
     setOnRevertAsset,
     activeGrantId,
     conditionFilter, setConditionFilter,
-    conditionOptions, setConditionOptions
+    conditionOptions, setConditionOptions,
+    dataActions,
+    setDataActions,
   } = useAppState();
 
   const grant = useMemo(() => {
-    return appSettings?.grants?.find(g => g.id === activeGrantId);
+    if (!appSettings || !appSettings.grants) return null;
+    return appSettings.grants.find(g => g.id === activeGrantId);
   }, [appSettings, activeGrantId]);
 
   const sheetDefinitions = useMemo(() => grant?.sheetDefinitions || {}, [grant]);
@@ -295,10 +299,18 @@ export default function AssetList() {
     addNotification({ title: 'Downloading from cloud...' });
     
     try {
-        const { newFromCloud, updatedFromCloud } = syncSummary;
-        const localAssets = await getLocalAssetsFromDb();
+        const { newFromCloud, updatedFromCloud, deletedOnCloud } = syncSummary;
+        let localAssets = await getLocalAssetsFromDb();
         const mergedAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
+        // Handle deletions
+        if (deletedOnCloud && deletedOnCloud.length > 0) {
+            for (const assetToDelete of deletedOnCloud) {
+                mergedAssetsMap.delete(assetToDelete.id);
+            }
+        }
+        
+        // Handle adds/updates
         const assetsToProcess = [...newFromCloud, ...updatedFromCloud];
 
         for (const cloudAsset of assetsToProcess) {
@@ -309,7 +321,8 @@ export default function AssetList() {
         await saveAssets(finalAssets);
         setAssets(finalAssets);
 
-        addNotification({ title: 'Download Complete', description: `${assetsToProcess.length} assets downloaded.` });
+        const totalChanges = assetsToProcess.length + (deletedOnCloud?.length || 0);
+        addNotification({ title: 'Download Complete', description: `${totalChanges} changes synced from the cloud.` });
         
     } catch (error) {
         console.error("Download failed:", error);
@@ -427,12 +440,14 @@ export default function AssetList() {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
         const cloudAssets = await getCloudAssets();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
+        const cloudAssetIds = new Set(cloudAssets.map(a => a.id));
 
         const summary: SyncSummary = {
             newFromCloud: [],
             updatedFromCloud: [],
             keptLocal: [],
             toUpload: [],
+            deletedOnCloud: [],
             type: 'download',
         };
 
@@ -454,7 +469,13 @@ export default function AssetList() {
             }
         }
         
-        if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0 && summary.keptLocal.length === 0) {
+        for (const localAsset of localAssets) {
+            if (!cloudAssetIds.has(localAsset.id) && localAsset.syncStatus !== 'local') {
+                summary.deletedOnCloud?.push(localAsset);
+            }
+        }
+        
+        if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0 && summary.keptLocal.length === 0 && (summary.deletedOnCloud || []).length === 0) {
             addNotification({ title: 'Already Up-to-Date', description: 'Your local data is already in sync with the cloud.' });
         } else {
             setSyncSummary(summary);
@@ -476,42 +497,18 @@ export default function AssetList() {
   const handleOverwriteDownload = useCallback(async () => {
     setIsDownloadWarningOpen(false);
     setIsSyncing(true);
-    addNotification({ title: 'Scanning for cloud changes...' });
+    addNotification({ title: 'Downloading and overwriting local data...' });
     
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
         const cloudAssets = await getCloudAssets();
-        const localAssets = await getLocalAssetsFromDb();
-        const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
-
-        const summary: SyncSummary = {
-            newFromCloud: [],
-            updatedFromCloud: [],
-            keptLocal: [],
-            toUpload: [],
-            type: 'download',
-        };
-
-        for (const cloudAsset of cloudAssets) {
-            const localAsset = localAssetsMap.get(cloudAsset.id);
-            if (!localAsset) {
-                summary.newFromCloud.push(cloudAsset);
-            } else {
-                const cloudTimestamp = cloudAsset.lastModified ? new Date(cloudAsset.lastModified).getTime() : 0;
-                const localTimestamp = localAsset.lastModified ? new Date(localAsset.lastModified).getTime() : 0;
-
-                if (cloudTimestamp > localTimestamp) {
-                    summary.updatedFromCloud.push(cloudAsset);
-                }
-            }
-        }
         
-        if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0) {
-            addNotification({ title: 'Already Up-to-Date', description: 'Your local data is already in sync with the cloud.' });
-        } else {
-            setSyncSummary(summary);
-            setIsSyncConfirmOpen(true);
-        }
+        const assetsToSave = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' as const }));
+        
+        await saveAssets(assetsToSave);
+        setAssets(assetsToSave);
+        
+        addNotification({ title: 'Overwrite Complete', description: `${assetsToSave.length} assets downloaded from the cloud.` });
     } catch (error) {
         console.error("Forced download scan failed:", error);
         addNotification({
@@ -523,7 +520,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [setIsSyncing, setIsOnline, activeDatabase]);
+  }, [setIsSyncing, setIsOnline, activeDatabase, setAssets]);
   
   const handleUploadFirst = useCallback(() => {
     setIsDownloadWarningOpen(false);
@@ -816,6 +813,16 @@ export default function AssetList() {
         setAssetToView(null);
     }
   }, [assetToView, setAssetToView]);
+
+  useEffect(() => {
+    setDataActions({
+        onAddAsset: handleAddAsset,
+        onClearAll: handleClearAllClick,
+        onTravelReport: handleTravelReport,
+        onScanAndImport: () => setIsImportScanOpen(true),
+    });
+    return () => setDataActions({});
+  }, [setDataActions, handleAddAsset, handleClearAllClick, handleTravelReport]);
 
   const handleDeleteConfirm = async () => {
     if (!assetToDelete) return;
@@ -1537,7 +1544,9 @@ export default function AssetList() {
     if (!isAdmin || !appSettings || !appSettings.sheetDefinitions) return;
 
     const newSheetDefinitions = { ...appSettings.sheetDefinitions };
-    newSheetDefinitions[sheetName].isHidden = !newSheetDefinitions[sheetName].isHidden;
+    if(newSheetDefinitions[sheetName]) {
+      newSheetDefinitions[sheetName].isHidden = !newSheetDefinitions[sheetName].isHidden;
+    }
 
     const newSettings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString() };
     
@@ -1745,8 +1754,8 @@ export default function AssetList() {
                         </SelectContent>
                       </Select>
                     )}
-                     {isAdmin && !appSettings.lockAssetList && (
-                        <Button variant="outline" className="w-full md:w-auto" onClick={() => setIsImportScanOpen(true)}>
+                     {isAdmin && !appSettings.lockAssetList && dataActions.onScanAndImport && (
+                        <Button variant="outline" className="w-full md:w-auto" onClick={dataActions.onScanAndImport}>
                             <PlusCircle className="mr-2 h-4 w-4" /> Add or Manage Sheets
                         </Button>
                     )}

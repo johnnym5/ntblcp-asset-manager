@@ -1,4 +1,5 @@
 
+
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -73,7 +74,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, setDataSource, assets, setAssets, isOnline, activeDatabase } = useAppState();
+  const { appSettings, setAppSettings, setDataSource, assets, setAssets, isOnline, activeDatabase, dataActions } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -457,7 +458,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         return;
     }
 
-    const allUsers = [...(draftSettings.authorizedUsers || []), { loginName: 'admin', displayName: 'Super Admin', password: 'setup', states: ['All'], isAdmin: true }];
+    const allUsers = [...(draftSettings.authorizedUsers || []), { loginName: 'admin', displayName: 'Super Admin', password: 'setup', states: ['All'], isAdmin: true, canAddAssets: true, canEditAssets: true, canVerifyAssets: true }];
     const userIndex = allUsers.findIndex(u => u.loginName === userProfile.loginName);
     
     if (userIndex === -1) {
@@ -716,7 +717,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                             <Label className="text-sm pl-2 flex-1">{sheetName}</Label>
                                             <div className="flex items-center gap-1">
                                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleSheetVisibility(sheetName, grant.id)}>
-                                                {grant.sheetDefinitions[sheetName].isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                                                {grant.sheetDefinitions?.[sheetName]?.isHidden ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                                               </Button>
                                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openPermissionsDialog(sheetName, grant)}><Users className="h-4 w-4" /></Button>
                                               <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditSheet(sheetName, grant)}><Wrench className="h-4 w-4" /></Button>
@@ -726,9 +727,20 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                         )) : <p className="text-xs text-center text-muted-foreground p-4">No sheets defined for this project.</p>}
                                       </div>
                                     </div>
-                                    <div className="mt-2 flex flex-col sm:flex-row gap-2">
+                                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
                                         <Button variant="outline" size="sm" className="w-full" onClick={() => handleAddSheet(grant.id)}><PlusCircle className="mr-2" /> Add Manually</Button>
-                                        <Button variant="outline" size="sm" className="w-full" onClick={() => handleImportTemplate(grant.id)}><FileUp className="mr-2" /> Import from File</Button>
+                                        <Button variant="outline" size="sm" className="w-full" onClick={() => handleImportTemplate(grant.id)}><FileUp className="mr-2" /> Import Template</Button>
+                                        {dataActions.onScanAndImport && (
+                                          <Button variant="outline" size="sm" className="w-full" onClick={() => {
+                                            if (draftSettings?.activeGrantId !== grant.id) {
+                                              handleSettingChange('activeGrantId', grant.id);
+                                              toast({ title: 'Project Switched', description: `Set '${grant.name}' as active project to import data into it.` });
+                                            }
+                                            dataActions.onScanAndImport();
+                                          }} disabled={dataActions.isImporting}>
+                                              <ScanSearch className="mr-2 h-4 w-4" /> Scan & Import Data
+                                          </Button>
+                                        )}
                                     </div>
                                 </div>
                             </CollapsibleContent>

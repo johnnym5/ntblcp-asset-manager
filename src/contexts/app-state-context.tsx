@@ -23,6 +23,16 @@ export interface SortConfig {
   direction: 'asc' | 'desc';
 }
 
+export interface DataActions {
+  onImport?: () => void;
+  onScanAndImport?: () => void;
+  onExport?: () => void;
+  onAddAsset?: () => void;
+  onClearAll?: () => void;
+  onTravelReport?: () => void;
+  isImporting?: boolean;
+}
+
 interface AppStateContextType {
   assets: Asset[];
   setAssets: Dispatch<SetStateAction<Asset[]>>;
@@ -89,6 +99,8 @@ interface AppStateContextType {
   setIsSettingsOpen: Dispatch<SetStateAction<boolean>>;
   initialSettingsTab: string;
   setInitialSettingsTab: Dispatch<SetStateAction<string>>;
+  dataActions: DataActions;
+  setDataActions: Dispatch<SetStateAction<DataActions>>;
 
   // Project Switch
   showProjectSwitchDialog: boolean;
@@ -151,6 +163,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialSettingsTab, setInitialSettingsTab] = useState('general');
+  const [dataActions, setDataActions] = useState<DataActions>({});
 
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] =
     useState(false);
@@ -335,6 +348,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setIsSettingsOpen,
     initialSettingsTab,
     setInitialSettingsTab,
+    dataActions,
+    setDataActions,
     showProjectSwitchDialog,
     setShowProjectSwitchDialog,
     activeDatabase,
