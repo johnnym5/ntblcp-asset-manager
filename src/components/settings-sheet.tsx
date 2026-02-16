@@ -145,7 +145,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   };
   
   const handleUsersChange = (newUsers: AuthorizedUser[]) => {
-    if (!draftSettings) return;
+    if (!draftSettings || !draftSettings.authorizedUsers) return;
     handleSettingChange('authorizedUsers', newUsers);
   };
 
@@ -167,7 +167,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   };
 
   const handleEditSheet = (sheetName: string, grant: Grant) => {
-    if (!draftSettings) return;
+    if (!draftSettings || !grant.sheetDefinitions) return;
     setSheetToEdit(grant.sheetDefinitions[sheetName]);
     setOriginalSheetName(sheetName);
     setIsSheetFormOpen(true);
@@ -331,7 +331,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   const handleSheetDefinitionSave = (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean, grantId: string) => {
     if (!draftSettings) return;
 
-    let newGrants = [...draftSettings.grants];
+    let newGrants = [...(draftSettings.grants || [])];
 
     if (applyToAll) {
       newGrants = newGrants.map(grant => {
@@ -366,7 +366,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   };
   
   const openPermissionsDialog = (sheetName: string, grant: Grant) => {
-    if (!draftSettings) return;
+    if (!draftSettings || !grant.sheetDefinitions) return;
     const sheet = grant.sheetDefinitions[sheetName];
     setTempDisabledList(sheet?.disabledFor || []);
     setPermissionSheetName(sheetName);
@@ -486,6 +486,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   };
   
   const handleRollback = (historicalSettings: HistoricalAppSettings) => {
+    if (!appSettings) return;
     const settingsToRestore: AppSettings = {
         ...appSettings,
         ...historicalSettings,
@@ -540,7 +541,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     if (draftSettings.activeGrantId === grantToDelete.id) {
       newActiveGrantId = updatedGrants[0]?.id || null;
     }
-    setDraftSettings(prev => prev ? { ...prev, grants: updatedGrants, activeGrantId: newActiveGrantId } : null);
+    setDraftSettings(prev => prev ? ({ ...prev, grants: updatedGrants, activeGrantId: newActiveGrantId }) : null);
     setGrantToDelete(null);
   };
 
@@ -666,7 +667,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                     <Separator />
                     <ScrollArea className="h-[400px] pr-2">
                         <div className="space-y-4">
-                        {draftSettings.grants.map(grant => (
+                        {draftSettings.grants?.map(grant => (
                             <Collapsible key={grant.id} className="border rounded-lg bg-background" defaultOpen={grant.id === draftSettings.activeGrantId}>
                             <div className="flex items-center p-2 border-b">
                                 <CollapsibleTrigger asChild>
@@ -710,7 +711,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                   <p className="text-sm font-medium">Sheet Definitions for this Project</p>
                                    <div className="rounded-lg border bg-background p-2 mt-2">
                                       <div className="space-y-1">
-                                        {grant.sheetDefinitions && Object.keys(grant.sheetDefinitions).length > 0 ? Object.keys(grant.sheetDefinitions).map(sheetName => (
+                                        {(grant.sheetDefinitions && Object.keys(grant.sheetDefinitions).length > 0) ? Object.keys(grant.sheetDefinitions).map(sheetName => (
                                           <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
                                             <Label className="text-sm pl-2 flex-1">{sheetName}</Label>
                                             <div className="flex items-center gap-1">
@@ -738,7 +739,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                 </TabsContent>
                   <TabsContent value="users" className="pt-4">
                       <UserManagement 
-                      users={draftSettings.authorizedUsers}
+                      users={draftSettings.authorizedUsers || []}
                       onUsersChange={handleUsersChange}
                       adminProfile={userProfile}
                       />
@@ -796,7 +797,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
       
       <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
 
-      {sheetToEdit && originalSheetName && draftSettings?.activeGrantId && (
+      {sheetToEdit && draftSettings?.activeGrantId && (
         <ColumnCustomizationSheet
           isOpen={isSheetFormOpen}
           onOpenChange={setIsSheetFormOpen}
