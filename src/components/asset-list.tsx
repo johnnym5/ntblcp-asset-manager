@@ -177,6 +177,32 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; app
     );
 };
 
+const assetMatchesGlobalFilter = (asset: Asset, filter: string): boolean => {
+    if (!filter || filter === 'All') {
+        // When filter is 'All', every asset is in scope for a full sync.
+        return true;
+    }
+    const isZone = ZONAL_STORES.includes(filter);
+
+    if (isZone) {
+        const lowerCaseFilter = filter.toLowerCase().trim();
+        const assetLocation = (asset.location || "").toLowerCase().trim();
+        return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
+    }
+    
+    if (SPECIAL_LOCATIONS.includes(filter)) {
+        const lowerCaseFilter = filter.toLowerCase().trim();
+        return (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter);
+    }
+
+    const lowerCaseFilter = filter.toLowerCase().trim();
+    const capitalCity = NIGERIAN_STATE_CAPITALS[filter]?.toLowerCase().trim();
+    const assetLocation = (asset.location || "").toLowerCase().trim();
+    const matchesState = assetLocation.startsWith(lowerCaseFilter);
+    const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+    return matchesState || matchesCapital;
+};
+
 
 export default function AssetList() {
   const [isFormOpen, setIsFormOpen] = useState(false);
@@ -438,7 +464,7 @@ export default function AssetList() {
 
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
-        const cloudAssets = await getCloudAssets();
+        const cloudAssets = await getCloudAssets(globalStateFilter);
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         const cloudAssetIds = new Set(cloudAssets.map(a => a.id));
 
@@ -471,7 +497,9 @@ export default function AssetList() {
         
         for (const localAsset of localAssets) {
             if (!cloudAssetIds.has(localAsset.id) && localAsset.syncStatus !== 'local') {
-                summary.deletedOnCloud?.push(localAsset);
+                if(assetMatchesGlobalFilter(localAsset, globalStateFilter)) {
+                    summary.deletedOnCloud?.push(localAsset);
+                }
             }
         }
         
@@ -492,7 +520,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing, activeDatabase]);
+  }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing, activeDatabase, globalStateFilter]);
   
   const handleOverwriteDownload = useCallback(async () => {
     setIsDownloadWarningOpen(false);
@@ -501,7 +529,7 @@ export default function AssetList() {
     
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
-        const cloudAssets = await getCloudAssets();
+        const cloudAssets = await getCloudAssets(globalStateFilter);
         
         const assetsToSave = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' as const }));
         
@@ -520,7 +548,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [setIsSyncing, setIsOnline, activeDatabase, setAssets]);
+  }, [setIsSyncing, setIsOnline, activeDatabase, setAssets, globalStateFilter]);
   
   const handleUploadFirst = useCallback(() => {
     setIsDownloadWarningOpen(false);
@@ -566,30 +594,7 @@ export default function AssetList() {
 
   const allAssetsForFiltering = useMemo(() => {
     if (globalStateFilter && globalStateFilter !== 'All') {
-        const isZone = ZONAL_STORES.includes(globalStateFilter);
-
-        if (isZone) {
-            const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-            return activeAssets.filter(asset => {
-                const assetLocation = (asset.location || "").toLowerCase().trim();
-                return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
-            });
-        }
-        
-        if (SPECIAL_LOCATIONS.includes(globalStateFilter)) {
-            const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-            return activeAssets.filter(asset => (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter));
-        }
-
-        const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-        const capitalCity = NIGERIAN_STATE_CAPITALS[globalStateFilter]?.toLowerCase().trim();
-        return activeAssets.filter(asset => {
-            const assetLocation = (asset.location || "").toLowerCase().trim();
-            const matchesState = assetLocation.startsWith(lowerCaseFilter);
-            const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-            return matchesState || matchesCapital;
-        });
-
+        return activeAssets.filter(asset => assetMatchesGlobalFilter(asset, globalStateFilter));
     }
     return activeAssets;
   }, [activeAssets, globalStateFilter]);
@@ -2183,5 +2188,7 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
 
     

@@ -1,9 +1,12 @@
+
 'use client';
 
-import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc } from 'firebase/firestore';
+import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc, where } from 'firebase/firestore';
 import { db, isConfigValid } from '@/lib/firebase';
-import type { Asset, AppSettings, HistoricalAppSettings } from './types';
+import type { Asset, AppSettings } from './types';
 import { addNotification } from '@/hooks/use-notifications';
+import { errorEmitter } from './error-emitter';
+import { FirestorePermissionError } from './errors';
 
 // Helper function to ensure Firebase is properly configured before use.
 const checkConfig = () => {
@@ -37,17 +40,43 @@ export async function updateSettings(settings: AppSettings) {
 
 // --- Assets ---
 
-export async function getAssets(): Promise<Asset[]> {
-    const db = checkConfig();
-    if (!db) return [];
-    const assetsCollectionRef = collection(db, 'assets');
-    const q = query(assetsCollectionRef);
-    const querySnapshot = await getDocs(q);
-    const fetchedAssets: Asset[] = [];
-    querySnapshot.forEach((doc) => {
-        fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
-    });
-    return fetchedAssets;
+export async function getAssets(location?: string): Promise<Asset[]> {
+    const firestoreDb = checkConfig();
+    if (!firestoreDb) return [];
+    const assetsCollectionRef = collection(firestoreDb, 'assets');
+    
+    let q;
+    if (location && location !== 'All') {
+        // This query performs a "starts with" search on the location field.
+        // It's a good-enough approximation for location-based filtering on the backend.
+        q = query(assetsCollectionRef, where("location", ">=", location), where("location", "<=", location + '\uf8ff'));
+    } else {
+        q = query(assetsCollectionRef);
+    }
+    
+    try {
+        const querySnapshot = await getDocs(q);
+        const fetchedAssets: Asset[] = [];
+        querySnapshot.forEach((doc) => {
+            fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
+        });
+        return fetchedAssets;
+    } catch (serverError) {
+        if ((serverError as any)?.code === 'permission-denied') {
+            const permissionError = new FirestorePermissionError({
+                path: assetsCollectionRef.path,
+                operation: 'list',
+            });
+            errorEmitter.emit('permission-error', permissionError);
+        } else if ((serverError as any)?.code === 'failed-precondition') {
+            addNotification({
+                title: 'Database Index Required',
+                description: `A database index is needed for this query. Please create a composite index on the 'assets' collection for the 'location' field in your Firebase console.`,
+                variant: 'destructive',
+            });
+        }
+        throw serverError;
+    }
 }
 
 export async function updateAsset(asset: Asset) {
@@ -105,3 +134,5 @@ export async function clearAssets() {
       await batchDeleteAssets(assetIds);
     }
 }
+
+    

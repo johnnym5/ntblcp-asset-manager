@@ -1,6 +1,7 @@
+
 'use client';
 
-import { ref, get, set, remove, update, onValue } from 'firebase/database';
+import { ref, get, set, remove, update, onValue, query, orderByChild, startAt, endAt } from 'firebase/database';
 import { rtdb, isConfigValid } from '@/lib/firebase';
 import type { Asset, AppSettings, HistoricalAppSettings } from './types';
 import { addNotification } from '@/hooks/use-notifications';
@@ -55,11 +56,20 @@ export function onSettingsChange(callback: (settings: AppSettings | null) => voi
 
 // --- Assets ---
 
-export async function getAssets(): Promise<Asset[]> {
+export async function getAssets(location?: string): Promise<Asset[]> {
     const db = checkConfig();
     if (!db) return [];
     const assetsRef = ref(db, 'assets');
-    const snapshot = await get(assetsRef);
+
+    let assetsQuery;
+    if (location && location !== 'All') {
+        // This query is more efficient if you have an index on "location" in your RTDB rules.
+        assetsQuery = query(assetsRef, orderByChild('location'), startAt(location), endAt(location + '\uf8ff'));
+    } else {
+        assetsQuery = assetsRef;
+    }
+    
+    const snapshot = await get(assetsQuery);
     if (snapshot.exists()) {
         const data = snapshot.val();
         // Firebase returns an object when fetching a collection, so we convert it to an array.
@@ -103,3 +113,5 @@ export async function clearAssets() {
     const assetsRef = ref(db, 'assets');
     await remove(assetsRef);
 }
+
+    
