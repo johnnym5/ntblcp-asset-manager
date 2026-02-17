@@ -84,6 +84,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     appSettings,
     activeGrantId,
     setActiveGrantId,
+    globalStateFilter,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -177,7 +178,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }
   
-  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
+  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0) + conditionFilter.length;
 
   const handleSettingsOpen = () => {
     setInitialSettingsTab('general');
@@ -343,7 +344,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <DropdownMenuLabel className="font-normal">
                     <div className="flex flex-col space-y-1">
                       <p className="text-sm font-medium leading-none">{getUserName()}</p>
-                      <p className="text-xs text-muted-foreground">{userProfile?.state}</p>
+                      <p className="text-xs text-muted-foreground">{globalStateFilter}</p>
                     </div>
                   </DropdownMenuLabel>
                   <DropdownMenuSeparator />

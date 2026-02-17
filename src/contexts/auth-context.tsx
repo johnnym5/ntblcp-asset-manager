@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -11,7 +12,7 @@ export interface LocalUserProfile {
   id: string; // Unique ID for this user session
   loginName: string;
   displayName: string;
-  state: string;
+  states: string[];
   isAdmin: boolean;
   isGuest?: boolean;
   canAddAssets?: boolean;
@@ -25,7 +26,7 @@ interface AuthContextType {
   profileSetupComplete: boolean;
   authInitialized: boolean;
   initialSetupPending: boolean;
-  login: (user: AuthorizedUser, state: string) => Promise<void>;
+  login: (user: AuthorizedUser) => Promise<void>;
   logout: () => void;
   completeInitialSetup: () => void;
 }
@@ -61,7 +62,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const savedProfileJSON = localStorage.getItem('ntblcp-user-profile');
       if (savedProfileJSON) {
-        const savedProfile: LocalUserProfile = JSON.parse(savedProfileJSON);
+        const savedProfile: LocalUserProfile & { state?: string } = JSON.parse(savedProfileJSON);
         
         const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
         const authorizedUser = allUsers.find(u => u.loginName === savedProfile.loginName);
@@ -71,7 +72,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               id: savedProfile.id || uuidv4(),
               loginName: authorizedUser.loginName,
               displayName: authorizedUser.displayName,
-              state: savedProfile.state,
+              states: authorizedUser.states,
               isAdmin: authorizedUser.isAdmin,
               isGuest: authorizedUser.isGuest,
               canAddAssets: authorizedUser.canAddAssets,
@@ -108,7 +109,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   }, [settingsLoaded, appSettings]);
 
-  const login = async (user: AuthorizedUser, state: string) => {
+  const login = async (user: AuthorizedUser) => {
     setLoading(true);
     const isNewDevice = !localStorage.getItem('ntblcp-user-profile');
 
@@ -116,7 +117,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       id: uuidv4(),
       loginName: user.loginName,
       displayName: user.displayName,
-      state: state,
+      states: user.states,
       isAdmin: user.isAdmin,
       isGuest: user.isGuest,
       canAddAssets: user.canAddAssets,

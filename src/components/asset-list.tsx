@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -84,7 +83,7 @@ import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { TravelReportDialog } from "./travel-report-dialog";
@@ -403,6 +402,7 @@ export default function AssetList() {
                 updatedFromCloud: [],
                 keptLocal: [],
                 toUpload: assetsToPush,
+                deletedOnCloud: [],
                 type: 'upload',
             });
             setIsSyncConfirmOpen(true);
@@ -565,9 +565,7 @@ export default function AssetList() {
   }, [appSettings?.appMode, setStatusOptions]);
 
   const allAssetsForFiltering = useMemo(() => {
-    if (isAdmin && globalStateFilter && globalStateFilter !== 'All') {
-        const zones: Record<string, string[]> = NIGERIAN_ZONES;
-        const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
+    if (globalStateFilter && globalStateFilter !== 'All') {
         const isZone = ZONAL_STORES.includes(globalStateFilter);
 
         if (isZone) {
@@ -584,7 +582,7 @@ export default function AssetList() {
         }
 
         const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-        const capitalCity = capitals[globalStateFilter]?.toLowerCase().trim();
+        const capitalCity = NIGERIAN_STATE_CAPITALS[globalStateFilter]?.toLowerCase().trim();
         return activeAssets.filter(asset => {
             const assetLocation = (asset.location || "").toLowerCase().trim();
             const matchesState = assetLocation.startsWith(lowerCaseFilter);
@@ -592,18 +590,9 @@ export default function AssetList() {
             return matchesState || matchesCapital;
         });
 
-    } else if (!isAdmin && userProfile?.state) {
-        const lowerCaseFilter = userProfile.state.toLowerCase().trim();
-        const capitalCity = NIGERIAN_STATE_CAPITALS[userProfile.state]?.toLowerCase().trim();
-        return activeAssets.filter(asset => {
-            const assetLocation = (asset.location || "").toLowerCase().trim();
-            const matchesState = assetLocation.startsWith(lowerCaseFilter);
-            const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-            return matchesState || matchesCapital;
-        });
     }
     return activeAssets;
-  }, [activeAssets, globalStateFilter, isAdmin, userProfile?.state]);
+  }, [activeAssets, globalStateFilter]);
   
   useEffect(() => {
     const locations = new Map<string, number>();
@@ -931,7 +920,7 @@ export default function AssetList() {
             ...data, 
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName,
-            lastModifiedByState: userProfile?.state,
+            lastModifiedByState: userProfile?.states[0],
             syncStatus: dataSource === 'cloud' ? 'local' : undefined,
         };
         if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
@@ -986,7 +975,7 @@ export default function AssetList() {
             ...assetToSave,
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName,
-            lastModifiedByState: userProfile?.state,
+            lastModifiedByState: userProfile?.states[0],
             syncStatus: dataSource === 'cloud' ? 'local' : undefined,
             previousState: Object.keys(previousState || {}).length > 0 ? previousState : undefined,
         });
@@ -1041,7 +1030,7 @@ export default function AssetList() {
         ...data, 
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
-        lastModifiedByState: userProfile?.state,
+        lastModifiedByState: userProfile?.states[0],
         syncStatus: dataSource === 'cloud' ? 'local' : undefined,
     });
 
@@ -1077,7 +1066,7 @@ export default function AssetList() {
       previousState: undefined, // Clear the history for this state
       lastModified: new Date().toISOString(),
       lastModifiedBy: userProfile?.displayName,
-      lastModifiedByState: userProfile?.state,
+      lastModifiedByState: userProfile?.states[0],
       syncStatus: 'local',
     });
 
@@ -1418,7 +1407,7 @@ export default function AssetList() {
                 verifiedStatus: data.status,
                 lastModified: new Date().toISOString(),
                 lastModifiedBy: userProfile?.displayName,
-                lastModifiedByState: userProfile?.state,
+                lastModifiedByState: userProfile?.states[0],
                 syncStatus: dataSource === 'cloud' ? 'local' : undefined,
             };
             if (data.status === 'Verified' && !asset.verifiedDate) {
@@ -1701,15 +1690,12 @@ export default function AssetList() {
                       </TooltipProvider>
                     </CardTitle>
                     <CardDescription>
-                        {isAdmin && !isFiltered
-                          ? `Viewing: ${globalStateFilter || 'All Assets'}`
-                          : `Viewing: ${userProfile?.state || 'All Assets'}`
-                        }
+                      Viewing: {globalStateFilter}
                     </CardDescription>
                   </div>
                   
                   <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:items-end">
-                    {isAdmin && !isFiltered && (
+                    {isAdmin && (
                        <Select
                           value={globalStateFilter || 'All'}
                           onValueChange={(value) => setGlobalStateFilter(value)}
@@ -1750,6 +1736,23 @@ export default function AssetList() {
                                     ))}
                                 </SelectGroup>
                             </ScrollArea>
+                        </SelectContent>
+                      </Select>
+                    )}
+                    {!isAdmin && userProfile && userProfile.states.length > 1 && (
+                      <Select
+                          value={globalStateFilter}
+                          onValueChange={(value) => setGlobalStateFilter(value)}
+                      >
+                        <SelectTrigger className="w-full md:w-[280px]">
+                          <SelectValue placeholder="Select a state to view..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {userProfile.states.map((state) => (
+                            <SelectItem key={state} value={state}>
+                              {state}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     )}

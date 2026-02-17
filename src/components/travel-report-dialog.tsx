@@ -58,7 +58,7 @@ const defaultObservations = "";
 
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
   const { userProfile } = useAuth();
-  const { assets, offlineAssets, dataSource } = useAppState();
+  const { assets, offlineAssets, dataSource, globalStateFilter } = useAppState();
   
   const [reportState, setReportState] = useState('');
   const [travelDate, setTravelDate] = useState('');
@@ -72,7 +72,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
 
   useEffect(() => {
     if (isOpen) {
-      setReportState(userProfile?.state || '');
+      setReportState(globalStateFilter || userProfile?.states[0] || '');
       setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
       setObjectives('To conduct physical verification of NTBLCP assets in the state.');
       setActivities(defaultActivities);
@@ -81,7 +81,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
       setChallenges('');
       setRecommendations('');
     }
-  }, [isOpen, userProfile]);
+  }, [isOpen, userProfile, globalStateFilter]);
 
   const activeAssets = useMemo(() => {
     return dataSource === 'cloud' ? assets : offlineAssets;
@@ -274,7 +274,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                             <Label htmlFor="officerName">Officer's Name</Label>
                             <Input id="officerName" value={userProfile?.displayName || ''} readOnly disabled />
                         </div>
-                         {userProfile?.isAdmin ? (
+                        {userProfile?.isAdmin ? (
                             <div className="space-y-1.5">
                                 <Label htmlFor="reportState">State for Report</Label>
                                 <Select onValueChange={setReportState} value={reportState}>
@@ -303,12 +303,22 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                                     </SelectContent>
                                 </Select>
                             </div>
+                        ) : (userProfile?.states && userProfile.states.length > 1 ? (
+                             <div className="space-y-1.5">
+                                <Label htmlFor="reportState">State for Report</Label>
+                                <Select onValueChange={setReportState} value={reportState}>
+                                    <SelectTrigger><SelectValue placeholder="Select a location..." /></SelectTrigger>
+                                    <SelectContent>
+                                        {userProfile.states.map(state => <SelectItem key={state} value={state}>{state}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
                         ) : (
                              <div className="space-y-1.5">
                                 <Label htmlFor="reportState">State Visited</Label>
-                                <Input id="reportState" value={userProfile?.state || ''} readOnly disabled />
+                                <Input id="reportState" value={reportState} readOnly disabled />
                             </div>
-                        )}
+                        ))}
                     </div>
                      <div className="space-y-1.5">
                         <Label htmlFor="travelDate">Date of Travel (e.g., 2nd-4th December 2024)</Label>

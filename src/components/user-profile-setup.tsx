@@ -11,13 +11,6 @@ import {
   AlertDialogDescription,
   AlertDialogFooter
 } from '@/components/ui/alert-dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -27,7 +20,6 @@ import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { AlertCircle, Boxes } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
-import { Separator } from './ui/separator';
 
 const superAdmin: AuthorizedUser = {
   loginName: 'admin',
@@ -47,13 +39,10 @@ export default function UserProfileSetup() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
-  const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
-  const [selectedState, setSelectedState] = useState<string>('');
-  
   const { login } = useAuth();
   const { appSettings } = useAppState();
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     setError(null);
     if (!loginName) {
       setError("Please enter your login name.");
@@ -78,14 +67,9 @@ export default function UserProfileSetup() {
 
     // Handle guest login (no password needed)
     if (user.isGuest) {
-      setFoundUser(user);
-      if (user.states.length === 1 && user.states[0] !== 'All') {
-        setSelectedState(user.states[0]);
-        handleConfirm(user, user.states[0]);
-      } else if (user.isAdmin) {
-        setSelectedState('All');
-        handleConfirm(user, 'All');
-      }
+      setIsSaving(true);
+      await login(user);
+      setIsSaving(false);
       return; 
     }
     
@@ -96,32 +80,13 @@ export default function UserProfileSetup() {
     }
 
     if (user.password === password) {
-      setFoundUser(user);
-      if (user.states.length === 1 && user.states[0] !== 'All') {
-        setSelectedState(user.states[0]);
-        handleConfirm(user, user.states[0]);
-      } else if (user.isAdmin) {
-        setSelectedState('All');
-        handleConfirm(user, 'All');
-      }
+      setIsSaving(true);
+      await login(user);
+      setIsSaving(false);
     } else {
       setError("Invalid login name or password.");
-      setFoundUser(null);
     }
   };
-
-  const handleConfirm = async (userToLogin: AuthorizedUser, stateToSet: string) => {
-    if (!userToLogin || !stateToSet) {
-        setError("An error occurred. Please try again.");
-        return;
-    }
-    
-    setIsSaving(true);
-    await login(userToLogin, stateToSet);
-    setIsSaving(false);
-  };
-  
-  const isMultiStateUser = foundUser && foundUser.states.length > 1 && !foundUser.isAdmin;
   
   if (!appSettings) {
      return (
@@ -146,52 +111,26 @@ export default function UserProfileSetup() {
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="py-4 space-y-4">
-                {!foundUser || isMultiStateUser ? (
-                    <>
-                        <div className="space-y-2">
-                            <Label htmlFor="loginName">Login Name</Label>
-                            <Input 
-                            id="loginName" 
-                            type="text"
-                            placeholder="Enter your login name"
-                            value={loginName} 
-                            onChange={(e) => setLoginName(e.target.value)}
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
-                            <Input 
-                            id="password" 
-                            type="password"
-                            value={password} 
-                            onChange={(e) => setPassword(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                            />
-                        </div>
-                    </>
-                ) : null}
-
-                {isMultiStateUser && (
-                    <>
-                     <Separator />
-                     <p className="text-sm text-center text-muted-foreground">Login successful. Please select your location for this session.</p>
-                     <div className="space-y-2">
-                        <Label htmlFor="state">Assigned Location</Label>
-                        <Select onValueChange={setSelectedState} value={selectedState}>
-                            <SelectTrigger id="state">
-                            <SelectValue placeholder="Select a location..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {foundUser.states.map((state) => (
-                                <SelectItem key={state} value={state}>
-                                    {state}
-                                </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                     </div>
-                    </>
-                )}
+                    <div className="space-y-2">
+                        <Label htmlFor="loginName">Login Name</Label>
+                        <Input 
+                        id="loginName" 
+                        type="text"
+                        placeholder="Enter your login name"
+                        value={loginName} 
+                        onChange={(e) => setLoginName(e.target.value)}
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label htmlFor="password">Password</Label>
+                        <Input 
+                        id="password" 
+                        type="password"
+                        value={password} 
+                        onChange={(e) => setPassword(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                        />
+                    </div>
 
                 {error && (
                     <Alert variant="destructive">
@@ -202,17 +141,10 @@ export default function UserProfileSetup() {
                 )}
                 </div>
                 <AlertDialogFooter>
-                    {isMultiStateUser ? (
-                        <Button className="w-full" onClick={() => handleConfirm(foundUser!, selectedState)} disabled={isSaving || !selectedState}>
-                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Confirm and Continue
-                        </Button>
-                    ) : (
-                        <Button className="w-full" onClick={handleLogin} disabled={isSaving}>
-                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Sign In
-                        </Button>
-                    )}
+                    <Button className="w-full" onClick={handleLogin} disabled={isSaving}>
+                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        Sign In
+                    </Button>
                 </AlertDialogFooter>
             </AlertDialogContent>
             </AlertDialog>

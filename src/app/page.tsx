@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect } from 'react';
@@ -15,7 +16,11 @@ export default function Page() {
 
   useEffect(() => {
     if (userProfile && (profileSetupComplete || initialSetupPending)) {
-      setGlobalStateFilter(userProfile.state || '');
+      if (userProfile.isAdmin) {
+        setGlobalStateFilter('All');
+      } else {
+        setGlobalStateFilter(userProfile.states?.[0] || '');
+      }
     }
   }, [userProfile, profileSetupComplete, initialSetupPending, setGlobalStateFilter]);
 
