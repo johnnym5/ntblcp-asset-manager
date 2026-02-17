@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useCallback, useMemo } from 'react';
@@ -26,7 +25,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { getAssets as getAssetsFS, batchSetAssets as batchSetAssetsFS, batchDeleteAssets as batchDeleteAssetsFS, clearAssets as clearFirestoreAssets, getSettings as getSettingsFS, updateSettings as updateSettingsFS } from '@/lib/firestore';
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, clearAssets as clearRtdbAssets, getSettings as getSettingsRTDB, updateSettings as updateSettingsRTDB } from '@/lib/database';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
+import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive, RefreshCw, CheckCircle, XCircle, ChevronsUpDown } from 'lucide-react';
 import type { AppSettings, Asset } from '@/lib/types';
 import { saveLocalSettings, clearLocalAssets, saveAssets, saveLockedOfflineAssets, getLocalAssets, getLockedOfflineAssets } from '@/lib/idb';
 import { exportFullBackupToJson, exportSettingsToJson, exportAssetsToJson } from '@/lib/json-export';
@@ -41,6 +40,7 @@ import { get, ref, set, remove } from 'firebase/database';
 import { rtdb, db, isConfigValid } from '@/lib/firebase';
 import { Textarea } from '../ui/textarea';
 import { Input } from '../ui/input';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -56,6 +56,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [confirmTitle, setConfirmTitle] = useState('');
   const [confirmDescription, setConfirmDescription] = useState('');
+  const [isHealthCheckOpen, setIsHealthCheckOpen] = useState(false);
 
   const importFileRef = useRef<HTMLInputElement>(null);
   const [backupToRestore, setBackupToRestore] = useState<{ settings: AppSettings, assets: Asset[] } | null>(null);
@@ -501,48 +502,60 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
           </DialogHeader>
           
           <div className="flex-1 space-y-4 overflow-y-auto pr-2">
-              <Card>
-                <CardHeader>
-                    <CardTitle>App Health Check</CardTitle>
-                    <CardDescription>Diagnostic checks for core application systems.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-6">
-                    {healthChecks && (
-                        <>
-                            <div>
-                                <h4 className="font-semibold mb-2">Settings</h4>
-                                <div className="space-y-4 pl-4 border-l">
-                                    {healthChecks.settings.map(item => <HealthCheckItem key={item.label} {...item} />)}
-                                </div>
-                            </div>
-                             <div>
-                                <h4 className="font-semibold mb-2">Database</h4>
-                                <div className="space-y-4 pl-4 border-l">
-                                    {healthChecks.database.map(item => <HealthCheckItem key={item.label} {...item} />)}
-                                </div>
-                            </div>
-                             <div>
-                                <h4 className="font-semibold mb-2">Assets</h4>
-                                <div className="space-y-4 pl-4 border-l">
-                                    {healthChecks.assets.map(item => <HealthCheckItem key={item.label} {...item} />)}
-                                </div>
-                            </div>
-                             <div>
-                                <h4 className="font-semibold mb-2">Functionality</h4>
-                                <div className="space-y-4 pl-4 border-l">
-                                    {healthChecks.functionality.map(item => <HealthCheckItem key={item.label} {...item} />)}
-                                </div>
-                            </div>
-                             <div>
-                                <h4 className="font-semibold mb-2">Export</h4>
-                                <div className="space-y-4 pl-4 border-l">
-                                    {healthChecks.export.map(item => <HealthCheckItem key={item.label} {...item} />)}
-                                </div>
-                            </div>
-                        </>
-                    )}
-                </CardContent>
-            </Card>
+              <Collapsible open={isHealthCheckOpen} onOpenChange={setIsHealthCheckOpen}>
+                  <div className='flex items-center justify-between rounded-lg border bg-background p-4 shadow-sm'>
+                      <div>
+                          <h3 className="text-lg font-medium">App Health Check</h3>
+                          <p className="text-sm text-muted-foreground">Diagnostic checks for core application systems.</p>
+                      </div>
+                      <CollapsibleTrigger asChild>
+                          <Button variant="ghost" size="sm" className="w-9 p-0">
+                              <ChevronsUpDown className="h-4 w-4" />
+                              <span className="sr-only">Toggle</span>
+                          </Button>
+                      </CollapsibleTrigger>
+                  </div>
+                  <CollapsibleContent className="pt-4">
+                      <Card>
+                        <CardContent className="space-y-6 pt-6">
+                            {healthChecks && (
+                                <>
+                                    <div>
+                                        <h4 className="font-semibold mb-2">Settings</h4>
+                                        <div className="space-y-4 pl-4 border-l">
+                                            {healthChecks.settings.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                        </div>
+                                    </div>
+                                     <div>
+                                        <h4 className="font-semibold mb-2">Database</h4>
+                                        <div className="space-y-4 pl-4 border-l">
+                                            {healthChecks.database.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                        </div>
+                                    </div>
+                                     <div>
+                                        <h4 className="font-semibold mb-2">Assets</h4>
+                                        <div className="space-y-4 pl-4 border-l">
+                                            {healthChecks.assets.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                        </div>
+                                    </div>
+                                     <div>
+                                        <h4 className="font-semibold mb-2">Functionality</h4>
+                                        <div className="space-y-4 pl-4 border-l">
+                                            {healthChecks.functionality.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                        </div>
+                                    </div>
+                                     <div>
+                                        <h4 className="font-semibold mb-2">Export</h4>
+                                        <div className="space-y-4 pl-4 border-l">
+                                            {healthChecks.export.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </CardContent>
+                      </Card>
+                  </CollapsibleContent>
+              </Collapsible>
 
               {appSettings && (
                 <Card>
@@ -737,5 +750,3 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     </>
   );
 }
-
-    
