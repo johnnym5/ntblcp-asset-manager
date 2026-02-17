@@ -23,7 +23,6 @@ import { useAppState } from '@/contexts/app-state-context';
 const superAdmin: AuthorizedUser = {
   loginName: 'admin',
   displayName: 'Super Admin',
-  email: 'admin@system.local',
   password: 'setup',
   states: ['All'],
   isAdmin: true,

@@ -60,11 +60,6 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
       return;
     }
     
-    if (userToSave.email && newUsers.some(u => u.email === userToSave.email && u.loginName !== originalLoginName)) {
-      toast({ title: "Save Failed", description: `The email "${userToSave.email}" is already in use.`, variant: "destructive" });
-      return;
-    }
-
     if (findIndex > -1) {
       const existingUser = newUsers[findIndex];
       newUsers[findIndex] = {
@@ -102,7 +97,6 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
             <TableRow>
               <TableHead>Display Name</TableHead>
               <TableHead>Login Name</TableHead>
-              <TableHead>Email</TableHead>
               <TableHead>Role</TableHead>
               <TableHead className="text-right">Actions</TableHead>
             </TableRow>
@@ -112,7 +106,6 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
               <TableRow key={user.loginName}>
                 <TableCell className="font-medium">{user.displayName}</TableCell>
                 <TableCell className="text-muted-foreground">{user.loginName}</TableCell>
-                <TableCell className="text-muted-foreground">{user.email}</TableCell>
                 <TableCell>{user.isAdmin ? 'Admin' : (user.isGuest ? 'Guest' : 'User')}</TableCell>
                 <TableCell className="text-right space-x-1">
                    <Button variant="ghost" size="icon" onClick={() => handleEditUser(user)}>

@@ -65,7 +65,6 @@ export interface Asset {
 export interface AuthorizedUser {
   loginName: string;
   displayName: string;
-  email?: string;
   password?: string;
   states: string[];
   isAdmin: boolean;

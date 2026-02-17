@@ -11,7 +11,6 @@ export interface LocalUserProfile {
   id: string; // Unique ID for this user session
   loginName: string;
   displayName: string;
-  email?: string;
   states: string[];
   isAdmin: boolean;
   isGuest?: boolean;
@@ -34,7 +33,6 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 const superAdmin: AuthorizedUser = {
   loginName: 'admin',
   displayName: 'Super Admin',
-  email: 'admin@system.local',
   password: 'setup',
   states: ['All'],
   isAdmin: true,
@@ -70,7 +68,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               id: savedProfile.id || uuidv4(),
               loginName: authorizedUser.loginName,
               displayName: authorizedUser.displayName,
-              email: authorizedUser.email,
               states: authorizedUser.states,
               isAdmin: authorizedUser.isAdmin,
               isGuest: authorizedUser.isGuest,
@@ -111,7 +108,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       id: uuidv4(),
       loginName: user.loginName,
       displayName: user.displayName,
-      email: user.email,
       states: user.states,
       isAdmin: user.isAdmin,
       isGuest: user.isGuest,
