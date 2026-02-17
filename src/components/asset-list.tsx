@@ -83,7 +83,7 @@ import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets, updateSettings as updateSettingsRTDB } from "@/lib/database";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { TravelReportDialog } from "./travel-report-dialog";
@@ -925,7 +925,7 @@ export default function AssetList() {
             ...data, 
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName,
-            lastModifiedByState: userProfile?.states[0],
+            lastModifiedByState: globalStateFilter,
             syncStatus: dataSource === 'cloud' ? 'local' : undefined,
         };
         if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
@@ -980,7 +980,7 @@ export default function AssetList() {
             ...assetToSave,
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName,
-            lastModifiedByState: userProfile?.states[0],
+            lastModifiedByState: globalStateFilter,
             syncStatus: dataSource === 'cloud' ? 'local' : undefined,
             previousState: Object.keys(previousState || {}).length > 0 ? previousState : undefined,
         });
@@ -1035,7 +1035,7 @@ export default function AssetList() {
         ...data, 
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
-        lastModifiedByState: userProfile?.states[0],
+        lastModifiedByState: globalStateFilter,
         syncStatus: dataSource === 'cloud' ? 'local' : undefined,
     });
 

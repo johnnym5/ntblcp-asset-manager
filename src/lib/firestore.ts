@@ -39,32 +39,24 @@ export async function updateSettings(settings: AppSettings) {
 
 // --- Assets ---
 
-export async function getAssets(grantId?: string | null, location?: string): Promise<Asset[]> {
+export async function getAssets(grantId?: string | null): Promise<Asset[]> {
     const firestoreDb = checkConfig();
     if (!firestoreDb) return [];
     
     const assetsCollectionRef = collection(firestoreDb, 'assets');
-    const constraints: QueryConstraint[] = [];
-
-    if (grantId) {
-        constraints.push(where("grantId", "==", grantId));
-    }
-    
-    // The location filter is a "startsWith" query, which is complex.
-    // If a location is provided, we can add it, but it might require a composite index.
-    if (location && location !== 'All') {
-        constraints.push(where("location", ">=", location));
-        constraints.push(where("location", "<=", location + '\uf8ff'));
-    }
-    
-    const q = query(assetsCollectionRef, ...constraints);
     
     try {
-        const querySnapshot = await getDocs(q);
+        const querySnapshot = await getDocs(assetsCollectionRef);
         const fetchedAssets: Asset[] = [];
         querySnapshot.forEach((doc) => {
             fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
         });
+
+        // Perform filtering client-side if a specific grantId is provided.
+        if (grantId && grantId !== 'All') {
+            return fetchedAssets.filter(asset => asset.grantId === grantId);
+        }
+
         return fetchedAssets;
     } catch (serverError) {
         if ((serverError as any)?.code === 'permission-denied') {
@@ -73,18 +65,6 @@ export async function getAssets(grantId?: string | null, location?: string): Pro
                 operation: 'list',
             });
             errorEmitter.emit('permission-error', permissionError);
-        } else if ((serverError as any)?.code === 'failed-precondition') {
-            let errorMsg = `A database index is needed for this query.`;
-            if (grantId && location) {
-              errorMsg += ` Please create a composite index in Firestore on the 'assets' collection for fields 'grantId' and 'location'.`;
-            } else if (grantId) {
-              errorMsg += ` Please create an index on the 'assets' collection for the 'grantId' field.`;
-            }
-             addNotification({
-                title: 'Database Index Required',
-                description: errorMsg,
-                variant: 'destructive',
-            });
         }
         throw serverError;
     }
