@@ -591,7 +591,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                     {browserPath && (
                         <div className="space-y-2">
                             <Label>Editing path: <span className="font-mono p-1 bg-muted rounded-md text-xs">{browserPath}</span></Label>
-                             <div className="flex items-center gap-2">
+                             <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
                                 <Input placeholder="Find..." value={dbSearchTerm} onChange={e => setDbSearchTerm(e.target.value)} />
                                 <Input placeholder="Replace with..." value={dbReplaceTerm} onChange={e => setDbReplaceTerm(e.target.value)} />
                                 <Button onClick={handleReplaceAll} variant="outline">Replace All</Button>

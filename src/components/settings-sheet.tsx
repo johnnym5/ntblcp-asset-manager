@@ -548,7 +548,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     if (draftSettings.activeGrantId === grantToDelete.id) {
       newActiveGrantId = updatedGrants[0]?.id || null;
     }
-    setDraftSettings(prev => prev ? ({ ...prev, grants: updatedGrants, activeGrantId: newActiveGrantId }) : null);
+    setDraftSettings(prev => prev ? ({ ...prev, grants: newGrants, activeGrantId: newActiveGrantId }) : null);
     setGrantToDelete(null);
   };
 
@@ -576,7 +576,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           </DialogHeader>
           <div className="flex-1 overflow-y-auto">
             <Tabs defaultValue={initialTab} value={activeTab} onValueChange={setActiveTab} className="p-1">
-              <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-4" : "grid-cols-1")}>
+              <TabsList className={cn("grid w-full", isAdmin ? "grid-cols-2 md:grid-cols-4" : "grid-cols-1")}>
                   <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
                   {isAdmin && (
                     <>
