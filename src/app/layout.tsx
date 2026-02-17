@@ -1,6 +1,5 @@
 
 import type {Metadata} from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from '@/contexts/auth-context';
@@ -8,17 +7,10 @@ import { AppStateProvider } from '@/contexts/app-state-context';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
-const inter = Inter({
-  subsets: ['latin'],
-  display: 'swap',
-  weight: ['400', '500', '600', '700'],
-});
-
 export const metadata: Metadata = {
   title: 'NTBLCP Asset Manager',
   description: 'A full-featured, offline-first web app to manage assets efficiently.',
   manifest: '/manifest.json',
-  icons: null,
 };
 
 export default function RootLayout({
@@ -28,7 +20,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning>
-      <body className={`${inter.className} antialiased`} suppressHydrationWarning>
+      <head>
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+      </head>
+      <body className="font-body antialiased" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"
