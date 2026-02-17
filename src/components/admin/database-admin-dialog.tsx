@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useRef, useCallback } from 'react';
+import React, { useState, useRef, useCallback, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -25,7 +26,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { getAssets as getAssetsFS, batchSetAssets as batchSetAssetsFS, batchDeleteAssets as batchDeleteAssetsFS, clearAssets as clearFirestoreAssets, getSettings as getSettingsFS, updateSettings as updateSettingsFS } from '@/lib/firestore';
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, clearAssets as clearRtdbAssets, getSettings as getSettingsRTDB, updateSettings as updateSettingsRTDB } from '@/lib/database';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive, RefreshCw } from 'lucide-react';
+import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive, RefreshCw, CheckCircle, XCircle } from 'lucide-react';
 import type { AppSettings, Asset } from '@/lib/types';
 import { saveLocalSettings, clearLocalAssets, saveAssets, saveLockedOfflineAssets, getLocalAssets, getLockedOfflineAssets } from '@/lib/idb';
 import { exportFullBackupToJson, exportSettingsToJson, exportAssetsToJson } from '@/lib/json-export';
@@ -37,7 +38,7 @@ import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Switch } from '../ui/switch';
 import { get, ref, set, remove } from 'firebase/database';
-import { rtdb } from '@/lib/firebase';
+import { rtdb, db, isConfigValid } from '@/lib/firebase';
 import { Textarea } from '../ui/textarea';
 import { Input } from '../ui/input';
 
@@ -48,7 +49,7 @@ interface DatabaseAdminDialogProps {
 
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, assets, setAssets, offlineAssets, setOfflineAssets, setIsSyncing } = useAppState();
+  const { appSettings, setAppSettings, assets, setAssets, offlineAssets, setOfflineAssets, setIsSyncing, isOnline, dataActions } = useAppState();
   const { toast } = useToast();
   
   const [isProcessing, setIsProcessing] = useState(false);
@@ -67,6 +68,99 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const [confirmDeletePath, setConfirmDeletePath] = useState<string | null>(null);
   const [dbSearchTerm, setDbSearchTerm] = useState('');
   const [dbReplaceTerm, setDbReplaceTerm] = useState('');
+
+  const HealthCheckItem = ({ label, status, description }: { label: string, status: 'ok' | 'warning' | 'error', description: string }) => {
+    const Icon = status === 'ok' ? CheckCircle : status === 'warning' ? AlertTriangle : XCircle;
+    const color = status === 'ok' ? 'text-green-500' : status === 'warning' ? 'text-yellow-500' : 'text-destructive';
+    return (
+        <div className="flex items-start gap-3">
+            <Icon className={`mt-1 h-5 w-5 flex-shrink-0 ${color}`} />
+            <div>
+                <p className="font-medium">{label}</p>
+                <p className="text-sm text-muted-foreground">{description}</p>
+            </div>
+        </div>
+    )
+  };
+
+  const healthChecks = useMemo(() => {
+      if (!appSettings || !userProfile) return null;
+
+      const checks = {
+          settings: [
+              {
+                  label: 'Settings Loaded',
+                  status: appSettings ? 'ok' : 'error',
+                  description: appSettings ? 'Application settings are loaded.' : 'Critical error: App settings not found.',
+              },
+              {
+                  label: 'User Profile Active',
+                  status: userProfile ? 'ok' : 'error',
+                  description: userProfile ? `Logged in as ${userProfile.displayName}.` : 'No user profile is active.',
+              },
+              {
+                  label: 'Sheet Definitions',
+                  status: appSettings?.grants?.some(g => g.sheetDefinitions && Object.keys(g.sheetDefinitions).length > 0) ? 'ok' : 'warning',
+                  description: appSettings?.grants?.some(g => g.sheetDefinitions && Object.keys(g.sheetDefinitions).length > 0) ? 'Sheet definitions are configured.' : 'No sheet definitions found. Import may fail.',
+              },
+          ],
+          database: [
+              {
+                  label: 'Firebase Config',
+                  status: isConfigValid ? 'ok' : 'error',
+                  description: isConfigValid ? 'Firebase environment variables are valid.' : 'Firebase config is missing or invalid. App cannot connect to the cloud.',
+              },
+              {
+                  label: 'Primary DB (RTDB)',
+                  status: rtdb ? 'ok' : 'error',
+                  description: rtdb ? 'Realtime Database client is initialized.' : 'RTDB client failed to initialize.',
+              },
+              {
+                  label: 'Backup DB (Firestore)',
+                  status: db ? 'ok' : 'error',
+                  description: db ? 'Firestore client is initialized.' : 'Firestore client failed to initialize.',
+              },
+              {
+                  label: 'Online Status',
+                  status: isOnline ? 'ok' : 'warning',
+                  description: isOnline ? 'Browser is online and connected.' : 'App is in offline mode.',
+              },
+          ],
+          assets: [
+              {
+                  label: 'Local Assets (Main)',
+                  status: assets.length > 0 ? 'ok' : 'warning',
+                  description: `${assets.length} assets loaded in the main local store.`,
+              },
+              {
+                  label: 'Offline Assets (Locked)',
+                  status: 'ok',
+                  description: `${offlineAssets.length} assets loaded in the offline store.`,
+              },
+              {
+                  label: 'Data Integrity',
+                  status: assets.some(a => !a.category || !a.description) ? 'warning' : 'ok',
+                  description: assets.some(a => !a.category || !a.description) ? `Found ${assets.filter(a => !a.category || !a.description).length} assets with missing critical fields (category/description).` : 'All assets have critical fields.',
+              },
+          ],
+          functionality: [
+              {
+                  label: 'Data Actions',
+                  status: dataActions && Object.keys(dataActions).length > 0 ? 'ok' : 'error',
+                  description: dataActions && Object.keys(dataActions).length > 0 ? 'Core data functions are available.' : 'Core data functions failed to initialize.',
+              },
+          ],
+          export: [
+              {
+                  label: 'Export Prerequisites',
+                  status: assets.length > 0 && appSettings ? 'ok' : 'warning',
+                  description: assets.length > 0 && appSettings ? 'Data is available for export.' : 'No assets or settings available to export.',
+              },
+          ],
+      };
+      return checks;
+  }, [appSettings, userProfile, isOnline, assets, offlineAssets, dataActions]);
+
 
   const handleReplaceAll = useCallback(() => {
     if (!dbSearchTerm) {
@@ -407,6 +501,49 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
           </DialogHeader>
           
           <div className="flex-1 space-y-4 overflow-y-auto pr-2">
+              <Card>
+                <CardHeader>
+                    <CardTitle>App Health Check</CardTitle>
+                    <CardDescription>Diagnostic checks for core application systems.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-6">
+                    {healthChecks && (
+                        <>
+                            <div>
+                                <h4 className="font-semibold mb-2">Settings</h4>
+                                <div className="space-y-4 pl-4 border-l">
+                                    {healthChecks.settings.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                </div>
+                            </div>
+                             <div>
+                                <h4 className="font-semibold mb-2">Database</h4>
+                                <div className="space-y-4 pl-4 border-l">
+                                    {healthChecks.database.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                </div>
+                            </div>
+                             <div>
+                                <h4 className="font-semibold mb-2">Assets</h4>
+                                <div className="space-y-4 pl-4 border-l">
+                                    {healthChecks.assets.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                </div>
+                            </div>
+                             <div>
+                                <h4 className="font-semibold mb-2">Functionality</h4>
+                                <div className="space-y-4 pl-4 border-l">
+                                    {healthChecks.functionality.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                </div>
+                            </div>
+                             <div>
+                                <h4 className="font-semibold mb-2">Export</h4>
+                                <div className="space-y-4 pl-4 border-l">
+                                    {healthChecks.export.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                </div>
+                            </div>
+                        </>
+                    )}
+                </CardContent>
+            </Card>
+
               {appSettings && (
                 <Card>
                     <CardHeader>
@@ -600,3 +737,5 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     </>
   );
 }
+
+    

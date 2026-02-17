@@ -1,10 +1,11 @@
+
 // Import the necessary functions from the Firebase SDKs.
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getDatabase, type Database } from 'firebase/database';
 
 // Your web app's Firebase configuration is now loaded from environment variables.
-export const firebaseConfig = {
+const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
   databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
@@ -16,7 +17,7 @@ export const firebaseConfig = {
 
 
 // Check if all essential keys are present and not placeholders
-export const isConfigValid = 
+const isConfigValid = 
     firebaseConfig.apiKey &&
     firebaseConfig.projectId;
 
@@ -41,4 +42,4 @@ if (typeof window !== 'undefined') {
 }
 
 // Export the initialized services for use throughout the app.
-export { app, db, rtdb };
+export { app, db, rtdb, firebaseConfig, isConfigValid };
