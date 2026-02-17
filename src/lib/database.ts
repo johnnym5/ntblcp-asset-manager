@@ -59,22 +59,23 @@ export async function getAssets(grantId?: string | null): Promise<Asset[]> {
     const db = checkConfig();
     if (!db) return [];
     
-    // RTDB doesn't support compound queries on different keys without denormalization.
-    // The most scalable approach is to query by grantId if provided, or fetch all.
-    // Location filtering will then happen client-side.
-    let assetsQuery;
-    if (grantId) {
-        // Requires an index on "grantId" in your RTDB rules for performance.
-        assetsQuery = query(ref(db, 'assets'), orderByChild('grantId'), equalTo(grantId));
-    } else {
-        assetsQuery = ref(db, 'assets');
-    }
+    // WORKAROUND: Instead of querying by grantId (which requires an index that is failing to deploy),
+    // we fetch all assets and filter them on the client-side. This is less performant for very large
+    // datasets but guarantees functionality in this environment.
+    const assetsQuery = ref(db, 'assets');
     
     const snapshot = await get(assetsQuery);
     if (snapshot.exists()) {
         const data = snapshot.val();
-        // Firebase returns an object when fetching a collection, so we convert it to an array.
-        return Object.keys(data).map(key => ({ ...data[key], id: key }));
+        const allAssets: Asset[] = Object.keys(data).map(key => ({ ...data[key], id: key }));
+        
+        // Perform filtering client-side if a specific grantId is provided.
+        if (grantId && grantId !== 'All') {
+            return allAssets.filter(asset => asset.grantId === grantId);
+        }
+        
+        // If no grantId or grantId is 'All', return all assets.
+        return allAssets;
     }
     return [];
 }
