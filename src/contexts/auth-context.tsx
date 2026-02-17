@@ -4,7 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
 import type { AuthorizedUser } from '@/lib/types';
-import { clearLocalAssets, clearLockedOfflineAssets } from '@/lib/idb';
+import { getLocalAssets, clearLocalAssets, clearLockedOfflineAssets } from '@/lib/idb';
 
 
 export interface LocalUserProfile {
@@ -48,7 +48,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { appSettings, settingsLoaded, setAssets, setOfflineAssets } = useAppState();
+  const { appSettings, settingsLoaded, setAssets, setOfflineAssets, setManualDownloadTrigger } = useAppState();
 
   useEffect(() => {
     if (!settingsLoaded || !appSettings) {
@@ -104,6 +104,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (user: AuthorizedUser) => {
     setLoading(true);
 
+    // Check if this is a "first time" login on this device by checking for existing assets.
+    const existingAssets = await getLocalAssets();
+    const isFirstTimeLogin = existingAssets.length === 0;
+
     const newProfile: LocalUserProfile = {
       id: uuidv4(),
       loginName: user.loginName,
@@ -119,6 +123,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
+
+      // If it's the first login and the user is online, trigger a download.
+      if (isFirstTimeLogin && typeof window !== 'undefined' && navigator.onLine) {
+        // Use a timeout to ensure the rest of the app state (like userProfile) has settled
+        setTimeout(() => {
+            setManualDownloadTrigger(c => c + 1);
+        }, 500);
+      }
 
     } catch(e) {
       console.error("Failed to save user profile", e);
