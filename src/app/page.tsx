@@ -19,7 +19,7 @@ const loadingTips = [
 
 export default function Page() {
   const { userProfile, loading, profileSetupComplete } = useAuth();
-  const { setGlobalStateFilter, setManualDownloadTrigger } = useAppState();
+  const { setGlobalStateFilter } = useAppState();
   const [tipIndex, setTipIndex] = useState(0);
 
   useEffect(() => {
@@ -30,12 +30,6 @@ export default function Page() {
       return () => clearInterval(timer);
     }
   }, [loading]);
-
-  useEffect(() => {
-    if (profileSetupComplete) {
-      setManualDownloadTrigger(c => c + 1);
-    }
-  }, [profileSetupComplete, setManualDownloadTrigger]);
 
   useEffect(() => {
     if (userProfile && profileSetupComplete) {

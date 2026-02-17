@@ -13,7 +13,7 @@ import {
 } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import type { Asset, AppSettings, Grant, AuthorizedUser } from '@/lib/types';
-import { onSettingsChange, updateSettingsRTDB, getSettings as getSettingsRTDB } from '@/lib/database';
+import { onSettingsChange, updateSettings as updateSettingsRTDB, getSettings as getSettingsRTDB } from '@/lib/database';
 import { updateSettings as updateSettingsFS } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
@@ -153,7 +153,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [isBrowserOnline, setIsBrowserOnline] = useState(true);
   const [activeGrantId, setActiveGrantId] = useState<string | null>(null);
 
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
@@ -181,18 +180,21 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const handleOnline = () => setIsBrowserOnline(true);
-    const handleOffline = () => setIsBrowserOnline(false);
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-
-    setIsBrowserOnline(navigator.onLine);
+    // This effect handles the manual online/offline switch persistence
+    localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
+    
+    // This separate listener just updates the UI icon based on browser connectivity
+    const handleBrowserConnectivityChange = () => {
+        setIsOnline(navigator.onLine);
+    };
+    window.addEventListener('online', handleBrowserConnectivityChange);
+    window.addEventListener('offline', handleBrowserConnectivityChange);
 
     return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
+      window.removeEventListener('online', handleBrowserConnectivityChange);
+      window.removeEventListener('offline', handleBrowserConnectivityChange);
     };
-  }, []);
+  }, [isOnline]);
   
   const migrateSettings = useCallback(async (settings: AppSettings | null): Promise<AppSettings | null> => {
       if (settings && !(settings as any).grants) {
@@ -220,7 +222,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         let settings: AppSettings | null = await getLocalSettings();
 
         // If no local settings, try fetching from the cloud
-        if (!settings && isBrowserOnline) {
+        if (!settings && navigator.onLine) {
             try {
                 // Using RTDB as primary source of truth for settings
                 const cloudSettings = await getSettingsRTDB(); 
@@ -273,7 +275,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             settings = newSettings;
             await saveLocalSettings(settings);
             
-            if (isBrowserOnline) {
+            if (navigator.onLine) {
                 await Promise.allSettled([
                     updateSettingsRTDB(settings),
                     updateSettingsFS(settings)
@@ -298,10 +300,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     };
     
     initializeSettings();
-  }, [isBrowserOnline, migrateSettings]);
+  }, [migrateSettings]);
   
   useEffect(() => {
-    if (!settingsLoaded || !isBrowserOnline) return;
+    if (!settingsLoaded || !isOnline) return;
 
     const handleRemoteSettingsUpdate = (remoteSettings: AppSettings | null) => {
        if (remoteSettings) {
@@ -324,7 +326,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return () => {
         if (unsubscribe) unsubscribe();
     };
-  }, [settingsLoaded, isBrowserOnline, migrateSettings, appSettings]);
+  }, [settingsLoaded, isOnline, migrateSettings, appSettings]);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && settingsLoaded) {
@@ -340,12 +342,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
     }
   }, [settingsLoaded]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
-    }
-  }, [isOnline]);
 
   useEffect(() => {
     if (appSettings && appSettings.appMode === 'management') {
