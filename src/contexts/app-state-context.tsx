@@ -13,7 +13,7 @@ import {
 } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import type { Asset, AppSettings, Grant, AuthorizedUser } from '@/lib/types';
-import { onSettingsChange, updateSettingsRTDB } from '@/lib/database';
+import { onSettingsChange, updateSettingsRTDB, getSettings as getSettingsRTDB } from '@/lib/database';
 import { updateSettings as updateSettingsFS } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
@@ -217,72 +217,88 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   
   useEffect(() => {
     const initializeSettings = async () => {
-      let localSettings = await getLocalSettings();
-      localSettings = await migrateSettings(localSettings);
+        let settings: AppSettings | null = await getLocalSettings();
 
-      if (!localSettings) {
-        addNotification({ title: 'First-Time Setup', description: 'Creating default settings and user accounts for each state.' });
-        
-        const grantId = uuidv4();
-        const defaultGrant: Grant = {
-            id: grantId,
-            name: 'Default Project',
-            sheetDefinitions: {},
-        };
-
-        const defaultUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
-            loginName: state.toLowerCase().replace(/[\s-]/g, ''),
-            displayName: `${state} User`,
-            states: [state],
-            isAdmin: false,
-            canAddAssets: true,
-            canEditAssets: true,
-            canVerifyAssets: true,
-            password: 'password',
-        }));
-        
-        const newSettings: AppSettings = {
-            grants: [defaultGrant],
-            activeGrantId: grantId,
-            authorizedUsers: defaultUsers,
-            lockAssetList: false,
-            appMode: 'verification',
-            lastModified: new Date().toISOString(),
-        };
-
-        setAppSettings(newSettings);
-        setActiveGrantId(newSettings.activeGrantId);
-        setSettingsLoaded(true);
-        
-        await saveLocalSettings(newSettings);
-        
-        if (isBrowserOnline) {
-            await Promise.allSettled([
-                updateSettingsRTDB(newSettings),
-                updateSettingsFS(newSettings)
-            ]);
+        // If no local settings, try fetching from the cloud
+        if (!settings && isBrowserOnline) {
+            try {
+                // Using RTDB as primary source of truth for settings
+                const cloudSettings = await getSettingsRTDB(); 
+                if (cloudSettings) {
+                    settings = cloudSettings;
+                    await saveLocalSettings(settings);
+                }
+            } catch (e) {
+                console.error("Failed to fetch settings from cloud", e);
+            }
         }
-        return; 
-      }
+        
+        // Migrate settings if they are from an old version
+        if (settings) {
+            settings = await migrateSettings(settings);
+        }
 
-      setAppSettings(localSettings);
-      if (localSettings?.activeGrantId) {
-        setActiveGrantId(localSettings.activeGrantId);
-      } else if (localSettings?.grants && localSettings.grants.length > 0) {
-        setActiveGrantId(localSettings.grants[0].id);
-      }
-      if (localSettings?.defaultDataSource) {
-        setDataSource(localSettings.defaultDataSource);
-      }
-      if (localSettings?.defaultDatabase) {
-        setActiveDatabase(localSettings.defaultDatabase);
-      }
-      setSettingsLoaded(true);
+        // If STILL no settings, it's a true first-time setup
+        if (!settings) {
+            addNotification({ title: 'First-Time Setup', description: 'Creating default settings and user accounts for each state.' });
+            
+            const grantId = uuidv4();
+            const defaultGrant: Grant = {
+                id: grantId,
+                name: 'Default Project',
+                sheetDefinitions: {},
+            };
+
+            const defaultUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
+                loginName: state.toLowerCase().replace(/[\s-]/g, ''),
+                displayName: `${state} User`,
+                states: [state],
+                isAdmin: false,
+                canAddAssets: true,
+                canEditAssets: true,
+                canVerifyAssets: true,
+                password: 'password',
+            }));
+            
+            const newSettings: AppSettings = {
+                grants: [defaultGrant],
+                activeGrantId: grantId,
+                authorizedUsers: defaultUsers,
+                lockAssetList: false,
+                appMode: 'verification',
+                lastModified: new Date().toISOString(),
+            };
+
+            settings = newSettings;
+            await saveLocalSettings(settings);
+            
+            if (isBrowserOnline) {
+                await Promise.allSettled([
+                    updateSettingsRTDB(settings),
+                    updateSettingsFS(settings)
+                ]);
+            }
+        }
+
+        // By now, we MUST have settings.
+        setAppSettings(settings);
+        if (settings?.activeGrantId) {
+            setActiveGrantId(settings.activeGrantId);
+        } else if (settings?.grants && settings.grants.length > 0) {
+            setActiveGrantId(settings.grants[0].id);
+        }
+        if (settings?.defaultDataSource) {
+            setDataSource(settings.defaultDataSource);
+        }
+        if (settings?.defaultDatabase) {
+            setActiveDatabase(settings.defaultDatabase);
+        }
+        setSettingsLoaded(true);
     };
     
     initializeSettings();
-  }, [migrateSettings, isBrowserOnline]);
-
+  }, [isBrowserOnline, migrateSettings]);
+  
   useEffect(() => {
     if (!settingsLoaded || !isBrowserOnline) return;
 
@@ -292,6 +308,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
          const localTimestamp = appSettings?.lastModified ? new Date(appSettings.lastModified).getTime() : 0;
 
          if (!appSettings || remoteTimestamp > localTimestamp) {
+            addNotification({ title: "Settings Updated", description: "Settings have been updated remotely and applied to your session."});
             migrateSettings(remoteSettings).then(migrated => {
               if (migrated) {
                 saveLocalSettings(migrated);

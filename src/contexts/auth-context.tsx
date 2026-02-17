@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -25,10 +24,8 @@ interface AuthContextType {
   loading: boolean;
   profileSetupComplete: boolean;
   authInitialized: boolean;
-  initialSetupPending: boolean;
   login: (user: AuthorizedUser) => Promise<void>;
   logout: () => void;
-  completeInitialSetup: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -50,7 +47,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [loading, setLoading] = useState(true);
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
-  const [initialSetupPending, setInitialSetupPending] = useState(false);
   
   const { appSettings, settingsLoaded, setAssets, setOfflineAssets } = useAppState();
 
@@ -83,26 +79,22 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           localStorage.setItem('ntblcp-user-profile', JSON.stringify(freshProfile));
           setUserProfile(freshProfile);
           setProfileSetupComplete(true);
-          setInitialSetupPending(false);
         } else {
           // Stale profile, clear it
           localStorage.removeItem('ntblcp-user-profile');
           setUserProfile(null);
           setProfileSetupComplete(false);
-          setInitialSetupPending(false);
         }
       } else {
-        // No profile, so no setup pending and not complete
+        // No profile, so not complete
         setUserProfile(null);
         setProfileSetupComplete(false);
-        setInitialSetupPending(false);
       }
     } catch (e) {
       console.error("Failed to process user profile from local storage", e);
       localStorage.removeItem('ntblcp-user-profile');
       setUserProfile(null);
       setProfileSetupComplete(false);
-      setInitialSetupPending(false);
     } finally {
       setLoading(false);
       setAuthInitialized(true);
@@ -111,7 +103,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (user: AuthorizedUser) => {
     setLoading(true);
-    const isNewDevice = !localStorage.getItem('ntblcp-user-profile');
 
     const newProfile: LocalUserProfile = {
       id: uuidv4(),
@@ -127,12 +118,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
-      
-      if (isNewDevice) {
-        setInitialSetupPending(true);
-      } else {
-        setProfileSetupComplete(true);
-      }
+      setProfileSetupComplete(true);
 
     } catch(e) {
       console.error("Failed to save user profile", e);
@@ -141,17 +127,11 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  const completeInitialSetup = () => {
-    setInitialSetupPending(false);
-    setProfileSetupComplete(true);
-  }
-
   const logout = async () => {
     setLoading(true);
     localStorage.removeItem('ntblcp-user-profile');
     setUserProfile(null);
     setProfileSetupComplete(false);
-    setInitialSetupPending(false);
 
     try {
       await clearLocalAssets();
@@ -165,7 +145,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     window.location.href = '/';
   };
 
-  const value = { userProfile, loading, login, logout, authInitialized, profileSetupComplete, initialSetupPending, completeInitialSetup };
+  const value = { userProfile, loading, login, logout, authInitialized, profileSetupComplete };
 
   return (
     <AuthContext.Provider value={value}>
