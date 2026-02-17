@@ -1,13 +1,9 @@
 {
   "rules": {
     "assets": {
-      ".indexOn": "grantId",
-      ".read": "true",
-      ".write": "true"
+      ".indexOn": "grantId"
     },
-    "config": {
-      ".read": "true",
-      ".write": "true"
-    }
+    ".read": "true",
+    ".write": "true"
   }
 }
