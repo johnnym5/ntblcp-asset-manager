@@ -1,7 +1,6 @@
-
 'use client';
 
-import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc, where } from 'firebase/firestore';
+import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc, where, QueryConstraint } from 'firebase/firestore';
 import { db, isConfigValid } from '@/lib/firebase';
 import type { Asset, AppSettings } from './types';
 import { addNotification } from '@/hooks/use-notifications';
@@ -40,19 +39,25 @@ export async function updateSettings(settings: AppSettings) {
 
 // --- Assets ---
 
-export async function getAssets(location?: string): Promise<Asset[]> {
+export async function getAssets(grantId?: string | null, location?: string): Promise<Asset[]> {
     const firestoreDb = checkConfig();
     if (!firestoreDb) return [];
-    const assetsCollectionRef = collection(firestoreDb, 'assets');
     
-    let q;
-    if (location && location !== 'All') {
-        // This query performs a "starts with" search on the location field.
-        // It's a good-enough approximation for location-based filtering on the backend.
-        q = query(assetsCollectionRef, where("location", ">=", location), where("location", "<=", location + '\uf8ff'));
-    } else {
-        q = query(assetsCollectionRef);
+    const assetsCollectionRef = collection(firestoreDb, 'assets');
+    const constraints: QueryConstraint[] = [];
+
+    if (grantId) {
+        constraints.push(where("grantId", "==", grantId));
     }
+    
+    // The location filter is a "startsWith" query, which is complex.
+    // If a location is provided, we can add it, but it might require a composite index.
+    if (location && location !== 'All') {
+        constraints.push(where("location", ">=", location));
+        constraints.push(where("location", "<=", location + '\uf8ff'));
+    }
+    
+    const q = query(assetsCollectionRef, ...constraints);
     
     try {
         const querySnapshot = await getDocs(q);
@@ -69,9 +74,15 @@ export async function getAssets(location?: string): Promise<Asset[]> {
             });
             errorEmitter.emit('permission-error', permissionError);
         } else if ((serverError as any)?.code === 'failed-precondition') {
-            addNotification({
+            let errorMsg = `A database index is needed for this query.`;
+            if (grantId && location) {
+              errorMsg += ` Please create a composite index in Firestore on the 'assets' collection for fields 'grantId' and 'location'.`;
+            } else if (grantId) {
+              errorMsg += ` Please create an index on the 'assets' collection for the 'grantId' field.`;
+            }
+             addNotification({
                 title: 'Database Index Required',
-                description: `A database index is needed for this query. Please create a composite index on the 'assets' collection for the 'location' field in your Firebase console.`,
+                description: errorMsg,
                 variant: 'destructive',
             });
         }
@@ -125,14 +136,16 @@ export async function batchDeleteAssets(assetIds: string[]) {
     }
 }
 
-export async function clearAssets() {
+export async function clearAssets(grantId: string) {
     const db = checkConfig();
     if (!db) return;
-    const assetsSnapshot = await getDocs(collection(db, "assets"));
-    const assetIds = assetsSnapshot.docs.map(doc => doc.id);
-    if(assetIds.length > 0) {
-      await batchDeleteAssets(assetIds);
+    
+    // Fetch all assets for the specific grant and then delete them.
+    const q = query(collection(db, "assets"), where("grantId", "==", grantId));
+    const assetsSnapshot = await getDocs(q);
+
+    if (!assetsSnapshot.empty) {
+        const assetIds = assetsSnapshot.docs.map(doc => doc.id);
+        await batchDeleteAssets(assetIds);
     }
 }
-
-    

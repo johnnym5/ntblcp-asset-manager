@@ -257,6 +257,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
                 canAddAssets: true,
                 canEditAssets: true,
                 canVerifyAssets: true,
+                isGuest: false,
                 password: 'password',
             }));
             

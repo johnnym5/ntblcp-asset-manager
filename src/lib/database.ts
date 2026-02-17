@@ -1,7 +1,6 @@
-
 'use client';
 
-import { ref, get, set, remove, update, onValue, query, orderByChild, startAt, endAt } from 'firebase/database';
+import { ref, get, set, remove, update, onValue, query, orderByChild, equalTo } from 'firebase/database';
 import { rtdb, isConfigValid } from '@/lib/firebase';
 import type { Asset, AppSettings, HistoricalAppSettings } from './types';
 import { addNotification } from '@/hooks/use-notifications';
@@ -56,17 +55,19 @@ export function onSettingsChange(callback: (settings: AppSettings | null) => voi
 
 // --- Assets ---
 
-export async function getAssets(location?: string): Promise<Asset[]> {
+export async function getAssets(grantId?: string | null): Promise<Asset[]> {
     const db = checkConfig();
     if (!db) return [];
-    const assetsRef = ref(db, 'assets');
-
+    
+    // RTDB doesn't support compound queries on different keys without denormalization.
+    // The most scalable approach is to query by grantId if provided, or fetch all.
+    // Location filtering will then happen client-side.
     let assetsQuery;
-    if (location && location !== 'All') {
-        // This query is more efficient if you have an index on "location" in your RTDB rules.
-        assetsQuery = query(assetsRef, orderByChild('location'), startAt(location), endAt(location + '\uf8ff'));
+    if (grantId) {
+        // Requires an index on "grantId" in your RTDB rules for performance.
+        assetsQuery = query(ref(db, 'assets'), orderByChild('grantId'), equalTo(grantId));
     } else {
-        assetsQuery = assetsRef;
+        assetsQuery = ref(db, 'assets');
     }
     
     const snapshot = await get(assetsQuery);
@@ -107,11 +108,17 @@ export async function batchDeleteAssets(assetIds: string[]) {
     await update(ref(db), updates);
 }
 
-export async function clearAssets() {
+export async function clearAssets(grantId: string) {
     const db = checkConfig();
     if (!db) return;
-    const assetsRef = ref(db, 'assets');
-    await remove(assetsRef);
-}
-
     
+    // Fetch all assets for the specific grant and then delete them.
+    const assetsSnapshot = await get(query(ref(db, 'assets'), orderByChild('grantId'), equalTo(grantId)));
+    if (assetsSnapshot.exists()) {
+        const updates: { [key: string]: null } = {};
+        assetsSnapshot.forEach((childSnapshot) => {
+            updates[`/assets/${childSnapshot.key}`] = null;
+        });
+        await update(ref(db), updates);
+    }
+}
