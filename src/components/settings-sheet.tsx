@@ -33,7 +33,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useAppState } from '@/contexts/app-state-context';
 import { updateSettings as updateSettingsFS, batchDeleteAssets as batchDeleteAssetsFS } from '@/lib/firestore';
-import { updateSettingsRTDB, batchDeleteAssets as batchDeleteAssetsRTDB } from '@/lib/database';
+import { updateSettings as updateSettingsRTDB, batchDeleteAssets as batchDeleteAssetsRTDB } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';

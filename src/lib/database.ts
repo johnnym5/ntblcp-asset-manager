@@ -28,7 +28,7 @@ export async function getSettings(): Promise<AppSettings | null> {
     return null;
 }
 
-export async function updateSettingsRTDB(settings: AppSettings) {
+export async function updateSettings(settings: AppSettings) {
     const db = checkConfig();
     if (!db) return;
     const settingsRef = ref(db, 'config/settings');
