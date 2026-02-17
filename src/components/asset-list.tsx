@@ -82,8 +82,8 @@ import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-for
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
-import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets } from "@/lib/idb";
+import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets, updateSettings as updateSettingsRTDB } from "@/lib/database";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { TravelReportDialog } from "./travel-report-dialog";
@@ -1501,7 +1501,7 @@ export default function AssetList() {
   };
   
   const handleSaveColumnLayout = async (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
-    if (!isAdmin || !appSettings) return;
+    if (!isAdmin || !appSettings || !userProfile) return;
 
     const newSheetDefinitions = { ...appSettings.sheetDefinitions };
     if (applyToAll) {
@@ -1516,38 +1516,63 @@ export default function AssetList() {
         newSheetDefinitions[originalName] = newDefinition;
     }
 
-    const newSettings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString() };
-    setAppSettings(newSettings);
+    const settingsToSave: AppSettings = { 
+      ...appSettings, 
+      sheetDefinitions: newSheetDefinitions, 
+      lastModified: new Date().toISOString(),
+      lastModifiedBy: {
+        displayName: userProfile.displayName,
+        loginName: userProfile.loginName,
+      }
+    };
+    
+    const oldSettings = appSettings;
+    setAppSettings(settingsToSave);
     
     try {
-        await updateSettingsFS(newSettings);
-        await saveLocalSettings(newSettings);
+        const rtdbPromise = updateSettingsRTDB(settingsToSave);
+        const firestorePromise = updateSettingsFS(settingsToSave);
+        const localPromise = saveLocalSettings(settingsToSave);
+
+        await Promise.all([rtdbPromise, firestorePromise, localPromise]);
+
         toast({ title: 'Layout updated', description: `Column layout changes have been saved.` });
     } catch (e) {
+        setAppSettings(oldSettings);
         toast({ title: 'Error', description: 'Could not save layout settings.', variant: 'destructive' });
     }
   };
 
   const handleToggleSheetVisibility = async (sheetName: string) => {
-    if (!isAdmin || !appSettings || !appSettings.sheetDefinitions) return;
+    if (!isAdmin || !appSettings || !appSettings.sheetDefinitions || !userProfile) return;
 
     const newSheetDefinitions = { ...appSettings.sheetDefinitions };
     if(newSheetDefinitions[sheetName]) {
       newSheetDefinitions[sheetName].isHidden = !newSheetDefinitions[sheetName].isHidden;
     }
 
-    const newSettings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString() };
+    const newSettings: AppSettings = { 
+        ...appSettings, 
+        sheetDefinitions: newSheetDefinitions, 
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: {
+            displayName: userProfile.displayName,
+            loginName: userProfile.loginName,
+        }
+    };
     
-    // Optimistic UI update
+    const oldSettings = appSettings;
     setAppSettings(newSettings);
 
     try {
-        await updateSettingsFS(newSettings);
+        const rtdbPromise = updateSettingsRTDB(newSettings);
+        const firestorePromise = updateSettingsFS(newSettings);
+        await Promise.all([rtdbPromise, firestorePromise]);
+
         await saveLocalSettings(newSettings);
         toast({ title: 'Visibility Changed', description: `Sheet '${sheetName}' is now ${newSheetDefinitions[sheetName].isHidden ? 'hidden' : 'visible'}.` });
     } catch (e) {
-        // Revert on failure
-        setAppSettings(appSettings);
+        setAppSettings(oldSettings);
         toast({ title: 'Error', description: 'Could not save visibility settings.', variant: 'destructive' });
     }
   };
@@ -2158,3 +2183,5 @@ export default function AssetList() {
     </div>
   );
 }
+
+    
