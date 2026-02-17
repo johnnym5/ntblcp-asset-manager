@@ -84,7 +84,7 @@ import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets } from "@/lib/idb";
-import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
+import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { TravelReportDialog } from "./travel-report-dialog";
 import { ScrollArea } from "./ui/scroll-area";
@@ -175,32 +175,6 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; app
             {appMode === 'verification' && <Progress value={percentage} className="h-1.5" />}
         </div>
     );
-};
-
-const assetMatchesGlobalFilter = (asset: Asset, filter: string): boolean => {
-    if (!filter || filter === 'All') {
-        // When filter is 'All', every asset is in scope for a full sync.
-        return true;
-    }
-    const isZone = ZONAL_STORES.includes(filter);
-
-    if (isZone) {
-        const lowerCaseFilter = filter.toLowerCase().trim();
-        const assetLocation = (asset.location || "").toLowerCase().trim();
-        return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
-    }
-    
-    if (SPECIAL_LOCATIONS.includes(filter)) {
-        const lowerCaseFilter = filter.toLowerCase().trim();
-        return (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter);
-    }
-
-    const lowerCaseFilter = filter.toLowerCase().trim();
-    const capitalCity = NIGERIAN_STATE_CAPITALS[filter]?.toLowerCase().trim();
-    const assetLocation = (asset.location || "").toLowerCase().trim();
-    const matchesState = assetLocation.startsWith(lowerCaseFilter);
-    const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-    return matchesState || matchesCapital;
 };
 
 
@@ -479,7 +453,7 @@ export default function AssetList() {
 
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
-        const cloudAssets = await getCloudAssets(globalStateFilter);
+        const cloudAssets = await getCloudAssets(activeGrantId);
         const localAssets = await getLocalAssetsFromDb();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         const cloudAssetIds = new Set(cloudAssets.map(a => a.id));
@@ -542,7 +516,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing, activeDatabase, globalStateFilter, executeDownload, setFirstTimeSetupStatus]);
+  }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing, activeDatabase, activeGrantId, globalStateFilter, executeDownload, setFirstTimeSetupStatus]);
   
   useEffect(() => {
     if (firstTimeSetupStatus === 'syncing') {
@@ -557,7 +531,7 @@ export default function AssetList() {
     
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
-        const cloudAssets = await getCloudAssets(globalStateFilter);
+        const cloudAssets = await getCloudAssets(activeGrantId);
         
         const assetsToSave = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' as const }));
         
@@ -576,7 +550,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [setIsSyncing, setIsOnline, activeDatabase, setAssets, globalStateFilter]);
+  }, [setIsSyncing, setIsOnline, activeDatabase, setAssets, activeGrantId]);
   
   const handleUploadFirst = useCallback(() => {
     setIsDownloadWarningOpen(false);

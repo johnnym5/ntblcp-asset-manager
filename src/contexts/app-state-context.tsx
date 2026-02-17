@@ -21,6 +21,10 @@ import { firebaseConfig } from '@/lib/firebase';
 import { addNotification } from '@/hooks/use-notifications';
 import { v4 as uuidv4 } from 'uuid';
 import { NIGERIAN_STATES } from '@/lib/constants';
+import { assetMatchesGlobalFilter } from '@/lib/utils';
+import { getAssets } from '@/lib/firestore';
+import { getAssets as getAssetsRTDB } from '@/lib/database';
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets } from '@/lib/idb';
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;

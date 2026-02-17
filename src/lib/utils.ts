@@ -1,7 +1,8 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
-import { NIGERIAN_STATES, NIGERIAN_STATE_CAPITALS } from "./constants";
+import { NIGERIAN_STATES, NIGERIAN_STATE_CAPITALS, ZONAL_STORES, SPECIAL_LOCATIONS } from "./constants";
 import React from "react";
+import type { Asset } from "./types";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
@@ -38,3 +39,29 @@ export const getStatusClasses = (status?: 'Verified' | 'Unverified' | 'Discrepan
             return '';
     }
 }
+
+export const assetMatchesGlobalFilter = (asset: Asset, filter: string): boolean => {
+    if (!filter || filter === 'All') {
+        // When filter is 'All', every asset is in scope for a full sync.
+        return true;
+    }
+    const isZone = ZONAL_STORES.includes(filter);
+
+    if (isZone) {
+        const lowerCaseFilter = filter.toLowerCase().trim();
+        const assetLocation = (asset.location || "").toLowerCase().trim();
+        return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
+    }
+    
+    if (SPECIAL_LOCATIONS.includes(filter)) {
+        const lowerCaseFilter = filter.toLowerCase().trim();
+        return (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter);
+    }
+
+    const lowerCaseFilter = filter.toLowerCase().trim();
+    const capitalCity = NIGERIAN_STATE_CAPITALS[filter]?.toLowerCase().trim();
+    const assetLocation = (asset.location || "").toLowerCase().trim();
+    const matchesState = assetLocation.startsWith(lowerCaseFilter);
+    const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+    return matchesState || matchesCapital;
+};
