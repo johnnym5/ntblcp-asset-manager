@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -95,6 +96,10 @@ interface AppStateContextType {
   isSyncing: boolean;
   setIsSyncing: Dispatch<SetStateAction<boolean>>;
 
+  // First Time Setup
+  firstTimeSetupStatus: 'idle' | 'syncing' | 'complete';
+  setFirstTimeSetupStatus: Dispatch<SetStateAction<'idle' | 'syncing' | 'complete'>>;
+
   // Cross-component communication
   assetToView: Asset | null;
   setAssetToView: Dispatch<SetStateAction<Asset | null>>;
@@ -158,6 +163,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
   const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [firstTimeSetupStatus, setFirstTimeSetupStatus] = useState<'idle' | 'syncing' | 'complete'>('idle');
 
   const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>(
     'cloud'
@@ -258,7 +264,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
                 isAdmin: false,
                 canAddAssets: true,
                 canEditAssets: true,
-                canVerifyAssets: true,
                 isGuest: false,
                 password: 'password',
             }));
@@ -402,6 +407,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setManualUploadTrigger,
     isSyncing,
     setIsSyncing,
+    firstTimeSetupStatus,
+    setFirstTimeSetupStatus,
     dataSource,
     setDataSource,
     assetToView,

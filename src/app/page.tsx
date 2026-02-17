@@ -1,12 +1,14 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import AppLayout from '@/components/app-layout';
 import AssetList from '@/components/asset-list';
-import { Loader2 } from 'lucide-react';
+import { Loader2, CheckCircle } from 'lucide-react';
 import UserProfileSetup from '@/components/user-profile-setup';
 import { useAppState } from '@/contexts/app-state-context';
+import { Button } from '@/components/ui/button';
 
 const loadingTips = [
     "Tip: You can work completely offline. Your changes will be saved and can be uploaded to the cloud later.",
@@ -19,17 +21,22 @@ const loadingTips = [
 
 export default function Page() {
   const { userProfile, loading, profileSetupComplete } = useAuth();
-  const { setGlobalStateFilter } = useAppState();
+  const { 
+    setGlobalStateFilter,
+    firstTimeSetupStatus,
+    setFirstTimeSetupStatus
+  } = useAppState();
+  
   const [tipIndex, setTipIndex] = useState(0);
 
   useEffect(() => {
-    if (loading) {
+    if (loading || firstTimeSetupStatus === 'syncing') {
       const timer = setInterval(() => {
         setTipIndex((prevIndex) => (prevIndex + 1) % loadingTips.length);
       }, 5000);
       return () => clearInterval(timer);
     }
-  }, [loading]);
+  }, [loading, firstTimeSetupStatus]);
 
   useEffect(() => {
     if (userProfile && profileSetupComplete) {
@@ -40,6 +47,35 @@ export default function Page() {
       }
     }
   }, [userProfile, profileSetupComplete, setGlobalStateFilter]);
+
+  if (firstTimeSetupStatus !== 'idle') {
+    return (
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-background gap-6 text-center p-4">
+        {firstTimeSetupStatus === 'syncing' && (
+          <>
+            <Loader2 className="h-16 w-16 animate-spin text-primary" />
+            <h1 className="text-2xl font-bold">Performing First-Time Setup</h1>
+            <p className="text-muted-foreground max-w-sm">
+              Downloading the latest asset database. Please wait...
+            </p>
+            <p className="text-muted-foreground max-w-sm h-10">{loadingTips[tipIndex]}</p>
+          </>
+        )}
+        {firstTimeSetupStatus === 'complete' && (
+          <>
+            <CheckCircle className="h-16 w-16 text-green-500" />
+            <h1 className="text-2xl font-bold">Setup Successful!</h1>
+            <p className="text-muted-foreground max-w-sm">
+              Your local database is now up-to-date with the latest assets.
+            </p>
+            <Button onClick={() => setFirstTimeSetupStatus('idle')}>
+              Continue to Asset Manager
+            </Button>
+          </>
+        )}
+      </div>
+    );
+  }
 
   if (loading) {
     return (

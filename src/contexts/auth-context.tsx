@@ -1,10 +1,11 @@
+
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
 import type { AuthorizedUser } from '@/lib/types';
-import { getLocalAssets, clearLocalAssets, clearLockedOfflineAssets } from '@/lib/idb';
+import { getLocalAssets, clearLocalAssets, saveLockedOfflineAssets } from '@/lib/idb';
 
 
 export interface LocalUserProfile {
@@ -16,7 +17,6 @@ export interface LocalUserProfile {
   isGuest?: boolean;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
-  canVerifyAssets?: boolean;
 }
 
 interface AuthContextType {
@@ -39,7 +39,6 @@ const superAdmin: AuthorizedUser = {
   isGuest: false,
   canAddAssets: true,
   canEditAssets: true,
-  canVerifyAssets: true,
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -48,7 +47,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { appSettings, settingsLoaded, setAssets, setOfflineAssets, setManualDownloadTrigger } = useAppState();
+  const { appSettings, settingsLoaded, setAssets, setOfflineAssets, setFirstTimeSetupStatus } = useAppState();
 
   useEffect(() => {
     if (!settingsLoaded || !appSettings) {
@@ -73,7 +72,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               isGuest: authorizedUser.isGuest,
               canAddAssets: authorizedUser.canAddAssets,
               canEditAssets: authorizedUser.canEditAssets,
-              canVerifyAssets: authorizedUser.canVerifyAssets,
            };
 
           localStorage.setItem('ntblcp-user-profile', JSON.stringify(freshProfile));
@@ -104,7 +102,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (user: AuthorizedUser) => {
     setLoading(true);
 
-    // Check if this is a "first time" login on this device by checking for existing assets.
     const existingAssets = await getLocalAssets();
     const isFirstTimeLogin = existingAssets.length === 0;
 
@@ -117,19 +114,14 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isGuest: user.isGuest,
       canAddAssets: user.canAddAssets,
       canEditAssets: user.canEditAssets,
-      canVerifyAssets: user.canVerifyAssets,
     };
     try {
       localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
 
-      // If it's the first login and the user is online, trigger a download.
       if (isFirstTimeLogin && typeof window !== 'undefined' && navigator.onLine) {
-        // Use a timeout to ensure the rest of the app state (like userProfile) has settled
-        setTimeout(() => {
-            setManualDownloadTrigger(c => c + 1);
-        }, 500);
+        setFirstTimeSetupStatus('syncing');
       }
 
     } catch(e) {
@@ -147,7 +139,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     try {
       await clearLocalAssets();
-      await clearLockedOfflineAssets();
+      await saveLockedOfflineAssets([]);
       setAssets([]);
       setOfflineAssets([]);
     } catch (e) {

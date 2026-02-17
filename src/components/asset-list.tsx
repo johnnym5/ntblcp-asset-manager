@@ -82,7 +82,7 @@ import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-for
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
-import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets, updateSettings as updateSettingsRTDB } from "@/lib/database";
+import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
@@ -265,6 +265,8 @@ export default function AssetList() {
     conditionOptions, setConditionOptions,
     dataActions,
     setDataActions,
+    firstTimeSetupStatus,
+    setFirstTimeSetupStatus,
   } = useAppState();
 
   const grant = useMemo(() => {
@@ -317,14 +319,14 @@ export default function AssetList() {
   }, [view]);
 
   // --- DATA LOADING & SYNC ---
-  const executeDownload = useCallback(async () => {
-    if (!syncSummary || syncSummary.type !== 'download') return;
-
+  const executeDownload = useCallback(async (summary: SyncSummary, isFirstTime?: boolean) => {
     setIsSyncing(true);
-    addNotification({ title: 'Downloading from cloud...' });
+    if (!isFirstTime) {
+      addNotification({ title: 'Downloading from cloud...' });
+    }
     
     try {
-        const { newFromCloud, updatedFromCloud, deletedOnCloud } = syncSummary;
+        const { newFromCloud, updatedFromCloud, deletedOnCloud } = summary;
         let localAssets = await getLocalAssetsFromDb();
         const mergedAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
@@ -347,7 +349,12 @@ export default function AssetList() {
         setAssets(finalAssets);
 
         const totalChanges = assetsToProcess.length + (deletedOnCloud?.length || 0);
-        addNotification({ title: 'Download Complete', description: `${totalChanges} changes synced from the cloud.` });
+        
+        if (!isFirstTime) {
+          addNotification({ title: 'Download Complete', description: `${totalChanges} changes synced from the cloud.` });
+        } else {
+          addNotification({ title: 'Setup Complete', description: `Successfully downloaded ${totalChanges} assets.` });
+        }
         
     } catch (error) {
         console.error("Download failed:", error);
@@ -356,12 +363,19 @@ export default function AssetList() {
           description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during download.",
           variant: 'destructive'
         });
+        if (isFirstTime) {
+          setFirstTimeSetupStatus('idle'); // Un-stick the UI on failure
+        }
     } finally {
         setIsSyncing(false);
-        setIsSyncConfirmOpen(false);
-        setSyncSummary(null);
+        if (!isFirstTime) {
+          setIsSyncConfirmOpen(false);
+          setSyncSummary(null);
+        } else {
+          setFirstTimeSetupStatus('complete');
+        }
     }
-}, [syncSummary, setAssets, setIsSyncing]);
+}, [setAssets, setIsSyncing, setFirstTimeSetupStatus]);
 
   const executeUpload = useCallback(async () => {
       if (!syncSummary || syncSummary.type !== 'upload') return;
@@ -406,7 +420,7 @@ export default function AssetList() {
 
   const handleSyncConfirm = () => {
     if (syncSummary?.type === 'download') {
-      executeDownload();
+      executeDownload(syncSummary);
     } else if (syncSummary?.type === 'upload') {
       executeUpload();
     }
@@ -447,24 +461,26 @@ export default function AssetList() {
     }
 }, [isOnline, authInitialized, isGuest, setIsSyncing]);
 
-    const handleDownloadScan = useCallback(async () => {
+    const handleDownloadScan = useCallback(async (isFirstTime = false) => {
     if (!isOnline || !authInitialized || isGuest) return;
-    setIsSyncing(true);
 
-    const localAssets = await getLocalAssetsFromDb();
-    const unsyncedAssets = localAssets.filter(a => a.syncStatus === 'local');
-    if (unsyncedAssets.length > 0) {
-      setNumUnsynced(unsyncedAssets.length);
-      setIsDownloadWarningOpen(true);
-      setIsSyncing(false);
-      return;
+    if (!isFirstTime) {
+      const localAssetsUnsynced = await getLocalAssetsFromDb();
+      const unsyncedAssets = localAssetsUnsynced.filter(a => a.syncStatus === 'local');
+      if (unsyncedAssets.length > 0) {
+        setNumUnsynced(unsyncedAssets.length);
+        setIsDownloadWarningOpen(true);
+        return;
+      }
     }
 
-    addNotification({ title: 'Scanning for cloud changes...' });
+    setIsSyncing(true);
+    addNotification({ title: isFirstTime ? 'Performing first-time setup...' : 'Scanning for cloud changes...' });
 
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
         const cloudAssets = await getCloudAssets(globalStateFilter);
+        const localAssets = await getLocalAssetsFromDb();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         const cloudAssetIds = new Set(cloudAssets.map(a => a.id));
 
@@ -505,9 +521,14 @@ export default function AssetList() {
         
         if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0 && summary.keptLocal.length === 0 && (summary.deletedOnCloud || []).length === 0) {
             addNotification({ title: 'Already Up-to-Date', description: 'Your local data is already in sync with the cloud.' });
+            if (isFirstTime) setFirstTimeSetupStatus('complete');
         } else {
-            setSyncSummary(summary);
-            setIsSyncConfirmOpen(true);
+            if (isFirstTime) {
+                await executeDownload(summary, true);
+            } else {
+                setSyncSummary(summary);
+                setIsSyncConfirmOpen(true);
+            }
         }
     } catch (error) {
         console.error("Download scan failed:", error);
@@ -516,12 +537,19 @@ export default function AssetList() {
           description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred.",
           variant: 'destructive'
         });
+        if (isFirstTime) setFirstTimeSetupStatus('idle');
         setIsOnline(false);
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing, activeDatabase, globalStateFilter]);
+  }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing, activeDatabase, globalStateFilter, executeDownload, setFirstTimeSetupStatus]);
   
+  useEffect(() => {
+    if (firstTimeSetupStatus === 'syncing') {
+      handleDownloadScan(true);
+    }
+  }, [firstTimeSetupStatus, handleDownloadScan]);
+
   const handleOverwriteDownload = useCallback(async () => {
     setIsDownloadWarningOpen(false);
     setIsSyncing(true);
@@ -2188,7 +2216,3 @@ export default function AssetList() {
     </div>
   );
 }
-
-    
-
-    
