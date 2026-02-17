@@ -65,7 +65,7 @@ interface AssetFormProps {
 export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: initialIsReadOnly, defaultCategory }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const { appSettings, dataSource, activeGrantId } = useAppState();
+  const { appSettings, dataSource, activeGrantId, assets: cloudAssets, offlineAssets, globalStateFilter } = useAppState();
   const isAdmin = userProfile?.isAdmin || false;
   
   const form = useForm<AssetFormValues>({
@@ -88,22 +88,77 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
   useEffect(() => {
     if (isOpen) {
         const defaultValues: AssetFormValues = {};
-        if (asset) {
+        if (asset) { // EDIT/VIEW MODE
             Object.keys(asset).forEach(key => {
                 const k = key as keyof Asset;
                 defaultValues[k] = String(asset[k] ?? '');
             });
             if (!defaultValues.verifiedStatus) defaultValues.verifiedStatus = 'Unverified';
-            if (!defaultValues.location && userProfile?.state) defaultValues.location = userProfile.state;
-        } else {
-             if (defaultCategory) defaultValues.category = defaultCategory;
-             if (userProfile?.state) defaultValues.location = userProfile.state;
-             defaultValues.verifiedStatus = 'Unverified';
+            
+            // Pre-fill location if empty and a state filter is active
+            if (!defaultValues.location) {
+              if (globalStateFilter && globalStateFilter !== 'All') {
+                  defaultValues.location = globalStateFilter;
+              } else if (userProfile?.states && userProfile.states.length === 1 && userProfile.states[0] !== 'All') {
+                  defaultValues.location = userProfile.states[0];
+              }
+            }
+        } else { // ADD NEW MODE
+            defaultValues.verifiedStatus = 'Unverified';
+
+            // Set location based on current state filter or user's single state
+            if (globalStateFilter && globalStateFilter !== 'All') {
+              defaultValues.location = globalStateFilter;
+            } else if (userProfile?.states && userProfile.states.length === 1 && userProfile.states[0] !== 'All') {
+                defaultValues.location = userProfile.states[0];
+            }
+            
+            // If adding from a specific category view, pre-populate common fields
+            if (defaultCategory) {
+              defaultValues.category = defaultCategory;
+              
+              const allCurrentAssets = dataSource === 'cloud' ? cloudAssets : offlineAssets;
+              const categoryAssets = allCurrentAssets.filter(a => a.category === defaultCategory);
+
+              if (categoryAssets.length > 0) {
+                  const currentSheetDef = grant?.sheetDefinitions?.[defaultCategory];
+                  if (currentSheetDef) {
+                      // Define fields that should NOT be pre-populated
+                      const excludedKeys = new Set<string>([
+                          'id', 'category', 'sn', 'serialNumber', 'assetIdCode', 'assignee', 'location', 'lga', 'site',
+                          'verifiedStatus', 'verifiedDate', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState',
+                          'previousState', 'approvalStatus', 'pendingChanges', 'changeSubmittedBy'
+                      ]);
+
+                      const fieldsToConsider = currentSheetDef.displayFields
+                          .map(f => f.key)
+                          .filter(key => !excludedKeys.has(key));
+                      
+                      fieldsToConsider.forEach(fieldKey => {
+                          const values = categoryAssets.map(a => a[fieldKey as keyof Asset]).filter(val => val !== null && val !== undefined && String(val).trim() !== '');
+                          if (values.length > 0) {
+                              const valueCounts = values.reduce((acc, value) => {
+                                  const v = String(value).trim();
+                                  acc[v] = (acc[v] || 0) + 1;
+                                  return acc;
+                              }, {} as Record<string, number>);
+
+                              const mostCommon = Object.entries(valueCounts).sort((a, b) => b[1] - a[1])[0];
+                              
+                              // Pre-populate if a value is present in > 50% of the category's assets
+                              if (mostCommon && (mostCommon[1] / categoryAssets.length > 0.5)) {
+                                  defaultValues[fieldKey as string] = mostCommon[0];
+                              }
+                          }
+                      });
+                  }
+              }
+            }
         }
         form.reset(defaultValues);
     }
-  }, [isOpen, asset, form, userProfile, defaultCategory]);
-  
+  }, [isOpen, asset, form, userProfile, defaultCategory, globalStateFilter, dataSource, cloudAssets, offlineAssets, grant]);
+
   const watchedStatusInForm = form.watch('verifiedStatus');
   useEffect(() => {
     if (watchedStatusInForm === 'Verified' && !form.getValues('verifiedDate')) {
