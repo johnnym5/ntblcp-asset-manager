@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -52,6 +53,7 @@ import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
 import { ActivityLogDialog } from "./admin/activity-log-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { Badge } from "./ui/badge";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { userProfile, loading, logout } = useAuth();
