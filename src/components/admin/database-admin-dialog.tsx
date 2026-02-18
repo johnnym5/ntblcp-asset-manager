@@ -22,10 +22,10 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
-import { getAssets as getAssetsFS, batchSetAssets as batchSetAssetsFS, batchDeleteAssets as batchDeleteAssetsFS, clearAssets as clearFirestoreAssets, getSettings as getSettingsFS, updateSettings as updateSettingsFS } from '@/lib/firestore';
+import { getAssets as getAssetsFS, batchSetAssets as batchSetAssetsFS, clearAssets as clearFirestoreAssets, getSettings as getSettingsFS, updateSettings as updateSettingsFS } from '@/lib/firestore';
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, clearAssets as clearRtdbAssets, getSettings as getSettingsRTDB, updateSettings as updateSettingsRTDB } from '@/lib/database';
 import { useAuth } from '@/contexts/auth-context';
-import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive, RefreshCw, CheckCircle, XCircle, ChevronsUpDown } from 'lucide-react';
+import { Loader2, Trash2, FileUp, Download, DatabaseZap, AlertTriangle, GitMerge, CloudOff, HardDrive, RefreshCw, CheckCircle, XCircle, ChevronsUpDown, Info } from 'lucide-react';
 import type { AppSettings, Asset } from '@/lib/types';
 import { saveLocalSettings, clearLocalAssets, saveAssets, saveLockedOfflineAssets, getLocalAssets, getLockedOfflineAssets } from '@/lib/idb';
 import { exportFullBackupToJson, exportSettingsToJson, exportAssetsToJson } from '@/lib/json-export';
@@ -35,21 +35,29 @@ import { Separator } from '../ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { Label } from '../ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Switch } from '../ui/switch';
 import { get, ref, set, remove } from 'firebase/database';
 import { rtdb, db, isConfigValid } from '@/lib/firebase';
 import { Textarea } from '../ui/textarea';
 import { Input } from '../ui/input';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '../ui/collapsible';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
+interface HealthCheckStatus {
+    label: string;
+    status: 'ok' | 'warning' | 'error';
+    description: string;
+    reason?: string;
+    resolution?: string;
+}
+
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, assets, setAssets, offlineAssets, setOfflineAssets, setIsSyncing, isOnline, dataActions } = useAppState();
+  const { appSettings, setAppSettings, assets, setAssets, offlineAssets, setOfflineAssets, isOnline, dataActions, activeDatabase, setActiveDatabase } = useAppState();
   const { toast } = useToast();
   
   const [isProcessing, setIsProcessing] = useState(false);
@@ -70,15 +78,43 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const [dbSearchTerm, setDbSearchTerm] = useState('');
   const [dbReplaceTerm, setDbReplaceTerm] = useState('');
 
-  const HealthCheckItem = ({ label, status, description }: { label: string, status: 'ok' | 'warning' | 'error', description: string }) => {
+  const HealthCheckItem = ({ label, status, description, reason, resolution }: HealthCheckStatus) => {
     const Icon = status === 'ok' ? CheckCircle : status === 'warning' ? AlertTriangle : XCircle;
     const color = status === 'ok' ? 'text-green-500' : status === 'warning' ? 'text-yellow-500' : 'text-destructive';
+    
     return (
-        <div className="flex items-start gap-3">
+        <div className="flex items-start gap-3 p-2 rounded-md transition-colors hover:bg-muted/30">
             <Icon className={`mt-1 h-5 w-5 flex-shrink-0 ${color}`} />
-            <div>
-                <p className="font-medium">{label}</p>
-                <p className="text-sm text-muted-foreground">{description}</p>
+            <div className="flex-1">
+                <div className="flex items-center gap-2">
+                    <p className="font-semibold text-sm">{label}</p>
+                    {status !== 'ok' && (
+                        <TooltipProvider>
+                            <Tooltip>
+                                <TooltipTrigger asChild>
+                                    <Info className="h-3 w-3 text-muted-foreground cursor-help" />
+                                </TooltipTrigger>
+                                <TooltipContent className="max-w-xs p-3">
+                                    <div className="space-y-2">
+                                        {reason && (
+                                            <div>
+                                                <p className="font-bold text-xs text-destructive uppercase">Possible Reason</p>
+                                                <p className="text-xs">{reason}</p>
+                                            </div>
+                                        )}
+                                        {resolution && (
+                                            <div>
+                                                <p className="font-bold text-xs text-green-600 uppercase">Resolution</p>
+                                                <p className="text-xs">{resolution}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </TooltipContent>
+                            </Tooltip>
+                        </TooltipProvider>
+                    )}
+                </div>
+                <p className="text-xs text-muted-foreground">{description}</p>
             </div>
         </div>
     )
@@ -87,85 +123,70 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const healthChecks = useMemo(() => {
       if (!appSettings || !userProfile) return null;
 
-      const checks = {
+      const checks: Record<string, HealthCheckStatus[]> = {
           settings: [
               {
-                  label: 'Settings Loaded',
+                  label: 'Settings Data Layer',
                   status: appSettings ? 'ok' : 'error',
-                  description: appSettings ? 'Application settings are loaded.' : 'Critical error: App settings not found.',
+                  description: appSettings ? 'Application settings are loaded from Firestore.' : 'App settings not found.',
+                  reason: 'Could not fetch config from Firestore/RTDB or local storage is corrupted.',
+                  resolution: 'Verify internet connection and ensure Firestore has a "config/settings" document.'
               },
               {
-                  label: 'User Profile Active',
-                  status: userProfile ? 'ok' : 'error',
-                  description: userProfile ? `Logged in as ${userProfile.displayName}.` : 'No user profile is active.',
-              },
-              {
-                  label: 'Sheet Definitions',
+                  label: 'Project Configuration',
                   status: appSettings?.grants?.some(g => g.sheetDefinitions && Object.keys(g.sheetDefinitions).length > 0) ? 'ok' : 'warning',
-                  description: appSettings?.grants?.some(g => g.sheetDefinitions && Object.keys(g.sheetDefinitions).length > 0) ? 'Sheet definitions are configured.' : 'No sheet definitions found. Import may fail.',
+                  description: appSettings?.grants?.some(g => g.sheetDefinitions && Object.keys(g.sheetDefinitions).length > 0) ? 'Project sheets are configured.' : 'No sheet definitions found.',
+                  reason: 'The active project has no templates defined.',
+                  resolution: 'Import an Excel template in the "Projects & Sheets" settings tab.'
               },
           ],
           database: [
               {
-                  label: 'Firebase Config',
+                  label: 'Firebase Environment',
                   status: isConfigValid ? 'ok' : 'error',
-                  description: isConfigValid ? 'Firebase environment variables are valid.' : 'Firebase config is missing or invalid. App cannot connect to the cloud.',
+                  description: isConfigValid ? 'Firebase API keys are verified.' : 'Firebase config is missing.',
+                  reason: 'Environment variables (NEXT_PUBLIC_FIREBASE_...) are not set in the build or .env file.',
+                  resolution: 'Check your project root for a valid .env file with all Firebase credentials.'
               },
               {
-                  label: 'Primary DB (RTDB)',
+                  label: 'Realtime DB (Asset Layer)',
                   status: rtdb ? 'ok' : 'error',
-                  description: rtdb ? 'Realtime Database client is initialized.' : 'RTDB client failed to initialize.',
+                  description: rtdb ? 'RTDB instance is active.' : 'RTDB failed to initialize.',
+                  reason: 'The Database URL might be incorrect or the service is disabled in the console.',
+                  resolution: 'Ensure Realtime Database is enabled in the Firebase Console and your URL is correct.'
               },
               {
-                  label: 'Backup DB (Firestore)',
+                  label: 'Firestore (Settings Layer)',
                   status: db ? 'ok' : 'error',
-                  description: db ? 'Firestore client is initialized.' : 'Firestore client failed to initialize.',
-              },
-              {
-                  label: 'Online Status',
-                  status: isOnline ? 'ok' : 'warning',
-                  description: isOnline ? 'Browser is online and connected.' : 'App is in offline mode.',
+                  description: db ? 'Firestore instance is active.' : 'Firestore failed to initialize.',
+                  reason: 'Service disabled or bad API key permissions.',
+                  resolution: 'Enable Firestore in the Firebase console and check Security Rules.'
               },
           ],
           assets: [
               {
-                  label: 'Local Assets (Main)',
+                  label: 'Main Local Store',
                   status: assets.length > 0 ? 'ok' : 'warning',
-                  description: `${assets.length} assets loaded in the main local store.`,
+                  description: `${assets.length} assets in indexedDB.`,
+                  reason: 'Local database might be empty or a sync hasn\'t been performed.',
+                  resolution: 'Click "Download from Cloud" in the top header to fetch remote assets.'
               },
               {
-                  label: 'Offline Assets (Locked)',
-                  status: 'ok',
-                  description: `${offlineAssets.length} assets loaded in the offline store.`,
-              },
-              {
-                  label: 'Data Integrity',
+                  label: 'Asset Data Integrity',
                   status: assets.some(a => !a.category || !a.description) ? 'warning' : 'ok',
-                  description: assets.some(a => !a.category || !a.description) ? `Found ${assets.filter(a => !a.category || !a.description).length} assets with missing critical fields (category/description).` : 'All assets have critical fields.',
-              },
-          ],
-          functionality: [
-              {
-                  label: 'Data Actions',
-                  status: dataActions && Object.keys(dataActions).length > 0 ? 'ok' : 'error',
-                  description: dataActions && Object.keys(dataActions).length > 0 ? 'Core data functions are available.' : 'Core data functions failed to initialize.',
-              },
-          ],
-          export: [
-              {
-                  label: 'Export Prerequisites',
-                  status: assets.length > 0 && appSettings ? 'ok' : 'warning',
-                  description: assets.length > 0 && appSettings ? 'Data is available for export.' : 'No assets or settings available to export.',
+                  description: assets.some(a => !a.category || !a.description) ? 'Detected corrupted asset entries.' : 'All assets have critical fields.',
+                  reason: 'Manual edits in DB browser or incomplete Excel imports.',
+                  resolution: 'Review assets with missing fields via the dashboard and fix them manually.'
               },
           ],
       };
       return checks;
-  }, [appSettings, userProfile, isOnline, assets, offlineAssets, dataActions]);
+  }, [appSettings, userProfile, assets]);
 
 
   const handleReplaceAll = useCallback(() => {
     if (!dbSearchTerm) {
-        toast({ title: 'Search term is empty', description: 'Please enter a term to search for.', variant: 'destructive' });
+        toast({ title: 'Search term is empty', variant: 'destructive' });
         return;
     }
     setBrowserData(currentData => currentData.replaceAll(dbSearchTerm, dbReplaceTerm));
@@ -175,7 +196,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   const handlePathSelect = useCallback(async (path: string) => {
     if (!rtdb) {
-      toast({ title: 'Database Not Connected', description: 'Firebase Realtime Database is not available.', variant: 'destructive' });
+      toast({ title: 'Database Not Connected', variant: 'destructive' });
       return;
     }
     setBrowserPath(path);
@@ -188,11 +209,10 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         if (snapshot.exists()) {
             setBrowserData(JSON.stringify(snapshot.val(), null, 2));
         } else {
-            setBrowserData('// No data exists at this path. You can add some and save.');
+            setBrowserData('// No data exists at this path.');
         }
     } catch (e) {
         setBrowserError((e as Error).message);
-        toast({ title: 'Error Fetching Data', description: (e as Error).message, variant: 'destructive' });
     } finally {
         setIsBrowserLoading(false);
     }
@@ -204,11 +224,9 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     try {
         const dataToSave = JSON.parse(browserData);
         await set(ref(rtdb, browserPath), dataToSave);
-        toast({ title: 'Data Saved', description: `Data at ${browserPath} has been updated.` });
+        toast({ title: 'Data Saved', description: `Path ${browserPath} updated.` });
     } catch (e) {
-        const errorMessage = 'Invalid JSON: ' + (e as Error).message;
-        setBrowserError(errorMessage);
-        toast({ title: 'Save Failed', description: errorMessage, variant: 'destructive' });
+        setBrowserError('Invalid JSON: ' + (e as Error).message);
     }
   }, [browserPath, browserData, toast]);
 
@@ -216,7 +234,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     if (!confirmDeletePath || !rtdb) return;
     try {
         await remove(ref(rtdb, confirmDeletePath));
-        toast({ title: 'Path Deleted', description: `Successfully deleted ${confirmDeletePath}` });
+        toast({ title: 'Path Deleted' });
         setBrowserPath(null);
         setBrowserData('');
     } catch (e) {
@@ -240,12 +258,12 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             const result = JSON.parse(e.target?.result as string);
             if (result && result.settings && Array.isArray(result.assets)) {
                 setBackupToRestore(result);
-                openConfirmation('restore', 'Restore from Backup?', 'This will overwrite all local data with the contents of the backup file. You can then sync this to the cloud. This action cannot be undone.');
+                openConfirmation('restore', 'Restore from Backup?', 'Overwrites local data. Cannot be undone.');
             } else {
-                addNotification({ title: 'Invalid Backup File', description: 'The selected JSON file does not have the correct structure.', variant: 'destructive' });
+                addNotification({ title: 'Invalid Backup', variant: 'destructive' });
             }
         } catch (error) {
-            addNotification({ title: 'Invalid JSON', description: 'Could not parse the selected file.', variant: 'destructive' });
+            addNotification({ title: 'Invalid JSON', variant: 'destructive' });
         } finally {
              if (importFileRef.current) importFileRef.current.value = "";
         }
@@ -256,8 +274,6 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const handleConfirmRestore = async () => {
     if (!backupToRestore) return;
     setIsProcessing(true);
-    addNotification({ title: 'Restoring from backup...', description: 'This may take a moment.' });
-    
     try {
         const { assets: restoredAssets, settings: restoredSettings } = backupToRestore;
         const assetsToSync = restoredAssets.map(a => ({ ...a, syncStatus: 'local' as const }));
@@ -270,10 +286,9 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         setOfflineAssets([]);
         setAppSettings(restoredSettings);
 
-        addNotification({ title: 'Local data restored', description: 'You can now manually upload the restored data to the cloud.' });
-
+        addNotification({ title: 'Local data restored' });
     } catch (e) {
-        addNotification({ title: 'Restore Failed', description: (e as Error).message, variant: 'destructive'});
+        addNotification({ title: 'Restore Failed', variant: 'destructive'});
     } finally {
         setIsProcessing(false);
         setBackupToRestore(null);
@@ -282,12 +297,10 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   const handleMergeOffline = async () => {
     setIsProcessing(true);
-    addNotification({ title: "Merging Offline Data...", description: "This may take a moment."});
     try {
         const mainAssets = await getLocalAssets();
         const offline = await getLockedOfflineAssets();
         if (offline.length === 0) {
-            addNotification({ title: 'Nothing to Merge', description: 'Your locked offline store is empty.'});
             setIsProcessing(false);
             return;
         }
@@ -298,157 +311,99 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         });
         
         const mergedAssets = Array.from(mainAssetsMap.values());
-
         await saveAssets(mergedAssets);
         await saveLockedOfflineAssets([]);
 
         setAssets(mergedAssets);
         setOfflineAssets([]);
 
-        addNotification({ title: "Merge Complete", description: `${offline.length} assets from the offline store have been merged into the main list.` });
+        addNotification({ title: "Merge Complete" });
     } catch (e) {
-      addNotification({ title: 'Merge Failed', description: (e as Error).message, variant: 'destructive'});
+      addNotification({ title: 'Merge Failed', variant: 'destructive'});
     }
     setIsProcessing(false);
   };
   
   const handleSyncRtdbToFirestore = async () => {
     setIsProcessing(true);
-    addNotification({ title: 'Syncing: RTDB -> Firestore', description: 'Copying data from Realtime Database to Firestore.' });
     try {
         const rtdbAssets = await getAssetsRTDB();
         const rtdbSettings = await getSettingsRTDB();
-
-        if (rtdbAssets && rtdbAssets.length > 0) {
-            await batchSetAssetsFS(rtdbAssets);
-        }
-        if (rtdbSettings) {
-            await updateSettingsFS(rtdbSettings);
-        }
-
-        addNotification({ title: 'Sync Complete', description: 'Firestore has been updated with data from Realtime Database.' });
+        if (rtdbAssets && rtdbAssets.length > 0) await batchSetAssetsFS(rtdbAssets);
+        if (rtdbSettings) await updateSettingsFS(rtdbSettings);
+        addNotification({ title: 'Sync Complete: RTDB -> Firestore' });
     } catch (e) {
-        addNotification({ title: 'Sync Failed', description: (e as Error).message, variant: 'destructive'});
+        addNotification({ title: 'Sync Failed', variant: 'destructive'});
     }
     setIsProcessing(false);
   };
   
   const handleSyncFirestoreToRtdb = async () => {
     setIsProcessing(true);
-    addNotification({ title: 'Syncing: Firestore -> RTDB', description: 'Copying data from Firestore to Realtime Database.' });
     try {
         const firestoreAssets = await getAssetsFS();
         const firestoreSettings = await getSettingsFS();
-
-        if (firestoreAssets && firestoreAssets.length > 0) {
-            await batchSetAssetsRTDB(firestoreAssets);
-        }
-        if (firestoreSettings) {
-            await updateSettingsRTDB(firestoreSettings);
-        }
-
-        addNotification({ title: 'Sync Complete', description: 'Realtime Database has been updated with data from Firestore.' });
+        if (firestoreAssets && firestoreAssets.length > 0) await batchSetAssetsRTDB(firestoreAssets);
+        if (firestoreSettings) await updateSettingsRTDB(firestoreSettings);
+        addNotification({ title: 'Sync Complete: Firestore -> RTDB' });
     } catch (e) {
-        addNotification({ title: 'Sync Failed', description: (e as Error).message, variant: 'destructive'});
+        addNotification({ title: 'Sync Failed', variant: 'destructive'});
     }
     setIsProcessing(false);
   };
 
   const handleClearFirestoreOnly = async () => {
     setIsProcessing(true);
-    addNotification({ title: "Clearing Firestore...", description: "This will remove all assets from the backup cloud database."});
     try {
       await clearFirestoreAssets();
-      if (appSettings?.defaultDatabase === 'firestore') {
-        await clearLocalAssets();
-        setAssets([]);
-      }
-      addNotification({ title: "Backup Cloud Cleared", description: "All assets have been removed from Firestore."});
+      addNotification({ title: "Firestore (Backup) Cleared" });
     } catch(e) {
-      addNotification({ title: 'Firestore Clear Failed', description: (e as Error).message, variant: 'destructive'});
+      addNotification({ title: 'Clear Failed', variant: 'destructive'});
     }
     setIsProcessing(false);
   };
 
   const handleClearRtdbOnly = async () => {
     setIsProcessing(true);
-    addNotification({ title: "Clearing Realtime DB...", description: "This will remove all assets from the primary cloud database."});
     try {
       await clearRtdbAssets();
-      if (appSettings?.defaultDatabase === 'rtdb') {
-        await clearLocalAssets();
-        setAssets([]);
-      }
-      addNotification({ title: "Primary Cloud Cleared", description: "All assets have been removed from Realtime DB."});
+      addNotification({ title: "Realtime DB (Primary) Cleared" });
     } catch(e) {
-      addNotification({ title: 'RTDB Clear Failed', description: (e as Error).message, variant: 'destructive'});
+      addNotification({ title: 'Clear Failed', variant: 'destructive'});
     }
     setIsProcessing(false);
   }
 
   const handleClearLocalOnly = async () => {
     setIsProcessing(true);
-    addNotification({ title: "Clearing Local Device...", description: "This will remove all assets from this device."});
     try {
         await clearLocalAssets();
         await saveLockedOfflineAssets([]);
         setAssets([]);
         setOfflineAssets([]);
-        addNotification({ title: "Local Device Cleared", description: "All asset data has been removed from your browser."});
+        addNotification({ title: "Local Device Cleared" });
     } catch (e) {
-         addNotification({ title: 'Local Clear Failed', description: (e as Error).message, variant: 'destructive'});
+         addNotification({ title: 'Clear Failed', variant: 'destructive'});
     }
     setIsProcessing(false);
   };
   
   const handleNukeAll = async () => {
     setIsProcessing(true);
-    addNotification({ title: "Clearing ALL Databases...", description: "This may take a moment."});
     try {
       await clearLocalAssets();
       await saveLockedOfflineAssets([]);
       setAssets([]);
       setOfflineAssets([]);
-      addNotification({ title: 'Local Device Cleared', description: 'Proceeding to clear cloud...'});
-
       await clearFirestoreAssets();
       await clearRtdbAssets();
-
-      addNotification({ title: "All Databases Cleared", description: "Local and all cloud asset stores are now empty."});
+      addNotification({ title: "All Databases Cleared" });
     } catch (e) {
-      addNotification({ title: 'Clear Failed', description: (e as Error).message, variant: 'destructive'});
+      addNotification({ title: 'Clear Failed', variant: 'destructive'});
     }
     setIsProcessing(false);
   };
 
-  const handleSettingChange = async (key: keyof AppSettings, value: any) => {
-    if (!userProfile || !appSettings) return;
-    
-    const newSettings: AppSettings = {
-        ...appSettings,
-        [key]: value,
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: {
-            displayName: userProfile.displayName,
-            loginName: userProfile.loginName,
-        }
-    };
-    
-    setAppSettings(newSettings); // Optimistic update
-    
-    try {
-        await updateSettingsFS(newSettings);
-        await updateSettingsRTDB(newSettings);
-        await saveLocalSettings(newSettings);
-        toast({ title: 'Setting Saved', description: 'Your change has been saved to the cloud.' });
-    } catch (e) {
-        toast({ title: "Save Failed", description: (e as Error).message || "Could not save settings.", variant: "destructive" });
-        if (appSettings) {
-            setAppSettings(appSettings); // Revert on failure
-        }
-    }
-  };
-  
   const openConfirmation = (action: string, title: string, description: string) => {
     setConfirmAction(action);
     setConfirmTitle(title);
@@ -458,8 +413,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const handleConfirmAction = () => {
     if (!confirmAction) return;
     const action = confirmAction;
-    setConfirmAction(null); // Close the dialog
-    
+    setConfirmAction(null);
     switch(action) {
         case 'restore': handleConfirmRestore(); break;
         case 'merge': handleMergeOffline(); break;
@@ -471,21 +425,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     }
   }
 
-  if (userProfile?.loginName !== 'admin') {
-    return null;
-  }
-  
+  if (userProfile?.loginName !== 'admin') return null;
   if (!appSettings) {
       return (
          <Dialog open={isOpen} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Loading...</DialogTitle>
-                </DialogHeader>
-                <div className="flex items-center justify-center p-8">
-                    <Loader2 className="h-8 w-8 animate-spin" />
-                </div>
-            </DialogContent>
+            <DialogContent className="flex items-center justify-center p-8"><Loader2 className="h-8 w-8 animate-spin" /></DialogContent>
          </Dialog>
       )
   }
@@ -496,254 +440,148 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         <DialogContent className="max-w-4xl flex flex-col max-h-[90vh]">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2"><DatabaseZap /> Database Administration</DialogTitle>
-            <DialogDescription>
-              Perform advanced backup, restore, and data management operations. Use with caution.
-            </DialogDescription>
+            <DialogDescription>Hybrid Strategy: Firestore (Settings) &amp; RTDB (Assets).</DialogDescription>
           </DialogHeader>
           
-          <div className="flex-1 space-y-4 overflow-y-auto pr-2">
+          <div className="flex-1 space-y-4 overflow-y-auto pr-2 pb-4">
               <Collapsible open={isHealthCheckOpen} onOpenChange={setIsHealthCheckOpen}>
-                  <div className='flex items-center justify-between rounded-lg border bg-background p-4 shadow-sm'>
+                  <div className='flex items-center justify-between rounded-lg border bg-card p-4 shadow-sm'>
                       <div>
                           <h3 className="text-lg font-medium">App Health Check</h3>
-                          <p className="text-sm text-muted-foreground">Diagnostic checks for core application systems.</p>
+                          <p className="text-sm text-muted-foreground">Detailed diagnostics for the Hybrid DB layers.</p>
                       </div>
                       <CollapsibleTrigger asChild>
-                          <Button variant="ghost" size="sm" className="w-9 p-0">
-                              <ChevronsUpDown className="h-4 w-4" />
-                              <span className="sr-only">Toggle</span>
-                          </Button>
+                          <Button variant="ghost" size="sm"><ChevronsUpDown className="h-4 w-4" /></Button>
                       </CollapsibleTrigger>
                   </div>
-                  <CollapsibleContent className="pt-4">
-                      <Card>
-                        <CardContent className="space-y-6 pt-6">
-                            {healthChecks && (
-                                <>
-                                    <div>
-                                        <h4 className="font-semibold mb-2">Settings</h4>
-                                        <div className="space-y-4 pl-4 border-l">
-                                            {healthChecks.settings.map(item => <HealthCheckItem key={item.label} {...item} />)}
-                                        </div>
-                                    </div>
-                                     <div>
-                                        <h4 className="font-semibold mb-2">Database</h4>
-                                        <div className="space-y-4 pl-4 border-l">
-                                            {healthChecks.database.map(item => <HealthCheckItem key={item.label} {...item} />)}
-                                        </div>
-                                    </div>
-                                     <div>
-                                        <h4 className="font-semibold mb-2">Assets</h4>
-                                        <div className="space-y-4 pl-4 border-l">
-                                            {healthChecks.assets.map(item => <HealthCheckItem key={item.label} {...item} />)}
-                                        </div>
-                                    </div>
-                                     <div>
-                                        <h4 className="font-semibold mb-2">Functionality</h4>
-                                        <div className="space-y-4 pl-4 border-l">
-                                            {healthChecks.functionality.map(item => <HealthCheckItem key={item.label} {...item} />)}
-                                        </div>
-                                    </div>
-                                     <div>
-                                        <h4 className="font-semibold mb-2">Export</h4>
-                                        <div className="space-y-4 pl-4 border-l">
-                                            {healthChecks.export.map(item => <HealthCheckItem key={item.label} {...item} />)}
-                                        </div>
-                                    </div>
-                                </>
-                            )}
-                        </CardContent>
-                      </Card>
+                  <CollapsibleContent className="pt-2">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        {healthChecks && Object.entries(healthChecks).map(([group, items]) => (
+                            <Card key={group}>
+                                <CardHeader className="py-3 px-4 bg-muted/30">
+                                    <CardTitle className="text-xs uppercase tracking-widest">{group}</CardTitle>
+                                </CardHeader>
+                                <CardContent className="p-2 space-y-1">
+                                    {items.map(item => <HealthCheckItem key={item.label} {...item} />)}
+                                </CardContent>
+                            </Card>
+                        ))}
+                      </div>
                   </CollapsibleContent>
               </Collapsible>
 
-              {appSettings && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <Card>
                     <CardHeader>
-                        <CardTitle>Global Settings</CardTitle>
-                        <CardDescription>Changes here are saved instantly and affect all users.</CardDescription>
+                        <CardTitle>Sync Assets (RTDB Primary)</CardTitle>
+                        <CardDescription>Assets are optimized for RTDB usage.</CardDescription>
                     </CardHeader>
-                    <CardContent className="space-y-4 pt-6">
-                        <div className="flex items-center justify-between">
-                            <Label htmlFor="default-db" className="text-sm font-medium">Default Cloud DB</Label>
-                            <Select value={appSettings.defaultDatabase} onValueChange={(value) => handleSettingChange('defaultDatabase', value)}>
-                                <SelectTrigger className="w-[150px]"><SelectValue /></SelectTrigger>
-                                <SelectContent>
-                                <SelectItem value="rtdb">Realtime DB (Primary)</SelectItem>
-                                <SelectItem value="firestore">Firestore (Backup)</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
+                    <CardContent className="space-y-2">
+                        <Button variant="outline" className="w-full justify-start" onClick={handleSyncRtdbToFirestore} disabled={isProcessing}>
+                            <RefreshCw className="mr-2 h-4 w-4" /> Push RTDB Assets to Firestore
+                        </Button>
+                        <Button variant="outline" className="w-full justify-start" onClick={handleSyncFirestoreToRtdb} disabled={isProcessing}>
+                            <RefreshCw className="mr-2 h-4 w-4" /> Pull Firestore Assets to RTDB
+                        </Button>
                     </CardContent>
                 </Card>
-              )}
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Backup &amp; Restore</CardTitle>
+                        <CardDescription>Export full snapshot of settings and assets.</CardDescription>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                        <input type="file" ref={importFileRef} onChange={handleFileSelected} accept=".json" className="hidden" />
+                        <Button variant="outline" className="w-full justify-start" onClick={handleImportFromJson} disabled={isProcessing}>
+                            <FileUp className="mr-2 h-4 w-4" /> Import Full Snapshot (JSON)
+                        </Button>
+                        <Button variant="outline" className="w-full justify-start" onClick={() => exportFullBackupToJson(assets, appSettings)} disabled={isProcessing}>
+                            <Download className="mr-2 h-4 w-4" /> Export Full Snapshot
+                        </Button>
+                    </CardContent>
+                </Card>
+              </div>
 
               <Card>
                 <CardHeader>
-                    <CardTitle>Database Browser</CardTitle>
-                    <CardDescription>Directly view and edit data in the Realtime Database. Be careful, changes are live.</CardDescription>
+                    <CardTitle>RTDB Browser</CardTitle>
+                    <CardDescription>Directly modify assets or config in the Realtime Database layer.</CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex gap-2">
-                        <Button variant={browserPath === '/config' ? 'default' : 'outline'} onClick={() => handlePathSelect('/config')}>Config</Button>
-                        <Button variant={browserPath === '/assets' ? 'default' : 'outline'} onClick={() => handlePathSelect('/assets')}>Assets</Button>
+                        <Button variant={browserPath === '/config' ? 'default' : 'outline'} onClick={() => handlePathSelect('/config')}>/config</Button>
+                        <Button variant={browserPath === '/assets' ? 'default' : 'outline'} onClick={() => handlePathSelect('/assets')}>/assets</Button>
                     </div>
                     {browserPath && (
                         <div className="space-y-2">
-                            <Label>Editing path: <span className="font-mono p-1 bg-muted rounded-md text-xs">{browserPath}</span></Label>
-                             <div className="flex flex-wrap sm:flex-nowrap items-center gap-2">
+                             <div className="flex items-center gap-2">
                                 <Input placeholder="Find..." value={dbSearchTerm} onChange={e => setDbSearchTerm(e.target.value)} />
-                                <Input placeholder="Replace with..." value={dbReplaceTerm} onChange={e => setDbReplaceTerm(e.target.value)} />
-                                <Button onClick={handleReplaceAll} variant="outline">Replace All</Button>
+                                <Input placeholder="Replace..." value={dbReplaceTerm} onChange={e => setDbReplaceTerm(e.target.value)} />
+                                <Button onClick={handleReplaceAll} variant="outline" size="sm">Replace All</Button>
                             </div>
                             <div className="relative">
                                 <Textarea
                                     value={browserData}
                                     onChange={(e) => setBrowserData(e.target.value)}
-                                    rows={15}
-                                    placeholder={isBrowserLoading ? "Loading data..." : "Select a path to view data."}
-                                    disabled={isBrowserLoading}
+                                    rows={12}
                                     className="font-mono text-xs"
+                                    disabled={isBrowserLoading}
                                 />
                                 {isBrowserLoading && (
-                                    <div className="absolute inset-0 flex items-center justify-center bg-background/50 rounded-md">
-                                        <Loader2 className="h-8 w-8 animate-spin" />
-                                    </div>
+                                    <div className="absolute inset-0 flex items-center justify-center bg-background/50"><Loader2 className="h-8 w-8 animate-spin" /></div>
                                 )}
                             </div>
-                             {browserError && <p className="text-sm text-destructive">{browserError}</p>}
-                             <div className="flex justify-between items-center">
-                                <Button onClick={handleBrowserSave} disabled={isBrowserLoading}>Save Changes</Button>
-                                <Button variant="destructive" onClick={() => setConfirmDeletePath(browserPath)} disabled={isBrowserLoading}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Delete Path
-                                </Button>
+                             <div className="flex justify-between">
+                                <Button onClick={handleBrowserSave} disabled={isBrowserLoading}>Save to RTDB</Button>
+                                <Button variant="destructive" onClick={() => setConfirmDeletePath(browserPath)} disabled={isBrowserLoading}><Trash2 className="mr-2 h-4 w-4" /> Wipe Path</Button>
                              </div>
                         </div>
                     )}
                 </CardContent>
               </Card>
 
-              <Card>
-                  <CardHeader>
-                      <CardTitle>Backup &amp; Restore</CardTitle>
-                      <CardDescription>Export or import all assets and settings.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                      <input type="file" ref={importFileRef} onChange={handleFileSelected} accept=".json" className="hidden" />
-                      <Button variant="outline" className="w-full justify-start" onClick={handleImportFromJson} disabled={isProcessing}>
-                          <FileUp className="mr-2 h-4 w-4" /> Import from Full Backup (JSON)
-                      </Button>
-                      <Separator />
-                      <Button variant="outline" className="w-full justify-start" onClick={() => {
-                        try {
-                          exportFullBackupToJson(assets, appSettings);
-                        } catch (e) {
-                          addNotification({ title: 'Export Failed', description: (e as Error).message, variant: 'destructive' });
-                        }
-                      }} disabled={isProcessing}>
-                          <Download className="mr-2 h-4 w-4" /> Export Full Backup (Assets &amp; Settings)
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => {
-                        try {
-                          exportSettingsToJson(appSettings);
-                        } catch (e) {
-                          addNotification({ title: 'Export Failed', description: (e as Error).message, variant: 'destructive' });
-                        }
-                      }} disabled={isProcessing}>
-                          <Download className="mr-2 h-4 w-4" /> Export Settings Only
-                      </Button>
-                      <Button variant="outline" className="w-full justify-start" onClick={() => {
-                        try {
-                          exportAssetsToJson(assets);
-                        } catch (e) {
-                          addNotification({ title: 'Export Failed', description: (e as Error).message, variant: 'destructive' });
-                        }
-                      }} disabled={isProcessing}>
-                          <Download className="mr-2 h-4 w-4" /> Export Assets Only
-                      </Button>
-                  </CardContent>
-              </Card>
-
-              <Card>
-                <CardHeader>
-                  <CardTitle>Data Management</CardTitle>
-                  <CardDescription>Perform actions on local and cloud data stores.</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-2">
-                  <Button variant="outline" className="w-full justify-start" onClick={() => openConfirmation('merge', 'Merge Offline Data?', 'This will merge all assets from your "Locked Offline" store into the main list. Offline edits will overwrite main list data. This cannot be undone.')} disabled={isProcessing}>
-                      <GitMerge className="mr-2 h-4 w-4" /> Import from Offline Store
-                  </Button>
-                   <Button variant="outline" className="w-full justify-start" onClick={handleSyncRtdbToFirestore} disabled={isProcessing}>
-                      <RefreshCw className="mr-2 h-4 w-4" /> Sync RTDB to Firestore
-                  </Button>
-                  <Button variant="outline" className="w-full justify-start" onClick={handleSyncFirestoreToRtdb} disabled={isProcessing}>
-                      <RefreshCw className="mr-2 h-4 w-4" /> Sync Firestore to RTDB
-                  </Button>
-                </CardContent>
-              </Card>
-
               <Card className="border-destructive">
-                  <CardHeader>
-                      <CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle/> Danger Zone</CardTitle>
-                      <CardDescription>These irreversible actions can result in data loss.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="space-y-2">
-                      <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_local', 'Clear Local Storage?', 'This will permanently delete all assets from THIS DEVICE ONLY (both main and offline stores). It will NOT affect the cloud database.')} disabled={isProcessing}>
-                          <HardDrive className="mr-2 h-4 w-4" /> Clear Local Device Storage Only
+                  <CardHeader><CardTitle className="text-destructive flex items-center gap-2"><AlertTriangle/> Danger Zone</CardTitle></CardHeader>
+                  <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                      <Button variant="outline" className="justify-start border-destructive text-destructive hover:bg-destructive/10" onClick={() => openConfirmation('clear_local', 'Wipe Local?', 'Deletes all local cache.')}>
+                          <HardDrive className="mr-2 h-4 w-4" /> Wipe Local Cache
                       </Button>
-                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_rtdb', 'Clear Realtime DB?', 'This will permanently delete ALL assets from the primary cloud database (RTDB). It will NOT touch your local data or the backup DB.')} disabled={isProcessing}>
-                          <CloudOff className="mr-2 h-4 w-4" /> Clear Realtime DB (Primary)
+                       <Button variant="outline" className="justify-start border-destructive text-destructive hover:bg-destructive/10" onClick={() => openConfirmation('clear_rtdb', 'Wipe RTDB?', 'Clears primary asset cloud layer.')}>
+                          <CloudOff className="mr-2 h-4 w-4" /> Wipe RTDB (Primary)
                       </Button>
-                       <Button variant="outline" className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 hover:text-destructive" onClick={() => openConfirmation('clear_firestore', 'Clear Firestore?', 'This will permanently delete ALL assets from the backup cloud database (Firestore). It will NOT touch your local data or the primary DB.')} disabled={isProcessing}>
-                          <CloudOff className="mr-2 h-4 w-4" /> Clear Firestore (Backup)
+                       <Button variant="outline" className="justify-start border-destructive text-destructive hover:bg-destructive/10" onClick={() => openConfirmation('clear_firestore', 'Wipe Firestore?', 'Clears backup asset cloud layer.')}>
+                          <CloudOff className="mr-2 h-4 w-4" /> Wipe Firestore Assets
                       </Button>
-                      <Separator />
-                      <Button variant="destructive" className="w-full justify-start" onClick={() => openConfirmation('nuke_all', 'Nuke ALL Data?', 'This is the most destructive option. It will permanently delete ALL assets from your local device AND from BOTH cloud databases.')} disabled={isProcessing}>
-                          {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseZap className="mr-2 h-4 w-4" />}
-                          Nuke ALL Data (Local &amp; Cloud)
+                      <Button variant="destructive" className="justify-start" onClick={() => openConfirmation('nuke_all', 'NUKE ALL?', 'Global wipe of all devices and clouds.')}>
+                          <DatabaseZap className="mr-2 h-4 w-4" /> NUKE GLOBAL DATA
                       </Button>
                   </CardContent>
               </Card>
             </div>
 
           <DialogFooter className="mt-auto">
-            <DialogClose asChild>
-              <Button variant="outline">Close</Button>
-            </DialogClose>
+            <DialogClose asChild><Button variant="outline">Close Admin</Button></DialogClose>
           </DialogFooter>
         </DialogContent>
       </Dialog>
       
       <AlertDialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
           <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>{confirmTitle}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                     {confirmDescription}
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
+              <AlertDialogHeader><AlertDialogTitle>{confirmTitle}</AlertDialogTitle><AlertDialogDescription>{confirmDescription}</AlertDialogDescription></AlertDialogHeader>
               <AlertDialogFooter>
                   <AlertDialogCancel onClick={() => setBackupToRestore(null)}>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleConfirmAction} className="bg-destructive hover:bg-destructive/90">
-                      Yes, Continue
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={handleConfirmAction} className="bg-destructive hover:bg-destructive/90">Yes, Execute</AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
       
        <AlertDialog open={!!confirmDeletePath} onOpenChange={() => setConfirmDeletePath(null)}>
           <AlertDialogContent>
-              <AlertDialogHeader>
-                  <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                  <AlertDialogDescription>
-                     This will permanently delete the entire path <span className="font-mono p-1 bg-muted rounded-md text-xs">{confirmDeletePath}</span> and all data within it from the Realtime Database. This action cannot be undone.
-                  </AlertDialogDescription>
-              </AlertDialogHeader>
+              <AlertDialogHeader><AlertDialogTitle>Confirm Wipe</AlertDialogTitle><AlertDialogDescription>Delete everything at {confirmDeletePath}?</AlertDialogDescription></AlertDialogHeader>
               <AlertDialogFooter>
                   <AlertDialogCancel>Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handlePathDelete} className="bg-destructive hover:bg-destructive/90">
-                      Yes, Delete Path
-                  </AlertDialogAction>
+                  <AlertDialogAction onClick={handlePathDelete} className="bg-destructive">Wipe Path</AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>

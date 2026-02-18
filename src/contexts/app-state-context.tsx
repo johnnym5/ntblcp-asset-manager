@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -14,17 +13,14 @@ import {
 } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import type { Asset, AppSettings, Grant, AuthorizedUser } from '@/lib/types';
-import { onSettingsChange, updateSettings as updateSettingsRTDB, getSettings as getSettingsRTDB } from '@/lib/database';
-import { updateSettings as updateSettingsFS } from '@/lib/firestore';
+import { updateSettings as updateSettingsRTDB, getSettings as getSettingsRTDB } from '@/lib/database';
+import { updateSettings as updateSettingsFS, getSettings as getSettingsFS } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { firebaseConfig } from '@/lib/firebase';
 import { addNotification } from '@/hooks/use-notifications';
 import { v4 as uuidv4 } from 'uuid';
 import { NIGERIAN_STATES } from '@/lib/constants';
 import { assetMatchesGlobalFilter } from '@/lib/utils';
-import { getAssets } from '@/lib/firestore';
-import { getAssets as getAssetsRTDB } from '@/lib/database';
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets } from '@/lib/idb';
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -86,7 +82,7 @@ interface AppStateContextType {
   setSortConfig: Dispatch<SetStateAction<SortConfig | null>>;
 
   // App Settings
-  appSettings: AppSettings | null; // Can be null initially
+  appSettings: AppSettings | null;
   setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
   settingsLoaded: boolean;
   activeGrantId: string | null;
@@ -189,11 +185,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
-    // This effect handles the manual online/offline switch persistence
     localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
     
-    // This separate listener just updates the UI icon based on browser connectivity
     const handleBrowserConnectivityChange = () => {
         setIsOnline(navigator.onLine);
     };
@@ -208,7 +201,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   
   const migrateSettings = useCallback(async (settings: AppSettings | null): Promise<AppSettings | null> => {
       if (settings && !(settings as any).grants) {
-        addNotification({ title: "Migrating Settings...", description: "Updating your settings to the new multi-project structure." });
         const grantId = 'default-grant';
         const defaultGrant: Grant = {
             id: grantId,
@@ -231,11 +223,16 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     const initializeSettings = async () => {
         let settings: AppSettings | null = await getLocalSettings();
 
-        // If no local settings, try fetching from the cloud
+        // SPLIT DB STRATEGY: Prioritize Firestore for settings as it's more robust for structured config
         if (!settings && navigator.onLine) {
             try {
-                // Using RTDB as primary source of truth for settings
-                const cloudSettings = await getSettingsRTDB(); 
+                // Try Firestore first for settings
+                let cloudSettings = await getSettingsFS(); 
+                if (!cloudSettings) {
+                    // Fallback to RTDB if Firestore is empty
+                    cloudSettings = await getSettingsRTDB();
+                }
+                
                 if (cloudSettings) {
                     settings = cloudSettings;
                     await saveLocalSettings(settings);
@@ -245,14 +242,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             }
         }
         
-        // Migrate settings if they are from an old version
         if (settings) {
             settings = await migrateSettings(settings);
         }
 
-        // If STILL no settings, it's a true first-time setup
         if (!settings) {
-            addNotification({ title: 'First-Time Setup', description: 'Creating default settings and user accounts for each state.' });
+            addNotification({ title: 'First-Time Setup', description: 'Creating default settings and user accounts.' });
             
             const grantId = uuidv4();
             const defaultGrant: Grant = {
@@ -285,6 +280,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             await saveLocalSettings(settings);
             
             if (navigator.onLine) {
+                // Save to both for initial split redundancy
                 await Promise.allSettled([
                     updateSettingsRTDB(settings),
                     updateSettingsFS(settings)
@@ -292,19 +288,15 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             }
         }
 
-        // By now, we MUST have settings.
         setAppSettings(settings);
         if (settings?.activeGrantId) {
             setActiveGrantId(settings.activeGrantId);
         } else if (settings?.grants && settings.grants.length > 0) {
             setActiveGrantId(settings.grants[0].id);
         }
-        if (settings?.defaultDataSource) {
-            setDataSource(settings.defaultDataSource);
-        }
-        if (settings?.defaultDatabase) {
-            setActiveDatabase(settings.defaultDatabase);
-        }
+        
+        // Default behavior: RTDB for assets
+        setActiveDatabase('rtdb');
         setSettingsLoaded(true);
     };
     
@@ -314,27 +306,30 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (!settingsLoaded || !isOnline) return;
 
-    const handleRemoteSettingsUpdate = (remoteSettings: AppSettings | null) => {
+    const handleRemoteSettingsUpdate = async (remoteSettings: AppSettings | null) => {
        if (remoteSettings) {
          const remoteTimestamp = remoteSettings.lastModified ? new Date(remoteSettings.lastModified).getTime() : 0;
          const localTimestamp = appSettings?.lastModified ? new Date(appSettings.lastModified).getTime() : 0;
 
          if (!appSettings || remoteTimestamp > localTimestamp) {
-            addNotification({ title: "Settings Updated", description: "Settings have been updated remotely and applied to your session."});
-            migrateSettings(remoteSettings).then(migrated => {
-              if (migrated) {
-                saveLocalSettings(migrated);
+            const migrated = await migrateSettings(remoteSettings);
+            if (migrated) {
+                await saveLocalSettings(migrated);
                 setAppSettings(migrated);
-              }
-            });
+            }
          }
        }
     };
     
-    const unsubscribe = onSettingsChange(handleRemoteSettingsUpdate);
-    return () => {
-        if (unsubscribe) unsubscribe();
-    };
+    // Periodically check Firestore for settings updates
+    const interval = setInterval(async () => {
+        if (isOnline) {
+            const settings = await getSettingsFS();
+            handleRemoteSettingsUpdate(settings);
+        }
+    }, 30000); // Check every 30s
+
+    return () => clearInterval(interval);
   }, [settingsLoaded, isOnline, migrateSettings, appSettings]);
 
   useEffect(() => {
