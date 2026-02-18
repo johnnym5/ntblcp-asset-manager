@@ -1,9 +1,8 @@
-
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect } from "react";
 import { usePathname, useRouter } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,10 +27,10 @@ import {
   Bell,
   CheckCheck,
   X,
-  Database,
   DatabaseZap,
   History,
-  Briefcase,
+  Menu,
+  MoreVertical,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -52,19 +51,11 @@ import { ScrollArea } from "./ui/scroll-area";
 import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
 import { ActivityLogDialog } from "./admin/activity-log-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { userProfile, loading, logout } = useAuth();
-  const router = useRouter();
-  const pathname = usePathname();
+  const isMobile = useIsMobile();
   const { 
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
@@ -81,9 +72,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     initialSettingsTab,
     setInitialSettingsTab,
     onRevertAsset,
-    appSettings,
-    activeGrantId,
-    setActiveGrantId,
     globalStateFilter,
   } = useAppState();
 
@@ -122,10 +110,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return userProfile?.displayName || "User";
   }
   
-  const handleActiveGrantChange = (grantId: string) => {
-    setActiveGrantId(grantId);
-  };
-
   const sortableFields: { key: keyof Asset, label: string }[] = [
       { key: 'sn', label: 'S/N' },
       { key: 'description', label: 'Description' },
@@ -147,11 +131,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const handleManualDownload = () => {
     if (!isOnline) {
-      addNotification({
-        title: "Currently Offline",
-        description: "Please connect to the internet to download from the cloud.",
-        variant: "destructive"
-      });
+      addNotification({ title: "Currently Offline", variant: "destructive" });
       return;
     }
     if (isSyncing) return;
@@ -160,11 +140,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const handleManualUpload = () => {
     if (!isOnline) {
-      addNotification({
-        title: "Currently Offline",
-        description: "Please connect to the internet to upload to the cloud.",
-        variant: "destructive"
-      });
+      addNotification({ title: "Currently Offline", variant: "destructive" });
       return;
     }
     if (isSyncing) return;
@@ -186,252 +162,256 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="flex flex-col w-full h-screen border-8 border-muted/50">
-      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:h-16 md:flex-nowrap md:py-0 md:px-6">
-        
-        {/* Left Side */}
-        <div className="flex items-center gap-4">
+    <div className="flex flex-col w-full h-screen border-0 sm:border-8 border-muted/50 bg-background overflow-hidden">
+      <header className="flex flex-col border-b bg-background/95 backdrop-blur-md z-50">
+        <div className="flex items-center justify-between px-4 py-2 h-14 sm:h-16 md:px-6">
+            {/* Left Side: Logo */}
             <div className="flex items-center gap-2">
-                <Boxes className="h-5 w-5 text-primary" />
-                <span className="text-lg font-semibold hidden sm:inline-block">Asset Manager</span>
-            </div>
-        </div>
-        
-        {/* Right Side */}
-        <div className="flex items-center gap-2 md:order-3 sm:gap-4">
-            {isOnline && (
-              <>
-                <TooltipProvider>
-                  <Tooltip>
-                      <TooltipTrigger asChild>
-                            <Button variant="outline" size="icon" onClick={handleManualDownload} disabled={isSyncing}>
-                              {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudDownload className="h-5 w-5" />}
-                          </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Download from Cloud</p></TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-
-                <TooltipProvider>
-                  <Tooltip>
-                      <TooltipTrigger asChild>
-                            <Button variant="outline" size="icon" onClick={handleManualUpload} disabled={isSyncing}>
-                              {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudUpload className="h-5 w-5" />}
-                          </Button>
-                      </TooltipTrigger>
-                      <TooltipContent><p>Upload to Cloud</p></TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </>
-            )}
-
-            <TooltipProvider>
-                <Tooltip>
-                    <TooltipTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="icon"
-                            onClick={() => {
-                                const newIsOnline = !isOnline;
-                                setIsOnline(newIsOnline);
-                                addNotification({
-                                    title: `Mode Changed to ${newIsOnline ? 'Online' : 'Offline'}`,
-                                    description: newIsOnline
-                                        ? 'Application is now connecting to the server.'
-                                        : 'Application is running in offline mode.',
-                                });
-                            }}
-                            aria-label={`Switch to ${isOnline ? 'Online' : 'Online'} mode`}
-                        >
-                           {isOnline ? (
-                                <Cloud className="h-5 w-5 text-green-500" />
-                            ) : (
-                                <CloudOff className="h-5 w-5 text-red-500" />
-                            )}
-                        </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                        <p>{isOnline ? 'Online (Firestore)' : 'Offline'}</p>
-                    </TooltipContent>
-                </Tooltip>
-            </TooltipProvider>
-            
-            <Popover open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <PopoverTrigger asChild>
-                      <Button variant="ghost" size="icon" className="relative">
-                        <Bell className="h-5 w-5" />
-                        {unreadCount > 0 && (
-                          <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
-                            {unreadCount}
-                          </span>
-                        )}
-                      </Button>
-                    </PopoverTrigger>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Notifications</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-              <PopoverContent align="end" className="w-full sm:w-96 p-0 flex flex-col max-h-[80vh] overflow-hidden">
-                <div className="p-4 border-b">
-                  <h3 className="font-semibold text-lg">Notifications</h3>
+                <div className="p-1.5 bg-primary rounded-lg">
+                    <Boxes className="h-5 w-5 text-primary-foreground" />
                 </div>
-                <ScrollArea className="flex-1">
-                  {notifications.length > 0 ? (
-                    notifications.map((notification, index) => (
-                      <div key={notification.id}>
-                        <div className="relative group p-4">
-                          <p className={cn("font-semibold mb-1 pr-8", !notification.read && "text-foreground", notification.read && "text-muted-foreground")}>
-                            {notification.title}
-                          </p>
-                          {notification.description && (
-                            <p className={cn("text-sm pr-8", !notification.read && "text-muted-foreground", notification.read && "text-muted-foreground/70")}>
-                              {notification.description}
-                            </p>
-                          )}
-                          {notification.action && <div className="mt-2">{notification.action}</div>}
-                          <p className="text-xs text-muted-foreground/80 mt-2">
-                            {formatDistanceToNow(notification.date, { addSuffix: true })}
-                          </p>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="absolute top-3 right-3 h-6 w-6 text-muted-foreground opacity-0 group-hover:opacity-100"
-                            onClick={() => removeNotification(notification.id)}
-                            aria-label="Dismiss notification"
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        {index < notifications.length - 1 && <Separator />}
-                      </div>
-                    ))
-                  ) : (
-                    <div className="flex flex-col items-center justify-center gap-2 text-center p-8 text-muted-foreground h-full">
-                      <CheckCheck className="h-8 w-8" />
-                      <p className="text-sm font-medium">You're all caught up!</p>
-                      <p className="text-xs">New notifications will appear here.</p>
-                    </div>
-                  )}
-                </ScrollArea>
-                {notifications.length > 0 && (
-                  <div className="p-4 border-t flex justify-end">
-                    <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => clearAll()}>
-                      Clear all
-                    </Button>
+                <span className="text-lg font-bold hidden sm:inline-block tracking-tight">NTBLCP</span>
+            </div>
+
+            {/* Right Side: Actions */}
+            <div className="flex items-center gap-1 sm:gap-2">
+                {!isMobile && isOnline && (
+                  <div className="flex items-center gap-1 mr-2 bg-muted/50 p-1 rounded-lg">
+                    <TooltipProvider>
+                      <Tooltip>
+                          <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleManualDownload} disabled={isSyncing}>
+                                  {isSyncing ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <CloudDownload className="h-4 w-4" />}
+                              </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Sync Down</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+
+                    <TooltipProvider>
+                      <Tooltip>
+                          <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleManualUpload} disabled={isSyncing}>
+                                  {isSyncing ? <Loader2 className="h-4 w-4 animate-spin text-primary" /> : <CloudUpload className="h-4 w-4" />}
+                              </Button>
+                          </TooltipTrigger>
+                          <TooltipContent><p>Sync Up</p></TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
                   </div>
                 )}
-              </PopoverContent>
-            </Popover>
 
-            {loading ? (
-              <Skeleton className="h-10 w-10 rounded-full" />
-            ) : (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="secondary" className="relative h-10 w-10 rounded-full">
-                    <Avatar className="h-9 w-9">
-                      <AvatarImage src={''} alt={getUserName()} />
-                      <AvatarFallback>{getInitials(userProfile?.displayName)}</AvatarFallback>
-                    </Avatar>
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-56">
-                  <DropdownMenuLabel className="font-normal">
-                    <div className="flex flex-col space-y-1">
-                      <p className="text-sm font-medium leading-none">{getUserName()}</p>
-                      <p className="text-xs text-muted-foreground">{globalStateFilter}</p>
+                {/* Mobile Cloud Actions */}
+                {isMobile && isOnline && (
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-9 w-9">
+                                <MoreVertical className="h-5 w-5" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Sync Actions</DropdownMenuLabel>
+                            <DropdownMenuItem onClick={handleManualDownload} disabled={isSyncing}>
+                                <CloudDownload className="mr-2 h-4 w-4" /> Download Changes
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={handleManualUpload} disabled={isSyncing}>
+                                <CloudUpload className="mr-2 h-4 w-4" /> Upload Changes
+                            </DropdownMenuItem>
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+                )}
+
+                <TooltipProvider>
+                    <Tooltip>
+                        <TooltipTrigger asChild>
+                            <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-9 w-9"
+                                onClick={() => setIsOnline(!isOnline)}
+                            >
+                               {isOnline ? (
+                                    <Cloud className="h-5 w-5 text-green-500 animate-pulse" />
+                                ) : (
+                                    <CloudOff className="h-5 w-5 text-destructive" />
+                                )}
+                            </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>{isOnline ? 'System Online' : 'System Offline'}</p>
+                        </TooltipContent>
+                    </Tooltip>
+                </TooltipProvider>
+                
+                <Popover open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
+                  <PopoverTrigger asChild>
+                    <Button variant="ghost" size="icon" className="relative h-9 w-9">
+                      <Bell className="h-5 w-5" />
+                      {unreadCount > 0 && (
+                        <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground ring-2 ring-background">
+                          {unreadCount}
+                        </span>
+                      )}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent align="end" className="w-screen sm:w-[400px] p-0 mr-4 shadow-2xl border-primary/20">
+                    <div className="p-4 border-b bg-muted/30 flex items-center justify-between">
+                      <h3 className="font-bold text-base">Activity Center</h3>
+                      <Badge variant="outline" className="text-[10px]">{unreadCount} Unread</Badge>
                     </div>
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  
-                  <DropdownMenuItem onClick={handleSettingsOpen}>
-                    <Settings className="mr-2 h-4 w-4"/>
-                    Settings
-                  </DropdownMenuItem>
+                    <ScrollArea className="h-[400px]">
+                      {notifications.length > 0 ? (
+                        notifications.map((notification, index) => (
+                          <div key={notification.id} className={cn("relative group p-4 transition-colors", !notification.read ? "bg-primary/5" : "bg-transparent")}>
+                            <p className={cn("text-sm font-semibold mb-1 pr-8", !notification.read ? "text-foreground" : "text-muted-foreground")}>
+                              {notification.title}
+                            </p>
+                            {notification.description && (
+                              <p className="text-xs text-muted-foreground pr-8 leading-relaxed">
+                                {notification.description}
+                              </p>
+                            )}
+                            <p className="text-[10px] text-muted-foreground/60 mt-2 flex items-center gap-1">
+                              <History className="h-3 w-3" /> {formatDistanceToNow(notification.date, { addSuffix: true })}
+                            </p>
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              className="absolute top-3 right-3 h-6 w-6 opacity-0 group-hover:opacity-100 transition-opacity"
+                              onClick={() => removeNotification(notification.id)}
+                            >
+                              <X className="h-3 w-3" />
+                            </Button>
+                            {index < notifications.length - 1 && <Separator className="mt-4" />}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="flex flex-col items-center justify-center gap-3 text-center p-12 text-muted-foreground">
+                          <CheckCheck className="h-10 w-10 text-green-500/50" />
+                          <p className="text-sm font-medium">All caught up!</p>
+                        </div>
+                      )}
+                    </ScrollArea>
+                    <div className="p-3 border-t bg-muted/10 flex justify-end">
+                      <Button variant="ghost" size="sm" className="text-xs h-8" onClick={() => clearAll()}>Clear All History</Button>
+                    </div>
+                  </PopoverContent>
+                </Popover>
 
-                  {userProfile?.loginName === 'admin' && (
-                    <DropdownMenuItem onClick={() => setIsDbAdminOpen(true)}>
-                      <DatabaseZap className="mr-2 h-4 w-4"/>
-                      Database Admin
-                    </DropdownMenuItem>
-                  )}
+                {loading ? (
+                  <Skeleton className="h-10 w-10 rounded-full" />
+                ) : (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="ghost" className="relative h-10 w-10 rounded-full ring-offset-background transition-all hover:ring-2 hover:ring-primary/20">
+                        <Avatar className="h-9 w-9 border-2 border-muted shadow-sm">
+                          <AvatarFallback className="bg-primary/10 text-primary font-bold">{getInitials(userProfile?.displayName)}</AvatarFallback>
+                        </Avatar>
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-64 p-2 shadow-2xl">
+                      <DropdownMenuLabel className="p-3">
+                        <div className="flex flex-col space-y-1">
+                          <p className="text-sm font-bold leading-none">{getUserName()}</p>
+                          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                            <Filter className="h-3 w-3" /> {globalStateFilter}
+                          </p>
+                        </div>
+                      </DropdownMenuLabel>
+                      <DropdownMenuSeparator />
+                      
+                      <DropdownMenuItem onClick={handleSettingsOpen} className="h-10 cursor-pointer">
+                        <Settings className="mr-2 h-4 w-4 text-muted-foreground"/>
+                        Configuration Settings
+                      </DropdownMenuItem>
 
-                  {userProfile?.isAdmin && (
-                    <DropdownMenuItem onClick={() => setIsActivityLogDialogOpen(true)}>
-                      <History className="mr-2 h-4 w-4"/>
-                      Recent Activity
-                    </DropdownMenuItem>
-                  )}
+                      {userProfile?.loginName === 'admin' && (
+                        <DropdownMenuItem onClick={() => setIsDbAdminOpen(true)} className="h-10 cursor-pointer">
+                          <DatabaseZap className="mr-2 h-4 w-4 text-muted-foreground"/>
+                          Database Management
+                        </DropdownMenuItem>
+                      )}
 
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={handleLogout}>
-                    <LogOut className="mr-2 h-4 w-4" />
-                    Log out
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
+                      {userProfile?.isAdmin && (
+                        <DropdownMenuItem onClick={() => setIsActivityLogDialogOpen(true)} className="h-10 cursor-pointer">
+                          <History className="mr-2 h-4 w-4 text-muted-foreground"/>
+                          Audit & Activity Log
+                        </DropdownMenuItem>
+                      )}
+
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem onClick={handleLogout} className="h-10 cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive">
+                        <LogOut className="mr-2 h-4 w-4" />
+                        Sign Out
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                )}
+            </div>
         </div>
 
-        {/* Center Search */}
-        <div className="w-full md:flex-1 md:order-2 md:px-4">
-            {pathname === '/' && (
-                <div className="relative flex items-center w-full h-10 rounded-full border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
-                    <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
-                    <Input
-                        type="search"
-                        placeholder="Search assets..."
-                        className="pl-10 pr-20 w-full h-full bg-transparent border-none rounded-full focus-visible:ring-0 focus-visible:ring-offset-0"
-                        value={localSearchTerm}
-                        onChange={(e) => setLocalSearchTerm(e.target.value)}
-                    />
-                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                        <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Sort assets">
-                                    <ArrowUpDown className="h-4 w-4" />
-                                </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
-                                <DropdownMenuSeparator />
-                                {sortableFields.map(field => (
-                                    <DropdownMenuItem key={field.key} onClick={() => handleSort(field.key)}>
-                                        {field.label}
-                                        {sortConfig?.key === field.key && (
-                                            <span className="ml-auto text-xs">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
-                                        )}
-                                    </DropdownMenuItem>
-                                ))}
-                            </DropdownMenuContent>
-                        </DropdownMenu>
-
-                         <Button variant="ghost" size="icon" className="h-8 w-8 relative" onClick={() => setIsFilterDialogOpen(true)}>
-                            <Filter className="h-4 w-4" />
-                            {activeFilterCount > 0 && (
-                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
-                                    {activeFilterCount}
-                                </span>
-                            )}
-                         </Button>
-                    </div>
+        {/* Search Bar Row */}
+        <div className="px-4 pb-3 sm:px-6">
+            <div className="relative flex items-center w-full h-11 group">
+                <div className="absolute left-4 z-10">
+                    <Search className={cn("h-4 w-4 transition-colors", localSearchTerm ? "text-primary" : "text-muted-foreground group-focus-within:text-primary")} />
                 </div>
-            )}
+                <Input
+                    type="search"
+                    placeholder="Search serials, descriptions, or locations..."
+                    className="pl-11 pr-24 w-full h-full bg-muted/40 hover:bg-muted/60 focus:bg-background border-none rounded-xl transition-all shadow-inner focus:ring-2 focus:ring-primary/20"
+                    value={localSearchTerm}
+                    onChange={(e) => setLocalSearchTerm(e.target.value)}
+                />
+                <div className="absolute right-2 flex items-center gap-1">
+                    <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-background/80">
+                                <ArrowUpDown className="h-4 w-4" />
+                            </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end" className="w-48">
+                            <DropdownMenuLabel>Sort Database</DropdownMenuLabel>
+                            <DropdownMenuSeparator />
+                            {sortableFields.map(field => (
+                                <DropdownMenuItem key={field.key} onClick={() => handleSort(field.key)} className="justify-between">
+                                    {field.label}
+                                    {sortConfig?.key === field.key && (
+                                        <span className="text-[10px] bg-primary/10 text-primary px-1.5 py-0.5 rounded uppercase font-bold">
+                                            {sortConfig.direction}
+                                        </span>
+                                    )}
+                                </DropdownMenuItem>
+                            ))}
+                        </DropdownMenuContent>
+                    </DropdownMenu>
+
+                     <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-background/80 relative" onClick={() => setIsFilterDialogOpen(true)}>
+                        <Filter className="h-4 w-4" />
+                        {activeFilterCount > 0 && (
+                            <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-primary-foreground shadow-sm">
+                                {activeFilterCount}
+                            </span>
+                        )}
+                     </Button>
+                </div>
+            </div>
         </div>
       </header>
+
       <motion.main
-        className="flex-1 flex flex-col p-4 md:p-6 bg-muted/40 overflow-hidden"
-        initial={{ opacity: 0, y: 20 }}
+        className="flex-1 flex flex-col p-4 md:p-6 bg-muted/30 overflow-hidden relative"
+        initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5, ease: 'easeInOut' }}
+        transition={{ duration: 0.4 }}
       >
-        {children}
+        <ScrollArea className="flex-1 -m-4 sm:-m-6">
+            <div className="p-4 sm:p-6">
+                {children}
+            </div>
+        </ScrollArea>
       </motion.main>
+
       <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} initialTab={initialSettingsTab} />
       {userProfile?.loginName === 'admin' && (
         <DatabaseAdminDialog isOpen={isDbAdminOpen} onOpenChange={setIsDbAdminOpen} />
@@ -460,5 +440,3 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     </div>
   );
 }
-
-    

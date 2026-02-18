@@ -53,6 +53,9 @@ import {
   Eye,
   EyeOff,
   Copy,
+  ChevronRight,
+  LayoutDashboard,
+  TableProperties,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -93,14 +96,11 @@ import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-di
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { AssetSummaryDashboard } from "./asset-summary-dashboard";
 import { isToday, isThisWeek, parseISO } from 'date-fns';
-import { AssetFilterDialog } from "./asset-filter-sheet";
+import { Badge } from "./ui/badge";
 
 
 /**
  * Compares two asset-like objects to see if any relevant fields have changed.
- * @param a The first object.
- * @param b The second object.
- * @returns True if there are changes, false otherwise.
  */
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
     const keys = Object.keys(b) as (keyof Asset)[];
@@ -150,28 +150,28 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; app
     const total = locationAssets.length;
     if (total === 0 && locationName !== 'All') {
         return (
-            <div className="flex justify-between items-center w-full p-2">
-                <span>{locationName}</span>
-                <span className="text-xs text-muted-foreground">0 assets</span>
+            <div className="flex justify-between items-center w-full p-2 group">
+                <span className="text-muted-foreground">{locationName}</span>
+                <span className="text-[10px] bg-muted px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">0 items</span>
             </div>
         );
     }
 
     const verified = locationAssets.filter(a => a.verifiedStatus === 'Verified').length;
     const percentage = total > 0 ? (verified / total) * 100 : 0;
-    const displayName = locationName === 'All' ? 'Overall (All Assets)' : locationName;
+    const displayName = locationName === 'All' ? 'Overall Project Scope' : locationName;
 
     return (
-        <div className="flex flex-col w-full gap-1 p-2 rounded-md hover:bg-muted">
-            <div className="flex justify-between items-center w-full text-sm">
+        <div className="flex flex-col w-full gap-1.5 p-2 rounded-lg hover:bg-accent/50 transition-colors">
+            <div className="flex justify-between items-center w-full text-xs font-semibold">
                 <span>{displayName}</span>
                 {appMode === 'verification' ? (
-                  <span className="text-xs font-mono">{verified}/{total} verified</span>
+                  <span className="text-[10px] font-mono bg-primary/10 text-primary px-1 rounded">{verified}/{total}</span>
                 ) : (
-                  <span className="text-xs font-mono">{total} assets</span>
+                  <span className="text-[10px] font-mono bg-muted text-muted-foreground px-1 rounded">{total}</span>
                 )}
             </div>
-            {appMode === 'verification' && <Progress value={percentage} className="h-1.5" />}
+            {appMode === 'verification' && <Progress value={percentage} className="h-1" />}
         </div>
     );
 };
@@ -234,8 +234,7 @@ export default function AssetList() {
     setOnRevertAsset,
     activeGrantId,
     conditionFilter, setConditionFilter,
-    conditionOptions, setConditionOptions,
-    dataActions,
+    setConditionOptions,
     setDataActions,
     firstTimeSetupStatus,
     setFirstTimeSetupStatus,
@@ -260,7 +259,7 @@ export default function AssetList() {
     const states = new Set(NIGERIAN_STATES);
     const zones = new Set(ZONAL_STORES);
     
-    appSettings.locations.forEach(loc => {
+    appSettings.locations?.forEach(loc => {
         if (!states.has(loc) && !zones.has(loc)) {
             defaultSpecial.add(loc);
         }
@@ -294,7 +293,7 @@ export default function AssetList() {
   const executeDownload = useCallback(async (summary: SyncSummary, isFirstTime?: boolean) => {
     setIsSyncing(true);
     if (!isFirstTime) {
-      addNotification({ title: 'Downloading from cloud...' });
+      addNotification({ title: 'Downloading updates...' });
     }
     
     try {
@@ -323,21 +322,19 @@ export default function AssetList() {
         const totalChanges = assetsToProcess.length + (deletedOnCloud?.length || 0);
         
         if (!isFirstTime) {
-          addNotification({ title: 'Download Complete', description: `${totalChanges} changes synced from the cloud.` });
+          addNotification({ title: 'Sync Successful', description: `${totalChanges} items synchronized from cloud.` });
         } else {
-          addNotification({ title: 'Setup Complete', description: `Successfully downloaded ${totalChanges} assets.` });
+          addNotification({ title: 'System Initialized', description: `Successfully downloaded ${totalChanges} state-assigned assets.` });
         }
         
     } catch (error) {
         console.error("Download failed:", error);
         addNotification({
-          title: "Download Failed",
-          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during download.",
+          title: "Synchronization Error",
+          description: error instanceof Error ? error.message : "An unexpected network error occurred.",
           variant: 'destructive'
         });
-        if (isFirstTime) {
-          setFirstTimeSetupStatus('idle'); // Un-stick the UI on failure
-        }
+        if (isFirstTime) setFirstTimeSetupStatus('idle');
     } finally {
         setIsSyncing(false);
         if (!isFirstTime) {
@@ -353,7 +350,7 @@ export default function AssetList() {
       if (!syncSummary || syncSummary.type !== 'upload') return;
 
       setIsSyncing(true);
-      addNotification({ title: 'Uploading changes...' });
+      addNotification({ title: 'Uploading local changes...' });
 
       try {
           const { toUpload: assetsToPush } = syncSummary;
@@ -374,13 +371,13 @@ export default function AssetList() {
               await saveAssets(updatedLocalAssets);
               setAssets(updatedLocalAssets);
 
-              addNotification({ title: 'Upload Complete', description: `${assetsToPush.length} local changes uploaded.` });
+              addNotification({ title: 'Cloud Updated', description: `Successfully pushed ${assetsToPush.length} local edits.` });
           }
       } catch (error) {
           console.error("Upload failed:", error);
           addNotification({
             title: "Upload Failed",
-            description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred during upload.",
+            description: "A network error prevented your changes from reaching the cloud.",
             variant: 'destructive'
           });
       } finally {
@@ -402,7 +399,7 @@ export default function AssetList() {
     if (!isOnline || !authInitialized || isGuest) return;
 
     setIsSyncing(true);
-    addNotification({ title: 'Scanning for local changes...' });
+    addNotification({ title: 'Scanning local storage...' });
     
     try {
         const localAssets = await getLocalAssetsFromDb();
@@ -419,13 +416,12 @@ export default function AssetList() {
             });
             setIsSyncConfirmOpen(true);
         } else {
-            addNotification({ title: 'No Local Changes', description: 'Everything is already in sync with the cloud.' });
+            addNotification({ title: 'Fully Synced', description: 'No local changes detected.' });
         }
     } catch (error) {
         console.error("Upload scan failed:", error);
         addNotification({
-          title: "Upload Scan Failed",
-          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred.",
+          title: "Scanner Error",
           variant: 'destructive'
         });
     } finally {
@@ -447,7 +443,7 @@ export default function AssetList() {
     }
 
     setIsSyncing(true);
-    addNotification({ title: isFirstTime ? 'Performing first-time setup...' : 'Scanning for cloud changes...' });
+    addNotification({ title: isFirstTime ? 'Initializing state database...' : 'Checking for cloud updates...' });
 
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
@@ -487,7 +483,7 @@ export default function AssetList() {
             }
         }
         
-        // Handle removals: items that were in our scope but are no longer on the cloud
+        // Handle removals
         for (const localAsset of localAssets) {
             if (!cloudAssetIds.has(localAsset.id) && localAsset.syncStatus !== 'local') {
                 if(assetMatchesGlobalFilter(localAsset, globalStateFilter)) {
@@ -497,7 +493,7 @@ export default function AssetList() {
         }
         
         if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0 && summary.keptLocal.length === 0 && (summary.deletedOnCloud || []).length === 0) {
-            addNotification({ title: 'Already Up-to-Date', description: 'Your local data is already in sync with the cloud.' });
+            if (!isFirstTime) addNotification({ title: 'Already Up-to-Date' });
             if (isFirstTime) setFirstTimeSetupStatus('complete');
         } else {
             if (isFirstTime) {
@@ -510,8 +506,7 @@ export default function AssetList() {
     } catch (error) {
         console.error("Download scan failed:", error);
         addNotification({
-          title: "Download Scan Failed",
-          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred.",
+          title: "Sync Error",
           variant: 'destructive'
         });
         if (isFirstTime) setFirstTimeSetupStatus('idle');
@@ -530,13 +525,12 @@ export default function AssetList() {
   const handleOverwriteDownload = useCallback(async () => {
     setIsDownloadWarningOpen(false);
     setIsSyncing(true);
-    addNotification({ title: 'Downloading and overwriting local data...' });
+    addNotification({ title: 'Overwriting local cache...' });
     
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
         const allCloudAssets = await getCloudAssets(activeGrantId);
         
-        // Filter down to the current state even on overwrite
         const assetsToSave = allCloudAssets
             .filter(asset => assetMatchesGlobalFilter(asset, globalStateFilter))
             .map(asset => ({ ...asset, syncStatus: 'synced' as const }));
@@ -544,14 +538,9 @@ export default function AssetList() {
         await saveAssets(assetsToSave);
         setAssets(assetsToSave);
         
-        addNotification({ title: 'Overwrite Complete', description: `${assetsToSave.length} assets downloaded from the cloud.` });
+        addNotification({ title: 'Refresh Complete', description: `${assetsToSave.length} records reloaded.` });
     } catch (error) {
         console.error("Forced download scan failed:", error);
-        addNotification({
-          title: "Download Scan Failed",
-          description: error instanceof Error ? `Error: ${error.message}` : "An unexpected error occurred.",
-          variant: 'destructive'
-        });
         setIsOnline(false);
     } finally {
         setIsSyncing(false);
@@ -563,7 +552,7 @@ export default function AssetList() {
     handleUploadScan();
   }, [handleUploadScan]);
 
-  // Effect for initial data load from IndexedDB. This runs once when component mounts.
+  // Initial load from IndexedDB
   useEffect(() => {
     const loadInitialDataFromDb = async () => {
       setIsLoading(true);
@@ -578,15 +567,11 @@ export default function AssetList() {
   }, [setAssets, setOfflineAssets]);
 
   useEffect(() => {
-    if (manualDownloadTrigger > 0) {
-        handleDownloadScan();
-    }
+    if (manualDownloadTrigger > 0) handleDownloadScan();
   }, [manualDownloadTrigger, handleDownloadScan]);
   
   useEffect(() => {
-    if (manualUploadTrigger > 0) {
-        handleUploadScan();
-    }
+    if (manualUploadTrigger > 0) handleUploadScan();
   }, [manualUploadTrigger, handleUploadScan]);
   
   useEffect(() => {
@@ -617,9 +602,7 @@ export default function AssetList() {
     });
 
     NIGERIAN_STATES.forEach(state => {
-      if(!locations.has(state)) {
-        locations.set(state, 0);
-      }
+      if(!locations.has(state)) locations.set(state, 0);
     });
     
     setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })).sort((a, b) => a.label.localeCompare(b.label)));
@@ -627,10 +610,8 @@ export default function AssetList() {
     const assigneeMap = new Map<string, number>();
     allAssetsForFiltering.forEach(asset => {
       if (asset.assignee) {
-        const assigneeName = asset.assignee.trim();
-        if (assigneeName) {
-            assigneeMap.set(assigneeName, (assigneeMap.get(assigneeName) || 0) + 1);
-        }
+        const name = asset.assignee.trim();
+        if (name) assigneeMap.set(name, (assigneeMap.get(name) || 0) + 1);
       }
     });
     setAssigneeOptions(Array.from(assigneeMap.entries()).map(([a, count]) => ({ label: a, value: a, count })).sort((a,b) => a.label.localeCompare(b.label)));
@@ -638,10 +619,8 @@ export default function AssetList() {
     const conditionMap = new Map<string, number>();
     allAssetsForFiltering.forEach(asset => {
         if (asset.condition) {
-            const conditionName = asset.condition.trim();
-            if (conditionName) {
-                conditionMap.set(conditionName, (conditionMap.get(conditionName) || 0) + 1);
-            }
+            const name = asset.condition.trim();
+            if (name) conditionMap.set(name, (conditionMap.get(name) || 0) + 1);
         }
     });
     setConditionOptions(Array.from(conditionMap.entries()).map(([c, count]) => ({ label: c, value: c, count })).sort((a,b) => a.label.localeCompare(b.label)));
@@ -686,28 +665,13 @@ export default function AssetList() {
     let results = allAssetsForFiltering.filter(asset => {
       if (!asset.category) return false;
       const def = sheetDefinitions?.[asset.category];
-      // Universal rule: if no definition or sheet is hidden, filter it out for everyone.
-      if (!def || def.isHidden) {
-          return false;
-      }
+      if (!def || def.isHidden) return false;
       
-      // Super admin has access to all non-hidden sheets.
-      if (userProfile?.loginName === 'admin') {
-        return true;
-      }
+      if (userProfile?.loginName === 'admin') return true;
       
-      // For other users, check disabledFor permissions.
       const disabledFor = def.disabledFor || [];
-
-      // Check if disabled for all non-admins
-      if (disabledFor.includes('all') && !userProfile?.isAdmin) {
-          return false;
-      }
-
-      // Check if disabled for the specific user
-      if (userProfile && disabledFor.includes(userProfile.loginName)) {
-          return false;
-      }
+      if (disabledFor.includes('all') && !userProfile?.isAdmin) return false;
+      if (userProfile && disabledFor.includes(userProfile.loginName)) return false;
       
       return true;
     });
@@ -719,7 +683,6 @@ export default function AssetList() {
             const assigneeMatch = selectedAssignees.length === 0 || (asset.assignee && selectedAssignees.map(a => a.toLowerCase()).includes(asset.assignee.trim().toLowerCase()));
             const statusMatch = selectedStatuses.length === 0 || (asset.verifiedStatus && selectedStatuses.includes(asset.verifiedStatus));
             const conditionMatch = conditionFilter.length === 0 || (asset.condition && conditionFilter.includes(asset.condition));
-            
             const missingFieldMatch = !missingFieldFilter || !asset[missingFieldFilter as keyof Asset];
 
             let dateMatch = true;
@@ -728,14 +691,9 @@ export default function AssetList() {
                     dateMatch = false;
                 } else {
                     const modifiedDate = parseISO(asset.lastModified);
-                    if (dateFilter === 'today') {
-                        dateMatch = isToday(modifiedDate);
-                    } else if (dateFilter === 'week') {
-                        dateMatch = isThisWeek(modifiedDate, { weekStartsOn: 1 });
-                    } else if (dateFilter === 'new-week') {
-                        // Asset is "new" if it has no previous state and was modified this week.
-                        dateMatch = isThisWeek(modifiedDate, { weekStartsOn: 1 }) && !asset.previousState;
-                    }
+                    if (dateFilter === 'today') dateMatch = isToday(modifiedDate);
+                    else if (dateFilter === 'week') dateMatch = isThisWeek(modifiedDate, { weekStartsOn: 1 });
+                    else if (dateFilter === 'new-week') dateMatch = isThisWeek(modifiedDate, { weekStartsOn: 1 }) && !asset.previousState;
                 }
             }
 
@@ -744,13 +702,13 @@ export default function AssetList() {
     }
 
     if (searchTerm) {
-        const lowerCaseSearchTokens = searchTerm.toLowerCase().split(' ').filter(token => token.length > 0);
-        if (lowerCaseSearchTokens.length > 0) {
+        const tokens = searchTerm.toLowerCase().split(' ').filter(t => t.length > 0);
+        if (tokens.length > 0) {
             results = results.filter(asset => {
-                const assetHaystack = Object.values(asset)
-                    .map(value => (typeof value === 'object' && value !== null) ? Object.values(value).join(' ') : String(value))
+                const haystack = Object.values(asset)
+                    .map(v => (typeof v === 'object' && v !== null) ? Object.values(v).join(' ') : String(v))
                     .join(' ').toLowerCase();
-                return lowerCaseSearchTokens.every(token => assetHaystack.includes(token));
+                return tokens.every(t => haystack.includes(t));
             });
         }
     }
@@ -761,9 +719,7 @@ export default function AssetList() {
   const assetsByCategory = useMemo(() => {
     return displayedAssets.reduce((acc, asset) => {
         const category = asset.category || 'Uncategorized';
-        if (!acc[category]) {
-            acc[category] = [];
-        }
+        if (!acc[category]) acc[category] = [];
         acc[category].push(asset);
         return acc;
     }, {} as { [key: string]: Asset[] });
@@ -777,17 +733,13 @@ export default function AssetList() {
 
   const handleAddAsset = useCallback(() => {
     if (!userProfile?.canAddAssets && !isAdmin) {
-      addNotification({ title: "Permission Denied", description: "You do not have permission to add new assets.", variant: "destructive" });
-      return;
-    }
-    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
-      addNotification({ title: "Asset List Locked", description: "Adding new assets to the main list is disabled. Switch to 'Locked Offline' to add.", variant: "destructive" });
+      addNotification({ title: "Restricted", description: "You don't have adding permissions.", variant: "destructive" });
       return;
     }
     setSelectedAsset(undefined);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  }, [appSettings?.lockAssetList, isAdmin, dataSource, userProfile]);
+  }, [isAdmin, userProfile]);
   
   const handleViewAsset = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -797,12 +749,8 @@ export default function AssetList() {
 
   const handleEditAsset = (asset: Asset) => {
     if (!userProfile?.canEditAssets && !isAdmin) {
-      addNotification({ title: "Permission Denied", description: "You do not have permission to edit assets.", variant: "destructive" });
+      addNotification({ title: "Restricted", variant: "destructive" });
       return;
-    }
-    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud' && appSettings.appMode !== 'verification') {
-        addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
-        return;
     }
     setSelectedAsset(asset);
     setIsFormReadOnly(false);
@@ -833,24 +781,17 @@ export default function AssetList() {
     if (!assetToDelete) return;
 
     if (dataSource === 'cloud') {
-      if (appSettings?.lockAssetList && isAdmin) {
-        addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
-        setIsDeleteDialogOpen(false);
-        return;
-      }
       const currentAssets = await getLocalAssetsFromDb();
       const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
       await saveAssets(updatedAssets);
       setAssets(updatedAssets);
-      addNotification({ title: 'Deleted Locally', description: `Asset "${assetToDelete.description}" removed from main list.` });
   
       if (isOnline) {
         try {
           const deleteCloudAsset = activeDatabase === 'firestore' ? deleteAsset : deleteAssetRTDB;
           await deleteCloudAsset(assetToDelete.id);
-          addNotification({ title: 'Deleted from Cloud', description: 'Asset also removed from the central database.' });
         } catch (e) {
-          addNotification({ title: 'Cloud Deletion Failed', description: 'Could not delete from cloud.', variant: 'destructive'});
+          addNotification({ title: 'Cloud Deletion Failed', variant: 'destructive'});
         }
       }
     } else {
@@ -858,7 +799,6 @@ export default function AssetList() {
       const updatedOfflineAssets = currentOfflineAssets.filter(a => a.id !== assetToDelete.id);
       await saveLockedOfflineAssets(updatedOfflineAssets);
       setOfflineAssets(updatedOfflineAssets);
-      addNotification({ title: 'Deleted from Offline Store', description: `Asset "${assetToDelete.description}" removed.` });
     }
 
     setAssetToDelete(null);
@@ -866,38 +806,30 @@ export default function AssetList() {
   };
 
   const handleBatchDelete = async () => {
-    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
-        addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
-        return;
-    }
-    
     setIsBatchDeleting(true);
-    const assetsToDeleteCount = selectedAssetIds.length;
+    const count = selectedAssetIds.length;
 
     if (dataSource === 'cloud') {
       let currentAssets = await getLocalAssetsFromDb();
-      const idsToDelete = new Set(selectedAssetIds);
-      currentAssets = currentAssets.filter(a => !idsToDelete.has(a.id));
+      const ids = new Set(selectedAssetIds);
+      currentAssets = currentAssets.filter(a => !ids.has(a.id));
       await saveAssets(currentAssets);
       setAssets(currentAssets);
-      addNotification({ title: 'Deleted Locally', description: `${assetsToDeleteCount} assets deleted from main list.` });
   
       if (isOnline) {
           try {
               const batchDeleteCloudAssets = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
               await batchDeleteCloudAssets(selectedAssetIds);
-              addNotification({ title: 'Assets Deleted from Cloud', description: `Successfully removed ${assetsToDeleteCount} assets.` });
           } catch (e) {
-              addNotification({ title: 'Error', description: 'Could not delete all selected assets from the cloud.', variant: 'destructive' });
+              addNotification({ title: 'Cloud Batch Delete Error', variant: 'destructive' });
           }
       }
     } else {
       let currentOfflineAssets = await getLockedOfflineAssets();
-      const idsToDelete = new Set(selectedAssetIds);
-      currentOfflineAssets = currentOfflineAssets.filter(a => !idsToDelete.has(a.id));
+      const ids = new Set(selectedAssetIds);
+      currentOfflineAssets = currentOfflineAssets.filter(a => !ids.has(a.id));
       await saveLockedOfflineAssets(currentOfflineAssets);
       setOfflineAssets(currentOfflineAssets);
-      addNotification({ title: 'Deleted from Offline Store', description: `${assetsToDeleteCount} assets deleted.` });
     }
 
     setSelectedAssetIds([]);
@@ -905,27 +837,12 @@ export default function AssetList() {
   };
 
   const handleBatchEdit = () => {
-    if (!userProfile?.canEditAssets && !isAdmin) {
-      addNotification({ title: "Permission Denied", description: "You do not have permission to batch edit.", variant: "destructive" });
-      return;
-    }
-    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
-        addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
-        return;
-    }
+    if (!userProfile?.canEditAssets && !isAdmin) return;
     setIsBatchEditOpen(true);
   }
   
   const handleSaveBatchEdit = async (data: BatchUpdateData) => {
-    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
-        addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
-        return;
-    }
-    const assetsToUpdateCount = selectedAssetIds.length;
-    addNotification({ title: 'Batch Updating...', description: `Applying changes to ${assetsToUpdateCount} assets.` });
-    
-    const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
-    const assetsToUpdate = sourceAssets.filter(asset => selectedAssetIds.includes(asset.id));
+    const assetsToUpdate = (dataSource === 'cloud' ? assets : offlineAssets).filter(a => selectedAssetIds.includes(a.id));
     
     const updatedAssets = assetsToUpdate.map(asset => {
         const updatedAsset: Asset = { 
@@ -946,29 +863,22 @@ export default function AssetList() {
 
     if (dataSource === 'cloud') {
       let currentAssets = await getLocalAssetsFromDb();
-      const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
-      currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+      const map = new Map(updatedAssets.map(a => [a.id, a]));
+      currentAssets = currentAssets.map(a => map.get(a.id) || a);
       await saveAssets(currentAssets);
       setAssets(currentAssets);
-      addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets.` });
     } else {
       let currentOfflineAssets = await getLockedOfflineAssets();
-      const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
-      currentOfflineAssets = currentOfflineAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
+      const map = new Map(updatedAssets.map(a => [a.id, a]));
+      currentOfflineAssets = currentOfflineAssets.map(a => map.get(a.id) || a);
       await saveLockedOfflineAssets(currentOfflineAssets);
       setOfflineAssets(currentOfflineAssets);
-      addNotification({ title: 'Updated in Offline Store', description: `Updated ${assetsToUpdateCount} assets.` });
     }
     
     setSelectedAssetIds([]);
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
-    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
-        addNotification({ title: "Edits Disabled", description: "The main asset list is locked.", variant: "destructive" });
-      return;
-    }
-
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
 
@@ -978,9 +888,7 @@ export default function AssetList() {
             previousState = {};
             for(const key in assetToSave) {
                 const k = key as keyof Asset;
-                if(originalAsset[k] !== assetToSave[k]) {
-                    (previousState as any)[k] = originalAsset[k];
-                }
+                if(originalAsset[k] !== assetToSave[k]) (previousState as any)[k] = originalAsset[k];
             }
         }
 
@@ -995,30 +903,22 @@ export default function AssetList() {
       
       if (dataSource === 'cloud') {
         const currentAssets = await getLocalAssetsFromDb();
-        const existingIndex = currentAssets.findIndex(a => a.id === finalAsset.id);
-        if (existingIndex > -1) {
-            currentAssets[existingIndex] = finalAsset;
-        } else {
-            currentAssets.unshift(finalAsset);
-        }
+        const idx = currentAssets.findIndex(a => a.id === finalAsset.id);
+        if (idx > -1) currentAssets[idx] = finalAsset;
+        else currentAssets.unshift(finalAsset);
         await saveAssets(currentAssets);
         setAssets(currentAssets);
-        addNotification({ title: 'Saved Locally', description: 'Changes will be synced with the cloud.' });
       } else {
         const currentOfflineAssets = await getLockedOfflineAssets();
-        const existingIndex = currentOfflineAssets.findIndex(a => a.id === finalAsset.id);
-        if (existingIndex > -1) {
-            currentOfflineAssets[existingIndex] = finalAsset;
-        } else {
-            currentOfflineAssets.unshift(finalAsset);
-        }
+        const idx = currentOfflineAssets.findIndex(a => a.id === finalAsset.id);
+        if (idx > -1) currentOfflineAssets[idx] = finalAsset;
+        else currentOfflineAssets.unshift(finalAsset);
         await saveLockedOfflineAssets(currentOfflineAssets);
         setOfflineAssets(currentOfflineAssets);
-        addNotification({ title: 'Saved to Offline Store', description: 'These changes will not be synced.' });
       }
 
     } else {
-        addNotification({ title: 'No Changes Detected', description: 'The asset was not saved.' });
+        addNotification({ title: 'No Changes Detected' });
     }
     
     setIsFormOpen(false);
@@ -1029,14 +929,7 @@ export default function AssetList() {
     const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
 
-    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud' && appSettings.appMode !== 'verification') {
-      addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
-      return;
-    }
-
-    if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus && asset.condition === data.condition) {
-        return;
-    }
+    if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus && asset.condition === data.condition) return;
 
     const updatedAsset: Asset = sanitizeForFirestore({ 
         ...asset, 
@@ -1049,17 +942,17 @@ export default function AssetList() {
 
     if (dataSource === 'cloud') {
       const currentAssets = await getLocalAssetsFromDb();
-      const existingIndex = currentAssets.findIndex(a => a.id === assetId);
-      if (existingIndex > -1) {
-          currentAssets[existingIndex] = updatedAsset;
+      const idx = currentAssets.findIndex(a => a.id === assetId);
+      if (idx > -1) {
+          currentAssets[idx] = updatedAsset;
           await saveAssets(currentAssets);
           setAssets(currentAssets);
       }
     } else {
       const currentOfflineAssets = await getLockedOfflineAssets();
-      const existingIndex = currentOfflineAssets.findIndex(a => a.id === assetId);
-      if (existingIndex > -1) {
-          currentOfflineAssets[existingIndex] = updatedAsset;
+      const idx = currentOfflineAssets.findIndex(a => a.id === assetId);
+      if (idx > -1) {
+          currentOfflineAssets[idx] = updatedAsset;
           await saveLockedOfflineAssets(currentOfflineAssets);
           setOfflineAssets(currentOfflineAssets);
       }
@@ -1069,14 +962,14 @@ export default function AssetList() {
   const handleRevertAsset = useCallback(async (assetId: string) => {
     const assetToRevert = activeAssets.find(a => a.id === assetId);
     if (!assetToRevert || !assetToRevert.previousState) {
-        toast({ title: "Cannot Revert", description: "No previous state found for this asset.", variant: "destructive" });
+        toast({ title: "Cannot Revert", variant: "destructive" });
         return;
     }
 
     const rolledBackAsset: Asset = sanitizeForFirestore({
       ...assetToRevert,
-      ...assetToRevert.previousState, // Apply the old values
-      previousState: undefined, // Clear the history for this state
+      ...assetToRevert.previousState,
+      previousState: undefined,
       lastModified: new Date().toISOString(),
       lastModifiedBy: userProfile?.displayName,
       lastModifiedByState: userProfile?.states[0],
@@ -1084,36 +977,28 @@ export default function AssetList() {
     });
 
     const currentAssets = await getLocalAssetsFromDb();
-    const assetIndex = currentAssets.findIndex(a => a.id === assetId);
-    if (assetIndex > -1) {
-        currentAssets[assetIndex] = rolledBackAsset;
+    const idx = currentAssets.findIndex(a => a.id === assetId);
+    if (idx > -1) {
+        currentAssets[idx] = rolledBackAsset;
         await saveAssets(currentAssets);
         setAssets(currentAssets);
-        toast({ title: "Asset Reverted", description: `"${rolledBackAsset.description}" has been restored to its previous state.` });
+        toast({ title: "Asset Reverted" });
     }
   }, [activeAssets, userProfile, setAssets, toast]);
 
   useEffect(() => {
     setOnRevertAsset(() => handleRevertAsset);
-    return () => {
-        setOnRevertAsset(() => async () => {});
-    }
+    return () => setOnRevertAsset(() => async () => {});
   }, [handleRevertAsset, setOnRevertAsset]);
 
   const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
-    if (checked) {
-      setSelectedAssetIds(allFilteredAssets.map(a => a.id));
-    } else {
-      setSelectedAssetIds([]);
-    }
+    if (checked) setSelectedAssetIds(allFilteredAssets.map(a => a.id));
+    else setSelectedAssetIds([]);
   };
   
   const handleSelectAllCategories = (checked: boolean) => {
-      if (checked) {
-          setSelectedCategories(Object.keys(assetsByCategory));
-      } else {
-          setSelectedCategories([]);
-      }
+      if (checked) setSelectedCategories(Object.keys(assetsByCategory));
+      else setSelectedCategories([]);
   }
 
   const handleSelectSingle = (assetId: string, checked: boolean) => {
@@ -1128,78 +1013,37 @@ export default function AssetList() {
     setIsClearAllDialogOpen(false);
     
     if (dataSource === 'cloud') {
-      addNotification({ title: 'Clearing Main Assets...', description: 'Removing all assets from your device.' });
       await clearLocalAssets();
       setAssets([]);
-      addNotification({ title: 'Local Data Cleared', description: 'All main assets removed from this device.' });
-      
       if (isOnline && isAdmin) {
-          addNotification({ title: 'Clearing Cloud Database...', description: `This will remove all assets.` });
           try {
               const cloudClear = activeDatabase === 'firestore' ? clearRtdbAssets : clearRtdbAssets;
               await cloudClear();
-              addNotification({ title: 'All Cloud Assets Cleared', description: 'The application is now in a clean state.' });
           } catch (e) {
-              addNotification({ title: 'Error', description: 'Could not clear all assets from the database.', variant: 'destructive' });
+              addNotification({ title: 'Cloud Clear Error', variant: 'destructive' });
           }
       }
     } else {
-      addNotification({ title: 'Clearing Offline Assets...', description: 'Removing all locked offline assets.' });
       await saveLockedOfflineAssets([]);
       setOfflineAssets([]);
-      addNotification({ title: 'Offline Data Cleared', description: 'The locked offline store is now empty.' });
     }
-
     setSelectedAssetIds([]);
-
   }, [isOnline, isAdmin, setAssets, dataSource, setOfflineAssets, activeDatabase]);
-
-  const handleExport = useCallback(() => {
-    if(!appSettings) return;
-    try {
-        const timestamp = new Date().toISOString().replace(/:/g, '-');
-        exportToExcel(activeAssets, appSettings.sheetDefinitions, `assets-export-${timestamp}.xlsx`);
-        addNotification({
-            title: 'Exporting to Excel',
-            description: `Your data is being downloaded as assets-export-${timestamp}.xlsx`,
-        });
-    } catch (e) {
-        addNotification({
-            title: 'Export Failed',
-            description: e instanceof Error ? e.message : 'An unknown error occurred.',
-            variant: 'destructive',
-        });
-    }
-  }, [activeAssets, appSettings]);
 
   const handleExportSelection = useCallback(() => {
     if(!appSettings) return;
     let assetsToExport: Asset[] = [];
 
-    if (view === 'dashboard') {
-        assetsToExport = selectedCategories.flatMap(cat => assetsByCategory[cat] || []);
-    } else if (view === 'table') {
-        assetsToExport = activeAssets.filter(a => selectedAssetIds.includes(a.id));
-    }
+    if (view === 'dashboard') assetsToExport = selectedCategories.flatMap(cat => assetsByCategory[cat] || []);
+    else if (view === 'table') assetsToExport = activeAssets.filter(a => selectedAssetIds.includes(a.id));
 
-    if (assetsToExport.length === 0) {
-      addNotification({ title: 'Nothing to Export', description: 'No items selected for export.', variant: 'destructive' });
-      return;
-    }
+    if (assetsToExport.length === 0) return;
 
     try {
-      const timestamp = new Date().toISOString().replace(/:/g, '-');
-      exportToExcel(assetsToExport, appSettings.sheetDefinitions, `asset-selection-export-${timestamp}.xlsx`);
-      addNotification({
-        title: 'Exporting Selection',
-        description: `Your selection of ${assetsToExport.length} assets is being downloaded.`,
-      });
+      const ts = new Date().toISOString().replace(/:/g, '-');
+      exportToExcel(assetsToExport, appSettings.sheetDefinitions, `export-${ts}.xlsx`);
     } catch (e) {
-      addNotification({
-        title: 'Export Failed',
-        description: e instanceof Error ? e.message : 'An unknown error occurred.',
-        variant: 'destructive',
-      });
+      addNotification({ title: 'Export Failed', variant: 'destructive' });
     }
   }, [view, selectedCategories, assetsByCategory, selectedAssetIds, activeAssets, appSettings]);
 
@@ -1210,78 +1054,49 @@ export default function AssetList() {
   }, []);
 
   const handleClearCategory = async () => {
-    if (!categoryToDelete) return;
-    if (!isAdmin) {
-      addNotification({ title: 'Permission Denied', description: 'Only admins can delete categories.', variant: 'destructive'});
-      return;
-    }
-
+    if (!categoryToDelete || !isAdmin) return;
     setIsClearCategoryDialogOpen(false);
-    
     const source = await getLocalAssetsFromDb();
     const assetsToKeep = source.filter(a => a.category !== categoryToDelete);
-    const assetsToDelete = source.filter(a => a.category === categoryToDelete);
-    const idsToDelete = assetsToDelete.map(a => a.id);
-    
+    const idsToDelete = source.filter(a => a.category === categoryToDelete).map(a => a.id);
     await saveAssets(assetsToKeep);
     setAssets(assetsToKeep);
-    addNotification({ title: 'Category Cleared', description: `All ${idsToDelete.length} assets from '${categoryToDelete}' have been deleted locally.`});
-
     if (isOnline) {
       try {
         const batchDelete = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
         await batchDelete(idsToDelete);
-        addNotification({ title: 'Cloud Data Deleted', description: `Category data has also been removed from the cloud.` });
       } catch (e) {
-        addNotification({ title: 'Cloud Deletion Failed', description: `Could not remove category from cloud.`, variant: 'destructive'});
+        addNotification({ title: 'Cloud Deletion Failed', variant: 'destructive'});
       }
     }
   };
   
   const handleSelectiveUpload = useCallback(async () => {
     if (!isOnline) {
-      addNotification({title: "Offline", description: "Cannot upload while offline.", variant: "destructive"});
+      addNotification({title: "Offline", variant: "destructive"});
       return;
     }
-
     if (dataSource === 'local_locked') {
         handleMergeToMainList();
         return;
     }
-
-    const idsToUpload = view === 'dashboard'
-      ? selectedCategories.flatMap(cat => assetsByCategory[cat]?.map(a => a.id) || [])
-      : selectedAssetIds;
-
-    if (idsToUpload.length === 0) {
-      addNotification({title: "No Selection", description: "Please select assets or categories to upload."});
-      return;
-    }
+    const ids = view === 'dashboard' ? selectedCategories.flatMap(cat => assetsByCategory[cat]?.map(a => a.id) || []) : selectedAssetIds;
+    if (ids.length === 0) return;
     
     setIsSyncing(true);
     try {
-      addNotification({title: "Uploading selected items...", description: `Preparing to upload ${idsToUpload.length} assets.`});
-      const allLocalAssets = await getLocalAssetsFromDb();
-      const assetsToUpload = allLocalAssets.filter(a => idsToUpload.includes(a.id) && a.syncStatus === 'local');
-
+      const all = await getLocalAssetsFromDb();
+      const assetsToUpload = all.filter(a => ids.includes(a.id) && a.syncStatus === 'local');
       if (assetsToUpload.length > 0) {
         const batchSet = activeDatabase === 'firestore' ? batchSetAssets : batchSetAssetsRTDB;
         await batchSet(assetsToUpload);
-
-        const updatedLocalAssets = allLocalAssets.map(asset => 
-          idsToUpload.includes(asset.id) ? { ...asset, syncStatus: 'synced' as const } : asset
-        );
-        await saveAssets(updatedLocalAssets);
-        setAssets(updatedLocalAssets);
-        
-        addNotification({title: "Selective Upload Complete", description: `${assetsToUpload.length} assets have been uploaded to the cloud.`});
-      } else {
-        addNotification({title: "No Changes to Upload", description: "Selected items have no local changes to upload."});
+        const updated = all.map(a => ids.includes(a.id) ? { ...a, syncStatus: 'synced' as const } : a);
+        await saveAssets(updated);
+        setAssets(updated);
+        addNotification({title: "Upload Successful"});
       }
-
     } catch(e) {
-      console.error("Selective upload failed", e);
-      addNotification({title: "Upload Failed", description: (e as Error).message, variant: "destructive"});
+      addNotification({title: "Upload Failed", variant: "destructive"});
     } finally {
       setIsSyncing(false);
       setSelectedAssetIds([]);
@@ -1290,113 +1105,48 @@ export default function AssetList() {
   }, [isOnline, view, selectedCategories, selectedAssetIds, assetsByCategory, setIsSyncing, setAssets, dataSource, activeDatabase]);
 
   const handleCopyToOffline = useCallback(async () => {
-    if (dataSource !== 'cloud') {
-      addNotification({ title: 'Invalid Operation', description: 'Can only copy from the main list to the offline store.', variant: 'destructive' });
-      return;
-    }
-
-    const idsToCopy = view === 'dashboard'
-      ? selectedCategories.flatMap(cat => assetsByCategory[cat]?.map(a => a.id) || [])
-      : selectedAssetIds;
-      
-    if (idsToCopy.length === 0) {
-      addNotification({ title: 'No Selection', description: 'Please select assets or categories to copy.' });
-      return;
-    }
-
+    const ids = view === 'dashboard' ? selectedCategories.flatMap(cat => assetsByCategory[cat]?.map(a => a.id) || []) : selectedAssetIds;
+    if (ids.length === 0) return;
     setIsSyncing(true);
-    addNotification({ title: 'Copying to Offline...', description: `Preparing to copy ${idsToCopy.length} assets.` });
-    
     try {
-      const assetsToCopy = assets.filter(a => idsToCopy.includes(a.id));
-      const existingOfflineAssets = await getLockedOfflineAssets();
-      const offlineAssetsMap = new Map(existingOfflineAssets.map(a => [a.id, a]));
-      
-      let copiedCount = 0;
-      let skippedCount = 0;
-
-      assetsToCopy.forEach(assetToCopy => {
-        const existingOfflineAsset = offlineAssetsMap.get(assetToCopy.id);
-        if (existingOfflineAsset) {
-          const mainTimestamp = assetToCopy.lastModified ? new Date(assetToCopy.lastModified).getTime() : 0;
-          const offlineTimestamp = existingOfflineAsset.lastModified ? new Date(existingOfflineAsset.lastModified).getTime() : 0;
-
-          if (mainTimestamp > offlineTimestamp) {
-            offlineAssetsMap.set(assetToCopy.id, { ...assetToCopy, syncStatus: undefined });
-            copiedCount++;
-          } else {
-            skippedCount++;
-          }
-        } else {
-          offlineAssetsMap.set(assetToCopy.id, { ...assetToCopy, syncStatus: undefined });
-          copiedCount++;
+      const toCopy = assets.filter(a => ids.includes(a.id));
+      const existing = await getLockedOfflineAssets();
+      const map = new Map(existing.map(a => [a.id, a]));
+      toCopy.forEach(a => {
+        const ex = map.get(a.id);
+        if (!ex || (new Date(a.lastModified || 0).getTime() > new Date(ex.lastModified || 0).getTime())) {
+          map.set(a.id, { ...a, syncStatus: undefined });
         }
       });
-      
-      const newOfflineAssets = Array.from(offlineAssetsMap.values());
-      await saveLockedOfflineAssets(newOfflineAssets);
-      setOfflineAssets(newOfflineAssets);
-      
-      let description = `${copiedCount} assets copied to the Locked Offline store.`;
-      if (skippedCount > 0) {
-        description += ` ${skippedCount} assets were skipped to preserve newer offline edits.`;
-      }
-      addNotification({ title: 'Copy Complete', description });
-      
+      const updated = Array.from(map.values());
+      await saveLockedOfflineAssets(updated);
+      setOfflineAssets(updated);
       setDataSource('local_locked');
-
     } catch(e) {
-      console.error("Copy to offline failed", e);
-      addNotification({ title: "Copy Failed", description: (e as Error).message, variant: "destructive" });
+      addNotification({ title: "Copy Failed", variant: "destructive" });
     } finally {
       setIsSyncing(false);
       setSelectedAssetIds([]);
       setSelectedCategories([]);
     }
-  }, [
-    dataSource, 
-    view, 
-    selectedCategories, 
-    selectedAssetIds, 
-    assets, 
-    assetsByCategory,
-    setIsSyncing, 
-    setOfflineAssets, 
-    setDataSource
-  ]);
+  }, [view, selectedCategories, selectedAssetIds, assets, assetsByCategory, setIsSyncing, setOfflineAssets, setDataSource]);
   
   const handleMergeToMainList = async () => {
-    const idsToMerge = view === 'dashboard'
-        ? selectedCategories.flatMap(cat => assetsByCategory[cat]?.map(a => a.id) || [])
-        : selectedAssetIds;
-
-    if (idsToMerge.length === 0) {
-        addNotification({ title: "No Selection", description: "Please select assets or categories to merge." });
-        return;
-    }
-
+    const ids = view === 'dashboard' ? selectedCategories.flatMap(cat => assetsByCategory[cat]?.map(a => a.id) || []) : selectedAssetIds;
+    if (ids.length === 0) return;
     setIsSyncing(true);
     try {
-        const offlineAssetsToMerge = offlineAssets.filter(a => idsToMerge.includes(a.id));
-        const remainingOfflineAssets = offlineAssets.filter(a => !idsToMerge.includes(a.id));
-
-        const mainAssets = await getLocalAssetsFromDb();
-        const mainAssetsMap = new Map(mainAssets.map(a => [a.id, a]));
-
-        offlineAssetsToMerge.forEach(asset => {
-            mainAssetsMap.set(asset.id, { ...asset, syncStatus: 'local' });
-        });
-
-        await saveAssets(Array.from(mainAssetsMap.values()));
-        await saveLockedOfflineAssets(remainingOfflineAssets);
-
-        setAssets(Array.from(mainAssetsMap.values()));
-        setOfflineAssets(remainingOfflineAssets);
-
-        addNotification({ title: 'Merge Complete', description: `${idsToMerge.length} assets merged to the main list and are ready for cloud upload.` });
-        
+        const toMerge = offlineAssets.filter(a => ids.includes(a.id));
+        const rem = offlineAssets.filter(a => !ids.includes(a.id));
+        const main = await getLocalAssetsFromDb();
+        const map = new Map(main.map(a => [a.id, a]));
+        toMerge.forEach(a => map.set(a.id, { ...a, syncStatus: 'local' }));
+        await saveAssets(Array.from(map.values()));
+        await saveLockedOfflineAssets(rem);
+        setAssets(Array.from(map.values()));
+        setOfflineAssets(rem);
     } catch (e) {
-        addNotification({ title: 'Merge Failed', description: (e as Error).message, variant: 'destructive' });
+        addNotification({ title: 'Merge Failed', variant: 'destructive' });
     } finally {
         setIsSyncing(false);
         setSelectedAssetIds([]);
@@ -1405,104 +1155,66 @@ export default function AssetList() {
   };
 
   const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
-    let assetsToUpdate: Asset[] = [];
-    selectedCategories.forEach(category => {
-        assetsToUpdate.push(...(assetsByCategory[category] || []));
-    });
-
+    let toUp: Asset[] = [];
+    selectedCategories.forEach(cat => toUp.push(...(assetsByCategory[cat] || [])));
     if (data.status) {
-        const assetsToUpdateCount = assetsToUpdate.length;
-        addNotification({ title: 'Batch Updating Categories...', description: `Applying status to ${assetsToUpdateCount} assets.` });
-
-        const updatedAssets = assetsToUpdate.map(asset => {
-            const updatedAsset: Asset = { 
-                ...asset, 
-                verifiedStatus: data.status,
-                lastModified: new Date().toISOString(),
-                lastModifiedBy: userProfile?.displayName,
-                lastModifiedByState: userProfile?.states[0],
-                syncStatus: dataSource === 'cloud' ? 'local' : undefined,
-            };
-            if (data.status === 'Verified' && !asset.verifiedDate) {
-                updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
-            } else if (data.status !== 'Verified') {
-                updatedAsset.verifiedDate = '';
-            }
-            return sanitizeForFirestore(updatedAsset);
+        const updated = toUp.map(a => {
+            const up: Asset = sanitizeForFirestore({ ...a, verifiedStatus: data.status, lastModified: new Date().toISOString(), lastModifiedBy: userProfile?.displayName, lastModifiedByState: globalStateFilter, syncStatus: dataSource === 'cloud' ? 'local' : undefined });
+            if (data.status === 'Verified' && !a.verifiedDate) up.verifiedDate = new Date().toLocaleDateString("en-CA");
+            else if (data.status !== 'Verified') up.verifiedDate = '';
+            return up;
         });
-        
         if (dataSource === 'cloud') {
-          let currentAssets = await getLocalAssetsFromDb();
-          const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
-          currentAssets = currentAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
-          await saveAssets(currentAssets);
-          setAssets(currentAssets);
-          addNotification({ title: 'Updated Locally', description: `Updated ${assetsToUpdateCount} assets.` });
+          let curr = await getLocalAssetsFromDb();
+          const map = new Map(updated.map(a => [a.id, a]));
+          curr = curr.map(a => map.get(a.id) || a);
+          await saveAssets(curr);
+          setAssets(curr);
         } else {
-            let currentOfflineAssets = await getLockedOfflineAssets();
-            const updatedAssetMap = new Map(updatedAssets.map(a => [a.id, a]));
-            currentOfflineAssets = currentOfflineAssets.map(asset => updatedAssetMap.get(asset.id) || asset);
-            await saveLockedOfflineAssets(currentOfflineAssets);
-            setOfflineAssets(currentOfflineAssets);
-            addNotification({ title: 'Updated in Offline Store', description: `Updated ${assetsToUpdateCount} assets.` });
+            let curr = await getLockedOfflineAssets();
+            const map = new Map(updated.map(a => [a.id, a]));
+            curr = curr.map(a => map.get(a.id) || a);
+            await saveLockedOfflineAssets(curr);
+            setOfflineAssets(curr);
         }
     }
-    
     setSelectedCategories([]);
   };
 
   const handleDeleteSelectedCategories = async () => {
-    let idsToDelete: string[] = [];
-    selectedCategories.forEach(category => {
-      const assetIds = (assetsByCategory[category] || []).map(a => a.id);
-      idsToDelete.push(...assetIds);
-    });
-
-    if (idsToDelete.length === 0) return;
-
-    if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud') {
-        addNotification({ title: "Deletion Disabled", description: "The main asset list is locked.", variant: "destructive" });
-        return;
-    }
-    
+    let ids: string[] = [];
+    selectedCategories.forEach(cat => ids.push(...(assetsByCategory[cat] || []).map(a => a.id)));
+    if (ids.length === 0) return;
     setIsBatchDeleting(true);
-
     if (dataSource === 'cloud') {
-      let currentAssets = await getLocalAssetsFromDb();
-      currentAssets = currentAssets.filter(a => !idsToDelete.includes(a.id));
-      await saveAssets(currentAssets);
-      setAssets(currentAssets);
-      addNotification({ title: 'Deleted Locally', description: `${idsToDelete.length} assets deleted.` });
-  
+      let curr = await getLocalAssetsFromDb();
+      curr = curr.filter(a => !ids.includes(a.id));
+      await saveAssets(curr);
+      setAssets(curr);
       if (isOnline) {
           try {
               const batchDelete = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
-              await batchDelete(idsToDelete);
-              addNotification({ title: 'Categories Deleted', description: `Successfully removed ${idsToDelete.length} assets.` });
+              await batchDelete(ids);
           } catch (e) {
-              addNotification({ title: 'Error', description: 'Could not delete all assets from cloud.', variant: 'destructive' });
+              addNotification({ title: 'Cloud Batch Delete Error', variant: 'destructive' });
           }
       }
     } else {
-      let currentOfflineAssets = await getLockedOfflineAssets();
-      currentOfflineAssets = currentOfflineAssets.filter(a => !idsToDelete.includes(a.id));
-      await saveLockedOfflineAssets(currentOfflineAssets);
-      setOfflineAssets(currentOfflineAssets);
-      addNotification({ title: 'Deleted from Offline Store', description: `${idsToDelete.length} assets deleted.` });
+      let curr = await getLockedOfflineAssets();
+      curr = curr.filter(a => !ids.includes(a.id));
+      await saveLockedOfflineAssets(curr);
+      setOfflineAssets(curr);
     }
-
     setSelectedCategories([]);
     setIsBatchDeleting(false);
   }
 
   const handleConfirmProjectSwitch = async () => {
     setShowProjectSwitchDialog(false);
-    addNotification({ title: 'Switching Projects...', description: 'Clearing all local data...' });
     await clearLocalAssets();
     await saveLockedOfflineAssets([]);
     setAssets([]);
     setOfflineAssets([]);
-    addNotification({ title: 'Local Data Cleared', description: 'Attempting to sync with new project.' });
     handleDownloadScan();
   };
 
@@ -1515,78 +1227,36 @@ export default function AssetList() {
   
   const handleSaveColumnLayout = async (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
     if (!isAdmin || !appSettings || !userProfile) return;
-
     const newSheetDefinitions = { ...appSettings.sheetDefinitions };
     if (applyToAll) {
-        Object.keys(newSheetDefinitions).forEach(sheetName => {
-            newSheetDefinitions[sheetName] = {
-                ...newSheetDefinitions[sheetName],
-                displayFields: newDefinition.displayFields.map(f => ({ ...f })),
-                headers: newDefinition.headers,
-            };
+        Object.keys(newSheetDefinitions).forEach(sn => {
+            newSheetDefinitions[sn] = { ...newSheetDefinitions[sn], displayFields: newDefinition.displayFields.map(f => ({ ...f })), headers: newDefinition.headers };
         });
-    } else if (originalName) {
-        newSheetDefinitions[originalName] = newDefinition;
-    }
+    } else if (originalName) newSheetDefinitions[originalName] = newDefinition;
 
-    const settingsToSave: AppSettings = { 
-      ...appSettings, 
-      sheetDefinitions: newSheetDefinitions, 
-      lastModified: new Date().toISOString(),
-      lastModifiedBy: {
-        displayName: userProfile.displayName,
-        loginName: userProfile.loginName,
-      }
-    };
-    
-    const oldSettings = appSettings;
-    setAppSettings(settingsToSave);
-    
+    const settings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
+    const old = appSettings;
+    setAppSettings(settings);
     try {
-        const rtdbPromise = updateSettingsRTDB(settingsToSave);
-        const firestorePromise = updateSettingsFS(settingsToSave);
-        const localPromise = saveLocalSettings(settingsToSave);
-
-        await Promise.all([rtdbPromise, firestorePromise, localPromise]);
-
-        toast({ title: 'Layout updated', description: `Column layout changes have been saved.` });
+        await Promise.all([updateSettingsRTDB(settings), updateSettingsFS(settings), saveLocalSettings(settings)]);
+        toast({ title: 'Layout Updated' });
     } catch (e) {
-        setAppSettings(oldSettings);
-        toast({ title: 'Error', description: 'Could not save layout settings.', variant: 'destructive' });
+        setAppSettings(old);
+        toast({ title: 'Error', variant: 'destructive' });
     }
   };
 
-  const handleToggleSheetVisibility = async (sheetName: string) => {
-    if (!isAdmin || !appSettings || !appSettings.sheetDefinitions || !userProfile) return;
-
+  const handleToggleSheetVisibility = async (sn: string) => {
+    if (!isAdmin || !appSettings || !userProfile) return;
     const newSheetDefinitions = { ...appSettings.sheetDefinitions };
-    if(newSheetDefinitions[sheetName]) {
-      newSheetDefinitions[sheetName].isHidden = !newSheetDefinitions[sheetName].isHidden;
-    }
-
-    const newSettings: AppSettings = { 
-        ...appSettings, 
-        sheetDefinitions: newSheetDefinitions, 
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: {
-            displayName: userProfile.displayName,
-            loginName: userProfile.loginName,
-        }
-    };
-    
-    const oldSettings = appSettings;
-    setAppSettings(newSettings);
-
+    if(newSheetDefinitions[sn]) newSheetDefinitions[sn].isHidden = !newSheetDefinitions[sn].isHidden;
+    const settings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
+    const old = appSettings;
+    setAppSettings(settings);
     try {
-        const rtdbPromise = updateSettingsRTDB(newSettings);
-        const firestorePromise = updateSettingsFS(newSettings);
-        await Promise.all([rtdbPromise, firestorePromise]);
-
-        await saveLocalSettings(newSettings);
-        toast({ title: 'Visibility Changed', description: `Sheet '${sheetName}' is now ${newSheetDefinitions[sheetName].isHidden ? 'hidden' : 'visible'}.` });
+        await Promise.all([updateSettingsRTDB(settings), updateSettingsFS(settings), saveLocalSettings(settings)]);
     } catch (e) {
-        setAppSettings(oldSettings);
-        toast({ title: 'Error', description: 'Could not save visibility settings.', variant: 'destructive' });
+        setAppSettings(old);
     }
   };
 
@@ -1603,52 +1273,61 @@ export default function AssetList() {
       const isHidden = sheetDefinitions?.[category]?.isHidden;
       
       return (
-          <Card key={category} className={cn("hover:shadow-md transition-shadow flex flex-col", isSelected && "ring-2 ring-primary", isHidden && "opacity-50")}>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+          <Card key={category} className={cn("group hover:shadow-xl transition-all duration-300 flex flex-col border-primary/10 overflow-hidden", isSelected && "ring-2 ring-primary bg-primary/5 shadow-primary/10", isHidden && "opacity-50")}>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 bg-muted/20">
                 <div className="flex-1">
-                  <CardTitle className="text-sm font-medium pr-2">{category}</CardTitle>
+                  <CardTitle className="text-sm font-bold truncate pr-2 tracking-tight group-hover:text-primary transition-colors">{category}</CardTitle>
                 </div>
                   <DropdownMenu>
                     <DropdownMenuTrigger asChild>
-                      <Button variant="ghost" size="icon" className="h-6 w-6 -translate-y-1.5 -translate-x-1.5">
+                      <Button variant="ghost" size="icon" className="h-7 w-7 rounded-full">
                         <MoreHorizontal className="h-4 w-4" />
                       </Button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
+                    <DropdownMenuContent align="end" className="w-48 shadow-xl">
                        <DropdownMenuItem onSelect={() => handleSelectCategory(category, !isSelected)} disabled={isGuest}>
                           <Checkbox className="mr-2 h-4 w-4" checked={isSelected}/>
-                          {isSelected ? 'Deselect' : 'Select'}
+                          {isSelected ? 'Deselect Category' : 'Select Category'}
                         </DropdownMenuItem>
                          <DropdownMenuItem onSelect={() => handleEditSheetLayout(category)} disabled={isGuest || !isAdmin}>
                           <Columns className="mr-2 h-4 w-4" />
-                          Edit Layout
+                          Customize Columns
                         </DropdownMenuItem>
                         <DropdownMenuItem onSelect={() => handleToggleSheetVisibility(category)} disabled={isGuest || !isAdmin}>
                             {isHidden ? <Eye className="mr-2 h-4 w-4" /> : <EyeOff className="mr-2 h-4 w-4" />}
-                            {isHidden ? 'Show Sheet' : 'Hide Sheet'}
+                            {isHidden ? 'Show Category' : 'Hide from List'}
                         </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onSelect={() => handleClearCategoryClick(category)} disabled={isGuest || !isAdmin} className="text-destructive focus:text-destructive">
-                          <Delete className="mr-2 h-4 w-4" />
-                          Delete Category
+                          <Trash2 className="mr-2 h-4 w-4" />
+                          Wipe Local Data
                         </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
               </CardHeader>
-              <CardContent className="flex-grow space-y-4">
-                  <div>
-                      <div className="text-2xl font-bold">{total}</div>
-                      <p className="text-xs text-muted-foreground">Total assets in this category</p>
+              <CardContent className="flex-grow space-y-4 pt-4">
+                  <div className="flex items-end justify-between">
+                      <div>
+                        <div className="text-3xl font-black tracking-tighter">{total}</div>
+                        <p className="text-[10px] uppercase font-bold text-muted-foreground">Asset Records</p>
+                      </div>
+                      <LayoutDashboard className="h-8 w-8 text-primary/10" />
                   </div>
                   {appSettings.appMode === 'verification' && (
-                    <div className="space-y-2">
-                        <Progress value={percentage} aria-label={`${percentage.toFixed(0)}% verified`} />
-                        <p className="text-xs text-muted-foreground">{verified} of {total} verified</p>
+                    <div className="space-y-2 pt-2 border-t border-dashed">
+                        <div className="flex justify-between items-center text-[10px] font-bold uppercase text-muted-foreground">
+                            <span>Verification</span>
+                            <span>{verified} / {total}</span>
+                        </div>
+                        <Progress value={percentage} className="h-1.5 shadow-inner" />
                     </div>
                   )}
               </CardContent>
-              <CardFooter className="pt-0 pb-4">
-                <Button variant="link" className="p-0 h-auto" onClick={() => { setView('table'); setCurrentCategory(category); }}>View Assets</Button>
+              <CardFooter className="pt-0 pb-4 px-6">
+                <Button variant="outline" size="sm" className="w-full text-xs font-bold rounded-lg border-primary/20 hover:bg-primary hover:text-primary-foreground transition-all group/btn" onClick={() => { setView('table'); setCurrentCategory(category); }}>
+                    View Records
+                    <ChevronRight className="ml-1 h-3 w-3 group-hover/btn:translate-x-1 transition-transform" />
+                </Button>
               </CardFooter>
           </Card>
       );
@@ -1656,486 +1335,259 @@ export default function AssetList() {
 
   // DASHBOARD VIEW
   if (view === 'dashboard') {
-    const totalAssetsInScope = allAssetsForFiltering.length;
-    const currentlyDisplayedAssets = displayedAssets.length;
-    const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
-    const verificationPercentage = currentlyDisplayedAssets > 0 ? (verifiedStateAssets / currentlyDisplayedAssets) * 100 : 0;
-    const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || dateFilter || missingFieldFilter || conditionFilter.length > 0;
     const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
-        
-    const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
+    const contextualButtonText = dataSource === 'local_locked' ? 'Merge Selected' : 'Upload Selection';
     const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
-
     const mainCategories = Object.keys(assetsByCategory).filter(cat => !sheetDefinitions?.[cat]?.isHidden).sort((a,b) => a.localeCompare(b));
 
     return (
-      <div className="flex flex-col h-full gap-4">
+      <div className="flex flex-col h-full gap-6">
         <AlertDialog open={isDownloadWarningOpen} onOpenChange={setIsDownloadWarningOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Unsynced Local Changes</AlertDialogTitle>
+                <AlertDialogTitle>Unsynced Changes Detected</AlertDialogTitle>
                 <AlertDialogDescription>
-                  You have {numUnsynced} local change(s) that have not been uploaded. 
-                  Downloading will overwrite these changes. What would you like to do?
+                  You have {numUnsynced} local edit(s) that will be lost if you overwrite with cloud data.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
                 <AlertDialogCancel>Cancel</AlertDialogCancel>
                 <Button variant="outline" onClick={handleUploadFirst}>Upload First</Button>
-                <AlertDialogAction onClick={handleOverwriteDownload} className={buttonVariants({ variant: "destructive" })}>
-                  Discard & Download
-                </AlertDialogAction>
+                <AlertDialogAction onClick={handleOverwriteDownload} className={buttonVariants({ variant: "destructive" })}>Discard & Refresh</AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
         <AlertDialog open={showProjectSwitchDialog} onOpenChange={setShowProjectSwitchDialog}>
             <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>New Firebase Project Detected</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        You've connected the app to a new Firebase project. To avoid data conflicts, it's highly recommended to clear your local data and sync fresh from the new project.
-                        <br/><br/>
-                        This will NOT affect any data in your old cloud project.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Keep Local Data</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmProjectSwitch}>
-                        Clear and Sync
-                    </AlertDialogAction>
-                </AlertDialogFooter>
+                <AlertDialogHeader><AlertDialogTitle>Environment Switch</AlertDialogTitle><AlertDialogDescription>New Firebase configuration detected. Clearing local cache to prevent cross-environment data contamination.</AlertDialogDescription></AlertDialogHeader>
+                <AlertDialogFooter><AlertDialogAction onClick={handleConfirmProjectSwitch}>Refresh Application</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
 
         <AssetSummaryDashboard />
         
-        <Card>
-            <CardHeader className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-                  <div className='flex-1'>
-                    <CardTitle className="flex items-center gap-2">
-                       <span>{appSettings.appMode === 'verification' ? 'Verification Status' : 'Management Status'}</span>
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                             <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setDataSource(prev => prev === 'cloud' ? 'local_locked' : 'cloud')}>
-                                {dataSource === 'cloud' ? <CloudUpload className="h-5 w-5 text-blue-500"/> : <HardDrive className="h-5 w-5 text-gray-500" />}
-                             </Button>
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            <p>Data Source: {dataSource === 'cloud' ? 'Cloud Synced' : 'Locked Offline'}</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
-                    </CardTitle>
-                    <CardDescription>
-                      Viewing: {globalStateFilter}
-                    </CardDescription>
-                  </div>
-                  
-                  <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:items-end">
-                    {isAdmin && (
-                       <Select
-                          value={globalStateFilter || 'All'}
-                          onValueChange={(value) => setGlobalStateFilter(value)}
-                      >
-                      <SelectTrigger className="w-full md:w-[280px]">
-                        <SelectValue placeholder="Select a location to filter..." />
+        <div className="flex flex-col md:flex-row gap-4 items-center justify-between">
+            <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                    <TableProperties className="h-5 w-5 text-primary" />
+                </div>
+                <h2 className="text-xl font-bold tracking-tight">Categories & Inventories</h2>
+            </div>
+            
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
+                {isAdmin && (
+                   <Select value={globalStateFilter || 'All'} onValueChange={setGlobalStateFilter}>
+                      <SelectTrigger className="w-full md:w-[240px] rounded-xl border-primary/20 shadow-sm bg-background">
+                        <SelectValue placeholder="Scope: All" />
                       </SelectTrigger>
-                        <SelectContent>
+                        <SelectContent className="rounded-xl shadow-2xl border-primary/10">
                             <ScrollArea className="h-[400px]">
-                                <SelectItem value="All">
-                                    <LocationProgress locationName="All" allAssets={activeAssets} appMode={appSettings.appMode} />
-                                </SelectItem>
+                                <SelectItem value="All"><LocationProgress locationName="All" allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
                                 <SelectSeparator />
                                 <SelectGroup>
-                                    <SelectLabel>Special Locations</SelectLabel>
+                                    <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">Special Locations</SelectLabel>
                                     {specialLocations.map((loc) => (
-                                        <SelectItem key={loc} value={loc} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
-                                            <LocationProgress locationName={loc} allAssets={activeAssets} appMode={appSettings.appMode} />
-                                        </SelectItem>
+                                        <SelectItem key={loc} value={loc} className="focus:bg-transparent p-0"><LocationProgress locationName={loc} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
                                     ))}
                                 </SelectGroup>
                                 <SelectSeparator />
                                 <SelectGroup>
-                                    <SelectLabel>Zonal Stores</SelectLabel>
+                                    <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">Zonal Stores</SelectLabel>
                                     {ZONAL_STORES.map((zone) => (
-                                        <SelectItem key={zone} value={zone} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
-                                            <LocationProgress locationName={zone} allAssets={activeAssets} appMode={appSettings.appMode} />
-                                        </SelectItem>
+                                        <SelectItem key={zone} value={zone} className="focus:bg-transparent p-0"><LocationProgress locationName={zone} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
                                     ))}
                                 </SelectGroup>
                                 <SelectSeparator />
                                 <SelectGroup>
-                                    <SelectLabel>States</SelectLabel>
+                                    <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">States</SelectLabel>
                                     {NIGERIAN_STATES.map((state) => (
-                                        <SelectItem key={state} value={state} className="focus:bg-transparent text-foreground focus:text-foreground p-0 m-0">
-                                            <LocationProgress locationName={state} allAssets={activeAssets} appMode={appSettings.appMode} />
-                                        </SelectItem>
+                                        <SelectItem key={state} value={state} className="focus:bg-transparent p-0"><LocationProgress locationName={state} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
                                     ))}
                                 </SelectGroup>
                             </ScrollArea>
                         </SelectContent>
                       </Select>
-                    )}
-                    {!isAdmin && userProfile && userProfile.states.length > 1 && (
-                      <Select
-                          value={globalStateFilter}
-                          onValueChange={(value) => setGlobalStateFilter(value)}
-                      >
-                        <SelectTrigger className="w-full md:w-[280px]">
-                          <SelectValue placeholder="Select a state to view..." />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {userProfile.states.map((state) => (
-                            <SelectItem key={state} value={state}>
-                              {state}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    )}
-                    <div className="flex items-center justify-end gap-4 w-full">
-                      <div className="flex items-center space-x-2">
-                        <Label htmlFor="select-all-categories" className="text-sm font-medium whitespace-nowrap">Select All</Label>
-                        <Checkbox
-                            id="select-all-categories"
-                            checked={areAllCategoriesSelected}
-                            onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)}
-                            aria-label="Select all categories"
-                            disabled={isGuest}
-                        />
-                      </div>
-                    </div>
-                  </div>
-              </CardHeader>
-               <CardContent className="pt-2 space-y-2">
-                  {appSettings.appMode === 'verification' ? (
-                    <>
-                      <Progress value={verificationPercentage} aria-label={`${verificationPercentage.toFixed(0)}% verified`} />
-                      <p className="text-sm text-muted-foreground">
-                        <span className="font-bold text-foreground">{verifiedStateAssets}</span> of <span className="font-bold text-foreground">{currentlyDisplayedAssets}</span> assets verified.
-                        {isFiltered && ` (Showing from a total of ${totalAssetsInScope})`}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-sm text-muted-foreground">
-                      <span className="font-bold text-foreground">{currentlyDisplayedAssets}</span> assets loaded.
-                      {isFiltered && ` (Filtered from ${totalAssetsInScope} total)`}
-                    </p>
-                  )}
-              </CardContent>
-               {selectedCategories.length > 0 && (
-                <CardFooter className="bg-muted/50 p-2 border-t flex flex-wrap items-center gap-2">
-                    <span className="text-sm font-medium text-muted-foreground">{selectedCategories.length} selected</span>
-                    <Separator orientation="vertical" className="h-6"/>
-                    <Button variant="ghost" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
-                        {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
+                )}
+                
+                <div className="flex items-center gap-3 ml-auto">
+                    <Label htmlFor="select-all-categories" className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Select All</Label>
+                    <Checkbox id="select-all-categories" checked={areAllCategoriesSelected} onCheckedChange={(checked) => handleSelectAllCategories(checked as boolean)} disabled={isGuest} />
+                </div>
+            </div>
+        </div>
+
+        {selectedCategories.length > 0 && (
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="sticky top-2 z-40 p-2 bg-primary text-primary-foreground rounded-2xl shadow-2xl flex flex-wrap items-center gap-3 border border-white/20 backdrop-blur-lg">
+                <Badge variant="outline" className="bg-white/20 text-white border-none font-black ml-2 px-3 py-1">{selectedCategories.length} Selected</Badge>
+                <Separator orientation="vertical" className="h-6 bg-white/20 hidden sm:block"/>
+                <div className="flex flex-wrap gap-1">
+                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={handleSelectiveUpload} disabled={isSyncing}>
+                        {isSyncing ? <Loader2 className="mr-2 h-3 w-3 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-3 w-3" />}
                         {contextualButtonText}
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={handleCopyToOffline} disabled={isSyncing || dataSource !== 'cloud'}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copy to Offline
+                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={handleCopyToOffline} disabled={isSyncing || dataSource !== 'cloud'}>
+                        <Copy className="mr-2 h-3 w-3" /> Copy to Sandbox
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
-                        <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
+                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
+                        <ClipboardEdit className="mr-2 h-3 w-3" /> Batch Edit
                     </Button>
-                    <Button variant="ghost" size="sm" onClick={handleExportSelection}>
-                        <Download className="mr-2 h-4 w-4" /> Export
+                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={handleExportSelection}>
+                        <Download className="mr-2 h-3 w-3" /> Export Excel
                     </Button>
-                    <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
-                        {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                        Delete
+                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-destructive hover:text-white" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
+                        <Trash2 className="mr-2 h-3 w-3" /> Wipe Selected
                     </Button>
-                </CardFooter>
-            )}
-          </Card>
+                </div>
+            </motion.div>
+        )}
         
-        <div className="flex-1 overflow-y-auto">
-          <div className="grid gap-4 p-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+        <div className="flex-1 overflow-y-auto min-h-[400px]">
+          <div className="grid gap-6 p-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {mainCategories.length > 0 ? (
                 mainCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))
               ) : (
-                  <div className="col-span-full text-center py-24 text-muted-foreground">
-                      <FolderSearch className="mx-auto h-12 w-12" />
-                      <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
-                      {searchTerm ? (
-                          <p className="mt-2 text-sm">Your search for "{searchTerm}" did not match any assets.</p>
-                      ) : (
-                          <p className="mt-2 text-sm">Import a file or add an asset to get started.</p>
-                      )}
+                  <div className="col-span-full flex flex-col items-center justify-center py-32 text-center">
+                      <div className="p-6 bg-muted rounded-full mb-4"><FolderSearch className="h-12 w-12 text-muted-foreground/50" /></div>
+                      <h3 className="text-xl font-bold">No Assets In Sight</h3>
+                      <p className="text-sm text-muted-foreground mt-2 max-w-xs mx-auto">Try clearing your filters or importing a new workbook template.</p>
                   </div>
               )}
           </div>
         </div>
+
         <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
-        <AssetForm 
-          isOpen={isFormOpen} 
-          onOpenChange={setIsFormOpen} 
-          asset={selectedAsset} 
-          onSave={handleSaveAsset}
-          onQuickSave={handleQuickSaveAsset}
-          isReadOnly={isFormReadOnly}
-          defaultCategory={currentCategory || undefined}
-        />
+        <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} defaultCategory={currentCategory || undefined} />
         <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
         <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
-         <ImportScannerDialog
-            isOpen={isImportScanOpen}
-            onOpenChange={setIsImportScanOpen}
-        />
-         <SyncConfirmationDialog
-          isOpen={isSyncConfirmOpen}
-          onOpenChange={setIsSyncConfirmOpen}
-          onConfirm={handleSyncConfirm}
-          summary={syncSummary}
-        />
+        <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
+        <SyncConfirmationDialog isOpen={isSyncConfirmOpen} onOpenChange={setIsSyncConfirmOpen} onConfirm={handleSyncConfirm} summary={syncSummary} />
         <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                       {clearAllDialogDescription}
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearAllAssets} className="bg-destructive hover:bg-destructive/90">
-                        Yes, delete all assets
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
+            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Destructive Wipe</AlertDialogTitle><AlertDialogDescription>{clearAllDialogDescription}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearAllAssets} className="bg-destructive">Wipe All Assets</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
          <AlertDialog open={isClearCategoryDialogOpen} onOpenChange={setIsClearCategoryDialogOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Delete all assets in '{categoryToDelete}'?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                      This will permanently delete all assets from this category on your local device and from the cloud database. This action cannot be undone.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel onClick={() => setCategoryToDelete(null)}>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleClearCategory} className="bg-destructive hover:bg-destructive/90">
-                        Yes, delete this category
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
+            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete category {categoryToDelete}?</AlertDialogTitle><AlertDialogDescription>This removes all assets from the local device and cloud backups. Irreversible.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearCategory} className="bg-destructive">Execute Deletion</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
         {sheetToEdit && originalSheetNameToEdit && (
-            <ColumnCustomizationSheet
-                isOpen={isColumnSheetOpen}
-                onOpenChange={setIsColumnSheetOpen}
-                sheetDefinition={sheetToEdit}
-                originalSheetName={originalSheetNameToEdit}
-                onSave={handleSaveColumnLayout}
-            />
+            <ColumnCustomizationSheet isOpen={isColumnSheetOpen} onOpenChange={setIsColumnSheetOpen} sheetDefinition={sheetToEdit} originalSheetName={originalSheetNameToEdit} onSave={handleSaveColumnLayout} />
         )}
       </div>
     )
   }
 
   // TABLE VIEW
-  const paginatedCategoryAssets = categoryFilteredAssets.slice(
-    (currentPage - 1) * itemsPerPage,
-    currentPage * itemsPerPage
-  );
+  const paginatedCategoryAssets = categoryFilteredAssets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
   const areAllCategoryResultsSelected = categoryFilteredAssets.length > 0 && categoryFilteredAssets.every(a => selectedAssetIds.includes(a.id));
-
-  const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
-  const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
-  
   const currentSheetDefinition = sheetDefinitions?.[currentCategory!];
-  
   let quickViewFields: DisplayField[] = currentSheetDefinition?.displayFields.filter(f => f.quickView) || [];
-
-  if (appSettings?.appMode === 'management') {
-    quickViewFields = quickViewFields.filter(f => f.key !== 'verifiedStatus');
-  }
-  
-  const backButtonTarget = 'dashboard';
-
+  if (appSettings?.appMode === 'management') quickViewFields = quickViewFields.filter(f => f.key !== 'verifiedStatus');
 
   return (
     <div className="flex flex-col h-full gap-4">
-         <AlertDialog open={isDownloadWarningOpen} onOpenChange={setIsDownloadWarningOpen}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Unsynced Local Changes</AlertDialogTitle>
-                <AlertDialogDescription>
-                  You have {numUnsynced} local change(s) that have not been uploaded. 
-                  Downloading will overwrite these changes. What would you like to do?
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                <Button variant="outline" onClick={handleUploadFirst}>Upload First</Button>
-                <AlertDialogAction onClick={handleOverwriteDownload} className={buttonVariants({ variant: "destructive" })}>
-                  Discard & Download
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-        <AlertDialog open={showProjectSwitchDialog} onOpenChange={setShowProjectSwitchDialog}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>New Firebase Project Detected</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        You've connected the app to a new Firebase project. To avoid data conflicts, it's highly recommended to clear your local data and sync fresh from the new project.
-                        <br/><br/>
-                        This will NOT affect any data in your old cloud project.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Keep Local Data</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleConfirmProjectSwitch}>
-                        Clear and Sync
-                    </AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
-        </AlertDialog>
-        <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="icon" onClick={() => { setView(backButtonTarget); setCurrentCategory(null); setSelectedAssetIds([]); }}>
-                <ArrowLeft className="h-4 w-4" />
+        <div className="flex flex-wrap items-center gap-3 pb-2 border-b border-dashed">
+            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted" onClick={() => { setView('dashboard'); setCurrentCategory(null); setSelectedAssetIds([]); }}>
+                <ArrowLeft className="h-5 w-5" />
             </Button>
-            <div className="flex flex-1 items-center gap-4">
-                <h2 className="text-2xl font-bold tracking-tight">
-                    {currentCategory}
-                </h2>
+            <div className="flex-1 min-w-0">
+                <h2 className="text-2xl font-black tracking-tighter truncate">{currentCategory}</h2>
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-muted-foreground mt-0.5">
+                    <Badge variant="outline" className="px-1.5 h-4 text-[9px] border-primary/30 text-primary">{categoryFilteredAssets.length} Records</Badge>
+                    <Separator orientation="vertical" className="h-2.5"/>
+                    <span>Viewing {globalStateFilter}</span>
+                </div>
+            </div>
+            <div className="flex items-center gap-2">
+                <div className="flex items-center space-x-2 bg-muted/50 px-3 py-1.5 rounded-lg border border-transparent hover:border-primary/20 transition-colors">
+                    <Label htmlFor="select-all-table" className="text-xs font-black uppercase text-muted-foreground cursor-pointer">Select All</Label>
+                    <Checkbox id="select-all-table" checked={areAllCategoryResultsSelected} onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)} disabled={isGuest} />
+                </div>
                 {(!appSettings?.lockAssetList || dataSource === 'local_locked') && (userProfile?.canAddAssets || isAdmin) && (
-                  <Button variant="outline" size="sm" onClick={handleAddAsset}>
-                    <PlusCircle className="mr-2 h-4 w-4"/>
-                    Add Asset
+                  <Button variant="default" size="sm" className="h-9 rounded-xl font-bold shadow-lg shadow-primary/20" onClick={handleAddAsset}>
+                    <PlusCircle className="mr-2 h-4 w-4"/> New Asset
                   </Button>
                 )}
             </div>
-            <div className="flex items-center space-x-2">
-                <Checkbox
-                    id="select-all-in-table-mobile"
-                    checked={areAllCategoryResultsSelected}
-                    onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)}
-                    aria-label="Select all in this category"
-                    disabled={isGuest}
-                />
-                <Label htmlFor="select-all-in-table-mobile" className="text-sm font-medium">Select All</Label>
-            </div>
-            {selectedAssetIds.length > 0 && (
-                <div className="flex items-center gap-2">
-                    <span className="text-sm text-muted-foreground">{selectedAssetIds.length} selected</span>
-                     <Button variant="outline" size="sm" onClick={handleSelectiveUpload} disabled={isSyncing || (!isOnline && dataSource !== 'local_locked')}>
-                      {isSyncing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-4 w-4" />}
-                       {contextualButtonText}
-                    </Button>
-                    <Button variant="outline" size="sm" onClick={handleCopyToOffline} disabled={isSyncing || dataSource !== 'cloud'}>
-                        <Copy className="mr-2 h-4 w-4" />
-                        Copy to Offline
-                    </Button>
-                     {selectedAssetIds.length === 1 && !isGuest && (
-                        <Button variant="outline" size="sm" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)} disabled={!userProfile?.canEditAssets && !isAdmin}>
-                            <Edit className="mr-2 h-4 w-4" /> Edit
-                        </Button>
-                    )}
-                    {selectedAssetIds.length > 0 && !isGuest && (
-                        <Button variant="outline" size="sm" onClick={handleBatchEdit} disabled={!userProfile?.canEditAssets && !isAdmin}>
-                            <ClipboardEdit className="mr-2 h-4 w-4" /> Batch Edit
-                        </Button>
-                    )}
-                    <Button variant="outline" size="sm" onClick={handleExportSelection}>
-                        <Download className="mr-2 h-4 w-4" /> Export
-                    </Button>
-                    <Button variant="destructive" size="sm" onClick={handleBatchDelete} disabled={isBatchDeleting || isGuest || !isAdmin}>
-                        {isBatchDeleting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Trash2 className="mr-2 h-4 w-4" />}
-                        Delete
-                    </Button>
-                </div>
-            )}
         </div>
+
+        {selectedAssetIds.length > 0 && (
+            <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} className="flex flex-wrap items-center gap-2 p-2 bg-muted/80 backdrop-blur-md rounded-xl border border-primary/10">
+                <div className="px-3 py-1 bg-primary text-primary-foreground text-xs font-black rounded-lg">{selectedAssetIds.length} Selected</div>
+                <Button variant="ghost" size="sm" className="h-8 text-xs font-bold" onClick={handleSelectiveUpload} disabled={isSyncing}>
+                    {isSyncing ? <Loader2 className="mr-2 h-3 w-3 animate-spin"/> : <CloudUpload className="mr-2 h-3 w-3" />} Sync
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 text-xs font-bold" onClick={handleCopyToOffline} disabled={isSyncing || dataSource !== 'cloud'}>
+                    <Copy className="mr-2 h-3 w-3" /> Sandbox
+                </Button>
+                {selectedAssetIds.length === 1 && !isGuest && (
+                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold" onClick={() => handleEditAsset(activeAssets.find(a => a.id === selectedAssetIds[0])!)}>
+                        <Edit className="mr-2 h-3 w-3" /> Edit
+                    </Button>
+                )}
+                <Button variant="ghost" size="sm" className="h-8 text-xs font-bold" onClick={handleBatchEdit} disabled={!userProfile?.canEditAssets && !isAdmin}>
+                    <ClipboardEdit className="mr-2 h-3 w-3" /> Batch
+                </Button>
+                <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-destructive hover:bg-destructive/10" onClick={handleBatchDelete} disabled={isBatchDeleting || isGuest || !isAdmin}>
+                    <Trash2 className="mr-2 h-3 w-3" /> Delete
+                </Button>
+            </motion.div>
+        )}
         
-        <Card className="flex-1 flex flex-col overflow-hidden">
-            <div className="flex-grow overflow-y-auto">
-              {/* Unified Card View */}
-              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 p-2 sm:p-4">
+        <Card className="flex-1 flex flex-col overflow-hidden border-none shadow-none bg-transparent">
+            <ScrollArea className="flex-1 h-full -mx-4 px-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-10">
                 {paginatedCategoryAssets.length > 0 ? (
                   paginatedCategoryAssets.map((asset) => (
                     <Card
                       key={asset.id}
                       data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''}
-                      className="data-[state=selected]:ring-2 data-[state=selected]:ring-primary flex flex-col"
+                      className="data-[state=selected]:ring-2 data-[state=selected]:ring-primary transition-all duration-300 hover:shadow-lg flex flex-col overflow-hidden border-primary/5"
                     >
-                      <CardHeader className="flex flex-row items-center space-x-4 p-4">
+                      <CardHeader className="flex flex-row items-center space-x-4 p-4 bg-muted/10 border-b border-dashed">
                           <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
-                              <Checkbox
-                                  checked={selectedAssetIds.includes(asset.id)}
-                                  onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)}
-                                  aria-label={`Select asset ${asset.description}`}
-                                  disabled={isGuest}
-                              />
+                              <Checkbox checked={selectedAssetIds.includes(asset.id)} onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)} disabled={isGuest} />
                           </div>
-                          <div className="flex-1 min-w-0" onClick={() => handleViewAsset(asset)}>
-                              <CardTitle className="text-base truncate">{asset.description || 'No Description'}</CardTitle>
-                              <CardDescription className="flex items-center gap-2 truncate">
-                                  {asset.syncStatus === 'local' && (
-                                      <TooltipProvider>
-                                          <Tooltip>
-                                              <TooltipTrigger>
-                                                  <CloudOff className="h-4 w-4 text-blue-500" />
-                                              </TooltipTrigger>
-                                              <TooltipContent><p>Local changes not synced</p></TooltipContent>
-                                          </Tooltip>
-                                      </TooltipProvider>
-                                  )}
-                                  {asset.category}
+                          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleViewAsset(asset)}>
+                              <CardTitle className="text-sm font-bold truncate leading-tight">{asset.description || 'Untitled Asset'}</CardTitle>
+                              <CardDescription className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest truncate mt-0.5">
+                                  {asset.syncStatus === 'local' && <CloudOff className="h-3 w-3 text-primary animate-pulse" />}
+                                  {asset.assetIdCode || asset.sn || 'No ID'}
                               </CardDescription>
                           </div>
-                          <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" disabled={isGuest}><MoreHorizontal className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                                <DropdownMenuContent align="end">
-                                    <DropdownMenuItem onClick={() => handleViewAsset(asset)}>
-                                        <FolderSearch className="mr-2 h-4 w-4" /> View
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onClick={() => handleEditAsset(asset)} disabled={!userProfile?.canEditAssets && !isAdmin}>
-                                        <Edit className="mr-2 h-4 w-4" /> Edit
-                                    </DropdownMenuItem>
-                                    <DropdownMenuItem onSelect={(e) => e.preventDefault()} onClick={() => { setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="text-destructive focus:bg-destructive/20" disabled={!isAdmin}>
-                                        <Trash2 className="mr-2 h-4 w-4" /> Delete
-                                    </DropdownMenuItem>
-                                </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
+                          <DropdownMenu>
+                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" disabled={isGuest}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-48 shadow-2xl border-primary/10">
+                                  <DropdownMenuItem onClick={() => handleViewAsset(asset)} className="h-9"><FolderSearch className="mr-2 h-4 w-4" /> Open Dashboard</DropdownMenuItem>
+                                  <DropdownMenuItem onClick={() => handleEditAsset(asset)} disabled={!userProfile?.canEditAssets && !isAdmin} className="h-9"><Edit className="mr-2 h-4 w-4" /> Fast Edit</DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem onClick={() => { setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="h-9 text-destructive focus:bg-destructive/10 focus:text-destructive" disabled={!isAdmin}><Trash2 className="mr-2 h-4 w-4" /> Remove Record</DropdownMenuItem>
+                              </DropdownMenuContent>
+                          </DropdownMenu>
                       </CardHeader>
-                      <CardContent className="p-4 pt-0 flex-grow" onClick={() => handleViewAsset(asset)}>
+                      <CardContent className="p-4 pt-4 flex-grow cursor-pointer" onClick={() => handleViewAsset(asset)}>
                           <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                               {quickViewFields.map(field => {
-                                // Exclude fields that are already displayed in the card's header or have dedicated controls.
                                 if (['description', 'category', 'verifiedStatus'].includes(field.key)) return null;
-                                
-                                const value = asset[field.key];
-                                if (value === null || value === undefined || String(value).trim() === '') return null;
-                                
+                                const val = asset[field.key];
+                                if (!val || String(val).trim() === '') return null;
                                 return (
-                                    <div key={field.key} className="space-y-1 overflow-hidden">
-                                        <p className="text-xs font-medium text-muted-foreground">{field.label}</p>
-                                        <p className="text-sm font-medium truncate">{String(value)}</p>
+                                    <div key={field.key} className="space-y-0.5 overflow-hidden">
+                                        <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-wider">{field.label}</p>
+                                        <p className="text-xs font-bold truncate text-foreground/80">{String(val)}</p>
                                     </div>
                                 )
                               })}
                           </div>
                           {appSettings?.appMode === 'verification' && (
-                            <div className="mt-4" onClick={e => e.stopPropagation()}>
-                                <p className="text-xs font-medium text-muted-foreground mb-1">Verified Status</p>
-                                <Select
-                                    value={asset.verifiedStatus || 'Unverified'}
-                                    onValueChange={async (status) => {
-                                      await handleQuickSaveAsset(asset.id, { verifiedStatus: status as any, verifiedDate: status === "Verified" ? new Date().toLocaleDateString("en-CA") : "", remarks: asset.remarks, condition: asset.condition });
-                                      addNotification({ title: "Status Updated", description: `Asset status changed to ${status}.` });
-                                    }}
-                                  >
-                                  <SelectTrigger className={cn("h-9 text-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                    <SelectValue placeholder="Select status" />
+                            <div className="mt-4 pt-4 border-t border-dashed" onClick={e => e.stopPropagation()}>
+                                <Select value={asset.verifiedStatus || 'Unverified'} onValueChange={async (s) => {
+                                      await handleQuickSaveAsset(asset.id, { verifiedStatus: s as any, verifiedDate: s === "Verified" ? new Date().toLocaleDateString("en-CA") : "", remarks: asset.remarks, condition: asset.condition });
+                                      addNotification({ title: "Verification Updated", description: `Asset set to ${s}` });
+                                }}>
+                                  <SelectTrigger className={cn("h-8 text-[10px] font-black uppercase rounded-lg border-none shadow-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                    <SelectValue />
                                   </SelectTrigger>
-                                  <SelectContent>
-                                      <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-3 w-3"/>Unverified</div></SelectItem>
-                                      <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-3 w-3"/>Verified</div></SelectItem>
+                                  <SelectContent className="rounded-xl">
+                                      <SelectItem value="Unverified" className="text-[10px] font-bold">Unverified</SelectItem>
+                                      <SelectItem value="Verified" className="text-[10px] font-bold">Verified</SelectItem>
                                   </SelectContent>
                                 </Select>
                             </div>
@@ -2144,54 +1596,18 @@ export default function AssetList() {
                     </Card>
                   ))
                 ) : (
-                  <div className="col-span-full text-center py-24 text-muted-foreground">
-                    <FolderSearch className="mx-auto h-12 w-12" />
-                    <h3 className="mt-4 text-lg font-semibold">No Assets Found</h3>
-                    <p className="mt-2 text-sm">No assets found matching your criteria.</p>
-                  </div>
+                  <div className="col-span-full py-20 text-center opacity-50"><FolderSearch className="mx-auto h-12 w-12 mb-2"/><p className="text-sm font-bold">No results in this view</p></div>
                 )}
               </div>
-            </div>
-            <CardFooter className="border-t pt-4">
-               <PaginationControls 
-                    currentPage={currentPage}
-                    totalPages={Math.ceil(categoryFilteredAssets.length / itemsPerPage)}
-                    onPageChange={setCurrentPage}
-                    itemsPerPage={itemsPerPage}
-                    setItemsPerPage={setItemsPerPage}
-                    totalItems={categoryFilteredAssets.length}
-                  />
+            </ScrollArea>
+            <CardFooter className="border-t bg-muted/10 py-3 rounded-b-2xl">
+               <PaginationControls currentPage={currentPage} totalPages={Math.ceil(categoryFilteredAssets.length / itemsPerPage)} onPageChange={setCurrentPage} itemsPerPage={itemsPerPage} setItemsPerPage={setItemsPerPage} totalItems={categoryFilteredAssets.length} />
             </CardFooter>
         </Card>
-        <AssetForm 
-          isOpen={isFormOpen} 
-          onOpenChange={setIsFormOpen} 
-          asset={selectedAsset} 
-          onSave={handleSaveAsset} 
-          onQuickSave={handleQuickSaveAsset}
-          isReadOnly={isFormReadOnly}
-          defaultCategory={currentCategory || undefined}
-        />
-        <AssetBatchEditForm 
-            isOpen={isBatchEditOpen} 
-            onOpenChange={setIsBatchEditOpen}
-            selectedAssetCount={selectedAssetIds.length}
-            onSave={handleSaveBatchEdit}
-        />
+        <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} defaultCategory={currentCategory || undefined} />
+        <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-            <AlertDialogContent>
-                <AlertDialogHeader>
-                    <AlertDialogTitle>Are you absolutely sure?</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        This action cannot be undone. This will permanently delete the asset
-                        from your {dataSource === 'cloud' ? (isOnline ? 'online database and ' : '') : ''}local storage.
-                    </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                    <AlertDialogCancel>Cancel</AlertDialogCancel>
-                    <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90">Delete</AlertDialogAction>
-                </AlertDialogFooter>
-            </AlertDialogContent>
+            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Record?</AlertDialogTitle><AlertDialogDescription>This asset will be permanently removed from local and cloud databases. This action is irreversible.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive">Delete Asset</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
     </div>
   );
