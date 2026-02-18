@@ -501,7 +501,7 @@ export default function AssetList() {
                 await executeDownload(summary, true);
             } else {
                 setSyncSummary(summary);
-                setIsSyncConfirmOpen(true);
+                setIsSyncOpen(true);
             }
         }
     } catch (error) {
@@ -1341,6 +1341,8 @@ export default function AssetList() {
     const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
     const mainCategories = Object.keys(assetsByCategory).filter(cat => !sheetDefinitions?.[cat]?.isHidden).sort((a,b) => a.localeCompare(b));
 
+    const showScopeSwitcher = isAdmin || (userProfile?.states && userProfile.states.length > 1);
+
     return (
       <div className="flex flex-col h-full gap-6">
         <AlertDialog open={isDownloadWarningOpen} onOpenChange={setIsDownloadWarningOpen}>
@@ -1376,35 +1378,45 @@ export default function AssetList() {
             </div>
             
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
-                {isAdmin && (
+                {showScopeSwitcher && (
                    <Select value={globalStateFilter || 'All'} onValueChange={setGlobalStateFilter}>
                       <SelectTrigger className="w-full md:w-[240px] rounded-xl border-primary/20 shadow-sm bg-background">
-                        <SelectValue placeholder="Scope: All" />
+                        <SelectValue placeholder={`Scope: ${globalStateFilter}`} />
                       </SelectTrigger>
                         <SelectContent className="rounded-xl shadow-2xl border-primary/10">
-                            <ScrollArea className="h-[400px]">
-                                <SelectItem value="All"><LocationProgress locationName="All" allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
-                                <SelectSeparator />
-                                <SelectGroup>
-                                    <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">Special Locations</SelectLabel>
-                                    {specialLocations.map((loc) => (
-                                        <SelectItem key={loc} value={loc} className="focus:bg-transparent p-0"><LocationProgress locationName={loc} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
-                                    ))}
-                                </SelectGroup>
-                                <SelectSeparator />
-                                <SelectGroup>
-                                    <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">Zonal Stores</SelectLabel>
-                                    {ZONAL_STORES.map((zone) => (
-                                        <SelectItem key={zone} value={zone} className="focus:bg-transparent p-0"><LocationProgress locationName={zone} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
-                                    ))}
-                                </SelectGroup>
-                                <SelectSeparator />
-                                <SelectGroup>
-                                    <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">States</SelectLabel>
-                                    {NIGERIAN_STATES.map((state) => (
-                                        <SelectItem key={state} value={state} className="focus:bg-transparent p-0"><LocationProgress locationName={state} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
-                                    ))}
-                                </SelectGroup>
+                            <ScrollArea className={cn(isAdmin ? "h-[400px]" : "h-auto max-h-[300px]")}>
+                                {isAdmin ? (
+                                    <>
+                                        <SelectItem value="All"><LocationProgress locationName="All" allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
+                                        <SelectSeparator />
+                                        <SelectGroup>
+                                            <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">Special Locations</SelectLabel>
+                                            {specialLocations.map((loc) => (
+                                                <SelectItem key={loc} value={loc} className="focus:bg-transparent p-0"><LocationProgress locationName={loc} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                        <SelectSeparator />
+                                        <SelectGroup>
+                                            <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">Zonal Stores</SelectLabel>
+                                            {ZONAL_STORES.map((zone) => (
+                                                <SelectItem key={zone} value={zone} className="focus:bg-transparent p-0"><LocationProgress locationName={zone} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                        <SelectSeparator />
+                                        <SelectGroup>
+                                            <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">States</SelectLabel>
+                                            {NIGERIAN_STATES.map((state) => (
+                                                <SelectItem key={state} value={state} className="focus:bg-transparent p-0"><LocationProgress locationName={state} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
+                                            ))}
+                                        </SelectGroup>
+                                    </>
+                                ) : (
+                                    userProfile?.states?.map((state) => (
+                                        <SelectItem key={state} value={state} className="focus:bg-transparent p-0">
+                                            <LocationProgress locationName={state} allAssets={activeAssets} appMode={appSettings.appMode} />
+                                        </SelectItem>
+                                    ))
+                                )}
                             </ScrollArea>
                         </SelectContent>
                       </Select>

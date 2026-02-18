@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -11,6 +10,11 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuSub,
+  DropdownMenuSubTrigger,
+  DropdownMenuSubContent,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -32,6 +36,7 @@ import {
   History,
   Menu,
   MoreVertical,
+  MapPin,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -46,7 +51,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { SettingsSheet } from "./settings-sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AssetFilterDialog } from "./asset-filter-sheet";
-import type { Asset } from "@/lib/types";
+import type { Asset } from "@/types";
 import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
 import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
@@ -75,6 +80,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setInitialSettingsTab,
     onRevertAsset,
     globalStateFilter,
+    setGlobalStateFilter,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -162,6 +168,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setInitialSettingsTab('general');
     setIsSettingsOpen(true);
   }
+
+  const userHasMultipleStates = userProfile?.states && userProfile.states.length > 1;
 
   return (
     <div className="flex flex-col w-full h-screen border-0 sm:border-8 border-muted/50 bg-background overflow-hidden">
@@ -322,6 +330,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       </DropdownMenuLabel>
                       <DropdownMenuSeparator />
                       
+                      {userHasMultipleStates && !isAdmin && (
+                        <DropdownMenuSub>
+                          <DropdownMenuSubTrigger className="h-10">
+                            <MapPin className="mr-2 h-4 w-4 text-muted-foreground"/>
+                            Switch State Scope
+                          </DropdownMenuSubTrigger>
+                          <DropdownMenuSubContent className="w-48">
+                            <DropdownMenuRadioGroup value={globalStateFilter} onValueChange={setGlobalStateFilter}>
+                              {userProfile.states.map(state => (
+                                <DropdownMenuRadioItem key={state} value={state}>
+                                  {state}
+                                </DropdownMenuRadioItem>
+                              ))}
+                            </DropdownMenuRadioGroup>
+                          </DropdownMenuSubContent>
+                        </DropdownMenuSub>
+                      )}
+
                       <DropdownMenuItem onClick={handleSettingsOpen} className="h-10 cursor-pointer">
                         <Settings className="mr-2 h-4 w-4 text-muted-foreground"/>
                         Configuration Settings
