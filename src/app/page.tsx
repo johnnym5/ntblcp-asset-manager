@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -48,40 +47,11 @@ export default function Page() {
     }
   }, [userProfile, profileSetupComplete, setGlobalStateFilter]);
 
-  if (firstTimeSetupStatus !== 'idle') {
-    return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-background gap-6 text-center p-4">
-        {firstTimeSetupStatus === 'syncing' && (
-          <>
-            <Loader2 className="h-16 w-16 animate-spin text-primary" />
-            <h1 className="text-2xl font-bold">Performing First-Time Setup</h1>
-            <p className="text-muted-foreground max-w-sm">
-              Downloading the latest asset database. Please wait...
-            </p>
-            <p className="text-muted-foreground max-w-sm h-10">{loadingTips[tipIndex]}</p>
-          </>
-        )}
-        {firstTimeSetupStatus === 'complete' && (
-          <>
-            <CheckCircle className="h-16 w-16 text-green-500" />
-            <h1 className="text-2xl font-bold">Setup Successful!</h1>
-            <p className="text-muted-foreground max-w-sm">
-              Your local database is now up-to-date with the latest assets.
-            </p>
-            <Button onClick={() => setFirstTimeSetupStatus('idle')}>
-              Continue to Asset Manager
-            </Button>
-          </>
-        )}
-      </div>
-    );
-  }
-
   if (loading) {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background gap-4 text-center">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-muted-foreground max-w-sm">{loadingTips[tipIndex]}</p>
+        <p className="text-muted-foreground max-w-sm">Initializing application...</p>
       </div>
     );
   }
@@ -91,8 +61,42 @@ export default function Page() {
   }
   
   return (
-    <AppLayout>
-        <AssetList />
-    </AppLayout>
+    <div className="relative h-screen w-full overflow-hidden">
+      {/* Background Application Shell - Always mounted to handle setup sync logic */}
+      <AppLayout>
+          <AssetList />
+      </AppLayout>
+
+      {/* Setup Overlay */}
+      {firstTimeSetupStatus !== 'idle' && (
+        <div className="fixed inset-0 z-[100] flex h-screen w-full flex-col items-center justify-center bg-background gap-6 text-center p-4 backdrop-blur-sm">
+          {firstTimeSetupStatus === 'syncing' && (
+            <>
+              <Loader2 className="h-16 w-16 animate-spin text-primary" />
+              <h1 className="text-2xl font-bold">Performing First-Time Setup</h1>
+              <p className="text-muted-foreground max-w-sm">
+                Downloading the asset database for your location. Please wait...
+              </p>
+              <div className="bg-muted/50 p-6 rounded-lg border border-dashed max-w-md w-full animate-in fade-in zoom-in duration-500">
+                <p className="text-sm font-medium text-primary mb-2 uppercase tracking-wider">Helpful Tip</p>
+                <p className="text-foreground italic">{loadingTips[tipIndex]}</p>
+              </div>
+            </>
+          )}
+          {firstTimeSetupStatus === 'complete' && (
+            <>
+              <CheckCircle className="h-16 w-16 text-green-500 animate-in zoom-in duration-300" />
+              <h1 className="text-2xl font-bold">Setup Successful!</h1>
+              <p className="text-muted-foreground max-w-sm">
+                Your local database is now up-to-date with the latest assets.
+              </p>
+              <Button size="lg" onClick={() => setFirstTimeSetupStatus('idle')} className="px-8 shadow-lg shadow-primary/20">
+                Continue to Asset Manager
+              </Button>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
