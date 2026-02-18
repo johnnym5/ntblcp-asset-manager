@@ -56,6 +56,7 @@ import {
   ChevronRight,
   LayoutDashboard,
   TableProperties,
+  MoreVertical,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
