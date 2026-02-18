@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -208,7 +207,6 @@ export default function AssetList() {
   const [originalSheetNameToEdit, setOriginalSheetNameToEdit] = useState<string | null>(null);
   const [isDownloadWarningOpen, setIsDownloadWarningOpen] = useState(false);
   const [numUnsynced, setNumUnsynced] = useState(0);
-  const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
@@ -453,7 +451,11 @@ export default function AssetList() {
 
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
-        const cloudAssets = await getCloudAssets(activeGrantId);
+        const allCloudAssets = await getCloudAssets(activeGrantId);
+        
+        // CRITICAL: Filter cloud assets to only those matching the user's current state/scope
+        const cloudAssets = allCloudAssets.filter(asset => assetMatchesGlobalFilter(asset, globalStateFilter));
+        
         const localAssets = await getLocalAssetsFromDb();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         const cloudAssetIds = new Set(cloudAssets.map(a => a.id));
@@ -485,6 +487,7 @@ export default function AssetList() {
             }
         }
         
+        // Handle removals: items that were in our scope but are no longer on the cloud
         for (const localAsset of localAssets) {
             if (!cloudAssetIds.has(localAsset.id) && localAsset.syncStatus !== 'local') {
                 if(assetMatchesGlobalFilter(localAsset, globalStateFilter)) {
@@ -531,9 +534,12 @@ export default function AssetList() {
     
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
-        const cloudAssets = await getCloudAssets(activeGrantId);
+        const allCloudAssets = await getCloudAssets(activeGrantId);
         
-        const assetsToSave = cloudAssets.map(asset => ({ ...asset, syncStatus: 'synced' as const }));
+        // Filter down to the current state even on overwrite
+        const assetsToSave = allCloudAssets
+            .filter(asset => assetMatchesGlobalFilter(asset, globalStateFilter))
+            .map(asset => ({ ...asset, syncStatus: 'synced' as const }));
         
         await saveAssets(assetsToSave);
         setAssets(assetsToSave);
@@ -550,7 +556,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [setIsSyncing, setIsOnline, activeDatabase, setAssets, activeGrantId]);
+  }, [setIsSyncing, setIsOnline, activeDatabase, setAssets, activeGrantId, globalStateFilter]);
   
   const handleUploadFirst = useCallback(() => {
     setIsDownloadWarningOpen(false);
@@ -795,7 +801,7 @@ export default function AssetList() {
       return;
     }
     if (appSettings?.lockAssetList && isAdmin && dataSource === 'cloud' && appSettings.appMode !== 'verification') {
-        addNotification({ title: "Edits Disabled", description: "The main asset list is locked for full edits. Switch to 'Locked Offline' to merge changes, or disable lock in settings.", variant: "destructive" });
+        addNotification({ title: "Edits Disabled", description: "The main asset list is locked. Switch to 'Locked Offline' source to make changes and merge.", variant: "destructive" });
         return;
     }
     setSelectedAsset(asset);

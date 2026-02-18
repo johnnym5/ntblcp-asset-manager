@@ -49,9 +49,13 @@ export default function Page() {
 
   if (loading) {
     return (
-      <div className="flex h-screen w-full flex-col items-center justify-center bg-background gap-4 text-center">
+      <div className="flex h-screen w-full flex-col items-center justify-center bg-background gap-6 text-center p-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <p className="text-muted-foreground max-w-sm">Initializing application...</p>
+        <h1 className="text-xl font-bold">Initializing NTBLCP Asset Manager</h1>
+        <div className="bg-muted/50 p-6 rounded-lg border border-dashed max-w-md w-full animate-in fade-in zoom-in duration-500">
+          <p className="text-sm font-medium text-primary mb-2 uppercase tracking-wider">Helpful Tip</p>
+          <p className="text-foreground italic">{loadingTips[tipIndex]}</p>
+        </div>
       </div>
     );
   }
