@@ -46,7 +46,7 @@ const StatCard = ({ title, value, description, icon, onAction, actionLabel, isAc
 export function AssetSummaryDashboard() {
     const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter, globalStateFilter, conditionFilter, setConditionFilter, activeGrantId } = useAppState();
     const { userProfile } = useAuth();
-    const [isOpen, setIsOpen] = useState(true);
+    const [isOpen, setIsOpen] = useState(false);
     const [activeView, setActiveTab] = useState<'stats' | 'progress'>('stats');
     
     const isAdmin = userProfile?.isAdmin;
