@@ -20,7 +20,12 @@ import {
     MapPin, 
     RefreshCw, 
     ChevronLeft, 
-    ChevronRight 
+    ChevronRight,
+    ClipboardCheck,
+    AlertCircle,
+    Hash,
+    MessageSquare,
+    Activity
 } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { isToday, isThisWeek, parseISO, formatDistanceToNow } from 'date-fns';
@@ -38,18 +43,18 @@ const StatCard = ({ title, value, description, icon, onAction, actionLabel, isAc
     const cardContent = (
         <Card className={cn("transition-all duration-300 w-64 shrink-0 overflow-hidden", isActive ? "bg-primary/10 border-primary shadow-lg shadow-primary/10" : "hover:bg-muted/50 hover:border-primary/30")}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{title}</CardTitle>
+                <CardTitle className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</CardTitle>
                 <div className={cn("p-2 rounded-full", isActive ? "bg-primary/20" : "bg-muted")}>
                     {icon}
                 </div>
             </CardHeader>
             <CardContent>
-                <div className="text-3xl font-bold tracking-tight">{value}</div>
-                <p className="text-xs text-muted-foreground mt-1 line-clamp-2 min-h-[2.5rem]">
+                <div className="text-2xl font-bold tracking-tight">{value}</div>
+                <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 min-h-[2.5rem] leading-tight">
                     {description}
                 </p>
                 {onAction && (
-                     <div className={cn("text-xs font-bold mt-2 transition-colors", isActive ? "text-primary" : "text-primary/70")}>
+                     <div className={cn("text-[10px] font-bold mt-2 transition-colors uppercase tracking-widest", isActive ? "text-primary" : "text-primary/70")}>
                         {actionLabel || "View Details"}
                      </div>
                 )}
@@ -72,15 +77,29 @@ interface Insight {
 }
 
 export function AssetSummaryDashboard() {
-    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter, globalStateFilter, conditionFilter, setConditionFilter, activeGrantId, setAssetToView } = useAppState();
+    const { 
+        assets, 
+        offlineAssets, 
+        dataSource, 
+        setMissingFieldFilter, 
+        missingFieldFilter, 
+        appSettings, 
+        dateFilter, 
+        setDateFilter, 
+        globalStateFilter, 
+        conditionFilter, 
+        setConditionFilter, 
+        activeGrantId, 
+        setAssetToView,
+        setSelectedStatuses,
+        selectedStatuses
+    } = useAppState();
     const { userProfile } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [activeView, setActiveTab] = useState<'stats' | 'progress'>('stats');
     const [insightIndex, setInsightIndex] = useState(0);
     const [refreshKey, setRefreshKey] = useState(0);
     
-    const isAdmin = userProfile?.isAdmin;
-
     const summaryAssets = useMemo(() => {
         const activeAssets = dataSource === 'cloud' ? assets : offlineAssets;
         if (globalStateFilter && globalStateFilter !== 'All') {
@@ -231,17 +250,25 @@ export function AssetSummaryDashboard() {
     }, [activeView, insightsPool.length, refreshKey]);
 
     const summary = useMemo(() => {
+        const total = summaryAssets.length;
+        const verified = summaryAssets.filter(a => a.verifiedStatus === 'Verified').length;
         return {
-          unusable: summaryAssets.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen'].includes(a.condition)).length,
+          total,
+          verified,
+          unverified: total - verified,
+          unusable: summaryAssets.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen', 'Writeoff'].includes(a.condition)).length,
+          needsRepair: summaryAssets.filter(a => a.condition && ['Bad condition', 'F2: Major repairs required-poor condition', 'Used but in poor condition'].includes(a.condition)).length,
           withoutAssetId: summaryAssets.filter(a => !a.assetIdCode?.trim()).length,
+          withoutSerial: summaryAssets.filter(a => !a.serialNumber?.trim()).length,
+          withDiscrepancy: summaryAssets.filter(a => a.verifiedStatus === 'Discrepancy').length,
           modifiedToday: summaryAssets.filter(a => a.lastModified && isToday(parseISO(a.lastModified))).length,
           newThisWeek: summaryAssets.filter(a => a.lastModified && !a.previousState && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length,
+          withRemarks: summaryAssets.filter(a => a.remarks?.trim()).length,
         };
     }, [summaryAssets]);
     
     const handleFilterClick = (field: keyof Asset | '') => {
-        setDateFilter(null);
-        setConditionFilter([]);
+        resetAllFilters();
         if (missingFieldFilter === field) {
             setMissingFieldFilter('');
         } else {
@@ -250,8 +277,7 @@ export function AssetSummaryDashboard() {
     };
 
     const handleDateFilterClick = (filter: 'today' | 'week' | 'new-week') => {
-        setMissingFieldFilter('');
-        setConditionFilter([]);
+        resetAllFilters();
         if (dateFilter === filter) {
             setDateFilter(null);
         } else {
@@ -260,14 +286,29 @@ export function AssetSummaryDashboard() {
     };
 
     const handleConditionFilterClick = (conditions: string[]) => {
-        setMissingFieldFilter('');
-        setDateFilter(null);
+        resetAllFilters();
         if (JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditions.sort())) {
             setConditionFilter([]);
         } else {
             setConditionFilter(conditions);
         }
     };
+
+    const handleStatusFilterClick = (status: 'Verified' | 'Unverified' | 'Discrepancy') => {
+        resetAllFilters();
+        if (selectedStatuses.includes(status)) {
+            setSelectedStatuses([]);
+        } else {
+            setSelectedStatuses([status]);
+        }
+    };
+
+    const resetAllFilters = () => {
+        setMissingFieldFilter('');
+        setDateFilter(null);
+        setConditionFilter([]);
+        setSelectedStatuses([]);
+    }
 
     const handleInsightClick = (insight: Insight) => {
         if (insight.asset) {
@@ -292,7 +333,8 @@ export function AssetSummaryDashboard() {
     };
 
     const conditionGroups = {
-        unusable: ['Unsalvageable', 'Burnt', 'Stolen'],
+        unusable: ['Unsalvageable', 'Burnt', 'Stolen', 'Writeoff'],
+        repair: ['Bad condition', 'F2: Major repairs required-poor condition', 'Used but in poor condition'],
     };
 
     if (!appSettings) return null;
@@ -344,36 +386,101 @@ export function AssetSummaryDashboard() {
                 {activeView === 'stats' ? (
                     <ScrollArea className="w-full pb-4">
                         <div className="flex gap-4 p-1">
-                            {summary.unusable > 0 && (
-                                <StatCard
-                                    title="Unusable"
-                                    value={summary.unusable}
-                                    description="Assets reported as stolen, burnt, or unsalvageable."
-                                    icon={<AlertTriangle className="h-4 w-4 text-destructive" />}
-                                    onAction={() => handleConditionFilterClick(conditionGroups.unusable)}
-                                    isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.unusable.sort())}
-                                />
-                            )}
+                            {/* 1. Verification Progress */}
                             <StatCard
-                                title="Missing ID"
+                                title="Verification Coverage"
+                                value={`${summary.total > 0 ? Math.round((summary.verified / summary.total) * 100) : 0}%`}
+                                description={`Showing ${summary.verified} verified items out of ${summary.total} assets in this scope.`}
+                                icon={<ClipboardCheck className="h-4 w-4 text-green-500" />}
+                                onAction={() => handleStatusFilterClick('Verified')}
+                                isActive={selectedStatuses.includes('Verified')}
+                            />
+
+                            {/* 2. Pending Verification */}
+                            <StatCard
+                                title="Pending Action"
+                                value={summary.unverified}
+                                description="Assets currently marked as unverified and requiring field inspection."
+                                icon={<Activity className="h-4 w-4 text-primary" />}
+                                onAction={() => handleStatusFilterClick('Unverified')}
+                                isActive={selectedStatuses.includes('Unverified')}
+                            />
+
+                            {/* 3. Missing ID (Data Quality) */}
+                            <StatCard
+                                title="Missing Asset ID"
                                 value={summary.withoutAssetId}
-                                description="Assets lacking a unique ID or tag number."
-                                icon={<FileWarning className="h-4 w-4 text-orange-500" />}
+                                description="Assets lacking a unique tag or system ID code. Crucial for audits."
+                                icon={<Tag className="h-4 w-4 text-orange-500" />}
                                 onAction={() => handleFilterClick('assetIdCode')}
                                 isActive={missingFieldFilter === 'assetIdCode'}
                             />
+
+                            {/* 4. Missing Serial (Data Quality) */}
+                            <StatCard
+                                title="Missing Serials"
+                                value={summary.withoutSerial}
+                                description="Items missing manufacturer serial numbers. Risk for identification."
+                                icon={<Hash className="h-4 w-4 text-blue-500" />}
+                                onAction={() => handleFilterClick('serialNumber')}
+                                isActive={missingFieldFilter === 'serialNumber'}
+                            />
+
+                            {/* 5. Critical Health */}
+                            <StatCard
+                                title="Critical Condition"
+                                value={summary.unusable}
+                                description="Assets reported as stolen, burnt, or unsalvageable."
+                                icon={<AlertCircle className="h-4 w-4 text-destructive" />}
+                                onAction={() => handleConditionFilterClick(conditionGroups.unusable)}
+                                isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.unusable.sort())}
+                            />
+
+                            {/* 6. Needs Maintenance */}
+                            <StatCard
+                                title="Maintenance Alert"
+                                value={summary.needsRepair}
+                                description="Assets in poor or bad condition requiring technical assessment."
+                                icon={<Wrench className="h-4 w-4 text-orange-600" />}
+                                onAction={() => handleConditionFilterClick(conditionGroups.repair)}
+                                isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.repair.sort())}
+                            />
+
+                            {/* 7. Discrepancies */}
+                            <StatCard
+                                title="Audit Exceptions"
+                                value={summary.withDiscrepancy}
+                                description="Records where field data conflicts with previous system information."
+                                icon={<FileWarning className="h-4 w-4 text-destructive" />}
+                                onAction={() => handleStatusFilterClick('Discrepancy')}
+                                isActive={selectedStatuses.includes('Discrepancy')}
+                            />
+
+                            {/* 8. Field Remarks */}
+                            <StatCard
+                                title="Field Feedback"
+                                value={summary.withRemarks}
+                                description="Assets containing specific comments or remarks from field officers."
+                                icon={<MessageSquare className="h-4 w-4 text-teal-500" />}
+                                onAction={() => handleFilterClick('remarks')}
+                                isActive={missingFieldFilter === 'remarks'}
+                            />
+
+                            {/* 9. Modified Today */}
                             <StatCard
                                 title="Modified Today"
                                 value={summary.modifiedToday}
-                                description="Updates or creations in the last 24 hours."
+                                description="Updates or creations performed in the last 24 hours."
                                 icon={<CalendarClock className="h-4 w-4 text-primary" />}
                                 onAction={() => handleDateFilterClick('today')}
                                 isActive={dateFilter === 'today'}
                             />
+
+                            {/* 10. Fresh Records */}
                             <StatCard
-                                title="New This Week"
+                                title="New In-Flow"
                                 value={summary.newThisWeek}
-                                description="Fresh records added to the system this week."
+                                description="Fresh records newly registered in the system this week."
                                 icon={<PlusCircle className="h-4 w-4 text-green-500" />}
                                 onAction={() => handleDateFilterClick('new-week')}
                                 isActive={dateFilter === 'new-week'}
