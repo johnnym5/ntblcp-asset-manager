@@ -66,3 +66,28 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .custom-scrollbar-x {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary)) transparent;
+  }
+
+  .custom-scrollbar-x::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .custom-scrollbar-x::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar-x::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--primary) / 0.4);
+    border-radius: 20px;
+    border: 1px solid transparent;
+  }
+
+  .custom-scrollbar-x::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--primary));
+  }
+}
