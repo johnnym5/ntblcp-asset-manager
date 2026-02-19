@@ -25,7 +25,8 @@ import {
     AlertCircle,
     Hash,
     MessageSquare,
-    Activity
+    Activity,
+    Wrench
 } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { isToday, isThisWeek, parseISO, formatDistanceToNow } from 'date-fns';
