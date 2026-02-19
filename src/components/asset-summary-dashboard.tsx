@@ -37,7 +37,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useAuth } from '@/contexts/auth-context';
 import { NIGERIAN_STATE_CAPITALS, SPECIAL_LOCATIONS, ZONAL_STORES } from '@/lib/constants';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Badge } from './ui/badge';
+import { Badge } from '@/components/ui/badge';
 
 const StatCard = ({ title, value, description, icon, onAction, actionLabel, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, actionLabel?: string, isActive?: boolean }) => {
     const cardContent = (

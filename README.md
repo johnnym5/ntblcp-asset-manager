@@ -9,31 +9,48 @@ This application is designed to solve the critical challenge of managing and ver
 ### Core Features
 
 *   **Offline-First by Default**: The application is built to work completely offline. All data is stored and managed in the browser's local database (IndexedDB), ensuring that work is never lost due to a lack of internet.
-*   **Role-Based Access & Approval Workflow**: A secure, password-based login system grants access based on user roles. Changes from non-admin users are submitted to an approval queue for an administrator to review, ensuring data integrity.
+*   **Role-Based Access & Approval Workflow**: A secure login system grants access based on user roles (Admin, User, Zonal Manager).
+*   **Regional Bulk Sync**: Intelligent synchronization fetches data for all authorized states in a user's region, enabling seamless offline switching between locations.
+*   **Asset Insight Engine**: A dynamic dashboard that highlights random data quality issues, maintenance alerts, and recent modifications every 5 seconds.
 *   **Dynamic Excel Import & Export**:
-    *   **Intelligent Import**: Parses complex Excel files, automatically detecting headers and mapping data to a unified structure. Imports are sandboxed in a "Locked Offline" store for review before merging.
-    *   **Structure-Preserving Export**: Exports data back into an Excel file that mirrors the original's column structure and naming conventions.
-*   **Advanced Data Management**: Features smart search, powerful filtering and sorting, and batch editing capabilities.
-*   **Insightful Dashboard**: Provides a high-level overview of asset verification progress with clear, visual progress bars.
-*   **Selective Sync with Confirmation**: Users can select one or more assets or entire categories and push/pull only those specific items to the cloud, with a clear confirmation step that summarizes all pending changes.
+    *   **Intelligent Import**: Parses complex Excel files, automatically detecting headers and mapping data to a unified structure.
+    *   **Structure-Preserving Export**: Exports data back into Excel files that mirror the original's column structure.
+*   **Insightful Dashboard**: Provides a high-level overview of asset verification progress with 10 key metrics and real-time visual progress bars.
 
 ---
 
-## 1. Local Development Setup
+## 1. Professional Production Roadmap
+
+If this application were to be fully developed by a professional team, the following structure would be used:
+
+### Team Roles
+*   **Product Manager**: Feature prioritization and stakeholder management.
+*   **UI/UX Designer**: Field-optimized interface design and accessibility.
+*   **Lead Frontend Engineer**: Next.js architecture and complex parsing logic.
+*   **Full-Stack/Cloud Engineer**: Firebase Hybrid-DB architecture and Security Rules.
+*   **QA Specialist**: Testing sync conflicts and IndexedDB edge cases.
+
+### Development Methodology
+*   **Agile Scrum**: 2-week sprints with bi-weekly demos.
+*   **Duration**: ~4 Months (1 month design, 2 months core development, 1 month testing/security).
+
+### App Scale
+*   **Capacity**: National-level utility capable of handling 100,000+ assets and thousands of concurrent field officers.
+*   **Architecture**: Scalable Vercel/Firebase backend designed for high availability.
+
+---
+
+## 2. Local Development Setup
 
 Before you can run the app locally, you must provide your Firebase project's credentials.
 
-### Step 1.1: Create `.env.local` file
+### Step 2.1: Create `.env.local` file
 
-Create a file named `.env.local` in the root of the project by copying the `.env.example` file if it exists, or creating a new one.
+Create a file named `.env.local` in the root of the project.
 
-### Step 1.2: Fill in your Firebase Credentials
+### Step 2.2: Fill in your Firebase Credentials
 
-Open the new `.env.local` file and add your actual Firebase project credentials. You can find these values in your Firebase project's settings page in the Firebase Console.
-
-*   In the Firebase Console, go to **Project settings** (click the gear icon ⚙️).
-*   In the **General** tab, scroll down to the "Your apps" section.
-*   Select your web app and copy the corresponding configuration values into your `.env.local` file. The file should look like this:
+Open the new `.env.local` file and add your actual Firebase project credentials from the Firebase Console.
 
 ```
 NEXT_PUBLIC_FIREBASE_API_KEY=AIza...
@@ -45,93 +62,13 @@ NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=12345...
 NEXT_PUBLIC_FIREBASE_APP_ID=1:12345...:web:...
 ```
 
-### Step 1.3: Install Dependencies & Run
-
-```bash
-npm install
-npm run dev
-```
-
-Open [http://localhost:9002](http://localhost:9002) with your browser to see the result.
-
----
-
-## 2. Deployment to Firebase App Hosting
-
-This project is pre-configured for one-click deployment to Firebase App Hosting.
-
-### Step 2.1: Install the Firebase CLI
-
-If you haven't already, install the Firebase Command Line Interface (CLI).
-
-```bash
-npm install -g firebase-tools
-```
-
-### Step 2.2: Log in to Firebase
-
-Log in to your Firebase account through the CLI. This command will open a browser window for you to sign in.
-
-```bash
-firebase login
-```
-
-### Step 2.3: Set Your Firebase Project
-
-From your project's root directory, run the following command to associate your local project with your Firebase project. Replace `<YOUR_FIREBASE_PROJECT_ID>` with your actual Firebase Project ID.
-
-```bash
-firebase use <YOUR_FIREBASE_PROJECT_ID>
-```
-
-### Step 2.4: Deploy the Application
-
-Run this single command from your project's root directory.
-
-```bash
-firebase deploy
-```
-
-This command will automatically build your Next.js application and deploy it to App Hosting. Your live application will be available at `https://<your-app-name>.web.app`.
-
 ---
 
 ## 3. Data Privacy & Security
 
-This section outlines the application's data handling practices and highlights critical security considerations for a production environment.
-
-### Data Storage
-
-*   **Local (Client-Side)**: The application uses the browser's **IndexedDB** to store all asset data and settings. This enables full offline functionality. This data is private to the user's device and browser profile and is not accessible by other websites.
-*   **Cloud (Firebase)**: When online, the app syncs with **Firebase Realtime Database** (primary) and **Cloud Firestore** (backup). All data, including user credentials and asset information, is stored in these cloud databases.
-
 ### **CRITICAL: Security Weaknesses in the Current Version**
 
-The current codebase is a prototype and **is NOT secure for production use** without significant modifications. The following are known vulnerabilities:
+The current codebase is a prototype and **is NOT secure for production use** without these modifications:
 
-1.  **Open Database Rules**: The Firebase security rules (`firestore.rules`) are configured to allow open read and write access to the entire database (`allow read, write: if true;`). This means **anyone** with your Firebase project credentials can read, modify, or delete all of your data.
-2.  **Plaintext Passwords**: User passwords are **stored in plaintext** in the Firebase database within the `config/settings` document. This is a major security risk. If your database is compromised, all user passwords will be exposed.
-
-### Recommendations for Production Deployment
-
-Before deploying this application to a production environment with real data, it is **essential** to address the security issues above:
-
-*   **Implement Strict Security Rules**: Rewrite your `firestore.rules` file to enforce proper access control.
-    *   Only authenticated users should be able to read or write data.
-    *   Implement role-based access (e.g., only admins can write to the `config` document).
-    *   Use rules to validate data integrity on write operations.
-*   **Use Firebase Authentication**: The current custom user management system should be replaced with **Firebase Authentication**. This service provides a secure, managed solution for user sign-up, sign-in, and password management, including industry-standard password hashing and recovery flows.
-*   **Review Data Collection**: Ensure you are only collecting and storing data that is necessary for the application's functionality. Avoid storing sensitive Personally Identifiable Information (PII) unless absolutely required and properly secured.
-
----
-
-## 4. Initial Setup & Default Credentials
-
-A "super admin" user is hardcoded into the application for initial setup and emergency access.
-
-*   **Login Name:** `admin`
-*   **Password:** `setup`
-
-This account provides full administrative access. It is highly recommended that you change this password or remove the hardcoded user from the code (`src/components/user-profile-setup.tsx`) once you have established your own administrative accounts using the in-app user management tools.
-
-Leaving default, hardcoded credentials in a production application is a significant security risk.
+1.  **Firebase Authentication**: Replace the custom login system with Firebase Auth to prevent plaintext password storage.
+2.  **Strict Security Rules**: Enforce per-user and per-state read/write permissions in `firestore.rules` and `database.rules.json`.
