@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -1448,30 +1447,34 @@ export default function AssetList() {
 
         {selectedCategories.length > 0 && (
             <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="sticky top-2 z-40 p-2 bg-primary text-primary-foreground rounded-2xl shadow-2xl flex flex-wrap items-center gap-3 border border-white/20 backdrop-blur-lg">
-                <Badge variant="outline" className="bg-white/20 text-white border-none font-black ml-2 px-3 py-1">{selectedCategories.length} Selected</Badge>
-                <Separator orientation="vertical" className="h-6 bg-white/20 hidden sm:block"/>
-                <div className="flex flex-wrap gap-1">
-                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={handleSelectiveUpload} disabled={isSyncing}>
-                        {isSyncing ? <Loader2 className="mr-2 h-3 w-3 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-3 w-3" />}
-                        {contextualButtonText}
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={handleCopyToOffline} disabled={isSyncing || dataSource !== 'cloud'}>
-                        <Copy className="mr-2 h-3 w-3" /> Copy to Sandbox
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
-                        <ClipboardEdit className="mr-2 h-3 w-3" /> Batch Edit
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={handleExportSelection}>
-                        <Download className="mr-2 h-3 w-3" /> Export Excel
-                    </Button>
-                    <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-destructive hover:text-white" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
-                        <Trash2 className="mr-2 h-3 w-3" /> Wipe Selected
-                    </Button>
+                <div className="flex items-center">
+                    <Badge variant="outline" className="bg-white/20 text-white border-none font-black ml-2 px-3 py-1">{selectedCategories.length} Selected</Badge>
                 </div>
+                <Separator orientation="vertical" className="h-6 bg-white/20 hidden sm:block"/>
+                <ScrollArea className="flex-1 max-h-24 overflow-y-auto">
+                    <div className="flex flex-wrap gap-1 p-1">
+                        <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={handleSelectiveUpload} disabled={isSyncing}>
+                            {isSyncing ? <Loader2 className="mr-2 h-3 w-3 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-3 w-3" />}
+                            {contextualButtonText}
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={handleCopyToOffline} disabled={isSyncing || dataSource !== 'cloud'}>
+                            <Copy className="mr-2 h-3 w-3" /> Copy to Sandbox
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={() => setIsCategoryBatchEditOpen(true)} disabled={isGuest || (!userProfile?.canEditAssets && !isAdmin)}>
+                            <ClipboardEdit className="mr-2 h-3 w-3" /> Batch Edit
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={handleExportSelection}>
+                            <Download className="mr-2 h-3 w-3" /> Export Excel
+                        </Button>
+                        <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-destructive hover:text-white" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
+                            <Trash2 className="mr-2 h-3 w-3" /> Wipe Selected
+                        </Button>
+                    </div>
+                </ScrollArea>
             </motion.div>
         )}
         
-        <div className="flex-1 overflow-y-auto min-h-[400px]">
+        <div className="flex-1 min-h-[400px]">
           <div className="grid gap-6 p-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {mainCategories.length > 0 ? (
                 mainCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))
@@ -1569,7 +1572,7 @@ export default function AssetList() {
                     <Card
                       key={asset.id}
                       data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''}
-                      className="data-[state=selected]:ring-2 data-[state=selected]:ring-primary transition-all duration-300 hover:shadow-lg flex flex-col overflow-hidden border-primary/5"
+                      className="data-[state=selected]:ring-2 data-[state=selected]:ring-primary transition-all duration-300 hover:shadow-lg flex flex-col overflow-hidden border-primary/5 shadow-sm"
                     >
                       <CardHeader className="flex flex-row items-center space-x-4 p-4 bg-muted/10 border-b border-dashed">
                           <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>

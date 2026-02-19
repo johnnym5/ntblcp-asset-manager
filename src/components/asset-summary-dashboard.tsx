@@ -42,7 +42,7 @@ import { Badge } from './ui/badge';
 
 const StatCard = ({ title, value, description, icon, onAction, actionLabel, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, actionLabel?: string, isActive?: boolean }) => {
     const cardContent = (
-        <Card className={cn("transition-all duration-300 w-64 shrink-0 overflow-hidden", isActive ? "bg-primary/10 border-primary shadow-lg shadow-primary/10" : "hover:bg-muted/50 hover:border-primary/30")}>
+        <Card className={cn("transition-all duration-300 w-64 shrink-0 overflow-hidden", isActive ? "bg-primary/10 border-primary shadow-lg shadow-primary/10" : "hover:bg-muted/50 hover:border-primary/30 shadow-sm")}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</CardTitle>
                 <div className={cn("p-2 rounded-full", isActive ? "bg-primary/20" : "bg-muted")}>
@@ -64,7 +64,7 @@ const StatCard = ({ title, value, description, icon, onAction, actionLabel, isAc
     );
 
     if (onAction) {
-        return <button onClick={onAction} className="text-left outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl">{cardContent}</button>;
+        return <button onClick={onAction} className="text-left outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl shrink-0">{cardContent}</button>;
     }
     return cardContent;
 };
@@ -386,7 +386,7 @@ export function AssetSummaryDashboard() {
             <CollapsibleContent className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300">
                 {activeView === 'stats' ? (
                     <ScrollArea className="w-full pb-4">
-                        <div className="flex gap-4 p-1">
+                        <div className="flex gap-4 p-1 overflow-x-auto no-scrollbar">
                             {/* 1. Verification Progress */}
                             <StatCard
                                 title="Verification Coverage"
@@ -487,7 +487,7 @@ export function AssetSummaryDashboard() {
                                 isActive={dateFilter === 'new-week'}
                             />
                         </div>
-                        <ScrollBar orientation="horizontal" />
+                        <ScrollBar orientation="horizontal" className="opacity-100" />
                     </ScrollArea>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
