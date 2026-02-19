@@ -1,9 +1,10 @@
+
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileWarning, History, BarChart2, CalendarClock, ChevronsUpDown, PlusCircle, AlertTriangle, CheckCircle2, PieChart, Sparkles, User, Search } from 'lucide-react';
+import { FileWarning, History, BarChart2, CalendarClock, ChevronsUpDown, PlusCircle, AlertTriangle, CheckCircle2, PieChart, Sparkles, User, Search, Tag, MapPin } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { isToday, isThisWeek, parseISO, formatDistanceToNow } from 'date-fns';
 import { useAppState } from '@/contexts/app-state-context';
@@ -49,10 +50,11 @@ interface Insight {
     icon: React.ReactNode;
     color: string;
     subtext?: string;
+    asset?: Asset;
 }
 
 export function AssetSummaryDashboard() {
-    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter, globalStateFilter, conditionFilter, setConditionFilter, activeGrantId } = useAppState();
+    const { assets, offlineAssets, dataSource, setMissingFieldFilter, missingFieldFilter, appSettings, dateFilter, setDateFilter, globalStateFilter, conditionFilter, setConditionFilter, activeGrantId, setAssetToView } = useAppState();
     const { userProfile } = useAuth();
     const [isOpen, setIsOpen] = useState(false);
     const [activeView, setActiveTab] = useState<'stats' | 'progress'>('stats');
@@ -110,71 +112,82 @@ export function AssetSummaryDashboard() {
     const insightsPool = useMemo(() => {
         const pool: Insight[] = [];
 
-        // 1. Verification Count
+        // 1. Random Recently Modified Asset
+        const recentlyModified = [...summaryAssets]
+            .filter(a => a.lastModified)
+            .sort((a, b) => new Date(b.lastModified!).getTime() - new Date(a.lastModified!).getTime())
+            .slice(0, 10);
+        
+        if (recentlyModified.length > 0) {
+            const randomAsset = recentlyModified[Math.floor(Math.random() * recentlyModified.length)];
+            pool.push({
+                text: `"${randomAsset.description || 'Record'}" was recently updated.`,
+                icon: <History className="h-5 w-5" />,
+                color: "text-green-500",
+                subtext: `Modified by ${randomAsset.lastModifiedBy || 'System'} ${formatDistanceToNow(new Date(randomAsset.lastModified!), { addSuffix: true })}.`,
+                asset: randomAsset
+            });
+        }
+
+        // 2. Random Asset Missing ID
+        const missingIds = summaryAssets.filter(a => !a.assetIdCode);
+        if (missingIds.length > 0) {
+            const randomAsset = missingIds[Math.floor(Math.random() * missingIds.length)];
+            pool.push({
+                text: `"${randomAsset.description || 'Asset'}" is missing its Asset ID Code.`,
+                icon: <Tag className="h-5 w-5" />,
+                color: "text-orange-500",
+                subtext: `Data Quality: Assets without tags are harder to audit in ${randomAsset.location || 'the field'}.`,
+                asset: randomAsset
+            });
+        }
+
+        // 3. Random Asset Missing Assignee
+        const noAssignees = summaryAssets.filter(a => !a.assignee);
+        if (noAssignees.length > 0) {
+            const randomAsset = noAssignees[Math.floor(Math.random() * noAssignees.length)];
+            pool.push({
+                text: `Ownership Gap: "${randomAsset.description || 'Asset'}" has no recorded user.`,
+                icon: <User className="h-5 w-5" />,
+                color: "text-blue-500",
+                subtext: `Current Location: ${randomAsset.location || 'Unknown'}. Click to view details.`,
+                asset: randomAsset
+            });
+        }
+
+        // 4. Random Bad Condition Asset
+        const badConditions = summaryAssets.filter(a => a.condition && a.condition.toLowerCase().includes('bad'));
+        if (badConditions.length > 0) {
+            const randomAsset = badConditions[Math.floor(Math.random() * badConditions.length)];
+            pool.push({
+                text: `Maintenance Alert: "${randomAsset.description}" is in bad condition.`,
+                icon: <AlertTriangle className="h-5 w-5" />,
+                color: "text-destructive",
+                subtext: `Reported Condition: ${randomAsset.condition}. Needs immediate assessment.`,
+                asset: randomAsset
+            });
+        }
+
+        // 5. Verification Progress
         const pending = summaryAssets.filter(a => a.verifiedStatus !== 'Verified').length;
         if (pending > 0) {
             pool.push({
-                text: `There are ${pending} assets in your scope currently awaiting verification.`,
+                text: `Verification Pulse: ${pending} assets in ${globalStateFilter === 'All' ? 'the project' : globalStateFilter} are pending verification.`,
                 icon: <PieChart className="h-5 w-5" />,
                 color: "text-primary",
-                subtext: "Action: Use the dashboard cards to find unverified items."
+                subtext: "Action: Use the 'Unverified' filter to clear the queue."
             });
         }
 
-        // 2. Recently Modified
-        const recent = [...summaryAssets]
-            .filter(a => a.lastModified)
-            .sort((a,b) => new Date(b.lastModified!).getTime() - new Date(a.lastModified!).getTime())[0];
-        if (recent) {
+        // 6. Category Insight
+        const laggingCategories = categoryStats.filter(c => c.percentage < 100);
+        if (laggingCategories.length > 0) {
+            const randomCat = laggingCategories[Math.floor(Math.random() * laggingCategories.length)];
             pool.push({
-                text: `Recent Activity: "${recent.description || 'Asset'}" was recently modified.`,
-                icon: <History className="h-5 w-5" />,
-                color: "text-green-500",
-                subtext: `Modified by ${recent.lastModifiedBy || 'System'} ${formatDistanceToNow(new Date(recent.lastModified!), { addSuffix: true })}.`
-            });
-        }
-
-        // 3. Missing IDs
-        const missingId = summaryAssets.find(a => !a.assetIdCode);
-        if (missingId) {
-            pool.push({
-                text: `Data Quality: "${missingId.description || 'Asset'}" is missing its Asset ID Code.`,
-                icon: <FileWarning className="h-5 w-5" />,
-                color: "text-orange-500",
-                subtext: "Quality Control: Assets should have a unique ID for proper tracking."
-            });
-        }
-
-        // 4. Missing Assignee
-        const noAssignee = summaryAssets.find(a => !a.assignee);
-        if (noAssignee) {
-            pool.push({
-                text: `Ownership Gap: "${noAssignee.description || 'Asset'}" has no recorded assignee.`,
-                icon: <User className="h-5 w-5" />,
-                color: "text-blue-500",
-                subtext: "Visibility: Records without users are harder to locate during physical audits."
-            });
-        }
-
-        // 5. Category missing info
-        const catMissing = categoryStats.find(c => c.percentage < 100);
-        if (catMissing) {
-            pool.push({
-                text: `Category Focus: The "${catMissing.name}" list contains unverified assets.`,
+                text: `Focus Area: The "${randomCat.name}" category is only ${randomCat.percentage.toFixed(0)}% verified.`,
                 icon: <BarChart2 className="h-5 w-5" />,
                 color: "text-purple-500",
-                subtext: `Status: ${catMissing.verified} / ${catMissing.total} items verified.`
-            });
-        }
-
-        // 6. Bad Condition
-        const badCond = summaryAssets.find(a => a.condition && a.condition.toLowerCase().includes('bad'));
-        if (badCond) {
-            pool.push({
-                text: `Maintenance Alert: "${badCond.description}" is reported in bad condition.`,
-                icon: <AlertTriangle className="h-5 w-5" />,
-                color: "text-destructive",
-                subtext: `Current Condition: ${badCond.condition}`
+                subtext: `${randomCat.total - randomCat.verified} items remaining in this inventory list.`
             });
         }
 
@@ -187,7 +200,7 @@ export function AssetSummaryDashboard() {
         }
 
         return pool;
-    }, [summaryAssets, categoryStats]);
+    }, [summaryAssets, categoryStats, globalStateFilter]);
 
     useEffect(() => {
         if (activeView === 'progress' && insightsPool.length > 1) {
@@ -199,12 +212,9 @@ export function AssetSummaryDashboard() {
     }, [activeView, insightsPool.length]);
 
     const summary = useMemo(() => {
-        const vehicleCategories = ['Vehicles-TB (IHVN)', 'MOTORCYCLES-C19RM'];
-
         return {
           unusable: summaryAssets.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen'].includes(a.condition)).length,
           withoutAssetId: summaryAssets.filter(a => !a.assetIdCode?.trim()).length,
-          withoutLocation: summaryAssets.filter(a => !a.location?.trim()).length,
           modifiedToday: summaryAssets.filter(a => a.lastModified && isToday(parseISO(a.lastModified))).length,
           newThisWeek: summaryAssets.filter(a => a.lastModified && !a.previousState && isThisWeek(parseISO(a.lastModified), { weekStartsOn: 1 })).length,
         };
@@ -237,6 +247,12 @@ export function AssetSummaryDashboard() {
             setConditionFilter([]);
         } else {
             setConditionFilter(conditions);
+        }
+    };
+
+    const handleInsightClick = (insight: Insight) => {
+        if (insight.asset) {
+            setAssetToView(insight.asset);
         }
     };
 
@@ -341,7 +357,8 @@ export function AssetSummaryDashboard() {
                                         animate={{ opacity: 1, y: 0 }}
                                         exit={{ opacity: 0, y: -10 }}
                                         transition={{ duration: 0.4 }}
-                                        className="flex flex-col items-center text-center gap-4"
+                                        className={cn("flex flex-col items-center text-center gap-4 cursor-pointer", insightsPool[insightIndex].asset && "hover:opacity-80")}
+                                        onClick={() => handleInsightClick(insightsPool[insightIndex])}
                                     >
                                         <div className={cn("p-4 rounded-full bg-background shadow-lg border", insightsPool[insightIndex].color)}>
                                             {insightsPool[insightIndex].icon}
@@ -354,6 +371,14 @@ export function AssetSummaryDashboard() {
                                                 <p className="text-sm text-muted-foreground italic">
                                                     {insightsPool[insightIndex].subtext}
                                                 </p>
+                                            )}
+                                            {insightsPool[insightIndex].asset && (
+                                                <div className="flex items-center justify-center gap-2 mt-2">
+                                                    <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                                                        <MapPin className="h-2 w-2 mr-1"/> {insightsPool[insightIndex].asset.location}
+                                                    </Badge>
+                                                    <span className="text-[10px] text-primary font-bold uppercase tracking-widest">Click to Inspect</span>
+                                                </div>
                                             )}
                                         </div>
                                     </motion.div>

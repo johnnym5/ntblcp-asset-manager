@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -325,7 +326,7 @@ export default function AssetList() {
         if (!isFirstTime) {
           addNotification({ title: 'Sync Successful', description: `${totalChanges} items synchronized from cloud.` });
         } else {
-          addNotification({ title: 'System Initialized', description: `Successfully downloaded ${totalChanges} state-assigned assets.` });
+          addNotification({ title: 'System Initialized', description: `Successfully downloaded ${totalChanges} regional assets.` });
         }
         
     } catch (error) {
@@ -450,8 +451,15 @@ export default function AssetList() {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
         const allCloudAssets = await getCloudAssets(activeGrantId);
         
-        // CRITICAL: Filter cloud assets to only those matching the user's current state/scope
-        const cloudAssets = allCloudAssets.filter(asset => assetMatchesGlobalFilter(asset, globalStateFilter));
+        // CRITICAL FIX: Zonal managers and regional users should download assets for ALL their authorized states.
+        // This ensures the data is available locally when they switch scopes via the dropdown.
+        const userAuthorizedStates = isAdmin ? ['All'] : (userProfile?.states || []);
+        
+        const cloudAssets = allCloudAssets.filter(asset => {
+            if (isAdmin) return true;
+            // Check if asset matches ANY of the user's authorized states/scopes
+            return userAuthorizedStates.some(state => assetMatchesGlobalFilter(asset, state));
+        });
         
         const localAssets = await getLocalAssetsFromDb();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
@@ -484,10 +492,12 @@ export default function AssetList() {
             }
         }
         
-        // Handle removals
+        // Handle removals for items that are in the user's regional scope but missing from cloud
         for (const localAsset of localAssets) {
             if (!cloudAssetIds.has(localAsset.id) && localAsset.syncStatus !== 'local') {
-                if(assetMatchesGlobalFilter(localAsset, globalStateFilter)) {
+                // Only mark for deletion if it's within one of the user's states
+                const isInScope = isAdmin || userAuthorizedStates.some(state => assetMatchesGlobalFilter(localAsset, state));
+                if(isInScope) {
                     summary.deletedOnCloud?.push(localAsset);
                 }
             }
@@ -501,7 +511,7 @@ export default function AssetList() {
                 await executeDownload(summary, true);
             } else {
                 setSyncSummary(summary);
-                setIsSyncOpen(true);
+                setIsSyncConfirmOpen(true);
             }
         }
     } catch (error) {
@@ -515,7 +525,7 @@ export default function AssetList() {
     } finally {
         setIsSyncing(false);
     }
-  }, [isOnline, authInitialized, isGuest, setIsOnline, setIsSyncing, activeDatabase, activeGrantId, globalStateFilter, executeDownload, setFirstTimeSetupStatus]);
+  }, [isOnline, authInitialized, isGuest, isAdmin, userProfile, setIsOnline, setIsSyncing, activeDatabase, activeGrantId, executeDownload, setFirstTimeSetupStatus]);
   
   useEffect(() => {
     if (firstTimeSetupStatus === 'syncing') {
@@ -532,21 +542,26 @@ export default function AssetList() {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
         const allCloudAssets = await getCloudAssets(activeGrantId);
         
+        const userAuthorizedStates = isAdmin ? ['All'] : (userProfile?.states || []);
+
         const assetsToSave = allCloudAssets
-            .filter(asset => assetMatchesGlobalFilter(asset, globalStateFilter))
+            .filter(asset => {
+                if (isAdmin) return true;
+                return userAuthorizedStates.some(state => assetMatchesGlobalFilter(asset, state));
+            })
             .map(asset => ({ ...asset, syncStatus: 'synced' as const }));
         
         await saveAssets(assetsToSave);
         setAssets(assetsToSave);
         
-        addNotification({ title: 'Refresh Complete', description: `${assetsToSave.length} records reloaded.` });
+        addNotification({ title: 'Refresh Complete', description: `${assetsToSave.length} regional records reloaded.` });
     } catch (error) {
         console.error("Forced download scan failed:", error);
         setIsOnline(false);
     } finally {
         setIsSyncing(false);
     }
-  }, [setIsSyncing, setIsOnline, activeDatabase, setAssets, activeGrantId, globalStateFilter]);
+  }, [setIsSyncing, setIsOnline, isAdmin, userProfile, activeDatabase, setAssets, activeGrantId]);
   
   const handleUploadFirst = useCallback(() => {
     setIsDownloadWarningOpen(false);
@@ -602,7 +617,8 @@ export default function AssetList() {
       }
     });
 
-    NIGERIAN_STATES.forEach(state => {
+    const possibleStates = isAdmin ? NIGERIAN_STATES : (userProfile?.states || []);
+    possibleStates.forEach(state => {
       if(!locations.has(state)) locations.set(state, 0);
     });
     
@@ -625,7 +641,7 @@ export default function AssetList() {
         }
     });
     setConditionOptions(Array.from(conditionMap.entries()).map(([c, count]) => ({ label: c, value: c, count })).sort((a,b) => a.label.localeCompare(b.label)));
-  }, [allAssetsForFiltering, setLocationOptions, setAssigneeOptions, setConditionOptions]);
+  }, [allAssetsForFiltering, setLocationOptions, setAssigneeOptions, setConditionOptions, isAdmin, userProfile]);
 
 
   const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
@@ -1042,11 +1058,11 @@ export default function AssetList() {
 
     try {
       const ts = new Date().toISOString().replace(/:/g, '-');
-      exportToExcel(assetsToExport, appSettings.sheetDefinitions, `export-${ts}.xlsx`);
+      exportToExcel(assetsToExport, grant?.sheetDefinitions || {}, `export-${ts}.xlsx`);
     } catch (e) {
       addNotification({ title: 'Export Failed', variant: 'destructive' });
     }
-  }, [view, selectedCategories, assetsByCategory, selectedAssetIds, activeAssets, appSettings]);
+  }, [view, selectedCategories, assetsByCategory, selectedAssetIds, activeAssets, appSettings, grant?.sheetDefinitions]);
 
 
   const handleClearCategoryClick = useCallback((category: string) => {
@@ -1235,7 +1251,7 @@ export default function AssetList() {
         });
     } else if (originalName) newSheetDefinitions[originalName] = newDefinition;
 
-    const settings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
+    const settings: AppSettings = { ...appSettings, grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefinitions } : g), lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
     const old = appSettings;
     setAppSettings(settings);
     try {
@@ -1249,9 +1265,10 @@ export default function AssetList() {
 
   const handleToggleSheetVisibility = async (sn: string) => {
     if (!isAdmin || !appSettings || !userProfile) return;
-    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
+    const newSheetDefinitions = { ...grant?.sheetDefinitions };
     if(newSheetDefinitions[sn]) newSheetDefinitions[sn].isHidden = !newSheetDefinitions[sn].isHidden;
-    const settings: AppSettings = { ...appSettings, sheetDefinitions: newSheetDefinitions, lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
+    
+    const settings: AppSettings = { ...appSettings, grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefinitions } : g), lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
     const old = appSettings;
     setAppSettings(settings);
     try {
