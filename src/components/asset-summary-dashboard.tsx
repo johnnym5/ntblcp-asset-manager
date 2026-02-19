@@ -1,10 +1,27 @@
-
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileWarning, History, BarChart2, CalendarClock, ChevronsUpDown, PlusCircle, AlertTriangle, CheckCircle2, PieChart, Sparkles, User, Search, Tag, MapPin } from 'lucide-react';
+import { 
+    FileWarning, 
+    History, 
+    BarChart2, 
+    CalendarClock, 
+    ChevronsUpDown, 
+    PlusCircle, 
+    AlertTriangle, 
+    CheckCircle2, 
+    PieChart, 
+    Sparkles, 
+    User, 
+    Search, 
+    Tag, 
+    MapPin, 
+    RefreshCw, 
+    ChevronLeft, 
+    ChevronRight 
+} from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { isToday, isThisWeek, parseISO, formatDistanceToNow } from 'date-fns';
 import { useAppState } from '@/contexts/app-state-context';
@@ -60,6 +77,7 @@ export function AssetSummaryDashboard() {
     const [isOpen, setIsOpen] = useState(false);
     const [activeView, setActiveTab] = useState<'stats' | 'progress'>('stats');
     const [insightIndex, setInsightIndex] = useState(0);
+    const [refreshKey, setRefreshKey] = useState(0);
     
     const isAdmin = userProfile?.isAdmin;
 
@@ -201,7 +219,7 @@ export function AssetSummaryDashboard() {
         }
 
         return pool;
-    }, [summaryAssets, categoryStats, globalStateFilter]);
+    }, [summaryAssets, categoryStats, globalStateFilter, refreshKey]);
 
     useEffect(() => {
         if (activeView === 'progress' && insightsPool.length > 1) {
@@ -210,7 +228,7 @@ export function AssetSummaryDashboard() {
             }, 5000);
             return () => clearInterval(timer);
         }
-    }, [activeView, insightsPool.length]);
+    }, [activeView, insightsPool.length, refreshKey]);
 
     const summary = useMemo(() => {
         return {
@@ -255,6 +273,22 @@ export function AssetSummaryDashboard() {
         if (insight.asset) {
             setAssetToView(insight.asset);
         }
+    };
+
+    const handleNextInsight = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setInsightIndex(prev => (prev + 1) % insightsPool.length);
+    };
+
+    const handlePrevInsight = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setInsightIndex(prev => (prev - 1 + insightsPool.length) % insightsPool.length);
+    };
+
+    const handleRefreshInsights = (e?: React.MouseEvent) => {
+        e?.stopPropagation();
+        setRefreshKey(prev => prev + 1);
+        setInsightIndex(0);
     };
 
     const conditionGroups = {
@@ -349,16 +383,21 @@ export function AssetSummaryDashboard() {
                     </ScrollArea>
                 ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <Card className="col-span-1 md:col-span-2 lg:col-span-3 min-h-[160px] flex flex-col justify-center bg-primary/5 border-dashed border-primary/20">
-                            <CardContent className="pt-6">
+                        <Card className="col-span-1 md:col-span-2 lg:col-span-3 min-h-[180px] flex flex-col justify-center bg-primary/5 border-dashed border-primary/20 relative group/insight">
+                            <div className="absolute top-4 right-4 z-10 opacity-0 group-hover/insight:opacity-100 transition-opacity">
+                                <Button variant="outline" size="icon" className="h-8 w-8 bg-background/80" onClick={handleRefreshInsights}>
+                                    <RefreshCw className="h-4 w-4" />
+                                </Button>
+                            </div>
+                            <CardContent className="pt-8">
                                 <AnimatePresence mode="wait">
                                     <motion.div
-                                        key={insightIndex}
-                                        initial={{ opacity: 0, y: 10 }}
-                                        animate={{ opacity: 1, y: 0 }}
-                                        exit={{ opacity: 0, y: -10 }}
-                                        transition={{ duration: 0.4 }}
-                                        className={cn("flex flex-col items-center text-center gap-4 cursor-pointer", insightsPool[insightIndex].asset && "hover:opacity-80")}
+                                        key={`${refreshKey}-${insightIndex}`}
+                                        initial={{ opacity: 0, x: 20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        exit={{ opacity: 0, x: -20 }}
+                                        transition={{ duration: 0.3 }}
+                                        className={cn("flex flex-col items-center text-center gap-4 cursor-pointer px-12", insightsPool[insightIndex].asset && "hover:opacity-80")}
                                         onClick={() => handleInsightClick(insightsPool[insightIndex])}
                                     >
                                         <div className={cn("p-4 rounded-full bg-background shadow-lg border", insightsPool[insightIndex].color)}>
@@ -384,13 +423,23 @@ export function AssetSummaryDashboard() {
                                         </div>
                                     </motion.div>
                                 </AnimatePresence>
-                                <div className="flex justify-center gap-1 mt-6">
-                                    {insightsPool.map((_, i) => (
-                                        <div 
-                                            key={i} 
-                                            className={cn("h-1 rounded-full transition-all", i === insightIndex ? "w-8 bg-primary" : "w-2 bg-muted")}
-                                        />
-                                    ))}
+                                
+                                <div className="flex items-center justify-center gap-4 mt-8">
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={handlePrevInsight}>
+                                        <ChevronLeft className="h-5 w-5" />
+                                    </Button>
+                                    <div className="flex justify-center gap-1.5">
+                                        {insightsPool.map((_, i) => (
+                                            <button 
+                                                key={i} 
+                                                onClick={(e) => { e.stopPropagation(); setInsightIndex(i); }}
+                                                className={cn("h-1.5 rounded-full transition-all", i === insightIndex ? "w-8 bg-primary" : "w-2 bg-muted hover:bg-muted-foreground/30")}
+                                            />
+                                        ))}
+                                    </div>
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={handleNextInsight}>
+                                        <ChevronRight className="h-5 w-5" />
+                                    </Button>
                                 </div>
                             </CardContent>
                         </Card>
