@@ -98,6 +98,7 @@ import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { AssetSummaryDashboard } from "./asset-summary-dashboard";
 import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { Badge } from "./ui/badge";
+import { motion } from "framer-motion";
 
 
 /**
@@ -1360,7 +1361,7 @@ export default function AssetList() {
     const showScopeSwitcher = isAdmin || (userProfile?.states && userProfile.states.length > 1);
 
     return (
-      <div className="flex flex-col h-full gap-6">
+      <div className="flex flex-col h-full gap-6 max-w-full">
         <AlertDialog open={isDownloadWarningOpen} onOpenChange={setIsDownloadWarningOpen}>
             <AlertDialogContent>
               <AlertDialogHeader>
@@ -1446,12 +1447,12 @@ export default function AssetList() {
         </div>
 
         {selectedCategories.length > 0 && (
-            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="sticky top-2 z-40 p-2 bg-primary text-primary-foreground rounded-2xl shadow-2xl flex flex-wrap items-center gap-3 border border-white/20 backdrop-blur-lg">
+            <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="sticky top-2 z-40 p-2 bg-primary text-primary-foreground rounded-2xl shadow-2xl flex flex-wrap items-center gap-3 border border-white/20 backdrop-blur-lg w-full max-w-full">
                 <div className="flex items-center">
-                    <Badge variant="outline" className="bg-white/20 text-white border-none font-black ml-2 px-3 py-1">{selectedCategories.length} Selected</Badge>
+                    <Badge variant="outline" className="bg-white/20 text-white border-none font-black ml-2 px-3 py-1 whitespace-nowrap">{selectedCategories.length} Selected</Badge>
                 </div>
                 <Separator orientation="vertical" className="h-6 bg-white/20 hidden sm:block"/>
-                <ScrollArea className="flex-1 max-h-24 overflow-y-auto">
+                <ScrollArea className="flex-1 max-h-24">
                     <div className="flex flex-wrap gap-1 p-1">
                         <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-white/20" onClick={handleSelectiveUpload} disabled={isSyncing}>
                             {isSyncing ? <Loader2 className="mr-2 h-3 w-3 animate-spin"/> : <ContextualButtonIcon className="mr-2 h-3 w-3" />}
@@ -1475,7 +1476,7 @@ export default function AssetList() {
         )}
         
         <div className="flex-1 min-h-[400px]">
-          <div className="grid gap-6 p-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="grid gap-4 sm:gap-6 p-1 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {mainCategories.length > 0 ? (
                 mainCategories.map(cat => renderDashboardCard(cat, assetsByCategory[cat]))
               ) : (
@@ -1515,7 +1516,7 @@ export default function AssetList() {
   if (appSettings?.appMode === 'management') quickViewFields = quickViewFields.filter(f => f.key !== 'verifiedStatus');
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-full gap-4 max-w-full">
         <div className="flex flex-wrap items-center gap-3 pb-2 border-b border-dashed">
             <Button variant="ghost" size="icon" className="h-10 w-10 rounded-full hover:bg-muted" onClick={() => { setView('dashboard'); setCurrentCategory(null); setSelectedAssetIds([]); }}>
                 <ArrowLeft className="h-5 w-5" />

@@ -26,7 +26,8 @@ import {
     Hash,
     MessageSquare,
     Activity,
-    Wrench
+    Wrench,
+    FileWarning as FileWarningIcon
 } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { isToday, isThisWeek, parseISO, formatDistanceToNow } from 'date-fns';
@@ -342,7 +343,7 @@ export function AssetSummaryDashboard() {
         <Collapsible
             open={isOpen}
             onOpenChange={setIsOpen}
-            className="w-full"
+            className="w-full max-w-full overflow-hidden"
         >
             <div className='flex items-center justify-between p-4 rounded-xl bg-card/80 border shadow-lg backdrop-blur-md mb-2'>
                 <div className="flex items-center gap-4">
@@ -381,175 +382,177 @@ export function AssetSummaryDashboard() {
                 </div>
             </div>
             
-            <CollapsibleContent className="space-y-4 animate-in fade-in slide-in-from-top-2 duration-300 overflow-hidden">
-                {activeView === 'stats' ? (
-                    <div className="w-full">
-                        <div className="flex overflow-x-auto pb-4 pt-2 px-1 gap-4 custom-scrollbar-x">
-                            {/* 1. Verification Progress */}
-                            <StatCard
-                                title="Verification Coverage"
-                                value={`${summary.total > 0 ? Math.round((summary.verified / summary.total) * 100) : 0}%`}
-                                description={`Showing ${summary.verified} verified items out of ${summary.total} assets in this scope.`}
-                                icon={<ClipboardCheck className="h-4 w-4 text-green-500" />}
-                                onAction={() => handleStatusFilterClick('Verified')}
-                                isActive={selectedStatuses.includes('Verified')}
-                            />
+            <CollapsibleContent className="animate-in fade-in slide-in-from-top-2 duration-300 overflow-hidden">
+                <div className="py-2">
+                    {activeView === 'stats' ? (
+                        <div className="w-full min-w-0">
+                            <div className="flex overflow-x-auto pb-4 pt-2 px-1 gap-4 custom-scrollbar-x scroll-smooth">
+                                {/* 1. Verification Progress */}
+                                <StatCard
+                                    title="Verification Coverage"
+                                    value={`${summary.total > 0 ? Math.round((summary.verified / summary.total) * 100) : 0}%`}
+                                    description={`Showing ${summary.verified} verified items out of ${summary.total} assets in this scope.`}
+                                    icon={<ClipboardCheck className="h-4 w-4 text-green-500" />}
+                                    onAction={() => handleStatusFilterClick('Verified')}
+                                    isActive={selectedStatuses.includes('Verified')}
+                                />
 
-                            {/* 2. Pending Action */}
-                            <StatCard
-                                title="Pending Action"
-                                value={summary.unverified}
-                                description="Assets currently marked as unverified and requiring field inspection."
-                                icon={<Activity className="h-4 w-4 text-primary" />}
-                                onAction={() => handleStatusFilterClick('Unverified')}
-                                isActive={selectedStatuses.includes('Unverified')}
-                            />
+                                {/* 2. Pending Action */}
+                                <StatCard
+                                    title="Pending Action"
+                                    value={summary.unverified}
+                                    description="Assets currently marked as unverified and requiring field inspection."
+                                    icon={<Activity className="h-4 w-4 text-primary" />}
+                                    onAction={() => handleStatusFilterClick('Unverified')}
+                                    isActive={selectedStatuses.includes('Unverified')}
+                                />
 
-                            {/* 3. Missing ID (Data Quality) */}
-                            <StatCard
-                                title="Missing Asset ID"
-                                value={summary.withoutAssetId}
-                                description="Assets lacking a unique tag or system ID code. Crucial for audits."
-                                icon={<Tag className="h-4 w-4 text-orange-500" />}
-                                onAction={() => handleFilterClick('assetIdCode')}
-                                isActive={missingFieldFilter === 'assetIdCode'}
-                            />
+                                {/* 3. Missing ID (Data Quality) */}
+                                <StatCard
+                                    title="Missing Asset ID"
+                                    value={summary.withoutAssetId}
+                                    description="Assets lacking a unique tag or system ID code. Crucial for audits."
+                                    icon={<Tag className="h-4 w-4 text-orange-500" />}
+                                    onAction={() => handleFilterClick('assetIdCode')}
+                                    isActive={missingFieldFilter === 'assetIdCode'}
+                                />
 
-                            {/* 4. Missing Serial (Data Quality) */}
-                            <StatCard
-                                title="Missing Serials"
-                                value={summary.withoutSerial}
-                                description="Items missing manufacturer serial numbers. Risk for identification."
-                                icon={<Hash className="h-4 w-4 text-blue-500" />}
-                                onAction={() => handleFilterClick('serialNumber')}
-                                isActive={missingFieldFilter === 'serialNumber'}
-                            />
+                                {/* 4. Missing Serial (Data Quality) */}
+                                <StatCard
+                                    title="Missing Serials"
+                                    value={summary.withoutSerial}
+                                    description="Items missing manufacturer serial numbers. Risk for identification."
+                                    icon={<Hash className="h-4 w-4 text-blue-500" />}
+                                    onAction={() => handleFilterClick('serialNumber')}
+                                    isActive={missingFieldFilter === 'serialNumber'}
+                                />
 
-                            {/* 5. Critical Health */}
-                            <StatCard
-                                title="Critical Condition"
-                                value={summary.unusable}
-                                description="Assets reported as stolen, burnt, or unsalvageable."
-                                icon={<AlertCircle className="h-4 w-4 text-destructive" />}
-                                onAction={() => handleConditionFilterClick(conditionGroups.unusable)}
-                                isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.unusable.sort())}
-                            />
+                                {/* 5. Critical Health */}
+                                <StatCard
+                                    title="Critical Condition"
+                                    value={summary.unusable}
+                                    description="Assets reported as stolen, burnt, or unsalvageable."
+                                    icon={<AlertCircle className="h-4 w-4 text-destructive" />}
+                                    onAction={() => handleConditionFilterClick(conditionGroups.unusable)}
+                                    isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.unusable.sort())}
+                                />
 
-                            {/* 6. Needs Maintenance */}
-                            <StatCard
-                                title="Maintenance Alert"
-                                value={summary.needsRepair}
-                                description="Assets in poor or bad condition requiring technical assessment."
-                                icon={<Wrench className="h-4 w-4 text-orange-600" />}
-                                onAction={() => handleConditionFilterClick(conditionGroups.repair)}
-                                isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.repair.sort())}
-                            />
+                                {/* 6. Needs Maintenance */}
+                                <StatCard
+                                    title="Maintenance Alert"
+                                    value={summary.needsRepair}
+                                    description="Assets in poor or bad condition requiring technical assessment."
+                                    icon={<Wrench className="h-4 w-4 text-orange-600" />}
+                                    onAction={() => handleConditionFilterClick(conditionGroups.repair)}
+                                    isActive={JSON.stringify(conditionFilter.sort()) === JSON.stringify(conditionGroups.repair.sort())}
+                                />
 
-                            {/* 7. Discrepancies */}
-                            <StatCard
-                                title="Audit Exceptions"
-                                value={summary.withDiscrepancy}
-                                description="Records where field data conflicts with previous system information."
-                                icon={<FileWarning className="h-4 w-4 text-destructive" />}
-                                onAction={() => handleStatusFilterClick('Discrepancy')}
-                                isActive={selectedStatuses.includes('Discrepancy')}
-                            />
+                                {/* 7. Discrepancies */}
+                                <StatCard
+                                    title="Audit Exceptions"
+                                    value={summary.withDiscrepancy}
+                                    description="Records where field data conflicts with previous system information."
+                                    icon={<FileWarningIcon className="h-4 w-4 text-destructive" />}
+                                    onAction={() => handleStatusFilterClick('Discrepancy')}
+                                    isActive={selectedStatuses.includes('Discrepancy')}
+                                />
 
-                            {/* 8. Field Remarks */}
-                            <StatCard
-                                title="Field Feedback"
-                                value={summary.withRemarks}
-                                description="Assets containing specific comments or remarks from field officers."
-                                icon={<MessageSquare className="h-4 w-4 text-teal-500" />}
-                                onAction={() => handleFilterClick('remarks')}
-                                isActive={missingFieldFilter === 'remarks'}
-                            />
+                                {/* 8. Field Remarks */}
+                                <StatCard
+                                    title="Field Feedback"
+                                    value={summary.withRemarks}
+                                    description="Assets containing specific comments or remarks from field officers."
+                                    icon={<MessageSquare className="h-4 w-4 text-teal-500" />}
+                                    onAction={() => handleFilterClick('remarks')}
+                                    isActive={missingFieldFilter === 'remarks'}
+                                />
 
-                            {/* 9. Modified Today */}
-                            <StatCard
-                                title="Modified Today"
-                                value={summary.modifiedToday}
-                                description="Updates or creations performed in the last 24 hours."
-                                icon={<CalendarClock className="h-4 w-4 text-primary" />}
-                                onAction={() => handleDateFilterClick('today')}
-                                isActive={dateFilter === 'today'}
-                            />
+                                {/* 9. Modified Today */}
+                                <StatCard
+                                    title="Modified Today"
+                                    value={summary.modifiedToday}
+                                    description="Updates or creations performed in the last 24 hours."
+                                    icon={<CalendarClock className="h-4 w-4 text-primary" />}
+                                    onAction={() => handleDateFilterClick('today')}
+                                    isActive={dateFilter === 'today'}
+                                />
 
-                            {/* 10. Fresh Records */}
-                            <StatCard
-                                title="New In-Flow"
-                                value={summary.newThisWeek}
-                                description="Fresh records newly registered in the system this week."
-                                icon={<PlusCircle className="h-4 w-4 text-green-500" />}
-                                onAction={() => handleDateFilterClick('new-week')}
-                                isActive={dateFilter === 'new-week'}
-                            />
-                        </div>
-                    </div>
-                ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <Card className="col-span-1 md:col-span-2 lg:col-span-3 min-h-[180px] flex flex-col justify-center bg-primary/5 border-dashed border-primary/20 relative group/insight">
-                            <div className="absolute top-4 right-4 z-10 opacity-0 group-hover/insight:opacity-100 transition-opacity">
-                                <Button variant="outline" size="icon" className="h-8 w-8 bg-background/80" onClick={handleRefreshInsights}>
-                                    <RefreshCw className="h-4 w-4" />
-                                </Button>
+                                {/* 10. Fresh Records */}
+                                <StatCard
+                                    title="New In-Flow"
+                                    value={summary.newThisWeek}
+                                    description="Fresh records newly registered in the system this week."
+                                    icon={<PlusCircle className="h-4 w-4 text-green-500" />}
+                                    onAction={() => handleDateFilterClick('new-week')}
+                                    isActive={dateFilter === 'new-week'}
+                                />
                             </div>
-                            <CardContent className="pt-8">
-                                <AnimatePresence mode="wait">
-                                    <motion.div
-                                        key={`${refreshKey}-${insightIndex}`}
-                                        initial={{ opacity: 0, x: 20 }}
-                                        animate={{ opacity: 1, x: 0 }}
-                                        exit={{ opacity: 0, x: -20 }}
-                                        transition={{ duration: 0.3 }}
-                                        className={cn("flex flex-col items-center text-center gap-4 cursor-pointer px-12", insightsPool[insightIndex].asset && "hover:opacity-80")}
-                                        onClick={() => handleInsightClick(insightsPool[insightIndex])}
-                                    >
-                                        <div className={cn("p-4 rounded-full bg-background shadow-lg border", insightsPool[insightIndex].color)}>
-                                            {insightsPool[insightIndex].icon}
-                                        </div>
-                                        <div className="space-y-1">
-                                            <h4 className="text-xl font-bold tracking-tight">
-                                                {insightsPool[insightIndex].text}
-                                            </h4>
-                                            {insightsPool[insightIndex].subtext && (
-                                                <p className="text-sm text-muted-foreground italic">
-                                                    {insightsPool[insightIndex].subtext}
-                                                </p>
-                                            )}
-                                            {insightsPool[insightIndex].asset && (
-                                                <div className="flex items-center justify-center gap-2 mt-2">
-                                                    <Badge variant="outline" className="text-[10px] uppercase font-bold">
-                                                        <MapPin className="h-2 w-2 mr-1"/> {insightsPool[insightIndex].asset.location}
-                                                    </Badge>
-                                                    <span className="text-[10px] text-primary font-bold uppercase tracking-widest">Click to Inspect</span>
-                                                </div>
-                                            )}
-                                        </div>
-                                    </motion.div>
-                                </AnimatePresence>
-                                
-                                <div className="flex items-center justify-center gap-4 mt-8">
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={handlePrevInsight}>
-                                        <ChevronLeft className="h-5 w-5" />
-                                    </Button>
-                                    <div className="flex justify-center gap-1.5">
-                                        {insightsPool.map((_, i) => (
-                                            <button 
-                                                key={i} 
-                                                onClick={(e) => { e.stopPropagation(); setInsightIndex(i); }}
-                                                className={cn("h-1.5 rounded-full transition-all", i === insightIndex ? "w-8 bg-primary" : "w-2 bg-muted hover:bg-muted-foreground/30")}
-                                            />
-                                        ))}
-                                    </div>
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={handleNextInsight}>
-                                        <ChevronRight className="h-5 w-5" />
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 gap-4">
+                            <Card className="min-h-[180px] flex flex-col justify-center bg-primary/5 border-dashed border-primary/20 relative group/insight">
+                                <div className="absolute top-4 right-4 z-10 opacity-0 group-hover/insight:opacity-100 transition-opacity">
+                                    <Button variant="outline" size="icon" className="h-8 w-8 bg-background/80" onClick={handleRefreshInsights}>
+                                        <RefreshCw className="h-4 w-4" />
                                     </Button>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
+                                <CardContent className="pt-8">
+                                    <AnimatePresence mode="wait">
+                                        <motion.div
+                                            key={`${refreshKey}-${insightIndex}`}
+                                            initial={{ opacity: 0, x: 20 }}
+                                            animate={{ opacity: 1, x: 0 }}
+                                            exit={{ opacity: 0, x: -20 }}
+                                            transition={{ duration: 0.3 }}
+                                            className={cn("flex flex-col items-center text-center gap-4 cursor-pointer px-4 sm:px-12", insightsPool[insightIndex].asset && "hover:opacity-80")}
+                                            onClick={() => handleInsightClick(insightsPool[insightIndex])}
+                                        >
+                                            <div className={cn("p-4 rounded-full bg-background shadow-lg border", insightsPool[insightIndex].color)}>
+                                                {insightsPool[insightIndex].icon}
+                                            </div>
+                                            <div className="space-y-1">
+                                                <h4 className="text-lg sm:text-xl font-bold tracking-tight">
+                                                    {insightsPool[insightIndex].text}
+                                                </h4>
+                                                {insightsPool[insightIndex].subtext && (
+                                                    <p className="text-sm text-muted-foreground italic">
+                                                        {insightsPool[insightIndex].subtext}
+                                                    </p>
+                                                )}
+                                                {insightsPool[insightIndex].asset && (
+                                                    <div className="flex items-center justify-center gap-2 mt-2">
+                                                        <Badge variant="outline" className="text-[10px] uppercase font-bold">
+                                                            <MapPin className="h-2 w-2 mr-1"/> {insightsPool[insightIndex].asset.location}
+                                                        </Badge>
+                                                        <span className="text-[10px] text-primary font-bold uppercase tracking-widest">Click to Inspect</span>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </motion.div>
+                                    </AnimatePresence>
+                                    
+                                    <div className="flex items-center justify-center gap-4 mt-8">
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={handlePrevInsight}>
+                                            <ChevronLeft className="h-5 w-5" />
+                                        </Button>
+                                        <div className="flex justify-center gap-1.5 overflow-hidden">
+                                            {insightsPool.map((_, i) => (
+                                                <button 
+                                                    key={i} 
+                                                    onClick={(e) => { e.stopPropagation(); setInsightIndex(i); }}
+                                                    className={cn("h-1.5 rounded-full transition-all", i === insightIndex ? "w-8 bg-primary" : "w-2 bg-muted hover:bg-muted-foreground/30")}
+                                                />
+                                            ))}
+                                        </div>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full hover:bg-primary/10" onClick={handleNextInsight}>
+                                            <ChevronRight className="h-5 w-5" />
+                                        </Button>
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    )}
+                </div>
             </CollapsibleContent>
         </Collapsible>
     )

@@ -174,7 +174,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const userHasMultipleStates = userProfile?.states && userProfile.states.length > 1;
 
   return (
-    <div className="flex flex-col w-full h-screen border-0 sm:border-8 border-muted/50 bg-background overflow-hidden">
+    <div className="flex flex-col w-full h-screen bg-background overflow-hidden">
       <header className="flex flex-col border-b bg-background/95 backdrop-blur-md z-50">
         <div className="flex items-center justify-between px-4 py-2 h-14 sm:h-16 md:px-6">
             {/* Left Side: Logo */}
@@ -430,13 +430,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </header>
 
       <motion.main
-        className="flex-1 flex flex-col p-4 md:p-6 bg-muted/30 overflow-hidden relative"
+        className="flex-1 flex flex-col bg-muted/30 overflow-hidden relative"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.4 }}
       >
-        <ScrollArea className="flex-1 -m-4 sm:-m-6">
-            <div className="p-4 sm:p-6">
+        <ScrollArea className="flex-1">
+            <div className="p-4 sm:p-6 lg:p-8 max-w-[1600px] mx-auto w-full">
                 {children}
             </div>
         </ScrollArea>
