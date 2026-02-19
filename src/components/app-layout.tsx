@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -51,7 +52,7 @@ import { useDebounce } from "@/hooks/use-debounce";
 import { SettingsSheet } from "./settings-sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 import { AssetFilterDialog } from "./asset-filter-sheet";
-import type { Asset } from "@/types";
+import type { Asset } from "@/lib/types";
 import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
 import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
@@ -91,6 +92,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isActivityLogDialogOpen, setIsActivityLogDialogOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
+
+  const isAdmin = userProfile?.isAdmin || false;
 
   useEffect(() => {
     setSearchTerm(debouncedSearchTerm);

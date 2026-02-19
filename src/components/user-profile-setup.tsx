@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -13,12 +14,20 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MapPin } from 'lucide-react';
 import type { AuthorizedUser } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { AlertCircle, Boxes } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
+import { Separator } from './ui/separator';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 const superAdmin: AuthorizedUser = {
   loginName: 'admin',
@@ -38,8 +47,11 @@ export default function UserProfileSetup() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
+  const [selectedInitialState, setSelectedInitialState] = useState<string>('');
+  
   const { login } = useAuth();
-  const { appSettings } = useAppState();
+  const { appSettings, setGlobalStateFilter } = useAppState();
 
   const handleLogin = async () => {
     setError(null);
@@ -48,7 +60,6 @@ export default function UserProfileSetup() {
       return;
     }
     
-    // appSettings could be null if the initial sync fails.
     if (!appSettings) {
         setError("Application settings are not available. Cannot log in.");
         return;
@@ -66,9 +77,13 @@ export default function UserProfileSetup() {
 
     // Handle guest login (no password needed)
     if (user.isGuest) {
-      setIsSaving(true);
-      await login(user);
-      setIsSaving(false);
+      if (user.states.length > 1) {
+          setFoundUser(user);
+      } else {
+          setIsSaving(true);
+          await login(user);
+          setIsSaving(false);
+      }
       return; 
     }
     
@@ -79,13 +94,26 @@ export default function UserProfileSetup() {
     }
 
     if (user.password === password) {
-      setIsSaving(true);
-      await login(user);
-      setIsSaving(false);
+      if (user.states.length > 1 && !user.isAdmin) {
+          setFoundUser(user);
+      } else {
+          setIsSaving(true);
+          await login(user);
+          setIsSaving(false);
+      }
     } else {
       setError("Invalid login name or password.");
     }
   };
+
+  const handleConfirmMultiState = async () => {
+      if (!foundUser || !selectedInitialState) return;
+      setIsSaving(true);
+      // We set the filter immediately to ensure the first-time setup sync uses the right initial scope
+      setGlobalStateFilter(selectedInitialState);
+      await login(foundUser);
+      setIsSaving(false);
+  }
   
   if (!appSettings) {
      return (
@@ -106,44 +134,83 @@ export default function UserProfileSetup() {
                     </div>
                     <AlertDialogTitle>NTBLCP Asset Manager</AlertDialogTitle>
                     <AlertDialogDescription>
-                        Please sign in to continue.
+                        {foundUser ? "Select your initial starting location." : "Please sign in to continue."}
                     </AlertDialogDescription>
                 </AlertDialogHeader>
+                
                 <div className="py-4 space-y-4">
-                    <div className="space-y-2">
-                        <Label htmlFor="loginName">Login Name</Label>
-                        <Input 
-                        id="loginName" 
-                        type="text"
-                        placeholder="Enter your login name"
-                        value={loginName} 
-                        onChange={(e) => setLoginName(e.target.value)}
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label htmlFor="password">Password</Label>
-                        <Input 
-                        id="password" 
-                        type="password"
-                        value={password} 
-                        onChange={(e) => setPassword(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                        />
-                    </div>
+                    {!foundUser ? (
+                        <>
+                            <div className="space-y-2">
+                                <Label htmlFor="loginName">Login Name</Label>
+                                <Input 
+                                id="loginName" 
+                                type="text"
+                                placeholder="Enter your login name"
+                                value={loginName} 
+                                onChange={(e) => setLoginName(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="password">Password</Label>
+                                <Input 
+                                id="password" 
+                                type="password"
+                                value={password} 
+                                onChange={(e) => setPassword(e.target.value)}
+                                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                                />
+                            </div>
+                        </>
+                    ) : (
+                        <div className="space-y-4">
+                            <div className="p-3 rounded-lg bg-muted/50 border border-dashed flex items-center gap-3">
+                                <div className="p-2 bg-background rounded-full border shadow-sm">
+                                    <MapPin className="h-4 w-4 text-primary" />
+                                </div>
+                                <div className="flex-1">
+                                    <p className="text-xs font-bold uppercase text-muted-foreground">Authorized States</p>
+                                    <p className="text-sm font-medium">{foundUser.states.join(', ')}</p>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="initial-state">Starting Scope</Label>
+                                <Select value={selectedInitialState} onValueChange={setSelectedInitialState}>
+                                    <SelectTrigger id="initial-state">
+                                        <SelectValue placeholder="Select a state to start with..." />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {foundUser.states.map(state => (
+                                            <SelectItem key={state} value={state}>{state}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                                <p className="text-[10px] text-muted-foreground italic">You can switch between your assigned states at any time from the dashboard.</p>
+                            </div>
+                        </div>
+                    )}
 
-                {error && (
-                    <Alert variant="destructive">
-                        <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Login Error</AlertTitle>
-                        <AlertDescription>{error}</AlertDescription>
-                    </Alert>
-                )}
+                    {error && (
+                        <Alert variant="destructive">
+                            <AlertCircle className="h-4 w-4" />
+                            <AlertTitle>Login Error</AlertTitle>
+                            <AlertDescription>{error}</AlertDescription>
+                        </Alert>
+                    )}
                 </div>
+
                 <AlertDialogFooter>
-                    <Button className="w-full" onClick={handleLogin} disabled={isSaving}>
-                        {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                        Sign In
-                    </Button>
+                    {foundUser ? (
+                        <Button className="w-full" onClick={handleConfirmMultiState} disabled={isSaving || !selectedInitialState}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Start Session
+                        </Button>
+                    ) : (
+                        <Button className="w-full" onClick={handleLogin} disabled={isSaving}>
+                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                            Sign In
+                        </Button>
+                    )}
                 </AlertDialogFooter>
             </AlertDialogContent>
             </AlertDialog>
