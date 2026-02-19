@@ -15,6 +15,7 @@ import { NIGERIAN_STATE_CAPITALS, SPECIAL_LOCATIONS, ZONAL_STORES } from '@/lib/
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Progress } from './ui/progress';
 import { motion, AnimatePresence } from 'framer-motion';
+import { Badge } from './ui/badge';
 
 const StatCard = ({ title, value, description, icon, onAction, actionLabel, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, actionLabel?: string, isActive?: boolean }) => {
     const cardContent = (
