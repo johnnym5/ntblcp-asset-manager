@@ -1,4 +1,4 @@
-'use client';
+'client';
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,33 +102,35 @@ export function AssetSummaryDashboard() {
     
     const summaryAssets = useMemo(() => {
         const activeAssets = dataSource === 'cloud' ? assets : offlineAssets;
+        
+        // Restricted to active project
+        let filtered = activeAssets.filter(a => a.grantId === activeGrantId);
+
         if (globalStateFilter && globalStateFilter !== 'All') {
             const isZone = ZONAL_STORES.includes(globalStateFilter);
 
             if (isZone) {
                 const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-                return activeAssets.filter(asset => {
+                filtered = filtered.filter(asset => {
                     const assetLocation = (asset.location || "").toLowerCase().trim();
                     return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
                 });
-            }
-            
-            if (SPECIAL_LOCATIONS.includes(globalStateFilter)) {
+            } else if (SPECIAL_LOCATIONS.includes(globalStateFilter)) {
                 const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-                return activeAssets.filter(asset => (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter));
+                filtered = filtered.filter(asset => (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter));
+            } else {
+                const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
+                const capitalCity = NIGERIAN_STATE_CAPITALS[globalStateFilter]?.toLowerCase().trim();
+                filtered = filtered.filter(asset => {
+                    const assetLocation = (asset.location || "").toLowerCase().trim();
+                    const matchesState = assetLocation.startsWith(lowerCaseFilter);
+                    const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+                    return matchesState || matchesCapital;
+                });
             }
-
-            const lowerCaseFilter = globalStateFilter.toLowerCase().trim();
-            const capitalCity = NIGERIAN_STATE_CAPITALS[globalStateFilter]?.toLowerCase().trim();
-            return activeAssets.filter(asset => {
-                const assetLocation = (asset.location || "").toLowerCase().trim();
-                const matchesState = assetLocation.startsWith(lowerCaseFilter);
-                const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-                return matchesState || matchesCapital;
-            });
         }
-        return activeAssets;
-    }, [assets, offlineAssets, dataSource, globalStateFilter]);
+        return filtered;
+    }, [assets, offlineAssets, dataSource, globalStateFilter, activeGrantId]);
 
 
     const categoryStats = useMemo(() => {
@@ -345,42 +347,42 @@ export function AssetSummaryDashboard() {
             onOpenChange={setIsOpen}
             className="w-full max-w-full overflow-hidden"
         >
-            <div className='flex items-center justify-between p-4 rounded-xl bg-card/80 border shadow-lg backdrop-blur-md mb-2'>
-                <div className="flex items-center gap-4">
-                    <div className="p-2 bg-primary/10 rounded-lg">
-                        <BarChart2 className="h-5 w-5 text-primary" />
+            <CollapsibleTrigger asChild>
+                <div className='flex items-center justify-between p-4 rounded-xl bg-card/80 border shadow-lg backdrop-blur-md mb-2 cursor-pointer hover:bg-card/100 transition-colors group/header'>
+                    <div className="flex items-center gap-4">
+                        <div className="p-2 bg-primary/10 rounded-lg group-hover/header:bg-primary/20 transition-colors">
+                            <BarChart2 className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                            <h3 className="text-lg font-bold tracking-tight">Inventory Pulse</h3>
+                            <p className="text-xs text-muted-foreground">Real-time status of {globalStateFilter === 'All' ? 'global' : globalStateFilter} assets</p>
+                        </div>
                     </div>
-                    <div>
-                        <h3 className="text-lg font-bold tracking-tight">Inventory Pulse</h3>
-                        <p className="text-xs text-muted-foreground">Real-time status of {globalStateFilter === 'All' ? 'global' : globalStateFilter} assets</p>
-                    </div>
-                </div>
-                <div className="flex items-center gap-2">
-                    <div className="hidden sm:flex bg-muted p-1 rounded-lg mr-2">
-                        <Button 
-                            variant={activeView === 'stats' ? 'secondary' : 'ghost'} 
-                            size="sm" 
-                            className="h-7 text-xs px-3 rounded-md"
-                            onClick={() => setActiveTab('stats')}
-                        >
-                            Key Stats
-                        </Button>
-                        <Button 
-                            variant={activeView === 'progress' ? 'secondary' : 'ghost'} 
-                            size="sm" 
-                            className="h-7 text-xs px-3 rounded-md"
-                            onClick={() => setActiveTab('progress')}
-                        >
-                            Asset Insights
-                        </Button>
-                    </div>
-                    <CollapsibleTrigger asChild>
-                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+                    <div className="flex items-center gap-2" onClick={e => e.stopPropagation()}>
+                        <div className="hidden sm:flex bg-muted p-1 rounded-lg mr-2">
+                            <Button 
+                                variant={activeView === 'stats' ? 'secondary' : 'ghost'} 
+                                size="sm" 
+                                className="h-7 text-xs px-3 rounded-md"
+                                onClick={(e) => { e.stopPropagation(); setActiveTab('stats'); }}
+                            >
+                                Key Stats
+                            </Button>
+                            <Button 
+                                variant={activeView === 'progress' ? 'secondary' : 'ghost'} 
+                                size="sm" 
+                                className="h-7 text-xs px-3 rounded-md"
+                                onClick={(e) => { e.stopPropagation(); setActiveTab('progress'); }}
+                            >
+                                Asset Insights
+                            </Button>
+                        </div>
+                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full pointer-events-none">
                             <ChevronsUpDown className="h-4 w-4" />
                         </Button>
-                    </CollapsibleTrigger>
+                    </div>
                 </div>
-            </div>
+            </CollapsibleTrigger>
             
             <CollapsibleContent className="animate-in fade-in slide-in-from-top-2 duration-300 overflow-hidden">
                 <div className="py-2">

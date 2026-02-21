@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -58,7 +57,7 @@ const defaultObservations = "";
 
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
   const { userProfile } = useAuth();
-  const { assets, offlineAssets, dataSource, globalStateFilter } = useAppState();
+  const { assets, offlineAssets, dataSource, globalStateFilter, activeGrantId } = useAppState();
   
   const [reportState, setReportState] = useState('');
   const [travelDate, setTravelDate] = useState('');
@@ -88,14 +87,30 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
   }, [dataSource, assets, offlineAssets]);
 
   const reportAssets = useMemo(() => {
-    if (!reportState) return [];
-    if (reportState === 'All Locations') return activeAssets;
+    if (!reportState || !activeGrantId) return [];
+    
+    // 1. Project Restriction: Filter only by active grant
+    let projectAssets = activeAssets.filter(asset => asset.grantId === activeGrantId);
+
+    // 2. User/Regional Restriction: Non-admins only see authorized states
+    if (userProfile && !userProfile.isAdmin) {
+        projectAssets = projectAssets.filter(asset => {
+            const assetLocation = (asset.location || "").toLowerCase().trim();
+            return userProfile.states.some(state => {
+                const lowerState = state.toLowerCase().trim();
+                const capitalCity = NIGERIAN_STATE_CAPITALS[state]?.toLowerCase().trim();
+                return assetLocation.startsWith(lowerState) || (capitalCity && assetLocation.startsWith(capitalCity));
+            });
+        });
+    }
+
+    if (reportState === 'All Locations') return projectAssets;
     
     const isZonalStore = ZONAL_STORES.map(z => z.toLowerCase()).includes(reportState.toLowerCase());
 
     if (isZonalStore) {
         const lowerCaseZone = reportState.toLowerCase();
-        return activeAssets.filter(asset => {
+        return projectAssets.filter(asset => {
             const assetLocation = (asset.location || "").toLowerCase().trim();
             return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
         });
@@ -104,13 +119,13 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
     const lowerCaseFilter = reportState.toLowerCase().trim();
     const capitalCity = NIGERIAN_STATE_CAPITALS[reportState]?.toLowerCase().trim();
     
-    return activeAssets.filter(asset => {
+    return projectAssets.filter(asset => {
       const assetLocation = (asset.location || "").toLowerCase().trim();
       const matchesState = assetLocation.startsWith(lowerCaseFilter);
       const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
       return matchesState || matchesCapital || (SPECIAL_LOCATIONS.includes(reportState) && assetLocation.includes(lowerCaseFilter));
     });
-  }, [activeAssets, reportState]);
+  }, [activeAssets, reportState, activeGrantId, userProfile]);
 
   const verifiedAssets = reportAssets.filter(asset => asset.verifiedStatus === 'Verified');
   const unverifiedAssetsCount = reportAssets.length - verifiedAssets.length;
@@ -262,7 +277,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         <DialogHeader>
           <DialogTitle>Travel Report Generator</DialogTitle>
           <DialogDescription>
-            Fill in the details below to generate a Word document report for your trip.
+            Fill in the details below to generate a Word document report for your trip. This report only includes data from the active project.
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="max-h-[70vh] p-1">
@@ -327,8 +342,8 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
 
                     <p className="p-4 bg-muted rounded-md text-sm">
                         {reportState === 'All Locations'
-                        ? <>A compilation of all assets in all locations. Out of <span className="font-bold">{reportAssets.length}</span> total assets, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.</>
-                        : <>On my asset verification visit to <span className="font-bold">{reportState}</span>, out of a total of <span className="font-bold">{reportAssets.length}</span> assets, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.</>
+                        ? <>A compilation of all assets in all locations. Out of <span className="font-bold">{reportAssets.length}</span> total assets in the active project, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.</>
+                        : <>On my asset verification visit to <span className="font-bold">{reportState}</span>, out of a total of <span className="font-bold">{reportAssets.length}</span> assets in the active project, <span className="font-bold text-green-600">{verifiedAssets.length}</span> were verified and <span className="font-bold text-red-600">{unverifiedAssetsCount}</span> were unverified.</>
                         }
                     </p>
                     <ReportInput label="Objectives" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} />
@@ -348,7 +363,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
             </div>
         </ScrollArea>
         <DialogFooter>
-          <Button onClick={generateWordDocument}>Export to Word</Button>
+          <Button onClick={generateWordDocument} disabled={reportAssets.length === 0}>Export to Word</Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
