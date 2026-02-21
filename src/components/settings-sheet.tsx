@@ -1,5 +1,4 @@
 
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -598,6 +597,31 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                           </div>
                       </div>
                   </div>
+
+                  {draftSettings.appMode === 'verification' && (
+                    <div className="space-y-4">
+                        <h3 className="text-lg font-medium">Reporting</h3>
+                        <div className="rounded-lg border p-4 space-y-3 bg-muted/30">
+                            <div className="space-y-1">
+                                <p className="text-sm font-medium">Travel Report Generator</p>
+                                <p className="text-xs text-muted-foreground">Compile field verification findings into a professional Word document.</p>
+                            </div>
+                            {dataActions.onTravelReport && (
+                                <Button 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="w-full justify-start bg-background" 
+                                    onClick={() => {
+                                        onOpenChange(false);
+                                        setTimeout(() => dataActions.onTravelReport?.(), 100);
+                                    }}
+                                >
+                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                  )}
 
                   <div className="space-y-4">
                     <h3 className="text-lg font-medium">Security</h3>
