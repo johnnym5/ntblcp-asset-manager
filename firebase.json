@@ -1,7 +1,7 @@
 
 {
   "hosting": {
-    "site": "assetbase",
+    "site": "assetain",
     "source": ".",
     "ignore": [
       "firebase.json",

@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const savedProfileJSON = localStorage.getItem('assetbase-user-profile');
+      const savedProfileJSON = localStorage.getItem('assetain-user-profile');
       if (savedProfileJSON) {
         const savedProfile: LocalUserProfile & { state?: string } = JSON.parse(savedProfileJSON);
         
@@ -74,12 +74,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               canEditAssets: authorizedUser.canEditAssets,
            };
 
-          localStorage.setItem('assetbase-user-profile', JSON.stringify(freshProfile));
+          localStorage.setItem('assetain-user-profile', JSON.stringify(freshProfile));
           setUserProfile(freshProfile);
           setProfileSetupComplete(true);
         } else {
           // Stale profile, clear it
-          localStorage.removeItem('assetbase-user-profile');
+          localStorage.removeItem('assetain-user-profile');
           setUserProfile(null);
           setProfileSetupComplete(false);
         }
@@ -90,7 +90,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (e) {
       console.error("Failed to process user profile from local storage", e);
-      localStorage.removeItem('assetbase-user-profile');
+      localStorage.removeItem('assetain-user-profile');
       setUserProfile(null);
       setProfileSetupComplete(false);
     } finally {
@@ -116,7 +116,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       canEditAssets: user.canEditAssets,
     };
     try {
-      localStorage.setItem('assetbase-user-profile', JSON.stringify(newProfile));
+      localStorage.setItem('assetain-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
 
@@ -133,7 +133,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     setLoading(true);
-    localStorage.removeItem('assetbase-user-profile');
+    localStorage.removeItem('assetain-user-profile');
     setUserProfile(null);
     setProfileSetupComplete(false);
 

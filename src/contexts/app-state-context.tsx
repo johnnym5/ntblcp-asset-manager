@@ -131,7 +131,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
   const [isOnline, setIsOnline] = useState(() => {
     if (typeof window !== 'undefined') {
-      const savedStatus = localStorage.getItem('assetbase-online-status');
+      const savedStatus = localStorage.getItem('assetain-online-status');
       return savedStatus ? JSON.parse(savedStatus) : true;
     }
     return true;
@@ -186,7 +186,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    localStorage.setItem('assetbase-online-status', JSON.stringify(isOnline));
+    localStorage.setItem('assetain-online-status', JSON.stringify(isOnline));
     
     const handleBrowserConnectivityChange = () => {
         setIsOnline(navigator.onLine);
@@ -336,14 +336,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (typeof window !== 'undefined' && settingsLoaded) {
         const currentProjectId = firebaseConfig.projectId;
-        const savedProjectId = localStorage.getItem('assetbase-firebase-project-id');
+        const savedProjectId = localStorage.getItem('assetain-firebase-project-id');
 
         if (currentProjectId && savedProjectId && currentProjectId !== savedProjectId) {
             setShowProjectSwitchDialog(true);
         }
 
         if (currentProjectId) {
-            localStorage.setItem('assetbase-firebase-project-id', currentProjectId);
+            localStorage.setItem('assetain-firebase-project-id', currentProjectId);
         }
     }
   }, [settingsLoaded]);

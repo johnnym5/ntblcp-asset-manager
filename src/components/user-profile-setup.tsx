@@ -132,7 +132,7 @@ export default function UserProfileSetup() {
                     <div className="p-3 bg-primary/10 rounded-full mb-2">
                         <Boxes className="h-6 w-6 text-primary" />
                     </div>
-                    <AlertDialogTitle>AssetBase</AlertDialogTitle>
+                    <AlertDialogTitle>Assetain</AlertDialogTitle>
                     <AlertDialogHeader className="text-center items-center">
                         <AlertDialogDescription>
                             {foundUser ? "Select your initial starting location." : "Please sign in to continue."}

@@ -1,5 +1,5 @@
 
-# AssetBase
+# Assetain
 
 A full-featured, offline-first Asset Management Web App, built with Next.js, Tailwind CSS, and Firebase.
 
@@ -61,20 +61,20 @@ Here are a few workshopped names that reflect the professional nature of the too
 
 ---
 
-## 3. Deployment to assetbase.web.app
+## 3. Deployment to assetain.web.app
 
-This project is pre-configured to deploy to the specific Firebase site `assetbase`.
+This project is pre-configured to deploy to the specific Firebase site `assetain`.
 
 ### Step 3.1: Verify Site ID
 1. Go to the [Firebase Console](https://console.firebase.google.com/).
 2. Select your project.
 3. Navigate to **Hosting**.
-4. Ensure you have a site created with the ID `assetbase`. If your site ID is different, update the `"site": "..."` property in `firebase.json`.
+4. Ensure you have a site created with the ID `assetain`. If your site ID is different, update the `"site": "..."` property in `firebase.json`.
 
 ### Step 3.2: Add Custom Domain
-To link `assetbase.com`:
+To link `assetain.com`:
 1. In the Firebase Hosting dashboard, click **Add custom domain**.
-2. Enter `assetbase.com` and follow the instructions to verify ownership via DNS records.
+2. Enter `assetain.com` and follow the instructions to verify ownership via DNS records.
 
 ### Step 3.3: Deploy
 Run the following command to deploy only to the specified site:
@@ -94,10 +94,10 @@ Create a file named `.env.local` in the root of the project.
 ### Step 4.2: Fill in your Firebase Credentials
 ```
 NEXT_PUBLIC_FIREBASE_API_KEY=AIza...
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=assetbase.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://assetbase-default-rtdb.firebaseio.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=assetbase
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=assetbase.appspot.com
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=assetain.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://assetain-default-rtdb.firebaseio.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=assetain
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=assetain.appspot.com
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
 NEXT_PUBLIC_FIREBASE_APP_ID=...
 ```

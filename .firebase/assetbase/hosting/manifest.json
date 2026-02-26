@@ -1,0 +1,9 @@
+{
+  "name": "NTBLCP Asset Manager",
+  "short_name": "NTBLCP Assets",
+  "description": "A full-featured, offline-first web app to manage assets efficiently.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#EBC237"
+}
