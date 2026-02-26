@@ -1,3 +1,4 @@
+
 # Global AssetsHub
 
 A full-featured, offline-first Asset Management Web App, built with Next.js, Tailwind CSS, and Firebase.
@@ -11,7 +12,7 @@ This application is designed to solve the critical challenge of managing and ver
 *   **Offline-First by Default**: The application is built to work completely offline. All data is stored and managed in the browser's local database (IndexedDB), ensuring that work is never lost due to a lack of internet.
 *   **Role-Based Access & Approval Workflow**: A secure login system grants access based on user roles (Admin, User, Zonal Manager).
 *   **Regional Bulk Sync**: Intelligent synchronization fetches data for all authorized states in a user's region, enabling seamless offline switching between locations.
-*   **Asset Insight Engine**: A dynamic dashboard that highlights random data quality issues, maintenance alerts, and recent modifications every 5 seconds.
+*   **Asset Insight Engine**: A dynamic dashboard that highlights random data quality issues, maintenance alerts, and recent modifications.
 *   **Dynamic Excel Import & Export**:
     *   **Intelligent Import**: Parses complex Excel files, automatically detecting headers and mapping data to a unified structure.
     *   **Structure-Preserving Export**: Exports data back into Excel files that mirror the original's column structure.
@@ -40,31 +41,50 @@ If this application were to be fully developed by a professional team, the follo
 
 ---
 
-## 2. Local Development Setup
+## 2. Deployment to globalassetshub.web.app
 
-Before you can run the app locally, you must provide your Firebase project's credentials.
+This project is pre-configured to deploy to the specific Firebase site `globalassetshub`.
 
-### Step 2.1: Create `.env.local` file
+### Step 2.1: Verify Site ID
+1. Go to the [Firebase Console](https://console.firebase.google.com/).
+2. Select your project.
+3. Navigate to **Hosting**.
+4. Ensure you have a site created with the ID `globalassetshub`. If your site ID is different, update the `"site": "..."` property in `firebase.json`.
 
-Create a file named `.env.local` in the root of the project.
+### Step 2.2: Add Custom Domain
+To link `globalassetshub.com`:
+1. In the Firebase Hosting dashboard, click **Add custom domain**.
+2. Enter `globalassetshub.com` and follow the instructions to verify ownership via DNS records.
 
-### Step 2.2: Fill in your Firebase Credentials
-
-Open the new `.env.local` file and add your actual Firebase project credentials from the Firebase Console.
-
-```
-NEXT_PUBLIC_FIREBASE_API_KEY=AIza...
-NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=your-project.firebaseapp.com
-NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://your-project.firebaseio.com
-NEXT_PUBLIC_FIREBASE_PROJECT_ID=your-project-id
-NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=your-project.appspot.com
-NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=12345...
-NEXT_PUBLIC_FIREBASE_APP_ID=1:12345...:web:...
+### Step 2.3: Deploy
+Run the following command to deploy only to the specified site:
+```bash
+firebase deploy --only hosting
 ```
 
 ---
 
-## 3. Data Privacy & Security
+## 3. Local Development Setup
+
+Before you can run the app locally, you must provide your Firebase project's credentials.
+
+### Step 3.1: Create `.env.local` file
+Create a file named `.env.local` in the root of the project.
+
+### Step 3.2: Fill in your Firebase Credentials
+```
+NEXT_PUBLIC_FIREBASE_API_KEY=AIza...
+NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=globalassetshub.firebaseapp.com
+NEXT_PUBLIC_FIREBASE_DATABASE_URL=https://globalassetshub-default-rtdb.firebaseio.com
+NEXT_PUBLIC_FIREBASE_PROJECT_ID=globalassetshub
+NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=globalassetshub.appspot.com
+NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=...
+NEXT_PUBLIC_FIREBASE_APP_ID=...
+```
+
+---
+
+## 4. Data Privacy & Security
 
 ### **CRITICAL: Security Weaknesses in the Current Version**
 

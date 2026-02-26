@@ -1,6 +1,7 @@
 
 {
   "hosting": {
+    "site": "globalassetshub",
     "source": ".",
     "ignore": [
       "firebase.json",
