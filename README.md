@@ -45,11 +45,19 @@ If this application were to be fully developed by a professional team, the follo
 
 Here are a few workshopped names that reflect the professional nature of the tool:
 
+**Set A: Authority & Vision**
 *   **Vantage Asset Manager**: Implies a powerful, high-level perspective on all resources.
 *   **Sentinel Field Ledger**: Suggests reliability, protection of data, and accurate field-based records.
 *   **OmniVerify Global**: Highlights the all-encompassing nature of the verification workflow.
 *   **Axiom Assets**: Sounds foundational, trustworthy, and authoritative.
 *   **AssetNode**: A modern, sleek name for a central information hub.
+
+**Set B: Flow & Precision**
+*   **AssetFlow**: Focuses on the movement and lifecycle of assets.
+*   **Sentinel Assets**: Evokes a sense of protection and vigilance.
+*   **VerifyPro Global**: A direct, action-oriented name for verification teams.
+*   **Global Ledger**: Sounds foundational and authoritative.
+*   **Inventory Prime**: Suggests a high-performance, essential tool.
 
 ---
 

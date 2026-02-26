@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -11,11 +12,15 @@ import { Button } from '@/components/ui/button';
 
 const loadingTips = [
     "Tip: You can work completely offline. Your changes will be saved and can be uploaded to the cloud later.",
-    "Did you know? You can create custom travel reports in Word format from the data management settings.",
+    "Did you know? You can create custom travel reports in Word format from the General Settings tab.",
     "Getting Started: Import your existing Excel asset lists using the 'Scan and Import Workbook' feature in Settings.",
     "Tip: Use the 'Locked Offline' data source as a sandbox for reviewing new imports before merging them.",
     "Power User: Batch edit multiple assets at once by selecting them in the table view.",
-    "Customization: You can reorder and hide columns for each sheet type in the Settings panel."
+    "Customization: You can reorder and hide columns for each sheet type in the Settings panel.",
+    "Quick Tip: Click on any stat card in the dashboard to immediately filter your asset list.",
+    "Field Hack: You can capture high-quality remarks during verification to help with future maintenance planning.",
+    "Efficiency: Use the 'Sync Up' feature when back online to push regional changes in one go.",
+    "Data Health: Periodically check the 'Audit Exceptions' card to identify data discrepancies early."
 ];
 
 export default function Page() {

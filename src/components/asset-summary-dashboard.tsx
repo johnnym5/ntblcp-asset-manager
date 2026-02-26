@@ -1,4 +1,5 @@
-'client';
+
+'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,8 +27,7 @@ import {
     Hash,
     MessageSquare,
     Activity,
-    Wrench,
-    FileWarning as FileWarningIcon
+    Wrench
 } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { isToday, isThisWeek, parseISO, formatDistanceToNow } from 'date-fns';
@@ -208,7 +208,20 @@ export function AssetSummaryDashboard() {
             });
         }
 
-        // 5. Verification Progress
+        // 5. Audit Check: Assets with missing manufacturer info
+        const noManuf = summaryAssets.filter(a => !a.manufacturer);
+        if (noManuf.length > 0) {
+            const randomAsset = noManuf[Math.floor(Math.random() * noManuf.length)];
+            pool.push({
+                text: `Missing Data: "${randomAsset.description}" has no Manufacturer listed.`,
+                icon: <Search className="h-5 w-5" />,
+                color: "text-indigo-500",
+                subtext: "Action: Fill in missing manufacturer details to improve database accuracy.",
+                asset: randomAsset
+            });
+        }
+
+        // 6. Verification Progress
         const pending = summaryAssets.filter(a => a.verifiedStatus !== 'Verified').length;
         if (pending > 0) {
             pool.push({
@@ -219,7 +232,7 @@ export function AssetSummaryDashboard() {
             });
         }
 
-        // 6. Category Insight
+        // 7. Category Insight
         const laggingCategories = categoryStats.filter(c => c.percentage < 100);
         if (laggingCategories.length > 0) {
             const randomCat = laggingCategories[Math.floor(Math.random() * laggingCategories.length)];
@@ -454,7 +467,7 @@ export function AssetSummaryDashboard() {
                                     title="Audit Exceptions"
                                     value={summary.withDiscrepancy}
                                     description="Records where field data conflicts with previous system information."
-                                    icon={<FileWarningIcon className="h-4 w-4 text-destructive" />}
+                                    icon={<FileWarning className="h-4 w-4 text-destructive" />}
                                     onAction={() => handleStatusFilterClick('Discrepancy')}
                                     isActive={selectedStatuses.includes('Discrepancy')}
                                 />
