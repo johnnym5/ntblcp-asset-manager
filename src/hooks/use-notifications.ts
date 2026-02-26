@@ -20,7 +20,7 @@ const actionTypes = {
   REMOVE_NOTIFICATION: "REMOVE_NOTIFICATION",
 } as const
 
-const NOTIFICATIONS_STORAGE_KEY = "global-assets-hub-notifications";
+const NOTIFICATIONS_STORAGE_KEY = "assetbase-notifications";
 
 let count = 0
 // A more robust ID generator for persistent notifications

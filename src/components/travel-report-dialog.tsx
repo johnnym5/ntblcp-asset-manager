@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -226,7 +227,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         },
         sections: [{
             children: [
-                new Paragraph({ text: "GLOBAL ASSETSHUB", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+                new Paragraph({ text: "ASSETBASE", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
                 new Paragraph({ text: "ASSET VERIFICATION TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
                 new Paragraph(" "),
                 new Paragraph({ text: `DATE OF TRAVEL:\t\t${travelDate}` }),

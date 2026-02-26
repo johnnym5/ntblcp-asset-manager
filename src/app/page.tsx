@@ -56,7 +56,7 @@ export default function Page() {
     return (
       <div className="flex h-screen w-full flex-col items-center justify-center bg-background gap-6 text-center p-4">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        <h1 className="text-xl font-bold">Initializing Global AssetsHub</h1>
+        <h1 className="text-xl font-bold">Initializing AssetBase</h1>
         <div className="bg-muted/50 p-6 rounded-lg border border-dashed max-w-md w-full animate-in fade-in zoom-in duration-500">
           <p className="text-sm font-medium text-primary mb-2 uppercase tracking-wider">Helpful Tip</p>
           <p className="text-foreground italic">{loadingTips[tipIndex]}</p>

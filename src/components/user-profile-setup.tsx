@@ -1,3 +1,4 @@
+
 'use client';
 
 import React, { useState, useEffect } from 'react';
@@ -131,10 +132,12 @@ export default function UserProfileSetup() {
                     <div className="p-3 bg-primary/10 rounded-full mb-2">
                         <Boxes className="h-6 w-6 text-primary" />
                     </div>
-                    <AlertDialogTitle>Global AssetsHub</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        {foundUser ? "Select your initial starting location." : "Please sign in to continue."}
-                    </AlertDialogDescription>
+                    <AlertDialogTitle>AssetBase</AlertDialogTitle>
+                    <AlertDialogHeader className="text-center items-center">
+                        <AlertDialogDescription>
+                            {foundUser ? "Select your initial starting location." : "Please sign in to continue."}
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
                 </AlertDialogHeader>
                 
                 <div className="py-4 space-y-4">
