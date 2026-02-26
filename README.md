@@ -1,4 +1,4 @@
-# NTBLCP Asset Manager
+# Global AssetsHub
 
 A full-featured, offline-first Asset Management Web App, built with Next.js, Tailwind CSS, and Firebase.
 

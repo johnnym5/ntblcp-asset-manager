@@ -130,7 +130,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
   const [isOnline, setIsOnline] = useState(() => {
     if (typeof window !== 'undefined') {
-      const savedStatus = localStorage.getItem('ntblcp-online-status');
+      const savedStatus = localStorage.getItem('global-assets-hub-online-status');
       return savedStatus ? JSON.parse(savedStatus) : true;
     }
     return true;
@@ -185,7 +185,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
+    localStorage.setItem('global-assets-hub-online-status', JSON.stringify(isOnline));
     
     const handleBrowserConnectivityChange = () => {
         setIsOnline(navigator.onLine);
@@ -335,14 +335,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   useEffect(() => {
     if (typeof window !== 'undefined' && settingsLoaded) {
         const currentProjectId = firebaseConfig.projectId;
-        const savedProjectId = localStorage.getItem('ntblcp-firebase-project-id');
+        const savedProjectId = localStorage.getItem('global-assets-hub-firebase-project-id');
 
         if (currentProjectId && savedProjectId && currentProjectId !== savedProjectId) {
             setShowProjectSwitchDialog(true);
         }
 
         if (currentProjectId) {
-            localStorage.setItem('ntblcp-firebase-project-id', currentProjectId);
+            localStorage.setItem('global-assets-hub-firebase-project-id', currentProjectId);
         }
     }
   }, [settingsLoaded]);

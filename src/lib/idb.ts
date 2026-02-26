@@ -2,7 +2,7 @@
 import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Asset, AppSettings } from './types';
 
-const DB_NAME = 'ntblcp-asset-db';
+const DB_NAME = 'global-assets-hub-db';
 const DB_VERSION = 4; // Incremented version
 const ASSET_STORE_NAME = 'assets';
 const OFFLINE_ASSET_STORE_NAME = 'offline-assets';

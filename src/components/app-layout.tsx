@@ -182,7 +182,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="p-1.5 bg-primary rounded-lg">
                     <Boxes className="h-5 w-5 text-primary-foreground" />
                 </div>
-                <span className="text-lg font-bold hidden sm:inline-block tracking-tight">NTBLCP</span>
+                <span className="text-lg font-bold hidden sm:inline-block tracking-tight">Global AssetsHub</span>
             </div>
 
             {/* Right Side: Actions */}

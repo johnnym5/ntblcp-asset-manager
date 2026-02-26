@@ -73,7 +73,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
     if (isOpen) {
       setReportState(globalStateFilter || userProfile?.states[0] || '');
       setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
-      setObjectives('To conduct physical verification of NTBLCP assets in the state.');
+      setObjectives('To conduct physical verification of assets in the state.');
       setActivities(defaultActivities);
       setObservations(defaultObservations);
       setApprovedBy('');
@@ -226,7 +226,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         },
         sections: [{
             children: [
-                new Paragraph({ text: "NATIONAL TUBERCULOSIS, LEPROSY & BURULI - ULCER CONTROL PROGRAMME (NTBLCP)", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+                new Paragraph({ text: "GLOBAL ASSETSHUB", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
                 new Paragraph({ text: "ASSET VERIFICATION TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
                 new Paragraph(" "),
                 new Paragraph({ text: `DATE OF TRAVEL:\t\t${travelDate}` }),

@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -55,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
 
     try {
-      const savedProfileJSON = localStorage.getItem('ntblcp-user-profile');
+      const savedProfileJSON = localStorage.getItem('global-assets-hub-user-profile');
       if (savedProfileJSON) {
         const savedProfile: LocalUserProfile & { state?: string } = JSON.parse(savedProfileJSON);
         
@@ -74,12 +73,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               canEditAssets: authorizedUser.canEditAssets,
            };
 
-          localStorage.setItem('ntblcp-user-profile', JSON.stringify(freshProfile));
+          localStorage.setItem('global-assets-hub-user-profile', JSON.stringify(freshProfile));
           setUserProfile(freshProfile);
           setProfileSetupComplete(true);
         } else {
           // Stale profile, clear it
-          localStorage.removeItem('ntblcp-user-profile');
+          localStorage.removeItem('global-assets-hub-user-profile');
           setUserProfile(null);
           setProfileSetupComplete(false);
         }
@@ -90,7 +89,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       }
     } catch (e) {
       console.error("Failed to process user profile from local storage", e);
-      localStorage.removeItem('ntblcp-user-profile');
+      localStorage.removeItem('global-assets-hub-user-profile');
       setUserProfile(null);
       setProfileSetupComplete(false);
     } finally {
@@ -116,7 +115,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       canEditAssets: user.canEditAssets,
     };
     try {
-      localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
+      localStorage.setItem('global-assets-hub-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
 
@@ -133,7 +132,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     setLoading(true);
-    localStorage.removeItem('ntblcp-user-profile');
+    localStorage.removeItem('global-assets-hub-user-profile');
     setUserProfile(null);
     setProfileSetupComplete(false);
 
