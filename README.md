@@ -41,22 +41,34 @@ If this application were to be fully developed by a professional team, the follo
 
 ---
 
-## 2. Deployment to globalassetshub.web.app
+## 2. Branding Options (Workshop)
+
+Here are a few workshopped names that reflect the professional nature of the tool:
+
+*   **Vantage Asset Manager**: Implies a powerful, high-level perspective on all resources.
+*   **Sentinel Field Ledger**: Suggests reliability, protection of data, and accurate field-based records.
+*   **OmniVerify Global**: Highlights the all-encompassing nature of the verification workflow.
+*   **Axiom Assets**: Sounds foundational, trustworthy, and authoritative.
+*   **AssetNode**: A modern, sleek name for a central information hub.
+
+---
+
+## 3. Deployment to globalassetshub.web.app
 
 This project is pre-configured to deploy to the specific Firebase site `globalassetshub`.
 
-### Step 2.1: Verify Site ID
+### Step 3.1: Verify Site ID
 1. Go to the [Firebase Console](https://console.firebase.google.com/).
 2. Select your project.
 3. Navigate to **Hosting**.
 4. Ensure you have a site created with the ID `globalassetshub`. If your site ID is different, update the `"site": "..."` property in `firebase.json`.
 
-### Step 2.2: Add Custom Domain
+### Step 3.2: Add Custom Domain
 To link `globalassetshub.com`:
 1. In the Firebase Hosting dashboard, click **Add custom domain**.
 2. Enter `globalassetshub.com` and follow the instructions to verify ownership via DNS records.
 
-### Step 2.3: Deploy
+### Step 3.3: Deploy
 Run the following command to deploy only to the specified site:
 ```bash
 firebase deploy --only hosting
@@ -64,14 +76,14 @@ firebase deploy --only hosting
 
 ---
 
-## 3. Local Development Setup
+## 4. Local Development Setup
 
 Before you can run the app locally, you must provide your Firebase project's credentials.
 
-### Step 3.1: Create `.env.local` file
+### Step 4.1: Create `.env.local` file
 Create a file named `.env.local` in the root of the project.
 
-### Step 3.2: Fill in your Firebase Credentials
+### Step 4.2: Fill in your Firebase Credentials
 ```
 NEXT_PUBLIC_FIREBASE_API_KEY=AIza...
 NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN=globalassetshub.firebaseapp.com
@@ -84,7 +96,7 @@ NEXT_PUBLIC_FIREBASE_APP_ID=...
 
 ---
 
-## 4. Data Privacy & Security
+## 5. Data Privacy & Security
 
 ### **CRITICAL: Security Weaknesses in the Current Version**
 
