@@ -87,8 +87,8 @@ import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-for
 import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
-import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets } from "@/lib/idb";
+import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets, updateSettings as updateSettingsRTDB } from "@/lib/database";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { TravelReportDialog } from "./travel-report-dialog";
@@ -359,25 +359,30 @@ export default function AssetList() {
 
       try {
           const { toUpload: assetsToPush } = syncSummary;
-          const batchSet = activeDatabase === 'firestore' ? batchSetAssets : batchSetAssetsRTDB;
+          
+          // Primary Cloud write (Default: Firestore)
+          const primaryBatchSet = batchSetAssets;
+          await primaryBatchSet(assetsToPush);
 
-          if (assetsToPush.length > 0) {
-              await batchSet(assetsToPush);
-              
-              const localAssets = await getLocalAssetsFromDb();
-              const localMap = new Map(localAssets.map(a => [a.id, a]));
-              assetsToPush.forEach(pushedAsset => {
-                  const localVersion = localMap.get(pushedAsset.id);
-                  if (localVersion) {
-                      localMap.set(pushedAsset.id, { ...localVersion, syncStatus: 'synced' });
-                  }
-              });
-              const updatedLocalAssets = Array.from(localMap.values());
-              await saveAssets(updatedLocalAssets);
-              setAssets(updatedLocalAssets);
+          // AUTO BACKUP: Mirror write to Realtime Database
+          batchSetAssetsRTDB(assetsToPush).catch(e => {
+              console.error("Automatic backup to RTDB failed:", e);
+          });
+          
+          const localAssets = await getLocalAssetsFromDb();
+          const localMap = new Map(localAssets.map(a => [a.id, a]));
+          assetsToPush.forEach(pushedAsset => {
+              const localVersion = localMap.get(pushedAsset.id);
+              if (localVersion) {
+                  localMap.set(pushedAsset.id, { ...localVersion, syncStatus: 'synced' });
+              }
+          });
+          const updatedLocalAssets = Array.from(localMap.values());
+          await saveAssets(updatedLocalAssets);
+          setAssets(updatedLocalAssets);
 
-              addNotification({ title: 'Cloud Updated', description: `Successfully pushed ${assetsToPush.length} local edits.` });
-          }
+          addNotification({ title: 'Cloud Updated', description: `Successfully pushed ${assetsToPush.length} local edits.` });
+          
       } catch (error) {
           console.error("Upload failed:", error);
           addNotification({
@@ -390,7 +395,7 @@ export default function AssetList() {
           setIsSyncConfirmOpen(false);
           setSyncSummary(null);
       }
-  }, [syncSummary, setAssets, setIsSyncing, activeDatabase]);
+  }, [syncSummary, setAssets, setIsSyncing]);
 
   const handleSyncConfirm = () => {
     if (syncSummary?.type === 'download') {
@@ -824,6 +829,10 @@ export default function AssetList() {
         try {
           const deleteCloudAsset = activeDatabase === 'firestore' ? deleteAsset : deleteAssetRTDB;
           await deleteCloudAsset(assetToDelete.id);
+          // Mirror delete to backup layer
+          if (activeDatabase === 'firestore') {
+              deleteAssetRTDB(assetToDelete.id).catch(() => {});
+          }
         } catch (e) {
           addNotification({ title: 'Cloud Deletion Failed', variant: 'destructive'});
         }
@@ -854,6 +863,10 @@ export default function AssetList() {
           try {
               const batchDeleteCloudAssets = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
               await batchDeleteCloudAssets(selectedAssetIds);
+              // Mirror delete to backup layer
+              if (activeDatabase === 'firestore') {
+                  batchDeleteAssetsRTDB(selectedAssetIds).catch(() => {});
+              }
           } catch (e) {
               addNotification({ title: 'Cloud Batch Delete Error', variant: 'destructive' });
           }
@@ -1051,8 +1064,11 @@ export default function AssetList() {
       setAssets([]);
       if (isOnline && isAdmin) {
           try {
-              const cloudClear = activeDatabase === 'firestore' ? clearRtdbAssets : clearRtdbAssets;
+              const cloudClear = activeDatabase === 'firestore' ? clearAssets : clearRtdbAssets;
               await cloudClear();
+              if (activeDatabase === 'firestore') {
+                  clearRtdbAssets().catch(() => {});
+              }
           } catch (e) {
               addNotification({ title: 'Cloud Clear Error', variant: 'destructive' });
           }
@@ -1099,6 +1115,9 @@ export default function AssetList() {
       try {
         const batchDelete = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
         await batchDelete(idsToDelete);
+        if (activeDatabase === 'firestore') {
+            batchDeleteAssetsRTDB(idsToDelete).catch(() => {});
+        }
       } catch (e) {
         addNotification({ title: 'Cloud Deletion Failed', variant: 'destructive'});
       }
@@ -1124,6 +1143,12 @@ export default function AssetList() {
       if (assetsToUpload.length > 0) {
         const batchSet = activeDatabase === 'firestore' ? batchSetAssets : batchSetAssetsRTDB;
         await batchSet(assetsToUpload);
+        
+        // Background backup mirror
+        if (activeDatabase === 'firestore') {
+            batchSetAssetsRTDB(assetsToUpload).catch(() => {});
+        }
+
         const updated = all.map(a => ids.includes(a.id) ? { ...a, syncStatus: 'synced' as const } : a);
         await saveAssets(updated);
         setAssets(updated);
@@ -1237,6 +1262,9 @@ export default function AssetList() {
           try {
               const batchDelete = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
               await batchDelete(ids);
+              if (activeDatabase === 'firestore') {
+                  batchDeleteAssetsRTDB(ids).catch(() => {});
+              }
           } catch (e) {
               addNotification({ title: 'Cloud Batch Delete Error', variant: 'destructive' });
           }
@@ -1269,7 +1297,7 @@ export default function AssetList() {
   
   const handleSaveColumnLayout = async (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
     if (!isAdmin || !appSettings || !userProfile) return;
-    const newSheetDefinitions = { ...appSettings.sheetDefinitions };
+    const newSheetDefinitions = { ...grant?.sheetDefinitions };
     if (applyToAll) {
         Object.keys(newSheetDefinitions).forEach(sn => {
             newSheetDefinitions[sn] = { ...newSheetDefinitions[sn], displayFields: newDefinition.displayFields.map(f => ({ ...f })), headers: newDefinition.headers };
@@ -1280,7 +1308,7 @@ export default function AssetList() {
     const old = appSettings;
     setAppSettings(settings);
     try {
-        await Promise.all([updateSettingsRTDB(settings), updateSettingsFS(settings), saveLocalSettings(settings)]);
+        await Promise.allSettled([updateSettingsRTDB(settings), updateSettingsFS(settings), saveLocalSettings(settings)]);
         toast({ title: 'Layout Updated' });
     } catch (e) {
         setAppSettings(old);
@@ -1297,7 +1325,7 @@ export default function AssetList() {
     const old = appSettings;
     setAppSettings(settings);
     try {
-        await Promise.all([updateSettingsRTDB(settings), updateSettingsFS(settings), saveLocalSettings(settings)]);
+        await Promise.allSettled([updateSettingsRTDB(settings), updateSettingsFS(settings), saveLocalSettings(settings)]);
     } catch (e) {
         setAppSettings(old);
     }

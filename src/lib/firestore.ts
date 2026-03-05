@@ -39,7 +39,14 @@ export async function updateSettings(settings: AppSettings) {
   const firestoreDb = checkConfig();
   if (!firestoreDb) return;
   const settingsRef = doc(firestoreDb, 'config', 'settings');
-  setDoc(settingsRef, settings, { merge: true }).catch(async (error) => {
+  
+  // Primary write to Firestore
+  setDoc(settingsRef, settings, { merge: true }).then(() => {
+      // AUTO BACKUP: Mirror settings to Realtime Database
+      import('@/lib/database').then(dbMod => {
+          dbMod.updateSettings(settings).catch(() => {});
+      });
+  }).catch(async (error) => {
       const permissionError = new FirestorePermissionError({
           path: settingsRef.path,
           operation: 'update',
