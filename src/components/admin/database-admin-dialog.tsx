@@ -262,6 +262,29 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     }
   };
 
+  const handleBulkExport = () => {
+    if (selectedDocIds.length === 0) return;
+    
+    try {
+        if (selectedCollection === 'assets') {
+            const assetsToExport = allFsAssets.filter(a => selectedDocIds.includes(a.id));
+            if (assetsToExport.length === 0) {
+                toast({ title: 'No matching assets found for export.', variant: 'destructive' });
+                return;
+            }
+            exportAssetsToJson(assetsToExport, `assetain-bulk-export-${new Date().getTime()}.json`);
+            addNotification({ title: 'Bulk Export Success', description: `${assetsToExport.length} records saved to JSON.` });
+        } else {
+            if (selectedDocIds.includes('settings') && fsSettings) {
+                exportSettingsToJson(fsSettings, `assetain-config-export.json`);
+                addNotification({ title: 'Config Export Success', description: 'System configuration saved to JSON.' });
+            }
+        }
+    } catch (e) {
+        toast({ title: 'Export failed.', variant: 'destructive' });
+    }
+  };
+
   // --- INTEGRATED CLOUD ACTIONS ---
   const handleCreateCloudSnapshot = async () => {
     setIsProcessing(true);
@@ -465,6 +488,9 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                 <Badge variant="default" className="h-10 font-black uppercase text-[11px] tracking-widest bg-primary px-4">
                                     {selectedDocIds.length} Selected
                                 </Badge>
+                                <Button size="sm" variant="outline" className="h-10 font-black uppercase text-[11px] tracking-[0.1em] border-primary/30 text-primary hover:bg-primary/10 px-6" onClick={handleBulkExport}>
+                                    <Download className="mr-2 h-4 w-4"/> Bulk Export JSON
+                                </Button>
                                 <Button size="sm" variant="destructive" className="h-10 font-black uppercase text-[11px] tracking-[0.1em] shadow-xl shadow-destructive/20 px-6" onClick={handleDeleteMultiple}>
                                     <Trash2 className="mr-2 h-4 w-4"/> Bulk Delete
                                 </Button>
