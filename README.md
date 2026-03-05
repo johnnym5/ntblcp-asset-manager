@@ -1,36 +1,70 @@
-
 # Assetain
 
-**Assetain** is a professional, offline-first Asset Management and Verification platform designed for high-stakes environments where internet connectivity is intermittent or unavailable. Built with Next.js, Tailwind CSS, and a hybrid Firebase architecture, it provides a robust solution for tracking, auditing, and maintaining large-scale asset inventories.
+**Assetain** is a professional, offline-first Asset Management and Verification platform designed for high-stakes environments. Built with Next.js, Tailwind CSS, and a hybrid Firebase architecture, it provides a robust solution for tracking, auditing, and maintaining large-scale asset inventories.
 
-## Core Capabilities
+## 🚀 Quick Start (Local Development)
 
-### 🌐 Hybrid Online/Offline Architecture
-*   **Offline-First by Design**: Utilizes IndexedDB for full browser-based persistence. Work continues seamlessly without an internet connection.
-*   **Intelligent Synchronization**: Detects connection state and provides a controlled "Sync Up/Down" workflow to resolve conflicts and update the global cloud database.
-*   **Regional Data Scoping**: Automatically downloads only the assets relevant to a user's authorized region to optimize device storage and performance.
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/johnnym5/ntblcp-asset-manager.git
+   cd ntblcp-asset-manager
+   ```
 
-### 📊 Comprehensive Asset Management
-*   **Dynamic Inventory Dashboard**: Real-time "Inventory Pulse" providing 10+ key metrics on data quality, verification coverage, and asset health.
-*   **Advanced Filtering**: Multi-criteria filtering by location, assignee, status, condition, and missing data fields.
-*   **Batch Operations**: High-speed batch editing for categories or individual selections, enabling thousands of records to be updated in seconds.
+2. **Configure Environment**:
+   - Rename `.env.example` to `.env`.
+   - Populate the keys with your Firebase Project credentials.
 
-### 📑 Professional Reporting & Imports
-*   **Smart Excel Scanner**: Automatically detects and maps headers from complex workbooks to internal templates.
-*   **Automated Travel Reports**: Generates professional Word documents (`.docx`) summarizing field verification findings, objectives, and exceptions based on active project data.
-*   **Flexible Schema**: Supports custom fields and per-sheet column configurations managed via an administrative interface.
+3. **Install & Run**:
+   ```bash
+   npm install
+   npm run dev
+   ```
 
-### 🔐 Enterprise Security & Controls
-*   **Role-Based Access Control (RBAC)**: Distinct permissions for Administrators, Field Users, and Guest accounts.
-*   **Verification Guardrails**: Optional "Asset List Lock" prevents accidental record creation/deletion during critical audit periods.
-*   **Change Audit Log**: Tracks modifications including timestamps, user identity, and regional scope.
+4. **Initial Login**:
+   - **Login Name**: `admin`
+   - **Password**: `setup`
+   - *Note: Change these immediately in the Settings > Users panel after first sign-in.*
 
-## Technical Foundation
-- **Framework**: Next.js 14 (App Router)
-- **Styling**: Tailwind CSS & Shadcn UI
-- **Database**: Hybrid Firestore (Configuration) & Realtime Database (High-volume Assets)
-- **Client Storage**: IndexedDB (via `idb` library)
-- **Animations**: Framer Motion
+## 🛠 Deployment Guide
+
+### Pushing to GitHub
+
+To push your latest changes to your repository:
+
+```bash
+# Initialize git if not already done
+git init
+
+# Link to your repository
+git remote remove origin
+git remote add origin https://github.com/johnnym5/ntblcp-asset-manager.git
+
+# Stage and Commit
+git add .
+git commit -m "Prepare for production deployment"
+
+# Push to Main
+git push -u origin main
+```
+
+### Web Deployment (Vercel / Firebase)
+
+1. **Vercel**: Connect your GitHub repository. Vercel will automatically detect Next.js settings. **Crucial**: Add all variables from your `.env` file to the "Environment Variables" section in the Vercel Dashboard.
+2. **Firebase App Hosting**: This project includes an `apphosting.yaml` and `firebase.json` for seamless deployment to Google's Firebase infrastructure.
+
+## 🏗 Architecture
+
+### 🌐 Hybrid Data Sync
+*   **Primary Layer**: Cloud Firestore (Real-time querying and configuration).
+*   **Backup Layer**: Realtime Database (High-speed "Shadow Mirroring" for redundancy).
+*   **Local Layer**: IndexedDB (Browser-based persistence for 100% offline capability).
+
+### 📊 Infrastructure Console
+The inbuilt **Infrastructure Console** allows administrators to:
+*   Perform full CRUD on cloud records.
+*   Execute manual Cloud Snapshots (Firestore → RTDB).
+*   Restore data from snapshots or JSON backups.
+*   Perform bulk exports and emergency system purges.
 
 ---
 
