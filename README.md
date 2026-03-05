@@ -106,9 +106,10 @@ git add .
 git commit -m "Initial commit: Assetain offline-first asset manager"
 ```
 
-### Step 5.3: Push to Remote (GitHub/GitLab)
+### Step 5.3: Push to Remote (GitHub)
 ```bash
-git remote add origin <your-repository-url>
+git remote remove origin
+git remote add origin https://github.com/johnnym5/ntblcp-asset-manager.git
 git branch -M main
 git push -u origin main
 ```
