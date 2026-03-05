@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -75,11 +75,14 @@ import {
     LayoutGrid,
     DatabaseIcon,
     History,
-    Save
+    Save,
+    Settings2,
+    HardDriveDownload,
+    AlertOctagon
 } from 'lucide-react';
-import type { Asset } from '@/lib/types';
-import { clearLocalAssets, saveLockedOfflineAssets } from '@/lib/idb';
-import { exportFullBackupToJson, exportAssetsToJson } from '@/lib/json-export';
+import type { Asset, AppSettings } from '@/lib/types';
+import { clearLocalAssets, saveLockedOfflineAssets, saveLocalSettings } from '@/lib/idb';
+import { exportFullBackupToJson, exportAssetsToJson, exportSettingsToJson } from '@/lib/json-export';
 import { addNotification } from '@/hooks/use-notifications';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { useToast } from '@/hooks/use-toast';
@@ -101,7 +104,7 @@ type CollectionType = 'assets' | 'config';
 
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAssets, setOfflineAssets } = useAppState();
+  const { appSettings, setAssets, setOfflineAssets, setAppSettings } = useAppState();
   const { toast } = useToast();
   
   const [isProcessing, setIsProcessing] = useState(false);
@@ -122,6 +125,8 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [editingData, setEditingData] = useState<any>(null);
+
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFsData = useCallback(async () => {
     setIsFsLoading(true);
@@ -153,7 +158,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   const filteredDocs = useMemo(() => {
     if (selectedCollection === 'config') {
-        return [{ id: 'settings', data: fsSettings, title: 'Application Settings' }];
+        return fsSettings ? [{ id: 'settings', data: fsSettings, title: 'Application Settings' }] : [];
     }
     
     let base = allFsAssets;
@@ -262,6 +267,52 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     }
   };
 
+  const handleExportSettings = () => {
+    if (!fsSettings) {
+        toast({ title: 'No settings data loaded.', variant: 'destructive' });
+        return;
+    }
+    try {
+        exportSettingsToJson(fsSettings, 'assetain-settings-backup.json');
+        toast({ title: 'Settings Exported' });
+    } catch (e) {
+        toast({ title: 'Export Failed', variant: 'destructive' });
+    }
+  }
+
+  const handleImportJson = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const data = JSON.parse(e.target?.result as string);
+            setIsProcessing(true);
+            
+            if (data.settings) {
+                await updateSettingsFS(data.settings);
+                await saveLocalSettings(data.settings);
+                setAppSettings(data.settings);
+                addNotification({ title: 'Settings Restored' });
+            }
+            
+            if (data.assets && Array.isArray(data.assets)) {
+                await batchSetAssetsFS(data.assets);
+                addNotification({ title: 'Assets Restored', description: `${data.assets.length} items merged.` });
+            }
+            
+            fetchFsData();
+        } catch (err) {
+            toast({ title: 'Invalid JSON file', variant: 'destructive' });
+        } finally {
+            setIsProcessing(false);
+            if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+    };
+    reader.readAsText(file);
+  };
+
   const handlePullRtdbToFs = async () => {
     setIsProcessing(true);
     try {
@@ -303,6 +354,10 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         case 'clear_firestore': 
             clearFirestoreAssets().then(() => fetchFsData()); 
             break;
+        case 'clear_settings':
+            // Logic to wipe settings specifically if needed
+            toast({ title: "Settings wipe requires system restart.", variant: "destructive" });
+            break;
         default: break;
     }
   }
@@ -314,36 +369,36 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[1400px] flex flex-col h-[90vh] p-0 overflow-hidden bg-background border-border shadow-2xl">
+        <DialogContent className="max-w-[1400px] flex flex-col h-[95vh] p-0 overflow-hidden bg-background border-border shadow-2xl">
           <Tabs defaultValue="explorer" className="flex flex-col h-full">
-            <div className="px-8 pt-8 bg-muted/20 border-b border-border">
+            <div className="px-8 pt-8 bg-muted/30 border-b border-border">
                 <DialogHeader className="mb-8">
-                    <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">
+                    <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight text-foreground">
                         <ShieldCheck className="text-primary h-10 w-10"/> Assetain Infrastructure Console
                     </DialogTitle>
-                    <DialogDescription className="text-base font-medium">
-                        Administrative Cloud Data Explorer & Disaster Recovery Manager
+                    <DialogDescription className="text-base font-medium text-muted-foreground">
+                        Cloud Database Management, Recovery & Governance Tool
                     </DialogDescription>
                 </DialogHeader>
                 
                 <TabsList className="bg-transparent h-auto p-0 gap-10 justify-start border-b-0">
                     <TabsTrigger value="explorer" className="rounded-none border-b-4 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground text-muted-foreground font-bold px-0 pb-4 h-auto transition-all uppercase text-xs tracking-[0.2em]">
-                        Database Explorer
+                        <LayoutGrid className="mr-2 h-4 w-4"/> Explorer
                     </TabsTrigger>
                     <TabsTrigger value="backup" className="rounded-none border-b-4 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground text-muted-foreground font-bold px-0 pb-4 h-auto transition-all uppercase text-xs tracking-[0.2em]">
-                        Backup & Export
+                        <Download className="mr-2 h-4 w-4"/> Backup & Export
                     </TabsTrigger>
                     <TabsTrigger value="restore" className="rounded-none border-b-4 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground text-muted-foreground font-bold px-0 pb-4 h-auto transition-all uppercase text-xs tracking-[0.2em]">
-                        Restore Layer
+                        <RefreshCw className="mr-2 h-4 w-4"/> Restore Layer
                     </TabsTrigger>
                     <TabsTrigger value="destructive" className="rounded-none border-b-4 border-transparent data-[state=active]:border-destructive data-[state=active]:bg-transparent data-[state=active]:text-destructive text-muted-foreground font-bold px-0 pb-4 h-auto transition-all uppercase text-xs tracking-[0.2em]">
-                        Destructive Zone
+                        <AlertOctagon className="mr-2 h-4 w-4"/> Danger Zone
                     </TabsTrigger>
                 </TabsList>
             </div>
 
-            <div className="flex-1 overflow-hidden">
-                {/* DATABASE EXPLORER (FIRESTORE STYLE) */}
+            <div className="flex-1 overflow-hidden bg-background">
+                {/* DATABASE EXPLORER */}
                 <TabsContent value="explorer" className="m-0 h-full flex flex-col animate-in fade-in duration-500">
                     <div className="bg-muted/10 border-b px-6 py-4 flex items-center justify-between gap-6">
                         <div className="flex items-center gap-6">
@@ -375,7 +430,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             )}
                         </div>
                         <Button size="sm" variant="outline" className="h-10 font-bold bg-background border-2 px-6" onClick={fetchFsData} disabled={isFsLoading}>
-                            <RefreshCw className={cn("mr-2 h-4 w-4", isFsLoading && "animate-spin")} /> Refresh Data
+                            <RefreshCw className={cn("mr-2 h-4 w-4", isFsLoading && "animate-spin")} /> Refresh
                         </Button>
                     </div>
 
@@ -392,7 +447,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                     <button 
                                         className={cn(
                                             "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
-                                            selectedCollection === 'assets' ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                            selectedCollection === 'assets' ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
                                         )}
                                         onClick={() => { setSelectedCollection('assets'); setSelectedDocId(null); setSelectedDocIds([]); }}
                                     >
@@ -402,7 +457,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                     <button 
                                         className={cn(
                                             "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
-                                            selectedCollection === 'config' ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                            selectedCollection === 'config' ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
                                         )}
                                         onClick={() => { setSelectedCollection('config'); setSelectedDocId(null); setSelectedDocIds([]); }}
                                     >
@@ -459,7 +514,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                         </div>
                                     ))}
                                     {filteredDocs.length === 0 && (
-                                        <div className="p-12 text-center text-sm text-muted-foreground italic font-medium">No records matching search query</div>
+                                        <div className="p-12 text-center text-sm text-muted-foreground italic font-medium">No records matching query</div>
                                     )}
                                 </div>
                             </ScrollArea>
@@ -480,7 +535,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                         disabled={isProcessing}
                                     >
                                         {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
-                                        Update Cloud
+                                        Commit Changes
                                     </Button>
                                 )}
                             </div>
@@ -508,7 +563,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                                         </div>
                                                     ) : typeof value === 'object' ? (
                                                         <div className="p-4 rounded-xl border-2 bg-muted/30 font-mono text-xs text-muted-foreground border-dashed">
-                                                            Complex objects/arrays must be managed via standard application forms.
+                                                            Nested objects/arrays must be managed via application forms.
                                                         </div>
                                                     ) : (
                                                         <Input 
@@ -522,9 +577,9 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                         </div>
                                     </div>
                                 ) : (
-                                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground/20 opacity-40">
-                                        <DatabaseZap className="h-24 w-24 mb-6" />
-                                        <p className="text-2xl font-black uppercase tracking-[0.3em]">No Document Loaded</p>
+                                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30">
+                                        <DatabaseZap className="h-24 w-24 mb-6 opacity-20" />
+                                        <p className="text-2xl font-black uppercase tracking-[0.3em] opacity-20">No Document Selected</p>
                                         <p className="text-sm font-medium mt-2">Select a record from the center column to view and edit its fields.</p>
                                     </div>
                                 )}
@@ -537,51 +592,50 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                     {/* BACKUP & EXPORT */}
                     <TabsContent value="backup" className="m-0 p-10 space-y-10 animate-in slide-in-from-left-4 duration-500">
                         <div className="space-y-3">
-                            <h2 className="text-3xl font-black tracking-tight">Data Scope & Resource Export</h2>
+                            <h2 className="text-3xl font-black tracking-tight">System Data Export</h2>
                             <p className="text-muted-foreground font-medium text-base">
-                                Create regional snapshots or export specific inventory context to JSON files.
+                                Export your asset records and application settings to JSON format for offline storage.
                             </p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                            <div className="space-y-4">
-                                <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Target Project (Data Source)</Label>
-                                <Select value={targetProjectId} onValueChange={setTargetProjectId}>
-                                    <SelectTrigger className="h-14 bg-background border-2 rounded-2xl font-bold text-base shadow-sm">
-                                        <SelectValue placeholder="All Available Projects" />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-2xl shadow-2xl">
-                                        <SelectItem value="all" className="font-bold">Full Scope (Global)</SelectItem>
-                                        {projects.map(p => (
-                                            <SelectItem key={p.id} value={p.id} className="font-bold">{p.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-4">
-                                <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Target Asset Collection</Label>
-                                <Select value={targetCategory} onValueChange={setTargetCategory}>
-                                    <SelectTrigger className="h-14 bg-background border-2 rounded-2xl font-bold text-base shadow-sm">
-                                        <SelectValue placeholder="All Categories" />
-                                    </SelectTrigger>
-                                    <SelectContent className="rounded-2xl shadow-2xl">
-                                        <SelectItem value="all" className="font-bold">All Asset Categories</SelectItem>
-                                        {categories.map(c => (
-                                            <SelectItem key={c} value={c} className="font-bold">{c}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </div>
+                            <Card className="rounded-[2rem] border-2 shadow-sm">
+                                <CardHeader className="p-8 pb-4">
+                                    <CardTitle className="text-xl font-black flex items-center gap-3"><FileText className="text-primary h-6 w-6"/> Asset Inventory Export</CardTitle>
+                                    <CardDescription>Target specific projects or categories for export.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-8 pt-4 space-y-6">
+                                    <div className="space-y-4">
+                                        <Label className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground">Target Project</Label>
+                                        <Select value={targetProjectId} onValueChange={setTargetProjectId}>
+                                            <SelectTrigger className="h-12 bg-background border-2 rounded-xl font-bold">
+                                                <SelectValue placeholder="All Available Projects" />
+                                            </SelectTrigger>
+                                            <SelectContent className="rounded-xl">
+                                                <SelectItem value="all" className="font-bold">Global Scope</SelectItem>
+                                                {projects.map(p => (
+                                                    <SelectItem key={p.id} value={p.id} className="font-bold">{p.name}</SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <Button variant="default" className="w-full h-14 font-black rounded-xl shadow-xl shadow-primary/20" onClick={handleExportJson}>
+                                        <Download className="mr-3 h-5 w-5" /> Export Selection (JSON)
+                                    </Button>
+                                </CardContent>
+                            </Card>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6">
-                            <Button variant="outline" className="h-20 font-black text-xl rounded-2xl border-2 hover:bg-muted/50 transition-all shadow-sm" onClick={handleExportJson}>
-                                <Download className="mr-4 h-8 w-8 text-primary" /> Export Scope (JSON)
-                            </Button>
-                            <Button variant="default" className="h-20 font-black text-xl rounded-2xl shadow-2xl shadow-primary/30 transition-all" onClick={handleCreateCloudSnapshot} disabled={isProcessing}>
-                                {isProcessing ? <Loader2 className="mr-4 h-8 w-8 animate-spin" /> : <PlusCircle className="mr-4 h-8 w-8" />}
-                                Push to RTDB Snapshot
-                            </Button>
+                            <Card className="rounded-[2rem] border-2 shadow-sm">
+                                <CardHeader className="p-8 pb-4">
+                                    <CardTitle className="text-xl font-black flex items-center gap-3"><Settings2 className="text-primary h-6 w-6"/> System Configuration Export</CardTitle>
+                                    <CardDescription>Export user accounts, roles, and sheet definitions.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-8 pt-4 flex flex-col justify-center h-[180px]">
+                                    <Button variant="outline" className="w-full h-14 font-black rounded-xl border-2" onClick={handleExportSettings}>
+                                        <Settings className="mr-3 h-5 w-5" /> Export Settings Backup
+                                    </Button>
+                                </CardContent>
+                            </Card>
                         </div>
                     </TabsContent>
 
@@ -590,7 +644,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                         <div className="space-y-3">
                             <h2 className="text-3xl font-black tracking-tight">System Recovery & Layer Sync</h2>
                             <p className="text-muted-foreground font-medium text-base">
-                                Recover Firestore primary state from Realtime Database snapshots or external backups.
+                                Recover Firestore state from Realtime Database snapshots or external JSON backups.
                             </p>
                         </div>
 
@@ -601,7 +655,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                     <CardDescription className="text-sm font-medium">Overwrite Firestore primary layer with RTDB redundancy data.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="p-8 pt-4">
-                                    <Button variant="outline" className="w-full h-14 bg-background font-black rounded-2xl border-2 text-base" onClick={handlePullRtdbToFs} disabled={isProcessing}>
+                                    <Button variant="outline" className="w-full h-14 bg-background font-black rounded-xl border-2 text-base" onClick={handlePullRtdbToFs} disabled={isProcessing}>
                                         {isProcessing ? <Loader2 className="mr-3 h-5 w-5 animate-spin"/> : <RefreshCw className="mr-3 h-5 w-5" />}
                                         Execute Recovery Sync
                                     </Button>
@@ -611,15 +665,18 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             <Card className="bg-muted/10 border-2 rounded-[2rem] overflow-hidden">
                                 <CardHeader className="p-8 pb-4">
                                     <CardTitle className="text-xl font-black flex items-center gap-3"><FileUp className="text-primary h-6 w-6"/> JSON Backup Import</CardTitle>
-                                    <CardDescription className="text-sm font-medium">Upload an Assetain .json file to perform a high-speed cloud merge.</CardDescription>
+                                    <CardDescription className="text-sm font-medium">Upload an Assetain backup file to perform a cloud merge.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="p-8 pt-4">
-                                    <div className="p-10 border-4 border-dashed border-border rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-primary/50 transition-all cursor-pointer bg-background group">
+                                    <div 
+                                        className="p-10 border-4 border-dashed border-border rounded-3xl flex flex-col items-center justify-center gap-4 hover:border-primary/50 transition-all cursor-pointer bg-background group"
+                                        onClick={() => fileInputRef.current?.click()}
+                                    >
                                         <UploadCloud className="h-12 w-12 text-muted-foreground group-hover:text-primary transition-all group-hover:scale-110 duration-300" />
                                         <div className="text-center">
-                                            <p className="text-sm font-black uppercase tracking-widest">Select .json backup file</p>
+                                            <p className="text-sm font-black uppercase tracking-widest">Select .json file</p>
                                         </div>
-                                        <Input type="file" className="hidden" accept=".json" />
+                                        <Input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportJson} />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -631,7 +688,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                         <div className="space-y-3">
                             <h2 className="text-3xl font-black tracking-tight text-destructive">Maintenance Danger Zone</h2>
                             <p className="text-muted-foreground font-medium text-base">
-                                High-impact operations that bypass safe sync cycles and affect cloud production databases immediately.
+                                High-impact operations that affect cloud production databases immediately. Use with extreme caution.
                             </p>
                         </div>
 
@@ -639,22 +696,34 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             <Card className="border-destructive/30 bg-destructive/5 shadow-none rounded-[2rem] border-2">
                                 <CardHeader className="p-8 pb-4">
                                     <CardTitle className="text-xl text-destructive font-black flex items-center gap-3">Wipe Primary Assets</CardTitle>
-                                    <CardDescription className="text-destructive/70 font-bold">Permanently remove ALL asset records from Firestore primary storage.</CardDescription>
+                                    <CardDescription className="text-destructive/70 font-bold">Permanently remove ALL asset records from Firestore.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="p-8 pt-4">
-                                    <Button variant="outline" className="w-full h-14 border-destructive/30 text-destructive hover:bg-destructive hover:text-white transition-all rounded-2xl font-black uppercase tracking-widest text-xs" onClick={() => openConfirmation('clear_firestore', 'Wipe Cloud Data?', 'This will permanently remove ALL assets from Firestore. This cannot be undone.')}>
-                                        Execute Primary Wipe
+                                    <Button variant="outline" className="w-full h-14 border-destructive/30 text-destructive hover:bg-destructive hover:text-white transition-all rounded-xl font-black uppercase tracking-widest text-xs" onClick={() => openConfirmation('clear_firestore', 'Wipe Cloud Data?', 'This will permanently remove ALL assets from Firestore. This cannot be undone.')}>
+                                        Execute Asset Wipe
                                     </Button>
                                 </CardContent>
                             </Card>
 
-                            <Card className="border-destructive bg-destructive/10 shadow-2xl shadow-destructive/20 rounded-[2rem] border-2">
+                            <Card className="border-destructive/30 bg-destructive/5 shadow-none rounded-[2rem] border-2">
                                 <CardHeader className="p-8 pb-4">
-                                    <CardTitle className="text-2xl text-destructive flex items-center gap-3 font-black uppercase tracking-tighter">Global System Purge</CardTitle>
-                                    <CardDescription className="text-destructive/80 font-black underline">Clears Firestore, RTDB, and all local IndexedDB/Metadata caches.</CardDescription>
+                                    <CardTitle className="text-xl text-destructive font-black flex items-center gap-3">Wipe Configuration</CardTitle>
+                                    <CardDescription className="text-destructive/70 font-bold">Clear all system settings, users, and sheet layouts.</CardDescription>
                                 </CardHeader>
                                 <CardContent className="p-8 pt-4">
-                                    <Button variant="destructive" className="w-full h-16 font-black text-xl rounded-2xl shadow-2xl shadow-destructive/30 uppercase tracking-widest" onClick={() => openConfirmation('nuke_all', 'INITIATE GLOBAL WIPE?', 'WARNING: This will clear EVERYTHING across all cloud and local layers. The system will reset to factory state.')}>
+                                    <Button variant="outline" className="w-full h-14 border-destructive/30 text-destructive hover:bg-destructive hover:text-white transition-all rounded-xl font-black uppercase tracking-widest text-xs" onClick={() => openConfirmation('clear_settings', 'Reset All Settings?', 'This will wipe your system configuration. You will need to restore from a backup or re-initialize.')}>
+                                        Reset System Config
+                                    </Button>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="col-span-full border-destructive bg-destructive/10 shadow-2xl shadow-destructive/20 rounded-[2rem] border-2">
+                                <CardHeader className="p-8 pb-4">
+                                    <CardTitle className="text-2xl text-destructive flex items-center gap-3 font-black uppercase tracking-tighter">Global System Purge</CardTitle>
+                                    <CardDescription className="text-destructive/80 font-black underline">Clears Firestore, RTDB, and all local caches across the platform.</CardDescription>
+                                </CardHeader>
+                                <CardContent className="p-8 pt-4">
+                                    <Button variant="destructive" className="w-full h-16 font-black text-xl rounded-xl shadow-2xl shadow-destructive/30 uppercase tracking-widest" onClick={() => openConfirmation('nuke_all', 'INITIATE GLOBAL WIPE?', 'WARNING: This will clear EVERYTHING across all cloud and local layers. The system will reset to factory state.')}>
                                         Execute Total Destruction
                                     </Button>
                                 </CardContent>
@@ -664,15 +733,15 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                 </ScrollArea>
             </div>
 
-            <DialogFooter className="px-10 py-6 bg-muted/20 border-t border-border">
-                <DialogClose asChild><Button variant="ghost" className="font-black uppercase tracking-widest text-xs h-12 px-8">Exit Admin Console</Button></DialogClose>
+            <DialogFooter className="px-10 py-6 bg-muted/30 border-t border-border">
+                <DialogClose asChild><Button variant="ghost" className="font-black uppercase tracking-widest text-xs h-12 px-8">Exit Infrastructure Console</Button></DialogClose>
             </DialogFooter>
           </Tabs>
         </DialogContent>
       </Dialog>
       
       <AlertDialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
-          <AlertDialogContent className="rounded-[2rem] border-destructive/20 shadow-2xl p-8">
+          <AlertDialogContent className="rounded-[2rem] border-destructive/20 shadow-2xl p-8 bg-background">
               <AlertDialogHeader>
                   <AlertDialogTitle className="text-destructive text-3xl font-black uppercase tracking-tighter">{confirmTitle}</AlertDialogTitle>
                   <AlertDialogDescription className="text-lg font-bold leading-relaxed pt-2">
@@ -680,8 +749,8 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                   </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter className="mt-8 gap-4">
-                  <AlertDialogCancel className="rounded-2xl font-black h-14 px-8 uppercase tracking-widest text-xs">Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleConfirmAction} className="bg-destructive hover:bg-destructive/90 text-white font-black rounded-2xl uppercase tracking-widest px-10 h-14 text-xs">Confirm Operation</AlertDialogAction>
+                  <AlertDialogCancel className="rounded-xl font-black h-14 px-8 uppercase tracking-widest text-xs">Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmAction} className="bg-destructive hover:bg-destructive/90 text-white font-black rounded-xl uppercase tracking-widest px-10 h-14 text-xs">Confirm Operation</AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
