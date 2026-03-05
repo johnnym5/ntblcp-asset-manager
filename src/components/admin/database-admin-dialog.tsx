@@ -1,7 +1,7 @@
 
 "use client";
 
-import React, { useState, useRef, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -41,7 +41,8 @@ import {
     batchSetAssets as batchSetAssetsFS, 
     clearAssets as clearFirestoreAssets, 
     setAsset as setAssetFS,
-    deleteAsset as deleteAssetFS
+    deleteAsset as deleteAssetFS,
+    getSettings as getSettingsFS
 } from '@/lib/firestore';
 import { 
     getAssets as getAssetsRTDB, 
@@ -55,18 +56,18 @@ import {
     FileUp, 
     Download, 
     DatabaseZap, 
-    AlertTriangle, 
-    CloudOff, 
     RefreshCw, 
-    CheckCircle, 
     Search, 
     FileJson, 
     ArrowRightLeft, 
     ShieldCheck, 
     PlusCircle, 
-    History, 
     Database, 
-    UploadCloud
+    UploadCloud,
+    ChevronRight,
+    FileText,
+    Settings,
+    Edit3
 } from 'lucide-react';
 import type { Asset } from '@/lib/types';
 import { clearLocalAssets, saveLockedOfflineAssets } from '@/lib/idb';
@@ -80,15 +81,18 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
 import { Label } from '../ui/label';
 import { cn } from '@/lib/utils';
+import { Separator } from '../ui/separator';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
+type CollectionType = 'assets' | 'config';
+
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAssets, setOfflineAssets, activeGrantId } = useAppState();
+  const { appSettings, setAssets, setOfflineAssets } = useAppState();
   const { toast } = useToast();
   
   const [isProcessing, setIsProcessing] = useState(false);
@@ -102,26 +106,34 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   // Firestore Browser State
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedCollection, setSelectedCollection] = useState<CollectionType>('assets');
   const [allFsAssets, setAllFsAssets] = useState<Asset[]>([]);
+  const [fsSettings, setFsSettings] = useState<any>(null);
   const [isFsLoading, setIsFsLoading] = useState(false);
-  const [selectedFsAsset, setSelectedFsAsset] = useState<Asset | null>(null);
+  const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
+  const [isJsonMode, setIsJsonMode] = useState(false);
   const [editingAssetJson, setEditingAssetJson] = useState('');
 
-  const fetchFsAssets = useCallback(async () => {
+  const fetchFsData = useCallback(async () => {
     setIsFsLoading(true);
     try {
-        const data = await getAssetsFS();
-        setAllFsAssets(data);
+        if (selectedCollection === 'assets') {
+            const data = await getAssetsFS();
+            setAllFsAssets(data);
+        } else {
+            const settings = await getSettingsFS();
+            setFsSettings(settings);
+        }
     } catch (e) {
-        toast({ title: 'Error fetching Firestore assets', variant: 'destructive' });
+        toast({ title: 'Error fetching Firestore data', variant: 'destructive' });
     } finally {
         setIsFsLoading(false);
     }
-  }, [toast]);
+  }, [selectedCollection, toast]);
 
   useEffect(() => {
-    if (isOpen) fetchFsAssets();
-  }, [isOpen, fetchFsAssets]);
+    if (isOpen) fetchFsData();
+  }, [isOpen, fetchFsData]);
 
   const projects = useMemo(() => appSettings?.grants || [], [appSettings]);
   const categories = useMemo(() => {
@@ -130,44 +142,63 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     return Array.from(uniqueCats).sort();
   }, [allFsAssets]);
 
-  const filteredFsAssets = useMemo(() => {
+  const filteredDocs = useMemo(() => {
+    if (selectedCollection === 'config') {
+        return [{ id: 'settings', data: fsSettings }];
+    }
+    
     let base = allFsAssets;
     if (searchQuery) {
         const q = searchQuery.toLowerCase();
         base = base.filter(a => 
             a.description?.toLowerCase().includes(q) || 
             a.assetIdCode?.toLowerCase().includes(q) || 
-            a.sn?.toLowerCase().includes(q)
+            a.sn?.toLowerCase().includes(q) ||
+            a.id.toLowerCase().includes(q)
         );
     }
-    return base.slice(0, 100);
-  }, [allFsAssets, searchQuery]);
+    return base.map(a => ({ id: a.id, data: a }));
+  }, [allFsAssets, fsSettings, searchQuery, selectedCollection]);
 
-  const handleEditFsAsset = (asset: Asset) => {
-    setSelectedFsAsset(asset);
-    setEditingAssetJson(JSON.stringify(asset, null, 2));
+  const selectedDocData = useMemo(() => {
+    if (!selectedDocId) return null;
+    return filteredDocs.find(d => d.id === selectedDocId)?.data || null;
+  }, [selectedDocId, filteredDocs]);
+
+  const handleSelectDoc = (id: string) => {
+    setSelectedDocId(id);
+    setIsJsonMode(false);
+    const data = filteredDocs.find(d => d.id === id)?.data;
+    if (data) setEditingAssetJson(JSON.stringify(data, null, 2));
   };
 
-  const handleSaveFsAsset = async () => {
-    if (!selectedFsAsset) return;
+  const handleSaveDoc = async () => {
+    if (!selectedDocId || !isJsonMode) return;
     try {
         const updated = JSON.parse(editingAssetJson);
-        await setAssetFS(updated);
-        toast({ title: 'Asset Updated in Firestore' });
-        fetchFsAssets();
-        setSelectedFsAsset(null);
+        if (selectedCollection === 'assets') {
+            await setAssetFS(updated);
+            toast({ title: 'Asset Updated in Firestore' });
+        } else {
+            // Config update would go here if implemented for raw JSON
+            toast({ title: 'Manual config editing restricted to UI for safety', variant: 'destructive' });
+            return;
+        }
+        fetchFsData();
+        setIsJsonMode(false);
     } catch (e) {
         toast({ title: 'Invalid JSON format', variant: 'destructive' });
     }
   };
 
-  const handleDeleteFsAsset = async (id: string) => {
+  const handleDeleteDoc = async (id: string) => {
+    if (selectedCollection === 'config') return;
     if (!confirm(`Are you sure you want to delete asset ${id}?`)) return;
     try {
         await deleteAssetFS(id);
         toast({ title: 'Asset Deleted' });
-        fetchFsAssets();
-        if (selectedFsAsset?.id === id) setSelectedFsAsset(null);
+        fetchFsData();
+        if (selectedDocId === id) setSelectedDocId(null);
     } catch (e) {
         toast({ title: 'Delete Failed', variant: 'destructive' });
     }
@@ -221,7 +252,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         if (rtdbAssets.length > 0) {
             await batchSetAssetsFS(rtdbAssets);
             addNotification({ title: 'Cloud Restore Complete', description: `${rtdbAssets.length} records recovered from Realtime Database.` });
-            fetchFsAssets();
+            fetchFsData();
         }
     } catch (e) {
         addNotification({ title: 'Restore Failed', variant: 'destructive'});
@@ -239,7 +270,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       await clearFirestoreAssets();
       await clearRtdbAssets();
       addNotification({ title: "GLOBAL WIPE COMPLETE", description: "All local and cloud layers cleared.", variant: 'destructive' });
-      fetchFsAssets();
+      fetchFsData();
     } catch (e) {
       addNotification({ title: 'Wipe Failed', variant: 'destructive'});
     }
@@ -259,7 +290,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     switch(action) {
         case 'nuke_all': handleNukeAll(); break;
         case 'clear_firestore': 
-            clearFirestoreAssets().then(() => fetchFsAssets()); 
+            clearFirestoreAssets().then(() => fetchFsData()); 
             break;
         default: break;
     }
@@ -270,53 +301,211 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-6xl flex flex-col h-[90vh] p-0 overflow-hidden bg-[#0f172a] text-slate-200 border-slate-800">
-          <Tabs defaultValue="backup" className="flex flex-col h-full">
-            <div className="px-6 pt-6 bg-[#1e293b]/50 border-b border-slate-800">
+        <DialogContent className="max-w-7xl flex flex-col h-[95vh] p-0 overflow-hidden bg-background border-border">
+          <Tabs defaultValue="explorer" className="flex flex-col h-full">
+            <div className="px-6 pt-6 bg-muted/30 border-b border-border">
                 <DialogHeader className="mb-6">
-                    <DialogTitle className="flex items-center gap-2 text-2xl font-bold text-white">
-                        <ShieldCheck className="text-blue-500 h-8 w-8"/> Global Infrastructure Console
+                    <DialogTitle className="flex items-center gap-2 text-2xl font-black tracking-tight">
+                        <ShieldCheck className="text-primary h-8 w-8"/> Assetain Infrastructure Console
                     </DialogTitle>
-                    <DialogDescription className="text-slate-400">
-                        Authorized Access Only: Cloud Firestore (Main) | Realtime Database (Redundancy)
+                    <DialogDescription>
+                        Authorized Management: Primary Firestore Storage & RTDB Backup Layer
                     </DialogDescription>
                 </DialogHeader>
                 
                 <TabsList className="bg-transparent h-auto p-0 gap-8 justify-start border-b-0">
-                    <TabsTrigger value="backup" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent data-[state=active]:text-white text-slate-400 font-bold px-0 pb-4 h-auto transition-all">
-                        Backup & Export
-                    </TabsTrigger>
-                    <TabsTrigger value="restore" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent data-[state=active]:text-white text-slate-400 font-bold px-0 pb-4 h-auto transition-all">
-                        Restore & Import
-                    </TabsTrigger>
-                    <TabsTrigger value="explorer" className="rounded-none border-b-2 border-transparent data-[state=active]:border-blue-500 data-[state=active]:bg-transparent data-[state=active]:text-white text-slate-400 font-bold px-0 pb-4 h-auto transition-all">
+                    <TabsTrigger value="explorer" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground text-muted-foreground font-bold px-0 pb-4 h-auto transition-all uppercase text-xs tracking-widest">
                         Database Explorer
                     </TabsTrigger>
-                    <TabsTrigger value="destructive" className="rounded-none border-b-2 border-transparent data-[state=active]:border-red-500 data-[state=active]:bg-transparent data-[state=active]:text-red-500 text-slate-400 font-bold px-0 pb-4 h-auto transition-all">
+                    <TabsTrigger value="backup" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground text-muted-foreground font-bold px-0 pb-4 h-auto transition-all uppercase text-xs tracking-widest">
+                        Backup & Export
+                    </TabsTrigger>
+                    <TabsTrigger value="restore" className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-foreground text-muted-foreground font-bold px-0 pb-4 h-auto transition-all uppercase text-xs tracking-widest">
+                        Restore & Import
+                    </TabsTrigger>
+                    <TabsTrigger value="destructive" className="rounded-none border-b-2 border-transparent data-[state=active]:border-destructive data-[state=active]:bg-transparent data-[state=active]:text-destructive text-muted-foreground font-bold px-0 pb-4 h-auto transition-all uppercase text-xs tracking-widest">
                         Destructive Zone
                     </TabsTrigger>
                 </TabsList>
             </div>
 
-            <ScrollArea className="flex-1">
-                <div className="p-8">
+            <div className="flex-1 overflow-hidden">
+                {/* DATABASE EXPLORER (FIRESTORE STYLE) */}
+                <TabsContent value="explorer" className="m-0 h-full flex flex-col animate-in fade-in duration-300">
+                    <div className="bg-muted/10 border-b p-4 flex items-center justify-between gap-4">
+                        <div className="flex items-center gap-4">
+                            <Badge variant="outline" className="h-8 px-3 font-bold uppercase tracking-tighter text-[10px] bg-background">
+                                <Database className="mr-2 h-3 w-3 text-primary"/> (default)
+                            </Badge>
+                            <div className="h-4 w-px bg-border"/>
+                            <div className="relative w-80">
+                                <Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground" />
+                                <Input 
+                                    placeholder="Search documents..." 
+                                    className="pl-10 h-9 bg-background border-border" 
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <Button size="sm" variant="outline" className="h-9 font-bold bg-background" onClick={fetchFsData} disabled={isFsLoading}>
+                            <RefreshCw className={cn("mr-2 h-4 w-4", isFsLoading && "animate-spin")} /> Refresh Cloud
+                        </Button>
+                    </div>
+
+                    <div className="flex-1 flex overflow-hidden divide-x border-b">
+                        {/* Column 1: Collections */}
+                        <div className="w-[200px] flex flex-col bg-muted/5">
+                            <div className="p-3 border-b flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Collections</span>
+                                <PlusCircle className="h-3 w-3 text-muted-foreground cursor-not-allowed opacity-20"/>
+                            </div>
+                            <ScrollArea className="flex-1">
+                                <div className="p-1 space-y-1">
+                                    <button 
+                                        className={cn(
+                                            "w-full text-left px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors",
+                                            selectedCollection === 'assets' ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                                        )}
+                                        onClick={() => { setSelectedCollection('assets'); setSelectedDocId(null); }}
+                                    >
+                                        <FileText className="mr-2 h-4 w-4 opacity-70"/> assets
+                                        <ChevronRight className="ml-auto h-3 w-3 opacity-50"/>
+                                    </button>
+                                    <button 
+                                        className={cn(
+                                            "w-full text-left px-3 py-2 rounded-md text-sm font-medium flex items-center transition-colors",
+                                            selectedCollection === 'config' ? "bg-primary/10 text-primary" : "hover:bg-muted"
+                                        )}
+                                        onClick={() => { setSelectedCollection('config'); setSelectedDocId(null); }}
+                                    >
+                                        <Settings className="mr-2 h-4 w-4 opacity-70"/> config
+                                        <ChevronRight className="ml-auto h-3 w-3 opacity-50"/>
+                                    </button>
+                                </div>
+                            </ScrollArea>
+                        </div>
+
+                        {/* Column 2: Documents */}
+                        <div className="w-[350px] flex flex-col bg-background">
+                            <div className="p-3 border-b flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{selectedCollection}</span>
+                                <div className="flex gap-2">
+                                    <Badge variant="outline" className="text-[9px] font-bold">{filteredDocs.length}</Badge>
+                                </div>
+                            </div>
+                            <ScrollArea className="flex-1">
+                                <div className="p-1 space-y-0.5">
+                                    {filteredDocs.map(doc => (
+                                        <button 
+                                            key={doc.id} 
+                                            className={cn(
+                                                "w-full text-left px-3 py-2.5 rounded-md text-[13px] font-mono flex items-center transition-colors group",
+                                                selectedDocId === doc.id ? "bg-primary/10 text-primary border-l-4 border-primary rounded-l-none" : "hover:bg-muted text-muted-foreground hover:text-foreground"
+                                            )}
+                                            onClick={() => handleSelectDoc(doc.id)}
+                                        >
+                                            <span className="truncate">{doc.id}</span>
+                                            <ChevronRight className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-50 transition-opacity"/>
+                                        </button>
+                                    ))}
+                                    {filteredDocs.length === 0 && (
+                                        <div className="p-8 text-center text-xs text-muted-foreground italic">No documents found</div>
+                                    )}
+                                </div>
+                            </ScrollArea>
+                        </div>
+
+                        {/* Column 3: Fields */}
+                        <div className="flex-1 flex flex-col bg-muted/5">
+                            <div className="p-3 border-b flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Document:</span>
+                                    <span className="text-xs font-mono font-bold text-primary">{selectedDocId || 'none'}</span>
+                                </div>
+                                {selectedDocId && (
+                                    <div className="flex items-center gap-2">
+                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-foreground" onClick={() => setIsJsonMode(!isJsonMode)}>
+                                            <FileJson className="h-4 w-4" />
+                                        </Button>
+                                        <Separator orientation="vertical" className="h-4"/>
+                                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => handleDeleteDoc(selectedDocId)}>
+                                            <Trash2 className="h-4 w-4" />
+                                        </Button>
+                                    </div>
+                                )}
+                            </div>
+                            
+                            <ScrollArea className="flex-1">
+                                {selectedDocId ? (
+                                    <div className="p-6">
+                                        {isJsonMode ? (
+                                            <div className="space-y-4">
+                                                <div className="flex items-center justify-between">
+                                                    <Label className="text-xs font-bold uppercase text-muted-foreground">Source JSON</Label>
+                                                    <Button size="sm" className="h-8 font-black uppercase text-[10px] tracking-widest shadow-lg shadow-primary/20" onClick={handleSaveDoc}>
+                                                        <DatabaseZap className="mr-2 h-3 w-3"/> Commit to Cloud
+                                                    </Button>
+                                                </div>
+                                                <div className="rounded-xl border border-border shadow-2xl overflow-hidden bg-background">
+                                                    <Textarea 
+                                                        className="min-h-[500px] font-mono text-xs p-4 resize-none border-none focus-visible:ring-0 leading-relaxed"
+                                                        value={editingAssetJson}
+                                                        onChange={(e) => setEditingAssetJson(e.target.value)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-1">
+                                                {selectedDocData && Object.entries(selectedDocData).map(([key, value]) => (
+                                                    <div key={key} className="flex items-start gap-4 p-3 rounded-lg hover:bg-muted/50 border border-transparent hover:border-border transition-all group">
+                                                        <div className="w-[180px] shrink-0">
+                                                            <span className="text-xs font-bold text-muted-foreground truncate block">{key}:</span>
+                                                        </div>
+                                                        <div className="flex-1 flex flex-wrap items-center gap-2">
+                                                            <span className="text-xs font-medium bg-muted/50 px-1.5 py-0.5 rounded text-[10px] font-mono text-muted-foreground">({typeof value})</span>
+                                                            <span className="text-sm font-semibold break-all">
+                                                                {typeof value === 'object' ? JSON.stringify(value) : String(value)}
+                                                            </span>
+                                                        </div>
+                                                        <button className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-background rounded" onClick={() => setIsJsonMode(true)}>
+                                                            <Edit3 className="h-3 w-3 text-muted-foreground"/>
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                ) : (
+                                    <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 opacity-50">
+                                        <DatabaseZap className="h-20 w-20 mb-4" />
+                                        <p className="text-lg font-black uppercase tracking-widest">No Document Selected</p>
+                                        <p className="text-sm">Select a document ID from the list to view its fields</p>
+                                    </div>
+                                )}
+                            </ScrollArea>
+                        </div>
+                    </div>
+                </TabsContent>
+
+                <ScrollArea className="flex-1">
                     {/* BACKUP & EXPORT */}
-                    <TabsContent value="backup" className="m-0 space-y-8 animate-in fade-in slide-in-from-left-2 duration-300">
+                    <TabsContent value="backup" className="m-0 p-8 space-y-8 animate-in slide-in-from-left-2 duration-300">
                         <div className="space-y-2">
-                            <h2 className="text-2xl font-bold text-white">Backup & Export</h2>
-                            <p className="text-slate-400 text-sm">
-                                Create offline (JSON) or online (Realtime Database) backups. You can scope backups to a specific organization and/or collection.
+                            <h2 className="text-2xl font-black tracking-tight">Backup & Resource Export</h2>
+                            <p className="text-muted-foreground text-sm">
+                                Create offline (JSON) or online (RTDB Snapshot) backups. You can scope backups by Organization or Collection.
                             </p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
                             <div className="space-y-3">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Target Organization (Project)</Label>
+                                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target Organization</Label>
                                 <Select value={targetProjectId} onValueChange={setTargetProjectId}>
-                                    <SelectTrigger className="bg-[#1e293b] border-slate-700 h-12 text-white">
+                                    <SelectTrigger className="h-12 bg-background border-border">
                                         <SelectValue placeholder="All Organizations" />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-[#1e293b] border-slate-700 text-white">
+                                    <SelectContent>
                                         <SelectItem value="all">All Organizations</SelectItem>
                                         {projects.map(p => (
                                             <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
@@ -325,12 +514,12 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                 </Select>
                             </div>
                             <div className="space-y-3">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-slate-500">Data to Export (Collection)</Label>
+                                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Target Collection</Label>
                                 <Select value={targetCategory} onValueChange={setTargetCategory}>
-                                    <SelectTrigger className="bg-[#1e293b] border-slate-700 h-12 text-white">
+                                    <SelectTrigger className="h-12 bg-background border-border">
                                         <SelectValue placeholder="All Collections" />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-[#1e293b] border-slate-700 text-white">
+                                    <SelectContent>
                                         <SelectItem value="all">All Collections</SelectItem>
                                         {categories.map(c => (
                                             <SelectItem key={c} value={c}>{c}</SelectItem>
@@ -341,205 +530,113 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4">
-                            <Button variant="default" className="h-14 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg rounded-xl shadow-lg shadow-indigo-900/20" onClick={handleExportJson}>
+                            <Button variant="outline" className="h-14 font-bold text-lg rounded-xl border-2" onClick={handleExportJson}>
                                 <Download className="mr-3 h-6 w-6" /> Export to JSON (Offline)
                             </Button>
-                            <Button variant="default" className="h-14 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-lg rounded-xl shadow-lg shadow-indigo-900/20" onClick={handleCreateCloudSnapshot} disabled={isProcessing}>
+                            <Button variant="default" className="h-14 font-bold text-lg rounded-xl shadow-lg shadow-primary/20" onClick={handleCreateCloudSnapshot} disabled={isProcessing}>
                                 {isProcessing ? <Loader2 className="mr-3 h-6 w-6 animate-spin" /> : <PlusCircle className="mr-3 h-6 w-6" />}
-                                Create Cloud Snapshot (Manual)
+                                Create Cloud Snapshot
                             </Button>
                         </div>
                     </TabsContent>
 
                     {/* RESTORE & IMPORT */}
-                    <TabsContent value="restore" className="m-0 space-y-8 animate-in fade-in slide-in-from-left-2 duration-300">
+                    <TabsContent value="restore" className="m-0 p-8 space-y-8 animate-in slide-in-from-left-2 duration-300">
                         <div className="space-y-2">
-                            <h2 className="text-2xl font-bold text-white">Restore & Recovery</h2>
-                            <p className="text-slate-400 text-sm">
-                                Recover data from existing snapshots or external files. Note: Restoring data will merge with or overwrite existing Firestore records.
-                            </p>
-                        </div>
-
-                        <Card className="bg-[#1e293b]/30 border-slate-800">
-                            <CardHeader>
-                                <CardTitle className="text-lg flex items-center gap-2"><ArrowRightLeft className="text-blue-500 h-5 w-5"/> Cloud Synchronization</CardTitle>
-                                <CardDescription className="text-slate-400">Restore the primary Firestore layer from the Realtime Database redundancy layer.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <Button variant="outline" className="w-full h-12 border-blue-500/30 text-blue-400 hover:bg-blue-500/10" onClick={handlePullRtdbToFs} disabled={isProcessing}>
-                                    {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCw className="mr-2 h-4 w-4" />}
-                                    Pull RTDB Snapshot to Firestore
-                                </Button>
-                            </CardContent>
-                        </Card>
-
-                        <Card className="bg-[#1e293b]/30 border-slate-800">
-                            <CardHeader>
-                                <CardTitle className="text-lg flex items-center gap-2"><FileUp className="text-blue-500 h-5 w-5"/> Manual JSON Import</CardTitle>
-                                <CardDescription className="text-slate-400">Upload an Assetain system backup file to perform a bulk data merge.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="p-8 border-2 border-dashed border-slate-700 rounded-xl flex flex-col items-center justify-center gap-4 hover:border-blue-500/50 transition-colors cursor-pointer">
-                                    <UploadCloud className="h-12 w-12 text-slate-500" />
-                                    <div className="text-center">
-                                        <p className="text-sm font-bold">Click to upload or drag & drop</p>
-                                        <p className="text-xs text-slate-500">Only .json files generated by Assetain are supported</p>
-                                    </div>
-                                    <Input type="file" className="hidden" accept=".json" />
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* DATABASE EXPLORER */}
-                    <TabsContent value="explorer" className="m-0 animate-in fade-in slide-in-from-left-2 duration-300">
-                        <Card className="bg-[#1e293b]/30 border-slate-800 overflow-hidden">
-                            <CardHeader className="bg-[#1e293b]/50 border-b border-slate-800">
-                                <div className="flex items-center justify-between">
-                                    <div>
-                                        <CardTitle className="text-lg flex items-center gap-2"><Database className="h-5 w-5 text-blue-500"/> Firestore Record Explorer</CardTitle>
-                                        <CardDescription className="text-slate-400">Direct Cloud management for {allFsAssets.length} active records.</CardDescription>
-                                    </div>
-                                    <div className="flex items-center gap-2">
-                                        <div className="relative w-80">
-                                            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-                                            <Input 
-                                                placeholder="Search IDs, Serials, or Descriptions..." 
-                                                className="pl-10 h-10 bg-[#0f172a] border-slate-700 text-white" 
-                                                value={searchQuery}
-                                                onChange={(e) => setSearchQuery(e.target.value)}
-                                            />
-                                        </div>
-                                        <Button size="icon" variant="outline" className="h-10 w-10 border-slate-700 hover:bg-[#0f172a]" onClick={fetchFsAssets} disabled={isFsLoading}>
-                                            <RefreshCw className={cn("h-4 w-4 text-slate-400", isFsLoading && "animate-spin")} />
-                                        </Button>
-                                    </div>
-                                </div>
-                            </CardHeader>
-                            <CardContent className="p-0">
-                                <div className="flex h-[500px]">
-                                    {/* List */}
-                                    <div className="w-1/3 border-r border-slate-800 bg-[#0f172a]/50">
-                                        <ScrollArea className="h-full">
-                                            <div className="divide-y divide-slate-800">
-                                                {filteredFsAssets.map(asset => (
-                                                    <div 
-                                                        key={asset.id} 
-                                                        className={cn(
-                                                            "p-4 cursor-pointer hover:bg-blue-500/5 transition-colors",
-                                                            selectedFsAsset?.id === asset.id && "bg-blue-500/10 border-l-4 border-blue-500"
-                                                        )}
-                                                        onClick={() => handleEditFsAsset(asset)}
-                                                    >
-                                                        <p className="text-sm font-bold truncate text-white">{asset.description || 'Untitled'}</p>
-                                                        <p className="text-[10px] font-mono text-slate-500 mt-1">{asset.id}</p>
-                                                        <div className="flex items-center gap-2 mt-2">
-                                                            <Badge variant="outline" className="text-[10px] bg-slate-800 border-slate-700 text-slate-400 font-normal">{asset.category}</Badge>
-                                                            {asset.verifiedStatus === 'Verified' && <CheckCircle className="h-3 w-3 text-emerald-500" />}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                                {filteredFsAssets.length === 0 && (
-                                                    <div className="p-12 text-center text-sm text-slate-500 italic">No records found matching criteria</div>
-                                                )}
-                                            </div>
-                                        </ScrollArea>
-                                    </div>
-                                    
-                                    {/* Detail/Edit */}
-                                    <div className="flex-1 bg-[#0f172a]/20 p-6">
-                                        {selectedFsAsset ? (
-                                            <div className="space-y-6 h-full flex flex-col">
-                                                <div className="flex items-center justify-between">
-                                                    <div className="space-y-1">
-                                                        <h4 className="text-white font-bold">Edit Cloud Document</h4>
-                                                        <p className="text-xs font-mono text-blue-400">{selectedFsAsset.id}</p>
-                                                    </div>
-                                                    <div className="flex gap-2">
-                                                        <Button variant="ghost" className="text-red-400 hover:text-red-300 hover:bg-red-500/10" onClick={() => handleDeleteFsAsset(selectedFsAsset.id)}>
-                                                            <Trash2 className="h-4 w-4 mr-2" /> Delete Document
-                                                        </Button>
-                                                        <Button className="bg-emerald-600 hover:bg-emerald-700" onClick={handleSaveFsAsset}>
-                                                            <DatabaseZap className="h-4 w-4 mr-2" /> Update Firestore
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                                <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-slate-800 shadow-2xl">
-                                                    <Textarea 
-                                                        className="h-full w-full font-mono text-xs p-4 resize-none bg-[#0f172a] text-blue-100 border-none focus-visible:ring-0"
-                                                        value={editingAssetJson}
-                                                        onChange={(e) => setEditingAssetJson(e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-                                        ) : (
-                                            <div className="h-full flex flex-col items-center justify-center text-slate-600">
-                                                <FileJson className="h-20 w-20 mb-4 opacity-10" />
-                                                <p className="text-lg font-medium opacity-50">Select a record to modify cloud data</p>
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-
-                    {/* DESTRUCTIVE ZONE */}
-                    <TabsContent value="destructive" className="m-0 space-y-8 animate-in fade-in slide-in-from-left-2 duration-300">
-                        <div className="space-y-2">
-                            <h2 className="text-2xl font-bold text-red-500">Destructive Operations</h2>
-                            <p className="text-slate-400 text-sm">
-                                Use these controls with extreme caution. Operations here bypass standard workflows and affect live production databases immediately.
+                            <h2 className="text-2xl font-black tracking-tight">System Restore & Recovery</h2>
+                            <p className="text-muted-foreground text-sm">
+                                Recover system state from online snapshots or external backup files.
                             </p>
                         </div>
 
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <Card className="bg-red-500/5 border-red-500/20">
+                            <Card className="bg-muted/30 border-border">
                                 <CardHeader>
-                                    <CardTitle className="text-lg text-red-400 flex items-center gap-2"><CloudOff className="h-5 w-5"/> Wipe Firestore Assets</CardTitle>
-                                    <CardDescription className="text-red-400/60">Permanently delete all asset records from the primary Firestore layer.</CardDescription>
+                                    <CardTitle className="text-lg flex items-center gap-2"><ArrowRightLeft className="text-primary h-5 w-5"/> Hybrid Sync</CardTitle>
+                                    <CardDescription>Restore Firestore primary layer from RTDB redundancy.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <Button variant="outline" className="w-full h-12 border-red-500/30 text-red-400 hover:bg-red-500/10" onClick={() => openConfirmation('clear_firestore', 'Wipe Firestore Layer?', 'This will permanently remove ALL assets from the primary cloud database. This action cannot be reversed.')}>
-                                        Execute Firestore Wipe
+                                    <Button variant="outline" className="w-full h-12 bg-background font-bold" onClick={handlePullRtdbToFs} disabled={isProcessing}>
+                                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <RefreshCw className="mr-2 h-4 w-4" />}
+                                        Pull Snapshot to Firestore
                                     </Button>
                                 </CardContent>
                             </Card>
 
-                            <Card className="bg-red-500/10 border-red-500 shadow-2xl shadow-red-900/20">
+                            <Card className="bg-muted/30 border-border">
                                 <CardHeader>
-                                    <CardTitle className="text-xl text-red-500 flex items-center gap-2 font-black tracking-tighter"><DatabaseZap className="h-6 w-6"/> TOTAL GLOBAL RESET</CardTitle>
-                                    <CardDescription className="text-red-400 font-bold">NUCLEAR OPTION: Wipes Firestore, Realtime Database, and clears local browser cache.</CardDescription>
+                                    <CardTitle className="text-lg flex items-center gap-2"><FileUp className="text-primary h-5 w-5"/> Manual Import</CardTitle>
+                                    <CardDescription>Upload an Assetain backup file to perform a bulk data merge.</CardDescription>
                                 </CardHeader>
                                 <CardContent>
-                                    <Button variant="destructive" className="w-full h-14 bg-red-600 hover:bg-red-700 font-black text-lg" onClick={() => openConfirmation('nuke_all', 'GLOBAL DESTRUCTION?', 'WARNING: This will clear EVERYTHING across all cloud and local layers. This is the absolute reset button.')}>
+                                    <div className="p-6 border-2 border-dashed border-border rounded-xl flex flex-col items-center justify-center gap-2 hover:border-primary/50 transition-colors cursor-pointer bg-background">
+                                        <UploadCloud className="h-8 w-8 text-muted-foreground" />
+                                        <div className="text-center">
+                                            <p className="text-xs font-bold">Click to upload .json backup</p>
+                                        </div>
+                                        <Input type="file" className="hidden" accept=".json" />
+                                    </div>
+                                </CardContent>
+                            </Card>
+                        </div>
+                    </TabsContent>
+
+                    {/* DESTRUCTIVE ZONE */}
+                    <TabsContent value="destructive" className="m-0 p-8 space-y-8 animate-in slide-in-from-left-2 duration-300">
+                        <div className="space-y-2">
+                            <h2 className="text-2xl font-black tracking-tight text-destructive">Danger Zone</h2>
+                            <p className="text-muted-foreground text-sm">
+                                These operations bypass standard workflows and affect cloud production databases immediately.
+                            </p>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <Card className="border-destructive/20 bg-destructive/5 shadow-none">
+                                <CardHeader>
+                                    <CardTitle className="text-lg text-destructive font-bold flex items-center gap-2">Wipe Firestore Assets</CardTitle>
+                                    <CardDescription className="text-destructive/60">Permanently delete all asset records from the cloud primary layer.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <Button variant="outline" className="w-full h-12 border-destructive/30 text-destructive hover:bg-destructive/10" onClick={() => openConfirmation('clear_firestore', 'Wipe Firestore?', 'This will permanently remove ALL assets from the primary cloud database.')}>
+                                        Execute Primary Wipe
+                                    </Button>
+                                </CardContent>
+                            </Card>
+
+                            <Card className="border-destructive bg-destructive/10 shadow-2xl shadow-destructive/10">
+                                <CardHeader>
+                                    <CardTitle className="text-xl text-destructive flex items-center gap-2 font-black uppercase tracking-tighter">Global System Reset</CardTitle>
+                                    <CardDescription className="text-destructive/80 font-bold underline">Wipes Firestore, RTDB, and local IndexedDB cache.</CardDescription>
+                                </CardHeader>
+                                <CardContent>
+                                    <Button variant="destructive" className="w-full h-14 font-black text-lg" onClick={() => openConfirmation('nuke_all', 'GLOBAL DESTRUCTION?', 'WARNING: This will clear EVERYTHING across all cloud and local layers.')}>
                                         INITIATE GLOBAL WIPE
                                     </Button>
                                 </CardContent>
                             </Card>
                         </div>
                     </TabsContent>
-                </div>
-            </ScrollArea>
+                </ScrollArea>
+            </div>
 
-            <DialogFooter className="px-8 py-4 bg-[#1e293b]/50 border-t border-slate-800">
-                <DialogClose asChild><Button variant="ghost" className="text-slate-400 hover:text-white hover:bg-white/10">Close Console</Button></DialogClose>
+            <DialogFooter className="px-8 py-4 bg-muted/30 border-t border-border">
+                <DialogClose asChild><Button variant="ghost" className="font-bold">Close Manager</Button></DialogClose>
             </DialogFooter>
           </Tabs>
         </DialogContent>
       </Dialog>
       
       <AlertDialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
-          <AlertDialogContent className="bg-[#0f172a] text-white border-slate-800">
+          <AlertDialogContent>
               <AlertDialogHeader>
-                  <AlertDialogTitle className="text-red-500 text-2xl font-black uppercase tracking-tighter">{confirmTitle}</AlertDialogTitle>
-                  <AlertDialogDescription className="text-slate-400 text-lg">
+                  <AlertDialogTitle className="text-destructive text-2xl font-black uppercase tracking-tighter">{confirmTitle}</AlertDialogTitle>
+                  <AlertDialogDescription className="text-lg">
                       {confirmDescription}
                   </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
-                  <AlertDialogCancel className="bg-transparent border-slate-700 text-slate-400 hover:bg-slate-800 hover:text-white">Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleConfirmAction} className="bg-red-600 hover:bg-red-700 text-white font-bold">Confirm Destructive Action</AlertDialogAction>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmAction} className="bg-destructive hover:bg-destructive/90 text-white font-bold">Confirm Destruction</AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
