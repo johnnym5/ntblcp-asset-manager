@@ -123,4 +123,3 @@ The current codebase is a prototype and **is NOT secure for production use** wit
 
 1.  **Firebase Authentication**: Replace the custom login system with Firebase Auth to prevent plaintext password storage.
 2.  **Strict Security Rules**: Enforce per-user and per-state read/write permissions in `firestore.rules` and `database.rules.json`.
-# ntblcp-asset-manager
