@@ -101,6 +101,7 @@ import { AssetSummaryDashboard } from "./asset-summary-dashboard";
 import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { Badge } from "./ui/badge";
 import { motion } from "framer-motion";
+import { isAllowed, getRemainingCooldown } from "@/lib/rate-limit";
 
 
 /**
@@ -402,6 +403,13 @@ export default function AssetList() {
     const handleUploadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
 
+    // Rate limiting
+    if (!isAllowed('sync-upload', 5000)) {
+        const remaining = getRemainingCooldown('sync-upload', 5000);
+        addNotification({ title: "Sync Paused", description: `Please wait ${remaining}s before next upload.` });
+        return;
+    }
+
     setIsSyncing(true);
     addNotification({ title: 'Scanning local storage...' });
     
@@ -437,6 +445,13 @@ export default function AssetList() {
     if (!isOnline || !authInitialized || isGuest) return;
 
     if (!isFirstTime) {
+      // Rate limiting
+      if (!isAllowed('sync-download', 5000)) {
+          const remaining = getRemainingCooldown('sync-download', 5000);
+          addNotification({ title: "Sync Paused", description: `Please wait ${remaining}s before checking cloud.` });
+          return;
+      }
+
       const localAssetsUnsynced = await getLocalAssetsFromDb();
       const unsyncedAssets = localAssetsUnsynced.filter(a => a.syncStatus === 'local');
       if (unsyncedAssets.length > 0) {
@@ -1544,7 +1559,7 @@ export default function AssetList() {
                     <Label htmlFor="select-all-table" className="text-xs font-black uppercase text-muted-foreground cursor-pointer">Select All</Label>
                     <Checkbox id="select-all-table" checked={areAllCategoryResultsSelected} onCheckedChange={(checked) => handleSelectAll(checked as boolean, categoryFilteredAssets)} disabled={isGuest} />
                 </div>
-                {(!appSettings?.lockAssetList || dataSource === 'local_locked') && (userProfile?.canAddAssets || isAdmin) && (
+                {(!appSettings?.lockAssetList || dataSource === 'cloud') && (userProfile?.canAddAssets || isAdmin) && (
                   <Button variant="default" size="sm" className="h-9 rounded-xl font-bold shadow-lg shadow-primary/20" onClick={handleAddAsset}>
                     <PlusCircle className="mr-2 h-4 w-4"/> New Asset
                   </Button>

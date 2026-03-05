@@ -2,7 +2,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -14,13 +13,11 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Loader2, MapPin } from 'lucide-react';
+import { Loader2, MapPin, AlertCircle, Boxes } from 'lucide-react';
 import type { AuthorizedUser } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { AlertCircle, Boxes } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
-import { Separator } from './ui/separator';
 import {
   Select,
   SelectContent,
@@ -28,6 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { isAllowed } from '@/lib/rate-limit';
 
 const superAdmin: AuthorizedUser = {
   loginName: 'admin',
@@ -54,6 +52,11 @@ export default function UserProfileSetup() {
   const { appSettings, setGlobalStateFilter } = useAppState();
 
   const handleLogin = async () => {
+    // Rate limit login attempts to prevent spam
+    if (!isAllowed('login-attempt', 3000)) {
+        return;
+    }
+
     setError(null);
     const sanitizedLoginName = loginName.trim().toLowerCase();
     const sanitizedPassword = password.trim();
