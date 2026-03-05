@@ -21,12 +21,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { AlertCircle, Check, FileText, Loader2 } from 'lucide-react';
+import { AlertCircle, Check, FileText, Loader2, ShieldQuestion } from 'lucide-react';
 import { useAuth } from '@/contexts/auth-context';
 import { cn, getStatusClasses } from '@/lib/utils';
+import { ASSET_CONDITIONS } from '@/lib/constants';
 
 export interface CategoryBatchUpdateData {
   status?: 'Verified' | 'Unverified';
+  condition?: string;
 }
 
 interface CategoryBatchEditFormProps {
@@ -49,10 +51,14 @@ export function CategoryBatchEditForm({
   const [applyStatus, setApplyStatus] = useState(false);
   const [status, setStatus] = useState<'Verified' | 'Unverified'>('Unverified');
 
+  const [applyCondition, setApplyCondition] = useState(false);
+  const [condition, setCondition] = useState('');
+
   const handleSubmit = async () => {
     setIsSaving(true);
     const updates: CategoryBatchUpdateData = {};
     if (applyStatus) updates.status = status;
+    if (applyCondition) updates.condition = condition;
 
     await onSave(updates);
     setIsSaving(false);
@@ -62,6 +68,8 @@ export function CategoryBatchEditForm({
   const resetForm = () => {
     setApplyStatus(false);
     setStatus('Unverified');
+    setApplyCondition(false);
+    setCondition('');
   }
 
   const handleOpenChange = (open: boolean) => {
@@ -71,7 +79,7 @@ export function CategoryBatchEditForm({
     onOpenChange(open);
   }
   
-  const canSave = applyStatus;
+  const canSave = applyStatus || applyCondition;
 
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
@@ -94,6 +102,23 @@ export function CategoryBatchEditForm({
                 <SelectContent>
                     <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
                     <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="flex items-center space-x-4">
+            <Checkbox id="applyCondition" checked={applyCondition} onCheckedChange={(checked) => setApplyCondition(!!checked)} />
+            <div className="w-full space-y-2">
+              <Label htmlFor="condition" className={!applyCondition ? 'text-muted-foreground' : ''}>Physical Condition</Label>
+              <Select onValueChange={setCondition} value={condition} disabled={!applyCondition}>
+                <SelectTrigger id="category-condition-select">
+                    <SelectValue placeholder="Select condition..." />
+                </SelectTrigger>
+                <SelectContent>
+                    {ASSET_CONDITIONS.map(cond => (
+                        <SelectItem key={cond} value={cond}>{cond}</SelectItem>
+                    ))}
                 </SelectContent>
               </Select>
             </div>

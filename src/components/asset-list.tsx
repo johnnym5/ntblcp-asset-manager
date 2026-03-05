@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -57,6 +58,7 @@ import {
   LayoutDashboard,
   TableProperties,
   MoreVertical,
+  ShieldQuestion,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -78,7 +80,7 @@ import { AssetForm } from "./asset-form";
 import type { Asset, AppSettings, SheetDefinition, DisplayField } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
-import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
+import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS, ASSET_CONDITIONS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
@@ -1174,26 +1176,34 @@ export default function AssetList() {
   const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
     let toUp: Asset[] = [];
     selectedCategories.forEach(cat => toUp.push(...(assetsByCategory[cat] || [])));
-    if (data.status) {
-        const updated = toUp.map(a => {
-            const up: Asset = sanitizeForFirestore({ ...a, verifiedStatus: data.status, lastModified: new Date().toISOString(), lastModifiedBy: userProfile?.displayName, lastModifiedByState: globalStateFilter, syncStatus: dataSource === 'cloud' ? 'local' : undefined });
-            if (data.status === 'Verified' && !a.verifiedDate) up.verifiedDate = new Date().toLocaleDateString("en-CA");
-            else if (data.status !== 'Verified') up.verifiedDate = '';
-            return up;
+    
+    const updated = toUp.map(a => {
+        const up: Asset = sanitizeForFirestore({ 
+            ...a, 
+            verifiedStatus: data.status || a.verifiedStatus, 
+            condition: data.condition || a.condition,
+            lastModified: new Date().toISOString(), 
+            lastModifiedBy: userProfile?.displayName, 
+            lastModifiedByState: globalStateFilter, 
+            syncStatus: dataSource === 'cloud' ? 'local' : undefined 
         });
-        if (dataSource === 'cloud') {
-          let curr = await getLocalAssetsFromDb();
-          const map = new Map(updated.map(a => [a.id, a]));
-          curr = curr.map(a => map.get(a.id) || a);
-          await saveAssets(curr);
-          setAssets(curr);
-        } else {
-            let curr = await getLockedOfflineAssets();
-            const map = new Map(updated.map(a => [a.id, a]));
-            curr = curr.map(a => map.get(a.id) || a);
-            await saveLockedOfflineAssets(curr);
-            setOfflineAssets(curr);
-        }
+        if (data.status === 'Verified' && !a.verifiedDate) up.verifiedDate = new Date().toLocaleDateString("en-CA");
+        else if (data.status && data.status !== 'Verified') up.verifiedDate = '';
+        return up;
+    });
+
+    if (dataSource === 'cloud') {
+      let curr = await getLocalAssetsFromDb();
+      const map = new Map(updated.map(a => [a.id, a]));
+      curr = curr.map(a => map.get(a.id) || a);
+      await saveAssets(curr);
+      setAssets(curr);
+    } else {
+        let curr = await getLockedOfflineAssets();
+        const map = new Map(updated.map(a => [a.id, a]));
+        curr = curr.map(a => map.get(a.id) || a);
+        await saveLockedOfflineAssets(curr);
+        setOfflineAssets(curr);
     }
     setSelectedCategories([]);
   };
@@ -1611,19 +1621,43 @@ export default function AssetList() {
                               })}
                           </div>
                           {appSettings?.appMode === 'verification' && (
-                            <div className="mt-4 pt-4 border-t border-dashed" onClick={e => e.stopPropagation()}>
-                                <Select value={asset.verifiedStatus || 'Unverified'} onValueChange={async (s) => {
-                                      await handleQuickSaveAsset(asset.id, { verifiedStatus: s as any, verifiedDate: s === "Verified" ? new Date().toLocaleDateString("en-CA") : "", remarks: asset.remarks, condition: asset.condition });
-                                      addNotification({ title: "Verification Updated", description: `Asset set to ${s}` });
-                                }}>
-                                  <SelectTrigger className={cn("h-8 text-[10px] font-black uppercase rounded-lg border-none shadow-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent className="rounded-xl">
-                                      <SelectItem value="Unverified" className="text-[10px] font-bold">Unverified</SelectItem>
-                                      <SelectItem value="Verified" className="text-[10px] font-bold">Verified</SelectItem>
-                                  </SelectContent>
-                                </Select>
+                            <div className="mt-4 pt-4 border-t border-dashed space-y-3" onClick={e => e.stopPropagation()}>
+                                <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase text-muted-foreground/60 flex items-center gap-1">
+                                        <Check className="h-2 w-2"/> Verification Status
+                                    </Label>
+                                    <Select value={asset.verifiedStatus || 'Unverified'} onValueChange={async (s) => {
+                                          await handleQuickSaveAsset(asset.id, { verifiedStatus: s as any, verifiedDate: s === "Verified" ? new Date().toLocaleDateString("en-CA") : "", remarks: asset.remarks, condition: asset.condition });
+                                          addNotification({ title: "Verification Updated", description: `Asset set to ${s}` });
+                                    }}>
+                                      <SelectTrigger className={cn("h-8 text-[10px] font-black uppercase rounded-lg border-none shadow-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                                        <SelectValue />
+                                      </SelectTrigger>
+                                      <SelectContent className="rounded-xl">
+                                          <SelectItem value="Unverified" className="text-[10px] font-bold">Unverified</SelectItem>
+                                          <SelectItem value="Verified" className="text-[10px] font-bold">Verified</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <Label className="text-[9px] font-black uppercase text-muted-foreground/60 flex items-center gap-1">
+                                        <ShieldQuestion className="h-2 w-2"/> Physical Condition
+                                    </Label>
+                                    <Select value={asset.condition || ''} onValueChange={async (c) => {
+                                          await handleQuickSaveAsset(asset.id, { verifiedStatus: asset.verifiedStatus, remarks: asset.remarks, condition: c });
+                                          addNotification({ title: "Condition Updated", description: `Set to ${c}` });
+                                    }}>
+                                      <SelectTrigger className="h-8 text-[10px] font-bold bg-muted/50 border-none shadow-inner rounded-lg">
+                                        <SelectValue placeholder="Select condition..." />
+                                      </SelectTrigger>
+                                      <SelectContent className="rounded-xl">
+                                          {ASSET_CONDITIONS.map(cond => (
+                                              <SelectItem key={cond} value={cond} className="text-[10px] font-bold">{cond}</SelectItem>
+                                          ))}
+                                      </SelectContent>
+                                    </Select>
+                                </div>
                             </div>
                           )}
                       </CardContent>
