@@ -38,13 +38,22 @@ for (const key in HEADER_ALIASES) {
     }
 }
 
+/**
+ * Recursively trims strings and prepares object for database storage.
+ */
 export const sanitizeForFirestore = <T extends object>(obj: T): T => {
+    if (!obj) return obj;
     const sanitizedObj: { [key: string]: any } = {};
+    
     for (const key in obj) {
         const value = (obj as any)[key];
-        if (value !== undefined) {
+        if (value !== undefined && value !== null) {
             if (value instanceof Date) {
                 sanitizedObj[key] = Timestamp.fromDate(value);
+            } else if (typeof value === 'string') {
+                sanitizedObj[key] = value.trim();
+            } else if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Timestamp)) {
+                sanitizedObj[key] = sanitizeForFirestore(value);
             } else {
                 sanitizedObj[key] = value;
             }
@@ -61,7 +70,8 @@ const parseRows = (headerRow: any[], jsonData: any[][], category: string): { ass
         rowsParsed++;
 
         const firstCell = row[0] ? String(row[0]).trim().toLowerCase() : '';
-        const isEndOfTable = category === 'NTBLCP-TB-FAR' && (firstCell.startsWith('total') || firstCell.startsWith('grand total'));
+        // Generic end-of-table check
+        const isEndOfTable = firstCell.startsWith('total') || firstCell.startsWith('grand total');
 
         if (row.every(cell => cell === null || String(cell).trim() === '') || (row[0] && normalizeHeader(row[0]) === 'S/N' && assets.length > 0) || isEndOfTable) {
              rowsParsed--;
@@ -77,11 +87,9 @@ const parseRows = (headerRow: any[], jsonData: any[][], category: string): { ass
             const normalizedHeader = normalizeHeader(rawHeader);
             let fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
             
-            if(category.startsWith('IHVN')) {
-                if(normalizedHeader === 'LOCATION') fieldName = 'location';
-                if(normalizedHeader === 'STATE') fieldName = undefined;
-                if(normalizedHeader === 'LOCATION/USER') fieldName = 'assignee';
-            }
+            // Special cases for common variation in headers
+            if(normalizedHeader === 'STATE' && !assetObject.location) fieldName = 'location';
+            if(normalizedHeader === 'LOCATION/USER') fieldName = 'assignee';
             
             if (fieldName) {
                 const cell = row[colIndex];
@@ -142,14 +150,12 @@ export async function scanExcelFile(
             
             let bestMatch: { definitionName: string, headerRowIndex: number, score: number } | null = null;
 
-            // Find the best matching definition for the current sheet
             for (const defName in sheetDefinitions) {
                 const definition = sheetDefinitions[defName];
                 const normalizedDefinitiveHeaders = definition.headers.map(normalizeHeader);
                 
                 if(normalizedDefinitiveHeaders.length === 0) continue;
                 
-                // Look for a matching header row within the first 50 rows of the sheet
                 for (let i = 0; i < Math.min(sheetData.length, 50); i++) {
                     const row = sheetData[i];
                     if (!Array.isArray(row) || row.length < normalizedDefinitiveHeaders.length * 0.5) continue;
@@ -158,14 +164,12 @@ export async function scanExcelFile(
                     const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
                     const score = matchCount / normalizedDefinitiveHeaders.length;
 
-                    // If it's a good match and better than any previous match for this sheet, store it.
                     if (score >= 0.7 && (!bestMatch || score > bestMatch.score)) {
                         bestMatch = { definitionName: defName, headerRowIndex: i, score: score };
                     }
                 }
             }
 
-            // If a best match was found for this sheet, add it to the results.
             if (bestMatch) {
                 const { definitionName, headerRowIndex } = bestMatch;
                 const dataRows = sheetData.slice(headerRowIndex + 1);
@@ -188,7 +192,7 @@ export async function scanExcelFile(
     } catch (e) {
         console.error("Error scanning Excel file:", e);
         if (e instanceof Error && e.message.toLowerCase().includes('bad compressed size')) {
-            errors.push("The selected file appears to be corrupt or is not a valid Excel (.xlsx) file. Please try re-saving the file or selecting a different one.");
+            errors.push("The selected file appears to be corrupt or is not a valid Excel (.xlsx) file.");
         } else {
             errors.push(e instanceof Error ? e.message : "An unknown error occurred during scanning.");
         }
@@ -250,7 +254,6 @@ export async function parseExcelFile(
                 continue;
             }
 
-            // Standard sheet processing
             const sheet = workbook.Sheets[sheetName];
             if (!sheet) {
                 result.errors.push(`Could not find sheet named "${sheetName}" in the workbook.`);
@@ -278,13 +281,13 @@ export async function parseExcelFile(
                 const existingId = existingAssetMap.get(assetKey)!;
                 const existingAsset = existingAssets.find(a => a.id === existingId)!;
                 if (haveAssetDetailsChanged(existingAsset, parsedAsset)) {
-                     result.updatedAssets.push({ ...existingAsset, ...parsedAsset });
+                     result.updatedAssets.push(sanitizeForFirestore({ ...existingAsset, ...parsedAsset }));
                 } else {
                      result.skipped++;
                 }
             } else {
                  if (!lockAssetList) {
-                    result.assets.push({ ...parsedAsset, id: uuidv4() } as Asset);
+                    result.assets.push(sanitizeForFirestore({ ...parsedAsset, id: uuidv4() } as Asset));
                  } else {
                     result.skipped++;
                  }
@@ -298,9 +301,7 @@ export async function parseExcelFile(
     } catch (e) {
         console.error("Error parsing Excel file:", e);
         if (e instanceof Error && e.message.toLowerCase().includes('bad compressed size')) {
-            result.errors.push("The selected file appears to be corrupt or is not a valid Excel (.xlsx) file. Please try re-saving the file or selecting a different one.");
-        } else if (e instanceof Error && e.message.includes('permission')) {
-             result.errors.push('The requested file could not be read.');
+            result.errors.push("The selected file appears to be corrupt or is not a valid Excel (.xlsx) file.");
         } else {
              result.errors.push(e instanceof Error ? e.message : "An unknown error occurred during parsing.");
         }
@@ -389,7 +390,7 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
         const normalizedRow = row.map(normalizeHeader);
         const matchCount = normalizedRow.filter(h => allPossibleHeaders.has(h)).length;
 
-        if (matchCount > 5) { // If we match a good number of known headers, treat it as a template
+        if (matchCount > 5) {
             const headerRow = row.map(h => String(h || '').trim()).filter(h => h);
             const displayFields: DisplayField[] = [];
 

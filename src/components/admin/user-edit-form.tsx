@@ -45,13 +45,13 @@ import { Separator } from '../ui/separator';
 import { ScrollArea } from '../ui/scroll-area';
 
 const userFormSchema = z.object({
-  displayName: z.string().min(2, 'Display name must be at least 2 characters.'),
+  displayName: z.string().min(2, 'Display name must be at least 2 characters.').transform(v => v.trim()),
   loginName: z.string().min(2, 'Login name must be at least 2 characters.').transform(v => v.toLowerCase().trim()),
   states: z.array(z.string()).min(1, 'At least one state must be selected.'),
   isAdmin: z.boolean(),
   isGuest: z.boolean(),
-  password: z.string().optional(),
-  confirmPassword: z.string().optional(),
+  password: z.string().optional().transform(v => v?.trim()),
+  confirmPassword: z.string().optional().transform(v => v?.trim()),
   canAddAssets: z.boolean(),
   canEditAssets: z.boolean(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -154,7 +154,7 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
     const userToSave: Partial<AuthorizedUser> = userToSaveData;
 
     if (!userToSave.password) {
-        delete userToSave.password; // Don't send empty password to save function
+        delete userToSave.password;
     }
 
     await onSave(userToSave, user?.loginName);

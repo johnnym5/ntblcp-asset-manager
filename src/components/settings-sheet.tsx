@@ -39,7 +39,7 @@ import { useTheme } from 'next-themes';
 import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download, Users, Eye, EyeOff, MapPin, KeyRound, History, RotateCcw, ChevronsUpDown, Check, X } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings, AuthorizedUser, HistoricalAppSettings, Grant } from '@/lib/types';
-import { parseExcelForTemplate, parseExcelFile } from '@/lib/excel-parser';
+import { parseExcelForTemplate, sanitizeForFirestore } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, saveLocalSettings } from '@/lib/idb';
 import {
@@ -95,7 +95,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   const [passwordError, setPasswordError] = useState('');
   const [passwordSuccess, setPasswordSuccess] = useState('');
   
-  // Grant/Project management state
   const [newGrantName, setNewGrantName] = useState('');
   const [editingGrantId, setEditingGrantId] = useState<string | null>(null);
   const [editingGrantName, setEditingGrantName] = useState('');
@@ -225,19 +224,9 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
 
       handleSettingChange('grants', newGrants);
 
-      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added/updated in your draft for this project.` });
-      if (sanitizedCount > 0) {
-        toast({
-            title: "Sheet Names Sanitized",
-            description: `${sanitizedCount} sheet name(s) were modified to remove invalid characters.`,
-        })
-      }
+      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added/updated.` });
     } catch (error) {
-      if (error instanceof Error && error.message.toLowerCase().includes('bad compressed size')) {
-        toast({ title: 'Import Failed', description: "The selected file appears to be corrupt or is not a valid Excel (.xlsx) file.", variant: 'destructive' });
-      } else {
-        toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
-      }
+      toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
     } finally {
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
@@ -257,10 +246,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         const assetIdsToDelete = assetsToDelete.map(a => a.id);
         
         if (assetIdsToDelete.length > 0) {
-            addNotification({
-                title: `Deleting Assets...`,
-                description: `Removing ${assetIdsToDelete.length} assets from deleted project(s).`
-            });
             try {
                 const currentAssets = await getLocalAssetsFromDb();
                 const remainingAssets = currentAssets.filter(a => !assetIdsToDelete.includes(a.id));
@@ -272,12 +257,11 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                     await batchDeleteCloudAssets(assetIdsToDelete);
                 }
             } catch (e) {
-                addNotification({ title: 'Asset Deletion Failed', description: (e as Error).message, variant: 'destructive' });
+                addNotification({ title: 'Asset Deletion Failed', variant: 'destructive' });
             }
         }
     }
     
-    // Save settings
     try {
       const historyEntry: HistoricalAppSettings = { ...appSettings, grants: (appSettings.grants || []).map(g => ({ id: g.id, name: g.name })) };
       delete (historyEntry as any).settingsHistory;
@@ -291,7 +275,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
 
       const newHistory = [historyEntry, ...recentHistory];
       
-      const settingsToSave: AppSettings = {
+      const settingsToSave: AppSettings = sanitizeForFirestore({
           ...draftSettings,
           lastModified: new Date().toISOString(),
           lastModifiedBy: {
@@ -299,28 +283,17 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
               loginName: userProfile.loginName,
           },
           settingsHistory: newHistory.slice(0, 10),
-      };
+      });
 
       const rtdbPromise = updateSettingsRTDB(settingsToSave);
       const firestorePromise = updateSettingsFS(settingsToSave);
 
-      const results = await Promise.allSettled([rtdbPromise, firestorePromise]);
-
-      const rtdbSuccess = results[0].status === 'fulfilled';
-      const firestoreSuccess = results[1].status === 'fulfilled';
-
-      if (rtdbSuccess && firestoreSuccess) {
-        toast({ title: "Settings Saved", description: "Your changes have been applied to both cloud databases." });
-      } else {
-        toast({ title: "Cloud Save Incomplete", description: "Could not save settings to one or both cloud databases. Your changes are saved locally.", variant: "destructive" });
-      }
-      
-      if (rtdbSuccess || firestoreSuccess) {
-        await saveLocalSettings(settingsToSave);
-        setAppSettings(settingsToSave);
-      }
+      await Promise.allSettled([rtdbPromise, firestorePromise]);
+      await saveLocalSettings(settingsToSave);
+      setAppSettings(settingsToSave);
+      toast({ title: "Settings Saved" });
     } catch(e) {
-      toast({ title: "Save Failed", description: (e as Error).message || "Could not save settings.", variant: "destructive" });
+      toast({ title: "Save Failed", variant: "destructive" });
     } finally {
       setIsSaving(false);
       setIsConfirmOpen(false);
@@ -345,7 +318,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           }
           return { ...grant, sheetDefinitions: newSheetDefs };
       });
-      toast({ title: "Layout Applied to All", description: "The new column layout has been staged for all sheets in all projects. Click 'Save Changes' to confirm." });
     } else {
        newGrants = newGrants.map(grant => {
         if (grant.id === grantId) {
@@ -358,8 +330,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         }
         return grant;
       });
-      
-      toast({ title: "Sheet Layout Staged", description: `Changes for '${newDefinition.name}' are ready to be saved.` });
     }
     
     setDraftSettings(prev => prev ? ({ ...prev, grants: newGrants }) : null);
@@ -399,10 +369,8 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         }
         
         const selectedNonAdmins = currentSelections.filter(name => allNonAdminLogins.includes(name));
-        const adminSelections = currentSelections.filter(name => !allNonAdminLogins.includes(name));
-
         if (allNonAdminLogins.length > 0 && selectedNonAdmins.length === allNonAdminLogins.length) {
-            return [...new Set(['all', ...adminSelections])];
+            return [...new Set(['all', ...currentSelections.filter(name => !allNonAdminLogins.includes(name))])];
         }
 
         return [...new Set(currentSelections.filter(name => name !== 'all'))];
@@ -447,41 +415,42 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     setPasswordError('');
     setPasswordSuccess('');
 
+    const sanitizedCurrent = currentPassword.trim();
+    const sanitizedNew = newPassword.trim();
+    const sanitizedConfirm = confirmNewPassword.trim();
+
     if (!userProfile || !draftSettings) return;
-    if (newPassword.length < 6) {
+    if (sanitizedNew.length < 6) {
         setPasswordError("New password must be at least 6 characters.");
         return;
     }
-    if (newPassword !== confirmNewPassword) {
+    if (sanitizedNew !== sanitizedConfirm) {
         setPasswordError("New passwords do not match.");
         return;
     }
 
     const allUsers = [...(draftSettings.authorizedUsers || []), { loginName: 'admin', displayName: 'Super Admin', password: 'setup', states: ['All'], isAdmin: true, canAddAssets: true, canEditAssets: true, canVerifyAssets: true }];
-    const userIndex = allUsers.findIndex(u => u.loginName === userProfile.loginName);
+    const user = allUsers.find(u => u.loginName === userProfile.loginName);
     
-    if (userIndex === -1) {
-        setPasswordError("Could not find your user profile to update.");
+    if (!user) {
+        setPasswordError("User profile not found.");
         return;
     }
 
-    const user = allUsers[userIndex];
-    if (user.password !== currentPassword) {
-        setPasswordError("Your current password is not correct.");
+    if (user.password !== sanitizedCurrent) {
+        setPasswordError("Current password incorrect.");
         return;
     }
     
     const updatedUsers = [...(draftSettings.authorizedUsers || [])];
-    const userToUpdateIndex = updatedUsers.findIndex(u => u.loginName === userProfile.loginName);
-    if(userToUpdateIndex > -1) {
-      updatedUsers[userToUpdateIndex].password = newPassword;
+    const userIdx = updatedUsers.findIndex(u => u.loginName === userProfile.loginName);
+    if(userIdx > -1) {
+      updatedUsers[userIdx].password = sanitizedNew;
       handleSettingChange('authorizedUsers', updatedUsers);
-      setPasswordSuccess("Password changed successfully! Click 'Save Changes' below to confirm.");
+      setPasswordSuccess("Staged! Click 'Save Changes' below to finalize.");
       setCurrentPassword('');
       setNewPassword('');
       setConfirmNewPassword('');
-    } else {
-        setPasswordError("An unexpected error occurred. Could not stage password change.");
     }
   };
   
@@ -490,27 +459,26 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
 
     const grantsToRestore = (historicalSettings.grants || []).map(historicGrant => {
         const currentFullGrant = (appSettings.grants || []).find(g => g.id === historicGrant.id);
-        // If we find the full grant in the current settings, use it to preserve sheet defs.
-        // Otherwise, it's a restored grant, so it starts with no defs.
         return currentFullGrant || { ...historicGrant, sheetDefinitions: {} };
     });
 
     const settingsToRestore: AppSettings = {
-        ...appSettings, // start with current settings to get history etc.
-        ...historicalSettings, // overwrite with historical data
-        grants: grantsToRestore, // use the re-hydrated grants
-        settingsHistory: appSettings.settingsHistory, // Ensure we keep the full, current history
+        ...appSettings,
+        ...historicalSettings,
+        grants: grantsToRestore,
+        settingsHistory: appSettings.settingsHistory,
     };
 
     setDraftSettings(settingsToRestore);
-    toast({ title: 'Rollback Staged', description: 'The selected historical settings have been loaded. Review and save changes to apply.' });
+    toast({ title: 'Rollback Staged' });
   };
   
   const handleAddNewGrant = () => {
-    if (!draftSettings || !newGrantName.trim()) return;
+    const sanitizedName = newGrantName.trim();
+    if (!draftSettings || !sanitizedName) return;
     const newGrant: Grant = {
       id: uuidv4(),
-      name: newGrantName.trim(),
+      name: sanitizedName,
       sheetDefinitions: {},
     };
     const updatedGrants = [...(draftSettings.grants || []), newGrant];
@@ -529,12 +497,13 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   };
 
   const handleConfirmRename = () => {
-    if (!draftSettings || !editingGrantId || !editingGrantName.trim()) {
+    const sanitizedName = editingGrantName.trim();
+    if (!draftSettings || !editingGrantId || !sanitizedName) {
       handleCancelRename();
       return;
     }
     const updatedGrants = (draftSettings.grants || []).map(g =>
-      g.id === editingGrantId ? { ...g, name: editingGrantName.trim() } : g
+      g.id === editingGrantId ? { ...g, name: sanitizedName } : g
     );
     handleSettingChange('grants', updatedGrants);
     handleCancelRename();
@@ -547,20 +516,14 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     if (draftSettings.activeGrantId === grantToDelete.id) {
       newActiveGrantId = updatedGrants[0]?.id || null;
     }
-    setDraftSettings(prev => prev ? ({ ...prev, grants: newGrants, activeGrantId: newActiveGrantId }) : null);
+    setDraftSettings(prev => prev ? ({ ...prev, grants: updatedGrants, activeGrantId: newActiveGrantId }) : null);
     setGrantToDelete(null);
   };
 
   const isAdmin = userProfile?.isAdmin || false;
   
   if (!draftSettings) {
-    return (
-      <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="flex items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin" />
-        </DialogContent>
-      </Dialog>
-    );
+    return null;
   }
 
   return (
@@ -570,7 +533,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           <DialogHeader>
             <DialogTitle>Settings</DialogTitle>
             <DialogDescription>
-              Manage application settings and preferences. {isAdmin ? 'Admin changes apply to all users.' : ''}
+              Manage application settings and preferences.
             </DialogDescription>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto">
@@ -604,7 +567,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                         <div className="rounded-lg border p-4 space-y-3 bg-muted/30">
                             <div className="space-y-1">
                                 <p className="text-sm font-medium">Travel Report Generator</p>
-                                <p className="text-xs text-muted-foreground">Compile field verification findings into a professional Word document.</p>
+                                <p className="text-xs text-muted-foreground">Compile field verification findings into a professional document.</p>
                             </div>
                             {dataActions.onTravelReport && (
                                 <Button 
@@ -642,7 +605,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                         {passwordError && <p className="text-sm text-destructive">{passwordError}</p>}
                         {passwordSuccess && <p className="text-sm text-green-600">{passwordSuccess}</p>}
                         <Button size="sm" onClick={handleChangePassword} disabled={isSaving}>Stage Password Change</Button>
-                        <p className="text-xs text-muted-foreground">Your password change will be saved when you click "Save Changes" at the bottom of the panel.</p>
                     </div>
                   </div>
 
@@ -655,8 +617,8 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                   <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
                                   <p className="text-xs text-muted-foreground">
                                   {draftSettings.appMode === 'management'
-                                      ? 'Management: Data is locked for non-admins.'
-                                      : 'Verification: Users can update status/remarks.'
+                                      ? 'Management: Structural data is locked for non-admins.'
+                                      : 'Verification: Field users can update status and remarks.'
                                   }
                                   </p>
                               </div>
@@ -671,7 +633,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                           <div className="flex items-center justify-between pt-4">
                               <div className="space-y-1">
                                   <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
-                                  <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
+                                  <p className="text-xs text-muted-foreground">Disable record creation and deletion for all users.</p>
                               </div>
                               <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
                           </div>
@@ -683,7 +645,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                 <>
                 <TabsContent value="projects" className="pt-4 space-y-4">
                     <div className="space-y-2">
-                      <h3 className="text-lg font-medium">Manage Projects (Grants)</h3>
+                      <h3 className="text-lg font-medium">Manage Projects</h3>
                       <div className="flex items-center gap-2">
                           <Input
                             placeholder="New project name..."
@@ -739,7 +701,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                             </div>
                             <CollapsibleContent className="p-4 bg-muted/50">
                                 <div className="space-y-4">
-                                  <p className="text-sm font-medium">Sheet Definitions for this Project</p>
+                                  <p className="text-sm font-medium">Sheet Definitions</p>
                                    <div className="rounded-lg border bg-background p-2 mt-2">
                                       <div className="space-y-1">
                                         {(grant.sheetDefinitions && Object.keys(grant.sheetDefinitions).length > 0) ? Object.keys(grant.sheetDefinitions).map(sheetName => (
@@ -754,7 +716,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                               <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSheet(sheetName, grant.id)}><Trash2 className="h-4 w-4" /></Button>
                                             </div>
                                           </div>
-                                        )) : <p className="text-xs text-center text-muted-foreground p-4">No sheets defined for this project.</p>}
+                                        )) : <p className="text-xs text-center text-muted-foreground p-4">No sheets defined.</p>}
                                       </div>
                                     </div>
                                     <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
@@ -764,7 +726,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                           <Button variant="outline" size="sm" className="w-full" onClick={() => {
                                             if (draftSettings?.activeGrantId !== grant.id) {
                                               handleSettingChange('activeGrantId', grant.id);
-                                              toast({ title: 'Project Switched', description: `Set '${grant.name}' as active project to import data into it.` });
                                             }
                                             dataActions.onScanAndImport();
                                           }} disabled={dataActions.isImporting}>
@@ -789,7 +750,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                   <TabsContent value="history" className="pt-4">
                      <div>
                         <h3 className="text-lg font-medium mb-4 flex items-center gap-2"><History className="h-5 w-5" /> Settings History</h3>
-                        <p className="text-sm text-muted-foreground mb-4">You can roll back to a previous version of your settings from the last 7 days. Rolling back will stage the changes; you still need to save them.</p>
+                        <p className="text-sm text-muted-foreground mb-4">Roll back settings from the last 7 days. Changes must be saved to apply.</p>
                         <div className="rounded-lg border p-3">
                             <ScrollArea className="h-[400px]">
                                 {(draftSettings.settingsHistory && draftSettings.settingsHistory.length > 0) ? (
@@ -814,7 +775,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                         ))}
                                     </div>
                                 ) : (
-                                    <p className="text-sm text-muted-foreground text-center py-8">No settings history available within the last week.</p>
+                                    <p className="text-sm text-muted-foreground text-center py-8">No history available.</p>
                                 )}
                             </ScrollArea>
                         </div>
@@ -853,9 +814,9 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
          <AlertDialog open={!!permissionSheetName} onOpenChange={() => setPermissionSheetName(null)}>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Sheet Permissions for '{permissionSheetName}'</AlertDialogTitle>
+                <AlertDialogTitle>Sheet Permissions: '{permissionSheetName}'</AlertDialogTitle>
                 <AlertDialogDescription>
-                    Select which users should be **denied** access to this sheet. The super-admin user always has access.
+                    Select users to restrict access.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <ScrollArea className="h-[250px] rounded-md border">
@@ -866,7 +827,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                 checked={tempDisabledList.includes('all')}
                                 onCheckedChange={(checked) => handlePermissionSelection('all', !!checked)}
                             />
-                            <Label htmlFor="disable-for-all" className="font-bold">Disable for all non-admin users</Label>
+                            <Label htmlFor="disable-for-all" className="font-bold">Disable for all non-admins</Label>
                        </div>
                        <Separator />
                        {(draftSettings.authorizedUsers || []).filter(u => u.loginName !== 'admin').map(user => (
@@ -898,12 +859,12 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm Changes</AlertDialogTitle>
             <AlertDialogDescription>
-              Are you sure you want to save these changes to the database? This will affect all users.
+              Apply these changes to the global database?
             </AlertDialogDescription>
           </AlertDialogHeader>
           {calculatedChanges.length > 0 && (
              <div className="py-4 text-sm text-foreground">
-                <p className="font-semibold mb-2">Summary of changes:</p>
+                <p className="font-semibold mb-2">Summary:</p>
                 <ul className="list-disc pl-5 space-y-1">
                     {calculatedChanges.map((change, i) => <li key={i}>{change}</li>)}
                 </ul>
@@ -923,13 +884,13 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Project: {grantToDelete?.name}?</AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this project and all of its associated assets and sheets. This action cannot be undone.
+              Permanently remove this project and all its records?
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteGrant} className="bg-destructive hover:bg-destructive/90">
-                Yes, Delete Project
+                Yes, Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -40,6 +40,7 @@ import { cn, getStatusClasses } from "@/lib/utils";
 import { AssetChecklist } from "./asset-checklist";
 import { ScrollArea } from "./ui/scroll-area";
 import { ASSET_CONDITIONS } from "@/lib/constants";
+import { sanitizeForFirestore } from "@/lib/excel-parser";
 
 const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
   path: ['category'],
@@ -88,14 +89,13 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
   useEffect(() => {
     if (isOpen) {
         const defaultValues: AssetFormValues = {};
-        if (asset) { // EDIT/VIEW MODE
+        if (asset) {
             Object.keys(asset).forEach(key => {
                 const k = key as keyof Asset;
                 defaultValues[k] = String(asset[k] ?? '');
             });
             if (!defaultValues.verifiedStatus) defaultValues.verifiedStatus = 'Unverified';
             
-            // Pre-fill location if empty and a state filter is active
             if (!defaultValues.location) {
               if (globalStateFilter && globalStateFilter !== 'All') {
                   defaultValues.location = globalStateFilter;
@@ -103,17 +103,15 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
                   defaultValues.location = userProfile.states[0];
               }
             }
-        } else { // ADD NEW MODE
+        } else {
             defaultValues.verifiedStatus = 'Unverified';
 
-            // Set location based on current state filter or user's single state
             if (globalStateFilter && globalStateFilter !== 'All') {
               defaultValues.location = globalStateFilter;
             } else if (userProfile?.states && userProfile.states.length === 1 && userProfile.states[0] !== 'All') {
                 defaultValues.location = userProfile.states[0];
             }
             
-            // If adding from a specific category view, pre-populate common fields
             if (defaultCategory) {
               defaultValues.category = defaultCategory;
               
@@ -123,7 +121,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
               if (categoryAssets.length > 0) {
                   const currentSheetDef = grant?.sheetDefinitions?.[defaultCategory];
                   if (currentSheetDef) {
-                      // Define fields that should NOT be pre-populated
                       const excludedKeys = new Set<string>([
                           'id', 'category', 'sn', 'serialNumber', 'assetIdCode', 'assignee', 'location', 'lga', 'site',
                           'verifiedStatus', 'verifiedDate', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState',
@@ -145,7 +142,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
 
                               const mostCommon = Object.entries(valueCounts).sort((a, b) => b[1] - a[1])[0];
                               
-                              // Pre-populate if a value is present in > 50% of the category's assets
                               if (mostCommon && (mostCommon[1] / categoryAssets.length > 0.5)) {
                                   defaultValues[fieldKey as string] = mostCommon[0];
                               }
@@ -172,16 +168,15 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
   const onSubmit = async (data: AssetFormValues) => {
     setIsSaving(true);
     try {
-        const assetToSave: Asset = {
+        const assetToSave: Asset = sanitizeForFirestore({
             id: asset?.id ?? crypto.randomUUID(),
             grantId: activeGrantId || undefined,
             ...(asset || {}),
             ...data,
-        } as Asset;
+        } as Asset);
         await onSave(assetToSave);
         onOpenChange(false);
     } catch (e) {
-        // Error toast is handled by the caller
     } finally {
         setIsSaving(false);
     }
@@ -192,15 +187,14 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
 
     setIsSaving(true);
     try {
-      const rolledBackAsset: Asset = {
+      const rolledBackAsset: Asset = sanitizeForFirestore({
         ...asset,
-        ...asset.previousState, // Apply the old values
-        previousState: undefined, // Clear the history
-      };
-      await onSave(rolledBackAsset); // Use the existing save function
+        ...asset.previousState,
+        previousState: undefined,
+      });
+      await onSave(rolledBackAsset);
       onOpenChange(false);
     } catch (e) {
-      // Error is handled by the caller
     } finally {
       setIsSaving(false);
     }
@@ -212,25 +206,21 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
         let disabled = initialIsReadOnly;
         const isVerificationField = ['verifiedStatus', 'remarks', 'condition'].includes(fieldName);
 
-        if (!disabled && appSettings) { // Only apply locks if the form is in edit mode
+        if (!disabled && appSettings) {
             if (isAdmin) {
-                // Admin is locked on cloud source based on settings
                 if (appSettings.lockAssetList && dataSource === 'cloud') {
                     if (appSettings.appMode === 'verification') {
-                        // In verification mode, only allow editing verification fields.
                         if (!isVerificationField) {
                             disabled = true;
                         }
                     } else {
-                        // In management mode, lock everything.
                         disabled = true;
                     }
                 }
-            } else { // Non-admin logic is simpler
+            } else {
                 if (appSettings.appMode === 'management') {
-                    disabled = true; // Non-admins are always locked in management mode.
+                    disabled = true;
                 } else if (appSettings.appMode === 'verification') {
-                    // Non-admins can only edit verification fields in verification mode.
                     if (!isVerificationField) {
                         disabled = true;
                     }
@@ -238,16 +228,12 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
             }
         }
 
-        // --- Final hardcoded locks ---
-        // These override any logic above.
         if (fieldName === 'verifiedDate') {
-            disabled = true; // Always auto-set based on status.
+            disabled = true;
         }
-        // Non-admins can never change location directly in the form.
         if (fieldName === 'location' && !isAdmin) {
             disabled = true; 
         }
-        // Category of an existing asset cannot be changed. For new assets, it's also locked if coming from a category view.
         if (fieldName === 'category' && (!!asset?.id || (!!defaultCategory && !asset?.id))) {
             disabled = true;
         }

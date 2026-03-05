@@ -55,7 +55,10 @@ export default function UserProfileSetup() {
 
   const handleLogin = async () => {
     setError(null);
-    if (!loginName) {
+    const sanitizedLoginName = loginName.trim().toLowerCase();
+    const sanitizedPassword = password.trim();
+
+    if (!sanitizedLoginName) {
       setError("Please enter your login name.");
       return;
     }
@@ -67,7 +70,7 @@ export default function UserProfileSetup() {
 
     const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
     const user = allUsers.find(
-      u => u.loginName.toLowerCase() === loginName.toLowerCase().trim()
+      u => u.loginName.toLowerCase() === sanitizedLoginName
     );
 
     if (!user) {
@@ -88,12 +91,12 @@ export default function UserProfileSetup() {
     }
     
     // Handle normal user login (password is required)
-    if (!password) {
+    if (!sanitizedPassword) {
       setError("Please enter your password.");
       return;
     }
 
-    if (user.password === password) {
+    if (user.password === sanitizedPassword) {
       if (user.states.length > 1 && !user.isAdmin) {
           setFoundUser(user);
       } else {
@@ -109,7 +112,6 @@ export default function UserProfileSetup() {
   const handleConfirmMultiState = async () => {
       if (!foundUser || !selectedInitialState) return;
       setIsSaving(true);
-      // We set the filter immediately to ensure the first-time setup sync uses the right initial scope
       setGlobalStateFilter(selectedInitialState);
       await login(foundUser);
       setIsSaving(false);
