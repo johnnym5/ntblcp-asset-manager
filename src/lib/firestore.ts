@@ -1,3 +1,4 @@
+
 'use client';
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc, where } from 'firebase/firestore';
@@ -11,7 +12,7 @@ const checkConfig = () => {
     return db;
 }
 
-// --- Settings (Primary Layer) ---
+// --- Settings ---
 export async function getSettings(): Promise<AppSettings | null> {
     const firestoreDb = checkConfig();
     if (!firestoreDb) return null;
@@ -48,7 +49,7 @@ export async function updateSettings(settings: AppSettings) {
   });
 }
 
-// --- Assets (Backup Layer) ---
+// --- Assets (Primary Layer) ---
 export async function getAssets(grantId?: string | null): Promise<Asset[]> {
     const firestoreDb = checkConfig();
     if (!firestoreDb) return [];
@@ -77,6 +78,22 @@ export async function getAssets(grantId?: string | null): Promise<Asset[]> {
     }
 }
 
+export async function getAsset(id: string): Promise<Asset | null> {
+    const firestoreDb = checkConfig();
+    if (!firestoreDb) return null;
+    const docRef = doc(firestoreDb, 'assets', id);
+    const snap = await getDoc(docRef);
+    if (snap.exists()) return { id: snap.id, ...snap.data() } as Asset;
+    return null;
+}
+
+export async function setAsset(asset: Asset) {
+    const firestoreDb = checkConfig();
+    if (!firestoreDb) return;
+    const docRef = doc(firestoreDb, 'assets', asset.id);
+    await setDoc(docRef, asset);
+}
+
 export async function batchSetAssets(assets: Asset[]) {
     const db = checkConfig();
     if (!db) return;
@@ -96,6 +113,22 @@ export async function batchSetAssets(assets: Asset[]) {
             }));
         });
     }
+}
+
+export async function deleteAsset(id: string) {
+    const firestoreDb = checkConfig();
+    if (!firestoreDb) return;
+    await deleteDoc(doc(firestoreDb, 'assets', id));
+}
+
+export async function batchDeleteAssets(assetIds: string[]) {
+    const db = checkConfig();
+    if (!db) return;
+    const batch = writeBatch(db);
+    assetIds.forEach(id => {
+        batch.delete(doc(db, 'assets', id));
+    });
+    await batch.commit();
 }
 
 export async function clearAssets() {

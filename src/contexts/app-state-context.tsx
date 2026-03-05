@@ -176,8 +176,10 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] =
     useState(false);
+  
+  // Reconfigured to Firestore as primary
   const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>(
-    'rtdb'
+    'firestore'
   );
 
   const [onRevertAsset, setOnRevertAsset] = useState<
@@ -224,13 +226,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     const initializeSettings = async () => {
         let settings: AppSettings | null = await getLocalSettings();
 
-        // SPLIT DB STRATEGY: Prioritize Firestore for settings as it's more robust for structured config
+        // Firestore is primary for settings
         if (!settings && navigator.onLine) {
             try {
-                // Try Firestore first for settings
                 let cloudSettings = await getSettingsFS(); 
                 if (!cloudSettings) {
-                    // Fallback to RTDB if Firestore is empty
                     cloudSettings = await getSettingsRTDB();
                 }
                 
@@ -248,7 +248,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (!settings) {
-            addNotification({ title: 'First-Time Setup', description: 'Creating default settings and user accounts.' });
+            addNotification({ title: 'First-Time Setup', description: 'Initializing primary Firestore database.' });
             
             const grantId = uuidv4();
             const defaultGrant: Grant = {
@@ -281,7 +281,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             await saveLocalSettings(settings);
             
             if (navigator.onLine) {
-                // Save to both for initial split redundancy
                 await Promise.allSettled([
                     updateSettingsRTDB(settings),
                     updateSettingsFS(settings)
@@ -296,8 +295,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             setActiveGrantId(settings.grants[0].id);
         }
         
-        // Default behavior: RTDB for assets
-        setActiveDatabase('rtdb');
+        // Firestore is now the primary active database
+        setActiveDatabase('firestore');
         setSettingsLoaded(true);
     };
     
@@ -322,13 +321,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
        }
     };
     
-    // Periodically check Firestore for settings updates
     const interval = setInterval(async () => {
         if (isOnline) {
             const settings = await getSettingsFS();
             handleRemoteSettingsUpdate(settings);
         }
-    }, 30000); // Check every 30s
+    }, 30000);
 
     return () => clearInterval(interval);
   }, [settingsLoaded, isOnline, migrateSettings, appSettings]);
