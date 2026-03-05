@@ -6,6 +6,7 @@ import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
 import type { AuthorizedUser } from '@/lib/types';
 import { getLocalAssets, clearLocalAssets, saveLockedOfflineAssets } from '@/lib/idb';
+import { getInitialAdminCreds } from '@/lib/auth-constants';
 
 
 export interface LocalUserProfile {
@@ -30,17 +31,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-const superAdmin: AuthorizedUser = {
-  loginName: 'admin',
-  displayName: 'Super Admin',
-  password: 'setup',
-  states: ['All'],
-  isAdmin: true,
-  isGuest: false,
-  canAddAssets: true,
-  canEditAssets: true,
-};
-
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [userProfile, setUserProfile] = useState<LocalUserProfile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -59,6 +49,18 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (savedProfileJSON) {
         const savedProfile: LocalUserProfile & { state?: string } = JSON.parse(savedProfileJSON);
         
+        const { u: adminLogin, p: adminPass } = getInitialAdminCreds();
+        const superAdmin: AuthorizedUser = {
+          loginName: adminLogin,
+          displayName: 'Super Admin',
+          password: adminPass,
+          states: ['All'],
+          isAdmin: true,
+          isGuest: false,
+          canAddAssets: true,
+          canEditAssets: true,
+        };
+
         const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
         const authorizedUser = allUsers.find(u => u.loginName === savedProfile.loginName);
         
@@ -78,18 +80,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUserProfile(freshProfile);
           setProfileSetupComplete(true);
         } else {
-          // Stale profile, clear it
           localStorage.removeItem('assetain-user-profile');
           setUserProfile(null);
           setProfileSetupComplete(false);
         }
       } else {
-        // No profile, so not complete
         setUserProfile(null);
         setProfileSetupComplete(false);
       }
     } catch (e) {
-      console.error("Failed to process user profile from local storage", e);
+      console.error("Failed to process user profile", e);
       localStorage.removeItem('assetain-user-profile');
       setUserProfile(null);
       setProfileSetupComplete(false);

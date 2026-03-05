@@ -1,7 +1,7 @@
 
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   AlertDialog,
   AlertDialogContent,
@@ -26,18 +26,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { isAllowed } from '@/lib/rate-limit';
-
-const superAdmin: AuthorizedUser = {
-  loginName: 'admin',
-  displayName: 'Super Admin',
-  password: 'setup',
-  states: ['All'],
-  isAdmin: true,
-  isGuest: false,
-  canAddAssets: true,
-  canEditAssets: true,
-  canVerifyAssets: true,
-};
+import { getInitialAdminCreds } from '@/lib/auth-constants';
 
 export default function UserProfileSetup() {
   const [loginName, setLoginName] = useState('');
@@ -52,7 +41,6 @@ export default function UserProfileSetup() {
   const { appSettings, setGlobalStateFilter } = useAppState();
 
   const handleLogin = async () => {
-    // Rate limit login attempts to prevent spam
     if (!isAllowed('login-attempt', 3000)) {
         return;
     }
@@ -67,9 +55,22 @@ export default function UserProfileSetup() {
     }
     
     if (!appSettings) {
-        setError("Application settings are not available. Cannot log in.");
+        setError("System initializing. Please wait.");
         return;
     }
+
+    const { u: adminLogin, p: adminPass } = getInitialAdminCreds();
+    const superAdmin: AuthorizedUser = {
+      loginName: adminLogin,
+      displayName: 'Super Admin',
+      password: adminPass,
+      states: ['All'],
+      isAdmin: true,
+      isGuest: false,
+      canAddAssets: true,
+      canEditAssets: true,
+      canVerifyAssets: true,
+    };
 
     const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
     const user = allUsers.find(
@@ -77,11 +78,10 @@ export default function UserProfileSetup() {
     );
 
     if (!user) {
-      setError("Invalid login name or password.");
+      setError("Invalid credentials.");
       return;
     }
 
-    // Handle guest login (no password needed)
     if (user.isGuest) {
       if (user.states.length > 1) {
           setFoundUser(user);
@@ -93,7 +93,6 @@ export default function UserProfileSetup() {
       return; 
     }
     
-    // Handle normal user login (password is required)
     if (!sanitizedPassword) {
       setError("Please enter your password.");
       return;
@@ -108,7 +107,7 @@ export default function UserProfileSetup() {
           setIsSaving(false);
       }
     } else {
-      setError("Invalid login name or password.");
+      setError("Invalid credentials.");
     }
   };
 
@@ -140,7 +139,7 @@ export default function UserProfileSetup() {
                     <AlertDialogTitle>Assetain</AlertDialogTitle>
                     <AlertDialogHeader className="text-center items-center">
                         <AlertDialogDescription>
-                            {foundUser ? "Select your initial starting location." : "Please sign in to continue."}
+                            {foundUser ? "Select your starting location." : "Sign in to access your assets."}
                         </AlertDialogDescription>
                     </AlertDialogHeader>
                 </AlertDialogHeader>
@@ -153,7 +152,7 @@ export default function UserProfileSetup() {
                                 <Input 
                                 id="loginName" 
                                 type="text"
-                                placeholder="Enter your login name"
+                                placeholder="e.g. lagos_admin"
                                 value={loginName} 
                                 onChange={(e) => setLoginName(e.target.value)}
                                 />
@@ -176,15 +175,15 @@ export default function UserProfileSetup() {
                                     <MapPin className="h-4 w-4 text-primary" />
                                 </div>
                                 <div className="flex-1">
-                                    <p className="text-xs font-bold uppercase text-muted-foreground">Authorized States</p>
+                                    <p className="text-xs font-bold uppercase text-muted-foreground">Authorized Scopes</p>
                                     <p className="text-sm font-medium">{foundUser.states.join(', ')}</p>
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="initial-state">Starting Scope</Label>
+                                <Label htmlFor="initial-state">Initial Filter Scope</Label>
                                 <Select value={selectedInitialState} onValueChange={setSelectedInitialState}>
                                     <SelectTrigger id="initial-state">
-                                        <SelectValue placeholder="Select a state to start with..." />
+                                        <SelectValue placeholder="Select starting state..." />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {foundUser.states.map(state => (
@@ -192,7 +191,6 @@ export default function UserProfileSetup() {
                                         ))}
                                     </SelectContent>
                                 </Select>
-                                <p className="text-[10px] text-muted-foreground italic">You can switch between your assigned states at any time from the dashboard.</p>
                             </div>
                         </div>
                     )}
@@ -210,7 +208,7 @@ export default function UserProfileSetup() {
                     {foundUser ? (
                         <Button className="w-full" onClick={handleConfirmMultiState} disabled={isSaving || !selectedInitialState}>
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Start Session
+                            Initialize Session
                         </Button>
                     ) : (
                         <Button className="w-full" onClick={handleLogin} disabled={isSaving}>
