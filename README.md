@@ -7,7 +7,7 @@
 ### Step 1: Create Repository on GitHub
 1. Go to [github.com/new](https://github.com/new).
 2. Create a new repository named `ntblcp-asset-manager`.
-3. **Important**: Do not initialize it with a README, license, or gitignore (keep it empty).
+3. **Important**: If you initialized it with a README or License on GitHub, follow the "Fixing Rejected Push" section below.
 
 ### Step 2: Push to GitHub
 Run these commands in your terminal:
@@ -22,11 +22,22 @@ git remote add origin https://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@github.co
 git push -u origin main
 ```
 
+#### 🛠 Troubleshooting "Rejected Push" (fetch first)
+If you get an error saying `Updates were rejected because the remote contains work that you do not have locally`, run this command to merge the remote changes:
+```bash
+# Force the local code to overwrite the remote (Easiest for new projects)
+git push -u origin main --force
+
+# OR: Merge the remote files into your local project
+git pull origin main --allow-unrelated-histories
+# Then push again
+git push -u origin main
+```
+
 #### 🛠 Troubleshooting "Authentication Failed" or "ECONNREFUSED"
 If you get a credential error or `ECONNREFUSED /tmp/vscode-git...`:
 
 1. **Clear the broken credential helper**:
-   The `ECONNREFUSED` error usually means the environment is trying to use a broken VS Code connection. Run this to fix it:
    ```bash
    git config --global --unset credential.helper
    ```
@@ -35,12 +46,6 @@ If you get a credential error or `ECONNREFUSED /tmp/vscode-git...`:
    If you already added the remote, run this to update it with your token:
    ```bash
    git remote set-url origin https://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@github.com/johnnym5/ntblcp-asset-manager.git
-   ```
-
-3. **Verify and Push**:
-   ```bash
-   git remote -v
-   git push -u origin main
    ```
 
 ### Step 3: Deploy Database Config
