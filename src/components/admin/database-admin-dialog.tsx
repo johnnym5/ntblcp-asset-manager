@@ -542,7 +542,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                     <RefreshCw className={cn("mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4", isFsLoading && "animate-spin")} /> Refresh
                                 </Button>
                                 <Button size="sm" className="h-9 sm:h-10 font-bold px-3 sm:px-6 shadow-lg shadow-primary/20 text-[10px] sm:text-xs" onClick={handleCreateNewDoc} disabled={selectedCollection !== 'assets' || isProcessing}>
-                                    <Plus className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/> New Doc
+                                    <Plus className="mr-1.5 sm:mr-2 h-3.5 w-3.5 h-4 w-4"/> New Doc
                                 </Button>
                             </div>
                         </div>
@@ -667,7 +667,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                                 className="flex-1 sm:flex-none h-9 sm:h-10 text-destructive hover:text-destructive hover:bg-destructive/10 font-bold uppercase text-[10px] sm:text-[11px] px-2 sm:px-4"
                                                 onClick={() => handleDeleteSingle(selectedDocId)}
                                             >
-                                                <Trash2 className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/> Delete
+                                                <Trash2 className="mr-1.5 sm:mr-2 h-3.5 w-3.5 h-4 w-4"/> Delete
                                             </Button>
                                             <Button 
                                                 size="sm" 
@@ -675,7 +675,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                                 onClick={handleSaveDoc}
                                                 disabled={isProcessing}
                                             >
-                                                {isProcessing ? <Loader2 className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin"/> : <Save className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/>}
+                                                {isProcessing ? <Loader2 className="mr-1.5 sm:mr-2 h-3.5 w-3.5 h-4 w-4 animate-spin"/> : <Save className="mr-1.5 sm:mr-2 h-3.5 w-3.5 h-4 w-4"/>}
                                                 Save
                                             </Button>
                                         </div>
@@ -730,7 +730,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                         </div>
                     </>
                 ) : (
-                    <IndexesView />
+                    <IndexesView toast={toast} />
                 )}
             </div>
 
@@ -764,7 +764,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   }
 }
 
-function IndexesView() {
+function IndexesView({ toast }: { toast: any }) {
     const indexes = [
         { 
             id: 'CICAgOjxH4EJ', 
@@ -799,6 +799,20 @@ function IndexesView() {
         }
     ];
 
+    const handleAddIndex = () => {
+        toast({
+            title: "Deployment Action Required",
+            description: "To add a new index, define it in 'firestore.indexes.json' and run 'firebase deploy --only firestore:indexes' from your terminal.",
+        });
+    };
+
+    const handleManageOverrides = () => {
+        toast({
+            title: "Database Configuration",
+            description: "Field overrides are managed via the Firebase CLI or the Firebase Console under Project Settings.",
+        });
+    };
+
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
             <div className="bg-muted/10 border-b px-4 sm:px-8 py-4 sm:py-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
@@ -808,7 +822,10 @@ function IndexesView() {
                     </h3>
                     <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-1">Firestore indexes optimized for regional performance.</p>
                 </div>
-                <Button className="font-bold shadow-lg shadow-primary/20 h-9 sm:h-10 text-[10px] sm:text-xs">
+                <Button 
+                    className="font-bold shadow-lg shadow-primary/20 h-9 sm:h-10 text-[10px] sm:text-xs"
+                    onClick={handleAddIndex}
+                >
                     <Plus className="mr-2 h-4 w-4"/> Add Index
                 </Button>
             </div>
@@ -868,7 +885,12 @@ function IndexesView() {
                             <h4 className="text-xs sm:text-sm font-black uppercase tracking-widest text-primary">Index Optimization</h4>
                             <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Server-side indexing reduces data transfer for regional managers.</p>
                         </div>
-                        <Button variant="outline" size="sm" className="font-bold border-2 h-9 sm:h-10 px-4 sm:px-6 text-[10px] sm:text-xs">
+                        <Button 
+                            variant="outline" 
+                            size="sm" 
+                            className="font-bold border-2 h-9 sm:h-10 px-4 sm:px-6 text-[10px] sm:text-xs"
+                            onClick={handleManageOverrides}
+                        >
                             Manage Overrides
                         </Button>
                     </div>
