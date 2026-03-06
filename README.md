@@ -1,70 +1,34 @@
 # Assetain
 
-**Assetain** is a professional, offline-first Asset Management and Verification platform. Built with Next.js, Tailwind CSS, and a hybrid Firestore/RTDB architecture, it provides a robust solution for tracking, auditing, and maintaining large-scale inventories.
+**Assetain** is a professional, offline-first Asset Management and Verification platform. Built for robust performance in demanding environments, it provides a high-integrity solution for tracking, auditing, and maintaining large-scale inventories across multiple geographical regions.
 
-## 🚀 Deployment Guide
+## 🌟 Core Features
 
-### Step 1: Create Repository on GitHub
-1. Go to [github.com/new](https://github.com/new).
-2. Create a new repository named `ntblcp-asset-manager`.
-3. **Important**: If you initialized it with a README or License on GitHub, follow the "Fixing Rejected Push" section below.
+### 📡 High-Availability Architecture
+- **Offline-First Resilience**: Full functionality in zero-connectivity environments using high-performance IndexedDB local storage.
+- **Triple-Layer Data Integrity**:
+    - **Primary**: Cloud Firestore for structured, real-time regional queries.
+    - **Redundancy**: Realtime Database shadow-mirroring for high-availability backups.
+    - **Local**: Intelligent browser persistence for 100% field uptime.
 
-### Step 2: Push to GitHub
-Run these commands in your terminal:
-```bash
-git init
-git add .
-git commit -m "Initialize Assetain Production v1.0"
-git branch -M main
+### 🔐 Secure Governance & Workflow
+- **Role-Based Access Control (RBAC)**: Distinct permissions for Administrators, Zonal Managers, and Field Verification Officers.
+- **Regional Scoping**: Users are locked into authorized geographical scopes (States/Zones) to ensure data privacy and operational focus.
+- **Audit & Revert System**: Every change is tracked. Administrators can review activity logs and revert individual or bulk changes with a single click.
 
-# Use your token to authenticate the remote
-git remote add origin https://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@github.com/johnnym5/ntblcp-asset-manager.git
-git push -u origin main
-```
+### 📊 Intelligence & Reporting
+- **Inventory Pulse Dashboard**: Real-time insights into verification coverage, maintenance alerts, and data quality exceptions.
+- **Verification Pulse**: Visual progress tracking for inspections across categories and locations.
+- **Travel Report Generator**: Automated generation of professional `.docx` field reports, compiling verification findings, observations, and challenges.
 
-#### 🛠 Troubleshooting "Rejected Push" (fetch first)
-If you get an error saying `Updates were rejected because the remote contains work that you do not have locally`, run this command to merge the remote changes:
-```bash
-# Force the local code to overwrite the remote (Easiest for new projects)
-git push -u origin main --force
+### 📁 Advanced Data Engineering
+- **Intelligent Workbook Scanner**: Automatically detects and maps complex Excel templates to the system schema.
+- **Structure-Preserving Export**: Generates Excel reports that mirror original column layouts and naming conventions.
+- **Sandbox Environment**: New data imports are isolated in a "Locked Offline" store for review before being merged into the global cloud database.
 
-# OR: Merge the remote files into your local project
-git pull origin main --allow-unrelated-histories
-# Then push again
-git push -u origin main
-```
-
-#### 🛠 Troubleshooting "Authentication Failed" or "ECONNREFUSED"
-If you get a credential error or `ECONNREFUSED /tmp/vscode-git...`:
-
-1. **Clear the broken credential helper**:
-   ```bash
-   git config --global --unset credential.helper
-   ```
-
-2. **Update to an Authenticated Remote URL**:
-   If you already added the remote, run this to update it with your token:
-   ```bash
-   git remote set-url origin https://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@github.com/johnnym5/ntblcp-asset-manager.git
-   ```
-
-### Step 3: Deploy Database Config
-The app requires specific indexes to handle regional queries. Use the Firebase CLI to deploy them:
-```bash
-# Install CLI if needed: npm install -g firebase-tools
-firebase login
-firebase use --add  # Select your project
-firebase deploy --only firestore:indexes,firestore:rules,database:rules
-```
-
-### Step 4: Web Hosting (Vercel / Firebase)
-1. **Connect**: Link your GitHub repo to Vercel or Firebase App Hosting.
-2. **Environment Variables**: Add all keys from your `.env` file to the "Environment Variables" section in your hosting provider's dashboard.
-
-## 🏗 Architecture
-- **Primary Layer**: Cloud Firestore (Used for all live queries and structured data).
-- **Backup Layer**: Realtime Database (Shadow mirroring for high-availability redundancy).
-- **Local Layer**: IndexedDB (Browser persistence for 100% offline capability).
+### 🛠 Infrastructure Management
+- **Integrated Database Console**: A low-level "Workstation" for administrators to browse collections, edit raw document fields, and manage composite query indexes without leaving the app.
+- **Cloud Snapshots**: One-click manual snapshots and restores between database layers for extreme disaster recovery.
 
 ---
 © 2024 Assetain. Professional Asset Intelligence.
