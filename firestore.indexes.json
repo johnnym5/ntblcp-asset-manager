@@ -25,6 +25,24 @@
         { "fieldPath": "location", "order": "ASCENDING" },
         { "fieldPath": "lastModified", "order": "DESCENDING" }
       ]
+    },
+    {
+      "collectionGroup": "assets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "grantId", "order": "ASCENDING" },
+        { "fieldPath": "condition", "order": "ASCENDING" },
+        { "fieldPath": "lastModified", "order": "DESCENDING" }
+      ]
+    },
+    {
+      "collectionGroup": "assets",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "grantId", "order": "ASCENDING" },
+        { "fieldPath": "lastModifiedBy", "order": "ASCENDING" },
+        { "fieldPath": "lastModified", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": [

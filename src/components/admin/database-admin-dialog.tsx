@@ -87,7 +87,10 @@ import {
     Layers,
     ChevronLeft,
     FolderPlus,
-    MinusCircle
+    MinusCircle,
+    Sparkles,
+    Lightbulb,
+    Info
 } from 'lucide-react';
 import type { Asset, AppSettings } from '@/lib/types';
 import { clearLocalAssets, saveLockedOfflineAssets, saveLocalSettings } from '@/lib/idb';
@@ -105,6 +108,7 @@ import { Switch } from '../ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -315,7 +319,6 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     }
   };
 
-  // --- INTEGRATED CLOUD ACTIONS ---
   const handleCreateCloudSnapshot = async () => {
     setIsProcessing(true);
     try {
@@ -835,6 +838,24 @@ function IndexesView({ toast }: { toast: any }) {
         }
     ]);
 
+    const RECOMMENDED_BLUEPRINTS = [
+        {
+            name: "Search Optimization",
+            description: "Enables fast project-wide text searching by description and serials.",
+            fields: [{ path: 'grantId', order: 'ASCENDING' }, { path: 'description', order: 'ASCENDING' }]
+        },
+        {
+            name: "Condition Health Audit",
+            description: "Optimizes status dashboards for identifying 'Bad Condition' or 'Stolen' assets.",
+            fields: [{ path: 'grantId', order: 'ASCENDING' }, { path: 'condition', order: 'ASCENDING' }, { path: 'lastModified', order: 'DESCENDING' }]
+        },
+        {
+            name: "User Activity Log",
+            description: "Required for the Admin Activity Log to track changes by specific staff members.",
+            fields: [{ path: 'grantId', order: 'ASCENDING' }, { path: 'lastModifiedBy', order: 'ASCENDING' }, { path: 'lastModified', order: 'DESCENDING' }]
+        }
+    ];
+
     const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
     const [newIdxCol, setNewIdxCol] = useState('assets');
     const [newIdxFields, setNewIdxFields] = useState('');
@@ -849,7 +870,7 @@ function IndexesView({ toast }: { toast: any }) {
         const newIndex = {
             id: `IDX-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
             collection: newIdxCol,
-            fields: fieldPaths.map(p => ({ path: f, order: 'ASCENDING' as const })),
+            fields: fieldPaths.map(p => ({ path: p, order: 'ASCENDING' as const })),
             scope: newIdxScope,
             status: 'Building'
         };
@@ -863,6 +884,21 @@ function IndexesView({ toast }: { toast: any }) {
             description: "To apply this to your real database, define it in 'firestore.indexes.json' and deploy via Firebase CLI.",
         });
     };
+
+    const handleStageBlueprint = (blueprint: any) => {
+        const newIndex = {
+            id: `SUG-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+            collection: 'assets',
+            fields: blueprint.fields,
+            scope: 'Collection' as const,
+            status: 'Building'
+        };
+        setIndexes(prev => [...prev, newIndex]);
+        toast({
+            title: "Blueprint Staged",
+            description: `Ready to optimize for: ${blueprint.name}`,
+        });
+    }
 
     const handleDeleteIndex = (id: string) => {
         setIndexes(prev => prev.filter(i => i.id !== id));
@@ -887,7 +923,33 @@ function IndexesView({ toast }: { toast: any }) {
             </div>
             
             <ScrollArea className="flex-1">
-                <div className="p-4 sm:p-8">
+                <div className="p-4 sm:p-8 space-y-8">
+                    {/* Recommendations Section */}
+                    <div className="space-y-4">
+                        <div className="flex items-center gap-2 px-1">
+                            <Sparkles className="h-4 w-4 text-primary animate-pulse" />
+                            <h4 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Smart Index Blueprints</h4>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {RECOMMENDED_BLUEPRINTS.map((bp, i) => (
+                                <Card key={i} className="bg-primary/5 border-primary/10 hover:bg-primary/10 transition-colors cursor-pointer group" onClick={() => handleStageBlueprint(bp)}>
+                                    <CardHeader className="p-4 pb-2">
+                                        <CardTitle className="text-sm font-bold flex items-center justify-between">
+                                            {bp.name}
+                                            <Lightbulb className="h-3.5 w-3.5 opacity-40 group-hover:opacity-100 transition-opacity" />
+                                        </CardTitle>
+                                        <CardDescription className="text-[10px] leading-relaxed line-clamp-2">{bp.description}</CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="p-4 pt-0">
+                                        <Button variant="ghost" size="sm" className="w-full h-7 text-[10px] font-black uppercase text-primary hover:bg-primary hover:text-white rounded-lg mt-2">
+                                            Stage Recommendation
+                                        </Button>
+                                    </CardContent>
+                                </Card>
+                            ))}
+                        </div>
+                    </div>
+
                     <div className="rounded-2xl border bg-card/50 overflow-hidden shadow-sm overflow-x-auto">
                         <Table className="min-w-[800px]">
                             <TableHeader className="bg-muted/30">
@@ -946,6 +1008,16 @@ function IndexesView({ toast }: { toast: any }) {
                                 ))}
                             </TableBody>
                         </Table>
+                    </div>
+                    
+                    <div className="p-4 bg-muted/20 border-2 border-dashed rounded-xl flex items-start gap-4">
+                        <Info className="h-5 w-5 text-muted-foreground shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                            <p className="text-xs font-bold uppercase text-muted-foreground">Deployment Required</p>
+                            <p className="text-xs text-muted-foreground/80 leading-relaxed">
+                                Defining indexes here updates the management console UI. To apply these to your actual Firestore database, you must add the definitions to <code className="bg-background px-1 rounded font-mono">firestore.indexes.json</code> and run <code className="bg-background px-1 rounded font-mono text-primary">firebase deploy</code>.
+                            </p>
+                        </div>
                     </div>
                 </div>
             </ScrollArea>
