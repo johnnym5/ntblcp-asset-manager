@@ -20,13 +20,34 @@ git branch -M main
 git push -u origin main
 ```
 
-#### 🛠 Troubleshooting "Authentication Failed"
-If you get a credential error or `ECONNREFUSED`:
-1. **Use a Personal Access Token (PAT)**: GitHub no longer accepts your account password for terminal commands. Generate one at [Settings > Developer Settings > Personal Access Tokens](https://github.com/settings/tokens).
-2. **When prompted for a password**, paste your Token instead.
-3. **To save your credentials** so you don't have to type them again:
+#### 🛠 Troubleshooting "Authentication Failed" or "ECONNREFUSED"
+If you get a credential error or `ECONNREFUSED /tmp/vscode-git...`:
+
+1. **Clear the broken credential helper**:
+   The `ECONNREFUSED` error usually means the environment is trying to use a broken VS Code connection. Run this to fix it:
+   ```bash
+   git config --global --unset credential.helper
+   ```
+
+2. **Use a Personal Access Token (PAT)**:
+   GitHub no longer accepts your account password for terminal commands. 
+   - Go to [GitHub Settings > Developer Settings > Personal Access Tokens > Tokens (classic)](https://github.com/settings/tokens).
+   - Generate a new token with `repo` scopes.
+   - **When prompted for a password in the terminal, paste your Token instead.**
+
+3. **To save your credentials** (so you only enter the token once):
    ```bash
    git config --global credential.helper store
+   ```
+
+4. **Verify your Remote URL**:
+   If it says "Repository not found", check your URL:
+   ```bash
+   git remote -v
+   ```
+   If it's wrong, fix it with:
+   ```bash
+   git remote set-url origin https://github.com/johnnym5/ntblcp-asset-manager.git
    ```
 
 ### Step 3: Deploy Database Config
