@@ -1,18 +1,16 @@
 /**
  * @fileOverview Authentication constants for the initial setup user.
- * These are kept in plain text for easier searchability and maintenance as requested.
+ * These are now loaded from environment variables to keep your source code secure on GitHub.
  */
-
-const _u = 'admin'; 
-const _p = 'setup'; 
 
 /**
  * Returns the admin credentials.
- * This is used for the initial bootstrap account before permanent users are created.
+ * Defaults are provided for local development, but should be overridden in production
+ * using NEXT_PUBLIC_INITIAL_ADMIN_USER and NEXT_PUBLIC_INITIAL_ADMIN_PASSWORD.
  */
 export const getInitialAdminCreds = () => {
   return {
-    u: _u,
-    p: _p
+    u: process.env.NEXT_PUBLIC_INITIAL_ADMIN_USER || 'admin',
+    p: process.env.NEXT_PUBLIC_INITIAL_ADMIN_PASSWORD || 'setup'
   };
 };
