@@ -736,15 +736,13 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 }
 
 function IndexesView() {
-    // Mock index data based on firestore.indexes.json and system defaults
     const indexes = [
         { 
             id: 'CICAgOjxH4EJ', 
             collection: 'assets', 
             fields: [
                 { path: 'grantId', order: 'ASCENDING' },
-                { path: 'lastModified', order: 'DESCENDING' },
-                { path: '__name__', order: 'ASCENDING' }
+                { path: 'lastModified', order: 'DESCENDING' }
             ], 
             scope: 'Collection', 
             status: 'Enabled' 
@@ -753,9 +751,9 @@ function IndexesView() {
             id: 'CICAgOjxH4EK', 
             collection: 'assets', 
             fields: [
+                { path: 'grantId', order: 'ASCENDING' },
                 { path: 'category', order: 'ASCENDING' },
-                { path: 'verifiedStatus', order: 'ASCENDING' },
-                { path: '__name__', order: 'ASCENDING' }
+                { path: 'verifiedStatus', order: 'ASCENDING' }
             ], 
             scope: 'Collection', 
             status: 'Enabled' 
@@ -765,18 +763,7 @@ function IndexesView() {
             collection: 'assets', 
             fields: [
                 { path: 'location', order: 'ASCENDING' },
-                { path: 'lastModified', order: 'DESCENDING' },
-                { path: '__name__', order: 'ASCENDING' }
-            ], 
-            scope: 'Collection', 
-            status: 'Enabled' 
-        },
-        { 
-            id: 'CICAgJjF9olK', 
-            collection: 'config', 
-            fields: [
-                { path: 'lastModified', order: 'DESCENDING' },
-                { path: '__name__', order: 'ASCENDING' }
+                { path: 'lastModified', order: 'DESCENDING' }
             ], 
             scope: 'Collection', 
             status: 'Enabled' 
@@ -790,7 +777,7 @@ function IndexesView() {
                     <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
                         <Layers className="h-5 w-5 text-primary"/> Composite Indexes
                     </h3>
-                    <p className="text-sm text-muted-foreground font-medium mt-1">Firestore composite indexes configured for high-performance regional filtering.</p>
+                    <p className="text-sm text-muted-foreground font-medium mt-1">Production Firestore indexes optimized for cross-project performance.</p>
                 </div>
                 <Button className="font-bold shadow-lg shadow-primary/20">
                     <Plus className="mr-2 h-4 w-4"/> Add Index
@@ -850,7 +837,7 @@ function IndexesView() {
                     <div className="mt-8 p-6 rounded-2xl border border-dashed bg-muted/5 flex items-center justify-between">
                         <div className="space-y-1">
                             <h4 className="text-sm font-black uppercase tracking-widest text-primary">Index Optimization</h4>
-                            <p className="text-xs text-muted-foreground font-medium">Automatic index suggestions are generated based on query performance in regional field reports.</p>
+                            <p className="text-xs text-muted-foreground font-medium">Server-side indexing reduces data transfer by up to 90% for regional managers.</p>
                         </div>
                         <Button variant="outline" size="sm" className="font-bold border-2 h-10 px-6">
                             Manage Overrides

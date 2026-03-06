@@ -13,6 +13,7 @@
       "collectionGroup": "assets",
       "queryScope": "COLLECTION",
       "fields": [
+        { "fieldPath": "grantId", "order": "ASCENDING" },
         { "fieldPath": "category", "order": "ASCENDING" },
         { "fieldPath": "verifiedStatus", "order": "ASCENDING" }
       ]
