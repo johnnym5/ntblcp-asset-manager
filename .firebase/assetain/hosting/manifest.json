@@ -1,9 +1,23 @@
 {
-  "name": "NTBLCP Asset Manager",
-  "short_name": "NTBLCP Assets",
-  "description": "A full-featured, offline-first web app to manage assets efficiently.",
+  "name": "Assetain",
+  "short_name": "Assetain",
+  "description": "Professional Asset Management and Verification Platform",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#000000",
-  "theme_color": "#EBC237"
+  "background_color": "#ffffff",
+  "theme_color": "#eab308",
+  "icons": [
+    {
+      "src": "https://picsum.photos/seed/assetain/192/192",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "https://picsum.photos/seed/assetain/512/512",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }

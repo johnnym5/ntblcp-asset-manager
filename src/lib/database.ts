@@ -1,6 +1,7 @@
+
 'use client';
 
-import { ref, get, set, remove, update } from 'firebase/database';
+import { ref, get, set, remove, update, query, orderByChild, equalTo } from 'firebase/database';
 import { rtdb, isConfigValid } from '@/lib/firebase';
 import type { Asset, AppSettings } from './types';
 
@@ -34,14 +35,17 @@ export async function getAssets(grantId?: string | null): Promise<Asset[]> {
     if (!db) return [];
     
     const assetsRef = ref(db, 'assets');
-    const snapshot = await get(assetsRef);
+    let assetsQuery: any = assetsRef;
+
+    // Server-side optimized query for RTDB using index defined in rules
+    if (grantId && grantId !== 'All') {
+        assetsQuery = query(assetsRef, orderByChild('grantId'), equalTo(grantId));
+    }
+    
+    const snapshot = await get(assetsQuery);
     if (snapshot.exists()) {
         const data = snapshot.val();
-        const allAssets: Asset[] = Object.keys(data).map(key => ({ ...data[key], id: key }));
-        if (grantId && grantId !== 'All') {
-            return allAssets.filter(asset => asset.grantId === grantId);
-        }
-        return allAssets;
+        return Object.keys(data).map(key => ({ ...data[key], id: key }));
     }
     return [];
 }
@@ -63,6 +67,12 @@ export async function batchDeleteAssets(assetIds: string[]) {
     const updates: { [key: string]: null } = {};
     assetIds.forEach(id => { updates[`/assets/${id}`] = null; });
     await update(ref(db), updates);
+}
+
+export async function deleteAsset(id: string) {
+    const db = checkConfig();
+    if (!db) return;
+    await remove(ref(db, `assets/${id}`));
 }
 
 export async function clearAssets() {

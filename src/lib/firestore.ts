@@ -62,16 +62,20 @@ export async function getAssets(grantId?: string | null): Promise<Asset[]> {
     if (!firestoreDb) return [];
     
     const assetsCollectionRef = collection(firestoreDb, 'assets');
+    
+    // Server-side optimized query using grantId index
+    let q = query(assetsCollectionRef);
+    if (grantId && grantId !== 'All') {
+        q = query(assetsCollectionRef, where('grantId', '==', grantId));
+    }
+
     try {
-        const querySnapshot = await getDocs(assetsCollectionRef);
+        const querySnapshot = await getDocs(q);
         const fetchedAssets: Asset[] = [];
         querySnapshot.forEach((doc) => {
             fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
         });
 
-        if (grantId && grantId !== 'All') {
-            return fetchedAssets.filter(asset => asset.grantId === grantId);
-        }
         return fetchedAssets;
     } catch (serverError) {
         if ((serverError as any)?.code === 'permission-denied') {
