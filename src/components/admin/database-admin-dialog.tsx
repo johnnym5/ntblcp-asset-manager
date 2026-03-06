@@ -82,7 +82,8 @@ import {
     ListFilter,
     ArrowUpCircle,
     ArrowDownCircle,
-    Layers
+    Layers,
+    ChevronLeft
 } from 'lucide-react';
 import type { Asset, AppSettings } from '@/lib/types';
 import { clearLocalAssets, saveLockedOfflineAssets, saveLocalSettings } from '@/lib/idb';
@@ -98,6 +99,7 @@ import { Separator } from '../ui/separator';
 import { Checkbox } from '../ui/checkbox';
 import { Switch } from '../ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -106,13 +108,16 @@ interface DatabaseAdminDialogProps {
 
 type CollectionType = 'assets' | 'config';
 type AdminView = 'explorer' | 'indexes';
+type MobileViewStep = 'collections' | 'documents' | 'editor';
 
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
   const { appSettings, setAssets, setOfflineAssets, setAppSettings } = useAppState();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   
   const [activeView, setActiveView] = useState<AdminView>('explorer');
+  const [mobileStep, setMobileStep] = useState<MobileViewStep>('collections');
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [confirmTitle, setConfirmTitle] = useState('');
@@ -179,6 +184,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     setSelectedDocId(id);
     const docItem = filteredDocs.find(d => d.id === id);
     if (docItem) setEditingData({ ...docItem.data });
+    if (isMobile) setMobileStep('editor');
   };
 
   const handleUpdateField = (key: string, value: any) => {
@@ -241,6 +247,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             toast({ title: 'Config records cannot be individualy deleted.', variant: 'destructive' });
         }
         setSelectedDocId(null);
+        if (isMobile) setMobileStep('documents');
         fetchFsData();
     } catch (e) {
         toast({ title: 'Operation failed.', variant: 'destructive' });
@@ -262,6 +269,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         setSelectedDocIds([]);
         fetchFsData();
         setSelectedDocId(null);
+        if (isMobile) setMobileStep('documents');
     } catch (e) {
         toast({ title: 'Bulk operation failed.', variant: 'destructive' });
     } finally {
@@ -416,65 +424,65 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-[1400px] flex flex-col h-[95vh] p-0 overflow-hidden bg-background border-border shadow-2xl">
-            <div className="px-8 pt-8 bg-muted/30 border-b border-border">
-                <div className="flex items-start justify-between mb-6">
+        <DialogContent className="max-w-[1400px] w-full sm:w-[95vw] flex flex-col h-[100vh] sm:h-[95vh] p-0 overflow-hidden bg-background border-border shadow-2xl rounded-none sm:rounded-xl">
+            <div className="px-4 sm:px-8 pt-4 sm:pt-8 bg-muted/30 border-b border-border">
+                <div className="flex flex-col sm:flex-row items-start justify-between mb-4 sm:mb-6 gap-4">
                     <DialogHeader>
-                        <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight text-foreground">
-                            <ShieldCheck className="text-primary h-10 w-10"/> Infrastructure Console
+                        <DialogTitle className="flex items-center gap-3 text-2xl sm:text-3xl font-black tracking-tight text-foreground">
+                            <ShieldCheck className="text-primary h-8 w-8 sm:h-10 sm:w-10"/> Infrastructure
                         </DialogTitle>
-                        <DialogDescription className="text-base font-medium text-muted-foreground">
-                            Unified Firestore Management & Multi-Layer Data Operations
+                        <DialogDescription className="text-sm sm:text-base font-medium text-muted-foreground hidden sm:block">
+                            Unified Firestore Management & Data Operations
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="flex bg-background border rounded-xl p-1 shadow-sm">
+                    <div className="flex w-full sm:w-auto bg-background border rounded-xl p-1 shadow-sm">
                         <Button 
                             variant={activeView === 'explorer' ? 'secondary' : 'ghost'} 
-                            className={cn("h-10 px-6 font-bold text-xs rounded-lg transition-all", activeView === 'explorer' && "shadow-sm")}
+                            className={cn("flex-1 sm:flex-none h-9 sm:h-10 px-3 sm:px-6 font-bold text-[10px] sm:text-xs rounded-lg transition-all", activeView === 'explorer' && "shadow-sm")}
                             onClick={() => setActiveView('explorer')}
                         >
-                            <DatabaseIcon className="mr-2 h-4 w-4"/> Document Explorer
+                            <DatabaseIcon className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/> Explorer
                         </Button>
                         <Button 
                             variant={activeView === 'indexes' ? 'secondary' : 'ghost'} 
-                            className={cn("h-10 px-6 font-bold text-xs rounded-lg transition-all", activeView === 'indexes' && "shadow-sm")}
+                            className={cn("flex-1 sm:flex-none h-9 sm:h-10 px-3 sm:px-6 font-bold text-[10px] sm:text-xs rounded-lg transition-all", activeView === 'indexes' && "shadow-sm")}
                             onClick={() => setActiveView('indexes')}
                         >
-                            <ListFilter className="mr-2 h-4 w-4"/> Database Indexes
+                            <ListFilter className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/> Indexes
                         </Button>
                     </div>
                 </div>
                 
                 {/* UNIFIED COMMAND TOOLBAR */}
-                <div className="flex flex-wrap items-center gap-2 pb-6">
-                    <div className="flex items-center gap-1 bg-background border rounded-xl p-1.5 shadow-sm">
-                        <Button variant="ghost" size="sm" className="h-9 font-bold text-xs" onClick={handleCreateCloudSnapshot} disabled={isProcessing}>
-                            <Zap className="mr-2 h-4 w-4 text-primary fill-primary/20"/> Cloud Snapshot (FS &rarr; RTDB)
+                <div className="flex flex-wrap items-center gap-2 pb-4 sm:pb-6">
+                    <div className="flex items-center gap-1 bg-background border rounded-xl p-1.5 shadow-sm overflow-x-auto no-scrollbar max-w-full">
+                        <Button variant="ghost" size="sm" className="h-8 sm:h-9 font-bold text-[10px] sm:text-xs whitespace-nowrap" onClick={handleCreateCloudSnapshot} disabled={isProcessing}>
+                            <Zap className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary fill-primary/20"/> Snapshot
                         </Button>
                         <Separator orientation="vertical" className="h-4 mx-1"/>
-                        <Button variant="ghost" size="sm" className="h-9 font-bold text-xs" onClick={handlePullRtdbToFs} disabled={isProcessing}>
-                            <ArchiveRestore className="mr-2 h-4 w-4 text-primary"/> Cloud Restore (RTDB &rarr; FS)
+                        <Button variant="ghost" size="sm" className="h-8 sm:h-9 font-bold text-[10px] sm:text-xs whitespace-nowrap" onClick={handlePullRtdbToFs} disabled={isProcessing}>
+                            <ArchiveRestore className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary"/> Restore
                         </Button>
                     </div>
 
                     <div className="flex items-center gap-1 bg-background border rounded-xl p-1.5 shadow-sm">
-                        <Button variant="ghost" size="sm" className="h-9 font-bold text-xs" onClick={handleExportJson}>
-                            <Download className="mr-2 h-4 w-4 text-blue-500"/> Export to JSON
+                        <Button variant="ghost" size="sm" className="h-8 sm:h-9 font-bold text-[10px] sm:text-xs whitespace-nowrap" onClick={handleExportJson}>
+                            <Download className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500"/> Export
                         </Button>
                         <Separator orientation="vertical" className="h-4 mx-1"/>
-                        <Button variant="ghost" size="sm" className="h-9 font-bold text-xs" onClick={() => fileInputRef.current?.click()}>
-                            <FileUp className="mr-2 h-4 w-4 text-blue-500"/> Import JSON Merge
+                        <Button variant="ghost" size="sm" className="h-8 sm:h-9 font-bold text-[10px] sm:text-xs whitespace-nowrap" onClick={() => fileInputRef.current?.click()}>
+                            <FileUp className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500"/> Import
                         </Button>
                         <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportJson} />
                     </div>
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-12 px-6 font-black uppercase tracking-widest text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
-                                <AlertOctagon className="mr-2 h-4 w-4"/> Danger Zone <MoreVertical className="ml-2 h-3 w-3"/>
+                            <Button variant="outline" size="sm" className="h-10 sm:h-12 px-4 sm:px-6 font-black uppercase tracking-widest text-[9px] sm:text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
+                                <AlertOctagon className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/> Danger <MoreVertical className="ml-1.5 sm:ml-2 h-3 w-3"/>
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="start" className="w-64 p-2 shadow-2xl border-destructive/20">
+                        <DropdownMenuContent align="end" className="w-64 p-2 shadow-2xl border-destructive/20">
                             <DropdownMenuLabel className="text-[10px] uppercase font-black tracking-widest text-destructive/60 mb-1">Destructive Operations</DropdownMenuLabel>
                             <DropdownMenuItem onClick={() => openConfirmation('clear_firestore', 'Wipe Assets?', 'Permanently remove ALL assets from Firestore.')} className="h-10 text-destructive font-bold focus:bg-destructive focus:text-white rounded-lg">
                                 <Trash2 className="mr-2 h-4 w-4"/> Wipe Primary Assets
@@ -495,51 +503,56 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                 {activeView === 'explorer' ? (
                     <>
                         {/* EXPLORER SUB-HEADER */}
-                        <div className="bg-muted/10 border-b px-6 py-4 flex items-center justify-between gap-6">
-                            <div className="flex items-center gap-6">
-                                <Badge variant="outline" className="h-10 px-4 font-black uppercase tracking-widest text-[11px] bg-background border-2">
-                                    <DatabaseIcon className="mr-2 h-4 w-4 text-primary"/> Firestore (default)
+                        <div className="bg-muted/10 border-b px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-6">
+                            <div className="flex flex-wrap items-center gap-3 sm:gap-6">
+                                {isMobile && mobileStep !== 'collections' && (
+                                    <Button variant="outline" size="sm" className="h-9 px-2 font-bold" onClick={() => setMobileStep(prev => prev === 'editor' ? 'documents' : 'collections')}>
+                                        <ChevronLeft className="mr-1 h-4 w-4"/> Back
+                                    </Button>
+                                )}
+                                <Badge variant="outline" className="hidden sm:flex h-10 px-4 font-black uppercase tracking-widest text-[11px] bg-background border-2">
+                                    <DatabaseIcon className="mr-2 h-4 w-4 text-primary"/> Firestore
                                 </Badge>
-                                <div className="h-6 w-px bg-border"/>
-                                <div className="relative w-[400px]">
-                                    <Search className="absolute left-4 top-3 h-4 w-4 text-muted-foreground" />
+                                <div className="hidden sm:block h-6 w-px bg-border"/>
+                                <div className="relative flex-1 sm:w-[400px]">
+                                    <Search className="absolute left-3 sm:left-4 top-2.5 sm:top-3 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                                     <Input 
-                                        placeholder="Filter documents by ID or description..." 
-                                        className="pl-12 h-10 bg-background border-border font-medium shadow-sm" 
+                                        placeholder="Filter documents..." 
+                                        className="pl-9 sm:pl-12 h-9 sm:h-10 bg-background border-border font-medium shadow-sm text-xs sm:text-sm" 
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                     />
                                 </div>
                                 {selectedDocIds.length > 0 && (
-                                    <div className="flex items-center gap-3 animate-in slide-in-from-left-4">
-                                        <Badge variant="default" className="h-10 font-black uppercase text-[11px] tracking-widest bg-primary px-4">
-                                            {selectedDocIds.length} Selected
+                                    <div className="flex items-center gap-2 animate-in slide-in-from-left-4">
+                                        <Badge variant="default" className="h-8 sm:h-10 font-black uppercase text-[9px] sm:text-[11px] tracking-widest bg-primary px-2 sm:px-4">
+                                            {selectedDocIds.length}
                                         </Badge>
-                                        <Button size="sm" variant="outline" className="h-10 font-black uppercase text-[11px] tracking-[0.1em] border-primary/30 text-primary hover:bg-primary/10 px-6" onClick={handleBulkExport}>
-                                            <Download className="mr-2 h-4 w-4"/> Bulk Export JSON
+                                        <Button size="icon" variant="destructive" className="h-8 w-8 sm:h-10 sm:w-10" onClick={handleDeleteMultiple}>
+                                            <Trash2 className="h-4 w-4"/>
                                         </Button>
-                                        <Button size="sm" variant="destructive" className="h-10 font-black uppercase text-[11px] tracking-[0.1em] shadow-xl shadow-destructive/20 px-6" onClick={handleDeleteMultiple}>
-                                            <Trash2 className="mr-2 h-4 w-4"/> Bulk Delete
-                                        </Button>
-                                        <Button size="icon" variant="ghost" className="h-10 w-10 hover:bg-muted" onClick={() => setSelectedDocIds([])}>
+                                        <Button size="icon" variant="ghost" className="h-8 w-8 sm:h-10 sm:w-10 hover:bg-muted" onClick={() => setSelectedDocIds([])}>
                                             <XCircle className="h-5 w-5"/>
                                         </Button>
                                     </div>
                                 )}
                             </div>
-                            <div className="flex items-center gap-3">
-                                <Button size="sm" variant="outline" className="h-10 font-bold bg-background border-2 px-6" onClick={fetchFsData} disabled={isFsLoading}>
-                                    <RefreshCw className={cn("mr-2 h-4 w-4", isFsLoading && "animate-spin")} /> Refresh
+                            <div className="flex items-center gap-2 ml-auto">
+                                <Button size="sm" variant="outline" className="h-9 sm:h-10 font-bold bg-background border-2 px-3 sm:px-6 text-[10px] sm:text-xs" onClick={fetchFsData} disabled={isFsLoading}>
+                                    <RefreshCw className={cn("mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4", isFsLoading && "animate-spin")} /> Refresh
                                 </Button>
-                                <Button size="sm" className="h-10 font-bold px-6 shadow-lg shadow-primary/20" onClick={handleCreateNewDoc} disabled={selectedCollection !== 'assets' || isProcessing}>
-                                    <Plus className="mr-2 h-4 w-4"/> Add Document
+                                <Button size="sm" className="h-9 sm:h-10 font-bold px-3 sm:px-6 shadow-lg shadow-primary/20 text-[10px] sm:text-xs" onClick={handleCreateNewDoc} disabled={selectedCollection !== 'assets' || isProcessing}>
+                                    <Plus className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/> New Doc
                                 </Button>
                             </div>
                         </div>
 
-                        <div className="flex-1 flex overflow-hidden divide-x border-b">
+                        <div className="flex-1 flex overflow-hidden divide-x border-b relative">
                             {/* Column 1: Collections */}
-                            <div className="w-[280px] flex flex-col bg-muted/5">
+                            <div className={cn(
+                                "w-full sm:w-[280px] flex-col bg-muted/5",
+                                isMobile ? (mobileStep === 'collections' ? "flex" : "hidden") : "flex"
+                            )}>
                                 <div className="px-4 py-3 border-b flex items-center justify-between bg-muted/10">
                                     <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
                                         <LayoutGrid className="h-3 w-3"/> Collections
@@ -552,7 +565,12 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                                 "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
                                                 selectedCollection === 'assets' ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
                                             )}
-                                            onClick={() => { setSelectedCollection('assets'); setSelectedDocId(null); setSelectedDocIds([]); }}
+                                            onClick={() => { 
+                                                setSelectedCollection('assets'); 
+                                                setSelectedDocId(null); 
+                                                setSelectedDocIds([]);
+                                                if (isMobile) setMobileStep('documents');
+                                            }}
                                         >
                                             <FileText className="mr-3 h-4 w-4"/> assets
                                             <ChevronRight className={cn("ml-auto h-4 w-4 transition-transform", selectedCollection === 'assets' && "rotate-90")}/>
@@ -562,7 +580,12 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                                 "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
                                                 selectedCollection === 'config' ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
                                             )}
-                                            onClick={() => { setSelectedCollection('config'); setSelectedDocId(null); setSelectedDocIds([]); }}
+                                            onClick={() => { 
+                                                setSelectedCollection('config'); 
+                                                setSelectedDocId(null); 
+                                                setSelectedDocIds([]);
+                                                if (isMobile) setMobileStep('documents');
+                                            }}
                                         >
                                             <Settings className="mr-3 h-4 w-4"/> config
                                             <ChevronRight className={cn("ml-auto h-4 w-4 transition-transform", selectedCollection === 'config' && "rotate-90")}/>
@@ -572,7 +595,10 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             </div>
 
                             {/* Column 2: Documents */}
-                            <div className="w-[450px] flex flex-col bg-background">
+                            <div className={cn(
+                                "w-full sm:w-[450px] flex-col bg-background",
+                                isMobile ? (mobileStep === 'documents' ? "flex" : "hidden") : "flex"
+                            )}>
                                 <div className="px-4 py-3 border-b flex items-center justify-between bg-muted/10">
                                     <div className="flex items-center gap-4">
                                         <Checkbox 
@@ -624,30 +650,33 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             </div>
 
                             {/* Column 3: Data Editor */}
-                            <div className="flex-1 flex flex-col bg-muted/5">
-                                <div className="px-6 py-3 border-b flex items-center justify-between bg-muted/10">
+                            <div className={cn(
+                                "flex-1 flex-col bg-muted/5",
+                                isMobile ? (mobileStep === 'editor' ? "flex" : "hidden") : "flex"
+                            )}>
+                                <div className="px-4 sm:px-6 py-3 border-b flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-muted/10">
                                     <div className="flex items-center gap-3">
-                                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">Data Editor:</span>
-                                        <span className="text-xs font-mono font-black text-primary truncate max-w-[300px]">{selectedDocId || 'none'}</span>
+                                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground whitespace-nowrap">Editor:</span>
+                                        <span className="text-xs font-mono font-black text-primary truncate max-w-[200px] sm:max-w-[300px]">{selectedDocId || 'none'}</span>
                                     </div>
                                     {selectedDocId && (
                                         <div className="flex items-center gap-2">
                                             <Button 
                                                 size="sm" 
                                                 variant="ghost"
-                                                className="h-10 text-destructive hover:text-destructive hover:bg-destructive/10 font-bold uppercase text-[11px] px-4"
+                                                className="flex-1 sm:flex-none h-9 sm:h-10 text-destructive hover:text-destructive hover:bg-destructive/10 font-bold uppercase text-[10px] sm:text-[11px] px-2 sm:px-4"
                                                 onClick={() => handleDeleteSingle(selectedDocId)}
                                             >
-                                                <Trash2 className="mr-2 h-4 w-4"/> Delete Doc
+                                                <Trash2 className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/> Delete
                                             </Button>
                                             <Button 
                                                 size="sm" 
-                                                className="h-10 font-black uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20 px-6" 
+                                                className="flex-1 sm:flex-none h-9 sm:h-10 font-black uppercase text-[10px] sm:text-[11px] tracking-widest shadow-xl shadow-primary/20 px-3 sm:px-6" 
                                                 onClick={handleSaveDoc}
                                                 disabled={isProcessing}
                                             >
-                                                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
-                                                Commit Changes
+                                                {isProcessing ? <Loader2 className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 animate-spin"/> : <Save className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/>}
+                                                Save
                                             </Button>
                                         </div>
                                     )}
@@ -655,34 +684,34 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                 
                                 <ScrollArea className="flex-1">
                                     {selectedDocId ? (
-                                        <div className="p-8">
-                                            <div className="space-y-6">
+                                        <div className="p-4 sm:p-8">
+                                            <div className="space-y-4 sm:space-y-6">
                                                 {editingData && Object.entries(editingData).map(([key, value]) => (
                                                     <div key={key} className="space-y-2 group">
                                                         <div className="flex items-center justify-between px-1">
-                                                            <Label className="text-[11px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                                                            <Label className="text-[10px] sm:text-[11px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
                                                                 <div className="h-1.5 w-1.5 rounded-full bg-primary/40"/> {key}
                                                             </Label>
-                                                            <Badge variant="outline" className="text-[9px] font-mono opacity-50 px-1.5 h-4 uppercase">{typeof value}</Badge>
+                                                            <Badge variant="outline" className="text-[8px] sm:text-[9px] font-mono opacity-50 px-1.5 h-4 uppercase">{typeof value}</Badge>
                                                         </div>
                                                         
                                                         {typeof value === 'boolean' ? (
-                                                            <div className="flex items-center gap-3 p-4 rounded-xl border-2 bg-background shadow-sm group-focus-within:border-primary transition-all">
+                                                            <div className="flex items-center gap-3 p-3 sm:p-4 rounded-xl border-2 bg-background shadow-sm group-focus-within:border-primary transition-all">
                                                                 <Switch 
                                                                     checked={value} 
                                                                     onCheckedChange={(checked) => handleUpdateField(key, checked)}
                                                                 />
-                                                                <span className="text-sm font-bold">{value ? 'ENABLED' : 'DISABLED'}</span>
+                                                                <span className="text-xs sm:text-sm font-bold">{value ? 'ENABLED' : 'DISABLED'}</span>
                                                             </div>
                                                         ) : typeof value === 'object' ? (
-                                                            <div className="p-4 rounded-xl border-2 bg-muted/30 font-mono text-xs text-muted-foreground border-dashed">
-                                                                Nested objects/arrays must be managed via specific application forms.
+                                                            <div className="p-3 sm:p-4 rounded-xl border-2 bg-muted/30 font-mono text-[10px] sm:text-xs text-muted-foreground border-dashed">
+                                                                Nested objects must be managed via forms.
                                                             </div>
                                                         ) : (
                                                             <Input 
                                                                 value={String(value || '')}
                                                                 onChange={(e) => handleUpdateField(key, e.target.value)}
-                                                                className="h-12 bg-background border-2 font-bold text-sm focus-visible:ring-0 focus-visible:border-primary transition-all shadow-sm rounded-xl"
+                                                                className="h-10 sm:h-12 bg-background border-2 font-bold text-xs sm:text-sm focus-visible:ring-0 focus-visible:border-primary transition-all shadow-sm rounded-xl"
                                                             />
                                                         )}
                                                     </div>
@@ -690,10 +719,10 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                             </div>
                                         </div>
                                     ) : (
-                                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30">
-                                            <DatabaseZap className="h-24 w-24 mb-6 opacity-20" />
-                                            <p className="text-2xl font-black uppercase tracking-[0.3em] opacity-20">No Document Selected</p>
-                                            <p className="text-sm font-medium mt-2">Select a record from the center column to view and edit its fields.</p>
+                                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30 px-4 text-center">
+                                            <DatabaseZap className="h-16 w-16 sm:h-24 sm:w-24 mb-4 sm:mb-6 opacity-20" />
+                                            <p className="text-lg sm:text-2xl font-black uppercase tracking-[0.3em] opacity-20">No Document Selected</p>
+                                            <p className="text-xs sm:text-sm font-medium mt-2">Select a record from the list to view its fields.</p>
                                         </div>
                                     )}
                                 </ScrollArea>
@@ -705,23 +734,23 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                 )}
             </div>
 
-            <DialogFooter className="px-10 py-6 bg-muted/30 border-t border-border">
-                <DialogClose asChild><Button variant="ghost" className="font-black uppercase tracking-widest text-xs h-12 px-8">Exit Infrastructure Console</Button></DialogClose>
+            <DialogFooter className="px-4 sm:px-10 py-4 sm:py-6 bg-muted/30 border-t border-border">
+                <DialogClose asChild><Button variant="ghost" className="w-full sm:w-auto font-black uppercase tracking-widest text-[10px] sm:text-xs h-10 sm:h-12 px-8">Exit Console</Button></DialogClose>
             </DialogFooter>
         </DialogContent>
       </Dialog>
       
       <AlertDialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
-          <AlertDialogContent className="rounded-[2rem] border-destructive/20 shadow-2xl p-8 bg-background">
+          <AlertDialogContent className="w-[90vw] sm:max-w-lg rounded-[1.5rem] sm:rounded-[2rem] border-destructive/20 shadow-2xl p-6 sm:p-8 bg-background">
               <AlertDialogHeader>
-                  <AlertDialogTitle className="text-destructive text-3xl font-black uppercase tracking-tighter">{confirmTitle}</AlertDialogTitle>
-                  <AlertDialogDescription className="text-lg font-bold leading-relaxed pt-2">
+                  <AlertDialogTitle className="text-destructive text-xl sm:text-3xl font-black uppercase tracking-tighter">{confirmTitle}</AlertDialogTitle>
+                  <AlertDialogDescription className="text-sm sm:text-lg font-bold leading-relaxed pt-2">
                       {confirmDescription}
                   </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter className="mt-8 gap-4">
-                  <AlertDialogCancel className="rounded-xl font-black h-14 px-8 uppercase tracking-widest text-xs">Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleConfirmAction} className="bg-destructive hover:bg-destructive/90 text-white font-black rounded-xl uppercase tracking-widest px-10 h-14 text-xs">Confirm Operation</AlertDialogAction>
+              <AlertDialogFooter className="mt-6 sm:mt-8 gap-3 sm:gap-4">
+                  <AlertDialogCancel className="rounded-xl font-black h-12 sm:h-14 px-6 sm:px-8 uppercase tracking-widest text-[10px] sm:text-xs">Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleConfirmAction} className="bg-destructive hover:bg-destructive/90 text-white font-black rounded-xl uppercase tracking-widest px-6 sm:px-10 h-12 sm:h-14 text-[10px] sm:text-xs">Confirm</AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>
@@ -772,58 +801,58 @@ function IndexesView() {
 
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
-            <div className="bg-muted/10 border-b px-8 py-6 flex items-center justify-between">
+            <div className="bg-muted/10 border-b px-4 sm:px-8 py-4 sm:py-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
                 <div>
-                    <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
+                    <h3 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2">
                         <Layers className="h-5 w-5 text-primary"/> Composite Indexes
                     </h3>
-                    <p className="text-sm text-muted-foreground font-medium mt-1">Production Firestore indexes optimized for cross-project performance.</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-1">Firestore indexes optimized for regional performance.</p>
                 </div>
-                <Button className="font-bold shadow-lg shadow-primary/20">
+                <Button className="font-bold shadow-lg shadow-primary/20 h-9 sm:h-10 text-[10px] sm:text-xs">
                     <Plus className="mr-2 h-4 w-4"/> Add Index
                 </Button>
             </div>
             
             <ScrollArea className="flex-1">
-                <div className="p-8">
-                    <div className="rounded-2xl border bg-card/50 overflow-hidden shadow-sm">
-                        <Table>
+                <div className="p-4 sm:p-8">
+                    <div className="rounded-2xl border bg-card/50 overflow-hidden shadow-sm overflow-x-auto">
+                        <Table className="min-w-[800px]">
                             <TableHeader className="bg-muted/30">
                                 <TableRow className="hover:bg-transparent border-b-2">
-                                    <TableHead className="h-14 font-black uppercase text-[10px] tracking-widest text-muted-foreground px-6">Collection ID</TableHead>
-                                    <TableHead className="h-14 font-black uppercase text-[10px] tracking-widest text-muted-foreground px-6">Fields Indexed</TableHead>
-                                    <TableHead className="h-14 font-black uppercase text-[10px] tracking-widest text-muted-foreground px-6">Query Scope</TableHead>
-                                    <TableHead className="h-14 font-black uppercase text-[10px] tracking-widest text-muted-foreground px-6">Index ID</TableHead>
-                                    <TableHead className="h-14 font-black uppercase text-[10px] tracking-widest text-muted-foreground px-6">Status</TableHead>
-                                    <TableHead className="h-14 w-14"></TableHead>
+                                    <TableHead className="h-12 sm:h-14 font-black uppercase text-[9px] sm:text-[10px] tracking-widest text-muted-foreground px-4 sm:px-6">Collection</TableHead>
+                                    <TableHead className="h-12 sm:h-14 font-black uppercase text-[9px] sm:text-[10px] tracking-widest text-muted-foreground px-4 sm:px-6">Fields Indexed</TableHead>
+                                    <TableHead className="h-12 sm:h-14 font-black uppercase text-[9px] sm:text-[10px] tracking-widest text-muted-foreground px-4 sm:px-6">Scope</TableHead>
+                                    <TableHead className="h-12 sm:h-14 font-black uppercase text-[9px] sm:text-[10px] tracking-widest text-muted-foreground px-4 sm:px-6">Index ID</TableHead>
+                                    <TableHead className="h-12 sm:h-14 font-black uppercase text-[9px] sm:text-[10px] tracking-widest text-muted-foreground px-4 sm:px-6">Status</TableHead>
+                                    <TableHead className="h-12 sm:h-14 w-14"></TableHead>
                                 </TableRow>
                             </TableHeader>
                             <TableBody>
                                 {indexes.map((idx) => (
                                     <TableRow key={idx.id} className="group hover:bg-muted/20 transition-colors">
-                                        <TableCell className="px-6 py-5 font-bold text-sm">{idx.collection}</TableCell>
-                                        <TableCell className="px-6 py-5">
-                                            <div className="flex flex-wrap items-center gap-3">
+                                        <TableCell className="px-4 sm:px-6 py-4 sm:py-5 font-bold text-xs sm:text-sm">{idx.collection}</TableCell>
+                                        <TableCell className="px-4 sm:px-6 py-4 sm:py-5">
+                                            <div className="flex flex-wrap items-center gap-2 sm:gap-3">
                                                 {idx.fields.map((f, i) => (
-                                                    <div key={i} className="flex items-center gap-1.5 bg-background border rounded-lg px-2.5 py-1 shadow-sm">
+                                                    <div key={i} className="flex items-center gap-1 sm:gap-1.5 bg-background border rounded-lg px-2 py-0.5 sm:py-1 shadow-sm">
                                                         {f.order === 'ASCENDING' ? (
-                                                            <ArrowUpCircle className="h-3.5 w-3.5 text-green-500 fill-green-500/10"/>
+                                                            <ArrowUpCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-green-500 fill-green-500/10"/>
                                                         ) : (
-                                                            <ArrowDownCircle className="h-3.5 w-3.5 text-blue-500 fill-blue-500/10"/>
+                                                            <ArrowDownCircle className="h-3 w-3 sm:h-3.5 sm:w-3.5 text-blue-500 fill-blue-500/10"/>
                                                         )}
-                                                        <span className="text-xs font-mono font-bold text-foreground/80">{f.path}</span>
+                                                        <span className="text-[9px] sm:text-xs font-mono font-bold text-foreground/80">{f.path}</span>
                                                     </div>
                                                 ))}
                                             </div>
                                         </TableCell>
-                                        <TableCell className="px-6 py-5 font-medium text-xs text-muted-foreground">{idx.scope}</TableCell>
-                                        <TableCell className="px-6 py-5 font-mono text-xs opacity-60">{idx.id}</TableCell>
-                                        <TableCell className="px-6 py-5">
-                                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 font-bold uppercase text-[9px] tracking-widest px-2.5 h-6">
+                                        <TableCell className="px-4 sm:px-6 py-4 sm:py-5 font-medium text-[10px] sm:text-xs text-muted-foreground">{idx.scope}</TableCell>
+                                        <TableCell className="px-4 sm:px-6 py-4 sm:py-5 font-mono text-[10px] sm:text-xs opacity-60">{idx.id}</TableCell>
+                                        <TableCell className="px-4 sm:px-6 py-4 sm:py-5">
+                                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 font-bold uppercase text-[8px] sm:text-[9px] tracking-widest px-2 h-5 sm:h-6">
                                                 {idx.status}
                                             </Badge>
                                         </TableCell>
-                                        <TableCell className="px-6 py-5">
+                                        <TableCell className="px-4 sm:px-6 py-4 sm:py-5">
                                             <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
                                                 <MoreVertical className="h-4 w-4"/>
                                             </Button>
@@ -834,12 +863,12 @@ function IndexesView() {
                         </Table>
                     </div>
                     
-                    <div className="mt-8 p-6 rounded-2xl border border-dashed bg-muted/5 flex items-center justify-between">
+                    <div className="mt-6 sm:mt-8 p-4 sm:p-6 rounded-2xl border border-dashed bg-muted/5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
                         <div className="space-y-1">
-                            <h4 className="text-sm font-black uppercase tracking-widest text-primary">Index Optimization</h4>
-                            <p className="text-xs text-muted-foreground font-medium">Server-side indexing reduces data transfer by up to 90% for regional managers.</p>
+                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-widest text-primary">Index Optimization</h4>
+                            <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Server-side indexing reduces data transfer for regional managers.</p>
                         </div>
-                        <Button variant="outline" size="sm" className="font-bold border-2 h-10 px-6">
+                        <Button variant="outline" size="sm" className="font-bold border-2 h-9 sm:h-10 px-4 sm:px-6 text-[10px] sm:text-xs">
                             Manage Overrides
                         </Button>
                     </div>
