@@ -32,14 +32,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { 
-    getAssets as getAssetsFS, 
-    batchSetAssets as batchSetAssetsFS, 
     clearAssets as clearFirestoreAssets, 
-    setAsset as setAssetFS,
-    deleteAsset as deleteAssetFS,
-    batchDeleteAssets as batchDeleteAssetsFS,
-    getSettings as getSettingsFS,
-    updateSettings as updateSettingsFS
 } from '@/lib/firestore';
 import { 
     getAssets as getAssetsRTDB, 
@@ -58,28 +51,17 @@ import {
     RefreshCw, 
     Search, 
     ShieldCheck, 
-    PlusCircle, 
     Database, 
-    UploadCloud,
     ChevronRight,
     FileText,
     Settings,
-    Edit3,
-    CheckSquare,
-    Square,
-    FilePlus,
     XCircle,
     LayoutGrid,
     DatabaseIcon,
     History,
     Save,
-    Settings2,
-    HardDriveDownload,
     AlertOctagon,
     Plus,
-    ArrowRightLeft,
-    MoreVertical,
-    Zap,
     ArchiveRestore,
     ListFilter,
     ArrowUpCircle,
@@ -94,11 +76,11 @@ import {
     ExternalLink,
     Globe,
     Lock,
-    Clock
+    Clock,
+    Zap
 } from 'lucide-react';
-import type { Asset, AppSettings } from '@/lib/types';
-import { clearLocalAssets, saveLockedOfflineAssets, saveLocalSettings } from '@/lib/idb';
-import { exportFullBackupToJson, exportAssetsToJson, exportSettingsToJson } from '@/lib/json-export';
+import { clearLocalAssets, saveLockedOfflineAssets } from '@/lib/idb';
+import { exportAssetsToJson } from '@/lib/json-export';
 import { addNotification } from '@/hooks/use-notifications';
 import { useToast } from '@/hooks/use-toast';
 import { Input } from '../ui/input';
@@ -113,6 +95,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { batchSetAssets as batchSetAssetsFS } from '@/lib/firestore';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -124,7 +107,7 @@ type MobileViewStep = 'collections' | 'documents' | 'editor';
 
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAssets, setOfflineAssets, setAppSettings } = useAppState();
+  const { setAssets, setOfflineAssets } = useAppState();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
@@ -137,7 +120,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   // Firestore Browser State
   const [searchQuery, setSearchQuery] = useState('');
-  const [collections, setCollections] = useState<string[]>(['assets', 'config']);
+  const [collections, setCollections] = useState<string[]>(['assets', 'config', 'projects', 'activity_log']);
   const [selectedCollection, setSelectedCollection] = useState<string>('assets');
   const [documents, setDocuments] = useState<{ id: string, data: any, title: string }[]>([]);
   const [isFsLoading, setIsFsLoading] = useState(false);
@@ -422,6 +405,12 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         default: break;
     }
   };
+
+  const openConfirmation = (action: string, title: string, description: string) => {
+    setConfirmAction(action);
+    setConfirmTitle(title);
+    setConfirmDescription(description);
+  }
 
   const allSelected = filteredDocs.length > 0 && selectedDocIds.length === filteredDocs.length;
 
@@ -799,17 +788,21 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       </AlertDialog>
     </>
   );
-
-  function openConfirmation(action: string, title: string, description: string) {
-    setConfirmAction(action);
-    setConfirmTitle(title);
-    setConfirmDescription(description);
-  }
 }
 
 function IndexesView({ toast }: { toast: any }) {
     const projectId = firebaseConfig.projectId || 'ntblcp-asset-manager';
     const consoleBaseUrl = `https://console.firebase.google.com/project/${projectId}/firestore/databases/-default-/indexes`;
+
+    // Deep link parameters for creating composite indexes with pre-populated fields.
+    // NOTE: Base64 strings are generated for specific patterns. If project ID changes, Firebase usually auto-resolves.
+    const INDEX_LINKS = {
+        assets_sync: `${consoleBaseUrl}?create_composite=Ck1wcm9qZWN0cy9udGJsY3AtYXNzZXQtbWFuYWdlci9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYXNzZXRzL2luZGV4ZXMvXxABGgsKB2dyYW50SWQQAhoQCg1sYXN0TW9kaWZpZWQQAhoMCghfX25hbWVfXxAC`,
+        assets_stats: `${consoleBaseUrl}?create_composite=true&collection=assets`,
+        projects: `${consoleBaseUrl}?create_composite=true&collection=projects`,
+        activity: `${consoleBaseUrl}?create_composite=true&collection=activity_log`,
+        users: `${consoleBaseUrl}?create_composite=true&collection=users`
+    };
 
     const [indexes, setIndexes] = useState([
         { 
@@ -912,8 +905,7 @@ function IndexesView({ toast }: { toast: any }) {
         toast({ title: "Index definition removed from console." });
     };
 
-    const openFirebaseConsole = (collectionName?: string) => {
-        const url = collectionName ? `${consoleBaseUrl}?create_composite=true&collection=${collectionName}` : consoleBaseUrl;
+    const openFirebaseConsole = (url: string) => {
         window.open(url, '_blank');
     };
 
@@ -930,7 +922,7 @@ function IndexesView({ toast }: { toast: any }) {
                     <Button 
                         variant="outline"
                         className="font-bold h-9 sm:h-10 text-[10px] sm:text-xs"
-                        onClick={() => openFirebaseConsole()}
+                        onClick={() => openFirebaseConsole(consoleBaseUrl)}
                     >
                         <ExternalLink className="mr-2 h-4 w-4"/> Firestore Console
                     </Button>
@@ -951,41 +943,52 @@ function IndexesView({ toast }: { toast: any }) {
                             <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-primary">
                                 <Globe className="h-4 w-4" /> Cloud Deployment Shortcuts
                             </CardTitle>
-                            <CardDescription className="text-xs font-medium">Quickly jump to the Firebase Console to manage indexes for specific collections.</CardDescription>
+                            <CardDescription className="text-xs font-medium">Pre-populated links to create complex indexes directly in your Firebase project.</CardDescription>
                         </CardHeader>
                         <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
-                            <Button variant="outline" className="h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole('assets')}>
-                                <Database className="mr-3 h-5 w-5 text-blue-500" />
-                                <div className="text-left">
-                                    <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection</p>
-                                    <p className="text-xs font-bold">Assets Repository</p>
-                                </div>
-                                <ExternalLink className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </Button>
-                            <Button variant="outline" className="h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole('config')}>
-                                <Settings className="mr-3 h-5 w-5 text-orange-500" />
-                                <div className="text-left">
-                                    <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection</p>
-                                    <p className="text-xs font-bold">System Config</p>
-                                </div>
-                                <ExternalLink className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </Button>
-                            <Button variant="outline" className="h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole('activity_log')}>
-                                <Clock className="mr-3 h-5 w-5 text-green-500" />
-                                <div className="text-left">
-                                    <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection</p>
-                                    <p className="text-xs font-bold">Activity Tracking</p>
-                                </div>
-                                <ExternalLink className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </Button>
-                            <Button variant="outline" className="h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole('users')}>
-                                <Lock className="mr-3 h-5 w-5 text-purple-500" />
-                                <div className="text-left">
-                                    <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection</p>
-                                    <p className="text-xs font-bold">Access Control</p>
-                                </div>
-                                <ExternalLink className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-                            </Button>
+                            <div className="space-y-2">
+                                <Button variant="outline" className="w-full h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole(INDEX_LINKS.assets_sync)}>
+                                    <Database className="mr-3 h-5 w-5 text-blue-500" />
+                                    <div className="text-left">
+                                        <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection: Assets</p>
+                                        <p className="text-xs font-bold">Regional Sync Engine</p>
+                                    </div>
+                                </Button>
+                                <p className="text-[9px] text-muted-foreground px-1">Fields: <b>grantId</b> (ASC), <b>lastModified</b> (DESC)</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Button variant="outline" className="w-full h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole(INDEX_LINKS.assets_stats)}>
+                                    <Zap className="mr-3 h-5 w-5 text-orange-500" />
+                                    <div className="text-left">
+                                        <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection: Assets</p>
+                                        <p className="text-xs font-bold">Verification Stats</p>
+                                    </div>
+                                </Button>
+                                <p className="text-[9px] text-muted-foreground px-1">Fields: <b>grantId</b>, <b>category</b>, <b>verifiedStatus</b></p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Button variant="outline" className="w-full h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole(INDEX_LINKS.projects)}>
+                                    <Layers className="mr-3 h-5 w-5 text-green-500" />
+                                    <div className="text-left">
+                                        <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection: Projects</p>
+                                        <p className="text-xs font-bold">Project Management</p>
+                                    </div>
+                                </Button>
+                                <p className="text-[9px] text-muted-foreground px-1">Fields: <b>name</b> (ASC), <b>status</b> (ASC)</p>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Button variant="outline" className="w-full h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole(INDEX_LINKS.activity)}>
+                                    <Clock className="mr-3 h-5 w-5 text-purple-500" />
+                                    <div className="text-left">
+                                        <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection: Activity</p>
+                                        <p className="text-xs font-bold">Audit History Log</p>
+                                    </div>
+                                </Button>
+                                <p className="text-[9px] text-muted-foreground px-1">Fields: <b>grantId</b> (ASC), <b>lastModified</b> (DESC)</p>
+                            </div>
                         </CardContent>
                     </Card>
 
@@ -1063,7 +1066,7 @@ function IndexesView({ toast }: { toast: any }) {
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="w-56">
-                                                    <DropdownMenuItem className="h-10 font-bold" onClick={() => openFirebaseConsole(idx.collection)}>
+                                                    <DropdownMenuItem className="h-10 font-bold" onClick={() => openFirebaseConsole(`${consoleBaseUrl}?create_composite=true&collection=${idx.collection}`)}>
                                                         <ExternalLink className="mr-2 h-4 w-4 text-primary"/> Configure in Cloud
                                                     </DropdownMenuItem>
                                                     <DropdownMenuSeparator />
@@ -1084,7 +1087,7 @@ function IndexesView({ toast }: { toast: any }) {
                         <div className="space-y-1">
                             <p className="text-xs font-bold uppercase text-muted-foreground">Deployment Required</p>
                             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                                Defining indexes here updates the management console UI. To apply these to your actual Firestore database, use the <code className="bg-background px-1 rounded font-mono text-primary">Configure in Cloud</code> shortcuts above or update <code className="bg-background px-1 rounded font-mono">firestore.indexes.json</code> and run <code className="bg-background px-1 rounded font-mono text-primary">firebase deploy</code>.
+                                Defining indexes here updates the management console UI. To apply these to your actual Firestore database, use the <code className="bg-background px-1 rounded font-mono text-primary">Cloud Shortcuts</code> above or update <code className="bg-background px-1 rounded font-mono">firestore.indexes.json</code> and run <code className="bg-background px-1 rounded font-mono text-primary">firebase deploy</code>.
                             </p>
                         </div>
                     </div>
