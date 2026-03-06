@@ -78,7 +78,11 @@ import {
     ArrowRightLeft,
     MoreVertical,
     Zap,
-    ArchiveRestore
+    ArchiveRestore,
+    ListFilter,
+    ArrowUpCircle,
+    ArrowDownCircle,
+    Layers
 } from 'lucide-react';
 import type { Asset, AppSettings } from '@/lib/types';
 import { clearLocalAssets, saveLockedOfflineAssets, saveLocalSettings } from '@/lib/idb';
@@ -93,6 +97,7 @@ import { cn } from '@/lib/utils';
 import { Separator } from '../ui/separator';
 import { Checkbox } from '../ui/checkbox';
 import { Switch } from '../ui/switch';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -100,12 +105,14 @@ interface DatabaseAdminDialogProps {
 }
 
 type CollectionType = 'assets' | 'config';
+type AdminView = 'explorer' | 'indexes';
 
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
   const { appSettings, setAssets, setOfflineAssets, setAppSettings } = useAppState();
   const { toast } = useToast();
   
+  const [activeView, setActiveView] = useState<AdminView>('explorer');
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmAction, setConfirmAction] = useState<string | null>(null);
   const [confirmTitle, setConfirmTitle] = useState('');
@@ -411,14 +418,32 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-[1400px] flex flex-col h-[95vh] p-0 overflow-hidden bg-background border-border shadow-2xl">
             <div className="px-8 pt-8 bg-muted/30 border-b border-border">
-                <DialogHeader className="mb-6">
-                    <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight text-foreground">
-                        <ShieldCheck className="text-primary h-10 w-10"/> Infrastructure Console
-                    </DialogTitle>
-                    <DialogDescription className="text-base font-medium text-muted-foreground">
-                        Unified Firestore Management & Multi-Layer Data Operations
-                    </DialogDescription>
-                </DialogHeader>
+                <div className="flex items-start justify-between mb-6">
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight text-foreground">
+                            <ShieldCheck className="text-primary h-10 w-10"/> Infrastructure Console
+                        </DialogTitle>
+                        <DialogDescription className="text-base font-medium text-muted-foreground">
+                            Unified Firestore Management & Multi-Layer Data Operations
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="flex bg-background border rounded-xl p-1 shadow-sm">
+                        <Button 
+                            variant={activeView === 'explorer' ? 'secondary' : 'ghost'} 
+                            className={cn("h-10 px-6 font-bold text-xs rounded-lg transition-all", activeView === 'explorer' && "shadow-sm")}
+                            onClick={() => setActiveView('explorer')}
+                        >
+                            <DatabaseIcon className="mr-2 h-4 w-4"/> Document Explorer
+                        </Button>
+                        <Button 
+                            variant={activeView === 'indexes' ? 'secondary' : 'ghost'} 
+                            className={cn("h-10 px-6 font-bold text-xs rounded-lg transition-all", activeView === 'indexes' && "shadow-sm")}
+                            onClick={() => setActiveView('indexes')}
+                        >
+                            <ListFilter className="mr-2 h-4 w-4"/> Database Indexes
+                        </Button>
+                    </div>
+                </div>
                 
                 {/* UNIFIED COMMAND TOOLBAR */}
                 <div className="flex flex-wrap items-center gap-2 pb-6">
@@ -467,211 +492,217 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             </div>
 
             <div className="flex-1 flex flex-col overflow-hidden bg-background">
-                {/* EXPLORER SUB-HEADER */}
-                <div className="bg-muted/10 border-b px-6 py-4 flex items-center justify-between gap-6">
-                    <div className="flex items-center gap-6">
-                        <Badge variant="outline" className="h-10 px-4 font-black uppercase tracking-widest text-[11px] bg-background border-2">
-                            <DatabaseIcon className="mr-2 h-4 w-4 text-primary"/> Firestore (default)
-                        </Badge>
-                        <div className="h-6 w-px bg-border"/>
-                        <div className="relative w-[400px]">
-                            <Search className="absolute left-4 top-3 h-4 w-4 text-muted-foreground" />
-                            <Input 
-                                placeholder="Filter documents by ID or description..." 
-                                className="pl-12 h-10 bg-background border-border font-medium shadow-sm" 
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                            />
-                        </div>
-                        {selectedDocIds.length > 0 && (
-                            <div className="flex items-center gap-3 animate-in slide-in-from-left-4">
-                                <Badge variant="default" className="h-10 font-black uppercase text-[11px] tracking-widest bg-primary px-4">
-                                    {selectedDocIds.length} Selected
+                {activeView === 'explorer' ? (
+                    <>
+                        {/* EXPLORER SUB-HEADER */}
+                        <div className="bg-muted/10 border-b px-6 py-4 flex items-center justify-between gap-6">
+                            <div className="flex items-center gap-6">
+                                <Badge variant="outline" className="h-10 px-4 font-black uppercase tracking-widest text-[11px] bg-background border-2">
+                                    <DatabaseIcon className="mr-2 h-4 w-4 text-primary"/> Firestore (default)
                                 </Badge>
-                                <Button size="sm" variant="outline" className="h-10 font-black uppercase text-[11px] tracking-[0.1em] border-primary/30 text-primary hover:bg-primary/10 px-6" onClick={handleBulkExport}>
-                                    <Download className="mr-2 h-4 w-4"/> Bulk Export JSON
-                                </Button>
-                                <Button size="sm" variant="destructive" className="h-10 font-black uppercase text-[11px] tracking-[0.1em] shadow-xl shadow-destructive/20 px-6" onClick={handleDeleteMultiple}>
-                                    <Trash2 className="mr-2 h-4 w-4"/> Bulk Delete
-                                </Button>
-                                <Button size="icon" variant="ghost" className="h-10 w-10 hover:bg-muted" onClick={() => setSelectedDocIds([])}>
-                                    <XCircle className="h-5 w-5"/>
-                                </Button>
-                            </div>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Button size="sm" variant="outline" className="h-10 font-bold bg-background border-2 px-6" onClick={fetchFsData} disabled={isFsLoading}>
-                            <RefreshCw className={cn("mr-2 h-4 w-4", isFsLoading && "animate-spin")} /> Refresh
-                        </Button>
-                        <Button size="sm" className="h-10 font-bold px-6 shadow-lg shadow-primary/20" onClick={handleCreateNewDoc} disabled={selectedCollection !== 'assets' || isProcessing}>
-                            <Plus className="mr-2 h-4 w-4"/> Add Document
-                        </Button>
-                    </div>
-                </div>
-
-                <div className="flex-1 flex overflow-hidden divide-x border-b">
-                    {/* Column 1: Collections */}
-                    <div className="w-[280px] flex flex-col bg-muted/5">
-                        <div className="px-4 py-3 border-b flex items-center justify-between bg-muted/10">
-                            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                                <LayoutGrid className="h-3 w-3"/> Collections
-                            </span>
-                        </div>
-                        <ScrollArea className="flex-1">
-                            <div className="p-2 space-y-1">
-                                <button 
-                                    className={cn(
-                                        "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
-                                        selectedCollection === 'assets' ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
-                                    )}
-                                    onClick={() => { setSelectedCollection('assets'); setSelectedDocId(null); setSelectedDocIds([]); }}
-                                >
-                                    <FileText className="mr-3 h-4 w-4"/> assets
-                                    <ChevronRight className={cn("ml-auto h-4 w-4 transition-transform", selectedCollection === 'assets' && "rotate-90")}/>
-                                </button>
-                                <button 
-                                    className={cn(
-                                        "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
-                                        selectedCollection === 'config' ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
-                                    )}
-                                    onClick={() => { setSelectedCollection('config'); setSelectedDocId(null); setSelectedDocIds([]); }}
-                                >
-                                    <Settings className="mr-3 h-4 w-4"/> config
-                                    <ChevronRight className={cn("ml-auto h-4 w-4 transition-transform", selectedCollection === 'config' && "rotate-90")}/>
-                                </button>
-                            </div>
-                        </ScrollArea>
-                    </div>
-
-                    {/* Column 2: Documents */}
-                    <div className="w-[450px] flex flex-col bg-background">
-                        <div className="px-4 py-3 border-b flex items-center justify-between bg-muted/10">
-                            <div className="flex items-center gap-4">
-                                <Checkbox 
-                                    checked={allSelected} 
-                                    onCheckedChange={(c) => {
-                                        if (c) setSelectedDocIds(filteredDocs.map(d => d.id));
-                                        else setSelectedDocIds([]);
-                                    }}
-                                    disabled={filteredDocs.length === 0}
-                                />
-                                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">Documents ({filteredDocs.length})</span>
-                            </div>
-                        </div>
-                        <ScrollArea className="flex-1">
-                            <div className="p-2 space-y-1">
-                                {filteredDocs.map(doc => (
-                                    <div 
-                                        key={doc.id}
-                                        className={cn(
-                                            "w-full flex items-center group transition-all rounded-lg overflow-hidden border border-transparent",
-                                            selectedDocId === doc.id ? "bg-primary/10 border-primary/20" : "hover:bg-muted/50"
-                                        )}
-                                    >
-                                        <div className="px-4">
-                                            <Checkbox 
-                                                checked={selectedDocIds.includes(doc.id)}
-                                                onCheckedChange={(c) => {
-                                                    setSelectedDocIds(prev => c ? [...prev, doc.id] : prev.filter(i => i !== doc.id));
-                                                }}
-                                            />
-                                        </div>
-                                        <button 
-                                            className={cn(
-                                                "flex-1 text-left py-4 pr-4 flex flex-col min-w-0",
-                                                selectedDocId === doc.id ? "text-primary font-bold" : "text-foreground"
-                                            )}
-                                            onClick={() => handleSelectDoc(doc.id)}
-                                        >
-                                            <span className="text-sm truncate font-bold">{doc.title}</span>
-                                            <span className="text-[10px] font-mono text-muted-foreground truncate uppercase tracking-tighter opacity-70">{doc.id}</span>
-                                        </button>
+                                <div className="h-6 w-px bg-border"/>
+                                <div className="relative w-[400px]">
+                                    <Search className="absolute left-4 top-3 h-4 w-4 text-muted-foreground" />
+                                    <Input 
+                                        placeholder="Filter documents by ID or description..." 
+                                        className="pl-12 h-10 bg-background border-border font-medium shadow-sm" 
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                    />
+                                </div>
+                                {selectedDocIds.length > 0 && (
+                                    <div className="flex items-center gap-3 animate-in slide-in-from-left-4">
+                                        <Badge variant="default" className="h-10 font-black uppercase text-[11px] tracking-widest bg-primary px-4">
+                                            {selectedDocIds.length} Selected
+                                        </Badge>
+                                        <Button size="sm" variant="outline" className="h-10 font-black uppercase text-[11px] tracking-[0.1em] border-primary/30 text-primary hover:bg-primary/10 px-6" onClick={handleBulkExport}>
+                                            <Download className="mr-2 h-4 w-4"/> Bulk Export JSON
+                                        </Button>
+                                        <Button size="sm" variant="destructive" className="h-10 font-black uppercase text-[11px] tracking-[0.1em] shadow-xl shadow-destructive/20 px-6" onClick={handleDeleteMultiple}>
+                                            <Trash2 className="mr-2 h-4 w-4"/> Bulk Delete
+                                        </Button>
+                                        <Button size="icon" variant="ghost" className="h-10 w-10 hover:bg-muted" onClick={() => setSelectedDocIds([])}>
+                                            <XCircle className="h-5 w-5"/>
+                                        </Button>
                                     </div>
-                                ))}
-                                {filteredDocs.length === 0 && (
-                                    <div className="p-12 text-center text-sm text-muted-foreground italic font-medium">No records matching query</div>
                                 )}
                             </div>
-                        </ScrollArea>
-                    </div>
-
-                    {/* Column 3: Data Editor */}
-                    <div className="flex-1 flex flex-col bg-muted/5">
-                        <div className="px-6 py-3 border-b flex items-center justify-between bg-muted/10">
                             <div className="flex items-center gap-3">
-                                <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">Data Editor:</span>
-                                <span className="text-xs font-mono font-black text-primary truncate max-w-[300px]">{selectedDocId || 'none'}</span>
+                                <Button size="sm" variant="outline" className="h-10 font-bold bg-background border-2 px-6" onClick={fetchFsData} disabled={isFsLoading}>
+                                    <RefreshCw className={cn("mr-2 h-4 w-4", isFsLoading && "animate-spin")} /> Refresh
+                                </Button>
+                                <Button size="sm" className="h-10 font-bold px-6 shadow-lg shadow-primary/20" onClick={handleCreateNewDoc} disabled={selectedCollection !== 'assets' || isProcessing}>
+                                    <Plus className="mr-2 h-4 w-4"/> Add Document
+                                </Button>
                             </div>
-                            {selectedDocId && (
-                                <div className="flex items-center gap-2">
-                                    <Button 
-                                        size="sm" 
-                                        variant="ghost"
-                                        className="h-10 text-destructive hover:text-destructive hover:bg-destructive/10 font-bold uppercase text-[11px] px-4"
-                                        onClick={() => handleDeleteSingle(selectedDocId)}
-                                    >
-                                        <Trash2 className="mr-2 h-4 w-4"/> Delete Doc
-                                    </Button>
-                                    <Button 
-                                        size="sm" 
-                                        className="h-10 font-black uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20 px-6" 
-                                        onClick={handleSaveDoc}
-                                        disabled={isProcessing}
-                                    >
-                                        {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
-                                        Commit Changes
-                                    </Button>
-                                </div>
-                            )}
                         </div>
-                        
-                        <ScrollArea className="flex-1">
-                            {selectedDocId ? (
-                                <div className="p-8">
-                                    <div className="space-y-6">
-                                        {editingData && Object.entries(editingData).map(([key, value]) => (
-                                            <div key={key} className="space-y-2 group">
-                                                <div className="flex items-center justify-between px-1">
-                                                    <Label className="text-[11px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
-                                                        <div className="h-1.5 w-1.5 rounded-full bg-primary/40"/> {key}
-                                                    </Label>
-                                                    <Badge variant="outline" className="text-[9px] font-mono opacity-50 px-1.5 h-4 uppercase">{typeof value}</Badge>
-                                                </div>
-                                                
-                                                {typeof value === 'boolean' ? (
-                                                    <div className="flex items-center gap-3 p-4 rounded-xl border-2 bg-background shadow-sm group-focus-within:border-primary transition-all">
-                                                        <Switch 
-                                                            checked={value} 
-                                                            onCheckedChange={(checked) => handleUpdateField(key, checked)}
-                                                        />
-                                                        <span className="text-sm font-bold">{value ? 'ENABLED' : 'DISABLED'}</span>
-                                                    </div>
-                                                ) : typeof value === 'object' ? (
-                                                    <div className="p-4 rounded-xl border-2 bg-muted/30 font-mono text-xs text-muted-foreground border-dashed">
-                                                        Nested objects/arrays must be managed via specific application forms.
-                                                    </div>
-                                                ) : (
-                                                    <Input 
-                                                        value={String(value || '')}
-                                                        onChange={(e) => handleUpdateField(key, e.target.value)}
-                                                        className="h-12 bg-background border-2 font-bold text-sm focus-visible:ring-0 focus-visible:border-primary transition-all shadow-sm rounded-xl"
-                                                    />
-                                                )}
-                                            </div>
-                                        ))}
+
+                        <div className="flex-1 flex overflow-hidden divide-x border-b">
+                            {/* Column 1: Collections */}
+                            <div className="w-[280px] flex flex-col bg-muted/5">
+                                <div className="px-4 py-3 border-b flex items-center justify-between bg-muted/10">
+                                    <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+                                        <LayoutGrid className="h-3 w-3"/> Collections
+                                    </span>
+                                </div>
+                                <ScrollArea className="flex-1">
+                                    <div className="p-2 space-y-1">
+                                        <button 
+                                            className={cn(
+                                                "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
+                                                selectedCollection === 'assets' ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
+                                            )}
+                                            onClick={() => { setSelectedCollection('assets'); setSelectedDocId(null); setSelectedDocIds([]); }}
+                                        >
+                                            <FileText className="mr-3 h-4 w-4"/> assets
+                                            <ChevronRight className={cn("ml-auto h-4 w-4 transition-transform", selectedCollection === 'assets' && "rotate-90")}/>
+                                        </button>
+                                        <button 
+                                            className={cn(
+                                                "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
+                                                selectedCollection === 'config' ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
+                                            )}
+                                            onClick={() => { setSelectedCollection('config'); setSelectedDocId(null); setSelectedDocIds([]); }}
+                                        >
+                                            <Settings className="mr-3 h-4 w-4"/> config
+                                            <ChevronRight className={cn("ml-auto h-4 w-4 transition-transform", selectedCollection === 'config' && "rotate-90")}/>
+                                        </button>
+                                    </div>
+                                </ScrollArea>
+                            </div>
+
+                            {/* Column 2: Documents */}
+                            <div className="w-[450px] flex flex-col bg-background">
+                                <div className="px-4 py-3 border-b flex items-center justify-between bg-muted/10">
+                                    <div className="flex items-center gap-4">
+                                        <Checkbox 
+                                            checked={allSelected} 
+                                            onCheckedChange={(c) => {
+                                                if (c) setSelectedDocIds(filteredDocs.map(d => d.id));
+                                                else setSelectedDocIds([]);
+                                            }}
+                                            disabled={filteredDocs.length === 0}
+                                        />
+                                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">Documents ({filteredDocs.length})</span>
                                     </div>
                                 </div>
-                            ) : (
-                                <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30">
-                                    <DatabaseZap className="h-24 w-24 mb-6 opacity-20" />
-                                    <p className="text-2xl font-black uppercase tracking-[0.3em] opacity-20">No Document Selected</p>
-                                    <p className="text-sm font-medium mt-2">Select a record from the center column to view and edit its fields.</p>
+                                <ScrollArea className="flex-1">
+                                    <div className="p-2 space-y-1">
+                                        {filteredDocs.map(doc => (
+                                            <div 
+                                                key={doc.id}
+                                                className={cn(
+                                                    "w-full flex items-center group transition-all rounded-lg overflow-hidden border border-transparent",
+                                                    selectedDocId === doc.id ? "bg-primary/10 border-primary/20" : "hover:bg-muted/50"
+                                                )}
+                                            >
+                                                <div className="px-4">
+                                                    <Checkbox 
+                                                        checked={selectedDocIds.includes(doc.id)}
+                                                        onCheckedChange={(c) => {
+                                                            setSelectedDocIds(prev => c ? [...prev, doc.id] : prev.filter(i => i !== doc.id));
+                                                        }}
+                                                    />
+                                                </div>
+                                                <button 
+                                                    className={cn(
+                                                        "flex-1 text-left py-4 pr-4 flex flex-col min-w-0",
+                                                        selectedDocId === doc.id ? "text-primary font-bold" : "text-foreground"
+                                                    )}
+                                                    onClick={() => handleSelectDoc(doc.id)}
+                                                >
+                                                    <span className="text-sm truncate font-bold">{doc.title}</span>
+                                                    <span className="text-[10px] font-mono text-muted-foreground truncate uppercase tracking-tighter opacity-70">{doc.id}</span>
+                                                </button>
+                                            </div>
+                                        ))}
+                                        {filteredDocs.length === 0 && (
+                                            <div className="p-12 text-center text-sm text-muted-foreground italic font-medium">No records matching query</div>
+                                        )}
+                                    </div>
+                                </ScrollArea>
+                            </div>
+
+                            {/* Column 3: Data Editor */}
+                            <div className="flex-1 flex flex-col bg-muted/5">
+                                <div className="px-6 py-3 border-b flex items-center justify-between bg-muted/10">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground">Data Editor:</span>
+                                        <span className="text-xs font-mono font-black text-primary truncate max-w-[300px]">{selectedDocId || 'none'}</span>
+                                    </div>
+                                    {selectedDocId && (
+                                        <div className="flex items-center gap-2">
+                                            <Button 
+                                                size="sm" 
+                                                variant="ghost"
+                                                className="h-10 text-destructive hover:text-destructive hover:bg-destructive/10 font-bold uppercase text-[11px] px-4"
+                                                onClick={() => handleDeleteSingle(selectedDocId)}
+                                            >
+                                                <Trash2 className="mr-2 h-4 w-4"/> Delete Doc
+                                            </Button>
+                                            <Button 
+                                                size="sm" 
+                                                className="h-10 font-black uppercase text-[11px] tracking-widest shadow-xl shadow-primary/20 px-6" 
+                                                onClick={handleSaveDoc}
+                                                disabled={isProcessing}
+                                            >
+                                                {isProcessing ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Save className="mr-2 h-4 w-4"/>}
+                                                Commit Changes
+                                            </Button>
+                                        </div>
+                                    )}
                                 </div>
-                            )}
-                        </ScrollArea>
-                    </div>
-                </div>
+                                
+                                <ScrollArea className="flex-1">
+                                    {selectedDocId ? (
+                                        <div className="p-8">
+                                            <div className="space-y-6">
+                                                {editingData && Object.entries(editingData).map(([key, value]) => (
+                                                    <div key={key} className="space-y-2 group">
+                                                        <div className="flex items-center justify-between px-1">
+                                                            <Label className="text-[11px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
+                                                                <div className="h-1.5 w-1.5 rounded-full bg-primary/40"/> {key}
+                                                            </Label>
+                                                            <Badge variant="outline" className="text-[9px] font-mono opacity-50 px-1.5 h-4 uppercase">{typeof value}</Badge>
+                                                        </div>
+                                                        
+                                                        {typeof value === 'boolean' ? (
+                                                            <div className="flex items-center gap-3 p-4 rounded-xl border-2 bg-background shadow-sm group-focus-within:border-primary transition-all">
+                                                                <Switch 
+                                                                    checked={value} 
+                                                                    onCheckedChange={(checked) => handleUpdateField(key, checked)}
+                                                                />
+                                                                <span className="text-sm font-bold">{value ? 'ENABLED' : 'DISABLED'}</span>
+                                                            </div>
+                                                        ) : typeof value === 'object' ? (
+                                                            <div className="p-4 rounded-xl border-2 bg-muted/30 font-mono text-xs text-muted-foreground border-dashed">
+                                                                Nested objects/arrays must be managed via specific application forms.
+                                                            </div>
+                                                        ) : (
+                                                            <Input 
+                                                                value={String(value || '')}
+                                                                onChange={(e) => handleUpdateField(key, e.target.value)}
+                                                                className="h-12 bg-background border-2 font-bold text-sm focus-visible:ring-0 focus-visible:border-primary transition-all shadow-sm rounded-xl"
+                                                            />
+                                                        )}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ) : (
+                                        <div className="h-full flex flex-col items-center justify-center text-muted-foreground/30">
+                                            <DatabaseZap className="h-24 w-24 mb-6 opacity-20" />
+                                            <p className="text-2xl font-black uppercase tracking-[0.3em] opacity-20">No Document Selected</p>
+                                            <p className="text-sm font-medium mt-2">Select a record from the center column to view and edit its fields.</p>
+                                        </div>
+                                    )}
+                                </ScrollArea>
+                            </div>
+                        </div>
+                    </>
+                ) : (
+                    <IndexesView />
+                )}
             </div>
 
             <DialogFooter className="px-10 py-6 bg-muted/30 border-t border-border">
@@ -702,4 +733,131 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     setConfirmTitle(title);
     setConfirmDescription(description);
   }
+}
+
+function IndexesView() {
+    // Mock index data based on firestore.indexes.json and system defaults
+    const indexes = [
+        { 
+            id: 'CICAgOjxH4EJ', 
+            collection: 'assets', 
+            fields: [
+                { path: 'grantId', order: 'ASCENDING' },
+                { path: 'lastModified', order: 'DESCENDING' },
+                { path: '__name__', order: 'ASCENDING' }
+            ], 
+            scope: 'Collection', 
+            status: 'Enabled' 
+        },
+        { 
+            id: 'CICAgOjxH4EK', 
+            collection: 'assets', 
+            fields: [
+                { path: 'category', order: 'ASCENDING' },
+                { path: 'verifiedStatus', order: 'ASCENDING' },
+                { path: '__name__', order: 'ASCENDING' }
+            ], 
+            scope: 'Collection', 
+            status: 'Enabled' 
+        },
+        { 
+            id: 'CICAgJiUpoMK', 
+            collection: 'assets', 
+            fields: [
+                { path: 'location', order: 'ASCENDING' },
+                { path: 'lastModified', order: 'DESCENDING' },
+                { path: '__name__', order: 'ASCENDING' }
+            ], 
+            scope: 'Collection', 
+            status: 'Enabled' 
+        },
+        { 
+            id: 'CICAgJjF9olK', 
+            collection: 'config', 
+            fields: [
+                { path: 'lastModified', order: 'DESCENDING' },
+                { path: '__name__', order: 'ASCENDING' }
+            ], 
+            scope: 'Collection', 
+            status: 'Enabled' 
+        }
+    ];
+
+    return (
+        <div className="flex-1 flex flex-col overflow-hidden">
+            <div className="bg-muted/10 border-b px-8 py-6 flex items-center justify-between">
+                <div>
+                    <h3 className="text-xl font-black tracking-tight flex items-center gap-2">
+                        <Layers className="h-5 w-5 text-primary"/> Composite Indexes
+                    </h3>
+                    <p className="text-sm text-muted-foreground font-medium mt-1">Firestore composite indexes configured for high-performance regional filtering.</p>
+                </div>
+                <Button className="font-bold shadow-lg shadow-primary/20">
+                    <Plus className="mr-2 h-4 w-4"/> Add Index
+                </Button>
+            </div>
+            
+            <ScrollArea className="flex-1">
+                <div className="p-8">
+                    <div className="rounded-2xl border bg-card/50 overflow-hidden shadow-sm">
+                        <Table>
+                            <TableHeader className="bg-muted/30">
+                                <TableRow className="hover:bg-transparent border-b-2">
+                                    <TableHead className="h-14 font-black uppercase text-[10px] tracking-widest text-muted-foreground px-6">Collection ID</TableHead>
+                                    <TableHead className="h-14 font-black uppercase text-[10px] tracking-widest text-muted-foreground px-6">Fields Indexed</TableHead>
+                                    <TableHead className="h-14 font-black uppercase text-[10px] tracking-widest text-muted-foreground px-6">Query Scope</TableHead>
+                                    <TableHead className="h-14 font-black uppercase text-[10px] tracking-widest text-muted-foreground px-6">Index ID</TableHead>
+                                    <TableHead className="h-14 font-black uppercase text-[10px] tracking-widest text-muted-foreground px-6">Status</TableHead>
+                                    <TableHead className="h-14 w-14"></TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {indexes.map((idx) => (
+                                    <TableRow key={idx.id} className="group hover:bg-muted/20 transition-colors">
+                                        <TableCell className="px-6 py-5 font-bold text-sm">{idx.collection}</TableCell>
+                                        <TableCell className="px-6 py-5">
+                                            <div className="flex flex-wrap items-center gap-3">
+                                                {idx.fields.map((f, i) => (
+                                                    <div key={i} className="flex items-center gap-1.5 bg-background border rounded-lg px-2.5 py-1 shadow-sm">
+                                                        {f.order === 'ASCENDING' ? (
+                                                            <ArrowUpCircle className="h-3.5 w-3.5 text-green-500 fill-green-500/10"/>
+                                                        ) : (
+                                                            <ArrowDownCircle className="h-3.5 w-3.5 text-blue-500 fill-blue-500/10"/>
+                                                        )}
+                                                        <span className="text-xs font-mono font-bold text-foreground/80">{f.path}</span>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </TableCell>
+                                        <TableCell className="px-6 py-5 font-medium text-xs text-muted-foreground">{idx.scope}</TableCell>
+                                        <TableCell className="px-6 py-5 font-mono text-xs opacity-60">{idx.id}</TableCell>
+                                        <TableCell className="px-6 py-5">
+                                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 font-bold uppercase text-[9px] tracking-widest px-2.5 h-6">
+                                                {idx.status}
+                                            </Badge>
+                                        </TableCell>
+                                        <TableCell className="px-6 py-5">
+                                            <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                                <MoreVertical className="h-4 w-4"/>
+                                            </Button>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    </div>
+                    
+                    <div className="mt-8 p-6 rounded-2xl border border-dashed bg-muted/5 flex items-center justify-between">
+                        <div className="space-y-1">
+                            <h4 className="text-sm font-black uppercase tracking-widest text-primary">Index Optimization</h4>
+                            <p className="text-xs text-muted-foreground font-medium">Automatic index suggestions are generated based on query performance in regional field reports.</p>
+                        </div>
+                        <Button variant="outline" size="sm" className="font-bold border-2 h-10 px-6">
+                            Manage Overrides
+                        </Button>
+                    </div>
+                </div>
+            </ScrollArea>
+        </div>
+    );
 }
