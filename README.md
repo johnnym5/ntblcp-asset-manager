@@ -1,71 +1,37 @@
 # Assetain
 
-**Assetain** is a professional, offline-first Asset Management and Verification platform designed for high-stakes environments. Built with Next.js, Tailwind CSS, and a hybrid Firebase architecture, it provides a robust solution for tracking, auditing, and maintaining large-scale asset inventories.
+**Assetain** is a professional, offline-first Asset Management and Verification platform. Built with Next.js, Tailwind CSS, and a hybrid Firestore/RTDB architecture, it provides a robust solution for tracking, auditing, and maintaining large-scale inventories.
 
-## 🚀 Quick Start (Local Development)
+## 🚀 Deployment Guide
 
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/johnnym5/ntblcp-asset-manager.git
-   cd ntblcp-asset-manager
-   ```
-
-2. **Configure Environment**:
-   - Rename `.env.example` to `.env`.
-   - Populate the keys with your Firebase Project credentials.
-
-3. **Install & Run**:
-   ```bash
-   npm install
-   npm run dev
-   ```
-
-4. **Initial Login**:
-   - **Login Name**: `admin`
-   - **Password**: `setup`
-   - *Note: Change these immediately in the Settings > Users panel after first sign-in.*
-
-## 🛠 Deployment Guide
-
-### Pushing to GitHub
-
-To push your latest changes to your repository:
-
+### Step 1: Push to GitHub
+Run these commands in your terminal to sync this code with your repository:
 ```bash
-# Initialize git if not already done
 git init
-
-# Link to your repository
-git remote remove origin
-git remote add origin https://github.com/johnnym5/ntblcp-asset-manager.git
-
-# Stage and Commit
 git add .
-git commit -m "Prepare for production deployment"
-
-# Push to Main
+git commit -m "Initialize Assetain Production v1.0"
+git remote add origin https://github.com/johnnym5/ntblcp-asset-manager.git
+git branch -M main
 git push -u origin main
 ```
 
-### Web Deployment (Vercel / Firebase)
+### Step 2: Deploy Database Config
+The app requires specific indexes to handle regional queries. Use the Firebase CLI to deploy them:
+```bash
+# Install CLI if needed: npm install -g firebase-tools
+firebase login
+firebase use --add  # Select your project
+firebase deploy --only firestore:indexes,firestore:rules,database:rules
+```
 
-1. **Vercel**: Connect your GitHub repository. Vercel will automatically detect Next.js settings. **Crucial**: Add all variables from your `.env` file to the "Environment Variables" section in the Vercel Dashboard.
-2. **Firebase App Hosting**: This project includes an `apphosting.yaml` and `firebase.json` for seamless deployment to Google's Firebase infrastructure.
+### Step 3: Web Hosting (Vercel / Firebase)
+1. **Connect**: Link your GitHub repo to Vercel or Firebase App Hosting.
+2. **Environment Variables**: Add all keys from your `.env` file to the "Environment Variables" section in your hosting provider's dashboard.
 
 ## 🏗 Architecture
-
-### 🌐 Hybrid Data Sync
-*   **Primary Layer**: Cloud Firestore (Real-time querying and configuration).
-*   **Backup Layer**: Realtime Database (High-speed "Shadow Mirroring" for redundancy).
-*   **Local Layer**: IndexedDB (Browser-based persistence for 100% offline capability).
-
-### 📊 Infrastructure Console
-The inbuilt **Infrastructure Console** allows administrators to:
-*   Perform full CRUD on cloud records.
-*   Execute manual Cloud Snapshots (Firestore → RTDB).
-*   Restore data from snapshots or JSON backups.
-*   Perform bulk exports and emergency system purges.
+- **Primary Layer**: Cloud Firestore (Used for all live queries and structured data).
+- **Backup Layer**: Realtime Database (Shadow mirroring for high-availability redundancy).
+- **Local Layer**: IndexedDB (Browser persistence for 100% offline capability).
 
 ---
-
 © 2024 Assetain. Professional Asset Intelligence.
