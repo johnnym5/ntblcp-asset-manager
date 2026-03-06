@@ -15,8 +15,10 @@ Run these commands in your terminal:
 git init
 git add .
 git commit -m "Initialize Assetain Production v1.0"
-git remote add origin https://github.com/johnnym5/ntblcp-asset-manager.git
 git branch -M main
+
+# Use your token to authenticate the remote
+git remote add origin https://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@github.com/johnnym5/ntblcp-asset-manager.git
 git push -u origin main
 ```
 
@@ -29,25 +31,16 @@ If you get a credential error or `ECONNREFUSED /tmp/vscode-git...`:
    git config --global --unset credential.helper
    ```
 
-2. **Use a Personal Access Token (PAT)**:
-   GitHub no longer accepts your account password for terminal commands. 
-   - Go to [GitHub Settings > Developer Settings > Personal Access Tokens > Tokens (classic)](https://github.com/settings/tokens).
-   - Generate a new token with `repo` scopes.
-   - **When prompted for a password in the terminal, paste your Token instead.**
-
-3. **To save your credentials** (so you only enter the token once):
+2. **Update to an Authenticated Remote URL**:
+   If you already added the remote, run this to update it with your token:
    ```bash
-   git config --global credential.helper store
+   git remote set-url origin https://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@github.com/johnnym5/ntblcp-asset-manager.git
    ```
 
-4. **Verify your Remote URL**:
-   If it says "Repository not found", check your URL:
+3. **Verify and Push**:
    ```bash
    git remote -v
-   ```
-   If it's wrong, fix it with:
-   ```bash
-   git remote set-url origin https://github.com/johnnym5/ntblcp-asset-manager.git
+   git push -u origin main
    ```
 
 ### Step 3: Deploy Database Config
