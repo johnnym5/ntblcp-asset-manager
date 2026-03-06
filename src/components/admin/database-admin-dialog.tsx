@@ -47,7 +47,7 @@ import {
     clearAssets as clearRtdbAssets, 
 } from '@/lib/database';
 import { doc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { db, firebaseConfig } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { 
     Loader2, 
@@ -90,7 +90,11 @@ import {
     MinusCircle,
     Sparkles,
     Lightbulb,
-    Info
+    Info,
+    ExternalLink,
+    Globe,
+    Lock,
+    Clock
 } from 'lucide-react';
 import type { Asset, AppSettings } from '@/lib/types';
 import { clearLocalAssets, saveLockedOfflineAssets, saveLocalSettings } from '@/lib/idb';
@@ -804,6 +808,9 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 }
 
 function IndexesView({ toast }: { toast: any }) {
+    const projectId = firebaseConfig.projectId || 'ntblcp-asset-manager';
+    const consoleBaseUrl = `https://console.firebase.google.com/project/${projectId}/firestore/databases/-default-/indexes`;
+
     const [indexes, setIndexes] = useState([
         { 
             id: 'CICAgOjxH4EJ', 
@@ -905,6 +912,11 @@ function IndexesView({ toast }: { toast: any }) {
         toast({ title: "Index definition removed from console." });
     };
 
+    const openFirebaseConsole = (collectionName?: string) => {
+        const url = collectionName ? `${consoleBaseUrl}?create_composite=true&collection=${collectionName}` : consoleBaseUrl;
+        window.open(url, '_blank');
+    };
+
     return (
         <div className="flex-1 flex flex-col overflow-hidden">
             <div className="bg-muted/10 border-b px-4 sm:px-8 py-4 sm:py-6 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
@@ -914,16 +926,69 @@ function IndexesView({ toast }: { toast: any }) {
                     </h3>
                     <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-1">Manage optimized server-side query definitions.</p>
                 </div>
-                <Button 
-                    className="font-bold shadow-lg shadow-primary/20 h-9 sm:h-10 text-[10px] sm:text-xs"
-                    onClick={() => setIsAddDialogOpen(true)}
-                >
-                    <Plus className="mr-2 h-4 w-4"/> Add Index
-                </Button>
+                <div className="flex items-center gap-2">
+                    <Button 
+                        variant="outline"
+                        className="font-bold h-9 sm:h-10 text-[10px] sm:text-xs"
+                        onClick={() => openFirebaseConsole()}
+                    >
+                        <ExternalLink className="mr-2 h-4 w-4"/> Firestore Console
+                    </Button>
+                    <Button 
+                        className="font-bold shadow-lg shadow-primary/20 h-9 sm:h-10 text-[10px] sm:text-xs"
+                        onClick={() => setIsAddDialogOpen(true)}
+                    >
+                        <Plus className="mr-2 h-4 w-4"/> Add Index
+                    </Button>
+                </div>
             </div>
             
             <ScrollArea className="flex-1">
                 <div className="p-4 sm:p-8 space-y-8">
+                    {/* Deployment Shortcuts Card */}
+                    <Card className="border-primary/20 shadow-lg bg-primary/5">
+                        <CardHeader className="pb-3">
+                            <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-2 text-primary">
+                                <Globe className="h-4 w-4" /> Cloud Deployment Shortcuts
+                            </CardTitle>
+                            <CardDescription className="text-xs font-medium">Quickly jump to the Firebase Console to manage indexes for specific collections.</CardDescription>
+                        </CardHeader>
+                        <CardContent className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3">
+                            <Button variant="outline" className="h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole('assets')}>
+                                <Database className="mr-3 h-5 w-5 text-blue-500" />
+                                <div className="text-left">
+                                    <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection</p>
+                                    <p className="text-xs font-bold">Assets Repository</p>
+                                </div>
+                                <ExternalLink className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </Button>
+                            <Button variant="outline" className="h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole('config')}>
+                                <Settings className="mr-3 h-5 w-5 text-orange-500" />
+                                <div className="text-left">
+                                    <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection</p>
+                                    <p className="text-xs font-bold">System Config</p>
+                                </div>
+                                <ExternalLink className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </Button>
+                            <Button variant="outline" className="h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole('activity_log')}>
+                                <Clock className="mr-3 h-5 w-5 text-green-500" />
+                                <div className="text-left">
+                                    <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection</p>
+                                    <p className="text-xs font-bold">Activity Tracking</p>
+                                </div>
+                                <ExternalLink className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </Button>
+                            <Button variant="outline" className="h-14 bg-background justify-start px-4 group" onClick={() => openFirebaseConsole('users')}>
+                                <Lock className="mr-3 h-5 w-5 text-purple-500" />
+                                <div className="text-left">
+                                    <p className="text-[10px] font-black uppercase tracking-tighter opacity-60">Collection</p>
+                                    <p className="text-xs font-bold">Access Control</p>
+                                </div>
+                                <ExternalLink className="ml-auto h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+                            </Button>
+                        </CardContent>
+                    </Card>
+
                     {/* Recommendations Section */}
                     <div className="space-y-4">
                         <div className="flex items-center gap-2 px-1">
@@ -997,8 +1062,12 @@ function IndexesView({ toast }: { toast: any }) {
                                                         <MoreVertical className="h-4 w-4"/>
                                                     </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end">
-                                                    <DropdownMenuItem className="text-destructive font-bold" onClick={() => handleDeleteIndex(idx.id)}>
+                                                <DropdownMenuContent align="end" className="w-56">
+                                                    <DropdownMenuItem className="h-10 font-bold" onClick={() => openFirebaseConsole(idx.collection)}>
+                                                        <ExternalLink className="mr-2 h-4 w-4 text-primary"/> Configure in Cloud
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuSeparator />
+                                                    <DropdownMenuItem className="text-destructive font-bold h-10" onClick={() => handleDeleteIndex(idx.id)}>
                                                         <Trash2 className="mr-2 h-4 w-4"/> Remove Definition
                                                     </DropdownMenuItem>
                                                 </DropdownMenuContent>
@@ -1015,7 +1084,7 @@ function IndexesView({ toast }: { toast: any }) {
                         <div className="space-y-1">
                             <p className="text-xs font-bold uppercase text-muted-foreground">Deployment Required</p>
                             <p className="text-xs text-muted-foreground/80 leading-relaxed">
-                                Defining indexes here updates the management console UI. To apply these to your actual Firestore database, you must add the definitions to <code className="bg-background px-1 rounded font-mono">firestore.indexes.json</code> and run <code className="bg-background px-1 rounded font-mono text-primary">firebase deploy</code>.
+                                Defining indexes here updates the management console UI. To apply these to your actual Firestore database, use the <code className="bg-background px-1 rounded font-mono text-primary">Configure in Cloud</code> shortcuts above or update <code className="bg-background px-1 rounded font-mono">firestore.indexes.json</code> and run <code className="bg-background px-1 rounded font-mono text-primary">firebase deploy</code>.
                             </p>
                         </div>
                     </div>
