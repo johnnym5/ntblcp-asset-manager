@@ -46,6 +46,8 @@ import {
     batchSetAssets as batchSetAssetsRTDB, 
     clearAssets as clearRtdbAssets, 
 } from '@/lib/database';
+import { doc, setDoc, deleteDoc, collection, getDocs } from 'firebase/firestore';
+import { db } from '@/lib/firebase';
 import { useAuth } from '@/contexts/auth-context';
 import { 
     Loader2, 
@@ -83,7 +85,9 @@ import {
     ArrowUpCircle,
     ArrowDownCircle,
     Layers,
-    ChevronLeft
+    ChevronLeft,
+    FolderPlus,
+    MinusCircle
 } from 'lucide-react';
 import type { Asset, AppSettings } from '@/lib/types';
 import { clearLocalAssets, saveLockedOfflineAssets, saveLocalSettings } from '@/lib/idb';
@@ -100,13 +104,13 @@ import { Checkbox } from '../ui/checkbox';
 import { Switch } from '../ui/switch';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
-type CollectionType = 'assets' | 'config';
 type AdminView = 'explorer' | 'indexes';
 type MobileViewStep = 'collections' | 'documents' | 'editor';
 
@@ -125,26 +129,38 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   // Firestore Browser State
   const [searchQuery, setSearchQuery] = useState('');
-  const [selectedCollection, setSelectedCollection] = useState<CollectionType>('assets');
-  const [allFsAssets, setAllFsAssets] = useState<Asset[]>([]);
-  const [fsSettings, setFsSettings] = useState<any>(null);
+  const [collections, setCollections] = useState<string[]>(['assets', 'config']);
+  const [selectedCollection, setSelectedCollection] = useState<string>('assets');
+  const [documents, setDocuments] = useState<{ id: string, data: any, title: string }[]>([]);
   const [isFsLoading, setIsFsLoading] = useState(false);
   const [selectedDocId, setSelectedDocId] = useState<string | null>(null);
   const [selectedDocIds, setSelectedDocIds] = useState<string[]>([]);
   const [editingData, setEditingData] = useState<any>(null);
 
+  // New Field State
+  const [newFieldKey, setNewFieldKey] = useState('');
+  const [newFieldValue, setNewFieldValue] = useState('');
+
+  // New Collection State
+  const [isNewCollectionDialogOpen, setIsNewCollectionDialogOpen] = useState(false);
+  const [newCollectionName, setNewCollectionName] = useState('');
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const fetchFsData = useCallback(async () => {
+    if (!db) return;
     setIsFsLoading(true);
     try {
-        if (selectedCollection === 'assets') {
-            const data = await getAssetsFS();
-            setAllFsAssets(data);
-        } else {
-            const settings = await getSettingsFS();
-            setFsSettings(settings);
-        }
+        const colRef = collection(db, selectedCollection);
+        const snapshot = await getDocs(colRef);
+        const docs = snapshot.docs.map(doc => {
+            const data = doc.data();
+            let title = doc.id;
+            if (selectedCollection === 'assets') title = data.description || doc.id;
+            if (selectedCollection === 'config' && doc.id === 'settings') title = 'Application Settings';
+            return { id: doc.id, data, title };
+        });
+        setDocuments(docs);
     } catch (e) {
         toast({ title: 'Error fetching Cloud data', variant: 'destructive' });
     } finally {
@@ -156,33 +172,19 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     if (isOpen) fetchFsData();
   }, [isOpen, fetchFsData]);
 
-  const categories = useMemo(() => {
-    const uniqueCats = new Set<string>();
-    allFsAssets.forEach(a => { if(a.category) uniqueCats.add(a.category) });
-    return Array.from(uniqueCats).sort();
-  }, [allFsAssets]);
-
   const filteredDocs = useMemo(() => {
-    if (selectedCollection === 'config') {
-        return fsSettings ? [{ id: 'settings', data: fsSettings, title: 'Application Settings' }] : [];
-    }
-    
-    let base = allFsAssets;
-    if (searchQuery) {
-        const q = searchQuery.toLowerCase();
-        base = base.filter(a => 
-            a.description?.toLowerCase().includes(q) || 
-            a.assetIdCode?.toLowerCase().includes(q) || 
-            a.sn?.toLowerCase().includes(q) ||
-            a.id.toLowerCase().includes(q)
-        );
-    }
-    return base.map(a => ({ id: a.id, data: a, title: a.description || a.id }));
-  }, [allFsAssets, fsSettings, searchQuery, selectedCollection]);
+    if (!searchQuery) return documents;
+    const q = searchQuery.toLowerCase();
+    return documents.filter(d => 
+        d.title.toLowerCase().includes(q) || 
+        d.id.toLowerCase().includes(q) ||
+        JSON.stringify(d.data).toLowerCase().includes(q)
+    );
+  }, [documents, searchQuery]);
 
   const handleSelectDoc = (id: string) => {
     setSelectedDocId(id);
-    const docItem = filteredDocs.find(d => d.id === id);
+    const docItem = documents.find(d => d.id === id);
     if (docItem) setEditingData({ ...docItem.data });
     if (isMobile) setMobileStep('editor');
   };
@@ -194,17 +196,29 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     }));
   };
 
+  const handleAddField = () => {
+    if (!newFieldKey.trim()) return;
+    setEditingData((prev: any) => ({
+        ...prev,
+        [newFieldKey.trim()]: newFieldValue
+    }));
+    setNewFieldKey('');
+    setNewFieldValue('');
+  };
+
+  const handleRemoveField = (key: string) => {
+    const newData = { ...editingData };
+    delete newData[key];
+    setEditingData(newData);
+  };
+
   const handleSaveDoc = async () => {
-    if (!selectedDocId || !editingData) return;
+    if (!selectedDocId || !editingData || !db) return;
     setIsProcessing(true);
     try {
-        if (selectedCollection === 'assets') {
-            await setAssetFS(editingData);
-            toast({ title: 'Asset record updated successfully.' });
-        } else {
-            await updateSettingsFS(editingData);
-            toast({ title: 'System configuration saved.' });
-        }
+        const docRef = doc(db, selectedCollection, selectedDocId);
+        await setDoc(docRef, editingData);
+        toast({ title: 'Document updated successfully.' });
         fetchFsData();
     } catch (e) {
         toast({ title: 'Failed to commit changes to cloud.', variant: 'destructive' });
@@ -214,21 +228,20 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   };
 
   const handleCreateNewDoc = async () => {
+    if (!db) return;
     setIsProcessing(true);
     try {
-        if (selectedCollection === 'assets') {
-            const newAsset: Asset = {
-                id: crypto.randomUUID(),
-                category: categories[0] || 'Uncategorized',
-                description: 'New Cloud Asset',
-                lastModified: new Date().toISOString(),
-                verifiedStatus: 'Unverified'
-            };
-            await setAssetFS(newAsset);
-            toast({ title: 'Blank asset created.' });
-        } else {
-            toast({ title: 'New config records cannot be created manually.', variant: 'destructive' });
-        }
+        const newId = crypto.randomUUID();
+        const docRef = doc(db, selectedCollection, newId);
+        const initialData = selectedCollection === 'assets' ? {
+            id: newId,
+            description: 'New Cloud Asset',
+            lastModified: new Date().toISOString(),
+            verifiedStatus: 'Unverified'
+        } : { id: newId, createdAt: new Date().toISOString() };
+        
+        await setDoc(docRef, initialData);
+        toast({ title: 'Document created.' });
         fetchFsData();
     } catch (e) {
         toast({ title: 'Creation failed.', variant: 'destructive' });
@@ -237,15 +250,31 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     }
   };
 
+  const handleCreateNewCollection = async () => {
+    if (!newCollectionName.trim() || !db) return;
+    setIsProcessing(true);
+    try {
+        const docRef = doc(db, newCollectionName.trim(), 'init_doc');
+        await setDoc(docRef, { description: "Collection initialized via console", createdAt: new Date().toISOString() });
+        setCollections(prev => [...new Set([...prev, newCollectionName.trim()])]);
+        setSelectedCollection(newCollectionName.trim());
+        setNewCollectionName('');
+        setIsNewCollectionDialogOpen(false);
+        toast({ title: 'Collection created.' });
+        fetchFsData();
+    } catch (e) {
+        toast({ title: 'Failed to create collection.', variant: 'destructive' });
+    } finally {
+        setIsProcessing(false);
+    }
+  };
+
   const handleDeleteSingle = async (id: string) => {
+    if (!db) return;
     setIsFsLoading(true);
     try {
-        if (selectedCollection === 'assets') {
-            await deleteAssetFS(id);
-            toast({ title: 'Document removed.' });
-        } else {
-            toast({ title: 'Config records cannot be individualy deleted.', variant: 'destructive' });
-        }
+        await deleteDoc(doc(db, selectedCollection, id));
+        toast({ title: 'Document removed.' });
         setSelectedDocId(null);
         if (isMobile) setMobileStep('documents');
         fetchFsData();
@@ -257,15 +286,13 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   };
 
   const handleDeleteMultiple = async () => {
-    if (selectedDocIds.length === 0) return;
+    if (selectedDocIds.length === 0 || !db) return;
     setIsFsLoading(true);
     try {
-        if (selectedCollection === 'assets') {
-            await batchDeleteAssetsFS(selectedDocIds);
-            toast({ title: `${selectedDocIds.length} assets removed.` });
-        } else {
-            toast({ title: 'Config records cannot be bulk deleted.', variant: 'destructive' });
+        for (const id of selectedDocIds) {
+            await deleteDoc(doc(db, selectedCollection, id));
         }
+        toast({ title: `${selectedDocIds.length} documents removed.` });
         setSelectedDocIds([]);
         fetchFsData();
         setSelectedDocId(null);
@@ -279,22 +306,10 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   const handleBulkExport = () => {
     if (selectedDocIds.length === 0) return;
-    
     try {
-        if (selectedCollection === 'assets') {
-            const assetsToExport = allFsAssets.filter(a => selectedDocIds.includes(a.id));
-            if (assetsToExport.length === 0) {
-                toast({ title: 'No matching assets found for export.', variant: 'destructive' });
-                return;
-            }
-            exportAssetsToJson(assetsToExport, `assetain-bulk-export-${new Date().getTime()}.json`);
-            addNotification({ title: 'Bulk Export Success', description: `${assetsToExport.length} records saved to JSON.` });
-        } else {
-            if (selectedDocIds.includes('settings') && fsSettings) {
-                exportSettingsToJson(fsSettings, `assetain-config-export.json`);
-                addNotification({ title: 'Config Export Success', description: 'System configuration saved to JSON.' });
-            }
-        }
+        const dataToExport = documents.filter(d => selectedDocIds.includes(d.id)).map(d => d.data);
+        exportAssetsToJson(dataToExport, `assetain-bulk-export-${new Date().getTime()}.json`);
+        addNotification({ title: 'Bulk Export Success', description: `${dataToExport.length} records saved to JSON.` });
     } catch (e) {
         toast({ title: 'Export failed.', variant: 'destructive' });
     }
@@ -304,11 +319,12 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   const handleCreateCloudSnapshot = async () => {
     setIsProcessing(true);
     try {
-        if (allFsAssets.length > 0) {
-            await batchSetAssetsRTDB(allFsAssets);
-            addNotification({ title: 'Cloud Snapshot Success', description: `${allFsAssets.length} records pushed to Realtime Database backup.` });
+        const data = documents.map(d => d.data);
+        if (data.length > 0) {
+            await batchSetAssetsRTDB(data);
+            addNotification({ title: 'Cloud Snapshot Success', description: `${data.length} records pushed to Realtime Database backup.` });
         } else {
-            toast({ title: 'No Firestore data found to backup.', variant: 'destructive' });
+            toast({ title: 'No data found to backup.', variant: 'destructive' });
         }
     } catch (e) {
         addNotification({ title: 'Snapshot Failed', variant: 'destructive'});
@@ -334,19 +350,16 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
   };
 
   const handleExportJson = () => {
-    if (allFsAssets.length === 0) {
-        toast({ title: 'No asset data to export.', variant: 'destructive' });
+    const data = documents.map(d => d.data);
+    if (data.length === 0) {
+        toast({ title: 'No data to export.', variant: 'destructive' });
         return;
     }
     try {
-        if (appSettings) {
-            exportFullBackupToJson(allFsAssets, appSettings, 'assetain-full-backup.json');
-        } else {
-            exportAssetsToJson(allFsAssets, `assetain-assets-export.json`);
-        }
-        addNotification({ title: 'Offline Backup Successful', description: `${allFsAssets.length} records saved to file.` });
+        exportAssetsToJson(data, `assetain-${selectedCollection}-export.json`);
+        addNotification({ title: 'Export Successful', description: `${data.length} records saved.` });
     } catch (e) {
-        toast({ title: 'Export process failed.', variant: 'destructive' });
+        toast({ title: 'Export failed.', variant: 'destructive' });
     }
   };
 
@@ -359,19 +372,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         try {
             const data = JSON.parse(e.target?.result as string);
             setIsProcessing(true);
-            
-            if (data.settings) {
-                await updateSettingsFS(data.settings);
-                await saveLocalSettings(data.settings);
-                setAppSettings(data.settings);
-                addNotification({ title: 'System Settings Restored' });
+            const assets = Array.isArray(data) ? data : (data.assets || []);
+            if (assets.length > 0) {
+                await batchSetAssetsFS(assets);
+                addNotification({ title: 'Data Restored', description: `${assets.length} items merged.` });
             }
-            
-            if (data.assets && Array.isArray(data.assets)) {
-                await batchSetAssetsFS(data.assets);
-                addNotification({ title: 'Assets Restored', description: `${data.assets.length} items merged into Firestore.` });
-            }
-            
             fetchFsData();
         } catch (err) {
             toast({ title: 'Invalid JSON structure.', variant: 'destructive' });
@@ -383,7 +388,6 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     reader.readAsText(file);
   };
 
-  // --- DESTRUCTIVE ---
   const handleNukeAll = async () => {
     setIsProcessing(true);
     try {
@@ -393,7 +397,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       setOfflineAssets([]);
       await clearFirestoreAssets();
       await clearRtdbAssets();
-      addNotification({ title: "GLOBAL SYSTEM PURGE COMPLETE", description: "All database layers cleared.", variant: 'destructive' });
+      addNotification({ title: "GLOBAL SYSTEM PURGE COMPLETE", description: "All layers cleared.", variant: 'destructive' });
       fetchFsData();
     } catch (e) {
       addNotification({ title: 'Wipe Failure', variant: 'destructive'});
@@ -407,15 +411,10 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     setConfirmAction(null);
     switch(action) {
         case 'nuke_all': handleNukeAll(); break;
-        case 'clear_firestore': 
-            clearFirestoreAssets().then(() => fetchFsData()); 
-            break;
-        case 'clear_settings':
-            toast({ title: "Configuration reset requires system re-initialization.", variant: "destructive" });
-            break;
+        case 'clear_firestore': clearFirestoreAssets().then(() => fetchFsData()); break;
         default: break;
     }
-  }
+  };
 
   const allSelected = filteredDocs.length > 0 && selectedDocIds.length === filteredDocs.length;
 
@@ -432,7 +431,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             <ShieldCheck className="text-primary h-8 w-8 sm:h-10 sm:w-10"/> Infrastructure
                         </DialogTitle>
                         <DialogDescription className="text-sm sm:text-base font-medium text-muted-foreground hidden sm:block">
-                            Unified Firestore Management & Data Operations
+                            Cloud Data Workstation & Schema Management
                         </DialogDescription>
                     </DialogHeader>
                     <div className="flex w-full sm:w-auto bg-background border rounded-xl p-1 shadow-sm">
@@ -453,7 +452,6 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                     </div>
                 </div>
                 
-                {/* UNIFIED COMMAND TOOLBAR */}
                 <div className="flex flex-wrap items-center gap-2 pb-4 sm:pb-6">
                     <div className="flex items-center gap-1 bg-background border rounded-xl p-1.5 shadow-sm overflow-x-auto no-scrollbar max-w-full">
                         <Button variant="ghost" size="sm" className="h-8 sm:h-9 font-bold text-[10px] sm:text-xs whitespace-nowrap" onClick={handleCreateCloudSnapshot} disabled={isProcessing}>
@@ -483,15 +481,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="w-64 p-2 shadow-2xl border-destructive/20">
-                            <DropdownMenuLabel className="text-[10px] uppercase font-black tracking-widest text-destructive/60 mb-1">Destructive Operations</DropdownMenuLabel>
-                            <DropdownMenuItem onClick={() => openConfirmation('clear_firestore', 'Wipe Assets?', 'Permanently remove ALL assets from Firestore.')} className="h-10 text-destructive font-bold focus:bg-destructive focus:text-white rounded-lg">
-                                <Trash2 className="mr-2 h-4 w-4"/> Wipe Primary Assets
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => openConfirmation('clear_settings', 'Reset Config?', 'Wipe all settings and user permissions.')} className="h-10 text-destructive font-bold focus:bg-destructive focus:text-white rounded-lg">
-                                <Settings2 className="mr-2 h-4 w-4"/> Wipe System Config
+                            <DropdownMenuItem onClick={() => openConfirmation('clear_firestore', 'Wipe Collection?', 'Permanently remove ALL documents from current collection.')} className="h-10 text-destructive font-bold focus:bg-destructive focus:text-white rounded-lg">
+                                <Trash2 className="mr-2 h-4 w-4"/> Wipe Current Collection
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => openConfirmation('nuke_all', 'GLOBAL PURGE?', 'Clear EVERY database layer (Local, FS, RTDB).')} className="h-12 bg-destructive/10 text-destructive font-black uppercase tracking-widest text-[10px] focus:bg-destructive focus:text-white rounded-lg">
+                            <DropdownMenuItem onClick={() => openConfirmation('nuke_all', 'GLOBAL PURGE?', 'Clear EVERY database layer.')} className="h-12 bg-destructive/10 text-destructive font-black uppercase tracking-widest text-[10px] focus:bg-destructive focus:text-white rounded-lg">
                                 <AlertOctagon className="mr-2 h-4 w-4"/> Execute Total Destruction
                             </DropdownMenuItem>
                         </DropdownMenuContent>
@@ -502,7 +496,6 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             <div className="flex-1 flex flex-col overflow-hidden bg-background">
                 {activeView === 'explorer' ? (
                     <>
-                        {/* EXPLORER SUB-HEADER */}
                         <div className="bg-muted/10 border-b px-4 sm:px-6 py-3 sm:py-4 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 sm:gap-6">
                             <div className="flex flex-wrap items-center gap-3 sm:gap-6">
                                 {isMobile && mobileStep !== 'collections' && (
@@ -510,10 +503,6 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                         <ChevronLeft className="mr-1 h-4 w-4"/> Back
                                     </Button>
                                 )}
-                                <Badge variant="outline" className="hidden sm:flex h-10 px-4 font-black uppercase tracking-widest text-[11px] bg-background border-2">
-                                    <DatabaseIcon className="mr-2 h-4 w-4 text-primary"/> Firestore
-                                </Badge>
-                                <div className="hidden sm:block h-6 w-px bg-border"/>
                                 <div className="relative flex-1 sm:w-[400px]">
                                     <Search className="absolute left-3 sm:left-4 top-2.5 sm:top-3 h-3.5 w-3.5 sm:h-4 sm:w-4 text-muted-foreground" />
                                     <Input 
@@ -528,6 +517,9 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                         <Badge variant="default" className="h-8 sm:h-10 font-black uppercase text-[9px] sm:text-[11px] tracking-widest bg-primary px-2 sm:px-4">
                                             {selectedDocIds.length}
                                         </Badge>
+                                        <Button size="icon" variant="outline" className="h-8 w-8 sm:h-10 sm:w-10" onClick={handleBulkExport}>
+                                            <Download className="h-4 w-4 text-blue-500"/>
+                                        </Button>
                                         <Button size="icon" variant="destructive" className="h-8 w-8 sm:h-10 sm:w-10" onClick={handleDeleteMultiple}>
                                             <Trash2 className="h-4 w-4"/>
                                         </Button>
@@ -541,7 +533,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                 <Button size="sm" variant="outline" className="h-9 sm:h-10 font-bold bg-background border-2 px-3 sm:px-6 text-[10px] sm:text-xs" onClick={fetchFsData} disabled={isFsLoading}>
                                     <RefreshCw className={cn("mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4", isFsLoading && "animate-spin")} /> Refresh
                                 </Button>
-                                <Button size="sm" className="h-9 sm:h-10 font-bold px-3 sm:px-6 shadow-lg shadow-primary/20 text-[10px] sm:text-xs" onClick={handleCreateNewDoc} disabled={selectedCollection !== 'assets' || isProcessing}>
+                                <Button size="sm" className="h-9 sm:h-10 font-bold px-3 sm:px-6 shadow-lg shadow-primary/20 text-[10px] sm:text-xs" onClick={handleCreateNewDoc} disabled={isProcessing}>
                                     <Plus className="mr-1.5 sm:mr-2 h-3.5 w-3.5 h-4 w-4"/> New Doc
                                 </Button>
                             </div>
@@ -557,39 +549,30 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                     <span className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
                                         <LayoutGrid className="h-3 w-3"/> Collections
                                     </span>
+                                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => setIsNewCollectionDialogOpen(true)}>
+                                        <FolderPlus className="h-4 w-4 text-primary" />
+                                    </Button>
                                 </div>
                                 <ScrollArea className="flex-1">
                                     <div className="p-2 space-y-1">
-                                        <button 
-                                            className={cn(
-                                                "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
-                                                selectedCollection === 'assets' ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
-                                            )}
-                                            onClick={() => { 
-                                                setSelectedCollection('assets'); 
-                                                setSelectedDocId(null); 
-                                                setSelectedDocIds([]);
-                                                if (isMobile) setMobileStep('documents');
-                                            }}
-                                        >
-                                            <FileText className="mr-3 h-4 w-4"/> assets
-                                            <ChevronRight className={cn("ml-auto h-4 w-4 transition-transform", selectedCollection === 'assets' && "rotate-90")}/>
-                                        </button>
-                                        <button 
-                                            className={cn(
-                                                "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
-                                                selectedCollection === 'config' ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
-                                            )}
-                                            onClick={() => { 
-                                                setSelectedCollection('config'); 
-                                                setSelectedDocId(null); 
-                                                setSelectedDocIds([]);
-                                                if (isMobile) setMobileStep('documents');
-                                            }}
-                                        >
-                                            <Settings className="mr-3 h-4 w-4"/> config
-                                            <ChevronRight className={cn("ml-auto h-4 w-4 transition-transform", selectedCollection === 'config' && "rotate-90")}/>
-                                        </button>
+                                        {collections.map(col => (
+                                            <button 
+                                                key={col}
+                                                className={cn(
+                                                    "w-full text-left px-4 py-3 rounded-lg text-sm font-bold flex items-center transition-all",
+                                                    selectedCollection === col ? "bg-primary text-primary-foreground shadow-lg" : "hover:bg-muted text-muted-foreground"
+                                                )}
+                                                onClick={() => { 
+                                                    setSelectedCollection(col); 
+                                                    setSelectedDocId(null); 
+                                                    setSelectedDocIds([]);
+                                                    if (isMobile) setMobileStep('documents');
+                                                }}
+                                            >
+                                                <FileText className="mr-3 h-4 w-4"/> {col}
+                                                <ChevronRight className={cn("ml-auto h-4 w-4 transition-transform", selectedCollection === col && "rotate-90")}/>
+                                            </button>
+                                        ))}
                                     </div>
                                 </ScrollArea>
                             </div>
@@ -684,7 +667,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                 
                                 <ScrollArea className="flex-1">
                                     {selectedDocId ? (
-                                        <div className="p-4 sm:p-8">
+                                        <div className="p-4 sm:p-8 space-y-8">
                                             <div className="space-y-4 sm:space-y-6">
                                                 {editingData && Object.entries(editingData).map(([key, value]) => (
                                                     <div key={key} className="space-y-2 group">
@@ -692,7 +675,14 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                                             <Label className="text-[10px] sm:text-[11px] font-black uppercase text-muted-foreground tracking-widest flex items-center gap-2">
                                                                 <div className="h-1.5 w-1.5 rounded-full bg-primary/40"/> {key}
                                                             </Label>
-                                                            <Badge variant="outline" className="text-[8px] sm:text-[9px] font-mono opacity-50 px-1.5 h-4 uppercase">{typeof value}</Badge>
+                                                            <div className="flex items-center gap-2">
+                                                                <Badge variant="outline" className="text-[8px] sm:text-[9px] font-mono opacity-50 px-1.5 h-4 uppercase">{typeof value}</Badge>
+                                                                {key !== 'id' && (
+                                                                    <Button variant="ghost" size="icon" className="h-5 w-5 text-muted-foreground hover:text-destructive" onClick={() => handleRemoveField(key)}>
+                                                                        <MinusCircle className="h-3.5 w-3.5"/>
+                                                                    </Button>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                         
                                                         {typeof value === 'boolean' ? (
@@ -703,9 +693,9 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                                                 />
                                                                 <span className="text-xs sm:text-sm font-bold">{value ? 'ENABLED' : 'DISABLED'}</span>
                                                             </div>
-                                                        ) : typeof value === 'object' ? (
+                                                        ) : typeof value === 'object' && value !== null ? (
                                                             <div className="p-3 sm:p-4 rounded-xl border-2 bg-muted/30 font-mono text-[10px] sm:text-xs text-muted-foreground border-dashed">
-                                                                Nested objects must be managed via forms.
+                                                                {JSON.stringify(value, null, 2)}
                                                             </div>
                                                         ) : (
                                                             <Input 
@@ -716,6 +706,28 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                                         )}
                                                     </div>
                                                 ))}
+                                            </div>
+
+                                            {/* Add Field Section */}
+                                            <div className="p-6 border-2 border-dashed rounded-2xl bg-muted/5 space-y-4">
+                                                <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">Add Custom Field</h4>
+                                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                    <Input 
+                                                        placeholder="Field Name" 
+                                                        value={newFieldKey} 
+                                                        onChange={e => setNewFieldKey(e.target.value)}
+                                                        className="h-10 bg-background rounded-xl"
+                                                    />
+                                                    <Input 
+                                                        placeholder="Initial Value" 
+                                                        value={newFieldValue} 
+                                                        onChange={e => setNewFieldValue(e.target.value)}
+                                                        className="h-10 bg-background rounded-xl"
+                                                    />
+                                                </div>
+                                                <Button variant="outline" className="w-full h-10 font-bold rounded-xl" onClick={handleAddField} disabled={!newFieldKey}>
+                                                    <Plus className="mr-2 h-4 w-4"/> Append to Schema
+                                                </Button>
                                             </div>
                                         </div>
                                     ) : (
@@ -740,6 +752,30 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         </DialogContent>
       </Dialog>
       
+      {/* New Collection Dialog */}
+      <Dialog open={isNewCollectionDialogOpen} onOpenChange={setIsNewCollectionDialogOpen}>
+          <DialogContent className="sm:max-w-md rounded-2xl p-6">
+              <DialogHeader>
+                  <DialogTitle className="text-xl font-black uppercase tracking-tight">Create Collection</DialogTitle>
+                  <DialogDescription>Firestore collections are initialized by adding a document.</DialogDescription>
+              </DialogHeader>
+              <div className="py-4">
+                  <Label htmlFor="col-name" className="text-xs font-bold uppercase text-muted-foreground mb-2 block">Collection Path</Label>
+                  <Input 
+                    id="col-name" 
+                    placeholder="e.g. users_audit" 
+                    value={newCollectionName} 
+                    onChange={e => setNewCollectionName(e.target.value)}
+                    className="h-12 font-bold rounded-xl"
+                  />
+              </div>
+              <DialogFooter className="gap-2">
+                  <Button variant="outline" onClick={() => setIsNewCollectionDialogOpen(false)} className="rounded-xl font-bold">Cancel</Button>
+                  <Button onClick={handleCreateNewCollection} disabled={!newCollectionName || isProcessing} className="rounded-xl font-bold">Create Collection</Button>
+              </DialogFooter>
+          </DialogContent>
+      </Dialog>
+
       <AlertDialog open={!!confirmAction} onOpenChange={() => setConfirmAction(null)}>
           <AlertDialogContent className="w-[90vw] sm:max-w-lg rounded-[1.5rem] sm:rounded-[2rem] border-destructive/20 shadow-2xl p-6 sm:p-8 bg-background">
               <AlertDialogHeader>
@@ -765,7 +801,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 }
 
 function IndexesView({ toast }: { toast: any }) {
-    const indexes = [
+    const [indexes, setIndexes] = useState([
         { 
             id: 'CICAgOjxH4EJ', 
             collection: 'assets', 
@@ -797,20 +833,40 @@ function IndexesView({ toast }: { toast: any }) {
             scope: 'Collection', 
             status: 'Enabled' 
         }
-    ];
+    ]);
+
+    const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
+    const [newIdxCol, setNewIdxCol] = useState('assets');
+    const [newIdxFields, setNewIdxFields] = useState('');
+    const [newIdxScope, setNewIdxScope] = useState<'Collection' | 'Collection Group'>('Collection');
 
     const handleAddIndex = () => {
+        if (!newIdxFields.trim()) return;
+        
+        const fieldPaths = newIdxFields.split(',').map(f => f.trim()).filter(Boolean);
+        if (fieldPaths.length === 0) return;
+
+        const newIndex = {
+            id: `IDX-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
+            collection: newIdxCol,
+            fields: fieldPaths.map(p => ({ path: f, order: 'ASCENDING' as const })),
+            scope: newIdxScope,
+            status: 'Building'
+        };
+
+        setIndexes(prev => [...prev, newIndex]);
+        setIsAddDialogOpen(false);
+        setNewIdxFields('');
+        
         toast({
-            title: "Deployment Action Required",
-            description: "To add a new index, define it in 'firestore.indexes.json' and run 'firebase deploy --only firestore:indexes' from your terminal.",
+            title: "Index Definition Staged",
+            description: "To apply this to your real database, define it in 'firestore.indexes.json' and deploy via Firebase CLI.",
         });
     };
 
-    const handleManageOverrides = () => {
-        toast({
-            title: "Database Configuration",
-            description: "Field overrides are managed via the Firebase CLI or the Firebase Console under Project Settings.",
-        });
+    const handleDeleteIndex = (id: string) => {
+        setIndexes(prev => prev.filter(i => i.id !== id));
+        toast({ title: "Index definition removed from console." });
     };
 
     return (
@@ -820,11 +876,11 @@ function IndexesView({ toast }: { toast: any }) {
                     <h3 className="text-lg sm:text-xl font-black tracking-tight flex items-center gap-2">
                         <Layers className="h-5 w-5 text-primary"/> Composite Indexes
                     </h3>
-                    <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-1">Firestore indexes optimized for regional performance.</p>
+                    <p className="text-xs sm:text-sm text-muted-foreground font-medium mt-1">Manage optimized server-side query definitions.</p>
                 </div>
                 <Button 
                     className="font-bold shadow-lg shadow-primary/20 h-9 sm:h-10 text-[10px] sm:text-xs"
-                    onClick={handleAddIndex}
+                    onClick={() => setIsAddDialogOpen(true)}
                 >
                     <Plus className="mr-2 h-4 w-4"/> Add Index
                 </Button>
@@ -865,37 +921,75 @@ function IndexesView({ toast }: { toast: any }) {
                                         <TableCell className="px-4 sm:px-6 py-4 sm:py-5 font-medium text-[10px] sm:text-xs text-muted-foreground">{idx.scope}</TableCell>
                                         <TableCell className="px-4 sm:px-6 py-4 sm:py-5 font-mono text-[10px] sm:text-xs opacity-60">{idx.id}</TableCell>
                                         <TableCell className="px-4 sm:px-6 py-4 sm:py-5">
-                                            <Badge variant="outline" className="bg-green-500/10 text-green-600 border-green-500/20 font-bold uppercase text-[8px] sm:text-[9px] tracking-widest px-2 h-5 sm:h-6">
+                                            <Badge variant="outline" className={cn(
+                                                "font-bold uppercase text-[8px] sm:text-[9px] tracking-widest px-2 h-5 sm:h-6",
+                                                idx.status === 'Enabled' ? "bg-green-500/10 text-green-600 border-green-500/20" : "bg-yellow-500/10 text-yellow-600 border-yellow-500/20"
+                                            )}>
                                                 {idx.status}
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="px-4 sm:px-6 py-4 sm:py-5">
-                                            <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
-                                                <MoreVertical className="h-4 w-4"/>
-                                            </Button>
+                                            <DropdownMenu>
+                                                <DropdownMenuTrigger asChild>
+                                                    <Button variant="ghost" size="icon" className="opacity-0 group-hover:opacity-100 transition-opacity">
+                                                        <MoreVertical className="h-4 w-4"/>
+                                                    </Button>
+                                                </DropdownMenuTrigger>
+                                                <DropdownMenuContent align="end">
+                                                    <DropdownMenuItem className="text-destructive font-bold" onClick={() => handleDeleteIndex(idx.id)}>
+                                                        <Trash2 className="mr-2 h-4 w-4"/> Remove Definition
+                                                    </DropdownMenuItem>
+                                                </DropdownMenuContent>
+                                            </DropdownMenu>
                                         </TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
                         </Table>
                     </div>
-                    
-                    <div className="mt-6 sm:mt-8 p-4 sm:p-6 rounded-2xl border border-dashed bg-muted/5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
-                        <div className="space-y-1">
-                            <h4 className="text-xs sm:text-sm font-black uppercase tracking-widest text-primary">Index Optimization</h4>
-                            <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">Server-side indexing reduces data transfer for regional managers.</p>
-                        </div>
-                        <Button 
-                            variant="outline" 
-                            size="sm" 
-                            className="font-bold border-2 h-9 sm:h-10 px-4 sm:px-6 text-[10px] sm:text-xs"
-                            onClick={handleManageOverrides}
-                        >
-                            Manage Overrides
-                        </Button>
-                    </div>
                 </div>
             </ScrollArea>
+
+            {/* Add Index Dialog */}
+            <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
+                <DialogContent className="sm:max-w-md rounded-2xl">
+                    <DialogHeader>
+                        <DialogTitle className="text-xl font-black uppercase tracking-tight">Define Index</DialogTitle>
+                        <DialogDescription>Composite indexes are required for complex Firestore queries.</DialogDescription>
+                    </DialogHeader>
+                    <div className="py-4 space-y-4">
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground">Target Collection</Label>
+                            <Input value={newIdxCol} onChange={e => setNewIdxCol(e.target.value)} className="h-10 rounded-xl" />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground">Indexed Fields (Comma separated)</Label>
+                            <Input 
+                                placeholder="e.g. grantId, category, lastModified" 
+                                value={newIdxFields} 
+                                onChange={e => setNewIdxFields(e.target.value)}
+                                className="h-10 rounded-xl"
+                            />
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label className="text-[10px] font-black uppercase text-muted-foreground">Query Scope</Label>
+                            <Select value={newIdxScope} onValueChange={(v: any) => setNewIdxScope(v)}>
+                                <SelectTrigger className="h-10 rounded-xl">
+                                    <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="Collection">Collection</SelectItem>
+                                    <SelectItem value="Collection Group">Collection Group</SelectItem>
+                                </SelectContent>
+                            </Select>
+                        </div>
+                    </div>
+                    <DialogFooter className="gap-2">
+                        <Button variant="outline" onClick={() => setIsAddDialogOpen(false)} className="rounded-xl font-bold">Cancel</Button>
+                        <Button onClick={handleAddIndex} disabled={!newIdxFields} className="rounded-xl font-bold">Stage Index</Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }
