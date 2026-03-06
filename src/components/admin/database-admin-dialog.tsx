@@ -77,7 +77,8 @@ import {
     Globe,
     Lock,
     Clock,
-    Zap
+    Zap,
+    MoreVertical
 } from 'lucide-react';
 import { clearLocalAssets, saveLockedOfflineAssets } from '@/lib/idb';
 import { exportAssetsToJson } from '@/lib/json-export';
@@ -249,6 +250,8 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         await setDoc(docRef, { description: "Collection initialized via console", createdAt: new Date().toISOString() });
         setCollections(prev => [...new Set([...prev, newCollectionName.trim()])]);
         setSelectedCollection(newCollectionName.trim());
+        setSelectedDocId(null); 
+        setSelectedDocIds([]);
         setNewCollectionName('');
         setIsNewCollectionDialogOpen(false);
         toast({ title: 'Collection created.' });
@@ -795,7 +798,6 @@ function IndexesView({ toast }: { toast: any }) {
     const consoleBaseUrl = `https://console.firebase.google.com/project/${projectId}/firestore/databases/-default-/indexes`;
 
     // Deep link parameters for creating composite indexes with pre-populated fields.
-    // NOTE: Base64 strings are generated for specific patterns. If project ID changes, Firebase usually auto-resolves.
     const INDEX_LINKS = {
         assets_sync: `${consoleBaseUrl}?create_composite=Ck1wcm9qZWN0cy9udGJsY3AtYXNzZXQtbWFuYWdlci9kYXRhYmFzZXMvKGRlZmF1bHQpL2NvbGxlY3Rpb25Hcm91cHMvYXNzZXRzL2luZGV4ZXMvXxABGgsKB2dyYW50SWQQAhoQCg1sYXN0TW9kaWZpZWQQAhoMCghfX25hbWVfXxAC`,
         assets_stats: `${consoleBaseUrl}?create_composite=true&collection=assets`,
