@@ -8,7 +8,10 @@
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "mobile:init": "npm install @capacitor/core @capacitor/cli @capacitor/android && npx cap init assetain com.assetain.app --web-dir out && npx cap add android",
+    "mobile:build": "npm run build && npx cap sync",
+    "mobile:open": "npx cap open android"
   },
   "dependencies": {
     "@ducanh2912/next-pwa": "^10.2.7",
