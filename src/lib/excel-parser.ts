@@ -1,19 +1,24 @@
-
 import * as XLSX from 'xlsx';
-import type { Asset, SheetDefinition, DisplayField } from './types';
+import type { Asset, SheetDefinition, DisplayField, ImportRow } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, IHVN_SUB_SHEET_DEFINITIONS } from './constants';
 import { Timestamp } from 'firebase/firestore';
 
-const normalizeHeader = (header: any): string => {
+/**
+ * Normalizes a header string by trimming and converting to uppercase.
+ */
+const normalizeHeader = (header: unknown): string => {
     if (header === null || header === undefined) return '';
     return String(header).trim().toUpperCase().replace(/\s+/g, ' ');
 };
 
-const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[], startRow: number = 0): number => {
+/**
+ * Attempts to find the header row index in a raw Excel sheet array.
+ */
+const findHeaderRowIndex = (sheetData: unknown[][], definitiveHeaders: string[], startRow: number = 0): number => {
     const normalizedDefinitiveHeaders = definitiveHeaders.map(normalizeHeader);
     
-    for (let i = startRow; i < Math.min(sheetData.length, startRow + 50); i++) { // Search deeper
+    for (let i = startRow; i < Math.min(sheetData.length, startRow + 50); i++) {
         const row = sheetData[i];
         if (!Array.isArray(row) || row.length === 0) continue;
 
@@ -43,7 +48,7 @@ for (const key in HEADER_ALIASES) {
  */
 export const sanitizeForFirestore = <T extends object>(obj: T): T => {
     if (!obj) return obj;
-    const sanitizedObj: { [key: string]: any } = {};
+    const sanitizedObj: Record<string, unknown> = {};
     
     for (const key in obj) {
         const value = (obj as any)[key];
@@ -62,15 +67,18 @@ export const sanitizeForFirestore = <T extends object>(obj: T): T => {
     return sanitizedObj as T;
 };
 
-const parseRows = (headerRow: any[], jsonData: any[][], category: string): { assets: Partial<Asset>[], rowsParsed: number } => {
+/**
+ * Parses a set of Excel rows into Asset objects based on a header row.
+ */
+const parseRows = (headerRow: unknown[], jsonData: unknown[][], category: string): { assets: Partial<Asset>[], rowsParsed: number } => {
     const assets: Partial<Asset>[] = [];
     let rowsParsed = 0;
 
     for (const row of jsonData) {
+        if (!Array.isArray(row)) continue;
         rowsParsed++;
 
         const firstCell = row[0] ? String(row[0]).trim().toLowerCase() : '';
-        // Generic end-of-table check
         const isEndOfTable = firstCell.startsWith('total') || firstCell.startsWith('grand total');
 
         if (row.every(cell => cell === null || String(cell).trim() === '') || (row[0] && normalizeHeader(row[0]) === 'S/N' && assets.length > 0) || isEndOfTable) {
@@ -87,13 +95,12 @@ const parseRows = (headerRow: any[], jsonData: any[][], category: string): { ass
             const normalizedHeader = normalizeHeader(rawHeader);
             let fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
             
-            // Special cases for common variation in headers
             if(normalizedHeader === 'STATE' && !assetObject.location) fieldName = 'location';
             if(normalizedHeader === 'LOCATION/USER') fieldName = 'assignee';
             
             if (fieldName) {
                 const cell = row[colIndex];
-                const finalValue = (cell && cell.w) ? String(cell.w).trim() : (cell !== null && cell !== undefined ? String(cell).trim() : null);
+                const finalValue = (cell && typeof cell === 'object' && 'w' in cell) ? String(cell.w).trim() : (cell !== null && cell !== undefined ? String(cell).trim() : null);
 
                 if (finalValue) {
                    (assetObject as any)[fieldName] = finalValue;
@@ -146,7 +153,7 @@ export async function scanExcelFile(
 
         for (const sheetName of workbook.SheetNames) {
             const sheet = workbook.Sheets[sheetName];
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
+            const sheetData: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
             
             let bestMatch: { definitionName: string, headerRowIndex: number, score: number } | null = null;
 
@@ -174,7 +181,7 @@ export async function scanExcelFile(
                 const { definitionName, headerRowIndex } = bestMatch;
                 const dataRows = sheetData.slice(headerRowIndex + 1);
                 const rowCount = dataRows.filter(row => Array.isArray(row) && row.some(cell => cell !== null && String(cell).trim() !== '')).length;
-                const headers = sheetData[headerRowIndex].filter(h => h !== null).map(String);
+                const headers = (sheetData[headerRowIndex] as unknown[]).filter(h => h !== null).map(String);
                 
                 scannedSheets.push({
                     sheetName,
@@ -190,7 +197,6 @@ export async function scanExcelFile(
         }
 
     } catch (e) {
-        console.error("Error scanning Excel file:", e);
         if (e instanceof Error && e.message.toLowerCase().includes('bad compressed size')) {
             errors.push("The selected file appears to be corrupt or is not a valid Excel (.xlsx) file.");
         } else {
@@ -224,10 +230,9 @@ export async function parseExcelFile(
         const processList: ScannedSheetInfo[] = sheetsToImport 
             ? sheetsToImport 
             : Object.keys(sheetDefinitions).map(defName => {
-                const sheet = sheetDefinitions[defName];
-                const actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader(sheet.name)));
+                const actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader(defName)));
                 return actualSheetName ? { sheetName: actualSheetName, definitionName: defName, rowCount: 0, headers: [] } : null;
-            }).filter(Boolean) as ScannedSheetInfo[];
+            }).filter((item): item is ScannedSheetInfo => item !== null);
 
         for (const { sheetName, definitionName } of processList) {
             const definition = sheetDefinitions[definitionName];
@@ -239,7 +244,7 @@ export async function parseExcelFile(
             // Handle IHVN special case
             if (definitionName === 'IHVN-GF N-THRIP') {
                  const sheet = workbook.Sheets[sheetName];
-                 const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+                 const sheetData: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
                  let currentPos = 0;
                  for (const subSheetName in IHVN_SUB_SHEET_DEFINITIONS) {
                     const headers = IHVN_SUB_SHEET_DEFINITIONS[subSheetName];
@@ -259,7 +264,7 @@ export async function parseExcelFile(
                 result.errors.push(`Could not find sheet named "${sheetName}" in the workbook.`);
                 continue;
             }
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
+            const sheetData: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
             const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers);
 
             if (headerRowIndex === -1) {
@@ -299,7 +304,6 @@ export async function parseExcelFile(
         }
 
     } catch (e) {
-        console.error("Error parsing Excel file:", e);
         if (e instanceof Error && e.message.toLowerCase().includes('bad compressed size')) {
             result.errors.push("The selected file appears to be corrupt or is not a valid Excel (.xlsx) file.");
         } else {
@@ -310,6 +314,9 @@ export async function parseExcelFile(
     return result;
 }
 
+/**
+ * Exports verified assets to a multi-sheet Excel workbook.
+ */
 export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, SheetDefinition>, fileName: string): void {
     const workbook = XLSX.utils.book_new();
 
@@ -335,7 +342,7 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
         if (!headerArray.includes("Last Modified Date")) headerArray.push("Last Modified Date");
         
         const sheetData = assetsByCategory[category].map(asset => {
-            const row: { [key: string]: any } = {};
+            const row: Record<string, unknown> = {};
             headerArray.forEach(header => {
                 const normalizedHeader = normalizeHeader(header);
                 
@@ -372,6 +379,9 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
     }
 }
 
+/**
+ * Scans an Excel file to extract potential sheet definitions (headers).
+ */
 export async function parseExcelForTemplate(file: File): Promise<SheetDefinition[]> {
   const templates: SheetDefinition[] = [];
   const buffer = await file.arrayBuffer();
@@ -382,7 +392,7 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
 
   for (const sheetName of workbook.SheetNames) {
     const sheet = workbook.Sheets[sheetName];
-    const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+    const sheetData: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
     
     for (let i = 0; i < Math.min(sheetData.length, 25); i++) {
         const row = sheetData[i];

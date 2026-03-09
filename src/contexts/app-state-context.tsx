@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -22,6 +21,7 @@ import { addNotification } from '@/hooks/use-notifications';
 import { v4 as uuidv4 } from 'uuid';
 import { NIGERIAN_STATES } from '@/lib/constants';
 import { assetMatchesGlobalFilter } from '@/lib/utils';
+import { logger } from '@/lib/logger';
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -239,7 +239,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
                     await saveLocalSettings(settings);
                 }
             } catch (e) {
-                console.error("Failed to fetch settings from cloud", e);
+                logger.error("Failed to fetch settings from cloud", e);
             }
         }
         
@@ -316,6 +316,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             if (migrated) {
                 await saveLocalSettings(migrated);
                 setAppSettings(migrated);
+                logger.log("Found newer settings in Firestore, updating local state.");
             }
          }
        }
