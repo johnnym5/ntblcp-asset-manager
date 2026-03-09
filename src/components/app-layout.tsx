@@ -1,7 +1,7 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
+import dynamic from 'next/dynamic';
 import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -42,7 +42,7 @@ import {
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
-import { cn } from "@/lib/utils";
+import { cn, sanitizeForFirestore } from "@/lib/utils";
 
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/auth-context";
@@ -56,14 +56,15 @@ import { AssetFilterDialog } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
 import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
-import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
-import { ActivityLogDialog } from "./admin/activity-log-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Badge } from "./ui/badge";
-import { InboxSheet } from "./inbox-sheet";
 import { saveAssets } from "@/lib/idb";
-import { sanitizeForFirestore } from "@/lib/excel-parser";
+
+// Defer loading of administrative modules to prevent dependency cycles and runtime errors
+const InboxSheet = dynamic(() => import("./inbox-sheet").then(mod => mod.InboxSheet), { ssr: false });
+const ActivityLogDialog = dynamic(() => import("./admin/activity-log-sheet").then(mod => mod.ActivityLogDialog), { ssr: false });
+const DatabaseAdminDialog = dynamic(() => import("./admin/database-admin-dialog").then(mod => mod.DatabaseAdminDialog), { ssr: false });
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { userProfile, loading, logout } = useAuth();

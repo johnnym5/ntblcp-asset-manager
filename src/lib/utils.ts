@@ -3,6 +3,7 @@ import { twMerge } from "tailwind-merge"
 import { NIGERIAN_STATES, NIGERIAN_STATE_CAPITALS, ZONAL_STORES, SPECIAL_LOCATIONS } from "./constants";
 import React from "react";
 import type { Asset } from "./types";
+import { Timestamp } from 'firebase/firestore';
 
 /**
  * Architecture Utility: Merges tailwind classes safely.
@@ -18,6 +19,31 @@ export const sanitizeInput = (input: string): string => {
     if (typeof input !== 'string') return input;
     // Remove characters that could be used for NoSQL injection or basic script tags
     return input.replace(/[${}]/g, "").trim();
+};
+
+/**
+ * Recursively trims strings and prepares object for database storage.
+ * Handles Firebase Timestamps and ensures clean data types.
+ */
+export const sanitizeForFirestore = <T extends object>(obj: T): T => {
+    if (!obj) return obj;
+    const sanitizedObj: Record<string, unknown> = {};
+    
+    for (const key in obj) {
+        const value = (obj as any)[key];
+        if (value !== undefined && value !== null) {
+            if (value instanceof Date) {
+                sanitizedObj[key] = Timestamp.fromDate(value);
+            } else if (typeof value === 'string') {
+                sanitizedObj[key] = value.trim();
+            } else if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Timestamp)) {
+                sanitizedObj[key] = sanitizeForFirestore(value);
+            } else {
+                sanitizedObj[key] = value;
+            }
+        }
+    }
+    return sanitizedObj as T;
 };
 
 export const normalizeAssetLocation = (location?: string): string => {

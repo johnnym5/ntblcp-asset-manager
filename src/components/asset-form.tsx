@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -36,11 +35,10 @@ import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
 import { Loader2, FileText, Check, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
-import { cn, getStatusClasses } from "@/lib/utils";
+import { cn, getStatusClasses, sanitizeForFirestore } from "@/lib/utils";
 import { AssetChecklist } from "./asset-checklist";
 import { ScrollArea } from "./ui/scroll-area";
 import { ASSET_CONDITIONS } from "@/lib/constants";
-import { sanitizeForFirestore } from "@/lib/excel-parser";
 
 const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
   path: ['category'],
@@ -208,6 +206,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
 
         if (!disabled && appSettings) {
             if (isAdmin) {
+                // Admin Lock Logic
                 if (appSettings.lockAssetList && dataSource === 'cloud') {
                     if (appSettings.appMode === 'verification') {
                         if (!isVerificationField) {
@@ -218,16 +217,29 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
                     }
                 }
             } else {
-                if (appSettings.appMode === 'management') {
+                // Non-Admin Permission Logic
+                if (!userProfile?.canEditAssets) {
                     disabled = true;
-                } else if (appSettings.appMode === 'verification') {
-                    if (!isVerificationField) {
-                        disabled = true;
+                } else {
+                    // Respect the Global List Lock even if user has edit permission
+                    if (appSettings.lockAssetList) {
+                        // Structural fields are locked if the list is locked.
+                        // If in verification mode, only allow verification fields.
+                        if (appSettings.appMode === 'verification') {
+                            if (!isVerificationField) {
+                                disabled = true;
+                            }
+                        } else {
+                            disabled = true; // In management mode, locked means completely read-only
+                        }
                     }
+                    // If list is NOT locked, user with canEditAssets can edit all structural fields
+                    // (Their edits will be routed through the Request/Approval system in the save logic)
                 }
             }
         }
 
+        // Hardcoded UI constraints
         if (fieldName === 'verifiedDate') {
             disabled = true;
         }

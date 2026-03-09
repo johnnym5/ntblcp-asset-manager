@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -79,7 +78,7 @@ import { Progress } from "@/components/ui/progress";
 
 import type { Asset, AppSettings, SheetDefinition, DisplayField } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
+import { exportToExcel } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS, ASSET_CONDITIONS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
@@ -87,7 +86,7 @@ import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets, updateSettings as updateSettingsRTDB } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
-import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter, sanitizeInput } from "@/lib/utils";
+import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter, sanitizeInput, sanitizeForFirestore } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
@@ -323,7 +322,7 @@ export default function AssetList() {
   const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
-  const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
+  const [syncSummary, setSyncSummary] = useState<any | null>(null);
   const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
@@ -413,7 +412,7 @@ export default function AssetList() {
   }, [view]);
 
   // --- DATA LOADING & SYNC ---
-  const executeDownload = useCallback(async (summary: SyncSummary, isFirstTime?: boolean) => {
+  const executeDownload = useCallback(async (summary: any, isFirstTime?: boolean) => {
     setIsSyncing(true);
     if (!isFirstTime) {
       addNotification({ title: 'Downloading updates...' });
@@ -605,7 +604,7 @@ export default function AssetList() {
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         const cloudAssetIds = new Set(cloudAssets.map(a => a.id));
 
-        const summary: SyncSummary = {
+        const summary: any = {
             newFromCloud: [],
             updatedFromCloud: [],
             keptLocal: [],
@@ -1010,7 +1009,7 @@ export default function AssetList() {
     setIsBatchEditOpen(true);
   }
   
-  const handleSaveBatchEdit = async (data: BatchUpdateData) => {
+  const handleSaveBatchEdit = async (data: any) => {
     const assetsToUpdate = (dataSource === 'cloud' ? assets : offlineAssets).filter(a => selectedAssetIds.includes(a.id));
     
     const updatedAssets = assetsToUpdate.map(asset => {
@@ -1237,7 +1236,7 @@ export default function AssetList() {
       setAssets([]);
       if (isOnline && isAdmin) {
           try {
-              const cloudClear = activeDatabase === 'firestore' ? clearAssets : clearRtdbAssets;
+              const cloudClear = activeDatabase === 'firestore' ? clearFirestoreAssets : clearRtdbAssets;
               await cloudClear();
               if (activeDatabase === 'firestore') {
                   clearRtdbAssets().catch(() => {});
@@ -1386,7 +1385,7 @@ export default function AssetList() {
     }
   };
 
-  const handleSaveCategoryBatchEdit = async (data: CategoryBatchUpdateData) => {
+  const handleSaveCategoryBatchEdit = async (data: any) => {
     let toUp: Asset[] = [];
     selectedCategories.forEach(cat => toUp.push(...(assetsByCategory[cat] || [])));
     

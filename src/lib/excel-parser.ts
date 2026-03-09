@@ -3,6 +3,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, IHVN_SUB_SHEET_DEFINITIONS } from './constants';
 import { Timestamp } from 'firebase/firestore';
 import { AssetSchema } from './validation/asset-schema';
+import { sanitizeForFirestore } from './utils';
 
 /**
  * Normalizes a header string by trimming and converting to uppercase.
@@ -42,30 +43,6 @@ for (const key in HEADER_ALIASES) {
         }
     }
 }
-
-/**
- * Recursively trims strings and prepares object for database storage.
- */
-export const sanitizeForFirestore = <T extends object>(obj: T): T => {
-    if (!obj) return obj;
-    const sanitizedObj: Record<string, unknown> = {};
-    
-    for (const key in obj) {
-        const value = (obj as any)[key];
-        if (value !== undefined && value !== null) {
-            if (value instanceof Date) {
-                sanitizedObj[key] = Timestamp.fromDate(value);
-            } else if (typeof value === 'string') {
-                sanitizedObj[key] = value.trim();
-            } else if (typeof value === 'object' && !Array.isArray(value) && !(value instanceof Timestamp)) {
-                sanitizedObj[key] = sanitizeForFirestore(value);
-            } else {
-                sanitizedObj[key] = value;
-            }
-        }
-    }
-    return sanitizedObj as T;
-};
 
 /**
  * Parses a set of Excel rows into Asset objects based on a header row.
