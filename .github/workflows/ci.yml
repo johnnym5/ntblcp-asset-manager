@@ -1,0 +1,39 @@
+name: Assetain CI Pipeline
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  validate:
+    name: Validate and Build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Type Check (TypeScript)
+        run: npm run typecheck
+
+      - name: Lint Check (ESLint)
+        run: npm run lint
+
+      - name: Build Next.js Application
+        run: npm run build
+        env:
+          # Providing placeholder values for build-time environment variables 
+          # to ensure static optimization steps pass in the CI environment.
+          NEXT_PUBLIC_FIREBASE_API_KEY: "ci-validation-key"
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: "ci-validation-project"
