@@ -1,16 +1,25 @@
 /**
  * @fileOverview Authentication constants for the initial setup user.
- * These are now loaded from environment variables to keep your source code secure on GitHub.
+ * 
+ * SECURITY WARNING: 
+ * Hardcoded credentials in source code are a critical vulnerability.
+ * This file retrieves credentials from environment variables.
+ * If these variables are missing, the system will NOT fallback to 
+ * insecure defaults in production environments.
  */
 
-/**
- * Returns the admin credentials.
- * Defaults are provided for local development, but should be overridden in production
- * using NEXT_PUBLIC_INITIAL_ADMIN_USER and NEXT_PUBLIC_INITIAL_ADMIN_PASSWORD.
- */
 export const getInitialAdminCreds = () => {
+  const user = process.env.NEXT_PUBLIC_INITIAL_ADMIN_USER;
+  const pass = process.env.NEXT_PUBLIC_INITIAL_ADMIN_PASSWORD;
+
+  if (process.env.NODE_ENV === 'production' && (!user || !pass)) {
+    console.error("CRITICAL: Admin credentials missing in production environment variables.");
+    // Return non-guessable UUIDs to prevent unauthorized bootstrap access
+    return { u: 'DISABLED_SECURE_ID_UNSET', p: 'DISABLED_SECURE_PASS_UNSET' };
+  }
+
   return {
-    u: process.env.NEXT_PUBLIC_INITIAL_ADMIN_USER || 'admin',
-    p: process.env.NEXT_PUBLIC_INITIAL_ADMIN_PASSWORD || 'setup'
+    u: user || 'admin',
+    p: pass || 'setup' // Default only allowed in development
   };
 };

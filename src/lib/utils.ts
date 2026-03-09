@@ -4,10 +4,19 @@ import { NIGERIAN_STATES, NIGERIAN_STATE_CAPITALS, ZONAL_STORES, SPECIAL_LOCATIO
 import React from "react";
 import type { Asset } from "./types";
 
+/**
+ * Architecture Utility: Merges tailwind classes safely.
+ */
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Security/Data Utility: Sanitizes input to prevent NoSQL injection patterns.
+ */
+export const sanitizeInput = (input: string): string => {
+    return input.replace(/[${}]/g, "");
+};
 
 export const normalizeAssetLocation = (location?: string): string => {
     if (!location) return '';
@@ -42,7 +51,6 @@ export const getStatusClasses = (status?: 'Verified' | 'Unverified' | 'Discrepan
 
 export const assetMatchesGlobalFilter = (asset: Asset, filter: string): boolean => {
     if (!filter || filter === 'All') {
-        // When filter is 'All', every asset is in scope for a full sync.
         return true;
     }
     const isZone = ZONAL_STORES.includes(filter);

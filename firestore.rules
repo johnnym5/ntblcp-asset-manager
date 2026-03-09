@@ -1,20 +1,37 @@
 rules_version = '2';
+
+/**
+ * ASSETAIN SECURITY RULES v1.1
+ * 
+ * ARCHITECT'S NOTE:
+ * Because this application uses a custom password-based logic without 
+ * Firebase Authentication (request.auth), security cannot be enforced 
+ * natively at the document level via these rules.
+ * 
+ * SECURITY RECOMMENDATION:
+ * 1. Migrate to Firebase Auth to enable request.auth.uid checks.
+ * 2. If maintaining custom auth, move all writes to a Firebase Cloud Function (Server-Side)
+ *    that validates the custom session token, then lock these rules to 'false'.
+ */
+
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Allow full read and write access to the settings document.
-    // In a production app, write access should be limited to admins.
+    // Configuration namespace: Highly sensitive
     match /config/{docId=**} {
-      allow read, write: if true;
+      // In a production environment, restrict write to internal service accounts only
+      allow read: if true;
+      allow write: if true; 
     }
 
-    // Allow full read and write access to the entire assets collection.
-    // This is necessary for the app to download all assets and for users to save changes.
+    // Assets namespace: Operational data
     match /assets/{assetId=**} {
+      // Allow read/write for the sync engine
+      // WARNING: Without request.auth, these are vulnerable to script-based scraping.
       allow read, write: if true;
     }
 
-    // Default deny all other access. This is a security best practice.
+    // Default deny for everything else
     match /{document=**} {
       allow read, write: if false;
     }
