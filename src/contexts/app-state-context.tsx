@@ -1,3 +1,4 @@
+
 'use client';
 
 import {
@@ -22,6 +23,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { NIGERIAN_STATES } from '@/lib/constants';
 import { assetMatchesGlobalFilter } from '@/lib/utils';
 import { logger } from '@/lib/logger';
+import { processOfflineQueue } from '@/lib/offline-queue';
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -177,7 +179,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] =
     useState(false);
   
-  // Reconfigured to Firestore as primary
   const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>(
     'firestore'
   );
@@ -191,7 +192,11 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('assetain-online-status', JSON.stringify(isOnline));
     
     const handleBrowserConnectivityChange = () => {
-        setIsOnline(navigator.onLine);
+        const currentlyOnline = navigator.onLine;
+        setIsOnline(currentlyOnline);
+        if (currentlyOnline) {
+            processOfflineQueue().catch(err => logger.error("Background sync failed", err));
+        }
     };
     window.addEventListener('online', handleBrowserConnectivityChange);
     window.addEventListener('offline', handleBrowserConnectivityChange);
@@ -226,7 +231,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     const initializeSettings = async () => {
         let settings: AppSettings | null = await getLocalSettings();
 
-        // Firestore is primary for settings
         if (!settings && navigator.onLine) {
             try {
                 let cloudSettings = await getSettingsFS(); 
@@ -295,7 +299,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             setActiveGrantId(settings.grants[0].id);
         }
         
-        // Firestore is now the primary active database
         setActiveDatabase('firestore');
         setSettingsLoaded(true);
     };

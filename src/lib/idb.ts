@@ -3,10 +3,21 @@ import { openDB, type DBSchema, type IDBPDatabase } from 'idb';
 import type { Asset, AppSettings } from './types';
 
 const DB_NAME = 'assetain-db';
-const DB_VERSION = 4; // Incremented version
+const DB_VERSION = 5; // Incremented version for offline-queue
 const ASSET_STORE_NAME = 'assets';
 const OFFLINE_ASSET_STORE_NAME = 'offline-assets';
 const SETTINGS_STORE_NAME = 'settings';
+const QUEUE_STORE_NAME = 'offline-queue';
+
+export interface OfflineOp {
+  id: string;
+  type: 'create' | 'update' | 'delete';
+  collection: string;
+  payload: any;
+  timestamp: number;
+  status: 'pending' | 'synced' | 'failed';
+  error?: string;
+}
 
 interface AssetDB extends DBSchema {
   [ASSET_STORE_NAME]: {
@@ -21,12 +32,15 @@ interface AssetDB extends DBSchema {
     key: string;
     value: AppSettings;
   };
+  [QUEUE_STORE_NAME]: {
+    key: string;
+    value: OfflineOp;
+  };
 }
 
 let dbPromise: Promise<IDBPDatabase<AssetDB>> | null = null;
 
-// This function ensures the DB is only opened on the client-side.
-const getDb = (): Promise<IDBPDatabase<AssetDB>> | null => {
+export const getDb = (): Promise<IDBPDatabase<AssetDB>> | null => {
     if (typeof window === 'undefined') {
         return null;
     }
@@ -48,6 +62,11 @@ const getDb = (): Promise<IDBPDatabase<AssetDB>> | null => {
                     db.createObjectStore(SETTINGS_STORE_NAME);
                   }
                 }
+                if (oldVersion < 5) {
+                  if (!db.objectStoreNames.contains(QUEUE_STORE_NAME)) {
+                    db.createObjectStore(QUEUE_STORE_NAME, { keyPath: 'id' });
+                  }
+                }
             },
         });
     }
@@ -58,7 +77,7 @@ const getDb = (): Promise<IDBPDatabase<AssetDB>> | null => {
 
 export const getLocalAssets = async (): Promise<Asset[]> => {
   const dbp = getDb();
-  if (!dbp) return []; // Don't run on server
+  if (!dbp) return [];
   try {
     const db = await dbp;
     return await db.getAll(ASSET_STORE_NAME);
@@ -70,7 +89,7 @@ export const getLocalAssets = async (): Promise<Asset[]> => {
 
 export const saveAssets = async (assets: Asset[]): Promise<void> => {
   const dbp = getDb();
-  if (!dbp) return; // Don't run on server
+  if (!dbp) return;
   try {
     const db = await dbp;
     const tx = db.transaction(ASSET_STORE_NAME, 'readwrite');
@@ -84,7 +103,7 @@ export const saveAssets = async (assets: Asset[]): Promise<void> => {
 
 export const clearLocalAssets = async (): Promise<void> => {
   const dbp = getDb();
-  if (!dbp) return; // Don't run on server
+  if (!dbp) return;
   try {
     const db = await dbp;
     await db.clear(ASSET_STORE_NAME);
@@ -154,5 +173,39 @@ export const saveLocalSettings = async (settings: AppSettings): Promise<void> =>
     await db.put(SETTINGS_STORE_NAME, settings, 'app-settings');
   } catch (error) {
     console.error("Failed to save settings to IndexedDB", error);
+  }
+};
+
+// --- Offline Queue ---
+export const getQueuedOps = async (): Promise<OfflineOp[]> => {
+  const dbp = getDb();
+  if (!dbp) return [];
+  try {
+    const db = await dbp;
+    return await db.getAll(QUEUE_STORE_NAME);
+  } catch (error) {
+    return [];
+  }
+};
+
+export const saveQueuedOp = async (op: OfflineOp): Promise<void> => {
+  const dbp = getDb();
+  if (!dbp) return;
+  try {
+    const db = await dbp;
+    await db.put(QUEUE_STORE_NAME, op);
+  } catch (error) {
+    console.error("Failed to enqueue operation", error);
+  }
+};
+
+export const deleteQueuedOp = async (id: string): Promise<void> => {
+  const dbp = getDb();
+  if (!dbp) return;
+  try {
+    const db = await dbp;
+    await db.delete(QUEUE_STORE_NAME, id);
+  } catch (error) {
+    console.error("Failed to remove queued operation", error);
   }
 };
