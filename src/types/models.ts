@@ -100,6 +100,8 @@ export interface DisplayField {
   label: string;
   table: boolean;
   quickView: boolean;
+  inChecklist?: boolean;
+  checklistSection?: 'required' | 'important';
 }
 
 export interface SheetDefinition {

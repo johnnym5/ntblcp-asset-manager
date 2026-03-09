@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -15,7 +14,7 @@ import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from './ui/scroll-area';
-import { ArrowDown, ArrowUp, GripVertical, PlusCircle } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, PlusCircle, Trash2 } from 'lucide-react';
 import type { SheetDefinition, DisplayField, Asset } from '@/lib/types';
 import { Input } from './ui/input';
 import {
@@ -27,6 +26,8 @@ import {
 } from '@/components/ui/select';
 import { HEADER_ALIASES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
+import { Badge } from './ui/badge';
+import { Separator } from './ui/separator';
 
 interface ColumnCustomizationSheetProps {
   isOpen: boolean;
@@ -84,10 +85,16 @@ export function ColumnCustomizationSheet({
         label: customLabel.trim(),
         table: true,
         quickView: true,
+        inChecklist: false,
+        checklistSection: 'important'
     };
 
     setEditedFields(current => [...current, newField]);
     setCustomLabel('');
+  };
+
+  const handleRemoveField = (index: number) => {
+      setEditedFields(current => current.filter((_, i) => i !== index));
   };
 
   const handleLabelChange = (index: number, newLabel: string) => {
@@ -98,11 +105,19 @@ export function ColumnCustomizationSheet({
     });
   };
 
-  const handleToggle = (index: number, view: 'table' | 'quickView') => {
+  const handleToggle = (index: number, prop: 'table' | 'quickView' | 'inChecklist') => {
     setEditedFields(currentFields => {
       const newFields = [...currentFields];
-      newFields[index] = { ...newFields[index], [view]: !newFields[index][view] };
+      newFields[index] = { ...newFields[index], [prop]: !newFields[index][prop] };
       return newFields;
+    });
+  };
+
+  const handleSectionChange = (index: number, section: 'required' | 'important') => {
+    setEditedFields(currentFields => {
+        const newFields = [...currentFields];
+        newFields[index] = { ...newFields[index], checklistSection: section };
+        return newFields;
     });
   };
 
@@ -137,81 +152,129 @@ export function ColumnCustomizationSheet({
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-2xl flex flex-col">
-        <SheetHeader>
-          <SheetTitle>Customize Sheet Layout</SheetTitle>
+      <SheetContent className="w-full sm:max-w-4xl flex flex-col p-0 overflow-hidden">
+        <SheetHeader className="px-6 py-4 border-b bg-muted/20">
+          <SheetTitle>Configure Sheet Layout & Checklist</SheetTitle>
           <SheetDescription>
-            Reorder fields, edit labels, and control visibility on desktop vs. mobile. Renaming a sheet is disabled to prevent data loss.
+            Manage columns, visibility, and checklist requirements for the "{editedName}" category.
           </SheetDescription>
         </SheetHeader>
-        <div className="px-1 py-4">
-            <Label htmlFor="sheet-name" className="text-sm font-medium">Sheet Name</Label>
-            <Input id="sheet-name" value={editedName} onChange={(e) => setEditedName(e.target.value)} className="mt-1" disabled={!!originalSheetName} />
+        
+        <div className="px-6 py-4 flex items-center justify-between bg-background border-b">
+            <div className="flex-1 max-w-sm">
+                <Label htmlFor="sheet-name" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Internal Sheet Name</Label>
+                <Input id="sheet-name" value={editedName} onChange={(e) => setEditedName(e.target.value)} className="mt-1 h-9 font-bold" disabled={!!originalSheetName} />
+            </div>
+            <div className="flex gap-2">
+                <Badge variant="outline" className="h-6">Total Fields: {editedFields.length}</Badge>
+                <Badge variant="outline" className="h-6 text-primary border-primary/20">Checklist: {editedFields.filter(f => f.inChecklist).length}</Badge>
+            </div>
         </div>
+
         <div className="flex-grow overflow-hidden flex flex-col">
-          <div className="flex items-center px-4 py-2 border-y font-medium text-sm bg-muted/50">
-            <div className="w-16"></div>
-            <div className="flex-1">Field Label (Header Name)</div>
-            <div className="w-24 text-center">In Table</div>
-            <div className="w-24 text-center">Quick View</div>
+          <div className="grid grid-cols-12 gap-2 px-6 py-2 border-b font-black text-[9px] uppercase tracking-widest bg-muted/30 text-muted-foreground">
+            <div className="col-span-1 text-center">Move</div>
+            <div className="col-span-4">Field Label</div>
+            <div className="col-span-1 text-center">Table</div>
+            <div className="col-span-1 text-center">Quick</div>
+            <div className="col-span-1 text-center">Check</div>
+            <div className="col-span-3">Checklist Section</div>
+            <div className="col-span-1"></div>
           </div>
+          
           <ScrollArea className="flex-1">
-            <div className="space-y-1 p-2">
+            <div className="p-2 space-y-1">
               {editedFields.map((field, index) => (
-                <div key={field.key} className="flex items-center p-2 rounded-md hover:bg-muted/50">
-                  <div className="flex flex-col items-center w-16 text-muted-foreground">
-                    <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMove(index, 'up')} disabled={index === 0}>
-                        <ArrowUp className="h-4 w-4" />
-                    </Button>
-                    <GripVertical className="h-4 w-4 my-1 cursor-grab" />
-                     <Button variant="ghost" size="icon" className="h-6 w-6" onClick={() => handleMove(index, 'down')} disabled={index === editedFields.length - 1}>
-                        <ArrowDown className="h-4 w-4" />
-                    </Button>
+                <div key={field.key} className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg hover:bg-muted/50 border border-transparent transition-colors group">
+                  <div className="col-span-1 flex flex-col items-center">
+                    <button className="text-muted-foreground hover:text-primary disabled:opacity-20" onClick={() => handleMove(index, 'up')} disabled={index === 0}>
+                        <ArrowUp className="h-3 w-3" />
+                    </button>
+                    <GripVertical className="h-4 w-4 my-0.5 text-muted-foreground/30 cursor-grab" />
+                     <button className="text-muted-foreground hover:text-primary disabled:opacity-20" onClick={() => handleMove(index, 'down')} disabled={index === editedFields.length - 1}>
+                        <ArrowDown className="h-3 w-3" />
+                    </button>
                   </div>
-                  <div className="flex-1">
+                  <div className="col-span-4">
                     <Input 
                         value={field.label}
                         onChange={(e) => handleLabelChange(index, e.target.value)}
-                        className="h-9"
+                        className="h-8 text-xs font-semibold bg-background"
                     />
                   </div>
-                  <div className="w-24 flex justify-center">
+                  <div className="col-span-1 flex justify-center">
                     <Switch
+                      className="scale-75"
                       checked={field.table}
                       onCheckedChange={() => handleToggle(index, 'table')}
-                      aria-label={`Show ${field.label} in table`}
                     />
                   </div>
-                  <div className="w-24 flex justify-center">
+                  <div className="col-span-1 flex justify-center">
                     <Switch
+                      className="scale-75"
                       checked={field.quickView}
                       onCheckedChange={() => handleToggle(index, 'quickView')}
-                      aria-label={`Show ${field.label} in quick view`}
                     />
+                  </div>
+                  <div className="col-span-1 flex justify-center">
+                    <Switch
+                      className="scale-75"
+                      checked={field.inChecklist}
+                      onCheckedChange={() => handleToggle(index, 'inChecklist')}
+                    />
+                  </div>
+                  <div className="col-span-3">
+                    <Select 
+                        value={field.checklistSection || 'important'} 
+                        onValueChange={(v: any) => handleSectionChange(index, v)}
+                        disabled={!field.inChecklist}
+                    >
+                        <SelectTrigger className="h-8 text-[10px] font-bold uppercase">
+                            <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                            <SelectItem value="required" className="text-[10px] font-bold">REQUIRED</SelectItem>
+                            <SelectItem value="important" className="text-[10px] font-bold">IMPORTANT</SelectItem>
+                        </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="col-span-1 flex justify-end">
+                      {String(field.key).startsWith('customField') && (
+                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveField(index)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                      )}
                   </div>
                 </div>
               ))}
             </div>
           </ScrollArea>
         </div>
-        <div className="px-4 py-4 border-t">
-          <Label className="text-sm font-medium">Add Custom Field</Label>
-          <div className="flex items-center gap-2 mt-2">
-            <Input
-              placeholder="Enter new header label..."
-              value={customLabel}
-              onChange={(e) => setCustomLabel(e.target.value)}
-            />
-            <Button onClick={handleAddField}><PlusCircle className="mr-2 h-4 w-4" /> Add</Button>
+
+        <div className="px-6 py-4 border-t bg-muted/5 flex items-center gap-4">
+          <div className="flex-1">
+            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block mb-1.5">Add Custom Field</Label>
+            <div className="flex items-center gap-2">
+                <Input
+                placeholder="Enter field label (e.g. Warranty Expiry)..."
+                value={customLabel}
+                onChange={(e) => setCustomLabel(e.target.value)}
+                className="h-9 text-xs"
+                />
+                <Button variant="outline" size="sm" onClick={handleAddField} className="h-9 font-bold px-4">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Add
+                </Button>
+            </div>
           </div>
         </div>
-        <SheetFooter className="sm:justify-between items-center pt-4 border-t">
+
+        <SheetFooter className="p-6 border-t bg-muted/20 sm:justify-between items-center">
           <SheetClose asChild>
-            <Button variant="outline">Cancel</Button>
+            <Button variant="outline" className="font-bold">Cancel</Button>
           </SheetClose>
           <div className="flex gap-2">
-            <Button variant="secondary" onClick={() => handleSaveChanges(true)}>Apply Layout to All Sheets</Button>
-            <Button onClick={() => handleSaveChanges(false)}>Apply to This Sheet</Button>
+            <Button variant="secondary" className="font-bold" onClick={() => handleSaveChanges(true)}>Update All Categories</Button>
+            <Button className="font-bold shadow-lg shadow-primary/20" onClick={() => handleSaveChanges(false)}>Update This Category</Button>
           </div>
         </SheetFooter>
       </SheetContent>

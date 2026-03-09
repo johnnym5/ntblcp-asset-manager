@@ -31,7 +31,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
+import type { Asset, SheetDefinition, DisplayField, AppSettings } from "@/lib/types";
 import { Loader2, FileText, Check, RotateCcw } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -39,6 +39,9 @@ import { cn, getStatusClasses, sanitizeForFirestore } from "@/lib/utils";
 import { AssetChecklist } from "./asset-checklist";
 import { ScrollArea } from "./ui/scroll-area";
 import { ASSET_CONDITIONS } from "@/lib/constants";
+import { ColumnCustomizationSheet } from "./column-customization-sheet";
+import { saveLocalSettings } from "@/lib/idb";
+import { enqueueOp } from "@/lib/offline-queue";
 
 const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
   path: ['category'],
@@ -64,9 +67,11 @@ interface AssetFormProps {
 export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: initialIsReadOnly, defaultCategory }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const { appSettings, dataSource, activeGrantId, assets: cloudAssets, offlineAssets, globalStateFilter } = useAppState();
+  const { appSettings, setAppSettings, dataSource, activeGrantId, assets: cloudAssets, offlineAssets, globalStateFilter } = useAppState();
   const isAdmin = userProfile?.isAdmin || false;
   
+  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
+
   const form = useForm<AssetFormValues>({
     resolver: zodResolver(assetFormSchema),
     mode: 'onChange',
@@ -197,6 +202,27 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
       setIsSaving(false);
     }
   };
+
+  const handleSaveColumnLayout = async (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
+    if (!isAdmin || !appSettings || !userProfile) return;
+    const newSheetDefinitions = { ...grant?.sheetDefinitions };
+    if (applyToAll) {
+        Object.keys(newSheetDefinitions).forEach(sn => {
+            newSheetDefinitions[sn] = { ...newSheetDefinitions[sn], displayFields: newDefinition.displayFields.map(f => ({ ...f })), headers: newDefinition.headers };
+        });
+    } else if (originalName) newSheetDefinitions[originalName] = newDefinition;
+
+    const settings: AppSettings = { 
+        ...appSettings, 
+        grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefinitions } : g), 
+        lastModified: new Date().toISOString(), 
+        lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } 
+    };
+    
+    await saveLocalSettings(settings);
+    setAppSettings(settings);
+    await enqueueOp('update', 'config', settings);
+  };
   
     const renderField = (field: DisplayField) => {
         const fieldName = field.key as keyof AssetFormValues;
@@ -313,67 +339,86 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
     };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-4xl w-full flex flex-col max-h-[95vh]">
-        <DialogHeader>
-          <DialogTitle>{asset?.id ? (initialIsReadOnly ? 'View Asset Details' : 'Edit Asset') : 'Add New Asset'}</DialogTitle>
-          <DialogDescription>
-            {initialIsReadOnly ? 'Viewing asset details.' : (asset?.id ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
-          </DialogDescription>
-        </DialogHeader>
+    <>
+      <Dialog open={isOpen} onOpenChange={onOpenChange}>
+        <DialogContent className="sm:max-w-4xl w-full flex flex-col max-h-[95vh] p-0 overflow-hidden">
+          <DialogHeader className="p-6 pb-2">
+            <DialogTitle>{asset?.id ? (initialIsReadOnly ? 'View Asset Details' : 'Edit Asset') : 'Add New Asset'}</DialogTitle>
+            <DialogDescription>
+              {initialIsReadOnly ? 'Viewing asset details.' : (asset?.id ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
+            </DialogDescription>
+          </DialogHeader>
 
-        <div className="grid md:grid-cols-3 gap-x-8 flex-1 overflow-hidden">
-            <ScrollArea className="md:col-span-2 pr-4 py-4">
-                <datalist id="location-datalist">
-                    {(appSettings?.locations || []).map(loc => <option key={loc} value={loc} />)}
-                </datalist>
-                <Form {...form}>
-                  <form
-                    id="asset-form"
-                    onSubmit={form.handleSubmit(onSubmit)}
-                    className="space-y-4 p-1"
-                  >
-                   {!sheetDefinition ? (
-                        renderField({ key: 'category', label: 'Category', table: false, quickView: false })
-                   ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            {sheetDefinition.displayFields.map(field => renderField(field))}
-                        </div>
-                   )}
-                  </form>
-                </Form>
-            </ScrollArea>
-            <ScrollArea className="hidden md:block md:col-span-1 border-l pl-6 py-4">
-                <AssetChecklist values={form.watch()} />
-            </ScrollArea>
-        </div>
-        
-        <DialogFooter className="mt-auto pt-4 border-t sm:justify-between">
-          {asset?.previousState && !initialIsReadOnly && (
-            <Button
-              variant="ghost"
-              type="button"
-              className="text-destructive hover:text-destructive justify-start"
-              onClick={handleRollback}
-              disabled={isSaving}
-            >
-              <RotateCcw className="mr-2 h-4 w-4" />
-              Undo Last Change
-            </Button>
-          )}
-          <div className="flex sm:justify-end gap-2">
-            <DialogClose asChild>
-              <Button variant="outline">Close</Button>
-            </DialogClose>
-            {!initialIsReadOnly && (
-              <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
-                  {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Save Changes
+          <div className="grid md:grid-cols-3 gap-x-0 flex-1 overflow-hidden">
+              <ScrollArea className="md:col-span-2 p-6 pt-2">
+                  <datalist id="location-datalist">
+                      {(appSettings?.locations || []).map(loc => <option key={loc} value={loc} />)}
+                  </datalist>
+                  <Form {...form}>
+                    <form
+                      id="asset-form"
+                      onSubmit={form.handleSubmit(onSubmit)}
+                      className="space-y-4 p-1"
+                    >
+                    {!sheetDefinition ? (
+                          renderField({ key: 'category', label: 'Category', table: false, quickView: false })
+                    ) : (
+                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                              {sheetDefinition.displayFields.map(field => renderField(field))}
+                          </div>
+                    )}
+                    </form>
+                  </Form>
+              </ScrollArea>
+              <div className="hidden md:block md:col-span-1 border-l bg-muted/10">
+                  <ScrollArea className="h-full p-6 pt-2">
+                      <AssetChecklist 
+                        values={form.watch()} 
+                        displayFields={sheetDefinition?.displayFields} 
+                        isAdmin={isAdmin}
+                        onEdit={() => setIsColumnSheetOpen(true)}
+                      />
+                  </ScrollArea>
+              </div>
+          </div>
+          
+          <DialogFooter className="mt-auto p-6 border-t sm:justify-between bg-muted/5">
+            {asset?.previousState && !initialIsReadOnly && (
+              <Button
+                variant="ghost"
+                type="button"
+                className="text-destructive hover:text-destructive justify-start"
+                onClick={handleRollback}
+                disabled={isSaving}
+              >
+                <RotateCcw className="mr-2 h-4 w-4" />
+                Undo Last Change
               </Button>
             )}
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+            <div className="flex sm:justify-end gap-2 ml-auto">
+              <DialogClose asChild>
+                <Button variant="outline">Close</Button>
+              </DialogClose>
+              {!initialIsReadOnly && (
+                <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
+                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    Save Changes
+                </Button>
+              )}
+            </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {sheetDefinition && (
+        <ColumnCustomizationSheet 
+            isOpen={isColumnSheetOpen} 
+            onOpenChange={setIsColumnSheetOpen} 
+            sheetDefinition={sheetDefinition} 
+            originalSheetName={currentCategory} 
+            onSave={handleSaveColumnLayout} 
+        />
+      )}
+    </>
   );
 }
