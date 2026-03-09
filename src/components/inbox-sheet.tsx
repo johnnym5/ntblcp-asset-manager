@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState } from 'react';
@@ -7,18 +6,21 @@ import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { ScrollArea } from './ui/scroll-area';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
-import { Inbox, User, MapPin, Clock, GitPullRequest, Check, X, MessageSquare } from 'lucide-react';
+import { Inbox, User, MapPin, Clock, GitPullRequest, Check, X, MessageSquare, RefreshCw, Loader2 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Asset } from '@/lib/types';
 import { Badge } from './ui/badge';
 import { Textarea } from './ui/textarea';
 import { Label } from './ui/label';
+import { cn } from '@/lib/utils';
 
 interface InboxSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   onApprove?: (assetId: string, comment?: string) => Promise<void>;
   onReject?: (assetId: string, comment?: string) => Promise<void>;
+  onRefresh?: () => void;
+  isRefreshing?: boolean;
 }
 
 const ChangeDetail = ({ label, oldValue, newValue }: { label: string, oldValue?: any, newValue?: any }) => {
@@ -33,7 +35,7 @@ const ChangeDetail = ({ label, oldValue, newValue }: { label: string, oldValue?:
 };
 
 
-export function InboxSheet({ isOpen, onOpenChange, onApprove, onReject }: InboxSheetProps) {
+export function InboxSheet({ isOpen, onOpenChange, onApprove, onReject, onRefresh, isRefreshing }: InboxSheetProps) {
   const { assets, setAssetToView } = useAppState();
   const [comments, setComments] = useState<Record<string, string>>({});
 
@@ -65,10 +67,22 @@ export function InboxSheet({ isOpen, onOpenChange, onApprove, onReject }: InboxS
       <SheetContent className="w-full sm:max-w-2xl flex flex-col p-0">
         <div className="p-6 border-b bg-muted/20">
             <SheetHeader>
-                <SheetTitle className="flex items-center gap-2">
-                    <Inbox className="text-primary h-5 w-5" /> Approval Queue
-                </SheetTitle>
-                <SheetDescription>
+                <div className="flex items-center justify-between">
+                    <SheetTitle className="flex items-center gap-2">
+                        <Inbox className="text-primary h-5 w-5" /> Approval Queue
+                    </SheetTitle>
+                    <Button 
+                        variant="outline" 
+                        size="sm" 
+                        className="h-8 font-bold text-[10px] uppercase tracking-wider"
+                        onClick={onRefresh}
+                        disabled={isRefreshing}
+                    >
+                        {isRefreshing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}
+                        Check for Requests
+                    </Button>
+                </div>
+                <SheetDescription className="mt-2">
                     Review modifications proposed by field officers. Approved changes will be applied to production.
                 </SheetDescription>
             </SheetHeader>

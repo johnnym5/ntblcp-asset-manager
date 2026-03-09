@@ -510,7 +510,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {userProfile?.isAdmin && (
         <>
           <ActivityLogDialog isOpen={isActivityLogDialogOpen} onOpenChange={setIsActivityLogDialogOpen} onRevert={onRevertAsset} />
-          <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} onApprove={handleApprove} onReject={handleReject} />
+          <InboxSheet 
+            isOpen={isInboxOpen} 
+            onOpenChange={setIsInboxOpen} 
+            onApprove={handleApprove} 
+            onReject={handleReject} 
+            onRefresh={handleManualDownload}
+            isRefreshing={isSyncing}
+          />
         </>
       )}
       <AssetFilterDialog
