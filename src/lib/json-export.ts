@@ -1,10 +1,11 @@
 import type { Asset, AppSettings } from './types';
-import { saveAs } from 'file-saver';
 
-export function exportFullBackupToJson(assets: Asset[] | null, settings: AppSettings | null, fileName: string = 'ntblcp-full-backup.json') {
+export async function exportFullBackupToJson(assets: Asset[] | null, settings: AppSettings | null, fileName: string = 'ntblcp-full-backup.json') {
   if ((!assets || assets.length === 0) && !settings) {
     throw new Error('No data available to export.');
   }
+
+  const { saveAs } = await import('file-saver');
 
   const exportData = {
     timestamp: new Date().toISOString(),
@@ -18,10 +19,12 @@ export function exportFullBackupToJson(assets: Asset[] | null, settings: AppSett
   saveAs(blob, fileName);
 }
 
-export function exportAssetsToJson(assets: Asset[] | null, fileName: string = 'ntblcp-assets-backup.json') {
+export async function exportAssetsToJson(assets: Asset[] | null, fileName: string = 'ntblcp-assets-backup.json') {
   if (!assets || assets.length === 0) {
     throw new Error('No assets available to export.');
   }
+
+  const { saveAs } = await import('file-saver');
 
   const exportData = {
     timestamp: new Date().toISOString(),
@@ -35,10 +38,12 @@ export function exportAssetsToJson(assets: Asset[] | null, fileName: string = 'n
   saveAs(blob, fileName);
 }
 
-export function exportSettingsToJson(settings: AppSettings | null, fileName: string = 'ntblcp-settings-backup.json') {
+export async function exportSettingsToJson(settings: AppSettings | null, fileName: string = 'ntblcp-settings-backup.json') {
   if (!settings) {
     throw new Error('No settings available to export.');
   }
+
+  const { saveAs } = await import('file-saver');
 
   const exportData = {
     timestamp: new Date().toISOString(),

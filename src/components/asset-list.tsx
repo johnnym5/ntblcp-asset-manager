@@ -1,7 +1,7 @@
-
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import dynamic from "next/dynamic";
 import {
   Table,
   TableBody,
@@ -76,33 +76,37 @@ import {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
 
-import { AssetForm } from "./asset-form";
 import type { Asset, AppSettings, SheetDefinition, DisplayField } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS, ASSET_CONDITIONS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
-import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
-import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets, updateSettings as updateSettingsRTDB } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
-import { TravelReportDialog } from "./travel-report-dialog";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
-import { ImportScannerDialog } from "./single-sheet-import-dialog";
-import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-dialog";
-import { ColumnCustomizationSheet } from "./column-customization-sheet";
-import { AssetSummaryDashboard } from "./asset-summary-dashboard";
 import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { Badge } from "./ui/badge";
 import { motion } from "framer-motion";
 import { isAllowed, getRemainingCooldown } from "@/lib/rate-limit";
 
+// Dynamic Imports for heavy components
+const AssetForm = dynamic(() => import("./asset-form").then(mod => mod.AssetForm), { 
+    ssr: false, 
+    loading: () => <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary"/></div> 
+});
+const AssetBatchEditForm = dynamic(() => import("./asset-batch-edit-form").then(mod => mod.AssetBatchEditForm), { ssr: false });
+const CategoryBatchEditForm = dynamic(() => import("./category-batch-edit-form").then(mod => mod.CategoryBatchEditForm), { ssr: false });
+const ImportScannerDialog = dynamic(() => import("./single-sheet-import-dialog").then(mod => mod.ImportScannerDialog), { ssr: false });
+const TravelReportDialog = dynamic(() => import("./travel-report-dialog").then(mod => mod.TravelReportDialog), { ssr: false });
+const SyncConfirmationDialog = dynamic(() => import("./sync-confirmation-dialog").then(mod => mod.SyncConfirmationDialog), { ssr: false });
+const ColumnCustomizationSheet = dynamic(() => import("./column-customization-sheet").then(mod => mod.ColumnCustomizationSheet), { ssr: false });
+const AssetSummaryDashboard = dynamic(() => import("./asset-summary-dashboard").then(mod => mod.AssetSummaryDashboard), { ssr: false });
 
 /**
  * Compares two asset-like objects to see if any relevant fields have changed.
@@ -121,6 +125,118 @@ const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean 
     }
     return false;
 };
+
+// Virtualization: Memoized components for individual rows/cards
+const AssetItemCard = React.memo(({ 
+    asset, 
+    isSelected, 
+    onSelect, 
+    onView, 
+    onEdit, 
+    onDelete, 
+    onQuickSave,
+    quickViewFields,
+    appMode,
+    isGuest,
+    isAdmin 
+}: { 
+    asset: Asset, 
+    isSelected: boolean, 
+    onSelect: (id: string, checked: boolean) => void,
+    onView: (asset: Asset) => void,
+    onEdit: (asset: Asset) => void,
+    onDelete: (asset: Asset) => void,
+    onQuickSave: (id: string, data: any) => Promise<void>,
+    quickViewFields: DisplayField[],
+    appMode: string,
+    isGuest: boolean,
+    isAdmin: boolean
+}) => {
+    return (
+        <Card
+            data-state={isSelected ? 'selected' : ''}
+            className="data-[state=selected]:ring-2 data-[state=selected]:ring-primary transition-all duration-300 hover:shadow-lg flex flex-col overflow-hidden border-primary/5 shadow-sm"
+        >
+            <CardHeader className="flex flex-row items-center space-x-4 p-4 bg-muted/10 border-b border-dashed">
+                <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
+                    <Checkbox checked={isSelected} onCheckedChange={(checked) => onSelect(asset.id, checked as boolean)} disabled={isGuest} />
+                </div>
+                <div className="flex-1 min-w-0 cursor-pointer" onClick={() => onView(asset)}>
+                    <CardTitle className="text-sm font-bold truncate leading-tight">{asset.description || 'Untitled Asset'}</CardTitle>
+                    <CardDescription className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest truncate mt-0.5">
+                        {asset.syncStatus === 'local' && <CloudOff className="h-3 w-3 text-primary animate-pulse" />}
+                        {asset.assetIdCode || asset.sn || 'No ID'}
+                    </CardDescription>
+                </div>
+                <DropdownMenu>
+                    <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" disabled={isGuest}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
+                    <DropdownMenuContent align="end" className="w-48 shadow-2xl border-primary/10">
+                        <DropdownMenuItem onClick={() => onView(asset)} className="h-9"><FolderSearch className="mr-2 h-4 w-4" /> Open Dashboard</DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => onEdit(asset)} disabled={isGuest} className="h-9"><Edit className="mr-2 h-4 w-4" /> Fast Edit</DropdownMenuItem>
+                        <DropdownMenuSeparator />
+                        <DropdownMenuItem onClick={() => onDelete(asset)} className="h-9 text-destructive focus:bg-destructive/10 focus:text-destructive" disabled={!isAdmin}><Trash2 className="mr-2 h-4 w-4" /> Remove Record</DropdownMenuItem>
+                    </DropdownMenuContent>
+                </DropdownMenu>
+            </CardHeader>
+            <CardContent className="p-4 pt-4 flex-grow cursor-pointer" onClick={() => onView(asset)}>
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                    {quickViewFields.map(field => {
+                    if (['description', 'category', 'verifiedStatus'].includes(field.key)) return null;
+                    const val = asset[field.key];
+                    if (!val || String(val).trim() === '') return null;
+                    return (
+                        <div key={field.key} className="space-y-0.5 overflow-hidden">
+                            <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-wider">{field.label}</p>
+                            <p className="text-xs font-bold truncate text-foreground/80">{String(val)}</p>
+                        </div>
+                    )
+                    })}
+                </div>
+                {appMode === 'verification' && (
+                <div className="mt-4 pt-4 border-t border-dashed space-y-3" onClick={e => e.stopPropagation()}>
+                    <div className="space-y-1">
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground/60 flex items-center gap-1">
+                            <Check className="h-2 w-2"/> Verification Status
+                        </Label>
+                        <Select value={asset.verifiedStatus || 'Unverified'} onValueChange={async (s) => {
+                                await onQuickSave(asset.id, { verifiedStatus: s as any, verifiedDate: s === "Verified" ? new Date().toLocaleDateString("en-CA") : "", remarks: asset.remarks, condition: asset.condition });
+                                addNotification({ title: "Verification Updated", description: `Asset set to ${s}` });
+                        }}>
+                            <SelectTrigger className={cn("h-8 text-[10px] font-black uppercase rounded-lg border-none shadow-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
+                            <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                                <SelectItem value="Unverified" className="text-[10px] font-bold">Unverified</SelectItem>
+                                <SelectItem value="Verified" className="text-[10px] font-bold">Verified</SelectItem>
+                            </SelectContent>
+                        </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                        <Label className="text-[9px] font-black uppercase text-muted-foreground/60 flex items-center gap-1">
+                            <ShieldQuestion className="h-2 w-2"/> Physical Condition
+                        </Label>
+                        <Select value={asset.condition || ''} onValueChange={async (c) => {
+                                await onQuickSave(asset.id, { verifiedStatus: asset.verifiedStatus, remarks: asset.remarks, condition: c });
+                                addNotification({ title: "Condition Updated", description: `Set to ${c}` });
+                        }}>
+                            <SelectTrigger className="h-8 text-[10px] font-bold bg-muted/50 border-none shadow-inner rounded-lg">
+                            <SelectValue placeholder="Select condition..." />
+                            </SelectTrigger>
+                            <SelectContent className="rounded-xl">
+                                {ASSET_CONDITIONS.map(cond => (
+                                    <SelectItem key={cond} value={cond} className="text-[10px] font-bold">{cond}</SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+});
+AssetItemCard.displayName = 'AssetItemCard';
 
 const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; appMode: 'management' | 'verification' }> = ({ locationName, allAssets, appMode }) => {
     const locationAssets = useMemo(() => {
@@ -780,13 +896,13 @@ export default function AssetList() {
     setIsFormOpen(true);
   }, [isAdmin, userProfile]);
   
-  const handleViewAsset = (asset: Asset) => {
+  const handleViewAsset = useCallback((asset: Asset) => {
     setSelectedAsset(asset);
     setIsFormReadOnly(true);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleEditAsset = (asset: Asset) => {
+  const handleEditAsset = useCallback((asset: Asset) => {
     if (!userProfile?.canEditAssets && !isAdmin) {
       addNotification({ title: "Restricted", variant: "destructive" });
       return;
@@ -794,14 +910,14 @@ export default function AssetList() {
     setSelectedAsset(asset);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  };
+  }, [userProfile, isAdmin]);
 
   useEffect(() => {
     if (assetToView) {
         handleViewAsset(assetToView);
         setAssetToView(null);
     }
-  }, [assetToView, setAssetToView]);
+  }, [assetToView, setAssetToView, handleViewAsset]);
 
   const handleTravelReport = useCallback(() => setIsTravelReportOpen(true), []);
   const handleClearAllClick = useCallback(() => setIsClearAllDialogOpen(true), []);
@@ -971,7 +1087,7 @@ export default function AssetList() {
     setIsFormOpen(false);
   };
 
-  const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; condition?: string; verifiedStatus?: 'Verified' | 'Unverified', verifiedDate?: string }) => {
+  const handleQuickSaveAsset = useCallback(async (assetId: string, data: { remarks?: string; condition?: string; verifiedStatus?: 'Verified' | 'Unverified', verifiedDate?: string }) => {
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
@@ -1004,7 +1120,7 @@ export default function AssetList() {
           setOfflineAssets(currentOfflineAssets);
       }
     }
-  };
+  }, [dataSource, assets, offlineAssets, userProfile, globalStateFilter, setAssets, setOfflineAssets]);
 
   const handleRevertAsset = useCallback(async (assetId: string) => {
     const assetToRevert = activeAssets.find(a => a.id === assetId);
@@ -1048,9 +1164,9 @@ export default function AssetList() {
       else setSelectedCategories([]);
   }
 
-  const handleSelectSingle = (assetId: string, checked: boolean) => {
+  const handleSelectSingle = useCallback((assetId: string, checked: boolean) => {
     setSelectedAssetIds(prev => checked ? [...prev, assetId] : prev.filter(id => id !== assetId));
-  };
+  }, []);
   
   const handleSelectCategory = (category: string, checked: boolean) => {
     setSelectedCategories(prev => checked ? [...prev, category] : prev.filter(c => c !== category));
@@ -1080,7 +1196,7 @@ export default function AssetList() {
     setSelectedAssetIds([]);
   }, [isOnline, isAdmin, setAssets, dataSource, setOfflineAssets, activeDatabase]);
 
-  const handleExportSelection = useCallback(() => {
+  const handleExportSelection = useCallback(async () => {
     if(!appSettings) return;
     let assetsToExport: Asset[] = [];
 
@@ -1091,7 +1207,7 @@ export default function AssetList() {
 
     try {
       const ts = new Date().toISOString().replace(/:/g, '-');
-      exportToExcel(assetsToExport, grant?.sheetDefinitions || {}, `export-${ts}.xlsx`);
+      await exportToExcel(assetsToExport, grant?.sheetDefinitions || {}, `export-${ts}.xlsx`);
     } catch (e) {
       addNotification({ title: 'Export Failed', variant: 'destructive' });
     }
@@ -1542,12 +1658,13 @@ export default function AssetList() {
           </div>
         </div>
 
-        <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
-        <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} defaultCategory={currentCategory || undefined} />
-        <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
-        <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />
-        <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
-        <SyncConfirmationDialog isOpen={isSyncConfirmOpen} onOpenChange={setIsSyncConfirmOpen} onConfirm={handleSyncConfirm} summary={syncSummary} />
+        {isTravelReportOpen && <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />}
+        {isFormOpen && <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} defaultCategory={currentCategory || undefined} />}
+        {isBatchEditOpen && <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />}
+        {isCategoryBatchEditOpen && <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategories.length} onSave={handleSaveCategoryBatchEdit} />}
+        {isImportScanOpen && <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />}
+        {isSyncConfirmOpen && <SyncConfirmationDialog isOpen={isSyncConfirmOpen} onOpenChange={setIsSyncConfirmOpen} onConfirm={handleSyncConfirm} summary={syncSummary} />}
+        
         <AlertDialog open={isClearAllDialogOpen} onOpenChange={setIsClearAllDialogOpen}>
             <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Destructive Wipe</AlertDialogTitle><AlertDialogDescription>{clearAllDialogDescription}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearAllAssets} className="bg-destructive">Wipe All Assets</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
@@ -1623,88 +1740,20 @@ export default function AssetList() {
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-10">
                 {paginatedCategoryAssets.length > 0 ? (
                   paginatedCategoryAssets.map((asset) => (
-                    <Card
-                      key={asset.id}
-                      data-state={selectedAssetIds.includes(asset.id) ? 'selected' : ''}
-                      className="data-[state=selected]:ring-2 data-[state=selected]:ring-primary transition-all duration-300 hover:shadow-lg flex flex-col overflow-hidden border-primary/5 shadow-sm"
-                    >
-                      <CardHeader className="flex flex-row items-center space-x-4 p-4 bg-muted/10 border-b border-dashed">
-                          <div className="flex-shrink-0" onClick={e => e.stopPropagation()}>
-                              <Checkbox checked={selectedAssetIds.includes(asset.id)} onCheckedChange={(checked) => handleSelectSingle(asset.id, checked as boolean)} disabled={isGuest} />
-                          </div>
-                          <div className="flex-1 min-w-0 cursor-pointer" onClick={() => handleViewAsset(asset)}>
-                              <CardTitle className="text-sm font-bold truncate leading-tight">{asset.description || 'Untitled Asset'}</CardTitle>
-                              <CardDescription className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest truncate mt-0.5">
-                                  {asset.syncStatus === 'local' && <CloudOff className="h-3 w-3 text-primary animate-pulse" />}
-                                  {asset.assetIdCode || asset.sn || 'No ID'}
-                              </CardDescription>
-                          </div>
-                          <DropdownMenu>
-                              <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="h-8 w-8 rounded-full" disabled={isGuest}><MoreVertical className="h-4 w-4" /></Button></DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-48 shadow-2xl border-primary/10">
-                                  <DropdownMenuItem onClick={() => handleViewAsset(asset)} className="h-9"><FolderSearch className="mr-2 h-4 w-4" /> Open Dashboard</DropdownMenuItem>
-                                  <DropdownMenuItem onClick={() => handleEditAsset(asset)} disabled={!userProfile?.canEditAssets && !isAdmin} className="h-9"><Edit className="mr-2 h-4 w-4" /> Fast Edit</DropdownMenuItem>
-                                  <DropdownMenuSeparator />
-                                  <DropdownMenuItem onClick={() => { setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="h-9 text-destructive focus:bg-destructive/10 focus:text-destructive" disabled={!isAdmin}><Trash2 className="mr-2 h-4 w-4" /> Remove Record</DropdownMenuItem>
-                              </DropdownMenuContent>
-                          </DropdownMenu>
-                      </CardHeader>
-                      <CardContent className="p-4 pt-4 flex-grow cursor-pointer" onClick={() => handleViewAsset(asset)}>
-                          <div className="grid grid-cols-2 gap-x-4 gap-y-3">
-                              {quickViewFields.map(field => {
-                                if (['description', 'category', 'verifiedStatus'].includes(field.key)) return null;
-                                const val = asset[field.key];
-                                if (!val || String(val).trim() === '') return null;
-                                return (
-                                    <div key={field.key} className="space-y-0.5 overflow-hidden">
-                                        <p className="text-[9px] font-black uppercase text-muted-foreground/60 tracking-wider">{field.label}</p>
-                                        <p className="text-xs font-bold truncate text-foreground/80">{String(val)}</p>
-                                    </div>
-                                )
-                              })}
-                          </div>
-                          {appSettings?.appMode === 'verification' && (
-                            <div className="mt-4 pt-4 border-t border-dashed space-y-3" onClick={e => e.stopPropagation()}>
-                                <div className="space-y-1">
-                                    <Label className="text-[9px] font-black uppercase text-muted-foreground/60 flex items-center gap-1">
-                                        <Check className="h-2 w-2"/> Verification Status
-                                    </Label>
-                                    <Select value={asset.verifiedStatus || 'Unverified'} onValueChange={async (s) => {
-                                          await handleQuickSaveAsset(asset.id, { verifiedStatus: s as any, verifiedDate: s === "Verified" ? new Date().toLocaleDateString("en-CA") : "", remarks: asset.remarks, condition: asset.condition });
-                                          addNotification({ title: "Verification Updated", description: `Asset set to ${s}` });
-                                    }}>
-                                      <SelectTrigger className={cn("h-8 text-[10px] font-black uppercase rounded-lg border-none shadow-sm", getStatusClasses(asset.verifiedStatus || 'Unverified'))}>
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent className="rounded-xl">
-                                          <SelectItem value="Unverified" className="text-[10px] font-bold">Unverified</SelectItem>
-                                          <SelectItem value="Verified" className="text-[10px] font-bold">Verified</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                </div>
-
-                                <div className="space-y-1">
-                                    <Label className="text-[9px] font-black uppercase text-muted-foreground/60 flex items-center gap-1">
-                                        <ShieldQuestion className="h-2 w-2"/> Physical Condition
-                                    </Label>
-                                    <Select value={asset.condition || ''} onValueChange={async (c) => {
-                                          await handleQuickSaveAsset(asset.id, { verifiedStatus: asset.verifiedStatus, remarks: asset.remarks, condition: c });
-                                          addNotification({ title: "Condition Updated", description: `Set to ${c}` });
-                                    }}>
-                                      <SelectTrigger className="h-8 text-[10px] font-bold bg-muted/50 border-none shadow-inner rounded-lg">
-                                        <SelectValue placeholder="Select condition..." />
-                                      </SelectTrigger>
-                                      <SelectContent className="rounded-xl">
-                                          {ASSET_CONDITIONS.map(cond => (
-                                              <SelectItem key={cond} value={cond} className="text-[10px] font-bold">{cond}</SelectItem>
-                                          ))}
-                                      </SelectContent>
-                                    </Select>
-                                </div>
-                            </div>
-                          )}
-                      </CardContent>
-                    </Card>
+                    <AssetItemCard 
+                        key={asset.id}
+                        asset={asset}
+                        isSelected={selectedAssetIds.includes(asset.id)}
+                        onSelect={handleSelectSingle}
+                        onView={handleViewAsset}
+                        onEdit={handleEditAsset}
+                        onDelete={(a) => { setAssetToDelete(a); setIsDeleteDialogOpen(true); }}
+                        onQuickSave={handleQuickSaveAsset}
+                        quickViewFields={quickViewFields}
+                        appMode={appSettings.appMode}
+                        isGuest={isGuest}
+                        isAdmin={isAdmin}
+                    />
                   ))
                 ) : (
                   <div className="col-span-full py-20 text-center opacity-50"><FolderSearch className="mx-auto h-12 w-12 mb-2"/><p className="text-sm font-bold">No results in this view</p></div>
@@ -1715,8 +1764,10 @@ export default function AssetList() {
                <PaginationControls currentPage={currentPage} totalPages={Math.ceil(categoryFilteredAssets.length / itemsPerPage)} onPageChange={setCurrentPage} itemsPerPage={itemsPerPage} setItemsPerPage={setItemsPerPage} totalItems={categoryFilteredAssets.length} />
             </CardFooter>
         </Card>
-        <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} defaultCategory={currentCategory || undefined} />
-        <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />
+        
+        {isFormOpen && <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} defaultCategory={currentCategory || undefined} />}
+        {isBatchEditOpen && <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />}
+        
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
             <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Record?</AlertDialogTitle><AlertDialogDescription>This asset will be permanently removed from local and cloud databases. This action is irreversible.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive">Delete Asset</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>

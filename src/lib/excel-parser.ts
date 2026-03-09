@@ -1,5 +1,4 @@
-import * as XLSX from 'xlsx';
-import type { Asset, SheetDefinition, DisplayField, ImportRow } from './types';
+import type { Asset, SheetDefinition, DisplayField } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, IHVN_SUB_SHEET_DEFINITIONS } from './constants';
 import { Timestamp } from 'firebase/firestore';
@@ -101,7 +100,7 @@ const parseRows = (headerRow: unknown[], jsonData: unknown[][], category: string
             
             if (fieldName) {
                 const cell = row[colIndex];
-                const finalValue = (cell && typeof cell === 'object' && 'w' in cell) ? String(cell.w).trim() : (cell !== null && cell !== undefined ? String(cell).trim() : null);
+                const finalValue = (cell !== null && cell !== undefined && typeof cell === 'object' && 'w' in (cell as any)) ? String((cell as any).w).trim() : (cell !== null && cell !== undefined ? String(cell).trim() : null);
 
                 if (finalValue) {
                    (assetObject as any)[fieldName] = finalValue;
@@ -149,6 +148,7 @@ export async function scanExcelFile(
     const errors: string[] = [];
 
     try {
+        const XLSX = await import('xlsx');
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
         const workbook = XLSX.read(buffer, { type: 'array' });
 
@@ -225,6 +225,7 @@ export async function parseExcelFile(
     let parsedAssets: Partial<Asset>[] = [];
 
     try {
+        const XLSX = await import('xlsx');
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
         const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, cellText: false });
 
@@ -326,7 +327,8 @@ export async function parseExcelFile(
 /**
  * Exports verified assets to a multi-sheet Excel workbook.
  */
-export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, SheetDefinition>, fileName: string): void {
+export async function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, SheetDefinition>, fileName: string): Promise<void> {
+    const XLSX = await import('xlsx');
     const workbook = XLSX.utils.book_new();
 
     const assetsByCategory = assets.reduce((acc, asset) => {
@@ -392,6 +394,7 @@ export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, 
  * Scans an Excel file to extract potential sheet definitions (headers).
  */
 export async function parseExcelForTemplate(file: File): Promise<SheetDefinition[]> {
+  const XLSX = await import('xlsx');
   const templates: SheetDefinition[] = [];
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });

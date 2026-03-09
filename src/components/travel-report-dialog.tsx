@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -28,8 +27,6 @@ import {
   SelectSeparator,
 } from '@/components/ui/select';
 import { ScrollArea } from './ui/scroll-area';
-import { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, ShadingType, Bullet, AlignmentType } from 'docx';
-import { saveAs } from 'file-saver';
 import type { Asset } from '@/lib/types';
 
 
@@ -132,7 +129,12 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
   const unverifiedAssetsCount = reportAssets.length - verifiedAssets.length;
   const assetsWithRemarks = reportAssets.filter(asset => asset.remarks && asset.remarks.trim() !== '');
 
-  const generateWordDocument = () => {
+  const generateWordDocument = async () => {
+    const { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, AlignmentType } = await import('docx');
+    const { saveAs } = await import('file-saver');
+
+    const cellStyles = { borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE } }};
+
     const createBulletedParagraphs = (text: string) => {
         return text.split('\n').filter(line => line.trim() !== '').map(line => {
             return new Paragraph({
@@ -269,8 +271,6 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         saveAs(blob, `Travel-Report-${reportState}-${userProfile?.displayName}.docx`);
     });
   };
-
-  const cellStyles = { borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE } }};
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
