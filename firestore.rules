@@ -1,37 +1,74 @@
 rules_version = '2';
 
 /**
- * ASSETAIN SECURITY RULES v1.1
+ * ASSETAIN PRODUCTION SECURITY RULES v2.0
+ * RBAC (Role-Based Access Control) Implementation
  * 
- * ARCHITECT'S NOTE:
- * Because this application uses a custom password-based logic without 
- * Firebase Authentication (request.auth), security cannot be enforced 
- * natively at the document level via these rules.
- * 
- * SECURITY RECOMMENDATION:
- * 1. Migrate to Firebase Auth to enable request.auth.uid checks.
- * 2. If maintaining custom auth, move all writes to a Firebase Cloud Function (Server-Side)
- *    that validates the custom session token, then lock these rules to 'false'.
+ * SECURITY NOTICE: 
+ * These rules assume the use of Firebase Authentication with custom claims.
+ * Role-based checks require 'role' to be set on the auth token.
  */
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Configuration namespace: Highly sensitive
-    match /config/{docId=**} {
-      // In a production environment, restrict write to internal service accounts only
-      allow read: if true;
-      allow write: if true; 
+    // --- GLOBAL HELPERS ---
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Assets namespace: Operational data
+    function checkRole(role) {
+      return isAuthenticated() && request.auth.token.role == role;
+    }
+
+    function isAdmin() {
+      return checkRole('admin');
+    }
+
+    function isFieldOfficer() {
+      return checkRole('field_officer');
+    }
+
+    // --- RESOURCE RULES ---
+
+    // Configuration & Global Settings
+    match /config/{document=**} {
+      // Authenticated members need to read config for app behavior
+      allow read: if isAuthenticated();
+      // Only Super Administrators can modify global settings or user lists
+      allow write: if isAdmin();
+    }
+
+    // Projects & Grants
+    match /projects/{document=**} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    // Asset Register
     match /assets/{assetId=**} {
-      // Allow read/write for the sync engine
-      // WARNING: Without request.auth, these are vulnerable to script-based scraping.
-      allow read, write: if true;
+      // Read access for any authorized project member
+      allow read: if isAuthenticated();
+
+      // Creation: Admins and Field Officers can register new assets
+      allow create: if isAdmin() || isFieldOfficer();
+
+      // Updates & Deletions: Restrict to Admins per project requirements
+      // to maintain data fidelity and central governance.
+      allow update, delete: if isAdmin();
     }
 
-    // Default deny for everything else
+    // Activity Logs / Audit Trails
+    match /activity_log/{logId=**} {
+      // Only admins should be able to audit global history
+      allow read: if isAdmin();
+      // Any authenticated user can append to the audit trail
+      allow create: if isAuthenticated();
+      // Logs must be immutable
+      allow update, delete: if false;
+    }
+
+    // Default Deny: All other access is forbidden
     match /{document=**} {
       allow read, write: if false;
     }
