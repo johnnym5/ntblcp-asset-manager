@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">assetain</string>
+    <string name="title_activity_main">assetain</string>
+    <string name="package_name">com.assetain.app</string>
+    <string name="custom_url_scheme">com.assetain.app</string>
+</resources>

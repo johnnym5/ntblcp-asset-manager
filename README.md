@@ -1,6 +1,5 @@
 # Assetain
 
-## 🚀 Short Summary
 **Assetain** is a professional, enterprise-grade Asset Management and Verification platform designed for high-integrity operations in geographically dispersed and low-connectivity environments. Built with an "Offline-First" philosophy, it transforms complex physical asset registers into actionable intelligence through automated verification workflows, regional governance, and deep data engineering. By bridging the gap between field inspections and cloud-based analytics, Assetain ensures 100% data fidelity for large-scale inventory audits, maintenance tracking, and regional resource management.
 
 ---
@@ -48,6 +47,66 @@ A low-level suite for technical administrators to maintain system health.
 *   **Integrated Database Console**: A "Workstation" for administrators to browse collections, edit raw document fields, and manage composite query indexes without leaving the application.
 *   **Cloud Snapshots**: One-click manual snapshots and restores between the Firestore and Realtime Database layers for extreme disaster recovery scenarios.
 *   **Dynamic Schema Management**: Admins can add or remove custom fields from documents on-the-fly, allowing the system to evolve with changing project requirements.
+
+---
+
+## 📱 Mobile App Build (Android)
+
+I have automated the mobile build process using Capacitor. Follow these steps to generate your native app:
+
+### Step 1: Initialize (Run Once)
+Install the necessary mobile dependencies and create the Android project:
+```bash
+npm run mobile:init
+```
+
+### Step 2: Build & Sync
+Run this whenever you make changes to your code to update the mobile app:
+```bash
+npm run mobile:build
+```
+
+### Step 3: Run on Device
+Open the project in Android Studio to run it on your phone or emulator:
+```bash
+npm run mobile:open
+```
+
+### 🔑 Important Firebase Setup
+1. Go to the [Firebase Console](https://console.firebase.google.com/).
+2. Add an **Android App** to your project with package name: `com.assetain.app`.
+3. Download `google-services.json`.
+4. Place it in `android/app/google-services.json`.
+
+---
+
+## 🚀 Deployment Guide
+
+### Step 1: Push to GitHub
+Run these commands in your terminal to sync this code with your repository:
+```bash
+git config --global user.email "jegbase@gmail.com"
+git config --global user.name "Johnmary"
+git add .
+git commit -m "Resolved merge conflict and updated build guides"
+git push origin main
+```
+
+### Step 2: Deploy Database Config
+The app requires specific indexes to handle regional queries. Use the Firebase CLI to deploy them:
+```bash
+firebase use --add  # Select your project
+firebase deploy --only firestore:indexes,firestore:rules,database:rules
+```
+
+### Step 3: Web Hosting (Vercel / Firebase)
+1. **Connect**: Link your GitHub repo to Vercel or Firebase App Hosting.
+2. **Environment Variables**: Add all keys from your `.env` file to the "Environment Variables" section in your hosting provider's dashboard.
+
+## 🏗 Architecture
+- **Primary Layer**: Cloud Firestore (Used for all live queries and structured data).
+- **Backup Layer**: Realtime Database (Shadow mirroring for high-availability redundancy).
+- **Local Layer**: IndexedDB (Browser persistence for 100% offline capability).
 
 ---
 © 2024 Assetain. Professional Asset Intelligence.
