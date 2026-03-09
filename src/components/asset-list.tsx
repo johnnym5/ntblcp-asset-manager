@@ -86,7 +86,7 @@ import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets, updateSettings as updateSettingsRTDB } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
-import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter } from "@/lib/utils";
+import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter, sanitizeInput } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
@@ -524,7 +524,7 @@ export default function AssetList() {
     const handleUploadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
 
-    // Rate limiting
+    // SECURITY: Rate limiting to prevent sync flood
     if (!isAllowed('sync-upload', 5000)) {
         const remaining = getRemainingCooldown('sync-upload', 5000);
         addNotification({ title: "Sync Paused", description: `Please wait ${remaining}s before next upload.` });
@@ -566,7 +566,7 @@ export default function AssetList() {
     if (!isOnline || !authInitialized || isGuest) return;
 
     if (!isFirstTime) {
-      // Rate limiting
+      // SECURITY: Rate limiting to prevent sync flood
       if (!isAllowed('sync-download', 5000)) {
           const remaining = getRemainingCooldown('sync-download', 5000);
           addNotification({ title: "Sync Paused", description: `Please wait ${remaining}s before checking cloud.` });
@@ -1016,6 +1016,11 @@ export default function AssetList() {
             lastModifiedByState: globalStateFilter,
             syncStatus: dataSource === 'cloud' ? 'local' : undefined,
         };
+        // SECURITY: Sanitize string inputs
+        if (updatedAsset.remarks) updatedAsset.remarks = sanitizeInput(updatedAsset.remarks);
+        if (updatedAsset.assignee) updatedAsset.assignee = sanitizeInput(updatedAsset.assignee);
+        if (updatedAsset.location) updatedAsset.location = sanitizeInput(updatedAsset.location);
+
         if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
             updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
         } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
@@ -1044,6 +1049,13 @@ export default function AssetList() {
   const handleSaveAsset = async (assetToSave: Asset) => {
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
+
+    // SECURITY: Sanitize all text fields before saving
+    (Object.keys(assetToSave) as Array<keyof Asset>).forEach(key => {
+        if (typeof assetToSave[key] === 'string') {
+            (assetToSave as any)[key] = sanitizeInput(assetToSave[key] as string);
+        }
+    });
 
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
         let previousState: Partial<Asset> | undefined = undefined;
@@ -1093,6 +1105,9 @@ export default function AssetList() {
     if (!asset) return;
 
     if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus && asset.condition === data.condition) return;
+
+    // SECURITY: Sanitize quick save input
+    if (data.remarks) data.remarks = sanitizeInput(data.remarks);
 
     const updatedAsset: Asset = sanitizeForFirestore({ 
         ...asset, 

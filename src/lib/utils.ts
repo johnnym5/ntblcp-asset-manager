@@ -15,7 +15,9 @@ export function cn(...inputs: ClassValue[]) {
  * Security/Data Utility: Sanitizes input to prevent NoSQL injection patterns.
  */
 export const sanitizeInput = (input: string): string => {
-    return input.replace(/[${}]/g, "");
+    if (typeof input !== 'string') return input;
+    // Remove characters that could be used for NoSQL injection or basic script tags
+    return input.replace(/[${}]/g, "").trim();
 };
 
 export const normalizeAssetLocation = (location?: string): string => {

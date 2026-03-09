@@ -1,4 +1,3 @@
-
 /**
  * Simple client-side rate limiting utility to prevent spamming high-impact operations.
  */
