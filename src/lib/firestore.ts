@@ -26,49 +26,18 @@ export async function getSettings(): Promise<AppSettings | null> {
         }
         return null;
     } catch (serverError) {
-        // If we get a permission error, we surface it contextually for debugging.
-        // This usually happens if the security rules haven't fully deployed yet.
-        if ((serverError as any)?.code === 'permission-denied') {
-            const permissionError = new FirestorePermissionError({
-                path: settingsRef.path,
-                operation: 'get',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        }
+        // Log errors but don't show full screen UI for background reads
         logger.error("Failed to fetch settings:", serverError);
         return null;
     }
 }
 
+/**
+ * Updates settings locally by enqueuing an operation.
+ * Cloud write only happens during manual sync.
+ */
 export async function updateSettings(settings: AppSettings) {
-  if (typeof window !== 'undefined' && !navigator.onLine) {
     await enqueueOp('update', 'config', settings);
-    return;
-  }
-
-  const firestoreDb = checkConfig();
-  if (!firestoreDb) return;
-  const settingsRef = doc(firestoreDb, 'config', 'settings');
-  
-  // Primary write to Firestore
-  setDoc(settingsRef, settings, { merge: true }).then(() => {
-      // AUTO BACKUP: Mirror settings to Realtime Database
-      import('@/lib/database').then(dbMod => {
-          dbMod.updateSettings(settings).catch(() => {});
-      });
-  }).catch(async (error) => {
-      if ((error as any)?.code === 'permission-denied') {
-          const permissionError = new FirestorePermissionError({
-              path: settingsRef.path,
-              operation: 'update',
-              requestResourceData: settings,
-          });
-          errorEmitter.emit('permission-error', permissionError);
-      } else {
-          // If other network error, enqueue for safety
-          await enqueueOp('update', 'config', settings);
-      }
-  });
 }
 
 // --- Assets (Primary Layer) ---
@@ -78,7 +47,6 @@ export async function getAssets(grantId?: string | null): Promise<Asset[]> {
     
     const assetsCollectionRef = collection(firestoreDb, 'assets');
     
-    // Server-side optimized query using grantId index
     let q = query(assetsCollectionRef);
     if (grantId && grantId !== 'All') {
         q = query(assetsCollectionRef, where('grantId', '==', grantId));
@@ -93,47 +61,15 @@ export async function getAssets(grantId?: string | null): Promise<Asset[]> {
 
         return fetchedAssets;
     } catch (serverError) {
-        if ((serverError as any)?.code === 'permission-denied') {
-            const permissionError = new FirestorePermissionError({
-                path: assetsCollectionRef.path,
-                operation: 'list',
-            });
-            errorEmitter.emit('permission-error', permissionError);
-        }
+        logger.error("Failed to fetch assets:", serverError);
         return [];
     }
 }
 
-export async function setAsset(asset: Asset) {
-    if (typeof window !== 'undefined' && !navigator.onLine) {
-        await enqueueOp('update', 'assets', asset);
-        return;
-    }
-
-    const firestoreDb = checkConfig();
-    if (!firestoreDb) return;
-    const docRef = doc(firestoreDb, 'assets', asset.id);
-    await setDoc(docRef, asset).catch(async (e) => {
-        if (e.code === 'permission-denied') {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: docRef.path,
-                operation: 'update',
-                requestResourceData: asset
-            }));
-        } else {
-            await enqueueOp('update', 'assets', asset);
-        }
-    });
-}
-
+/**
+ * Used for manual synchronization only.
+ */
 export async function batchSetAssets(assets: Asset[]) {
-    if (typeof window !== 'undefined' && !navigator.onLine) {
-        for (const asset of assets) {
-            await enqueueOp('update', 'assets', asset);
-        }
-        return;
-    }
-
     const db = checkConfig();
     if (!db) return;
     const assetsCollectionRef = collection(db, 'assets');
@@ -151,58 +87,36 @@ export async function batchSetAssets(assets: Asset[]) {
                     path: assetsCollectionRef.path,
                     operation: 'update'
                 }));
-            } else {
-                // If network failure during batch, individual enqueuing is safest
-                for (const asset of chunk) {
-                    await enqueueOp('update', 'assets', asset);
-                }
             }
+            throw e;
         });
     }
 }
 
-export async function deleteAsset(id: string) {
-    if (typeof window !== 'undefined' && !navigator.onLine) {
-        await enqueueOp('delete', 'assets', { id });
-        return;
-    }
-
-    const firestoreDb = checkConfig();
-    if (!firestoreDb) return;
-    const docRef = doc(firestoreDb, 'assets', id);
-    await deleteDoc(docRef).catch(async (e) => {
-        if (e.code === 'permission-denied') {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: docRef.path,
-                operation: 'delete'
-            }));
-        } else {
-            await enqueueOp('delete', 'assets', { id });
-        }
-    });
-}
-
+/**
+ * Used for manual synchronization only.
+ */
 export async function batchDeleteAssets(assetIds: string[]) {
-    if (typeof window !== 'undefined' && !navigator.onLine) {
-        for (const id of assetIds) {
-            await enqueueOp('delete', 'assets', { id });
-        }
-        return;
-    }
-
     const db = checkConfig();
     if (!db) return;
     const batch = writeBatch(db);
     assetIds.forEach(id => {
         batch.delete(doc(db, 'assets', id));
     });
-    await batch.commit().catch(async () => {
-        for (const id of assetIds) {
-            await enqueueOp('delete', 'assets', { id });
+    await batch.commit().catch(async (e) => {
+        if (e.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: 'assets',
+                operation: 'delete'
+            }));
         }
+        throw e;
     });
 }
 
+/**
+ * Administrative wipe - used only when strictly required.
+ */
 export async function clearAssets() {
     const db = checkConfig();
     if (!db) return;

@@ -60,6 +60,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Badge } from "./ui/badge";
 import { saveAssets } from "@/lib/idb";
+import { processOfflineQueue } from "@/lib/offline-queue";
 
 // Defer loading of administrative modules to prevent dependency cycles and runtime errors
 const InboxSheet = dynamic(() => import("./inbox-sheet").then(mod => mod.InboxSheet), { ssr: false });
@@ -156,12 +157,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setManualDownloadTrigger(c => c + 1);
   };
   
-  const handleManualUpload = () => {
+  const handleManualUpload = async () => {
     if (!isOnline) {
       addNotification({ title: "Currently Offline", variant: "destructive" });
       return;
     }
     if (isSyncing) return;
+    
+    // Process structural changes (deletions, settings) first
+    await processOfflineQueue();
+    
+    // Then process asset updates
     setManualUploadTrigger(c => c + 1);
   };
 

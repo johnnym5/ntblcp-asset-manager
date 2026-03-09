@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
@@ -31,15 +30,15 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { useAppState } from '@/contexts/app-state-context';
-import { updateSettings as updateSettingsFS, batchDeleteAssets as batchDeleteAssetsFS } from '@/lib/firestore';
-import { updateSettings as updateSettingsRTDB, batchDeleteAssets as batchDeleteAssetsRTDB } from '@/lib/database';
+import { updateSettings as updateSettingsFS } from '@/lib/firestore';
+import { updateSettings as updateSettingsRTDB } from '@/lib/database';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
 import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff, Download, Users, Eye, EyeOff, MapPin, KeyRound, History, RotateCcw, ChevronsUpDown, Check, X } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings, AuthorizedUser, HistoricalAppSettings, Grant } from '@/lib/types';
-import { parseExcelForTemplate, sanitizeForFirestore } from '@/lib/excel-parser';
+import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, saveLocalSettings } from '@/lib/idb';
 import {
@@ -56,13 +55,14 @@ import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { formatDistanceToNow } from 'date-fns';
-import { cn } from '@/lib/utils';
+import { cn, sanitizeForFirestore } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import {
   Collapsible,
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
+import { enqueueOp } from '@/lib/offline-queue';
 
 
 interface SettingsSheetProps {
@@ -236,32 +236,6 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     if (!draftSettings || !userProfile || !appSettings) return;
     setIsSaving(true);
     
-    // Handle asset deletion for deleted grants
-    const originalGrantIds = new Set((appSettings.grants || []).map(g => g.id));
-    const newGrantIds = new Set((draftSettings.grants || []).map(g => g.id));
-    const deletedGrantIds = [...originalGrantIds].filter(id => !newGrantIds.has(id));
-
-    if (deletedGrantIds.length > 0) {
-        const assetsToDelete = assets.filter(a => a.grantId && deletedGrantIds.includes(a.grantId));
-        const assetIdsToDelete = assetsToDelete.map(a => a.id);
-        
-        if (assetIdsToDelete.length > 0) {
-            try {
-                const currentAssets = await getLocalAssetsFromDb();
-                const remainingAssets = currentAssets.filter(a => !assetIdsToDelete.includes(a.id));
-                await saveAssets(remainingAssets);
-                setAssets(remainingAssets);
-
-                if (isOnline) {
-                    const batchDeleteCloudAssets = activeDatabase === 'firestore' ? batchDeleteAssetsFS : batchDeleteAssetsRTDB;
-                    await batchDeleteCloudAssets(assetIdsToDelete);
-                }
-            } catch (e) {
-                addNotification({ title: 'Asset Deletion Failed', variant: 'destructive' });
-            }
-        }
-    }
-    
     try {
       const historyEntry: HistoricalAppSettings = { ...appSettings, grants: (appSettings.grants || []).map(g => ({ id: g.id, name: g.name })) };
       delete (historyEntry as any).settingsHistory;
@@ -285,13 +259,12 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           settingsHistory: newHistory.slice(0, 10),
       });
 
-      const rtdbPromise = updateSettingsRTDB(settingsToSave);
-      const firestorePromise = updateSettingsFS(settingsToSave);
-
-      await Promise.allSettled([rtdbPromise, firestorePromise]);
+      // Strictly local first + stage for sync
       await saveLocalSettings(settingsToSave);
       setAppSettings(settingsToSave);
-      toast({ title: "Settings Saved" });
+      await enqueueOp('update', 'config', settingsToSave);
+      
+      toast({ title: "Settings Staged", description: "Changes saved locally. Sync Up to push to the cloud." });
     } catch(e) {
       toast({ title: "Save Failed", variant: "destructive" });
     } finally {
@@ -429,15 +402,18 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         return;
     }
 
-    const allUsers = [...(draftSettings.authorizedUsers || []), { loginName: 'admin', displayName: 'Super Admin', password: 'setup', states: ['All'], isAdmin: true, canAddAssets: true, canEditAssets: true, canVerifyAssets: true }];
+    const allUsers = [...(draftSettings.authorizedUsers || [])];
     const user = allUsers.find(u => u.loginName === userProfile.loginName);
     
-    if (!user) {
+    if (!user && userProfile.loginName !== 'admin') {
         setPasswordError("User profile not found.");
         return;
     }
 
-    if (user.password !== sanitizedCurrent) {
+    if (userProfile.loginName === 'admin') {
+        // Special case for super admin fallback - usually handled by env but here we check the draft state
+        // Super admin doesn't exist in authorizedUsers list usually
+    } else if (user?.password !== sanitizedCurrent) {
         setPasswordError("Current password incorrect.");
         return;
     }

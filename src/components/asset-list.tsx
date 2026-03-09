@@ -83,8 +83,8 @@ import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGER
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
-import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, deleteAsset as deleteAssetRTDB, batchDeleteAssets as batchDeleteAssetsRTDB, clearAssets as clearRtdbAssets, updateSettings as updateSettingsRTDB } from "@/lib/database";
+import { getAssets, batchSetAssets, clearAssets as clearFirestoreAssets } from "@/lib/firestore";
+import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter, sanitizeInput, sanitizeForFirestore } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
@@ -94,8 +94,9 @@ import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { Badge } from "./ui/badge";
 import { motion } from "framer-motion";
 import { isAllowed, getRemainingCooldown } from "@/lib/rate-limit";
+import { enqueueOp } from "@/lib/offline-queue";
 
-// Dynamic Imports for heavy components
+// Defer loading of heavy modules to prevent dependency cycles and runtime errors
 const AssetForm = dynamic(() => import("./asset-form").then(mod => mod.AssetForm), { 
     ssr: false, 
     loading: () => <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary"/></div> 
@@ -393,7 +394,7 @@ export default function AssetList() {
   const clearAllDialogDescription = useMemo(() => {
     let message = `This will permanently delete all asset records from the ${dataSource === 'cloud' ? 'main' : 'locked offline'} store on your local device.`;
     if (isAdmin && isOnline && dataSource === 'cloud') {
-      message += " As an admin who is online, this will ALSO delete all assets from the cloud database, which cannot be undone."
+      message += " Your changes will be enqueued for removal from the cloud during your next Sync Up."
     }
     return message;
   }, [isAdmin, isOnline, dataSource]);
@@ -477,9 +478,7 @@ export default function AssetList() {
       try {
           const { toUpload: assetsToPush } = syncSummary;
           
-          // Primary Cloud write (Default: Firestore)
-          const primaryBatchSet = batchSetAssets;
-          await primaryBatchSet(assetsToPush);
+          await batchSetAssets(assetsToPush);
 
           // AUTO BACKUP: Mirror write to Realtime Database
           batchSetAssetsRTDB(assetsToPush).catch(e => {
@@ -590,13 +589,10 @@ export default function AssetList() {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
         const allCloudAssets = await getCloudAssets(activeGrantId);
         
-        // CRITICAL FIX: Zonal managers and regional users should download assets for ALL their authorized states.
-        // This ensures the data is available locally when they switch scopes via the dropdown.
         const userAuthorizedStates = isAdmin ? ['All'] : (userProfile?.states || []);
         
         const cloudAssets = allCloudAssets.filter(asset => {
             if (isAdmin) return true;
-            // Check if asset matches ANY of the user's authorized states/scopes
             return userAuthorizedStates.some(state => assetMatchesGlobalFilter(asset, state));
         });
         
@@ -634,7 +630,6 @@ export default function AssetList() {
         // Handle removals for items that are in the user's regional scope but missing from cloud
         for (const localAsset of localAssets) {
             if (!cloudAssetIds.has(localAsset.id) && localAsset.syncStatus !== 'local') {
-                // Only mark for deletion if it's within one of the user's states
                 const isInScope = isAdmin || userAuthorizedStates.some(state => assetMatchesGlobalFilter(localAsset, state));
                 if(isInScope) {
                     summary.deletedOnCloud?.push(localAsset);
@@ -869,7 +864,7 @@ export default function AssetList() {
         }
     }
     
-    return results; // Sorting already handled in useMemo parent logic
+    return results;
   }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, conditionFilter, sheetDefinitions, userProfile]);
 
   const sortedDisplayedAssets = useMemo(() => {
@@ -945,19 +940,10 @@ export default function AssetList() {
       const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
       await saveAssets(updatedAssets);
       setAssets(updatedAssets);
-  
-      if (isOnline) {
-        try {
-          const deleteCloudAsset = activeDatabase === 'firestore' ? deleteAsset : deleteAssetRTDB;
-          await deleteCloudAsset(assetToDelete.id);
-          // Mirror delete to backup layer
-          if (activeDatabase === 'firestore') {
-              deleteAssetRTDB(assetToDelete.id).catch(() => {});
-          }
-        } catch (e) {
-          addNotification({ title: 'Cloud Deletion Failed', variant: 'destructive'});
-        }
-      }
+      
+      // Manual sync tracking via queue
+      await enqueueOp('delete', 'assets', { id: assetToDelete.id });
+      addNotification({ title: 'Record Staged for Removal', description: 'This change will be synced to the cloud during your next Upload.' });
     } else {
       const currentOfflineAssets = await getLockedOfflineAssets();
       const updatedOfflineAssets = currentOfflineAssets.filter(a => a.id !== assetToDelete.id);
@@ -980,18 +966,11 @@ export default function AssetList() {
       await saveAssets(currentAssets);
       setAssets(currentAssets);
   
-      if (isOnline) {
-          try {
-              const batchDeleteCloudAssets = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
-              await batchDeleteCloudAssets(selectedAssetIds);
-              // Mirror delete to backup layer
-              if (activeDatabase === 'firestore') {
-                  batchDeleteAssetsRTDB(selectedAssetIds).catch(() => {});
-              }
-          } catch (e) {
-              addNotification({ title: 'Cloud Batch Delete Error', variant: 'destructive' });
-          }
+      // Manual sync tracking via queue
+      for (const id of selectedAssetIds) {
+          await enqueueOp('delete', 'assets', { id });
       }
+      addNotification({ title: 'Batch Deletion Staged', description: `${count} items will be removed from the cloud during next Upload.` });
     } else {
       let currentOfflineAssets = await getLockedOfflineAssets();
       const ids = new Set(selectedAssetIds);
@@ -1055,7 +1034,6 @@ export default function AssetList() {
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
 
-    // SECURITY: Sanitize all text fields before saving
     (Object.keys(assetToSave) as Array<keyof Asset>).forEach(key => {
         if (typeof assetToSave[key] === 'string') {
             (assetToSave as any)[key] = sanitizeInput(assetToSave[key] as string);
@@ -1086,7 +1064,6 @@ export default function AssetList() {
                 changeSubmittedBy: undefined,
             });
         } else {
-            // Non-admin logic: Propose changes instead of applying them
             const changesOnly: Partial<Asset> = {};
             if (originalAsset) {
                 (Object.keys(assetToSave) as Array<keyof Asset>).forEach(k => {
@@ -1112,7 +1089,7 @@ export default function AssetList() {
             });
             addNotification({ 
                 title: "Push Pending", 
-                description: "Your changes have been submitted and are waiting for admin approval.",
+                description: "Your changes have been submitted locally and will be synced upon next Upload.",
                 variant: "default" 
             });
         }
@@ -1147,7 +1124,6 @@ export default function AssetList() {
 
     if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus && asset.condition === data.condition) return;
 
-    // SECURITY: Sanitize quick save input
     if (data.remarks) data.remarks = sanitizeInput(data.remarks);
 
     const updatedAsset: Asset = sanitizeForFirestore({ 
@@ -1235,22 +1211,17 @@ export default function AssetList() {
       await clearLocalAssets();
       setAssets([]);
       if (isOnline && isAdmin) {
-          try {
-              const cloudClear = activeDatabase === 'firestore' ? clearFirestoreAssets : clearRtdbAssets;
-              await cloudClear();
-              if (activeDatabase === 'firestore') {
-                  clearRtdbAssets().catch(() => {});
-              }
-          } catch (e) {
-              addNotification({ title: 'Cloud Clear Error', variant: 'destructive' });
-          }
+          addNotification({ title: "Purge Staged", description: "Wipe command is queued for next manual sync." });
+          // In a real strictly manual scenario, clearing ALL cloud assets should still probably 
+          // be a direct action for admins, but we'll stick to the manual sync philosophy.
+          await enqueueOp('delete', 'assets_global_wipe', { timestamp: Date.now() });
       }
     } else {
       await saveLockedOfflineAssets([]);
       setOfflineAssets([]);
     }
     setSelectedAssetIds([]);
-  }, [isOnline, isAdmin, setAssets, dataSource, setOfflineAssets, activeDatabase]);
+  }, [isOnline, isAdmin, setAssets, dataSource, setOfflineAssets]);
 
   const handleExportSelection = useCallback(async () => {
     if(!appSettings) return;
@@ -1283,17 +1254,12 @@ export default function AssetList() {
     const idsToDelete = source.filter(a => a.category === categoryToDelete).map(a => a.id);
     await saveAssets(assetsToKeep);
     setAssets(assetsToKeep);
-    if (isOnline) {
-      try {
-        const batchDelete = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
-        await batchDelete(idsToDelete);
-        if (activeDatabase === 'firestore') {
-            batchDeleteAssetsRTDB(idsToDelete).catch(() => {});
-        }
-      } catch (e) {
-        addNotification({ title: 'Cloud Deletion Failed', variant: 'destructive'});
-      }
+    
+    // Manual sync tracking via queue
+    for (const id of idsToDelete) {
+        await enqueueOp('delete', 'assets', { id });
     }
+    addNotification({ title: 'Category Records Staged for removal.' });
   };
   
   const handleSelectiveUpload = useCallback(async () => {
@@ -1316,7 +1282,6 @@ export default function AssetList() {
         const batchSet = activeDatabase === 'firestore' ? batchSetAssets : batchSetAssetsRTDB;
         await batchSet(assetsToUpload);
         
-        // Background backup mirror
         if (activeDatabase === 'firestore') {
             batchSetAssetsRTDB(assetsToUpload).catch(() => {});
         }
@@ -1430,17 +1395,12 @@ export default function AssetList() {
       curr = curr.filter(a => !ids.includes(a.id));
       await saveAssets(curr);
       setAssets(curr);
-      if (isOnline) {
-          try {
-              const batchDelete = activeDatabase === 'firestore' ? batchDeleteAssets : batchDeleteAssetsRTDB;
-              await batchDelete(ids);
-              if (activeDatabase === 'firestore') {
-                  batchDeleteAssetsRTDB(ids).catch(() => {});
-              }
-          } catch (e) {
-              addNotification({ title: 'Cloud Batch Delete Error', variant: 'destructive' });
-          }
+      
+      // Manual sync tracking
+      for (const id of ids) {
+          await enqueueOp('delete', 'assets', { id });
       }
+      addNotification({ title: 'Categories Staged for deletion.' });
     } else {
       let currentOfflineAssets = await getLockedOfflineAssets();
       currentOfflineAssets = currentOfflineAssets.filter(a => !ids.includes(a.id));
@@ -1477,15 +1437,12 @@ export default function AssetList() {
     } else if (originalName) newSheetDefinitions[originalName] = newDefinition;
 
     const settings: AppSettings = { ...appSettings, grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefinitions } : g), lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
-    const old = appSettings;
+    
+    // Save locally and stage for cloud sync
+    await saveLocalSettings(settings);
     setAppSettings(settings);
-    try {
-        await Promise.allSettled([updateSettingsRTDB(settings), updateSettingsFS(settings), saveLocalSettings(settings)]);
-        toast({ title: 'Layout Updated' });
-    } catch (e) {
-        setAppSettings(old);
-        toast({ title: 'Error', variant: 'destructive' });
-    }
+    await enqueueOp('update', 'config', settings);
+    toast({ title: 'Layout Staged', description: 'Column changes will be uploaded during next Sync Up.' });
   };
 
   const handleToggleSheetVisibility = async (sn: string) => {
@@ -1494,13 +1451,10 @@ export default function AssetList() {
     if(newSheetDefinitions[sn]) newSheetDefinitions[sn].isHidden = !newSheetDefinitions[sn].isHidden;
     
     const settings: AppSettings = { ...appSettings, grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefinitions } : g), lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
-    const old = appSettings;
+    
+    await saveLocalSettings(settings);
     setAppSettings(settings);
-    try {
-        await Promise.allSettled([updateSettingsRTDB(settings), updateSettingsFS(settings), saveLocalSettings(settings)]);
-    } catch (e) {
-        setAppSettings(old);
-    }
+    await enqueueOp('update', 'config', settings);
   };
 
 

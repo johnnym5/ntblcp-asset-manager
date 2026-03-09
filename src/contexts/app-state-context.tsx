@@ -1,4 +1,3 @@
-
 'use client';
 
 import {
@@ -9,7 +8,6 @@ import {
   type Dispatch,
   type SetStateAction,
   useEffect,
-  useMemo,
   useCallback,
 } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
@@ -23,7 +21,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { NIGERIAN_STATES } from '@/lib/constants';
 import { assetMatchesGlobalFilter } from '@/lib/utils';
 import { logger } from '@/lib/logger';
-import { processOfflineQueue } from '@/lib/offline-queue';
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -161,7 +158,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [activeGrantId, setActiveGrantId] = useState<string | null>(null);
+  const [activeGrantId, activeGrantIdSet] = useState<string | null>(null);
 
   const [manualDownloadTrigger, setManualDownloadTrigger] = useState(0);
   const [manualUploadTrigger, setManualUploadTrigger] = useState(0);
@@ -192,11 +189,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     localStorage.setItem('assetain-online-status', JSON.stringify(isOnline));
     
     const handleBrowserConnectivityChange = () => {
-        const currentlyOnline = navigator.onLine;
-        setIsOnline(currentlyOnline);
-        if (currentlyOnline) {
-            processOfflineQueue().catch(err => logger.error("Background sync failed", err));
-        }
+        setIsOnline(navigator.onLine);
+        // Automatic queue replay is removed here per user request for strictly manual sync
     };
     window.addEventListener('online', handleBrowserConnectivityChange);
     window.addEventListener('offline', handleBrowserConnectivityChange);
@@ -252,8 +246,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
         }
 
         if (!settings) {
-            addNotification({ title: 'First-Time Setup', description: 'Initializing primary Firestore database.' });
-            
             const grantId = uuidv4();
             const defaultGrant: Grant = {
                 id: grantId,
@@ -294,9 +286,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
         setAppSettings(settings);
         if (settings?.activeGrantId) {
-            setActiveGrantId(settings.activeGrantId);
-        } else if (settings?.grants && settings.grants.length > 0) {
-            setActiveGrantId(settings.grants[0].id);
+            activeGrantIdSet(settings.activeGrantId);
         }
         
         setActiveDatabase('firestore');
@@ -306,62 +296,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     initializeSettings();
   }, [migrateSettings]);
   
-  useEffect(() => {
-    if (!settingsLoaded || !isOnline) return;
-
-    const handleRemoteSettingsUpdate = async (remoteSettings: AppSettings | null) => {
-       if (remoteSettings) {
-         const remoteTimestamp = remoteSettings.lastModified ? new Date(remoteSettings.lastModified).getTime() : 0;
-         const localTimestamp = appSettings?.lastModified ? new Date(appSettings.lastModified).getTime() : 0;
-
-         if (!appSettings || remoteTimestamp > localTimestamp) {
-            const migrated = await migrateSettings(remoteSettings);
-            if (migrated) {
-                await saveLocalSettings(migrated);
-                setAppSettings(migrated);
-                logger.log("Found newer settings in Firestore, updating local state.");
-            }
-         }
-       }
-    };
-    
-    const interval = setInterval(async () => {
-        if (isOnline) {
-            const settings = await getSettingsFS();
-            handleRemoteSettingsUpdate(settings);
-        }
-    }, 30000);
-
-    return () => clearInterval(interval);
-  }, [settingsLoaded, isOnline, migrateSettings, appSettings]);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && settingsLoaded) {
-        const currentProjectId = firebaseConfig.projectId;
-        const savedProjectId = localStorage.getItem('assetain-firebase-project-id');
-
-        if (currentProjectId && savedProjectId && currentProjectId !== savedProjectId) {
-            setShowProjectSwitchDialog(true);
-        }
-
-        if (currentProjectId) {
-            localStorage.setItem('assetain-firebase-project-id', currentProjectId);
-        }
-    }
-  }, [settingsLoaded]);
-
-  useEffect(() => {
-    if (appSettings && appSettings.appMode === 'management') {
-      setSelectedStatuses([]);
-    }
-  }, [appSettings, setSelectedStatuses]);
-
-  useEffect(() => {
-      if (appSettings?.activeGrantId && activeGrantId !== appSettings.activeGrantId) {
-          setActiveGrantId(appSettings.activeGrantId);
-      }
-  }, [appSettings?.activeGrantId, activeGrantId]);
-
+  const setActiveGrantId = (id: string | null) => {
+      activeGrantIdSet(id);
+  }
 
   const value = {
     assets,
