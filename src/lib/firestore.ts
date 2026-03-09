@@ -1,4 +1,3 @@
-
 'use client';
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc, where } from 'firebase/firestore';
@@ -18,6 +17,7 @@ const checkConfig = () => {
 export async function getSettings(): Promise<AppSettings | null> {
     const firestoreDb = checkConfig();
     if (!firestoreDb) return null;
+    
     const settingsRef = doc(firestoreDb, 'config', 'settings');
     try {
         const docSnap = await getDoc(settingsRef);
@@ -26,6 +26,8 @@ export async function getSettings(): Promise<AppSettings | null> {
         }
         return null;
     } catch (serverError) {
+        // If we get a permission error, we surface it contextually for debugging.
+        // This usually happens if the security rules haven't fully deployed yet.
         if ((serverError as any)?.code === 'permission-denied') {
             const permissionError = new FirestorePermissionError({
                 path: settingsRef.path,
@@ -33,6 +35,7 @@ export async function getSettings(): Promise<AppSettings | null> {
             });
             errorEmitter.emit('permission-error', permissionError);
         }
+        logger.error("Failed to fetch settings:", serverError);
         return null;
     }
 }
