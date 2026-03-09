@@ -112,13 +112,26 @@ const AssetSummaryDashboard = dynamic(() => import("./asset-summary-dashboard").
 
 /**
  * Compares two asset-like objects to see if any relevant fields have changed.
+ * Crucially, this must detect changes in approvalStatus and pendingChanges 
+ * so Admins notice new requests from field officers.
  */
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
-    const keys = Object.keys(b) as (keyof Asset)[];
+    const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof Asset>;
+    const ignoredKeys = new Set(['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState']);
+    
     for (const key of keys) {
-        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState', 'approvalStatus', 'pendingChanges', 'adminComment', 'changeSubmittedBy'].includes(key)) {
+        if (ignoredKeys.has(key)) {
             continue;
         }
+        
+        // Handle deep object comparison for pendingChanges and changeSubmittedBy
+        if (typeof a[key] === 'object' || typeof b[key] === 'object') {
+            if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) {
+                return true;
+            }
+            continue;
+        }
+
         const valA = String(a[key] ?? '').trim();
         const valB = String(b[key] ?? '').trim();
         if (valA !== valB) {
