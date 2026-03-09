@@ -3,6 +3,7 @@ import type { Asset, SheetDefinition, DisplayField, ImportRow } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, IHVN_SUB_SHEET_DEFINITIONS } from './constants';
 import { Timestamp } from 'firebase/firestore';
+import { AssetSchema } from './validation/asset-schema';
 
 /**
  * Normalizes a header string by trimming and converting to uppercase.
@@ -281,6 +282,14 @@ export async function parseExcelFile(
         const existingAssetMap = new Map(existingAssets.map(a => [`${a.sn || ''}-${a.assetIdCode || ''}-${a.description || ''}`.toLowerCase(), a.id]));
 
         for (const parsedAsset of parsedAssets) {
+            // PHASE 3: Data Validation using Zod
+            const validation = AssetSchema.safeParse(parsedAsset);
+            if (!validation.success) {
+                const errorMessages = validation.error.errors.map(err => `${err.path.join('.')}: ${err.message}`).join(', ');
+                result.errors.push(`Row validation failed: ${parsedAsset.description || 'Unknown'} - ${errorMessages}`);
+                continue;
+            }
+
             const assetKey = `${parsedAsset.sn || ''}-${parsedAsset.assetIdCode || ''}-${parsedAsset.description || ''}`.toLowerCase();
             if (existingAssetMap.has(assetKey)) {
                 const existingId = existingAssetMap.get(assetKey)!;
