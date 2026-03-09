@@ -17,7 +17,7 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/avatar';
 import {
   Boxes,
   Settings,
@@ -38,6 +38,7 @@ import {
   Menu,
   MoreVertical,
   MapPin,
+  Inbox,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -60,11 +61,15 @@ import { ActivityLogDialog } from "./admin/activity-log-sheet";
 import { Popover, PopoverContent, PopoverTrigger } from "./ui/popover";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Badge } from "./ui/badge";
+import { InboxSheet } from "./inbox-sheet";
+import { saveAssets } from "@/lib/idb";
+import { sanitizeForFirestore } from "@/lib/excel-parser";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { userProfile, loading, logout } = useAuth();
   const isMobile = useIsMobile();
   const { 
+    assets, setAssets,
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
     sortConfig, setSortConfig,
@@ -90,6 +95,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [isFilterDialogOpen, setIsFilterDialogOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isActivityLogDialogOpen, setIsActivityLogDialogOpen] = useState(false);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
 
   const { notifications, unreadCount, markAllAsRead } = useNotifications();
 
@@ -165,6 +171,53 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }
   
+  const handleApprove = async (assetId: string, comment?: string) => {
+    const assetToApprove = assets.find(a => a.id === assetId);
+    if (!assetToApprove || !assetToApprove.pendingChanges) return;
+
+    const approvedAsset = sanitizeForFirestore({
+        ...assetToApprove,
+        ...assetToApprove.pendingChanges,
+        approvalStatus: 'approved',
+        pendingChanges: undefined,
+        adminComment: comment,
+        syncStatus: 'local',
+    } as Asset);
+
+    const newAssets = assets.map(a => a.id === assetId ? approvedAsset : a);
+    setAssets(newAssets);
+    await saveAssets(newAssets);
+
+    addNotification({
+        title: "Approval Accepted",
+        description: `Changes for "${approvedAsset.description}" have been applied and data updated.`,
+        variant: "default"
+    });
+  };
+
+  const handleReject = async (assetId: string, comment?: string) => {
+    const assetToReject = assets.find(a => a.id === assetId);
+    if (!assetToReject) return;
+
+    const rejectedAsset = sanitizeForFirestore({
+        ...assetToReject,
+        approvalStatus: 'rejected',
+        pendingChanges: undefined,
+        adminComment: comment,
+        syncStatus: 'local',
+    } as Asset);
+    
+    const newAssets = assets.map(a => a.id === assetId ? rejectedAsset : a);
+    setAssets(newAssets);
+    await saveAssets(newAssets);
+
+    addNotification({
+        title: "Request Denied",
+        description: `Changes for "${assetToReject.description}" were rejected by admin. Reason: ${comment || 'No reason provided'}. Try again or close.`,
+        variant: "destructive"
+    });
+  };
+
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0) + conditionFilter.length;
 
   const handleSettingsOpen = () => {
@@ -173,12 +226,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }
 
   const userHasMultipleStates = userProfile?.states && userProfile.states.length > 1;
+  const pendingCount = assets.filter(a => a.approvalStatus === 'pending').length;
 
   return (
     <div className="flex flex-col w-full h-screen bg-background overflow-hidden">
       <header className="flex flex-col border-b bg-background/95 backdrop-blur-md z-50">
         <div className="flex items-center justify-between px-4 py-2 h-14 sm:h-16 md:px-6">
-            {/* Left Side: Logo */}
             <div className="flex items-center gap-2">
                 <div className="p-1.5 bg-primary rounded-lg">
                     <Boxes className="h-5 w-5 text-primary-foreground" />
@@ -186,7 +239,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <span className="text-lg font-bold hidden sm:inline-block tracking-tight">Assetain</span>
             </div>
 
-            {/* Right Side: Actions */}
             <div className="flex items-center gap-1 sm:gap-2">
                 {!isMobile && isOnline && (
                   <div className="flex items-center gap-1 mr-2 bg-muted/50 p-1 rounded-lg">
@@ -214,7 +266,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
 
-                {/* Mobile Cloud Actions */}
                 {isMobile && isOnline && (
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -364,10 +415,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       )}
 
                       {userProfile?.isAdmin && (
-                        <DropdownMenuItem onClick={() => setIsActivityLogDialogOpen(true)} className="h-10 cursor-pointer">
-                          <History className="mr-2 h-4 w-4 text-muted-foreground"/>
-                          Audit & Activity Log
-                        </DropdownMenuItem>
+                        <>
+                          <DropdownMenuItem onClick={() => setIsInboxOpen(true)} className="h-10 cursor-pointer flex items-center justify-between">
+                            <div className="flex items-center">
+                              <Inbox className="mr-2 h-4 w-4 text-muted-foreground"/>
+                              Approval Queue
+                            </div>
+                            {pendingCount > 0 && <Badge className="h-5 px-1.5 min-w-[20px] justify-center bg-primary text-primary-foreground">{pendingCount}</Badge>}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => setIsActivityLogDialogOpen(true)} className="h-10 cursor-pointer">
+                            <History className="mr-2 h-4 w-4 text-muted-foreground"/>
+                            Audit & Activity Log
+                          </DropdownMenuItem>
+                        </>
                       )}
 
                       <DropdownMenuSeparator />
@@ -381,7 +441,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
         </div>
 
-        {/* Search Bar Row */}
         <div className="px-4 pb-3 sm:px-6">
             <div className="relative flex items-center w-full h-11 group">
                 <div className="absolute left-4 z-10">
@@ -448,7 +507,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <DatabaseAdminDialog isOpen={isDbAdminOpen} onOpenChange={setIsDbAdminOpen} />
       )}
       {userProfile?.isAdmin && (
-        <ActivityLogDialog isOpen={isActivityLogDialogOpen} onOpenChange={setIsActivityLogDialogOpen} onRevert={onRevertAsset} />
+        <>
+          <ActivityLogDialog isOpen={isActivityLogDialogOpen} onOpenChange={setIsActivityLogDialogOpen} onRevert={onRevertAsset} />
+          <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} onApprove={handleApprove} onReject={handleReject} />
+        </>
       )}
       <AssetFilterDialog
         isOpen={isFilterDialogOpen}

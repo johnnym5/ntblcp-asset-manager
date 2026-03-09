@@ -57,6 +57,16 @@ export interface Asset {
   // Client-side undo buffer
   previousState?: Partial<Asset>;
 
+  // Approval Workflow Fields
+  approvalStatus?: 'pending' | 'approved' | 'rejected';
+  pendingChanges?: Partial<Asset>;
+  adminComment?: string;
+  changeSubmittedBy?: { 
+    displayName: string;
+    loginName: string;
+    state: string;
+  };
+
   // Custom fields
   customField1?: string;
   customField2?: string;

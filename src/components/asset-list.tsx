@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -60,7 +61,7 @@ import {
   MoreVertical,
   ShieldQuestion,
 } from "lucide-react";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -114,7 +115,7 @@ const AssetSummaryDashboard = dynamic(() => import("./asset-summary-dashboard").
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
     const keys = Object.keys(b) as (keyof Asset)[];
     for (const key of keys) {
-        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState'].includes(key)) {
+        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState', 'approvalStatus', 'pendingChanges', 'adminComment', 'changeSubmittedBy'].includes(key)) {
             continue;
         }
         const valA = String(a[key] ?? '').trim();
@@ -166,6 +167,7 @@ const AssetItemCard = React.memo(({
                     <CardDescription className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-widest truncate mt-0.5">
                         {asset.syncStatus === 'local' && <CloudOff className="h-3 w-3 text-primary animate-pulse" />}
                         {asset.assetIdCode || asset.sn || 'No ID'}
+                        {asset.approvalStatus === 'pending' && <Badge variant="outline" className="ml-1 bg-yellow-100 text-yellow-800 border-yellow-200 text-[8px] h-4">Pending Approval</Badge>}
                     </CardDescription>
                 </div>
                 <DropdownMenu>
@@ -868,17 +870,21 @@ export default function AssetList() {
         }
     }
     
-    return sortAssets(results, sortConfig);
-  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, conditionFilter, sortConfig, sheetDefinitions, userProfile]);
+    return results; // Sorting already handled in useMemo parent logic
+  }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, conditionFilter, sheetDefinitions, userProfile]);
+
+  const sortedDisplayedAssets = useMemo(() => {
+      return sortAssets(displayedAssets, sortConfig);
+  }, [displayedAssets, sortConfig]);
 
   const assetsByCategory = useMemo(() => {
-    return displayedAssets.reduce((acc, asset) => {
+    return sortedDisplayedAssets.reduce((acc, asset) => {
         const category = asset.category || 'Uncategorized';
         if (!acc[category]) acc[category] = [];
         acc[category].push(asset);
         return acc;
     }, {} as { [key: string]: Asset[] });
-  }, [displayedAssets]);
+  }, [sortedDisplayedAssets]);
 
   const categoryFilteredAssets = useMemo(() => {
     if (!currentCategory) return [];
@@ -1067,14 +1073,50 @@ export default function AssetList() {
             }
         }
 
-        const finalAsset: Asset = sanitizeForFirestore({
-            ...assetToSave,
-            lastModified: new Date().toISOString(),
-            lastModifiedBy: userProfile?.displayName,
-            lastModifiedByState: globalStateFilter,
-            syncStatus: dataSource === 'cloud' ? 'local' : undefined,
-            previousState: Object.keys(previousState || {}).length > 0 ? previousState : undefined,
-        });
+        let finalAsset: Asset;
+        if (isAdmin) {
+            finalAsset = sanitizeForFirestore({
+                ...assetToSave,
+                lastModified: new Date().toISOString(),
+                lastModifiedBy: userProfile?.displayName,
+                lastModifiedByState: globalStateFilter,
+                syncStatus: dataSource === 'cloud' ? 'local' : undefined,
+                previousState: Object.keys(previousState || {}).length > 0 ? previousState : undefined,
+                approvalStatus: undefined,
+                pendingChanges: undefined,
+                changeSubmittedBy: undefined,
+            });
+        } else {
+            // Non-admin logic: Propose changes instead of applying them
+            const changesOnly: Partial<Asset> = {};
+            if (originalAsset) {
+                (Object.keys(assetToSave) as Array<keyof Asset>).forEach(k => {
+                    if (assetToSave[k] !== originalAsset[k]) {
+                        (changesOnly as any)[k] = assetToSave[k];
+                    }
+                });
+            }
+
+            finalAsset = sanitizeForFirestore({
+                ...(originalAsset || assetToSave),
+                approvalStatus: 'pending',
+                pendingChanges: changesOnly,
+                changeSubmittedBy: {
+                    displayName: userProfile?.displayName || 'Unknown',
+                    loginName: userProfile?.loginName || 'unknown',
+                    state: globalStateFilter,
+                },
+                lastModified: new Date().toISOString(),
+                lastModifiedBy: userProfile?.displayName,
+                lastModifiedByState: globalStateFilter,
+                syncStatus: dataSource === 'cloud' ? 'local' : undefined,
+            });
+            addNotification({ 
+                title: "Push Pending", 
+                description: "Your changes have been submitted and are waiting for admin approval.",
+                variant: "default" 
+            });
+        }
       
       if (dataSource === 'cloud') {
         const currentAssets = await getLocalAssetsFromDb();
@@ -1401,10 +1443,10 @@ export default function AssetList() {
           }
       }
     } else {
-      let curr = await getLockedOfflineAssets();
-      curr = curr.filter(a => !ids.includes(a.id));
-      await saveLockedOfflineAssets(curr);
-      setOfflineAssets(curr);
+      let currentOfflineAssets = await getLockedOfflineAssets();
+      currentOfflineAssets = currentOfflineAssets.filter(a => !ids.includes(a.id));
+      await saveLockedOfflineAssets(currentOfflineAssets);
+      setOfflineAssets(currentOfflineAssets);
     }
     setSelectedCategories([]);
     setIsBatchDeleting(false);

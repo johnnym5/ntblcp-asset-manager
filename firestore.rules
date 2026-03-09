@@ -1,7 +1,7 @@
 rules_version = '2';
 
 /**
- * ASSETAIN PRODUCTION SECURITY RULES v2.0
+ * ASSETAIN PRODUCTION SECURITY RULES v2.1
  * RBAC (Role-Based Access Control) Implementation
  * 
  * SECURITY NOTICE: 
@@ -53,9 +53,15 @@ service cloud.firestore {
       // Creation: Admins and Field Officers can register new assets
       allow create: if isAdmin() || isFieldOfficer();
 
-      // Updates & Deletions: Restrict to Admins per project requirements
-      // to maintain data fidelity and central governance.
-      allow update, delete: if isAdmin();
+      // Updates & Deletions: 
+      // Admins have full control.
+      // Field Officers can update assets ONLY IF they are proposing a change (approvalStatus == 'pending')
+      allow update: if isAdmin() || 
+        (isFieldOfficer() && 
+         request.resource.data.diff(resource.data).affectedKeys().hasOnly(['approvalStatus', 'pendingChanges', 'changeSubmittedBy', 'lastModified', 'lastModifiedBy', 'lastModifiedByState']) &&
+         request.resource.data.approvalStatus == 'pending');
+         
+      allow delete: if isAdmin();
     }
 
     // Activity Logs / Audit Trails
