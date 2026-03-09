@@ -1,7 +1,9 @@
 /**
  * @fileOverview Centralized logging utility for Assetain.
- * Filters logs based on the environment to prevent leaking debug info in production.
+ * Integrated with the Monitoring Service for production tracking.
  */
+
+import { monitoring } from "./monitoring";
 
 export const logger = {
   log: (...args: unknown[]) => {
@@ -16,9 +18,15 @@ export const logger = {
       console.warn(...args);
     }
   },
-  error: (...args: unknown[]) => {
-    // Error logging is preserved in production for diagnostic purposes
+  error: (message: string, error?: any, context?: any) => {
+    // Log to console for local debugging
     // eslint-disable-next-line no-console
-    console.error(...args);
+    console.error(`[ERROR] ${message}`, error);
+
+    // Automatically report to high-level monitoring
+    monitoring.trackError(error || new Error(message), {
+      message,
+      ...context
+    });
   }
 };

@@ -95,6 +95,7 @@ import { Badge } from "./ui/badge";
 import { motion } from "framer-motion";
 import { isAllowed, getRemainingCooldown } from "@/lib/rate-limit";
 import { enqueueOp } from "@/lib/offline-queue";
+import { monitoring } from "@/lib/monitoring";
 
 // Defer loading of heavy modules to prevent dependency cycles and runtime errors
 const AssetForm = dynamic(() => import("./asset-form").then(mod => mod.AssetForm), { 
@@ -451,7 +452,7 @@ export default function AssetList() {
         }
         
     } catch (error) {
-        console.error("Download failed:", error);
+        monitoring.trackError(error, { component: 'AssetList', action: 'executeDownload' });
         addNotification({
           title: "Synchronization Error",
           description: error instanceof Error ? error.message : "An unexpected network error occurred.",
@@ -482,7 +483,7 @@ export default function AssetList() {
 
           // AUTO BACKUP: Mirror write to Realtime Database
           batchSetAssetsRTDB(assetsToPush).catch(e => {
-              console.error("Automatic backup to RTDB failed:", e);
+              monitoring.trackError(e, { component: 'AssetList', action: 'RTDBBackup' });
           });
           
           const localAssets = await getLocalAssetsFromDb();
@@ -499,11 +500,15 @@ export default function AssetList() {
 
           addNotification({ title: 'Cloud Updated', description: `Successfully pushed ${assetsToPush.length} local edits.` });
           
-      } catch (error) {
-          console.error("Upload failed:", error);
+      } catch (error: any) {
+          const isPermissionError = error?.code === 'permission-denied' || error?.message?.toLowerCase().includes('permission');
+          monitoring.trackError(error, { component: 'AssetList', action: 'executeUpload', context: isPermissionError ? 'Security Rule Rejection' : 'Network/Config Issue' });
+          
           addNotification({
-            title: "Upload Failed",
-            description: "A network error prevented your changes from reaching the cloud.",
+            title: isPermissionError ? "Access Denied" : "Upload Failed",
+            description: isPermissionError 
+                ? "The database rejected your changes. Your local role does not have cloud write permissions."
+                : "A network or configuration error prevented your changes from reaching the cloud.",
             variant: 'destructive'
           });
       } finally {
@@ -552,7 +557,7 @@ export default function AssetList() {
             addNotification({ title: 'Fully Synced', description: 'No local changes detected.' });
         }
     } catch (error) {
-        console.error("Upload scan failed:", error);
+        monitoring.trackError(error, { component: 'AssetList', action: 'handleUploadScan' });
         addNotification({
           title: "Scanner Error",
           variant: 'destructive'
@@ -649,7 +654,7 @@ export default function AssetList() {
             }
         }
     } catch (error) {
-        console.error("Download scan failed:", error);
+        monitoring.trackError(error, { component: 'AssetList', action: 'handleDownloadScan' });
         addNotification({
           title: "Sync Error",
           variant: 'destructive'
@@ -690,7 +695,7 @@ export default function AssetList() {
         
         addNotification({ title: 'Refresh Complete', description: `${assetsToSave.length} regional records reloaded.` });
     } catch (error) {
-        console.error("Forced download scan failed:", error);
+        monitoring.trackError(error, { component: 'AssetList', action: 'handleOverwriteDownload' });
         setIsOnline(false);
     } finally {
         setIsSyncing(false);
@@ -1292,6 +1297,7 @@ export default function AssetList() {
         addNotification({title: "Upload Successful"});
       }
     } catch(e) {
+      monitoring.trackError(e, { component: 'AssetList', action: 'handleSelectiveUpload' });
       addNotification({title: "Upload Failed", variant: "destructive"});
     } finally {
       setIsSyncing(false);
@@ -1319,6 +1325,7 @@ export default function AssetList() {
       setOfflineAssets(updated);
       setDataSource('local_locked');
     } catch(e) {
+      monitoring.trackError(e, { component: 'AssetList', action: 'handleCopyToOffline' });
       addNotification({ title: "Copy Failed", variant: "destructive" });
     } finally {
       setIsSyncing(false);
@@ -1342,6 +1349,7 @@ export default function AssetList() {
         setAssets(Array.from(map.values()));
         setOfflineAssets(rem);
     } catch (e) {
+        monitoring.trackError(e, { component: 'AssetList', action: 'handleMergeToMainList' });
         addNotification({ title: 'Merge Failed', variant: 'destructive' });
     } finally {
         setIsSyncing(false);
