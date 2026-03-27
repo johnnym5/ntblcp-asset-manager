@@ -92,4 +92,20 @@
   .custom-scrollbar-x::-webkit-scrollbar-thumb:hover {
     background-color: hsl(var(--primary));
   }
+
+  /* Force showing scrollbars for Radix ScrollArea in data-heavy views */
+  .show-scrollbar [data-radix-scroll-area-viewport] {
+    scrollbar-width: auto !important;
+    -ms-overflow-style: auto !important;
+  }
+  
+  .show-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar {
+    display: block !important;
+    width: 8px !important;
+  }
+
+  .show-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.3);
+    border-radius: 10px;
+  }
 }
