@@ -52,6 +52,7 @@ import {
     Clock,
     Zap,
     LayoutGrid,
+    RotateCcw,
 } from 'lucide-react';
 import { clearLocalAssets, saveLockedOfflineAssets } from '@/lib/idb';
 import { addNotification } from '@/hooks/use-notifications';

@@ -24,6 +24,7 @@ import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn, assetMatchesGlobalFilter } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Badge } from './ui/badge';
 
 const StatCard = ({ title, value, description, icon, onAction, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, isActive?: boolean }) => {
     return (

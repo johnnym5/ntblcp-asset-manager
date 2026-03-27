@@ -55,7 +55,7 @@ const defaultObservations = "";
 
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
   const { userProfile } = useAuth();
-  const { assets, offlineAssets, dataSource, globalStateFilter, activeGrantId } = useAppState();
+  const { assets, offlineAssets, dataSource, globalStateFilters, activeGrantId } = useAppState();
   
   const [reportState, setReportState] = useState('');
   const [travelDate, setTravelDate] = useState('');
@@ -69,7 +69,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
 
   useEffect(() => {
     if (isOpen) {
-      setReportState(globalStateFilter || userProfile?.states[0] || '');
+      setReportState(globalStateFilters[0] || userProfile?.states[0] || '');
       setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
       setObjectives('To conduct physical verification of assets in the state.');
       setActivities(defaultActivities);
@@ -78,7 +78,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
       setChallenges('');
       setRecommendations('');
     }
-  }, [isOpen, userProfile, globalStateFilter]);
+  }, [isOpen, userProfile, globalStateFilters]);
 
   const activeAssets = useMemo(() => {
     return dataSource === 'cloud' ? assets : offlineAssets;
@@ -182,6 +182,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
     : new Paragraph({
         children: [
             new TextRun("On my asset verification visit to "),
+            new TextRun({ text: reportState, bold: true }),
             new TextRun({ text: reportState, bold: true }),
             new TextRun(", out of a total of "),
             new TextRun({ text: `${reportAssets.length} assets`, bold: true }),

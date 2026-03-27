@@ -88,8 +88,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     initialSettingsTab,
     setInitialSettingsTab,
     onRevertAsset,
-    globalStateFilter,
-    setGlobalStateFilter,
+    globalStateFilters,
+    setGlobalStateFilters,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -391,7 +391,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <div className="flex flex-col space-y-1">
                           <p className="text-sm font-bold leading-none">{getUserName()}</p>
                           <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                            <Filter className="h-3 w-3" /> {globalStateFilter}
+                            <Filter className="h-3 w-3" /> {globalStateFilters.length > 1 ? `${globalStateFilters.length} Selected` : globalStateFilters[0]}
                           </p>
                         </div>
                       </DropdownMenuLabel>
@@ -404,7 +404,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             Switch State Scope
                           </DropdownMenuSubTrigger>
                           <DropdownMenuSubContent className="w-48">
-                            <DropdownMenuRadioGroup value={globalStateFilter} onValueChange={setGlobalStateFilter}>
+                            <DropdownMenuRadioGroup value={globalStateFilters[0]} onValueChange={(v) => setGlobalStateFilters([v])}>
                               {userProfile.states.map(state => (
                                 <DropdownMenuRadioItem key={state} value={state}>
                                   {state}
