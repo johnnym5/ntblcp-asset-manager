@@ -84,6 +84,8 @@ export interface AuthorizedUser {
   password?: string;
   states: string[];
   isAdmin: boolean;
+  isZonalAdmin?: boolean;
+  assignedZone?: string;
   isGuest?: boolean;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
@@ -133,7 +135,7 @@ export interface AppSettings {
   appMode: 'management' | 'verification';
   locations?: string[];
   defaultDataSource?: 'cloud' | 'local_locked';
-  defaultDatabase?: 'firestore' | 'rtdb';
+  activeDatabase: 'firestore' | 'rtdb';
   lastModified?: string;
   lastModifiedBy?: {
     displayName: string;

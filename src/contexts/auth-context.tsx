@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -7,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { AuthorizedUser } from '@/lib/types';
 import { getLocalAssets, clearLocalAssets, saveLockedOfflineAssets } from '@/lib/idb';
 import { getInitialAdminCreds } from '@/lib/auth-constants';
+import { NIGERIAN_ZONES } from '@/lib/constants';
 
 
 export interface LocalUserProfile {
@@ -15,6 +15,8 @@ export interface LocalUserProfile {
   displayName: string;
   states: string[];
   isAdmin: boolean;
+  isZonalAdmin?: boolean;
+  assignedZone?: string;
   isGuest?: boolean;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
@@ -37,7 +39,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { appSettings, settingsLoaded, setAssets, setOfflineAssets, setFirstTimeSetupStatus } = useAppState();
+  const { appSettings, settingsLoaded, setAssets, setOfflineAssets, setFirstTimeSetupStatus, setGlobalStateFilters } = useAppState();
 
   useEffect(() => {
     if (!settingsLoaded || !appSettings) {
@@ -47,7 +49,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     try {
       const savedProfileJSON = localStorage.getItem('assetain-user-profile');
       if (savedProfileJSON) {
-        const savedProfile: LocalUserProfile & { state?: string } = JSON.parse(savedProfileJSON);
+        const savedProfile: LocalUserProfile = JSON.parse(savedProfileJSON);
         
         const { u: adminLogin, p: adminPass } = getInitialAdminCreds();
         const superAdmin: AuthorizedUser = {
@@ -59,6 +61,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           isGuest: false,
           canAddAssets: true,
           canEditAssets: true,
+          canVerifyAssets: true,
         };
 
         const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
@@ -71,6 +74,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
               displayName: authorizedUser.displayName,
               states: authorizedUser.states,
               isAdmin: authorizedUser.isAdmin,
+              isZonalAdmin: authorizedUser.isZonalAdmin,
+              assignedZone: authorizedUser.assignedZone,
               isGuest: authorizedUser.isGuest,
               canAddAssets: authorizedUser.canAddAssets,
               canEditAssets: authorizedUser.canEditAssets,
@@ -111,14 +116,27 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       displayName: user.displayName,
       states: user.states,
       isAdmin: user.isAdmin,
+      isZonalAdmin: user.isZonalAdmin,
+      assignedZone: user.assignedZone,
       isGuest: user.isGuest,
       canAddAssets: user.canAddAssets,
       canEditAssets: user.canEditAssets,
     };
+
     try {
       localStorage.setItem('assetain-user-profile', JSON.stringify(newProfile));
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
+
+      // Handle Initial Context Scope
+      if (user.isAdmin) {
+          setGlobalStateFilters(['All']);
+      } else if (user.isZonalAdmin && user.assignedZone) {
+          const zoneStates = NIGERIAN_ZONES[user.assignedZone as keyof typeof NIGERIAN_ZONES] || [];
+          setGlobalStateFilters(zoneStates);
+      } else {
+          setGlobalStateFilters(user.states.length > 0 ? [user.states[0]] : ['All']);
+      }
 
       if (isFirstTimeLogin && typeof window !== 'undefined' && navigator.onLine) {
         setFirstTimeSetupStatus('syncing');

@@ -15,11 +15,12 @@ import type { Asset, AppSettings, Grant, AuthorizedUser } from '@/lib/types';
 import { updateSettings as updateSettingsRTDB, getSettings as getSettingsRTDB } from '@/lib/database';
 import { updateSettings as updateSettingsFS, getSettings as getSettingsFS } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
-import { db, firebaseConfig } from '@/lib/firebase';
+import { db, rtdb, firebaseConfig } from '@/lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
+import { ref, onValue } from 'firebase/database';
 import { addNotification } from '@/hooks/use-notifications';
 import { v4 as uuidv4 } from 'uuid';
-import { NIGERIAN_STATES } from '@/lib/constants';
+import { NIGERIAN_STATES, NIGERIAN_ZONES } from '@/lib/constants';
 import { assetMatchesGlobalFilter } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 
@@ -47,8 +48,8 @@ interface AppStateContextType {
   setIsOnline: Dispatch<SetStateAction<boolean>>;
   searchTerm: string;
   setSearchTerm: Dispatch<SetStateAction<string>>;
-  globalStateFilter: string;
-  setGlobalStateFilter: Dispatch<SetStateAction<string>>;
+  globalStateFilters: string[];
+  setGlobalStateFilters: Dispatch<SetStateAction<string[]>>;
   itemsPerPage: number;
   setItemsPerPage: Dispatch<SetStateAction<number>>;
   dataSource: 'cloud' | 'local_locked';
@@ -117,7 +118,7 @@ interface AppStateContextType {
 
   // Active Database
   activeDatabase: 'firestore' | 'rtdb';
-  setActiveDatabase: Dispatch<SetStateAction<'firestore' | 'rtdb'>>;
+  setActiveDatabase: (db: 'firestore' | 'rtdb') => Promise<void>;
 
   // Asset Actions
   onRevertAsset: (assetId: string) => Promise<void>;
@@ -137,7 +138,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return true;
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const [globalStateFilter, setGlobalStateFilter] = useState('All');
+  const [globalStateFilters, setGlobalStateFilters] = useState<string[]>(['All']);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
@@ -177,9 +178,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [showProjectSwitchDialog, setShowProjectSwitchDialog] =
     useState(false);
   
-  const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>(
-    'firestore'
-  );
+  const [activeDatabase, setActiveDatabaseInternal] = useState<'firestore' | 'rtdb'>(() => {
+      if (typeof window !== 'undefined') {
+          return (localStorage.getItem('assetain-active-db') as 'firestore' | 'rtdb') || 'rtdb';
+      }
+      return 'rtdb';
+  });
 
   const [onRevertAsset, setOnRevertAsset] = useState<
     (assetId: string) => Promise<void>
@@ -213,23 +217,24 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             ...settings,
             grants: [defaultGrant],
             activeGrantId: grantId,
+            activeDatabase: activeDatabase,
         };
         delete (migratedSettings as any).sheetDefinitions;
         await saveLocalSettings(migratedSettings);
         return migratedSettings;
       }
       return settings;
-  }, []);
+  }, [activeDatabase]);
   
   useEffect(() => {
     const initializeSettings = async () => {
         let settings: AppSettings | null = await getLocalSettings();
 
-        if (!settings && navigator.onLine) {
+        if (navigator.onLine) {
             try {
-                let cloudSettings = await getSettingsFS(); 
+                let cloudSettings = activeDatabase === 'rtdb' ? await getSettingsRTDB() : await getSettingsFS();
                 if (!cloudSettings) {
-                    cloudSettings = await getSettingsRTDB();
+                    cloudSettings = activeDatabase === 'rtdb' ? await getSettingsFS() : await getSettingsRTDB();
                 }
                 
                 if (cloudSettings) {
@@ -270,6 +275,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
                 authorizedUsers: defaultUsers,
                 lockAssetList: false,
                 appMode: 'verification',
+                activeDatabase: activeDatabase,
                 lastModified: new Date().toISOString(),
             };
 
@@ -289,41 +295,75 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             activeGrantIdSet(settings.activeGrantId);
         }
         
-        setActiveDatabase('firestore');
         setSettingsLoaded(true);
     };
     
     initializeSettings();
-  }, [migrateSettings]);
+  }, [migrateSettings, activeDatabase]);
 
-  // ADDED: Real-time listener for Configuration Settings
+  // Real-time listener for Configuration Settings - Automatic Broadcast
   useEffect(() => {
-    if (!db || !isOnline) return;
+    if (!isOnline || !settingsLoaded) return;
 
-    const settingsRef = doc(db, 'config', 'settings');
-    const unsubscribe = onSnapshot(settingsRef, async (snapshot) => {
-      if (snapshot.exists()) {
-        const remoteSettings = snapshot.data() as AppSettings;
-        const localSettings = await getLocalSettings();
-        
-        // Deep compare to avoid redundant state updates and prevent loops
-        if (JSON.stringify(remoteSettings) !== JSON.stringify(localSettings)) {
-          logger.log("Cloud settings updated remotely. Syncing local state...");
-          await saveLocalSettings(remoteSettings);
-          setAppSettings(remoteSettings);
-          
-          if (remoteSettings.activeGrantId && remoteSettings.activeGrantId !== activeGrantId) {
-              activeGrantIdSet(remoteSettings.activeGrantId);
-          }
-        }
-      }
-    }, (error) => {
-        logger.warn("Settings listener encounterd an error:", error);
-    });
+    let unsubscribe: () => void = () => {};
+
+    if (activeDatabase === 'firestore' && db) {
+        const settingsRef = doc(db, 'config', 'settings');
+        unsubscribe = onSnapshot(settingsRef, async (snapshot) => {
+            if (snapshot.exists()) {
+                const remoteSettings = snapshot.data() as AppSettings;
+                const localSettings = await getLocalSettings();
+                if (JSON.stringify(remoteSettings) !== JSON.stringify(localSettings)) {
+                    logger.log("Cloud (Firestore) config updated. Broadcasting to local state...");
+                    await saveLocalSettings(remoteSettings);
+                    setAppSettings(remoteSettings);
+                    if (remoteSettings.activeGrantId && remoteSettings.activeGrantId !== activeGrantId) {
+                        activeGrantIdSet(remoteSettings.activeGrantId);
+                    }
+                }
+            }
+        });
+    } else if (activeDatabase === 'rtdb' && rtdb) {
+        const settingsRef = ref(rtdb, 'config/settings');
+        unsubscribe = onValue(settingsRef, async (snapshot) => {
+            if (snapshot.exists()) {
+                const remoteSettings = snapshot.val() as AppSettings;
+                const localSettings = await getLocalSettings();
+                if (JSON.stringify(remoteSettings) !== JSON.stringify(localSettings)) {
+                    logger.log("Cloud (RTDB) config updated. Broadcasting to local state...");
+                    await saveLocalSettings(remoteSettings);
+                    setAppSettings(remoteSettings);
+                    if (remoteSettings.activeGrantId && remoteSettings.activeGrantId !== activeGrantId) {
+                        activeGrantIdSet(remoteSettings.activeGrantId);
+                    }
+                }
+            }
+        });
+    }
 
     return () => unsubscribe();
-  }, [isOnline, activeGrantId]);
+  }, [isOnline, activeDatabase, settingsLoaded, activeGrantId]);
   
+  const setActiveDatabase = async (newDb: 'firestore' | 'rtdb') => {
+      setActiveDatabaseInternal(newDb);
+      if (typeof window !== 'undefined') {
+          localStorage.setItem('assetain-active-db', newDb);
+      }
+      
+      if (appSettings) {
+          const updatedSettings = { ...appSettings, activeDatabase: newDb };
+          setAppSettings(updatedSettings);
+          await saveLocalSettings(updatedSettings);
+          
+          if (isOnline) {
+              await Promise.allSettled([
+                  updateSettingsFS(updatedSettings),
+                  updateSettingsRTDB(updatedSettings)
+              ]);
+          }
+      }
+  };
+
   const setActiveGrantId = (id: string | null) => {
       activeGrantIdSet(id);
   }
@@ -337,8 +377,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setIsOnline,
     searchTerm,
     setSearchTerm,
-    globalStateFilter,
-    setGlobalStateFilter,
+    globalStateFilters,
+    setGlobalStateFilters,
     itemsPerPage,
     setItemsPerPage,
     selectedLocations,
