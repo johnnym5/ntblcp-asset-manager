@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -83,8 +84,8 @@ import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGER
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, clearAssets as clearFirestoreAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
-import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
+import { getAssets as getAssetsFS, batchSetAssets as batchSetAssetsFS } from "@/lib/firestore";
+import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter, sanitizeInput, sanitizeForFirestore } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
@@ -94,7 +95,7 @@ import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { Badge } from "./ui/badge";
 import { motion } from "framer-motion";
 import { isAllowed, getRemainingCooldown } from "@/lib/rate-limit";
-import { enqueueOp } from "@/lib/offline-queue";
+import { enqueueOp, processOfflineQueue } from "@/lib/offline-queue";
 import { monitoring } from "@/lib/monitoring";
 
 // Defer loading of heavy modules to prevent dependency cycles and runtime errors
@@ -112,31 +113,22 @@ const AssetSummaryDashboard = dynamic(() => import("./asset-summary-dashboard").
 
 /**
  * Compares two asset-like objects to see if any relevant fields have changed.
- * Crucially, this must detect changes in approvalStatus and pendingChanges 
- * so Admins notice new requests from field officers.
  */
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
     const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof Asset>;
     const ignoredKeys = new Set(['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState']);
     
     for (const key of keys) {
-        if (ignoredKeys.has(key)) {
-            continue;
-        }
+        if (ignoredKeys.has(key)) continue;
         
-        // Handle deep object comparison for pendingChanges and changeSubmittedBy
         if (typeof a[key] === 'object' || typeof b[key] === 'object') {
-            if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) {
-                return true;
-            }
+            if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return true;
             continue;
         }
 
         const valA = String(a[key] ?? '').trim();
         const valB = String(b[key] ?? '').trim();
-        if (valA !== valB) {
-            return true;
-        }
+        if (valA !== valB) return true;
     }
     return false;
 };
@@ -256,9 +248,7 @@ AssetItemCard.displayName = 'AssetItemCard';
 
 const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; appMode: 'management' | 'verification' }> = ({ locationName, allAssets, appMode }) => {
     const locationAssets = useMemo(() => {
-        if (locationName === 'All') {
-            return allAssets;
-        }
+        if (locationName === 'All') return allAssets;
 
         const lowerCaseLocation = locationName.toLowerCase().trim();
         const isZonalStore = ZONAL_STORES.map(z => z.toLowerCase()).includes(lowerCaseLocation);
@@ -397,9 +387,7 @@ export default function AssetList() {
     const zones = new Set(ZONAL_STORES);
     
     appSettings.locations?.forEach(loc => {
-        if (!states.has(loc) && !zones.has(loc)) {
-            defaultSpecial.add(loc);
-        }
+        if (!states.has(loc) && !zones.has(loc)) defaultSpecial.add(loc);
     });
 
     return Array.from(defaultSpecial).sort((a,b) => a.localeCompare(b));
@@ -419,35 +407,27 @@ export default function AssetList() {
   }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, globalStateFilter, dataSource, conditionFilter]);
   
   useEffect(() => {
-    if (view === 'dashboard') {
-        setSelectedAssetIds([]);
-    } else {
-        setSelectedCategories([]);
-    }
+    if (view === 'dashboard') setSelectedAssetIds([]);
+    else setSelectedCategories([]);
   }, [view]);
 
   // --- DATA LOADING & SYNC ---
   const executeDownload = useCallback(async (summary: any, isFirstTime?: boolean) => {
     setIsSyncing(true);
-    if (!isFirstTime) {
-      addNotification({ title: 'Downloading updates...' });
-    }
+    if (!isFirstTime) addNotification({ title: 'Downloading updates...' });
     
     try {
         const { newFromCloud, updatedFromCloud, deletedOnCloud } = summary;
         let localAssets = await getLocalAssetsFromDb();
         const mergedAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
-        // Handle deletions
         if (deletedOnCloud && deletedOnCloud.length > 0) {
             for (const assetToDelete of deletedOnCloud) {
                 mergedAssetsMap.delete(assetToDelete.id);
             }
         }
         
-        // Handle adds/updates
         const assetsToProcess = [...newFromCloud, ...updatedFromCloud];
-
         for (const cloudAsset of assetsToProcess) {
             mergedAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
         }
@@ -457,7 +437,6 @@ export default function AssetList() {
         setAssets(finalAssets);
 
         const totalChanges = assetsToProcess.length + (deletedOnCloud?.length || 0);
-        
         if (!isFirstTime) {
           addNotification({ title: 'Sync Successful', description: `${totalChanges} items synchronized from cloud.` });
         } else {
@@ -492,12 +471,12 @@ export default function AssetList() {
       try {
           const { toUpload: assetsToPush } = syncSummary;
           
-          await batchSetAssets(assetsToPush);
-
-          // AUTO BACKUP: Mirror write to Realtime Database
-          batchSetAssetsRTDB(assetsToPush).catch(e => {
-              monitoring.trackError(e, { component: 'AssetList', action: 'RTDBBackup' });
-          });
+          // TARGET THE ACTIVE DATABASE LAYER
+          if (activeDatabase === 'firestore') {
+              await batchSetAssetsFS(assetsToPush);
+          } else {
+              await batchSetAssetsRTDB(assetsToPush);
+          }
           
           const localAssets = await getLocalAssetsFromDb();
           const localMap = new Map(localAssets.map(a => [a.id, a]));
@@ -511,7 +490,7 @@ export default function AssetList() {
           await saveAssets(updatedLocalAssets);
           setAssets(updatedLocalAssets);
 
-          addNotification({ title: 'Cloud Updated', description: `Successfully pushed ${assetsToPush.length} local edits.` });
+          addNotification({ title: 'Cloud Updated', description: `Successfully pushed ${assetsToPush.length} edits to ${activeDatabase === 'firestore' ? 'Firestore' : 'RTDB'}.` });
           
       } catch (error: any) {
           const isPermissionError = error?.code === 'permission-denied' || error?.message?.toLowerCase().includes('permission');
@@ -529,20 +508,16 @@ export default function AssetList() {
           setIsSyncConfirmOpen(false);
           setSyncSummary(null);
       }
-  }, [syncSummary, setAssets, setIsSyncing]);
+  }, [syncSummary, setAssets, setIsSyncing, activeDatabase]);
 
   const handleSyncConfirm = () => {
-    if (syncSummary?.type === 'download') {
-      executeDownload(syncSummary);
-    } else if (syncSummary?.type === 'upload') {
-      executeUpload();
-    }
+    if (syncSummary?.type === 'download') executeDownload(syncSummary);
+    else if (syncSummary?.type === 'upload') executeUpload();
   };
 
     const handleUploadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
 
-    // SECURITY: Rate limiting to prevent sync flood
     if (!isAllowed('sync-upload', 5000)) {
         const remaining = getRemainingCooldown('sync-upload', 5000);
         addNotification({ title: "Sync Paused", description: `Please wait ${remaining}s before next upload.` });
@@ -571,10 +546,7 @@ export default function AssetList() {
         }
     } catch (error) {
         monitoring.trackError(error, { component: 'AssetList', action: 'handleUploadScan' });
-        addNotification({
-          title: "Scanner Error",
-          variant: 'destructive'
-        });
+        addNotification({ title: "Scanner Error", variant: 'destructive' });
     } finally {
         setIsSyncing(false);
     }
@@ -584,7 +556,6 @@ export default function AssetList() {
     if (!isOnline || !authInitialized || isGuest) return;
 
     if (!isFirstTime) {
-      // SECURITY: Rate limiting to prevent sync flood
       if (!isAllowed('sync-download', 5000)) {
           const remaining = getRemainingCooldown('sync-download', 5000);
           addNotification({ title: "Sync Paused", description: `Please wait ${remaining}s before checking cloud.` });
@@ -601,10 +572,11 @@ export default function AssetList() {
     }
 
     setIsSyncing(true);
-    addNotification({ title: isFirstTime ? 'Initializing state database...' : 'Checking for cloud updates...' });
+    addNotification({ title: isFirstTime ? 'Initializing database...' : `Checking ${activeDatabase === 'firestore' ? 'Firestore' : 'RTDB'}...` });
 
     try {
-        const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
+        // TARGET THE ACTIVE DATABASE LAYER
+        const getCloudAssets = activeDatabase === 'firestore' ? getAssetsFS : getAssetsRTDB;
         const allCloudAssets = await getCloudAssets(activeGrantId);
         
         const userAuthorizedStates = isAdmin ? ['All'] : (userProfile?.states || []);
@@ -645,13 +617,10 @@ export default function AssetList() {
             }
         }
         
-        // Handle removals for items that are in the user's regional scope but missing from cloud
         for (const localAsset of localAssets) {
             if (!cloudAssetIds.has(localAsset.id) && localAsset.syncStatus !== 'local') {
                 const isInScope = isAdmin || userAuthorizedStates.some(state => assetMatchesGlobalFilter(localAsset, state));
-                if(isInScope) {
-                    summary.deletedOnCloud?.push(localAsset);
-                }
+                if(isInScope) summary.deletedOnCloud?.push(localAsset);
             }
         }
         
@@ -659,19 +628,15 @@ export default function AssetList() {
             if (!isFirstTime) addNotification({ title: 'Already Up-to-Date' });
             if (isFirstTime) setFirstTimeSetupStatus('complete');
         } else {
-            if (isFirstTime) {
-                await executeDownload(summary, true);
-            } else {
+            if (isFirstTime) await executeDownload(summary, true);
+            else {
                 setSyncSummary(summary);
                 setIsSyncConfirmOpen(true);
             }
         }
     } catch (error) {
         monitoring.trackError(error, { component: 'AssetList', action: 'handleDownloadScan' });
-        addNotification({
-          title: "Sync Error",
-          variant: 'destructive'
-        });
+        addNotification({ title: "Sync Error", variant: 'destructive' });
         if (isFirstTime) setFirstTimeSetupStatus('idle');
         setIsOnline(false);
     } finally {
@@ -680,9 +645,7 @@ export default function AssetList() {
   }, [isOnline, authInitialized, isGuest, isAdmin, userProfile, setIsOnline, setIsSyncing, activeDatabase, activeGrantId, executeDownload, setFirstTimeSetupStatus]);
   
   useEffect(() => {
-    if (firstTimeSetupStatus === 'syncing') {
-      handleDownloadScan(true);
-    }
+    if (firstTimeSetupStatus === 'syncing') handleDownloadScan(true);
   }, [firstTimeSetupStatus, handleDownloadScan]);
 
   const handleOverwriteDownload = useCallback(async () => {
@@ -691,7 +654,7 @@ export default function AssetList() {
     addNotification({ title: 'Overwriting local cache...' });
     
     try {
-        const getCloudAssets = activeDatabase === 'firestore' ? getAssets : getAssetsRTDB;
+        const getCloudAssets = activeDatabase === 'firestore' ? getAssetsFS : getAssetsRTDB;
         const allCloudAssets = await getCloudAssets(activeGrantId);
         
         const userAuthorizedStates = isAdmin ? ['All'] : (userProfile?.states || []);
@@ -706,7 +669,7 @@ export default function AssetList() {
         await saveAssets(assetsToSave);
         setAssets(assetsToSave);
         
-        addNotification({ title: 'Refresh Complete', description: `${assetsToSave.length} regional records reloaded.` });
+        addNotification({ title: 'Refresh Complete', description: `${assetsToSave.length} records reloaded from ${activeDatabase}.` });
     } catch (error) {
         monitoring.trackError(error, { component: 'AssetList', action: 'handleOverwriteDownload' });
         setIsOnline(false);
@@ -730,7 +693,6 @@ export default function AssetList() {
       setOfflineAssets(localOfflineAssets);
       setIsLoading(false);
     };
-
     loadInitialDataFromDb();
   }, [setAssets, setOfflineAssets]);
 
@@ -748,9 +710,7 @@ export default function AssetList() {
             { value: "Verified", label: "Verified" },
             { value: "Unverified", label: "Unverified" },
         ]);
-    } else {
-        setStatusOptions([]);
-    }
+    } else setStatusOptions([]);
   }, [appSettings?.appMode, setStatusOptions]);
 
   const allAssetsForFiltering = useMemo(() => {
@@ -764,9 +724,7 @@ export default function AssetList() {
     const locations = new Map<string, number>();
     allAssetsForFiltering.forEach(asset => {
       const normalized = normalizeAssetLocation(asset.location);
-      if (normalized) {
-        locations.set(normalized, (locations.get(normalized) || 0) + 1);
-      }
+      if (normalized) locations.set(normalized, (locations.get(normalized) || 0) + 1);
     });
 
     const possibleStates = isAdmin ? NIGERIAN_STATES : (userProfile?.states || []);
@@ -798,7 +756,6 @@ export default function AssetList() {
 
   const sortAssets = (assetsToSort: Asset[], config: SortConfig | null): Asset[] => {
     if (!config) return assetsToSort;
-
     const dateFields = new Set(['lastModified', 'verifiedDate', 'dateReceived']);
 
     return [...assetsToSort].sort((a, b) => {
@@ -808,7 +765,6 @@ export default function AssetList() {
         if (config.key && dateFields.has(config.key)) {
             const dateA = aVal ? new Date(aVal as string).getTime() : 0;
             const dateB = bVal ? new Date(bVal as string).getTime() : 0;
-            // asc = oldest first, desc = newest first
             if (dateA < dateB) return config.direction === 'asc' ? -1 : 1;
             if (dateA > dateB) return config.direction === 'asc' ? 1 : -1;
             return 0;
@@ -824,7 +780,6 @@ export default function AssetList() {
         
         const strA = String(aVal ?? '').toLowerCase();
         const strB = String(bVal ?? '').toLowerCase();
-
         if (strA < strB) return config.direction === 'asc' ? -1 : 1;
         if (strA > strB) return config.direction === 'asc' ? 1 : -1;
         return 0;
@@ -836,13 +791,10 @@ export default function AssetList() {
       if (!asset.category) return false;
       const def = sheetDefinitions?.[asset.category];
       if (!def || def.isHidden) return false;
-      
       if (userProfile?.loginName === 'admin') return true;
-      
       const disabledFor = def.disabledFor || [];
       if (disabledFor.includes('all') && !userProfile?.isAdmin) return false;
       if (userProfile && disabledFor.includes(userProfile.loginName)) return false;
-      
       return true;
     });
 
@@ -857,16 +809,14 @@ export default function AssetList() {
 
             let dateMatch = true;
             if (dateFilter) {
-                if (!asset.lastModified) {
-                    dateMatch = false;
-                } else {
+                if (!asset.lastModified) dateMatch = false;
+                else {
                     const modifiedDate = parseISO(asset.lastModified);
                     if (dateFilter === 'today') dateMatch = isToday(modifiedDate);
                     else if (dateFilter === 'week') dateMatch = isThisWeek(modifiedDate, { weekStartsOn: 1 });
                     else if (dateFilter === 'new-week') dateMatch = isThisWeek(modifiedDate, { weekStartsOn: 1 }) && !asset.previousState;
                 }
             }
-
             return locationMatch && assigneeMatch && statusMatch && missingFieldMatch && dateMatch && conditionMatch;
         });
     }
@@ -882,13 +832,10 @@ export default function AssetList() {
             });
         }
     }
-    
     return results;
   }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, conditionFilter, sheetDefinitions, userProfile]);
 
-  const sortedDisplayedAssets = useMemo(() => {
-      return sortAssets(displayedAssets, sortConfig);
-  }, [displayedAssets, sortConfig]);
+  const sortedDisplayedAssets = useMemo(() => sortAssets(displayedAssets, sortConfig), [displayedAssets, sortConfig]);
 
   const assetsByCategory = useMemo(() => {
     return sortedDisplayedAssets.reduce((acc, asset) => {
@@ -959,10 +906,8 @@ export default function AssetList() {
       const updatedAssets = currentAssets.filter(a => a.id !== assetToDelete.id);
       await saveAssets(updatedAssets);
       setAssets(updatedAssets);
-      
-      // Manual sync tracking via queue
       await enqueueOp('delete', 'assets', { id: assetToDelete.id });
-      addNotification({ title: 'Record Staged for Removal', description: 'This change will be synced to the cloud during your next Upload.' });
+      addNotification({ title: 'Record Staged for Removal', description: 'Deletion will sync during next Upload.' });
     } else {
       const currentOfflineAssets = await getLockedOfflineAssets();
       const updatedOfflineAssets = currentOfflineAssets.filter(a => a.id !== assetToDelete.id);
@@ -984,12 +929,8 @@ export default function AssetList() {
       currentAssets = currentAssets.filter(a => !ids.has(a.id));
       await saveAssets(currentAssets);
       setAssets(currentAssets);
-  
-      // Manual sync tracking via queue
-      for (const id of selectedAssetIds) {
-          await enqueueOp('delete', 'assets', { id });
-      }
-      addNotification({ title: 'Batch Deletion Staged', description: `${count} items will be removed from the cloud during next Upload.` });
+      for (const id of selectedAssetIds) await enqueueOp('delete', 'assets', { id });
+      addNotification({ title: 'Batch Deletion Staged', description: `${count} items will sync during next Upload.` });
     } else {
       let currentOfflineAssets = await getLockedOfflineAssets();
       const ids = new Set(selectedAssetIds);
@@ -1009,7 +950,6 @@ export default function AssetList() {
   
   const handleSaveBatchEdit = async (data: any) => {
     const assetsToUpdate = (dataSource === 'cloud' ? assets : offlineAssets).filter(a => selectedAssetIds.includes(a.id));
-    
     const updatedAssets = assetsToUpdate.map(asset => {
         const updatedAsset: Asset = { 
             ...asset, 
@@ -1019,16 +959,12 @@ export default function AssetList() {
             lastModifiedByState: globalStateFilter,
             syncStatus: dataSource === 'cloud' ? 'local' : undefined,
         };
-        // SECURITY: Sanitize string inputs
         if (updatedAsset.remarks) updatedAsset.remarks = sanitizeInput(updatedAsset.remarks);
         if (updatedAsset.assignee) updatedAsset.assignee = sanitizeInput(updatedAsset.assignee);
         if (updatedAsset.location) updatedAsset.location = sanitizeInput(updatedAsset.location);
 
-        if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) {
-            updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
-        } else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') {
-            updatedAsset.verifiedDate = '';
-        }
+        if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
+        else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') updatedAsset.verifiedDate = '';
         return sanitizeForFirestore(updatedAsset);
     });
 
@@ -1045,7 +981,6 @@ export default function AssetList() {
       await saveLockedOfflineAssets(currentOfflineAssets);
       setOfflineAssets(currentOfflineAssets);
     }
-    
     setSelectedAssetIds([]);
   };
 
@@ -1054,9 +989,7 @@ export default function AssetList() {
     const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
 
     (Object.keys(assetToSave) as Array<keyof Asset>).forEach(key => {
-        if (typeof assetToSave[key] === 'string') {
-            (assetToSave as any)[key] = sanitizeInput(assetToSave[key] as string);
-        }
+        if (typeof assetToSave[key] === 'string') (assetToSave as any)[key] = sanitizeInput(assetToSave[key] as string);
     });
 
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
@@ -1073,7 +1006,6 @@ export default function AssetList() {
         if (isAdmin) {
             finalAsset = sanitizeForFirestore({
                 ...assetToSave,
-                // Ensure new assets always get the active project ID
                 grantId: assetToSave.grantId || activeGrantId || undefined,
                 lastModified: new Date().toISOString(),
                 lastModifiedBy: userProfile?.displayName,
@@ -1088,15 +1020,12 @@ export default function AssetList() {
             const changesOnly: Partial<Asset> = {};
             if (originalAsset) {
                 (Object.keys(assetToSave) as Array<keyof Asset>).forEach(k => {
-                    if (assetToSave[k] !== originalAsset[k]) {
-                        (changesOnly as any)[k] = assetToSave[k];
-                    }
+                    if (assetToSave[k] !== originalAsset[k]) (changesOnly as any)[k] = assetToSave[k];
                 });
             }
 
             finalAsset = sanitizeForFirestore({
                 ...(originalAsset || assetToSave),
-                // Ensure new assets get the active project ID
                 grantId: (originalAsset || assetToSave).grantId || activeGrantId || undefined,
                 approvalStatus: 'pending',
                 pendingChanges: changesOnly,
@@ -1112,7 +1041,7 @@ export default function AssetList() {
             });
             addNotification({ 
                 title: "Push Pending", 
-                description: "Your changes have been submitted locally and will be synced upon next Upload.",
+                description: "Changes submitted locally. Sync Up to push to cloud.",
                 variant: "default" 
             });
         }
@@ -1132,11 +1061,7 @@ export default function AssetList() {
         await saveLockedOfflineAssets(currentOfflineAssets);
         setOfflineAssets(currentOfflineAssets);
       }
-
-    } else {
-        addNotification({ title: 'No Changes Detected' });
-    }
-    
+    } else addNotification({ title: 'No Changes Detected' });
     setIsFormOpen(false);
   };
 
@@ -1144,9 +1069,7 @@ export default function AssetList() {
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
-
     if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus && asset.condition === data.condition) return;
-
     if (data.remarks) data.remarks = sanitizeInput(data.remarks);
 
     const updatedAsset: Asset = sanitizeForFirestore({ 
@@ -1235,8 +1158,6 @@ export default function AssetList() {
       setAssets([]);
       if (isOnline && isAdmin) {
           addNotification({ title: "Purge Staged", description: "Wipe command is queued for next manual sync." });
-          // In a real strictly manual scenario, clearing ALL cloud assets should still probably 
-          // be a direct action for admins, but we'll stick to the manual sync philosophy.
           await enqueueOp('delete', 'assets_global_wipe', { timestamp: Date.now() });
       }
     } else {
@@ -1249,10 +1170,8 @@ export default function AssetList() {
   const handleExportSelection = useCallback(async () => {
     if(!appSettings) return;
     let assetsToExport: Asset[] = [];
-
     if (view === 'dashboard') assetsToExport = selectedCategories.flatMap(cat => assetsByCategory[cat] || []);
     else if (view === 'table') assetsToExport = activeAssets.filter(a => selectedAssetIds.includes(a.id));
-
     if (assetsToExport.length === 0) return;
 
     try {
@@ -1277,11 +1196,7 @@ export default function AssetList() {
     const idsToDelete = source.filter(a => a.category === categoryToDelete).map(a => a.id);
     await saveAssets(assetsToKeep);
     setAssets(assetsToKeep);
-    
-    // Manual sync tracking via queue
-    for (const id of idsToDelete) {
-        await enqueueOp('delete', 'assets', { id });
-    }
+    for (const id of idsToDelete) await enqueueOp('delete', 'assets', { id });
     addNotification({ title: 'Category Records Staged for removal.' });
   };
   
@@ -1302,11 +1217,11 @@ export default function AssetList() {
       const all = await getLocalAssetsFromDb();
       const assetsToUpload = all.filter(a => ids.includes(a.id) && a.syncStatus === 'local');
       if (assetsToUpload.length > 0) {
-        const batchSet = activeDatabase === 'firestore' ? batchSetAssets : batchSetAssetsRTDB;
-        await batchSet(assetsToUpload);
-        
+        // TARGET ACTIVE DATABASE
         if (activeDatabase === 'firestore') {
-            batchSetAssetsRTDB(assetsToUpload).catch(() => {});
+            await batchSetAssetsFS(assetsToUpload);
+        } else {
+            await batchSetAssetsRTDB(assetsToUpload);
         }
 
         const updated = all.map(a => ids.includes(a.id) ? { ...a, syncStatus: 'synced' as const } : a);
@@ -1421,11 +1336,7 @@ export default function AssetList() {
       curr = curr.filter(a => !ids.includes(a.id));
       await saveAssets(curr);
       setAssets(curr);
-      
-      // Manual sync tracking
-      for (const id of ids) {
-          await enqueueOp('delete', 'assets', { id });
-      }
+      for (const id of ids) await enqueueOp('delete', 'assets', { id });
       addNotification({ title: 'Categories Staged for deletion.' });
     } else {
       let currentOfflineAssets = await getLockedOfflineAssets();
@@ -1463,18 +1374,16 @@ export default function AssetList() {
     } else if (originalName) newSheetDefinitions[originalName] = newDefinition;
 
     const settings: AppSettings = { ...appSettings, grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefinitions } : g), lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
-    
-    // Save locally
     await saveLocalSettings(settings);
     setAppSettings(settings);
     
-    // Immediate cloud write for automatic broadcast to all users
     try {
-        await updateSettingsFS(settings);
+        const updateSettings = activeDatabase === 'firestore' ? batchSetAssetsFS : batchSetAssetsRTDB;
+        // Broadcast layout update to active layer immediately
+        const settingsRef = doc(db!, 'config', 'settings');
+        await setDoc(settingsRef, settings, { merge: true });
         toast({ title: 'Layout Broadcasted', description: 'Column changes have been updated for all users immediately.' });
-    } catch (e) {
-        // Fallback already handled by firestore service
-    }
+    } catch (e) {}
   };
 
   const handleToggleSheetVisibility = async (sn: string) => {
@@ -1483,13 +1392,11 @@ export default function AssetList() {
     if(newSheetDefinitions[sn]) newSheetDefinitions[sn].isHidden = !newSheetDefinitions[sn].isHidden;
     
     const settings: AppSettings = { ...appSettings, grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefinitions } : g), lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
-    
     await saveLocalSettings(settings);
     setAppSettings(settings);
-    
-    // Immediate cloud write
     try {
-        await updateSettingsFS(settings);
+        const settingsRef = doc(db!, 'config', 'settings');
+        await setDoc(settingsRef, settings, { merge: true });
     } catch (e) {}
   };
 

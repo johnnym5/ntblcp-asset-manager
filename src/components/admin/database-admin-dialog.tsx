@@ -33,6 +33,8 @@ import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { 
     clearAssets as clearFirestoreAssets, 
+    batchSetAssets as batchSetAssetsFS,
+    getAssets as getAssetsFS
 } from '@/lib/firestore';
 import { 
     getAssets as getAssetsRTDB, 
@@ -78,7 +80,9 @@ import {
     Lock,
     Clock,
     Zap,
-    MoreVertical
+    MoreVertical,
+    GitBranch,
+    Server
 } from 'lucide-react';
 import { clearLocalAssets, saveLockedOfflineAssets } from '@/lib/idb';
 import { exportAssetsToJson } from '@/lib/json-export';
@@ -96,7 +100,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { batchSetAssets as batchSetAssetsFS } from '@/lib/firestore';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -108,7 +111,13 @@ type MobileViewStep = 'collections' | 'documents' | 'editor';
 
 export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialogProps) {
   const { userProfile } = useAuth();
-  const { setAssets, setOfflineAssets } = useAppState();
+  const { 
+    setAssets, 
+    setOfflineAssets, 
+    activeDatabase, 
+    setActiveDatabase, 
+    activeGrantId 
+  } = useAppState();
   const { toast } = useToast();
   const isMobile = useIsMobile();
   
@@ -309,35 +318,49 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
     }
   };
 
+  /**
+   * CLOUD SNAPSHOT (Firestore -> RTDB)
+   * Copies the active project's data from Firestore to the RTDB layer.
+   */
   const handleCreateCloudSnapshot = async () => {
     setIsProcessing(true);
     try {
-        const data = documents.map(d => d.data);
-        if (data.length > 0) {
-            await batchSetAssetsRTDB(data);
-            addNotification({ title: 'Cloud Snapshot Success', description: `${data.length} records pushed to Realtime Database backup.` });
+        const fsAssets = await getAssetsFS(activeGrantId);
+        if (fsAssets.length > 0) {
+            await batchSetAssetsRTDB(fsAssets);
+            addNotification({ 
+                title: 'Cloud Snapshot Successful', 
+                description: `${fsAssets.length} records cloned from Firestore to Realtime Database.` 
+            });
         } else {
-            toast({ title: 'No data found to backup.', variant: 'destructive' });
+            toast({ title: 'No Firestore data found for active project.', variant: 'destructive' });
         }
     } catch (e) {
-        addNotification({ title: 'Snapshot Failed', variant: 'destructive'});
+        toast({ title: 'Snapshot failed. Check connectivity.', variant: 'destructive'});
     }
     setIsProcessing(false);
   };
 
+  /**
+   * RESTORE LAYER (RTDB -> Firestore)
+   * Migrates data from RTDB back into Firestore. Use this after testing in RTDB.
+   */
   const handlePullRtdbToFs = async () => {
     setIsProcessing(true);
     try {
-        const rtdbAssets = await getAssetsRTDB();
+        const rtdbAssets = await getAssetsRTDB(activeGrantId);
         if (rtdbAssets.length > 0) {
             await batchSetAssetsFS(rtdbAssets);
-            addNotification({ title: 'Cloud Restore Complete', description: `${rtdbAssets.length} records recovered from RTDB Snapshot.` });
+            addNotification({ 
+                title: 'Firestore Restored', 
+                description: `${rtdbAssets.length} records migrated from RTDB to Firestore.` 
+            });
             fetchFsData();
         } else {
-            toast({ title: 'No snapshot data found in RTDB layer.', variant: 'destructive' });
+            toast({ title: 'No snapshot data found in RTDB for active project.', variant: 'destructive' });
         }
     } catch (e) {
-        addNotification({ title: 'Restore Layer Failed', variant: 'destructive'});
+        toast({ title: 'Migration failed.', variant: 'destructive'});
     }
     setIsProcessing(false);
   };
@@ -365,10 +388,15 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
         try {
             const data = JSON.parse(e.target?.result as string);
             setIsProcessing(true);
-            const assets = Array.isArray(data) ? data : (data.assets || []);
-            if (assets.length > 0) {
-                await batchSetAssetsFS(assets);
-                addNotification({ title: 'Data Restored', description: `${assets.length} items merged.` });
+            const assetsToImport = Array.isArray(data) ? data : (data.assets || []);
+            if (assetsToImport.length > 0) {
+                // Target the ACTIVE database for imports
+                if (activeDatabase === 'firestore') {
+                    await batchSetAssetsFS(assetsToImport);
+                } else {
+                    await batchSetAssetsRTDB(assetsToImport);
+                }
+                addNotification({ title: 'Data Imported', description: `${assetsToImport.length} items merged into ${activeDatabase === 'firestore' ? 'Firestore' : 'RTDB'}.` });
             }
             fetchFsData();
         } catch (err) {
@@ -390,7 +418,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       setOfflineAssets([]);
       await clearFirestoreAssets();
       await clearRtdbAssets();
-      addNotification({ title: "GLOBAL SYSTEM PURGE COMPLETE", description: "All layers cleared.", variant: 'destructive' });
+      addNotification({ title: "GLOBAL SYSTEM PURGE COMPLETE", description: "All cloud and local layers have been wiped.", variant: 'destructive' });
       fetchFsData();
     } catch (e) {
       addNotification({ title: 'Wipe Failure', variant: 'destructive'});
@@ -430,52 +458,74 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             <ShieldCheck className="text-primary h-8 w-8 sm:h-10 sm:w-10"/> Infrastructure
                         </DialogTitle>
                         <DialogDescription className="text-sm sm:text-base font-medium text-muted-foreground hidden sm:block">
-                            Cloud Data Workstation & Schema Management
+                            Cross-Database Management & Migration Tools
                         </DialogDescription>
                     </DialogHeader>
-                    <div className="flex w-full sm:w-auto bg-background border rounded-xl p-1 shadow-sm">
-                        <Button 
-                            variant={activeView === 'explorer' ? 'secondary' : 'ghost'} 
-                            className={cn("flex-1 sm:flex-none h-9 sm:h-10 px-3 sm:px-6 font-bold text-[10px] sm:text-xs rounded-lg transition-all", activeView === 'explorer' && "shadow-sm")}
-                            onClick={() => setActiveView('explorer')}
-                        >
-                            <DatabaseIcon className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/> Explorer
-                        </Button>
-                        <Button 
-                            variant={activeView === 'indexes' ? 'secondary' : 'ghost'} 
-                            className={cn("flex-1 sm:flex-none h-9 sm:h-10 px-3 sm:px-6 font-bold text-[10px] sm:text-xs rounded-lg transition-all", activeView === 'indexes' && "shadow-sm")}
-                            onClick={() => setActiveView('indexes')}
-                        >
-                            <ListFilter className="mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/> Indexes
-                        </Button>
+                    
+                    {/* Database Toggle */}
+                    <div className="flex flex-col gap-2 w-full sm:w-auto">
+                        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">Active Cloud Source</Label>
+                        <div className="flex bg-background border-2 rounded-xl p-1 shadow-sm">
+                            <Button 
+                                variant={activeDatabase === 'firestore' ? 'secondary' : 'ghost'} 
+                                className={cn("flex-1 sm:flex-none h-9 px-4 font-black text-[10px] rounded-lg transition-all", activeDatabase === 'firestore' && "shadow-sm bg-primary/10 text-primary")}
+                                onClick={() => setActiveDatabase('firestore')}
+                            >
+                                <Server className="mr-2 h-3.5 w-3.5"/> Firestore
+                            </Button>
+                            <Button 
+                                variant={activeDatabase === 'rtdb' ? 'secondary' : 'ghost'} 
+                                className={cn("flex-1 sm:flex-none h-9 px-4 font-black text-[10px] rounded-lg transition-all", activeDatabase === 'rtdb' && "shadow-sm bg-blue-500/10 text-blue-600")}
+                                onClick={() => setActiveDatabase('rtdb')}
+                            >
+                                <DatabaseIcon className="mr-2 h-3.5 w-3.5"/> Realtime DB
+                            </Button>
+                        </div>
                     </div>
                 </div>
                 
                 <div className="flex flex-wrap items-center gap-2 pb-4 sm:pb-6">
                     <div className="flex items-center gap-1 bg-background border rounded-xl p-1.5 shadow-sm overflow-x-auto no-scrollbar max-w-full">
                         <Button variant="ghost" size="sm" className="h-8 sm:h-9 font-bold text-[10px] sm:text-xs whitespace-nowrap" onClick={handleCreateCloudSnapshot} disabled={isProcessing}>
-                            <Zap className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary fill-primary/20"/> Snapshot
+                            <Zap className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary fill-primary/20"/> Cloud Snapshot
                         </Button>
                         <Separator orientation="vertical" className="h-4 mx-1"/>
                         <Button variant="ghost" size="sm" className="h-8 sm:h-9 font-bold text-[10px] sm:text-xs whitespace-nowrap" onClick={handlePullRtdbToFs} disabled={isProcessing}>
-                            <ArchiveRestore className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary"/> Restore
+                            <ArchiveRestore className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-primary"/> Restore Layer
                         </Button>
                     </div>
 
                     <div className="flex items-center gap-1 bg-background border rounded-xl p-1.5 shadow-sm">
                         <Button variant="ghost" size="sm" className="h-8 sm:h-9 font-bold text-[10px] sm:text-xs whitespace-nowrap" onClick={handleExportJson}>
-                            <Download className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500"/> Export
+                            <Download className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500"/> Export Active
                         </Button>
                         <Separator orientation="vertical" className="h-4 mx-1"/>
                         <Button variant="ghost" size="sm" className="h-8 sm:h-9 font-bold text-[10px] sm:text-xs whitespace-nowrap" onClick={() => fileInputRef.current?.click()}>
-                            <FileUp className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500"/> Import
+                            <FileUp className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-500"/> Import to Active
                         </Button>
                         <input type="file" ref={fileInputRef} className="hidden" accept=".json" onChange={handleImportJson} />
                     </div>
 
+                    <div className="flex bg-background border rounded-xl p-1 shadow-sm">
+                        <Button 
+                            variant={activeView === 'explorer' ? 'secondary' : 'ghost'} 
+                            className={cn("h-8 sm:h-9 px-3 sm:px-4 font-bold text-[10px] rounded-lg transition-all", activeView === 'explorer' && "shadow-sm")}
+                            onClick={() => setActiveView('explorer')}
+                        >
+                            <LayoutGrid className="mr-2 h-3.5 w-3.5"/> Explorer
+                        </Button>
+                        <Button 
+                            variant={activeView === 'indexes' ? 'secondary' : 'ghost'} 
+                            className={cn("h-8 sm:h-9 px-3 sm:px-4 font-bold text-[10px] rounded-lg transition-all", activeView === 'indexes' && "shadow-sm")}
+                            onClick={() => setActiveView('indexes')}
+                        >
+                            <ListFilter className="mr-2 h-3.5 w-3.5"/> Indexes
+                        </Button>
+                    </div>
+
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
-                            <Button variant="outline" size="sm" className="h-10 sm:h-12 px-4 sm:px-6 font-black uppercase tracking-widest text-[9px] sm:text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10">
+                            <Button variant="outline" size="sm" className="h-10 sm:h-12 px-4 sm:px-6 font-black uppercase tracking-widest text-[9px] sm:text-[10px] border-destructive/20 text-destructive hover:bg-destructive/10 ml-auto">
                                 <AlertOctagon className="mr-1.5 sm:mr-2 h-3.5 w-3.5 sm:h-4 sm:w-4"/> Danger <MoreVertical className="ml-1.5 sm:ml-2 h-3 w-3"/>
                             </Button>
                         </DropdownMenuTrigger>
@@ -484,7 +534,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                 <Trash2 className="mr-2 h-4 w-4"/> Wipe Current Collection
                             </DropdownMenuItem>
                             <DropdownMenuSeparator />
-                            <DropdownMenuItem onClick={() => openConfirmation('nuke_all', 'GLOBAL PURGE?', 'Clear EVERY database layer.')} className="h-12 bg-destructive/10 text-destructive font-black uppercase tracking-widest text-[10px] focus:bg-destructive focus:text-white rounded-lg">
+                            <DropdownMenuItem onClick={() => openConfirmation('nuke_all', 'GLOBAL PURGE?', 'Clear EVERY database layer (Local, Firestore, and RTDB).')} className="h-12 bg-destructive/10 text-destructive font-black uppercase tracking-widest text-[10px] focus:bg-destructive focus:text-white rounded-lg">
                                 <AlertOctagon className="mr-2 h-4 w-4"/> Execute Total Destruction
                             </DropdownMenuItem>
                         </DropdownMenuContent>
