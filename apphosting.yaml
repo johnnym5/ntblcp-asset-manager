@@ -8,3 +8,51 @@
 runConfig:
   # Automatically spin up more instances in response to traffic.
   maxInstances: 10
+
+# Environment variables available at build and runtime.
+env:
+  - variable: NEXT_PUBLIC_FIREBASE_API_KEY
+    value: "AIzaSyB9O662zXyyJkhtle1snkNLapre3_Sa3rc"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
+    value: "ntblcp-asset-manager-k7hy1.firebaseapp.com"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
+    value: "https://ntblcp-asset-manager-k7hy1-default-rtdb.firebaseio.com"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
+    value: "ntblcp-asset-manager-k7hy1"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
+    value: "ntblcp-asset-manager-k7hy1.appspot.com"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
+    value: "45027293772"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_FIREBASE_APP_ID
+    value: "1:45027293772:web:0116cfaa586d17fa4c52e9"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_INITIAL_ADMIN_USER
+    value: "admin"
+    availability:
+      - BUILD
+      - RUNTIME
+  - variable: NEXT_PUBLIC_INITIAL_ADMIN_PASSWORD
+    value: "setup"
+    availability:
+      - BUILD
+      - RUNTIME

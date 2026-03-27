@@ -158,7 +158,7 @@ export const getLocalSettings = async (): Promise<AppSettings | null> => {
   if (!dbp) return null;
   try {
     const db = await dbp;
-    return await db.get(SETTINGS_STORE_NAME, 'app-settings');
+    return (await db.get(SETTINGS_STORE_NAME, 'app-settings')) || null;
   } catch (error) {
     console.error("Failed to get local settings from IndexedDB", error);
     return null;

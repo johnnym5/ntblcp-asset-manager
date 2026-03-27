@@ -33,26 +33,25 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
-import { useToast } from '@/hooks/use-toast';
 import type { AuthorizedUser } from '@/lib/types';
 import { NIGERIAN_STATES, NIGERIAN_ZONES, ZONAL_STORES } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
 import { ChevronsUpDown, Check, MapPin, ShieldCheck, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
-import { Separator } from '../ui/separator';
+import { Checkbox } from '../ui/checkbox';
 import { ScrollArea } from '../ui/scroll-area';
 
 const userFormSchema = z.object({
-  displayName: z.string().min(2, 'Display name required.').transform(v => v.trim()),
+  displayName: z.string().min(2, 'Display name required.'),
   loginName: z.string().min(2, 'Login name required.').transform(v => v.toLowerCase().trim()),
   states: z.array(z.string()).min(1, 'Select at least one state.'),
   isAdmin: z.boolean(),
   isZonalAdmin: z.boolean().optional(),
   assignedZone: z.string().optional(),
   isGuest: z.boolean(),
-  password: z.string().optional().transform(v => v?.trim()),
-  confirmPassword: z.string().optional().transform(v => v?.trim()),
+  password: z.string().optional(),
+  confirmPassword: z.string().optional(),
   canAddAssets: z.boolean(),
   canEditAssets: z.boolean(),
 }).refine((data) => data.password === data.confirmPassword, {
@@ -90,7 +89,6 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
     }
   }, [isOpen, user, form]);
 
-  // Role Logic Sync
   useEffect(() => {
     if (isAdmin) form.setValue('states', ['All']);
     else if (isZonalAdmin && assignedZone) {
@@ -118,19 +116,19 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
             <form onSubmit={form.handleSubmit(handleSubmit)} className="p-6 space-y-6">
                 <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="displayName" render={({ field }) => (
-                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} className="rounded-xl"/></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
                     )}/>
                     <FormField control={form.control} name="loginName" render={({ field }) => (
-                        <FormItem><FormLabel>Login ID</FormLabel><FormControl><Input placeholder="jdoe" {...field} className="rounded-xl"/></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormLabel>Login ID</FormLabel><FormControl><Input placeholder="jdoe" {...field} /></FormControl><FormMessage /></FormItem>
                     )}/>
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="password" render={({ field }) => (
-                        <FormItem><FormLabel>Credentials</FormLabel><FormControl><Input type="password" placeholder="Passphrase" {...field} className="rounded-xl"/></FormControl></FormItem>
+                        <FormItem><FormLabel>Passphrase</FormLabel><FormControl><Input type="password" {...field} /></FormControl></FormItem>
                     )}/>
                     <FormField control={form.control} name="confirmPassword" render={({ field }) => (
-                        <FormItem><FormLabel>Confirm</FormLabel><FormControl><Input type="password" {...field} className="rounded-xl"/></FormControl></FormItem>
+                        <FormItem><FormLabel>Confirm</FormLabel><FormControl><Input type="password" {...field} /></FormControl></FormItem>
                     )}/>
                 </div>
 
@@ -156,8 +154,8 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                             <FormItem>
                                 <FormLabel>Assigned Geopolitical Zone</FormLabel>
                                 <Select onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger className="rounded-xl"><SelectValue placeholder="Select Zone..." /></SelectTrigger>
-                                    <SelectContent className="rounded-xl">{ZONAL_STORES.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}</SelectContent>
+                                    <SelectTrigger><SelectValue placeholder="Select Zone..." /></SelectTrigger>
+                                    <SelectContent>{ZONAL_STORES.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}</SelectContent>
                                 </Select>
                             </FormItem>
                         )}/>
@@ -170,12 +168,12 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
                             <FormLabel>Regional Authorized Scope</FormLabel>
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant="outline" className="w-full justify-between rounded-xl">
-                                        {field.value?.length > 0 ? `${field.value.length} States` : "Select states..."}
+                                    <Button variant="outline" className="w-full justify-between">
+                                        {field.value?.length > 0 ? `${field.value.length} States Selected` : "Select states..."}
                                         <ChevronsUpDown className="h-4 w-4 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[300px] p-0 rounded-2xl">
+                                <PopoverContent className="w-[300px] p-0">
                                     <ScrollArea className="h-64">
                                         <div className="p-2 space-y-1">
                                             {NIGERIAN_STATES.map(s => (
@@ -198,10 +196,10 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
             </Form>
         </ScrollArea>
         <DialogFooter className="p-6 bg-muted/20 border-t gap-2">
-            <DialogClose asChild><Button variant="outline" className="rounded-xl">Cancel</Button></DialogClose>
-            <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSaving} className="rounded-xl font-bold">
+            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
+            <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSaving} className="font-bold">
                 {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-2"/> : <ShieldCheck className="h-4 w-4 mr-2"/>}
-                Initialize Permissions
+                Save Identity
             </Button>
         </DialogFooter>
       </DialogContent>

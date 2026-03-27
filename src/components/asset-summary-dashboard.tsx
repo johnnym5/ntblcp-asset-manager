@@ -2,29 +2,20 @@
 
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { 
     FileWarning, 
     BarChart2, 
-    CalendarClock, 
-    ChevronsUpDown, 
-    PlusCircle, 
-    AlertTriangle, 
-    CheckCircle2, 
     ClipboardCheck,
-    AlertCircle,
-    Hash,
-    MessageSquare,
     Activity,
-    Wrench,
-    Tag
+    Tag,
+    AlertCircle,
+    ChevronsUpDown
 } from 'lucide-react';
-import type { Asset } from '@/lib/types';
-import { isToday, isThisWeek, parseISO } from 'date-fns';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn, assetMatchesGlobalFilter } from '@/lib/utils';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible"
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from './ui/badge';
+import { Button } from './ui/button';
 
 const StatCard = ({ title, value, description, icon, onAction, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, isActive?: boolean }) => {
     return (
@@ -52,8 +43,6 @@ export function AssetSummaryDashboard() {
         dataSource, 
         setMissingFieldFilter, 
         missingFieldFilter, 
-        dateFilter, 
-        setDateFilter, 
         globalStateFilters, 
         conditionFilter, 
         setConditionFilter, 
@@ -63,30 +52,23 @@ export function AssetSummaryDashboard() {
     } = useAppState();
     const [isOpen, setIsOpen] = useState(false);
     
-    const summaryAssets = useMemo(() => {
-        const source = dataSource === 'cloud' ? assets : offlineAssets;
-        let filtered = source.filter(a => a.grantId === activeGrantId);
-        if (!globalStateFilters.includes('All')) {
-            filtered = filtered.filter(a => globalStateFilters.some(s => assetMatchesGlobalFilter(a, s)));
-        }
-        return filtered;
-    }, [assets, offlineAssets, dataSource, globalStateFilters, activeGrantId]);
-
     const summary = useMemo(() => {
-        const total = summaryAssets.length;
-        const verified = summaryAssets.filter(a => a.verifiedStatus === 'Verified').length;
+        const source = dataSource === 'cloud' ? assets : offlineAssets;
+        const scoped = source.filter(a => a.grantId === activeGrantId && assetMatchesGlobalFilter(a, globalStateFilters));
+        
+        const total = scoped.length;
+        const verified = scoped.filter(a => a.verifiedStatus === 'Verified').length;
+        
         return {
           total,
           verified,
           percentage: total > 0 ? Math.round((verified / total) * 100) : 0,
           unverified: total - verified,
-          unusable: summaryAssets.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen', 'Writeoff'].includes(a.condition)).length,
-          needsRepair: summaryAssets.filter(a => a.condition && ['Bad condition', 'Used but in poor condition'].includes(a.condition)).length,
-          missingId: summaryAssets.filter(a => !a.assetIdCode?.trim()).length,
-          modifiedToday: summaryAssets.filter(a => a.lastModified && isToday(parseISO(a.lastModified))).length,
-          discrepancy: summaryAssets.filter(a => a.verifiedStatus === 'Discrepancy').length,
+          unusable: scoped.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen', 'Writeoff'].includes(a.condition)).length,
+          missingId: scoped.filter(a => !a.assetIdCode?.trim()).length,
+          discrepancy: scoped.filter(a => a.verifiedStatus === 'Discrepancy').length,
         };
-    }, [summaryAssets]);
+    }, [assets, offlineAssets, dataSource, activeGrantId, globalStateFilters]);
 
     return (
         <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
@@ -111,7 +93,7 @@ export function AssetSummaryDashboard() {
             </CollapsibleTrigger>
             
             <CollapsibleContent className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex overflow-x-auto pb-4 pt-2 px-1 gap-4 custom-scrollbar-x">
+                <div className="flex overflow-x-auto pb-4 pt-2 px-1 gap-4 custom-scrollbar">
                     <StatCard
                         title="Verification Coverage"
                         value={`${summary.percentage}%`}
@@ -155,5 +137,5 @@ export function AssetSummaryDashboard() {
                 </div>
             </CollapsibleContent>
         </Collapsible>
-    )
+    );
 }

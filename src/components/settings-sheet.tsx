@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -32,14 +32,11 @@ import { useTheme } from 'next-themes';
 import { 
     Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, 
     Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, 
-    PlaneTakeoff, Download, Users, Eye, EyeOff, MapPin, KeyRound, 
-    History, RotateCcw, ChevronsUpDown, Check, X, Layers, LayoutGrid,
-    Edit
+    Layers, LayoutGrid, Edit
 } from 'lucide-react';
-import type { SheetDefinition, AppSettings, AuthorizedUser, HistoricalAppSettings, Grant } from '@/lib/types';
-import { parseExcelForTemplate } from '@/lib/excel-parser';
+import type { SheetDefinition, AppSettings, AuthorizedUser, Grant } from '@/lib/types';
 import { UserManagement } from './admin/user-management';
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, saveLocalSettings } from '@/lib/idb';
+import { saveLocalSettings } from '@/lib/idb';
 import {
   Select,
   SelectContent,
@@ -49,16 +46,13 @@ import {
 } from '@/components/ui/select';
 import { Separator } from './ui/separator';
 import { addNotification } from '@/hooks/use-notifications';
-import { Checkbox } from './ui/checkbox';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
-import { formatDistanceToNow } from 'date-fns';
 import { cn, sanitizeForFirestore } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Card } from './ui/card';
-
 import { Tabs as TabsRoot, TabsList as TabsListRoot, TabsTrigger as TabsTriggerRoot, TabsContent as TabsContentRoot } from "@/components/ui/tabs";
 
 interface SettingsSheetProps {
@@ -69,7 +63,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, setDataSource, activeGrantId, isOnline, activeDatabase, dataActions } = useAppState();
+  const { appSettings, setAppSettings, activeGrantId, isOnline, activeDatabase, dataActions } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -114,7 +108,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
       if (isOnline) {
           const update = activeDatabase === 'firestore' ? updateSettingsFS : updateSettingsRTDB;
           await update(settingsToSave);
-          addNotification({ title: "Settings Broadcasted", description: "All users updated in real-time." });
+          addNotification({ title: "Settings Broadcasted", description: "Changes pushed to cloud source." });
       }
     } finally {
       setIsSaving(false);
@@ -140,16 +134,16 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
         <DialogContent className="max-w-3xl flex flex-col h-[90vh] p-0 overflow-hidden rounded-3xl">
           <DialogHeader className="p-6 border-b bg-muted/20">
             <DialogTitle>System Configuration</DialogTitle>
-            <DialogDescription>Broadcasting project isolation and regional governance rules.</DialogDescription>
+            <DialogDescription>Manage project registers and user authorization rules.</DialogDescription>
           </DialogHeader>
           
           <TabsRoot value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
             <TabsListRoot className="mx-6 mt-4">
-                <TabsTriggerRoot value="general" className="rounded-xl">General</TabsTriggerRoot>
+                <TabsTriggerRoot value="general">General</TabsTriggerRoot>
                 {isAdmin && (
                     <>
-                        <TabsTriggerRoot value="projects" className="rounded-xl">Projects</TabsTriggerRoot>
-                        <TabsTriggerRoot value="users" className="rounded-xl">Users</TabsTriggerRoot>
+                        <TabsTriggerRoot value="projects">Projects</TabsTriggerRoot>
+                        <TabsTriggerRoot value="users">Users</TabsTriggerRoot>
                     </>
                 )}
             </TabsListRoot>
@@ -190,8 +184,8 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                 <TabsContentRoot value="projects" className="space-y-6">
                     <div className="space-y-4">
                         <div className="flex items-center gap-2">
-                            <Input placeholder="Create new project..." value={newGrantName} onChange={e => setNewGrantName(e.target.value)} className="rounded-xl"/>
-                            <Button onClick={handleAddNewGrant} disabled={!newGrantName.trim()} className="rounded-xl"><PlusCircle className="mr-2 h-4 w-4"/> Initialize</Button>
+                            <Input placeholder="Create new project..." value={newGrantName} onChange={e => setNewGrantName(e.target.value)} />
+                            <Button onClick={handleAddNewGrant} disabled={!newGrantName.trim()}><PlusCircle className="mr-2 h-4 w-4"/> Initialize</Button>
                         </div>
                         <Separator />
                         <div className="space-y-3">
@@ -205,19 +199,19 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                         </div>
                                         <div className="flex gap-1">
                                             {draftSettings.activeGrantId !== grant.id && (
-                                                <Button size="sm" variant="outline" className="rounded-lg h-8 px-2 text-[10px] uppercase font-black" onClick={() => handleSettingChange('activeGrantId', grant.id)}>Activate</Button>
+                                                <Button size="sm" variant="outline" className="h-8 px-2 text-[10px] font-black" onClick={() => handleSettingChange('activeGrantId', grant.id)}>Activate</Button>
                                             )}
-                                            <Button size="sm" variant="ghost" className="h-8 w-8 rounded-full" onClick={() => { setEditingGrantId(grant.id); setEditingGrantName(grant.name); }}><Edit className="h-3.5 w-3.5"/></Button>
-                                            <Button size="sm" variant="ghost" className="h-8 w-8 rounded-full text-destructive" onClick={() => setGrantToDelete(grant)} disabled={draftSettings.grants.length <= 1}><Trash2 className="h-3.5 w-3.5"/></Button>
+                                            <Button size="sm" variant="ghost" className="h-8 w-8" onClick={() => { setEditingGrantId(grant.id); setEditingGrantName(grant.name); }}><Edit className="h-3.5 w-3.5"/></Button>
+                                            <Button size="sm" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setGrantToDelete(grant)} disabled={draftSettings.grants.length <= 1}><Trash2 className="h-3.5 w-3.5"/></Button>
                                         </div>
                                     </div>
                                     <Collapsible open={draftSettings.activeGrantId === grant.id}>
                                         <CollapsibleContent className="p-4 pt-0 space-y-3">
                                             <Separator className="bg-primary/10" />
                                             <div className="grid grid-cols-3 gap-2">
-                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase tracking-widest bg-background border h-8" onClick={() => addNotification({title: 'Manual Entry Enabled', description: 'Switch to project context to add.'})}><PlusCircle className="mr-1.5 h-3 w-3"/> Manual</Button>
-                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase tracking-widest bg-background border h-8" onClick={() => addNotification({title: 'Template Generator', description: 'Download from individual categories.'})}><FileUp className="mr-1.5 h-3 w-3"/> Template</Button>
-                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase tracking-widest bg-background border h-8" onClick={() => { onOpenChange(false); dataActions.onScanAndImport?.(); }}><ScanSearch className="mr-1.5 h-3 w-3"/> Scan</Button>
+                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase bg-background border h-8" onClick={() => addNotification({title: 'Manual Entry Enabled'})}><PlusCircle className="mr-1.5 h-3 w-3"/> Manual</Button>
+                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase bg-background border h-8" onClick={() => addNotification({title: 'Template Ready'})}><FileUp className="mr-1.5 h-3 w-3"/> Template</Button>
+                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase bg-background border h-8" onClick={() => { onOpenChange(false); dataActions.onScanAndImport?.(); }}><ScanSearch className="mr-1.5 h-3 w-3"/> Scan</Button>
                                             </div>
                                         </CollapsibleContent>
                                     </Collapsible>
@@ -235,9 +229,9 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
             <DialogFooter className="p-6 border-t bg-muted/20 sm:justify-between items-center">
                 <DialogClose asChild><Button variant="ghost">Discard Draft</Button></DialogClose>
                 {hasChanges && (
-                    <Button onClick={() => setIsConfirmOpen(true)} className="rounded-xl shadow-xl shadow-primary/20 font-bold px-8">
+                    <Button onClick={() => setIsConfirmOpen(true)} className="rounded-xl shadow-primary/20 font-bold px-8">
                         {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : <Save className="mr-2 h-4 w-4"/>}
-                        Broadcast Changes
+                        Apply Globally
                     </Button>
                 )}
             </DialogFooter>
@@ -246,21 +240,21 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
       </Dialog>
 
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <AlertDialogContent className="rounded-3xl border-primary/20">
-          <AlertDialogHeader><AlertDialogTitle>Apply Project Governance?</AlertDialogTitle><AlertDialogDescription>This will update the project logic and authorized scopes for all users connected to the cloud database.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel className="rounded-xl">Review More</AlertDialogCancel><AlertDialogAction onClick={handleConfirmSave} className="rounded-xl bg-primary font-bold">Apply Globally</AlertDialogAction></AlertDialogFooter>
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle>Apply Project Governance?</AlertDialogTitle><AlertDialogDescription>This will update project logic and regional scopes for all active users.</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Review</AlertDialogCancel><AlertDialogAction onClick={handleConfirmSave} className="bg-primary font-bold">Apply Globally</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
       <AlertDialog open={!!grantToDelete} onOpenChange={() => setGrantToDelete(null)}>
-        <AlertDialogContent className="rounded-3xl border-destructive/20">
-          <AlertDialogHeader><AlertDialogTitle className="text-destructive">Purge Project: {grantToDelete?.name}?</AlertDialogTitle><AlertDialogDescription>All assets and configuration headers for this project will be permanently erased. Proceed with caution.</AlertDialogDescription></AlertDialogHeader>
-          <AlertDialogFooter><AlertDialogCancel className="rounded-xl">Cancel</AlertDialogCancel><AlertDialogAction onClick={async () => {
+        <AlertDialogContent>
+          <AlertDialogHeader><AlertDialogTitle className="text-destructive">Purge Project: {grantToDelete?.name}?</AlertDialogTitle><AlertDialogDescription>All assets associated with this project will be permanently erased. Proceed?</AlertDialogDescription></AlertDialogHeader>
+          <AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={async () => {
               const updated = (draftSettings.grants || []).filter(g => g.id !== grantToDelete!.id);
               handleSettingChange('grants', updated);
               if (draftSettings.activeGrantId === grantToDelete!.id) handleSettingChange('activeGrantId', updated[0]?.id || null);
               setGrantToDelete(null);
-          }} className="rounded-xl bg-destructive font-bold text-white">Execute Purge</AlertDialogAction></AlertDialogFooter>
+          }} className="bg-destructive font-bold text-white">Execute Purge</AlertDialogAction></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </>

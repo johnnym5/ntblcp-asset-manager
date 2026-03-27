@@ -136,11 +136,9 @@ export default function UserProfileSetup() {
                         <Boxes className="h-6 w-6 text-primary" />
                     </div>
                     <AlertDialogTitle>Assetain</AlertDialogTitle>
-                    <AlertDialogHeader className="text-center items-center">
-                        <AlertDialogDescription>
-                            {foundUser ? "Select your starting location." : "Sign in to access your assets."}
-                        </AlertDialogDescription>
-                    </AlertDialogHeader>
+                    <AlertDialogDescription>
+                        {foundUser ? "Select your starting location." : "Sign in to access your assets."}
+                    </AlertDialogDescription>
                 </AlertDialogHeader>
                 
                 <div className="py-4 space-y-4">

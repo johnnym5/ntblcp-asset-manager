@@ -26,51 +26,32 @@ export async function getSettings(): Promise<AppSettings | null> {
         }
         return null;
     } catch (serverError) {
-        // Log errors but don't show full screen UI for background reads
-        logger.error("Failed to fetch settings:", serverError);
+        logger.error("Failed to fetch Firestore settings:", serverError);
         return null;
     }
 }
 
-/**
- * Updates settings immediately in the cloud and broadcast to all users.
- * Falls back to local queue if offline.
- */
 export async function updateSettings(settings: AppSettings) {
     const firestoreDb = checkConfig();
     if (!firestoreDb) return;
     
     const settingsRef = doc(firestoreDb, 'config', 'settings');
     try {
-        // Attempt immediate cloud write for real-time reactivity
         await setDoc(settingsRef, settings, { merge: true });
     } catch (serverError) {
-        logger.error("Immediate cloud config update failed, enqueuing for later:", serverError);
-        // Fallback to queue for manual sync if direct write fails (e.g. offline)
+        logger.error("Cloud config update failed, enqueuing:", serverError);
         await enqueueOp('update', 'config', settings);
-        
-        if ((serverError as any)?.code === 'permission-denied') {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: settingsRef.path,
-                operation: 'update',
-                requestResourceData: settings,
-            }));
-        }
         throw serverError;
     }
 }
 
-// --- Assets (Primary Layer) ---
-export async function getAssets(grantId?: string | null): Promise<Asset[]> {
+// --- Assets (Project Scoped) ---
+export async function getAssets(grantId: string): Promise<Asset[]> {
     const firestoreDb = checkConfig();
-    if (!firestoreDb) return [];
+    if (!firestoreDb || !grantId) return [];
     
     const assetsCollectionRef = collection(firestoreDb, 'assets');
-    
-    let q = query(assetsCollectionRef);
-    if (grantId && grantId !== 'All') {
-        q = query(assetsCollectionRef, where('grantId', '==', grantId));
-    }
+    const q = query(assetsCollectionRef, where('grantId', '==', grantId));
 
     try {
         const querySnapshot = await getDocs(q);
@@ -78,70 +59,46 @@ export async function getAssets(grantId?: string | null): Promise<Asset[]> {
         querySnapshot.forEach((doc) => {
             fetchedAssets.push({ id: doc.id, ...doc.data() } as Asset);
         });
-
         return fetchedAssets;
     } catch (serverError) {
-        logger.error("Failed to fetch assets:", serverError);
+        logger.error("Failed to fetch Firestore assets:", serverError);
         return [];
     }
 }
 
-/**
- * Used for manual synchronization only.
- */
 export async function batchSetAssets(assets: Asset[]) {
     const db = checkConfig();
     if (!db) return;
     const assetsCollectionRef = collection(db, 'assets');
     const batchSize = 500;
+    
     for (let i = 0; i < assets.length; i += batchSize) {
         const batch = writeBatch(db);
         const chunk = assets.slice(i, i + batchSize);
         chunk.forEach((asset) => {
+            if (!asset.grantId) {
+                logger.warn("Attempting to save asset without grantId:", asset.id);
+                return;
+            }
             const docRef = doc(assetsCollectionRef, asset.id);
             batch.set(docRef, { ...asset, lastModified: asset.lastModified || new Date().toISOString() });
         });
-        await batch.commit().catch(async (e) => {
-            if (e.code === 'permission-denied') {
-                errorEmitter.emit('permission-error', new FirestorePermissionError({
-                    path: assetsCollectionRef.path,
-                    operation: 'update'
-                }));
-            }
-            throw e;
-        });
+        await batch.commit();
     }
 }
 
-/**
- * Used for manual synchronization only.
- */
-export async function batchDeleteAssets(assetIds: string[]) {
+export async function clearAssets(grantId?: string) {
     const db = checkConfig();
     if (!db) return;
-    const batch = writeBatch(db);
-    assetIds.forEach(id => {
-        batch.delete(doc(db, 'assets', id));
-    });
-    await batch.commit().catch(async (e) => {
-        if (e.code === 'permission-denied') {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: 'assets',
-                operation: 'delete'
-            }));
-        }
+    try {
+        const assetsRef = collection(db, "assets");
+        const q = grantId ? query(assetsRef, where('grantId', '==', grantId)) : query(assetsRef);
+        const snapshot = await getDocs(q);
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+    } catch (e) {
+        logger.error("Firestore Wipe Error:", e);
         throw e;
-    });
-}
-
-/**
- * Administrative wipe - used only when strictly required.
- */
-export async function clearAssets() {
-    const db = checkConfig();
-    if (!db) return;
-    const snapshot = await getDocs(collection(db, "assets"));
-    const batch = writeBatch(db);
-    snapshot.docs.forEach(doc => batch.delete(doc.ref));
-    await batch.commit();
+    }
 }
