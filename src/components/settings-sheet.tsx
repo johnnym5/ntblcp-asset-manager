@@ -57,6 +57,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn, sanitizeForFirestore } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Card } from './ui/card';
 
 import { Tabs as TabsRoot, TabsList as TabsListRoot, TabsTrigger as TabsTriggerRoot, TabsContent as TabsContentRoot } from "@/components/ui/tabs";
 
