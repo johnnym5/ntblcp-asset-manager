@@ -415,7 +415,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
             isOpen={isColumnSheetOpen} 
             onOpenChange={setIsColumnSheetOpen} 
             sheetDefinition={sheetDefinition} 
-            originalSheetName={currentCategory} 
+            originalSheetName={currentCategory || null} 
             onSave={handleSaveColumnLayout} 
         />
       )}

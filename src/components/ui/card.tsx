@@ -19,7 +19,7 @@ const Card = React.forwardRef<
       )}
       whileHover={!isMobile ? { y: -5, scale: 1.02 } : {}}
       transition={{ type: "spring", stiffness: 300, damping: 10 }}
-      {...props}
+      {...(props as any)}
     />
   )
 })

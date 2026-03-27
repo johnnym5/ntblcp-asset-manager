@@ -41,7 +41,7 @@ import { Badge } from '@/components/ui/badge';
 
 const StatCard = ({ title, value, description, icon, onAction, actionLabel, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, actionLabel?: string, isActive?: boolean }) => {
     const cardContent = (
-        <Card className={cn("transition-all duration-300 w-64 shrink-0 overflow-hidden h-full", isActive ? "bg-primary/10 border-primary shadow-lg shadow-primary/10" : "hover:bg-muted/50 hover:border-primary/30 shadow-sm")}>
+        <Card className={cn("transition-all duration-300 w-full overflow-hidden h-full flex flex-col", isActive ? "bg-primary/10 border-primary shadow-lg shadow-primary/10" : "hover:bg-muted/50 hover:border-primary/30 shadow-sm")}>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                 <CardTitle className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">{title}</CardTitle>
                 <div className={cn("p-2 rounded-full", isActive ? "bg-primary/20" : "bg-muted")}>
@@ -50,7 +50,7 @@ const StatCard = ({ title, value, description, icon, onAction, actionLabel, isAc
             </CardHeader>
             <CardContent>
                 <div className="text-2xl font-bold tracking-tight">{value}</div>
-                <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 min-h-[2.5rem] leading-tight whitespace-normal">
+                <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 min-h-[2.5rem] leading-tight flex-1">
                     {description}
                 </p>
                 {onAction && (
@@ -63,7 +63,7 @@ const StatCard = ({ title, value, description, icon, onAction, actionLabel, isAc
     );
 
     if (onAction) {
-        return <button onClick={onAction} className="text-left outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl shrink-0 h-full">{cardContent}</button>;
+        return <button onClick={onAction} className="text-left outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl w-full h-full block">{cardContent}</button>;
     }
     return cardContent;
 };
@@ -103,8 +103,10 @@ export function AssetSummaryDashboard() {
     const summaryAssets = useMemo(() => {
         const activeAssets = dataSource === 'cloud' ? assets : offlineAssets;
         
-        // Restricted to active project
-        let filtered = activeAssets.filter(a => a.grantId === activeGrantId);
+        // Filter by active project — include assets that match OR have no grantId set (common with imports)
+        let filtered = activeAssets.filter(a => 
+            !activeGrantId || !a.grantId || a.grantId === activeGrantId
+        );
 
         if (globalStateFilter && globalStateFilter !== 'All') {
             const isZone = ZONAL_STORES.includes(globalStateFilter);
@@ -291,6 +293,19 @@ export function AssetSummaryDashboard() {
         }
     };
 
+    // Special handler for "Field Feedback" — shows assets that HAVE remarks (opposite of missing filter)
+    const { setSearchTerm } = useAppState();
+    const handleRemarksClick = () => {
+        resetAllFilters();
+        // Toggle: if already searching for remarks, clear; otherwise search for any asset with remarks
+        // We use the missingFieldFilter with a special sentinel value to track this
+        if (missingFieldFilter === 'remarks') {
+            setMissingFieldFilter('');
+        } else {
+            setMissingFieldFilter('remarks');
+        }
+    };
+
     const handleDateFilterClick = (filter: 'today' | 'week' | 'new-week') => {
         resetAllFilters();
         if (dateFilter === filter) {
@@ -400,8 +415,8 @@ export function AssetSummaryDashboard() {
             <CollapsibleContent className="animate-in fade-in slide-in-from-top-2 duration-300 overflow-hidden">
                 <div className="py-2">
                     {activeView === 'stats' ? (
-                        <div className="w-full min-w-0">
-                            <div className="flex overflow-x-auto pb-4 pt-2 px-1 gap-4 custom-scrollbar-x scroll-smooth">
+                        <div className="w-full">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-4 pt-2">
                                 {/* 1. Verification Progress */}
                                 <StatCard
                                     title="Verification Coverage"

@@ -4,7 +4,7 @@ import { getFirestore, type Firestore } from "firebase/firestore";
 import { getDatabase, type Database } from 'firebase/database';
 import { logger } from "@/lib/logger";
 
-// Your web app's Firebase configuration is now loaded from environment variables.
+// Firebase configuration loaded from environment variables.
 const firebaseConfig = {
   apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
   authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
@@ -15,31 +15,38 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Firestore requires apiKey + projectId.
+const isConfigValid =
+    !!firebaseConfig.apiKey &&
+    !!firebaseConfig.projectId;
 
-// Check if all essential keys are present and not placeholders
-const isConfigValid = 
-    firebaseConfig.apiKey &&
-    firebaseConfig.projectId;
+// Realtime Database additionally requires a databaseURL.
+const isRtdbConfigValid =
+    isConfigValid &&
+    !!firebaseConfig.databaseURL;
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
 let rtdb: Database | undefined;
 
-// Initialize Firebase only on the client side and if config is valid
+// Initialize Firebase only on the client side and if config is valid.
 if (typeof window !== 'undefined') {
   if (isConfigValid) {
     try {
       app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
       db = getFirestore(app);
-      rtdb = getDatabase(app);
+      if (isRtdbConfigValid) {
+        rtdb = getDatabase(app);
+      } else {
+        logger.warn("NEXT_PUBLIC_FIREBASE_DATABASE_URL is not set. Realtime Database features are disabled.");
+      }
     } catch (e) {
       logger.error("Firebase initialization error:", e);
     }
   } else {
-    // This warning helps developers who haven't set up their .env file.
-    logger.warn("Firebase configuration is missing or incomplete. Online features will be disabled. Please create and populate a .env file for local development as described in the README.");
+    logger.warn("Firebase configuration is missing or incomplete. Online features will be disabled. Please populate your .env file as described in the README.");
   }
 }
 
 // Export the initialized services for use throughout the app.
-export { app, db, rtdb, firebaseConfig, isConfigValid };
+export { app, db, rtdb, firebaseConfig, isConfigValid, isRtdbConfigValid };

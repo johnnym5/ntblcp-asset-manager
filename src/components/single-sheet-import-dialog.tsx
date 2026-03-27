@@ -103,10 +103,10 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
 
     const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
       ...asset,
-      grantId: activeGrantId,
+      grantId: activeGrantId!,
       lastModified: new Date().toISOString(),
       lastModifiedBy: userProfile?.displayName,
-      lastModifiedByState: userProfile?.state,
+      lastModifiedByState: userProfile?.states?.[0],
       syncStatus: undefined
     }));
 
