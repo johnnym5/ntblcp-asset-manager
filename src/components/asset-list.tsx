@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -18,6 +17,7 @@ import {
   DropdownMenuTrigger,
   DropdownMenuSeparator,
   DropdownMenuLabel,
+  DropdownMenuCheckboxItem,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -60,6 +60,13 @@ import {
   TableProperties,
   MoreVertical,
   ShieldQuestion,
+  RotateCcw,
+  CheckSquare,
+  Square,
+  ListFilter,
+  ArrowDownWideNarrow,
+  ArrowUpAZ,
+  Layers,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -76,6 +83,7 @@ import {
 } from "@/components/ui/select";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Progress } from "@/components/ui/progress";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 import type { Asset, AppSettings, SheetDefinition, DisplayField } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
@@ -249,7 +257,14 @@ const AssetItemCard = React.memo(({
 });
 AssetItemCard.displayName = 'AssetItemCard';
 
-const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; appMode: 'management' | 'verification' }> = ({ locationName, allAssets, appMode }) => {
+const LocationProgress: React.FC<{ 
+    locationName: string; 
+    allAssets: Asset[]; 
+    appMode: 'management' | 'verification';
+    isSelected?: boolean;
+    onToggle?: () => void;
+    showCheckbox?: boolean;
+}> = ({ locationName, allAssets, appMode, isSelected, onToggle, showCheckbox }) => {
     const locationAssets = useMemo(() => {
         if (locationName === 'All') return allAssets;
 
@@ -272,29 +287,36 @@ const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; app
             const assetLocation = (asset.location || "").toLowerCase().trim();
             const matchesState = assetLocation.startsWith(lowerCaseLocation);
             const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-            return matchesState || matchesCapital;
+            return matchesState || capitalCity ? (matchesState || matchesCapital) : matchesState;
         });
 
     }, [locationName, allAssets]);
 
     const total = locationAssets.length;
-    if (total === 0 && locationName !== 'All') {
-        return (
-            <div className="flex justify-between items-center w-full p-2 group">
-                <span className="text-muted-foreground">{locationName}</span>
-                <span className="text-[10px] bg-muted px-1.5 rounded opacity-0 group-hover:opacity-100 transition-opacity">0 items</span>
-            </div>
-        );
-    }
-
     const verified = locationAssets.filter(a => a.verifiedStatus === 'Verified').length;
     const percentage = total > 0 ? (verified / total) * 100 : 0;
     const displayName = locationName === 'All' ? 'Overall Project Scope' : locationName;
 
     return (
-        <div className="flex flex-col w-full gap-1.5 p-2 rounded-lg hover:bg-accent/50 transition-colors">
+        <div 
+            className={cn(
+                "flex flex-col w-full gap-1 p-2 rounded-lg transition-all cursor-pointer",
+                isSelected ? "bg-primary/10 ring-1 ring-primary/20" : "hover:bg-accent/50"
+            )}
+            onClick={(e) => {
+                e.stopPropagation();
+                onToggle?.();
+            }}
+        >
             <div className="flex justify-between items-center w-full text-xs font-semibold">
-                <span>{displayName}</span>
+                <div className="flex items-center gap-2">
+                    {showCheckbox && (
+                        <div className={cn("h-4 w-4 rounded border border-primary flex items-center justify-center", isSelected ? "bg-primary text-primary-foreground" : "bg-background")}>
+                            {isSelected && <Check className="h-3 w-3" />}
+                        </div>
+                    )}
+                    <span>{displayName}</span>
+                </div>
                 {appMode === 'verification' ? (
                   <span className="text-[10px] font-mono bg-primary/10 text-primary px-1 rounded">{verified}/{total}</span>
                 ) : (
@@ -337,11 +359,13 @@ export default function AssetList() {
   const [originalSheetNameToEdit, setOriginalSheetNameToEdit] = useState<string | null>(null);
   const [isDownloadWarningOpen, setIsDownloadWarningOpen] = useState(false);
   const [numUnsynced, setNumUnsynced] = useState(0);
+  const [scopeSortOrder, setScopeSortOrder] = useState<'alpha' | 'amount'>('alpha');
+  const [scopeGroupBy, setScopeGroupBy] = useState<'none' | 'zone'>('none');
   
   const {
     assets, setAssets, isOnline, setIsOnline, 
     offlineAssets, setOfflineAssets, dataSource, setDataSource,
-    globalStateFilter, setGlobalStateFilter,
+    globalStateFilters, setGlobalStateFilters,
     itemsPerPage, setItemsPerPage,
     selectedLocations, setSelectedLocations,
     selectedAssignees, setSelectedAssignees,
@@ -407,7 +431,7 @@ export default function AssetList() {
   useEffect(() => {
     setCurrentPage(1);
     setSelectedCategories([]);
-  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, globalStateFilter, dataSource, conditionFilter]);
+  }, [searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, dateFilter, globalStateFilters, dataSource, conditionFilter]);
   
   useEffect(() => {
     if (view === 'dashboard') setSelectedAssetIds([]);
@@ -415,10 +439,6 @@ export default function AssetList() {
   }, [view]);
 
   // --- DATA LOADING & SYNC ---
-  /**
-   * executeDownload: The final step of the Sync Down process.
-   * Merges identified cloud changes into the local IndexedDB.
-   */
   const executeDownload = useCallback(async (summary: any, isFirstTime?: boolean) => {
     setIsSyncing(true);
     if (!isFirstTime) addNotification({ title: 'Downloading updates...' });
@@ -428,22 +448,18 @@ export default function AssetList() {
         let localAssets = await getLocalAssetsFromDb();
         const mergedAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
-        // 1. Handle Deletions: Remove assets that no longer exist in the cloud
         if (deletedOnCloud && deletedOnCloud.length > 0) {
             for (const assetToDelete of deletedOnCloud) {
                 mergedAssetsMap.delete(assetToDelete.id);
             }
         }
         
-        // 2. Handle Additions & Updates: Apply cloud version to local
         const assetsToProcess = [...newFromCloud, ...updatedFromCloud];
         for (const cloudAsset of assetsToProcess) {
             mergedAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
         }
         
         const finalAssets = Array.from(mergedAssetsMap.values());
-        
-        // 3. Commit to IndexedDB and update application state
         await saveAssets(finalAssets);
         setAssets(finalAssets);
 
@@ -451,27 +467,21 @@ export default function AssetList() {
         if (!isFirstTime) {
           addNotification({ title: 'Sync Successful', description: `${totalChanges} items synchronized from ${activeDatabase}.` });
         } else {
-          addNotification({ title: 'System Initialized', description: `Successfully downloaded ${totalChanges} regional assets.` });
+          setFirstTimeSetupStatus('complete');
         }
         
     } catch (error) {
         monitoring.trackError(error, { component: 'AssetList', action: 'executeDownload', source: activeDatabase });
-        addNotification({
-          title: "Synchronization Error",
-          description: error instanceof Error ? error.message : "An unexpected database error occurred.",
-          variant: 'destructive'
-        });
+        addNotification({ title: "Sync Error", variant: 'destructive' });
         if (isFirstTime) setFirstTimeSetupStatus('idle');
     } finally {
         setIsSyncing(false);
         if (!isFirstTime) {
           setIsSyncConfirmOpen(false);
           setSyncSummary(null);
-        } else {
-          setFirstTimeSetupStatus('complete');
         }
     }
-}, [setAssets, setIsSyncing, setFirstTimeSetupStatus, activeDatabase]);
+  }, [setAssets, setIsSyncing, setFirstTimeSetupStatus, activeDatabase]);
 
   const executeUpload = useCallback(async () => {
       if (!syncSummary || syncSummary.type !== 'upload') return;
@@ -482,7 +492,6 @@ export default function AssetList() {
       try {
           const { toUpload: assetsToPush } = syncSummary;
           
-          // TARGET THE ACTIVE DATABASE LAYER
           if (activeDatabase === 'firestore') {
               await batchSetAssetsFS(assetsToPush);
           } else {
@@ -501,19 +510,11 @@ export default function AssetList() {
           await saveAssets(updatedLocalAssets);
           setAssets(updatedLocalAssets);
 
-          addNotification({ title: 'Cloud Updated', description: `Successfully pushed ${assetsToPush.length} edits to ${activeDatabase === 'firestore' ? 'Firestore' : 'RTDB'}.` });
+          addNotification({ title: 'Cloud Updated', description: `Pushed ${assetsToPush.length} edits.` });
           
       } catch (error: any) {
-          const isPermissionError = error?.code === 'permission-denied' || error?.message?.toLowerCase().includes('permission');
-          monitoring.trackError(error, { component: 'AssetList', action: 'executeUpload', context: isPermissionError ? 'Security Rule Rejection' : 'Network/Config Issue' });
-          
-          addNotification({
-            title: isPermissionError ? "Access Denied" : "Upload Failed",
-            description: isPermissionError 
-                ? "The database rejected your changes. Your local role does not have cloud write permissions."
-                : "A network or configuration error prevented your changes from reaching the cloud.",
-            variant: 'destructive'
-          });
+          monitoring.trackError(error, { component: 'AssetList', action: 'executeUpload' });
+          addNotification({ title: "Upload Failed", variant: 'destructive' });
       } finally {
           setIsSyncing(false);
           setIsSyncConfirmOpen(false);
@@ -531,13 +532,11 @@ export default function AssetList() {
 
     if (!isAllowed('sync-upload', 5000)) {
         const remaining = getRemainingCooldown('sync-upload', 5000);
-        addNotification({ title: "Sync Paused", description: `Please wait ${remaining}s before next upload.` });
+        addNotification({ title: "Sync Paused", description: `Please wait ${remaining}s.` });
         return;
     }
 
     setIsSyncing(true);
-    addNotification({ title: 'Scanning local storage...' });
-    
     try {
         const localAssets = await getLocalAssetsFromDb();
         const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
@@ -553,31 +552,25 @@ export default function AssetList() {
             });
             setIsSyncConfirmOpen(true);
         } else {
-            addNotification({ title: 'Fully Synced', description: 'No local changes detected.' });
+            addNotification({ title: 'Fully Synced' });
         }
     } catch (error) {
         monitoring.trackError(error, { component: 'AssetList', action: 'handleUploadScan' });
-        addNotification({ title: "Scanner Error", variant: "destructive" });
     } finally {
         setIsSyncing(false);
     }
 }, [isOnline, authInitialized, isGuest, setIsSyncing]);
 
-    /**
-     * handleDownloadScan: Scans the cloud for changes and builds a summary.
-     * This is the "Download" trigger that ensures all database download functions are checked.
-     */
     const handleDownloadScan = useCallback(async (isFirstTime = false) => {
     if (!isOnline || !authInitialized || isGuest) return;
 
     if (!isFirstTime) {
       if (!isAllowed('sync-download', 5000)) {
           const remaining = getRemainingCooldown('sync-download', 5000);
-          addNotification({ title: "Sync Paused", description: `Please wait ${remaining}s before checking cloud.` });
+          addNotification({ title: "Sync Paused", description: `Please wait ${remaining}s.` });
           return;
       }
 
-      // Safeguard: Check for unsynced local changes that might be overwritten
       const localAssetsUnsynced = await getLocalAssetsFromDb();
       const unsyncedAssets = localAssetsUnsynced.filter(a => a.syncStatus === 'local');
       if (unsyncedAssets.length > 0) {
@@ -588,22 +581,17 @@ export default function AssetList() {
     }
 
     setIsSyncing(true);
-    addNotification({ title: isFirstTime ? 'Initializing database...' : `Checking ${activeDatabase === 'firestore' ? 'Firestore' : 'RTDB'}...` });
-
     try {
-        // Step 1: Fetch raw cloud data from the active project
         const getCloudAssets = activeDatabase === 'firestore' ? getAssetsFS : getAssetsRTDB;
         const allCloudAssets = await getCloudAssets(activeGrantId);
         
-        // Step 2: Apply regional/administrative filtering
-        const userAuthorizedStates = isAdmin ? ['All'] : (userProfile?.states || []);
+        const authorizedFilters = isAdmin ? ['All'] : (userProfile?.states || []);
         
         const cloudAssets = allCloudAssets.filter(asset => {
             if (isAdmin) return true;
-            return userAuthorizedStates.some(state => assetMatchesGlobalFilter(asset, state));
+            return assetMatchesGlobalFilter(asset, authorizedFilters);
         });
         
-        // Step 3: Compare cloud version with local cache
         const localAssets = await getLocalAssetsFromDb();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         const cloudAssetIds = new Set(cloudAssets.map(a => a.id));
@@ -623,50 +611,41 @@ export default function AssetList() {
                 const cloudTimestamp = cloudAsset.lastModified ? new Date(cloudAsset.lastModified).getTime() : 0;
                 const localTimestamp = localAsset.lastModified ? new Date(localAsset.lastModified).getTime() : 0;
 
-                // Priority Check: If local version is newer and unsynced, keep it (unless user overwrites)
                 if (localAsset.syncStatus === 'local' && localTimestamp > cloudTimestamp) {
                     summary.keptLocal.push(localAsset);
-                } else {
-                    // Check for substantive changes using deep comparison
-                    if (haveAssetDetailsChanged(localAsset, cloudAsset)) {
-                       summary.updatedFromCloud.push(cloudAsset);
-                    }
+                } else if (haveAssetDetailsChanged(localAsset, cloudAsset)) {
+                    summary.updatedFromCloud.push(cloudAsset);
                 }
             } else {
                 summary.newFromCloud.push(cloudAsset);
             }
         }
         
-        // Step 4: Detect Deletions (In local but not in cloud)
-        // Safety Check: Only suggest local deletion if we received a legitimate list of cloud assets (prevent wipe-on-network-error)
         if (allCloudAssets.length > 0 || isFirstTime) {
             for (const localAsset of localAssets) {
                 if (!cloudAssetIds.has(localAsset.id) && localAsset.syncStatus !== 'local') {
-                    const isInScope = isAdmin || userAuthorizedStates.some(state => assetMatchesGlobalFilter(localAsset, state));
+                    const isInScope = isAdmin || authorizedFilters.some(state => assetMatchesGlobalFilter(localAsset, [state]));
                     if(isInScope) summary.deletedOnCloud?.push(localAsset);
                 }
             }
         }
         
-        // Step 5: Process Results
         const hasChanges = summary.newFromCloud.length > 0 || summary.updatedFromCloud.length > 0 || (summary.deletedOnCloud || []).length > 0;
 
         if (!hasChanges && summary.keptLocal.length === 0) {
-            if (!isFirstTime) addNotification({ title: 'Already Up-to-Date', description: 'Local data matches cloud registry.' });
+            if (!isFirstTime) addNotification({ title: 'Up-to-Date' });
             if (isFirstTime) setFirstTimeSetupStatus('complete');
         } else {
-            if (isFirstTime) {
-                await executeDownload(summary, true);
-            } else {
+            if (isFirstTime) await executeDownload(summary, true);
+            else {
                 setSyncSummary(summary);
                 setIsSyncConfirmOpen(true);
             }
         }
     } catch (error) {
-        monitoring.trackError(error, { component: 'AssetList', action: 'handleDownloadScan', source: activeDatabase });
-        addNotification({ title: "Sync Scan Failed", description: "Database connection interrupted.", variant: "destructive" });
+        monitoring.trackError(error, { component: 'AssetList', action: 'handleDownloadScan' });
         if (isFirstTime) setFirstTimeSetupStatus('idle');
-        setIsOnline(false); // Force offline state to prevent retry loops
+        setIsOnline(false);
     } finally {
         setIsSyncing(false);
     }
@@ -679,27 +658,17 @@ export default function AssetList() {
   const handleOverwriteDownload = useCallback(async () => {
     setIsDownloadWarningOpen(false);
     setIsSyncing(true);
-    addNotification({ title: 'Overwriting local cache...' });
-    
     try {
         const getCloudAssets = activeDatabase === 'firestore' ? getAssetsFS : getAssetsRTDB;
         const allCloudAssets = await getCloudAssets(activeGrantId);
-        
-        const userAuthorizedStates = isAdmin ? ['All'] : (userProfile?.states || []);
-
+        const authorizedFilters = isAdmin ? ['All'] : (userProfile?.states || []);
         const assetsToSave = allCloudAssets
-            .filter(asset => {
-                if (isAdmin) return true;
-                return userAuthorizedStates.some(state => assetMatchesGlobalFilter(asset, state));
-            })
+            .filter(asset => isAdmin || assetMatchesGlobalFilter(asset, authorizedFilters))
             .map(asset => ({ ...asset, syncStatus: 'synced' as const }));
-        
         await saveAssets(assetsToSave);
         setAssets(assetsToSave);
-        
-        addNotification({ title: 'Refresh Complete', description: `${assetsToSave.length} records reloaded from ${activeDatabase}.` });
+        addNotification({ title: 'Registry Reloaded' });
     } catch (error) {
-        monitoring.trackError(error, { component: 'AssetList', action: 'handleOverwriteDownload' });
         setIsOnline(false);
     } finally {
         setIsSyncing(false);
@@ -711,7 +680,6 @@ export default function AssetList() {
     handleUploadScan();
   }, [handleUploadScan]);
 
-  // Initial load from IndexedDB
   useEffect(() => {
     const loadInitialDataFromDb = async () => {
       setIsLoading(true);
@@ -742,11 +710,11 @@ export default function AssetList() {
   }, [appSettings?.appMode, setStatusOptions]);
 
   const allAssetsForFiltering = useMemo(() => {
-    if (globalStateFilter && globalStateFilter !== 'All') {
-        return activeAssets.filter(asset => assetMatchesGlobalFilter(asset, globalStateFilter));
+    if (globalStateFilters.length > 0 && !globalStateFilters.includes('All')) {
+        return activeAssets.filter(asset => assetMatchesGlobalFilter(asset, globalStateFilters));
     }
     return activeAssets;
-  }, [activeAssets, globalStateFilter]);
+  }, [activeAssets, globalStateFilters]);
   
   useEffect(() => {
     const locations = new Map<string, number>();
@@ -760,7 +728,7 @@ export default function AssetList() {
       if(!locations.has(state)) locations.set(state, 0);
     });
     
-    setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })).sort((a, b) => a.label.localeCompare(b.label)));
+    setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })));
 
     const assigneeMap = new Map<string, number>();
     allAssetsForFiltering.forEach(asset => {
@@ -882,7 +850,7 @@ export default function AssetList() {
 
   const handleAddAsset = useCallback(() => {
     if (!userProfile?.canAddAssets && !isAdmin) {
-      addNotification({ title: "Restricted", description: "You don't have adding permissions.", variant: "destructive" });
+      addNotification({ title: "Restricted", variant: "destructive" });
       return;
     }
     setSelectedAsset(undefined);
@@ -935,7 +903,6 @@ export default function AssetList() {
       await saveAssets(updatedAssets);
       setAssets(updatedAssets);
       await enqueueOp('delete', 'assets', { id: assetToDelete.id });
-      addNotification({ title: 'Record Staged for Removal', description: 'Deletion will sync during next Upload.' });
     } else {
       const currentOfflineAssets = await getLockedOfflineAssets();
       const updatedOfflineAssets = currentOfflineAssets.filter(a => a.id !== assetToDelete.id);
@@ -949,8 +916,6 @@ export default function AssetList() {
 
   const handleBatchDelete = async () => {
     setIsBatchDeleting(true);
-    const count = selectedAssetIds.length;
-
     if (dataSource === 'cloud') {
       let currentAssets = await getLocalAssetsFromDb();
       const ids = new Set(selectedAssetIds);
@@ -958,7 +923,6 @@ export default function AssetList() {
       await saveAssets(currentAssets);
       setAssets(currentAssets);
       for (const id of selectedAssetIds) await enqueueOp('delete', 'assets', { id });
-      addNotification({ title: 'Batch Deletion Staged', description: `${count} items will sync during next Upload.` });
     } else {
       let currentOfflineAssets = await getLockedOfflineAssets();
       const ids = new Set(selectedAssetIds);
@@ -966,7 +930,6 @@ export default function AssetList() {
       await saveLockedOfflineAssets(currentOfflineAssets);
       setOfflineAssets(currentOfflineAssets);
     }
-
     setSelectedAssetIds([]);
     setIsBatchDeleting(false);
   };
@@ -984,13 +947,9 @@ export default function AssetList() {
             ...data, 
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName,
-            lastModifiedByState: globalStateFilter,
+            lastModifiedByState: userProfile?.states[0],
             syncStatus: dataSource === 'cloud' ? 'local' : undefined,
         };
-        if (updatedAsset.remarks) updatedAsset.remarks = sanitizeInput(updatedAsset.remarks);
-        if (updatedAsset.assignee) updatedAsset.assignee = sanitizeInput(updatedAsset.assignee);
-        if (updatedAsset.location) updatedAsset.location = sanitizeInput(updatedAsset.location);
-
         if (data.verifiedStatus === 'Verified' && !asset.verifiedDate) updatedAsset.verifiedDate = new Date().toLocaleDateString("en-CA");
         else if (data.verifiedStatus && data.verifiedStatus !== 'Verified') updatedAsset.verifiedDate = '';
         return sanitizeForFirestore(updatedAsset);
@@ -1016,10 +975,6 @@ export default function AssetList() {
     const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
     const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
 
-    (Object.keys(assetToSave) as Array<keyof Asset>).forEach(key => {
-        if (typeof assetToSave[key] === 'string') (assetToSave as any)[key] = sanitizeInput(assetToSave[key] as string);
-    });
-
     if (!originalAsset || haveAssetDetailsChanged(originalAsset, assetToSave)) {
         let previousState: Partial<Asset> | undefined = undefined;
         if (originalAsset) {
@@ -1037,12 +992,9 @@ export default function AssetList() {
                 grantId: assetToSave.grantId || activeGrantId || undefined,
                 lastModified: new Date().toISOString(),
                 lastModifiedBy: userProfile?.displayName,
-                lastModifiedByState: globalStateFilter,
+                lastModifiedByState: userProfile?.states[0],
                 syncStatus: dataSource === 'cloud' ? 'local' : undefined,
                 previousState: Object.keys(previousState || {}).length > 0 ? previousState : undefined,
-                approvalStatus: undefined,
-                pendingChanges: undefined,
-                changeSubmittedBy: undefined,
             });
         } else {
             const changesOnly: Partial<Asset> = {};
@@ -1060,17 +1012,12 @@ export default function AssetList() {
                 changeSubmittedBy: {
                     displayName: userProfile?.displayName || 'Unknown',
                     loginName: userProfile?.loginName || 'unknown',
-                    state: globalStateFilter,
+                    state: userProfile?.states[0] || 'Unknown',
                 },
                 lastModified: new Date().toISOString(),
                 lastModifiedBy: userProfile?.displayName,
-                lastModifiedByState: globalStateFilter,
+                lastModifiedByState: userProfile?.states[0],
                 syncStatus: dataSource === 'cloud' ? 'local' : undefined,
-            });
-            addNotification({ 
-                title: "Push Pending", 
-                description: "Changes submitted locally. Sync Up to push to cloud.",
-                variant: "default" 
             });
         }
       
@@ -1089,7 +1036,7 @@ export default function AssetList() {
         await saveLockedOfflineAssets(currentOfflineAssets);
         setOfflineAssets(currentOfflineAssets);
       }
-    } else addNotification({ title: 'No Changes Detected' });
+    }
     setIsFormOpen(false);
   };
 
@@ -1098,14 +1045,13 @@ export default function AssetList() {
     const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
     if (asset.remarks === data.remarks && asset.verifiedStatus === data.verifiedStatus && asset.condition === data.condition) return;
-    if (data.remarks) data.remarks = sanitizeInput(data.remarks);
 
     const updatedAsset: Asset = sanitizeForFirestore({ 
         ...asset, 
         ...data, 
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName,
-        lastModifiedByState: globalStateFilter,
+        lastModifiedByState: userProfile?.states[0],
         syncStatus: dataSource === 'cloud' ? 'local' : undefined,
     });
 
@@ -1126,14 +1072,11 @@ export default function AssetList() {
           setOfflineAssets(currentOfflineAssets);
       }
     }
-  }, [dataSource, assets, offlineAssets, userProfile, globalStateFilter, setAssets, setOfflineAssets]);
+  }, [dataSource, assets, offlineAssets, userProfile, setAssets, setOfflineAssets]);
 
   const handleRevertAsset = useCallback(async (assetId: string) => {
     const assetToRevert = activeAssets.find(a => a.id === assetId);
-    if (!assetToRevert || !assetToRevert.previousState) {
-        toast({ title: "Cannot Revert", variant: "destructive" });
-        return;
-    }
+    if (!assetToRevert || !assetToRevert.previousState) return;
 
     const rolledBackAsset: Asset = sanitizeForFirestore({
       ...assetToRevert,
@@ -1180,14 +1123,10 @@ export default function AssetList() {
 
   const handleClearAllAssets = useCallback(async () => {
     setIsClearAllDialogOpen(false);
-    
     if (dataSource === 'cloud') {
       await clearLocalAssets();
       setAssets([]);
-      if (isOnline && isAdmin) {
-          addNotification({ title: "Purge Staged", description: "Wipe command is queued for next manual sync." });
-          await enqueueOp('delete', 'assets_global_wipe', { timestamp: Date.now() });
-      }
+      if (isOnline && isAdmin) await enqueueOp('delete', 'assets_global_wipe', { timestamp: Date.now() });
     } else {
       await saveLockedOfflineAssets([]);
       setOfflineAssets([]);
@@ -1225,14 +1164,10 @@ export default function AssetList() {
     await saveAssets(assetsToKeep);
     setAssets(assetsToKeep);
     for (const id of idsToDelete) await enqueueOp('delete', 'assets', { id });
-    addNotification({ title: 'Category Records Staged for removal.' });
   };
   
   const handleSelectiveUpload = useCallback(async () => {
-    if (!isOnline) {
-      addNotification({title: "Offline", variant: "destructive"});
-      return;
-    }
+    if (!isOnline) return;
     if (dataSource === 'local_locked') {
         handleMergeToMainList();
         return;
@@ -1245,21 +1180,14 @@ export default function AssetList() {
       const all = await getLocalAssetsFromDb();
       const assetsToUpload = all.filter(a => ids.includes(a.id) && a.syncStatus === 'local');
       if (assetsToUpload.length > 0) {
-        // TARGET ACTIVE DATABASE
-        if (activeDatabase === 'firestore') {
-            await batchSetAssetsFS(assetsToUpload);
-        } else {
-            await batchSetAssetsRTDB(assetsToUpload);
-        }
-
+        if (activeDatabase === 'firestore') await batchSetAssetsFS(assetsToUpload);
+        else await batchSetAssetsRTDB(assetsToUpload);
         const updated = all.map(a => ids.includes(a.id) ? { ...a, syncStatus: 'synced' as const } : a);
         await saveAssets(updated);
         setAssets(updated);
-        addNotification({title: "Upload Successful"});
       }
     } catch(e) {
       monitoring.trackError(e, { component: 'AssetList', action: 'handleSelectiveUpload' });
-      addNotification({title: "Upload Failed", variant: "destructive"});
     } finally {
       setIsSyncing(false);
       setSelectedAssetIds([]);
@@ -1275,19 +1203,13 @@ export default function AssetList() {
       const toCopy = assets.filter(a => ids.includes(a.id));
       const existing = await getLockedOfflineAssets();
       const map = new Map(existing.map(a => [a.id, a]));
-      toCopy.forEach(a => {
-        const ex = map.get(a.id);
-        if (!ex || (new Date(a.lastModified || 0).getTime() > new Date(ex.lastModified || 0).getTime())) {
-          map.set(a.id, { ...a, syncStatus: undefined });
-        }
-      });
+      toCopy.forEach(a => map.set(a.id, { ...a, syncStatus: undefined }));
       const updated = Array.from(map.values());
       await saveLockedOfflineAssets(updated);
       setOfflineAssets(updated);
       setDataSource('local_locked');
     } catch(e) {
       monitoring.trackError(e, { component: 'AssetList', action: 'handleCopyToOffline' });
-      addNotification({ title: "Copy Failed", variant: "destructive" });
     } finally {
       setIsSyncing(false);
       setSelectedAssetIds([]);
@@ -1311,7 +1233,6 @@ export default function AssetList() {
         setOfflineAssets(rem);
     } catch (e) {
         monitoring.trackError(e, { component: 'AssetList', action: 'handleMergeToMainList' });
-        addNotification({ title: 'Merge Failed', variant: 'destructive' });
     } finally {
         setIsSyncing(false);
         setSelectedAssetIds([]);
@@ -1322,7 +1243,6 @@ export default function AssetList() {
   const handleSaveCategoryBatchEdit = async (data: any) => {
     let toUp: Asset[] = [];
     selectedCategories.forEach(cat => toUp.push(...(assetsByCategory[cat] || [])));
-    
     const updated = toUp.map(a => {
         const up: Asset = sanitizeForFirestore({ 
             ...a, 
@@ -1330,14 +1250,13 @@ export default function AssetList() {
             condition: data.condition || a.condition,
             lastModified: new Date().toISOString(), 
             lastModifiedBy: userProfile?.displayName, 
-            lastModifiedByState: globalStateFilter, 
+            lastModifiedByState: userProfile?.states[0], 
             syncStatus: dataSource === 'cloud' ? 'local' : undefined 
         });
         if (data.status === 'Verified' && !a.verifiedDate) up.verifiedDate = new Date().toLocaleDateString("en-CA");
         else if (data.status && data.status !== 'Verified') up.verifiedDate = '';
         return up;
     });
-
     if (dataSource === 'cloud') {
       let curr = await getLocalAssetsFromDb();
       const map = new Map(updated.map(a => [a.id, a]));
@@ -1365,7 +1284,6 @@ export default function AssetList() {
       await saveAssets(curr);
       setAssets(curr);
       for (const id of ids) await enqueueOp('delete', 'assets', { id });
-      addNotification({ title: 'Categories Staged for deletion.' });
     } else {
       let currentOfflineAssets = await getLockedOfflineAssets();
       currentOfflineAssets = currentOfflineAssets.filter(a => !ids.includes(a.id));
@@ -1404,13 +1322,9 @@ export default function AssetList() {
     const settings: AppSettings = { ...appSettings, grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefinitions } : g), lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
     await saveLocalSettings(settings);
     setAppSettings(settings);
-    
     try {
-        const updateSettings = activeDatabase === 'firestore' ? batchSetAssetsFS : batchSetAssetsRTDB;
-        // Broadcast layout update to active layer immediately
         const settingsRef = doc(db!, 'config', 'settings');
         await setDoc(settingsRef, settings, { merge: true });
-        toast({ title: 'Layout Broadcasted', description: 'Column changes have been updated for all users immediately.' });
     } catch (e) {}
   };
 
@@ -1418,7 +1332,6 @@ export default function AssetList() {
     if (!isAdmin || !appSettings || !userProfile) return;
     const newSheetDefinitions = { ...grant?.sheetDefinitions };
     if(newSheetDefinitions[sn]) newSheetDefinitions[sn].isHidden = !newSheetDefinitions[sn].isHidden;
-    
     const settings: AppSettings = { ...appSettings, grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefinitions } : g), lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
     await saveLocalSettings(settings);
     setAppSettings(settings);
@@ -1428,6 +1341,36 @@ export default function AssetList() {
     } catch (e) {}
   };
 
+  const toggleScopeFilter = (location: string) => {
+    setGlobalStateFilters(prev => {
+        if (location === 'All') return ['All'];
+        const withoutAll = prev.filter(s => s !== 'All');
+        if (withoutAll.includes(location)) {
+            const next = withoutAll.filter(s => s !== location);
+            return next.length === 0 ? ['All'] : next;
+        }
+        return [...withoutAll, location];
+    });
+  }
+
+  const selectZoneScope = (zoneName: string) => {
+      const zoneStates = NIGERIAN_ZONES[zoneName] || [];
+      setGlobalStateFilters(prev => {
+          const withoutAll = prev.filter(s => s !== 'All');
+          const allZoneSelected = zoneStates.every(s => withoutAll.includes(s));
+          if (allZoneSelected) {
+              const next = withoutAll.filter(s => !zoneStates.includes(s));
+              return next.length === 0 ? ['All'] : next;
+          }
+          return [...new Set([...withoutAll, ...zoneStates])];
+      });
+  }
+
+  const sortedScopeLocations = useMemo(() => {
+      const locations = locationOptions.filter(l => !ZONAL_STORES.includes(l.value));
+      if (scopeSortOrder === 'alpha') return [...locations].sort((a,b) => a.label.localeCompare(b.label));
+      return [...locations].sort((a,b) => (b.count || 0) - (a.count || 0));
+  }, [locationOptions, scopeSortOrder]);
 
   if (isLoading || !appSettings) {
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
@@ -1439,7 +1382,6 @@ export default function AssetList() {
       const percentage = total > 0 ? (verified / total) * 100 : 0;
       const isSelected = selectedCategories.includes(category);
       const isHidden = sheetDefinitions?.[category]?.isHidden;
-      
       return (
           <Card key={category} className={cn("group hover:shadow-xl transition-all duration-300 flex flex-col border-primary/10 overflow-hidden", isSelected && "ring-2 ring-primary bg-primary/5 shadow-primary/10", isHidden && "opacity-50")}>
               <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 bg-muted/20">
@@ -1507,7 +1449,6 @@ export default function AssetList() {
     const contextualButtonText = dataSource === 'local_locked' ? 'Merge Selected' : 'Upload Selection';
     const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
     const mainCategories = Object.keys(assetsByCategory).filter(cat => !sheetDefinitions?.[cat]?.isHidden).sort((a,b) => a.localeCompare(b));
-
     const showScopeSwitcher = isAdmin || (userProfile?.states && userProfile.states.length > 1);
 
     return (
@@ -1529,7 +1470,7 @@ export default function AssetList() {
         </AlertDialog>
         <AlertDialog open={showProjectSwitchDialog} onOpenChange={setShowProjectSwitchDialog}>
             <AlertDialogContent>
-                <AlertDialogHeader><AlertDialogTitle>Environment Switch</AlertDialogTitle><AlertDialogDescription>New Firebase configuration detected. Clearing local cache to prevent cross-environment data contamination.</AlertDialogDescription></AlertDialogHeader>
+                <AlertDialogHeader><AlertDialogTitle>Environment Switch</AlertDialogTitle><AlertDialogDescription>New Firebase configuration detected. Clearing local cache.</AlertDialogDescription></AlertDialogHeader>
                 <AlertDialogFooter><AlertDialogAction onClick={handleConfirmProjectSwitch}>Refresh Application</AlertDialogAction></AlertDialogFooter>
             </AlertDialogContent>
         </AlertDialog>
@@ -1546,47 +1487,126 @@ export default function AssetList() {
             
             <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
                 {showScopeSwitcher && (
-                   <Select value={globalStateFilter || 'All'} onValueChange={setGlobalStateFilter}>
-                      <SelectTrigger className="w-full md:w-[240px] rounded-xl border-primary/20 shadow-sm bg-background">
-                        <SelectValue placeholder={`Scope: ${globalStateFilter}`} />
-                      </SelectTrigger>
-                        <SelectContent className="rounded-xl shadow-2xl border-primary/10">
-                            <ScrollArea className={cn(isAdmin ? "h-[400px]" : "h-auto max-h-[300px]")}>
-                                {isAdmin ? (
-                                    <>
-                                        <SelectItem value="All"><LocationProgress locationName="All" allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
-                                        <SelectSeparator />
-                                        <SelectGroup>
-                                            <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">Special Locations</SelectLabel>
-                                            {specialLocations.map((loc) => (
-                                                <SelectItem key={loc} value={loc} className="focus:bg-transparent p-0"><LocationProgress locationName={loc} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                        <SelectSeparator />
-                                        <SelectGroup>
-                                            <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">Zonal Stores</SelectLabel>
-                                            {ZONAL_STORES.map((zone) => (
-                                                <SelectItem key={zone} value={zone} className="focus:bg-transparent p-0"><LocationProgress locationName={zone} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                        <SelectSeparator />
-                                        <SelectGroup>
-                                            <SelectLabel className="px-4 py-2 text-[10px] font-black uppercase text-primary/60">States</SelectLabel>
-                                            {NIGERIAN_STATES.map((state) => (
-                                                <SelectItem key={state} value={state} className="focus:bg-transparent p-0"><LocationProgress locationName={state} allAssets={activeAssets} appMode={appSettings.appMode} /></SelectItem>
-                                            ))}
-                                        </SelectGroup>
-                                    </>
+                   <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full md:w-[280px] rounded-xl border-primary/20 shadow-sm bg-background justify-between h-11 px-4">
+                            <div className="flex items-center gap-2 overflow-hidden">
+                                <MapPin className="h-4 w-4 shrink-0 text-primary" />
+                                <span className="truncate text-xs font-bold">
+                                    {globalStateFilters.includes('All') ? 'All Project Scope' : `${globalStateFilters.length} Regions Active`}
+                                </span>
+                            </div>
+                            <ChevronRight className="h-4 w-4 shrink-0 rotate-90 opacity-50" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-[350px] p-0 rounded-2xl shadow-2xl border-primary/10" align="end">
+                        <div className="p-4 border-b bg-muted/20 space-y-3">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Manage Regional Scope</span>
+                                <Button 
+                                    variant="ghost" 
+                                    size="sm" 
+                                    className="h-7 text-[10px] font-black uppercase text-primary hover:bg-primary/10"
+                                    onClick={() => setGlobalStateFilters(['All'])}
+                                >
+                                    <RotateCcw className="mr-1 h-3 w-3" /> Reset to All
+                                </Button>
+                            </div>
+                            
+                            <div className="flex items-center gap-2">
+                                <Button 
+                                    variant={scopeSortOrder === 'alpha' ? 'secondary' : 'ghost'} 
+                                    size="sm" 
+                                    className="flex-1 h-8 text-[9px] font-bold uppercase rounded-lg"
+                                    onClick={() => setScopeSortOrder('alpha')}
+                                >
+                                    <ArrowUpAZ className="mr-1.5 h-3.5 w-3.5" /> A-Z
+                                </Button>
+                                <Button 
+                                    variant={scopeSortOrder === 'amount' ? 'secondary' : 'ghost'} 
+                                    size="sm" 
+                                    className="flex-1 h-8 text-[9px] font-bold uppercase rounded-lg"
+                                    onClick={() => setScopeSortOrder('amount')}
+                                >
+                                    <ArrowDownWideNarrow className="mr-1.5 h-3.5 w-3.5" /> Volume
+                                </Button>
+                                <Separator orientation="vertical" className="h-4 mx-1"/>
+                                <Button 
+                                    variant={scopeGroupBy === 'zone' ? 'secondary' : 'ghost'} 
+                                    size="sm" 
+                                    className="flex-1 h-8 text-[9px] font-bold uppercase rounded-lg"
+                                    onClick={() => setScopeGroupBy(prev => prev === 'zone' ? 'none' : 'zone')}
+                                >
+                                    <Layers className="mr-1.5 h-3.5 w-3.5" /> Zones
+                                </Button>
+                            </div>
+                        </div>
+                        
+                        <ScrollArea className="h-[400px]">
+                            <div className="p-2 space-y-1">
+                                <LocationProgress 
+                                    locationName="All" 
+                                    allAssets={activeAssets} 
+                                    appMode={appSettings.appMode} 
+                                    isSelected={globalStateFilters.includes('All')}
+                                    onToggle={() => setGlobalStateFilters(['All'])}
+                                    showCheckbox
+                                />
+                                <Separator className="my-2 opacity-50" />
+                                
+                                {scopeGroupBy === 'zone' ? (
+                                    Object.entries(NIGERIAN_ZONES).map(([zone, states]) => {
+                                        const isZoneActive = states.every(s => globalStateFilters.includes(s));
+                                        const someStatesActive = states.some(s => globalStateFilters.includes(s));
+                                        
+                                        return (
+                                            <div key={zone} className="space-y-1">
+                                                <div 
+                                                    className={cn(
+                                                        "flex items-center justify-between px-3 py-2 rounded-lg transition-colors cursor-pointer group",
+                                                        isZoneActive ? "bg-primary/5 text-primary" : "hover:bg-muted"
+                                                    )}
+                                                    onClick={() => selectZoneScope(zone)}
+                                                >
+                                                    <span className="text-[10px] font-black uppercase tracking-wider">{zone} Zone</span>
+                                                    <div className={cn("h-4 w-4 rounded border border-primary flex items-center justify-center", isZoneActive ? "bg-primary text-primary-foreground" : someStatesActive ? "bg-primary/20 border-primary/40" : "bg-background")}>
+                                                        {isZoneActive && <Check className="h-3 w-3" />}
+                                                        {!isZoneActive && someStatesActive && <div className="h-1.5 w-1.5 rounded-full bg-primary" />}
+                                                    </div>
+                                                </div>
+                                                <div className="pl-4 space-y-1 border-l-2 border-primary/10 ml-2">
+                                                    {states.map(state => (
+                                                        <LocationProgress 
+                                                            key={state}
+                                                            locationName={state}
+                                                            allAssets={activeAssets}
+                                                            appMode={appSettings.appMode}
+                                                            isSelected={globalStateFilters.includes(state)}
+                                                            onToggle={() => toggleScopeFilter(state)}
+                                                            showCheckbox
+                                                        />
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        );
+                                    })
                                 ) : (
-                                    userProfile?.states?.map((state) => (
-                                        <SelectItem key={state} value={state} className="focus:bg-transparent p-0">
-                                            <LocationProgress locationName={state} allAssets={activeAssets} appMode={appSettings.appMode} />
-                                        </SelectItem>
+                                    sortedScopeLocations.map(loc => (
+                                        <LocationProgress 
+                                            key={loc.value}
+                                            locationName={loc.value}
+                                            allAssets={activeAssets}
+                                            appMode={appSettings.appMode}
+                                            isSelected={globalStateFilters.includes(loc.value)}
+                                            onToggle={() => toggleScopeFilter(loc.value)}
+                                            showCheckbox
+                                        />
                                     ))
                                 )}
-                            </ScrollArea>
-                        </SelectContent>
-                      </Select>
+                            </div>
+                        </ScrollArea>
+                      </PopoverContent>
+                   </Popover>
                 )}
                 
                 <div className="flex items-center gap-3 ml-auto">
@@ -1618,7 +1638,7 @@ export default function AssetList() {
                             <Download className="mr-2 h-3 w-3" /> Export Excel
                         </Button>
                         <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-white hover:bg-destructive hover:text-white" onClick={handleDeleteSelectedCategories} disabled={isBatchDeleting || isGuest}>
-                            <Trash2 className="mr-2 h-3 w-3" /> Wipe Selected
+                            <Trash2 className="mr-2 h-4 w-4" /> Wipe Selected
                         </Button>
                     </div>
                 </ScrollArea>
@@ -1650,7 +1670,7 @@ export default function AssetList() {
             <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Destructive Wipe</AlertDialogTitle><AlertDialogDescription>{clearAllDialogDescription}</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearAllAssets} className="bg-destructive">Wipe All Assets</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
          <AlertDialog open={isClearCategoryDialogOpen} onOpenChange={setIsClearCategoryDialogOpen}>
-            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete category {categoryToDelete}?</AlertDialogTitle><AlertDialogDescription>This removes all assets from the local device and cloud backups. Irreversible.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearCategory} className="bg-destructive">Execute Deletion</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete category {categoryToDelete}?</AlertDialogTitle><AlertDialogDescription>Irreversible.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleClearCategory} className="bg-destructive">Execute Deletion</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
         {sheetToEdit && originalSheetNameToEdit && (
             <ColumnCustomizationSheet isOpen={isColumnSheetOpen} onOpenChange={setIsColumnSheetOpen} sheetDefinition={sheetToEdit} originalSheetName={originalSheetNameToEdit} onSave={handleSaveColumnLayout} />
@@ -1677,7 +1697,7 @@ export default function AssetList() {
                 <div className="flex items-center gap-2 text-[10px] font-bold uppercase text-muted-foreground mt-0.5">
                     <Badge variant="outline" className="px-1.5 h-4 text-[9px] border-primary/30 text-primary">{categoryFilteredAssets.length} Records</Badge>
                     <Separator orientation="vertical" className="h-2.5"/>
-                    <span>Viewing {globalStateFilter}</span>
+                    <span className="truncate">Active Scope: {globalStateFilters.join(', ')}</span>
                 </div>
             </div>
             <div className="flex items-center gap-2">
@@ -1711,7 +1731,7 @@ export default function AssetList() {
                     <ClipboardEdit className="mr-2 h-3 w-3" /> Batch
                 </Button>
                 <Button variant="ghost" size="sm" className="h-8 text-xs font-bold text-destructive hover:bg-destructive/10" onClick={handleBatchDelete} disabled={isBatchDeleting || isGuest || !isAdmin}>
-                    <Trash2 className="mr-2 h-3 w-3" /> Delete
+                    <Trash2 className="mr-2 h-4 w-4" /> Delete
                 </Button>
             </motion.div>
         )}
@@ -1750,7 +1770,7 @@ export default function AssetList() {
         {isBatchEditOpen && <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.length} onSave={handleSaveBatchEdit} />}
         
         <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Record?</AlertDialogTitle><AlertDialogDescription>This asset will be permanently removed from local and cloud databases. This action is irreversible.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive">Delete Asset</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
+            <AlertDialogContent><AlertDialogHeader><AlertDialogTitle>Delete Record?</AlertDialogTitle><AlertDialogDescription>Irreversible.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter><AlertDialogCancel>Cancel</AlertDialogCancel><AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive">Delete Asset</AlertDialogAction></AlertDialogFooter></AlertDialogContent>
         </AlertDialog>
     </div>
   );

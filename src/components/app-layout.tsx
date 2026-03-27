@@ -16,6 +16,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
+  DropdownMenuCheckboxItem,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import {
@@ -88,8 +89,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     initialSettingsTab,
     setInitialSettingsTab,
     onRevertAsset,
-    globalStateFilter,
-    setGlobalStateFilter,
+    globalStateFilters,
+    setGlobalStateFilters,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
@@ -236,6 +237,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const handleSettingsOpen = () => {
     setInitialSettingsTab('general');
     setIsSettingsOpen(true);
+  }
+
+  const toggleRegionalScope = (state: string) => {
+    setGlobalStateFilters(prev => {
+        if (state === 'All') return ['All'];
+        const withoutAll = prev.filter(s => s !== 'All');
+        if (withoutAll.includes(state)) {
+            const next = withoutAll.filter(s => s !== state);
+            return next.length === 0 ? ['All'] : next;
+        }
+        return [...withoutAll, state];
+    });
   }
 
   const userHasMultipleStates = userProfile?.states && userProfile.states.length > 1;
@@ -390,8 +403,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <DropdownMenuLabel className="p-3">
                         <div className="flex flex-col space-y-1">
                           <p className="text-sm font-bold leading-none">{getUserName()}</p>
-                          <p className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                            <Filter className="h-3 w-3" /> {globalStateFilter}
+                          <p className="text-[10px] font-medium text-muted-foreground flex items-center gap-1 truncate">
+                            <MapPin className="h-2.5 w-2.5" /> {globalStateFilters.join(', ')}
                           </p>
                         </div>
                       </DropdownMenuLabel>
@@ -401,16 +414,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <DropdownMenuSub>
                           <DropdownMenuSubTrigger className="h-10">
                             <MapPin className="mr-2 h-4 w-4 text-muted-foreground"/>
-                            Switch State Scope
+                            Manage State Scope
                           </DropdownMenuSubTrigger>
-                          <DropdownMenuSubContent className="w-48">
-                            <DropdownMenuRadioGroup value={globalStateFilter} onValueChange={setGlobalStateFilter}>
-                              {userProfile.states.map(state => (
-                                <DropdownMenuRadioItem key={state} value={state}>
-                                  {state}
-                                </DropdownMenuRadioItem>
-                              ))}
-                            </DropdownMenuRadioGroup>
+                          <DropdownMenuSubContent className="w-56">
+                            <DropdownMenuLabel className="text-[10px] font-black uppercase text-muted-foreground px-2 py-1">Select Multiple</DropdownMenuLabel>
+                            {userProfile.states.map(state => (
+                              <DropdownMenuCheckboxItem 
+                                key={state} 
+                                checked={globalStateFilters.includes(state)}
+                                onCheckedChange={() => toggleRegionalScope(state)}
+                              >
+                                {state}
+                              </DropdownMenuCheckboxItem>
+                            ))}
                           </DropdownMenuSubContent>
                         </DropdownMenuSub>
                       )}

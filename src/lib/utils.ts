@@ -77,27 +77,28 @@ export const getStatusClasses = (status?: 'Verified' | 'Unverified' | 'Discrepan
     }
 }
 
-export const assetMatchesGlobalFilter = (asset: Asset, filter: string): boolean => {
-    if (!filter || filter === 'All') {
+export const assetMatchesGlobalFilter = (asset: Asset, filters: string[]): boolean => {
+    if (!filters || filters.length === 0 || filters.includes('All')) {
         return true;
     }
-    const isZone = ZONAL_STORES.includes(filter);
 
-    if (isZone) {
-        const lowerCaseFilter = filter.toLowerCase().trim();
-        const assetLocation = (asset.location || "").toLowerCase().trim();
-        return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
-    }
-    
-    if (SPECIAL_LOCATIONS.includes(filter)) {
-        const lowerCaseFilter = filter.toLowerCase().trim();
-        return (asset.location || "").toLowerCase().trim().includes(lowerCaseFilter);
-    }
-
-    const lowerCaseFilter = filter.toLowerCase().trim();
-    const capitalCity = NIGERIAN_STATE_CAPITALS[filter]?.toLowerCase().trim();
     const assetLocation = (asset.location || "").toLowerCase().trim();
-    const matchesState = assetLocation.startsWith(lowerCaseFilter);
-    const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-    return matchesState || matchesCapital;
+    
+    return filters.some(filter => {
+        const lowerCaseFilter = filter.toLowerCase().trim();
+        const isZone = ZONAL_STORES.includes(filter);
+
+        if (isZone) {
+            return assetLocation.includes(lowerCaseFilter) && assetLocation.includes("zonal store");
+        }
+        
+        if (SPECIAL_LOCATIONS.includes(filter)) {
+            return assetLocation.includes(lowerCaseFilter);
+        }
+
+        const capitalCity = NIGERIAN_STATE_CAPITALS[filter]?.toLowerCase().trim();
+        const matchesState = assetLocation.startsWith(lowerCaseFilter);
+        const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
+        return matchesState || matchesCapital;
+    });
 };

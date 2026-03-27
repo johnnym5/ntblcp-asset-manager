@@ -47,8 +47,8 @@ interface AppStateContextType {
   setIsOnline: Dispatch<SetStateAction<boolean>>;
   searchTerm: string;
   setSearchTerm: Dispatch<SetStateAction<string>>;
-  globalStateFilter: string;
-  setGlobalStateFilter: Dispatch<SetStateAction<string>>;
+  globalStateFilters: string[];
+  setGlobalStateFilters: Dispatch<SetStateAction<string[]>>;
   itemsPerPage: number;
   setItemsPerPage: Dispatch<SetStateAction<number>>;
   dataSource: 'cloud' | 'local_locked';
@@ -137,7 +137,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return true;
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const [globalStateFilter, setGlobalStateFilter] = useState('All');
+  const [globalStateFilters, setGlobalStateFilters] = useState<string[]>(['All']);
   const [itemsPerPage, setItemsPerPage] = useState(25);
 
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
@@ -296,7 +296,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     initializeSettings();
   }, [migrateSettings]);
 
-  // ADDED: Real-time listener for Configuration Settings
+  // Real-time listener for Configuration Settings
   useEffect(() => {
     if (!db || !isOnline) return;
 
@@ -324,7 +324,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [isOnline, activeGrantId]);
   
-  // removed wrapper function
   const value = {
     assets,
     setAssets,
@@ -334,8 +333,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setIsOnline,
     searchTerm,
     setSearchTerm,
-    globalStateFilter,
-    setGlobalStateFilter,
+    globalStateFilters,
+    setGlobalStateFilters,
     itemsPerPage,
     setItemsPerPage,
     selectedLocations,

@@ -84,6 +84,8 @@ export interface AuthorizedUser {
   password?: string;
   states: string[];
   isAdmin: boolean;
+  isZonalAdmin?: boolean;
+  assignedZone?: string;
   isGuest?: boolean;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
