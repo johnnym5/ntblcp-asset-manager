@@ -12,19 +12,28 @@ import {
 } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import type { Asset, AppSettings, Grant, AuthorizedUser } from '@/lib/types';
-import { updateSettings as updateSettingsRTDB, getSettings as getSettingsRTDB } from '@/lib/database';
-import { updateSettings as updateSettingsFS, getSettings as getSettingsFS } from '@/lib/firestore';
-import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
-import { db, firebaseConfig } from '@/lib/firebase';
+import { 
+    updateSettings as updateSettingsRTDB, 
+    getSettings as getSettingsRTDB,
+    batchSetAssets as batchSetAssetsRTDB,
+    getAssets as getAssetsRTDB
+} from '@/lib/database';
+import { 
+    updateSettings as updateSettingsFS, 
+    getSettings as getSettingsFS,
+    batchSetAssets as batchSetAssetsFS,
+    getAssets as getAssetsFS
+} from '@/lib/firestore';
+import { getLocalSettings, saveLocalSettings, saveAssets, getLocalAssets } from '@/lib/idb';
+import { db } from '@/lib/firebase';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { addNotification } from '@/hooks/use-notifications';
 import { v4 as uuidv4 } from 'uuid';
 import { NIGERIAN_STATES } from '@/lib/constants';
-import { assetMatchesGlobalFilter } from '@/lib/utils';
 import { logger } from '@/lib/logger';
 
 export interface SortConfig {
-  key: keyof import('@/lib/types').Asset;
+  key: keyof Asset;
   direction: 'asc' | 'desc';
 }
 
@@ -87,7 +96,7 @@ interface AppStateContextType {
   setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
   settingsLoaded: boolean;
   activeGrantId: string | null;
-  setActiveGrantId: Dispatch<SetStateAction<string | null>>;
+  setActiveGrantId: (id: string | null) => Promise<void>;
 
   // Sync Settings
   manualDownloadTrigger: number;
@@ -117,7 +126,7 @@ interface AppStateContextType {
 
   // Active Database
   activeDatabase: 'firestore' | 'rtdb';
-  setActiveDatabase: Dispatch<SetStateAction<'firestore' | 'rtdb'>>;
+  setActiveDatabase: (db: 'firestore' | 'rtdb') => Promise<void>;
 
   // Asset Actions
   onRevertAsset: (assetId: string) => Promise<void>;
@@ -129,13 +138,7 @@ const AppStateContext = createContext<AppStateContextType | undefined>(undefined
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
-  const [isOnline, setIsOnline] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedStatus = localStorage.getItem('assetain-online-status');
-      return savedStatus ? JSON.parse(savedStatus) : true;
-    }
-    return true;
-  });
+  const [isOnline, setIsOnline] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [globalStateFilters, setGlobalStateFilters] = useState<string[]>(['All']);
   const [itemsPerPage, setItemsPerPage] = useState(25);
@@ -152,10 +155,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [statusOptions, setStatusOptions] = useState<OptionType[]>([]);
   const [conditionOptions, setConditionOptions] = useState<OptionType[]>([]);
 
-  const [sortConfig, setSortConfig] = useState<SortConfig | null>({
-    key: 'sn',
-    direction: 'asc',
-  });
+  const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'sn', direction: 'asc' });
 
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
@@ -166,241 +166,111 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   const [firstTimeSetupStatus, setFirstTimeSetupStatus] = useState<'idle' | 'syncing' | 'complete'>('idle');
 
-  const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>(
-    'cloud'
-  );
+  const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [initialSettingsTab, setInitialSettingsTab] = useState('general');
   const [dataActions, setDataActions] = useState<DataActions>({});
+  const [showProjectSwitchDialog, setShowProjectSwitchDialog] = useState(false);
+  const [activeDatabase, activeDatabaseSet] = useState<'firestore' | 'rtdb'>('firestore');
 
-  const [showProjectSwitchDialog, setShowProjectSwitchDialog] =
-    useState(false);
-  
-  const [activeDatabase, setActiveDatabase] = useState<'firestore' | 'rtdb'>(
-    'firestore'
-  );
+  const [onRevertAsset, setOnRevertAsset] = useState<(assetId: string) => Promise<void>>(() => async () => {});
 
-  const [onRevertAsset, setOnRevertAsset] = useState<
-    (assetId: string) => Promise<void>
-  >(() => async () => {});
-
+  // Real-time Settings Listener (Broadcasting)
   useEffect(() => {
-    if (typeof window === 'undefined') return;
-    localStorage.setItem('assetain-online-status', JSON.stringify(isOnline));
-    
-    const handleBrowserConnectivityChange = () => {
-        setIsOnline(navigator.onLine);
-    };
-    window.addEventListener('online', handleBrowserConnectivityChange);
-    window.addEventListener('offline', handleBrowserConnectivityChange);
-
-    return () => {
-      window.removeEventListener('online', handleBrowserConnectivityChange);
-      window.removeEventListener('offline', handleBrowserConnectivityChange);
-    };
-  }, [isOnline]);
-  
-  const migrateSettings = useCallback(async (settings: AppSettings | null): Promise<AppSettings | null> => {
-      if (settings && !(settings as any).grants) {
-        const grantId = 'default-grant';
-        const defaultGrant: Grant = {
-            id: grantId,
-            name: 'Default Project',
-            sheetDefinitions: (settings as any).sheetDefinitions || {},
-        };
-        const migratedSettings: AppSettings = {
-            ...settings,
-            grants: [defaultGrant],
-            activeGrantId: grantId,
-        };
-        delete (migratedSettings as any).sheetDefinitions;
-        await saveLocalSettings(migratedSettings);
-        return migratedSettings;
-      }
-      return settings;
-  }, []);
-  
-  useEffect(() => {
-    const initializeSettings = async () => {
-        let settings: AppSettings | null = await getLocalSettings();
-
-        if (!settings && navigator.onLine) {
-            try {
-                let cloudSettings = await getSettingsFS(); 
-                if (!cloudSettings) {
-                    cloudSettings = await getSettingsRTDB();
-                }
-                
-                if (cloudSettings) {
-                    settings = cloudSettings;
-                    await saveLocalSettings(settings);
-                }
-            } catch (e) {
-                logger.error("Failed to fetch settings from cloud", e);
-            }
-        }
-        
-        if (settings) {
-            settings = await migrateSettings(settings);
-        }
-
-        if (!settings) {
-            const grantId = uuidv4();
-            const defaultGrant: Grant = {
-                id: grantId,
-                name: 'Default Project',
-                sheetDefinitions: {},
-            };
-
-            const defaultUsers: AuthorizedUser[] = NIGERIAN_STATES.map(state => ({
-                loginName: state.toLowerCase().replace(/[\s-]/g, ''),
-                displayName: `${state} User`,
-                states: [state],
-                isAdmin: false,
-                canAddAssets: true,
-                canEditAssets: true,
-                isGuest: false,
-                password: 'password',
-            }));
-            
-            const newSettings: AppSettings = {
-                grants: [defaultGrant],
-                activeGrantId: grantId,
-                authorizedUsers: defaultUsers,
-                lockAssetList: false,
-                appMode: 'verification',
-                lastModified: new Date().toISOString(),
-            };
-
-            settings = newSettings;
-            await saveLocalSettings(settings);
-            
-            if (navigator.onLine) {
-                await Promise.allSettled([
-                    updateSettingsRTDB(settings),
-                    updateSettingsFS(settings)
-                ]);
-            }
-        }
-
-        setAppSettings(settings);
-        if (settings?.activeGrantId) {
-            activeGrantIdSet(settings.activeGrantId);
-        }
-        
-        setActiveDatabase('firestore');
-        setSettingsLoaded(true);
-    };
-    
-    initializeSettings();
-  }, [migrateSettings]);
-
-  // Real-time listener for Configuration Settings
-  useEffect(() => {
-    if (!db || !isOnline) return;
-
+    if (!db) return;
     const settingsRef = doc(db, 'config', 'settings');
     const unsubscribe = onSnapshot(settingsRef, async (snapshot) => {
       if (snapshot.exists()) {
         const remoteSettings = snapshot.data() as AppSettings;
-        const localSettings = await getLocalSettings();
-        
-        // Deep compare to avoid redundant state updates and prevent loops
-        if (JSON.stringify(remoteSettings) !== JSON.stringify(localSettings)) {
-          logger.log("Cloud settings updated remotely. Syncing local state...");
-          await saveLocalSettings(remoteSettings);
-          setAppSettings(remoteSettings);
-          
-          if (remoteSettings.activeGrantId && remoteSettings.activeGrantId !== activeGrantId) {
-              activeGrantIdSet(remoteSettings.activeGrantId);
-          }
+        setAppSettings(remoteSettings);
+        if (remoteSettings.activeGrantId) {
+            activeGrantIdSet(remoteSettings.activeGrantId);
         }
+        await saveLocalSettings(remoteSettings);
       }
-    }, (error) => {
-        logger.warn("Settings listener encounterd an error:", error);
     });
-
     return () => unsubscribe();
-  }, [isOnline, activeGrantId]);
-  
-  const value = {
-    assets,
-    setAssets,
-    offlineAssets,
-    setOfflineAssets,
-    isOnline,
-    setIsOnline,
-    searchTerm,
-    setSearchTerm,
-    globalStateFilters,
-    setGlobalStateFilters,
-    itemsPerPage,
-    setItemsPerPage,
-    selectedLocations,
-    setSelectedLocations,
-    selectedAssignees,
-    setSelectedAssignees,
-    selectedStatuses,
-    setSelectedStatuses,
-    missingFieldFilter,
-    setMissingFieldFilter,
-    dateFilter,
-    setDateFilter,
-    conditionFilter,
-    setConditionFilter,
-    locationOptions,
-    setLocationOptions,
-    assigneeOptions,
-    setAssigneeOptions,
-    statusOptions,
-    setStatusOptions,
-    conditionOptions,
-    setConditionOptions,
-    sortConfig,
-    setSortConfig,
-    appSettings,
-    setAppSettings,
-    settingsLoaded,
-    activeGrantId,
-    setActiveGrantId: activeGrantIdSet,
-    manualDownloadTrigger,
-    setManualDownloadTrigger,
-    manualUploadTrigger,
-    setManualUploadTrigger,
-    isSyncing,
-    setIsSyncing,
-    firstTimeSetupStatus,
-    setFirstTimeSetupStatus,
-    dataSource,
-    setDataSource,
-    assetToView,
-    setAssetToView,
-    isSettingsOpen,
-    setIsSettingsOpen,
-    initialSettingsTab,
-    setInitialSettingsTab,
-    dataActions,
-    setDataActions,
-    showProjectSwitchDialog,
-    setShowProjectSwitchDialog,
-    activeDatabase,
-    setActiveDatabase,
-    onRevertAsset,
-    setOnRevertAsset,
+  }, []);
+
+  // Strict Project Scoping: Switch logic
+  const setActiveGrantId = async (id: string | null) => {
+    if (!appSettings) return;
+    const updated = { ...appSettings, activeGrantId: id };
+    setAppSettings(updated);
+    activeGrantIdSet(id);
+    await updateSettingsFS(updated);
+    // Project swap deactivates current view
+    setAssets([]);
+    setManualDownloadTrigger(prev => prev + 1);
   };
 
-  return (
-    <AppStateContext.Provider value={value}>
-      {children}
-    </AppStateContext.Provider>
-  );
+  // Database Management Logic: Auto-Backup on Toggle
+  const setActiveDatabase = async (targetDb: 'firestore' | 'rtdb') => {
+    if (targetDb === activeDatabase) return;
+    
+    setIsSyncing(true);
+    addNotification({ title: 'Performing Database Handover...', description: 'Mirroring primary data to secondary source.' });
+    
+    try {
+        const currentData = await getLocalAssets();
+        if (targetDb === 'rtdb') {
+            // Firestore was primary, move to RTDB
+            await batchSetAssetsRTDB(currentData);
+        } else {
+            // RTDB was primary, move to Firestore
+            await batchSetAssetsFS(currentData);
+        }
+        activeDatabaseSet(targetDb);
+        addNotification({ title: 'Database Switch Successful', description: `Source is now ${targetDb.toUpperCase()}. Backup updated.` });
+    } catch (e) {
+        logger.error("Auto-backup switch failed", e);
+        addNotification({ title: 'Switch Error', variant: 'destructive' });
+    } finally {
+        setIsSyncing(false);
+    }
+  };
+
+  const value = {
+    assets, setAssets,
+    offlineAssets, setOfflineAssets,
+    isOnline, setIsOnline,
+    searchTerm, setSearchTerm,
+    globalStateFilters, setGlobalStateFilters,
+    itemsPerPage, setItemsPerPage,
+    selectedLocations, setSelectedLocations,
+    selectedAssignees, setSelectedAssignees,
+    selectedStatuses, setSelectedStatuses,
+    missingFieldFilter, setMissingFieldFilter,
+    dateFilter, setDateFilter,
+    conditionFilter, setConditionFilter,
+    locationOptions, setLocationOptions,
+    assigneeOptions, setAssigneeOptions,
+    statusOptions, setStatusOptions,
+    conditionOptions, setConditionOptions,
+    sortConfig, setSortConfig,
+    appSettings, setAppSettings,
+    settingsLoaded,
+    activeGrantId, setActiveGrantId,
+    manualDownloadTrigger, setManualDownloadTrigger,
+    manualUploadTrigger, setManualUploadTrigger,
+    isSyncing, setIsSyncing,
+    firstTimeSetupStatus, setFirstTimeSetupStatus,
+    dataSource, setDataSource,
+    assetToView, setAssetToView,
+    isSettingsOpen, setIsSettingsOpen,
+    initialSettingsTab, setInitialSettingsTab,
+    dataActions, setDataActions,
+    showProjectSwitchDialog, setShowProjectSwitchDialog,
+    activeDatabase, setActiveDatabase,
+    onRevertAsset, setOnRevertAsset,
+  };
+
+  return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 };
 
-export const useAppState = (): AppStateContextType => {
+export const useAppState = () => {
   const context = useContext(AppStateContext);
-  if (context === undefined) {
-    throw new Error('useAppState must be used within an AppStateProvider');
-  }
+  if (context === undefined) throw new Error('useAppState must be used within AppStateProvider');
   return context;
 };
