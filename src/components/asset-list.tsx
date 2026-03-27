@@ -67,6 +67,7 @@ import {
   ArrowDownWideNarrow,
   ArrowUpAZ,
   Layers,
+  MapPin,
 } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
