@@ -94,7 +94,6 @@
     background-color: hsl(var(--primary));
   }
 
-<<<<<<< HEAD
   /* Force showing scrollbars for Radix ScrollArea in data-heavy views */
   .show-scrollbar [data-radix-scroll-area-viewport] {
     scrollbar-width: auto !important;
@@ -108,7 +107,9 @@
 
   .show-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
     background-color: hsl(var(--muted-foreground) / 0.3);
-=======
+    border-radius: 10px;
+  }
+
   /* Vertical scrollbar */
   .custom-scrollbar {
     scrollbar-width: thin;
@@ -151,7 +152,6 @@
 
   .table-scroll-wrapper::-webkit-scrollbar-thumb {
     background-color: hsl(var(--primary) / 0.5);
->>>>>>> b3cdeffc9c2c3feafeb510f0c5e6016ae0f948d6
     border-radius: 10px;
   }
 }
