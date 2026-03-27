@@ -113,7 +113,7 @@ export function ActivityLogDialog({ isOpen, onOpenChange, onRevert }: ActivityLo
               Review changes made to assets across the system. You can revert the last change for any asset here.
             </DialogDescription>
           </DialogHeader>
-          <ScrollArea className="flex-1 px-6 py-4 show-scrollbar">
+          <ScrollArea className="flex-1 px-6 py-4 show-scrollbar" type="always">
             {Object.keys(activitiesByUser).length > 0 ? (
               <Accordion type="multiple" className="w-full space-y-2">
                 {Object.entries(activitiesByUser).map(([userKey, userAssets]) => {
