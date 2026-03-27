@@ -1,4 +1,3 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -26,7 +25,7 @@ const loadingTips = [
 export default function Page() {
   const { userProfile, loading, profileSetupComplete } = useAuth();
   const { 
-    setGlobalStateFilter,
+    setGlobalStateFilters,
     firstTimeSetupStatus,
     setFirstTimeSetupStatus
   } = useAppState();
@@ -45,12 +44,12 @@ export default function Page() {
   useEffect(() => {
     if (userProfile && profileSetupComplete) {
       if (userProfile.isAdmin) {
-        setGlobalStateFilter('All');
+        setGlobalStateFilters(['All']);
       } else {
-        setGlobalStateFilter(userProfile.states?.[0] || '');
+        setGlobalStateFilters(userProfile.states || []);
       }
     }
-  }, [userProfile, profileSetupComplete, setGlobalStateFilter]);
+  }, [userProfile, profileSetupComplete, setGlobalStateFilters]);
 
   if (loading) {
     return (

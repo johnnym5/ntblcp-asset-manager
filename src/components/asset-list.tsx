@@ -28,7 +28,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 import {
   MoreHorizontal,
   Loader2,
@@ -95,11 +95,11 @@ import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter,
 import { addNotification } from "@/hooks/use-notifications";
 import { ScrollArea } from "./ui/scroll-area";
 import { Separator } from "./ui/separator";
-import { isToday, isThisWeek, parseISO } from 'date-fns';
+import { isToday, parseISO } from 'date-fns';
 import { Badge } from "./ui/badge";
 import { motion } from "framer-motion";
-import { isAllowed, getRemainingCooldown } from "@/lib/rate-limit";
-import { enqueueOp } from "@/lib/offline-queue";
+import { isAllowed } from "@/lib/rate-limit";
+import { processOfflineQueue } from "@/lib/offline-queue";
 import { monitoring } from "@/lib/monitoring";
 
 // Robust loading for dialogs to prevent ChunkLoadErrors
@@ -109,7 +109,6 @@ const CategoryBatchEditForm = dynamic(() => import("./category-batch-edit-form")
 const ImportScannerDialog = dynamic(() => import("./single-sheet-import-dialog").then(mod => mod.ImportScannerDialog), { ssr: false });
 const TravelReportDialog = dynamic(() => import("./travel-report-dialog").then(mod => mod.TravelReportDialog), { ssr: false });
 const SyncConfirmationDialog = dynamic(() => import("./sync-confirmation-dialog").then(mod => mod.SyncConfirmationDialog), { ssr: false });
-const ColumnCustomizationSheet = dynamic(() => import("./column-customization-sheet").then(mod => mod.ColumnCustomizationSheet), { ssr: false });
 const AssetSummaryDashboard = dynamic(() => import("./asset-summary-dashboard").then(mod => mod.AssetSummaryDashboard), { ssr: false });
 
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
@@ -295,11 +294,6 @@ export default function AssetList() {
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [syncSummary, setSyncSummary] = useState<any | null>(null);
   const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
-  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
-  const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
-  const [originalSheetNameToEdit, setOriginalSheetNameToEdit] = useState<string | null>(null);
-  const [isDownloadWarningOpen, setIsDownloadWarningOpen] = useState(false);
-  const [numUnsynced, setNumUnsynced] = useState(0);
   const [scopeSort, setScopeSort] = useState<'alpha' | 'volume' | 'zone'>('zone');
   
   const {
@@ -338,7 +332,6 @@ export default function AssetList() {
   const isGuest = userProfile?.isGuest || false;
   const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
 
-  // Project Isolation: Filter all assets by activeGrantId before anything else
   const scopedAssets = useMemo(() => {
       return activeAssets.filter(a => a.grantId === activeGrantId);
   }, [activeAssets, activeGrantId]);
@@ -348,7 +341,6 @@ export default function AssetList() {
     return scopedAssets.filter(asset => globalStateFilters.some(state => assetMatchesGlobalFilter(asset, state)));
   }, [scopedAssets, globalStateFilters]);
 
-  // Regional Sorting Logic
   const sortedScopeOptions = useMemo(() => {
       const options = [...NIGERIAN_STATES];
       if (scopeSort === 'alpha') return options.sort();
@@ -359,29 +351,10 @@ export default function AssetList() {
               return countB - countA;
           });
       }
-      return options; // Default by constant order (which is alpha anyway)
+      return options;
   }, [scopedAssets, scopeSort]);
 
-  const handleToggleScope = (name: string) => {
-      if (name === 'All') {
-          setGlobalStateFilters(['All']);
-          return;
-      }
-      setGlobalStateFilters(prev => {
-          let next = prev.filter(s => s !== 'All');
-          if (next.includes(name)) {
-              next = next.filter(s => s !== name);
-              if (next.length === 0) next = ['All'];
-          } else {
-              next.push(name);
-          }
-          return next;
-      });
-  };
-
-  const resetScope = () => setGlobalStateFilters(['All']);
-
-  // --- SYNC ENGINE ---
+  // --- SYNC ENGINE CALLBACKS (Defined before UseEffects) ---
   const executeDownload = useCallback(async (summary: any, isFirstTime?: boolean) => {
     setIsSyncing(true);
     if (!isFirstTime) addNotification({ title: 'Syncing Project Data...' });
@@ -415,7 +388,6 @@ export default function AssetList() {
           const { toUpload: assetsToPush } = syncSummary;
           const batchSet = activeDatabase === 'firestore' ? batchSetAssets : batchSetAssetsRTDB;
           await batchSet(assetsToPush);
-          // Mirror to Backup
           if (activeDatabase === 'firestore') batchSetAssetsRTDB(assetsToPush).catch(() => {});
           else batchSetAssetsFS(assetsToPush).catch(() => {});
           
@@ -469,9 +441,6 @@ export default function AssetList() {
     } finally { setIsSyncing(false); }
   }, [isOnline, authInitialized, isGuest, isAdmin, userProfile, setIsOnline, setIsSyncing, activeDatabase, activeGrantId, executeDownload, setFirstTimeSetupStatus]);
 
-  useEffect(() => { if (manualDownloadTrigger > 0) handleDownloadScan(); }, [manualDownloadTrigger, handleDownloadScan]);
-  useEffect(() => { if (manualUploadTrigger > 0) handleUploadScan(); }, [manualUploadTrigger, handleUploadScan]);
-
   const handleUploadScan = useCallback(async () => {
     if (!isOnline || isGuest) return;
     setIsSyncing(true);
@@ -484,6 +453,28 @@ export default function AssetList() {
         } else addNotification({ title: 'Project Fully Synced' });
     } finally { setIsSyncing(false); }
   }, [isOnline, isGuest, activeGrantId, setIsSyncing]);
+
+  useEffect(() => { if (manualDownloadTrigger > 0) handleDownloadScan(); }, [manualDownloadTrigger, handleDownloadScan]);
+  useEffect(() => { if (manualUploadTrigger > 0) handleUploadScan(); }, [manualUploadTrigger, handleUploadScan]);
+
+  const handleToggleScope = (name: string) => {
+      if (name === 'All') {
+          setGlobalStateFilters(['All']);
+          return;
+      }
+      setGlobalStateFilters(prev => {
+          let next = prev.filter(s => s !== 'All');
+          if (next.includes(name)) {
+              next = next.filter(s => s !== name);
+              if (next.length === 0) next = ['All'];
+          } else {
+              next.push(name);
+          }
+          return next;
+      });
+  };
+
+  const resetScope = () => setGlobalStateFilters(['All']);
 
   // --- FILTERS & DISPLAY ---
   const displayedAssets = useMemo(() => {
@@ -515,6 +506,11 @@ export default function AssetList() {
     });
   }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, conditionFilter, sheetDefinitions, userProfile, sortConfig]);
 
+  const categoryFilteredAssets = useMemo(() => {
+    if (!currentCategory) return [];
+    return displayedAssets.filter(a => a.category === currentCategory);
+  }, [currentCategory, displayedAssets]);
+
   const assetsByCategory = useMemo(() => {
     return displayedAssets.reduce((acc, a) => {
         const cat = a.category || 'Uncategorized';
@@ -531,6 +527,18 @@ export default function AssetList() {
     setIsFormOpen(true);
   }, [isAdmin, userProfile]);
 
+  const handleViewAsset = useCallback((asset: Asset) => {
+    setSelectedAsset(asset);
+    setIsFormReadOnly(true);
+    setIsFormOpen(true);
+  }, []);
+
+  const handleEditAsset = useCallback((asset: Asset) => {
+    setSelectedAsset(asset);
+    setIsFormReadOnly(false);
+    setIsFormOpen(true);
+  }, []);
+
   const handleQuickSaveAsset = useCallback(async (assetId: string, data: any) => {
     const asset = scopedAssets.find(a => a.id === assetId);
     if (!asset) return;
@@ -544,6 +552,40 @@ export default function AssetList() {
     setDataActions({ onAddAsset: handleAddAsset, onClearAll: () => setIsClearAllDialogOpen(true), onTravelReport: () => setIsTravelReportOpen(true), onScanAndImport: () => setIsImportScanOpen(true) });
     return () => setDataActions({});
   }, [setDataActions, handleAddAsset]);
+
+  useEffect(() => {
+    const locations = new Map<string, number>();
+    allAssetsForFiltering.forEach(asset => {
+      const normalized = normalizeAssetLocation(asset.location);
+      if (normalized) {
+        locations.set(normalized, (locations.get(normalized) || 0) + 1);
+      }
+    });
+    setLocationOptions(Array.from(locations.entries()).map(([l, count]) => ({ label: l, value: l, count })).sort((a, b) => (b.count || 0) - (a.count || 0)));
+
+    const assigneeMap = new Map<string, number>();
+    allAssetsForFiltering.forEach(asset => {
+      if (asset.assignee) {
+        const assigneeName = asset.assignee.trim();
+        if (assigneeName) {
+            assigneeMap.set(assigneeName, (assigneeMap.get(assigneeName) || 0) + 1);
+        }
+      }
+    });
+    setAssigneeOptions(Array.from(assigneeMap.entries()).map(([a, count]) => ({ label: a, value: a, count })).sort((a,b) => a.label.localeCompare(b.label)));
+    
+    setStatusOptions([
+        { label: 'Verified', value: 'Verified' },
+        { label: 'Unverified', value: 'Unverified' },
+        { label: 'Discrepancy', value: 'Discrepancy' }
+    ]);
+
+    setConditionOptions(ASSET_CONDITIONS.map(c => ({ label: c, value: c })));
+  }, [allAssetsForFiltering, setLocationOptions, setAssigneeOptions, setStatusOptions, setConditionOptions]);
+
+  useEffect(() => {
+    if (authInitialized) setIsLoading(false);
+  }, [authInitialized]);
 
   if (isLoading || !appSettings) return <div className="flex h-full w-full items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
 
@@ -607,7 +649,7 @@ export default function AssetList() {
         {view === 'dashboard' ? (
             <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
                 {Object.keys(assetsByCategory).length > 0 ? (
-                    Object.keys(assetsByCategory).map(cat => (
+                    Object.keys(assetsByCategory).sort().map(cat => (
                         <Card key={cat} className="group hover:shadow-xl transition-all border-primary/10 overflow-hidden">
                             <CardHeader className="p-4 bg-muted/20 flex flex-row items-center justify-between">
                                 <CardTitle className="text-sm font-bold truncate tracking-tight">{cat}</CardTitle>
@@ -629,13 +671,26 @@ export default function AssetList() {
         ) : (
             <Card className="flex-1 flex flex-col overflow-hidden border-none shadow-none bg-transparent">
                 <div className="flex items-center gap-2 mb-4">
-                    <Button variant="ghost" size="icon" onClick={() => setView('dashboard')}><ArrowLeft /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => { setView('dashboard'); setCurrentCategory(null); }}><ArrowLeft /></Button>
                     <h2 className="text-2xl font-black">{currentCategory}</h2>
                 </div>
                 <ScrollArea className="flex-1">
                     <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 pb-10">
                         {categoryFilteredAssets.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage).map(a => (
-                            <AssetItemCard key={a.id} asset={a} isSelected={selectedAssetIds.includes(a.id)} onSelect={(id, c) => setSelectedAssetIds(prev => c ? [...prev, id] : prev.filter(i => i !== id))} onView={handleViewAsset} onEdit={handleEditAsset} onDelete={a => { setAssetToDelete(a); setIsDeleteDialogOpen(true); }} onQuickSave={handleQuickSaveAsset} quickViewFields={sheetDefinitions[currentCategory!]?.displayFields.filter(f => f.quickView) || []} appMode={appSettings.appMode} isGuest={isGuest} isAdmin={isAdmin} />
+                            <AssetItemCard 
+                                key={a.id} 
+                                asset={a} 
+                                isSelected={selectedAssetIds.includes(a.id)} 
+                                onSelect={(id, c) => setSelectedAssetIds(prev => c ? [...prev, id] : prev.filter(i => i !== id))} 
+                                onView={handleViewAsset} 
+                                onEdit={handleEditAsset} 
+                                onDelete={asset => { setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} 
+                                onQuickSave={handleQuickSaveAsset} 
+                                quickViewFields={sheetDefinitions[currentCategory!]?.displayFields.filter(f => f.quickView) || []} 
+                                appMode={appSettings.appMode} 
+                                isGuest={isGuest} 
+                                isAdmin={isAdmin} 
+                            />
                         ))}
                     </div>
                 </ScrollArea>
@@ -650,9 +705,27 @@ export default function AssetList() {
             if (idx > -1) current[idx] = up; else current.unshift(up);
             await saveAssets(current); setAssets(current); setIsFormOpen(false);
         }} onQuickSave={handleQuickSaveAsset} isReadOnly={isFormReadOnly} defaultCategory={currentCategory || undefined} />}
+        
         {isSyncConfirmOpen && <SyncConfirmationDialog isOpen={isSyncConfirmOpen} onOpenChange={setIsSyncConfirmOpen} onConfirm={() => syncSummary?.type === 'download' ? executeDownload(syncSummary) : executeUpload()} summary={syncSummary} />}
         {isTravelReportOpen && <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />}
         {isImportScanOpen && <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />}
+        
+        <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+            <AlertDialogContent>
+                <AlertDialogHeader>
+                    <AlertDialogTitle>Remove record?</AlertDialogTitle>
+                    <AlertDialogDescription>This will delete the asset locally. Syncing will remove it from the cloud context.</AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                    <AlertDialogAction onClick={async () => {
+                        const cur = await getLocalAssetsFromDb();
+                        const up = cur.filter(a => a.id !== assetToDelete?.id);
+                        await saveAssets(up); setAssets(up); setIsDeleteDialogOpen(false);
+                    }} className="bg-destructive">Execute Deletion</AlertDialogAction>
+                </AlertDialogFooter>
+            </AlertDialogContent>
+        </AlertDialog>
     </div>
   );
 }

@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useState } from 'react';
@@ -38,7 +37,7 @@ export default function UserProfileSetup() {
   const [selectedInitialState, setSelectedInitialState] = useState<string>('');
   
   const { login } = useAuth();
-  const { appSettings, setGlobalStateFilter } = useAppState();
+  const { appSettings, setGlobalStateFilters } = useAppState();
 
   const handleLogin = async () => {
     if (!isAllowed('login-attempt', 3000)) {
@@ -93,12 +92,12 @@ export default function UserProfileSetup() {
       return; 
     }
     
-    if (!sanitizedPassword) {
+    if (!sanitizedPassword && !user.isGuest) {
       setError("Please enter your password.");
       return;
     }
 
-    if (user.password === sanitizedPassword) {
+    if (user.password === sanitizedPassword || user.isGuest) {
       if (user.states.length > 1 && !user.isAdmin) {
           setFoundUser(user);
       } else {
@@ -114,7 +113,7 @@ export default function UserProfileSetup() {
   const handleConfirmMultiState = async () => {
       if (!foundUser || !selectedInitialState) return;
       setIsSaving(true);
-      setGlobalStateFilter(selectedInitialState);
+      setGlobalStateFilters([selectedInitialState]);
       await login(foundUser);
       setIsSaving(false);
   }

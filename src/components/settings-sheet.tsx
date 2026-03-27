@@ -11,12 +11,6 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import {
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from '@/tabs'; // Using custom tabs export if available or from ui
-import {
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -39,7 +33,8 @@ import {
     Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, 
     Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, 
     PlaneTakeoff, Download, Users, Eye, EyeOff, MapPin, KeyRound, 
-    History, RotateCcw, ChevronsUpDown, Check, X, Layers, LayoutGrid
+    History, RotateCcw, ChevronsUpDown, Check, X, Layers, LayoutGrid,
+    Edit
 } from 'lucide-react';
 import type { SheetDefinition, AppSettings, AuthorizedUser, HistoricalAppSettings, Grant } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
@@ -63,7 +58,6 @@ import { cn, sanitizeForFirestore } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-// Standardizing Tabs import
 import { Tabs as TabsRoot, TabsList as TabsListRoot, TabsTrigger as TabsTriggerRoot, TabsContent as TabsContentRoot } from "@/components/ui/tabs";
 
 interface SettingsSheetProps {
@@ -89,7 +83,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
   const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (isOpen) {
+    if (isOpen && appSettings) {
         setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
         setActiveTab(initialTab || 'general');
     }
@@ -99,6 +93,10 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
+  };
+
+  const handleUsersChange = async (newUsers: AuthorizedUser[]) => {
+      handleSettingChange('authorizedUsers', newUsers);
   };
 
   const handleConfirmSave = async () => {
@@ -196,7 +194,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                         </div>
                         <Separator />
                         <div className="space-y-3">
-                            {draftSettings.grants.map(grant => (
+                            {draftSettings.grants?.map(grant => (
                                 <Card key={grant.id} className={cn("transition-all border-2", draftSettings.activeGrantId === grant.id ? "border-primary bg-primary/5" : "border-border")}>
                                     <div className="p-4 flex items-center justify-between">
                                         <div className="flex items-center gap-3">
@@ -216,8 +214,8 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                         <CollapsibleContent className="p-4 pt-0 space-y-3">
                                             <Separator className="bg-primary/10" />
                                             <div className="grid grid-cols-3 gap-2">
-                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase tracking-widest bg-background border h-8" onClick={() => addNotification({title: 'Add Manually (Project Scope)'})}><PlusCircle className="mr-1.5 h-3 w-3"/> Manual</Button>
-                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase tracking-widest bg-background border h-8" onClick={() => addNotification({title: 'Import Template (Project Scope)'})}><FileUp className="mr-1.5 h-3 w-3"/> Template</Button>
+                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase tracking-widest bg-background border h-8" onClick={() => addNotification({title: 'Manual Entry Enabled', description: 'Switch to project context to add.'})}><PlusCircle className="mr-1.5 h-3 w-3"/> Manual</Button>
+                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase tracking-widest bg-background border h-8" onClick={() => addNotification({title: 'Template Generator', description: 'Download from individual categories.'})}><FileUp className="mr-1.5 h-3 w-3"/> Template</Button>
                                                 <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase tracking-widest bg-background border h-8" onClick={() => { onOpenChange(false); dataActions.onScanAndImport?.(); }}><ScanSearch className="mr-1.5 h-3 w-3"/> Scan</Button>
                                             </div>
                                         </CollapsibleContent>
