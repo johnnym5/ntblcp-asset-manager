@@ -33,11 +33,31 @@ export async function getSettings(): Promise<AppSettings | null> {
 }
 
 /**
- * Updates settings locally by enqueuing an operation.
- * Cloud write only happens during manual sync.
+ * Updates settings immediately in the cloud and broadcast to all users.
+ * Falls back to local queue if offline.
  */
 export async function updateSettings(settings: AppSettings) {
-    await enqueueOp('update', 'config', settings);
+    const firestoreDb = checkConfig();
+    if (!firestoreDb) return;
+    
+    const settingsRef = doc(firestoreDb, 'config', 'settings');
+    try {
+        // Attempt immediate cloud write for real-time reactivity
+        await setDoc(settingsRef, settings, { merge: true });
+    } catch (serverError) {
+        logger.error("Immediate cloud config update failed, enqueuing for later:", serverError);
+        // Fallback to queue for manual sync if direct write fails (e.g. offline)
+        await enqueueOp('update', 'config', settings);
+        
+        if ((serverError as any)?.code === 'permission-denied') {
+            errorEmitter.emit('permission-error', new FirestorePermissionError({
+                path: settingsRef.path,
+                operation: 'update',
+                requestResourceData: settings,
+            }));
+        }
+        throw serverError;
+    }
 }
 
 // --- Assets (Primary Layer) ---

@@ -259,12 +259,20 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
           settingsHistory: newHistory.slice(0, 10),
       });
 
-      // Strictly local first + stage for sync
+      // 1. Save locally for immediate UI response
       await saveLocalSettings(settingsToSave);
       setAppSettings(settingsToSave);
-      await enqueueOp('update', 'config', settingsToSave);
       
-      toast({ title: "Settings Staged", description: "Changes saved locally. Sync Up to push to the cloud." });
+      // 2. Immediate cloud update (broadcast to all users)
+      try {
+          await updateSettingsFS(settingsToSave);
+          await updateSettingsRTDB(settingsToSave).catch(() => {});
+          toast({ title: "Settings Broadcasted", description: "Changes have been broadcast to all users immediately." });
+      } catch (cloudError) {
+          // updateSettingsFS already falls back to enqueueOp if offline
+          toast({ title: "Saved Locally", description: "Offline mode: Settings saved locally and will broadcast when online." });
+      }
+      
     } catch(e) {
       toast({ title: "Save Failed", variant: "destructive" });
     } finally {

@@ -83,7 +83,7 @@ import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGER
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
 import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, clearAssets as clearFirestoreAssets } from "@/lib/firestore";
+import { getAssets, batchSetAssets, clearAssets as clearFirestoreAssets, updateSettings as updateSettingsFS } from "@/lib/firestore";
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB, clearAssets as clearRtdbAssets } from "@/lib/database";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, saveLocalSettings } from "@/lib/idb";
 import { cn, normalizeAssetLocation, getStatusClasses, assetMatchesGlobalFilter, sanitizeInput, sanitizeForFirestore } from "@/lib/utils";
@@ -1459,11 +1459,17 @@ export default function AssetList() {
 
     const settings: AppSettings = { ...appSettings, grants: appSettings.grants.map(g => g.id === activeGrantId ? { ...g, sheetDefinitions: newSheetDefinitions } : g), lastModified: new Date().toISOString(), lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } };
     
-    // Save locally and stage for cloud sync
+    // Save locally
     await saveLocalSettings(settings);
     setAppSettings(settings);
-    await enqueueOp('update', 'config', settings);
-    toast({ title: 'Layout Staged', description: 'Column changes will be uploaded during next Sync Up.' });
+    
+    // Immediate cloud write for automatic broadcast to all users
+    try {
+        await updateSettingsFS(settings);
+        toast({ title: 'Layout Broadcasted', description: 'Column changes have been updated for all users immediately.' });
+    } catch (e) {
+        // Fallback already handled by firestore service
+    }
   };
 
   const handleToggleSheetVisibility = async (sn: string) => {
@@ -1475,7 +1481,11 @@ export default function AssetList() {
     
     await saveLocalSettings(settings);
     setAppSettings(settings);
-    await enqueueOp('update', 'config', settings);
+    
+    // Immediate cloud write
+    try {
+        await updateSettingsFS(settings);
+    } catch (e) {}
   };
 
 

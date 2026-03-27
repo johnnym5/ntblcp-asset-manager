@@ -15,7 +15,8 @@ import type { Asset, AppSettings, Grant, AuthorizedUser } from '@/lib/types';
 import { updateSettings as updateSettingsRTDB, getSettings as getSettingsRTDB } from '@/lib/database';
 import { updateSettings as updateSettingsFS, getSettings as getSettingsFS } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
-import { firebaseConfig } from '@/lib/firebase';
+import { db, firebaseConfig } from '@/lib/firebase';
+import { doc, onSnapshot } from 'firebase/firestore';
 import { addNotification } from '@/hooks/use-notifications';
 import { v4 as uuidv4 } from 'uuid';
 import { NIGERIAN_STATES } from '@/lib/constants';
@@ -190,7 +191,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     
     const handleBrowserConnectivityChange = () => {
         setIsOnline(navigator.onLine);
-        // Automatic queue replay is removed here per user request for strictly manual sync
     };
     window.addEventListener('online', handleBrowserConnectivityChange);
     window.addEventListener('offline', handleBrowserConnectivityChange);
@@ -295,6 +295,34 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     
     initializeSettings();
   }, [migrateSettings]);
+
+  // ADDED: Real-time listener for Configuration Settings
+  useEffect(() => {
+    if (!db || !isOnline) return;
+
+    const settingsRef = doc(db, 'config', 'settings');
+    const unsubscribe = onSnapshot(settingsRef, async (snapshot) => {
+      if (snapshot.exists()) {
+        const remoteSettings = snapshot.data() as AppSettings;
+        const localSettings = await getLocalSettings();
+        
+        // Deep compare to avoid redundant state updates and prevent loops
+        if (JSON.stringify(remoteSettings) !== JSON.stringify(localSettings)) {
+          logger.log("Cloud settings updated remotely. Syncing local state...");
+          await saveLocalSettings(remoteSettings);
+          setAppSettings(remoteSettings);
+          
+          if (remoteSettings.activeGrantId && remoteSettings.activeGrantId !== activeGrantId) {
+              activeGrantIdSet(remoteSettings.activeGrantId);
+          }
+        }
+      }
+    }, (error) => {
+        logger.warn("Settings listener encounterd an error:", error);
+    });
+
+    return () => unsubscribe();
+  }, [isOnline, activeGrantId]);
   
   const setActiveGrantId = (id: string | null) => {
       activeGrantIdSet(id);

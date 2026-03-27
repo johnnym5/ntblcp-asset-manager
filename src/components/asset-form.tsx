@@ -41,7 +41,7 @@ import { ScrollArea } from "./ui/scroll-area";
 import { ASSET_CONDITIONS } from "@/lib/constants";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { saveLocalSettings } from "@/lib/idb";
-import { enqueueOp } from "@/lib/offline-queue";
+import { updateSettings as updateSettingsFS } from "@/lib/firestore";
 
 const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
   path: ['category'],
@@ -219,9 +219,16 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
         lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } 
     };
     
+    // Save locally first
     await saveLocalSettings(settings);
     setAppSettings(settings);
-    await enqueueOp('update', 'config', settings);
+    
+    // Immediate broadcast to all users
+    try {
+        await updateSettingsFS(settings);
+    } catch (e) {
+        // Falling back to manual sync logic is handled by updateSettingsFS itself if offline
+    }
   };
   
     const renderField = (field: DisplayField) => {
