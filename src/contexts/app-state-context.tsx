@@ -324,10 +324,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [isOnline, activeGrantId]);
   
-  const setActiveGrantId = (id: string | null) => {
-      activeGrantIdSet(id);
-  }
-
+  // removed wrapper function
   const value = {
     assets,
     setAssets,
@@ -367,7 +364,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     setAppSettings,
     settingsLoaded,
     activeGrantId,
-    setActiveGrantId,
+    setActiveGrantId: activeGrantIdSet,
     manualDownloadTrigger,
     setManualDownloadTrigger,
     manualUploadTrigger,

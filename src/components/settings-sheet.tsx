@@ -143,7 +143,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
     setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
   };
   
-  const handleUsersChange = (newUsers: AuthorizedUser[]) => {
+  const handleUsersChange = async (newUsers: AuthorizedUser[]) => {
     if (!draftSettings || !draftSettings.authorizedUsers) return;
     handleSettingChange('authorizedUsers', newUsers);
   };
@@ -711,7 +711,7 @@ export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsShee
                                             if (draftSettings?.activeGrantId !== grant.id) {
                                               handleSettingChange('activeGrantId', grant.id);
                                             }
-                                            dataActions.onScanAndImport();
+                                            dataActions.onScanAndImport?.();
                                           }} disabled={dataActions.isImporting}>
                                               <ScanSearch className="mr-2 h-4 w-4" /> Scan & Import Data
                                           </Button>

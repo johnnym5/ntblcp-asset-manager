@@ -68,13 +68,14 @@
 }
 
 @layer utilities {
+  /* Horizontal scrollbar (for tables) */
   .custom-scrollbar-x {
     scrollbar-width: thin;
     scrollbar-color: hsl(var(--primary)) transparent;
   }
 
   .custom-scrollbar-x::-webkit-scrollbar {
-    height: 8px;
+    height: 6px;
   }
 
   .custom-scrollbar-x::-webkit-scrollbar-track {
@@ -93,6 +94,7 @@
     background-color: hsl(var(--primary));
   }
 
+<<<<<<< HEAD
   /* Force showing scrollbars for Radix ScrollArea in data-heavy views */
   .show-scrollbar [data-radix-scroll-area-viewport] {
     scrollbar-width: auto !important;
@@ -106,6 +108,50 @@
 
   .show-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
     background-color: hsl(var(--muted-foreground) / 0.3);
+=======
+  /* Vertical scrollbar */
+  .custom-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.4) transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--primary) / 0.4);
+    border-radius: 10px;
+  }
+
+  .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--primary) / 0.7);
+  }
+
+  /* Table overflow wrapper with subtle shadow scroll hint */
+  .table-scroll-wrapper {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--primary) / 0.4) transparent;
+  }
+
+  .table-scroll-wrapper::-webkit-scrollbar {
+    height: 5px;
+  }
+
+  .table-scroll-wrapper::-webkit-scrollbar-track {
+    background: hsl(var(--muted) / 0.2);
+    border-radius: 10px;
+  }
+
+  .table-scroll-wrapper::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--primary) / 0.5);
+>>>>>>> b3cdeffc9c2c3feafeb510f0c5e6016ae0f948d6
     border-radius: 10px;
   }
 }

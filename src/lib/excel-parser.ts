@@ -210,7 +210,7 @@ export async function parseExcelFile(
             ? sheetsToImport 
             : Object.keys(sheetDefinitions).map(defName => {
                 const actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader(defName)));
-                return actualSheetName ? { sheetName: actualSheetName, definitionName: defName, rowCount: 0, headers: [] } : null;
+                return actualSheetName ? { sheetName: actualSheetName, definitionName: defName, rowCount: 0, headers: [] as string[] } : null;
             }).filter((item): item is ScannedSheetInfo => item !== null);
 
         for (const { sheetName, definitionName } of processList) {
@@ -336,7 +336,7 @@ export async function exportToExcel(assets: Asset[], sheetDefinitions: Record<st
                 
                 let assetKey: keyof Asset | undefined;
                 for (const key in HEADER_ALIASES) {
-                    if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES].map(a => normalizeHeader(a)).includes(normalizedHeader)) {
+                    if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES]?.map(a => normalizeHeader(a)).includes(normalizedHeader)) {
                         assetKey = key as keyof Asset;
                         break;
                     }
@@ -398,7 +398,7 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
                 let fieldKey: keyof Asset | undefined;
 
                 for (const key in HEADER_ALIASES) {
-                    if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES].map(a => normalizeHeader(a)).includes(normalizedHeader)) {
+                    if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES]?.map(a => normalizeHeader(a)).includes(normalizedHeader)) {
                         fieldKey = key as keyof Asset;
                         break;
                     }

@@ -501,7 +501,7 @@ export default function AssetList() {
           
           const localAssets = await getLocalAssetsFromDb();
           const localMap = new Map(localAssets.map(a => [a.id, a]));
-          assetsToPush.forEach(pushedAsset => {
+          (assetsToPush as Asset[]).forEach(pushedAsset => {
               const localVersion = localMap.get(pushedAsset.id);
               if (localVersion) {
                   localMap.set(pushedAsset.id, { ...localVersion, syncStatus: 'synced' });
@@ -808,8 +808,9 @@ export default function AssetList() {
         if (config.key && dateFields.has(config.key)) {
             const dateA = aVal ? new Date(aVal as string).getTime() : 0;
             const dateB = bVal ? new Date(bVal as string).getTime() : 0;
-            if (dateA < dateB) return config.direction === 'asc' ? 1 : -1;
-            if (dateA > dateB) return config.direction === 'asc' ? -1 : 1;
+            // asc = oldest first, desc = newest first
+            if (dateA < dateB) return config.direction === 'asc' ? -1 : 1;
+            if (dateA > dateB) return config.direction === 'asc' ? 1 : -1;
             return 0;
         }
 
@@ -1072,6 +1073,8 @@ export default function AssetList() {
         if (isAdmin) {
             finalAsset = sanitizeForFirestore({
                 ...assetToSave,
+                // Ensure new assets always get the active project ID
+                grantId: assetToSave.grantId || activeGrantId || undefined,
                 lastModified: new Date().toISOString(),
                 lastModifiedBy: userProfile?.displayName,
                 lastModifiedByState: globalStateFilter,
@@ -1093,6 +1096,8 @@ export default function AssetList() {
 
             finalAsset = sanitizeForFirestore({
                 ...(originalAsset || assetToSave),
+                // Ensure new assets get the active project ID
+                grantId: (originalAsset || assetToSave).grantId || activeGrantId || undefined,
                 approvalStatus: 'pending',
                 pendingChanges: changesOnly,
                 changeSubmittedBy: {

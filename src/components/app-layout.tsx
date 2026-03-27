@@ -336,7 +336,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <h3 className="font-bold text-base">Activity Center</h3>
                       <Badge variant="outline" className="text-[10px]">{unreadCount} Unread</Badge>
                     </div>
-                    <ScrollArea className="h-[400px]">
+                    <ScrollArea className="h-[min(400px,55vh)]">
                       {notifications.length > 0 ? (
                         notifications.map((notification, index) => (
                           <div key={notification.id} className={cn("relative group p-4 transition-colors", !notification.read ? "bg-primary/5" : "bg-transparent")}>
