@@ -1,3 +1,4 @@
+
 'use client';
 
 import { doc, getDocs, setDoc, collection, writeBatch, deleteDoc, query, getDoc, where } from 'firebase/firestore';
@@ -26,8 +27,7 @@ export async function getSettings(): Promise<AppSettings | null> {
         }
         return null;
     } catch (serverError) {
-        // Log errors but don't show full screen UI for background reads
-        logger.error("Failed to fetch settings:", serverError);
+        logger.error("Failed to fetch Firestore settings:", serverError);
         return null;
     }
 }
@@ -42,11 +42,9 @@ export async function updateSettings(settings: AppSettings) {
     
     const settingsRef = doc(firestoreDb, 'config', 'settings');
     try {
-        // Attempt immediate cloud write for real-time reactivity
         await setDoc(settingsRef, settings, { merge: true });
     } catch (serverError) {
         logger.error("Immediate cloud config update failed, enqueuing for later:", serverError);
-        // Fallback to queue for manual sync if direct write fails (e.g. offline)
         await enqueueOp('update', 'config', settings);
         
         if ((serverError as any)?.code === 'permission-denied') {
@@ -81,7 +79,7 @@ export async function getAssets(grantId?: string | null): Promise<Asset[]> {
 
         return fetchedAssets;
     } catch (serverError) {
-        logger.error("Failed to fetch assets:", serverError);
+        logger.error("Failed to fetch Firestore assets:", serverError);
         return [];
     }
 }
@@ -94,13 +92,16 @@ export async function batchSetAssets(assets: Asset[]) {
     if (!db) return;
     const assetsCollectionRef = collection(db, 'assets');
     const batchSize = 500;
+    
     for (let i = 0; i < assets.length; i += batchSize) {
         const batch = writeBatch(db);
         const chunk = assets.slice(i, i + batchSize);
         chunk.forEach((asset) => {
             const docRef = doc(assetsCollectionRef, asset.id);
+            // Ensure lastModified is set on batch writes
             batch.set(docRef, { ...asset, lastModified: asset.lastModified || new Date().toISOString() });
         });
+        
         await batch.commit().catch(async (e) => {
             if (e.code === 'permission-denied') {
                 errorEmitter.emit('permission-error', new FirestorePermissionError({
@@ -119,19 +120,25 @@ export async function batchSetAssets(assets: Asset[]) {
 export async function batchDeleteAssets(assetIds: string[]) {
     const db = checkConfig();
     if (!db) return;
-    const batch = writeBatch(db);
-    assetIds.forEach(id => {
-        batch.delete(doc(db, 'assets', id));
-    });
-    await batch.commit().catch(async (e) => {
-        if (e.code === 'permission-denied') {
-            errorEmitter.emit('permission-error', new FirestorePermissionError({
-                path: 'assets',
-                operation: 'delete'
-            }));
-        }
-        throw e;
-    });
+    const batchSize = 500;
+    
+    for (let i = 0; i < assetIds.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const chunk = assetIds.slice(i, i + batchSize);
+        chunk.forEach(id => {
+            batch.delete(doc(db, 'assets', id));
+        });
+        
+        await batch.commit().catch(async (e) => {
+            if (e.code === 'permission-denied') {
+                errorEmitter.emit('permission-error', new FirestorePermissionError({
+                    path: 'assets',
+                    operation: 'delete'
+                }));
+            }
+            throw e;
+        });
+    }
 }
 
 /**
@@ -140,8 +147,13 @@ export async function batchDeleteAssets(assetIds: string[]) {
 export async function clearAssets() {
     const db = checkConfig();
     if (!db) return;
-    const snapshot = await getDocs(collection(db, "assets"));
-    const batch = writeBatch(db);
-    snapshot.docs.forEach(doc => batch.delete(doc.ref));
-    await batch.commit();
+    try {
+        const snapshot = await getDocs(collection(db, "assets"));
+        const batch = writeBatch(db);
+        snapshot.docs.forEach(doc => batch.delete(doc.ref));
+        await batch.commit();
+    } catch (e) {
+        logger.error("Firestore Global Wipe Error:", e);
+        throw e;
+    }
 }

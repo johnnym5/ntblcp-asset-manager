@@ -97,30 +97,21 @@ import { motion } from "framer-motion";
 import { isAllowed, getRemainingCooldown } from "@/lib/rate-limit";
 import { enqueueOp, processOfflineQueue } from "@/lib/offline-queue";
 import { monitoring } from "@/lib/monitoring";
-
-// Defer loading of heavy modules to prevent dependency cycles and runtime errors
-const AssetForm = dynamic(() => import("./asset-form").then(mod => mod.AssetForm), { 
-    ssr: false, 
-    loading: () => <div className="p-12 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary"/></div> 
-});
-const AssetBatchEditForm = dynamic(() => import("./asset-batch-edit-form").then(mod => mod.AssetBatchEditForm), { ssr: false });
-const CategoryBatchEditForm = dynamic(() => import("./category-batch-edit-form").then(mod => mod.CategoryBatchEditForm), { ssr: false });
-const ImportScannerDialog = dynamic(() => import("./single-sheet-import-dialog").then(mod => mod.ImportScannerDialog), { ssr: false });
-const TravelReportDialog = dynamic(() => import("./travel-report-dialog").then(mod => mod.TravelReportDialog), { ssr: false });
-const SyncConfirmationDialog = dynamic(() => import("./sync-confirmation-dialog").then(mod => mod.SyncConfirmationDialog), { ssr: false });
-const ColumnCustomizationSheet = dynamic(() => import("./column-customization-sheet").then(mod => mod.ColumnCustomizationSheet), { ssr: false });
-const AssetSummaryDashboard = dynamic(() => import("./asset-summary-dashboard").then(mod => mod.AssetSummaryDashboard), { ssr: false });
+import { logger } from "@/lib/logger";
 
 /**
  * Compares two asset-like objects to see if any relevant fields have changed.
+ * This function is critical for the download/upload sync engine.
  */
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
     const keys = new Set([...Object.keys(a), ...Object.keys(b)]) as Set<keyof Asset>;
+    // Fields we ignore during comparison (metadata handled by sync logic)
     const ignoredKeys = new Set(['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState', 'previousState']);
     
     for (const key of keys) {
         if (ignoredKeys.has(key)) continue;
         
+        // Deep compare objects (like pendingChanges)
         if (typeof a[key] === 'object' || typeof b[key] === 'object') {
             if (JSON.stringify(a[key]) !== JSON.stringify(b[key])) return true;
             continue;
@@ -412,6 +403,10 @@ export default function AssetList() {
   }, [view]);
 
   // --- DATA LOADING & SYNC ---
+  /**
+   * executeDownload: The final step of the Sync Down process.
+   * Merges identified cloud changes into the local IndexedDB.
+   */
   const executeDownload = useCallback(async (summary: any, isFirstTime?: boolean) => {
     setIsSyncing(true);
     if (!isFirstTime) addNotification({ title: 'Downloading updates...' });
@@ -421,33 +416,37 @@ export default function AssetList() {
         let localAssets = await getLocalAssetsFromDb();
         const mergedAssetsMap = new Map(localAssets.map(a => [a.id, a]));
 
+        // 1. Handle Deletions: Remove assets that no longer exist in the cloud
         if (deletedOnCloud && deletedOnCloud.length > 0) {
             for (const assetToDelete of deletedOnCloud) {
                 mergedAssetsMap.delete(assetToDelete.id);
             }
         }
         
+        // 2. Handle Additions & Updates: Apply cloud version to local
         const assetsToProcess = [...newFromCloud, ...updatedFromCloud];
         for (const cloudAsset of assetsToProcess) {
             mergedAssetsMap.set(cloudAsset.id, { ...cloudAsset, syncStatus: 'synced' });
         }
         
         const finalAssets = Array.from(mergedAssetsMap.values());
+        
+        // 3. Commit to IndexedDB and update application state
         await saveAssets(finalAssets);
         setAssets(finalAssets);
 
         const totalChanges = assetsToProcess.length + (deletedOnCloud?.length || 0);
         if (!isFirstTime) {
-          addNotification({ title: 'Sync Successful', description: `${totalChanges} items synchronized from cloud.` });
+          addNotification({ title: 'Sync Successful', description: `${totalChanges} items synchronized from ${activeDatabase}.` });
         } else {
           addNotification({ title: 'System Initialized', description: `Successfully downloaded ${totalChanges} regional assets.` });
         }
         
     } catch (error) {
-        monitoring.trackError(error, { component: 'AssetList', action: 'executeDownload' });
+        monitoring.trackError(error, { component: 'AssetList', action: 'executeDownload', source: activeDatabase });
         addNotification({
           title: "Synchronization Error",
-          description: error instanceof Error ? error.message : "An unexpected network error occurred.",
+          description: error instanceof Error ? error.message : "An unexpected database error occurred.",
           variant: 'destructive'
         });
         if (isFirstTime) setFirstTimeSetupStatus('idle');
@@ -460,7 +459,7 @@ export default function AssetList() {
           setFirstTimeSetupStatus('complete');
         }
     }
-}, [setAssets, setIsSyncing, setFirstTimeSetupStatus]);
+}, [setAssets, setIsSyncing, setFirstTimeSetupStatus, activeDatabase]);
 
   const executeUpload = useCallback(async () => {
       if (!syncSummary || syncSummary.type !== 'upload') return;
@@ -546,12 +545,16 @@ export default function AssetList() {
         }
     } catch (error) {
         monitoring.trackError(error, { component: 'AssetList', action: 'handleUploadScan' });
-        addNotification({ title: "Scanner Error", variant: 'destructive' });
+        addNotification({ title: "Scanner Error", variant: "destructive" });
     } finally {
         setIsSyncing(false);
     }
 }, [isOnline, authInitialized, isGuest, setIsSyncing]);
 
+    /**
+     * handleDownloadScan: Scans the cloud for changes and builds a summary.
+     * This is the "Download" trigger that ensures all database download functions are checked.
+     */
     const handleDownloadScan = useCallback(async (isFirstTime = false) => {
     if (!isOnline || !authInitialized || isGuest) return;
 
@@ -562,6 +565,7 @@ export default function AssetList() {
           return;
       }
 
+      // Safeguard: Check for unsynced local changes that might be overwritten
       const localAssetsUnsynced = await getLocalAssetsFromDb();
       const unsyncedAssets = localAssetsUnsynced.filter(a => a.syncStatus === 'local');
       if (unsyncedAssets.length > 0) {
@@ -575,10 +579,11 @@ export default function AssetList() {
     addNotification({ title: isFirstTime ? 'Initializing database...' : `Checking ${activeDatabase === 'firestore' ? 'Firestore' : 'RTDB'}...` });
 
     try {
-        // TARGET THE ACTIVE DATABASE LAYER
+        // Step 1: Fetch raw cloud data from the active project
         const getCloudAssets = activeDatabase === 'firestore' ? getAssetsFS : getAssetsRTDB;
         const allCloudAssets = await getCloudAssets(activeGrantId);
         
+        // Step 2: Apply regional/administrative filtering
         const userAuthorizedStates = isAdmin ? ['All'] : (userProfile?.states || []);
         
         const cloudAssets = allCloudAssets.filter(asset => {
@@ -586,6 +591,7 @@ export default function AssetList() {
             return userAuthorizedStates.some(state => assetMatchesGlobalFilter(asset, state));
         });
         
+        // Step 3: Compare cloud version with local cache
         const localAssets = await getLocalAssetsFromDb();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         const cloudAssetIds = new Set(cloudAssets.map(a => a.id));
@@ -605,9 +611,11 @@ export default function AssetList() {
                 const cloudTimestamp = cloudAsset.lastModified ? new Date(cloudAsset.lastModified).getTime() : 0;
                 const localTimestamp = localAsset.lastModified ? new Date(localAsset.lastModified).getTime() : 0;
 
+                // Priority Check: If local version is newer and unsynced, keep it (unless user overwrites)
                 if (localAsset.syncStatus === 'local' && localTimestamp > cloudTimestamp) {
                     summary.keptLocal.push(localAsset);
                 } else {
+                    // Check for substantive changes using deep comparison
                     if (haveAssetDetailsChanged(localAsset, cloudAsset)) {
                        summary.updatedFromCloud.push(cloudAsset);
                     }
@@ -617,28 +625,36 @@ export default function AssetList() {
             }
         }
         
-        for (const localAsset of localAssets) {
-            if (!cloudAssetIds.has(localAsset.id) && localAsset.syncStatus !== 'local') {
-                const isInScope = isAdmin || userAuthorizedStates.some(state => assetMatchesGlobalFilter(localAsset, state));
-                if(isInScope) summary.deletedOnCloud?.push(localAsset);
+        // Step 4: Detect Deletions (In local but not in cloud)
+        // Safety Check: Only suggest local deletion if we received a legitimate list of cloud assets (prevent wipe-on-network-error)
+        if (allCloudAssets.length > 0 || isFirstTime) {
+            for (const localAsset of localAssets) {
+                if (!cloudAssetIds.has(localAsset.id) && localAsset.syncStatus !== 'local') {
+                    const isInScope = isAdmin || userAuthorizedStates.some(state => assetMatchesGlobalFilter(localAsset, state));
+                    if(isInScope) summary.deletedOnCloud?.push(localAsset);
+                }
             }
         }
         
-        if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0 && summary.keptLocal.length === 0 && (summary.deletedOnCloud || []).length === 0) {
-            if (!isFirstTime) addNotification({ title: 'Already Up-to-Date' });
+        // Step 5: Process Results
+        const hasChanges = summary.newFromCloud.length > 0 || summary.updatedFromCloud.length > 0 || (summary.deletedOnCloud || []).length > 0;
+
+        if (!hasChanges && summary.keptLocal.length === 0) {
+            if (!isFirstTime) addNotification({ title: 'Already Up-to-Date', description: 'Local data matches cloud registry.' });
             if (isFirstTime) setFirstTimeSetupStatus('complete');
         } else {
-            if (isFirstTime) await executeDownload(summary, true);
-            else {
+            if (isFirstTime) {
+                await executeDownload(summary, true);
+            } else {
                 setSyncSummary(summary);
                 setIsSyncConfirmOpen(true);
             }
         }
     } catch (error) {
-        monitoring.trackError(error, { component: 'AssetList', action: 'handleDownloadScan' });
-        addNotification({ title: "Sync Error", variant: 'destructive' });
+        monitoring.trackError(error, { component: 'AssetList', action: 'handleDownloadScan', source: activeDatabase });
+        addNotification({ title: "Sync Scan Failed", description: "Database connection interrupted.", variant: "destructive" });
         if (isFirstTime) setFirstTimeSetupStatus('idle');
-        setIsOnline(false);
+        setIsOnline(false); // Force offline state to prevent retry loops
     } finally {
         setIsSyncing(false);
     }
