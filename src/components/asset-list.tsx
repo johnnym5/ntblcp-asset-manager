@@ -98,6 +98,18 @@ import { isAllowed, getRemainingCooldown } from "@/lib/rate-limit";
 import { enqueueOp, processOfflineQueue } from "@/lib/offline-queue";
 import { monitoring } from "@/lib/monitoring";
 import { logger } from "@/lib/logger";
+import { doc, setDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
+
+// Component Imports
+import { AssetSummaryDashboard } from "./asset-summary-dashboard";
+import { AssetForm } from "./asset-form";
+import { AssetBatchEditForm } from "./asset-batch-edit-form";
+import { CategoryBatchEditForm } from "./category-batch-edit-form";
+import { TravelReportDialog } from "./travel-report-dialog";
+import { ImportScannerDialog } from "./single-sheet-import-dialog";
+import { SyncConfirmationDialog } from "./sync-confirmation-dialog";
+import { ColumnCustomizationSheet } from "./column-customization-sheet";
 
 /**
  * Compares two asset-like objects to see if any relevant fields have changed.
