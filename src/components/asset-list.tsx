@@ -8,7 +8,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-} from "@/components/ui/table";
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +60,7 @@ import type { Asset, DisplayField } from "@/lib/types";
 import { NIGERIAN_STATES, ZONAL_STORES, ASSET_CONDITIONS, NIGERIAN_ZONES } from "@/lib/constants";
 import { useAppState } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
+import { useToast } from "@/hooks/use-toast";
 import { getAssets as getAssetsFS, batchSetAssets as batchSetAssetsFS } from "@/lib/firestore";
 import { getAssets as getAssetsRTDB, batchSetAssets as batchSetAssetsRTDB } from "@/lib/database";
 import { getLocalAssets, saveAssets } from "@/lib/idb";
@@ -199,7 +200,7 @@ export default function AssetList() {
     return scopedAssets.filter(asset => globalStateFilters.some(state => assetMatchesGlobalFilter(asset, [state])));
   }, [scopedAssets, globalStateFilters]);
 
-  // --- SYNC ENGINE ---
+  // --- SYNC ENGINE HANDLERS ---
   const handleDownloadScan = useCallback(async () => {
     if (!isOnline || !authInitialized) return;
     setIsSyncing(true);
@@ -220,7 +221,7 @@ export default function AssetList() {
         setSyncSummary(summary);
         setIsSyncConfirmOpen(true);
     } finally { setIsSyncing(false); }
-  }, [isOnline, authInitialized, activeDatabase, activeGrantId]);
+  }, [isOnline, authInitialized, activeDatabase, activeGrantId, setIsSyncing]);
 
   const handleUploadScan = useCallback(async () => {
     if (!isOnline || isGuest) return;
@@ -233,7 +234,7 @@ export default function AssetList() {
             setIsSyncConfirmOpen(true);
         } else addNotification({ title: 'System Synced' });
     } finally { setIsSyncing(false); }
-  }, [isOnline, isGuest, activeGrantId]);
+  }, [isOnline, isGuest, activeGrantId, setIsSyncing]);
 
   useEffect(() => { if (manualDownloadTrigger > 0) handleDownloadScan(); }, [manualDownloadTrigger, handleDownloadScan]);
   useEffect(() => { if (manualUploadTrigger > 0) handleUploadScan(); }, [manualUploadTrigger, handleUploadScan]);
@@ -304,6 +305,12 @@ export default function AssetList() {
     setIsFormOpen(true);
   }, [isAdmin, userProfile]);
 
+  const handleViewAsset = useCallback((asset: Asset) => {
+    setSelectedAsset(asset);
+    setIsFormReadOnly(true);
+    setIsFormOpen(true);
+  }, []);
+
   useEffect(() => {
     setDataActions({ onAddAsset: handleAddAsset, onScanAndImport: () => setIsImportScanOpen(true), onTravelReport: () => setIsTravelReportOpen(true) });
     return () => setDataActions({});
@@ -314,16 +321,6 @@ export default function AssetList() {
   }, [authInitialized]);
 
   if (isLoading || !appSettings) return <div className="flex h-full w-full items-center justify-center"><Loader2 className="animate-spin text-primary" /></div>;
-
-  const sortedScopeOptions = [...NIGERIAN_STATES].sort((a, b) => {
-      if (scopeSort === 'alpha') return a.localeCompare(b);
-      if (scopeSort === 'volume') {
-          const countA = scopedAssets.filter(asset => assetMatchesGlobalFilter(asset, [a])).length;
-          const countB = scopedAssets.filter(asset => assetMatchesGlobalFilter(asset, [b])).length;
-          return countB - countA;
-      }
-      return 0;
-  });
 
   return (
     <div className="flex flex-col h-full gap-6 max-w-full">
@@ -412,7 +409,7 @@ export default function AssetList() {
         ) : (
             <Card className="flex-1 flex flex-col overflow-hidden border-none shadow-none bg-transparent">
                 <div className="flex items-center gap-2 mb-4">
-                    <Button variant="ghost" size="icon" onClick={() => { setView('dashboard'); setCurrentCategory(null); }}><ArrowLeft /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => { setView('dashboard'); setCurrentCategory(null); setSelectedAssetIds([]); }}><ArrowLeft /></Button>
                     <h2 className="text-2xl font-black">{currentCategory}</h2>
                 </div>
                 <ScrollArea className="flex-1">
