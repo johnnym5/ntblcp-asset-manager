@@ -49,6 +49,7 @@ import {
   PlusCircle,
   ScanSearch,
   CloudOff,
+  CloudDownload,
 } from "lucide-react";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -203,7 +204,7 @@ export default function AssetList() {
     globalStateFilter, setGlobalStateFilter,
     itemsPerPage, setItemsPerPage,
     selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees, selectedStatuses, setSelectedStatuses, missingFieldFilter, setMissingFieldFilter,
-    setLocationOptions, setAssigneeOptions, setStatusOptions,
+    setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
     sortConfig, setSortConfig,
     appSettings, setAppSettings,
     manualDownloadTrigger,
