@@ -26,8 +26,8 @@ import { doc, onSnapshot } from 'firebase/firestore';
 import { ref, onValue } from 'firebase/database';
 import { addNotification } from '@/hooks/use-notifications';
 import { v4 as uuidv4 } from 'uuid';
-import { NIGERIAN_STATES, NIGERIAN_ZONES } from '@/lib/constants';
 import { logger } from '@/lib/logger';
+import { useToast } from '@/hooks/use-toast';
 
 export interface SortConfig {
   key: keyof Asset;
@@ -133,6 +133,7 @@ interface AppStateContextType {
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
+  const { toast } = useToast();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
   const [isOnline, setIsOnline] = useState(true);
@@ -172,9 +173,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   
   const [activeDatabase, setActiveDatabaseInternal] = useState<'firestore' | 'rtdb'>(() => {
       if (typeof window !== 'undefined') {
-          return (localStorage.getItem('assetain-active-db') as 'firestore' | 'rtdb') || 'firestore';
+          return (localStorage.getItem('assetain-active-db') as 'firestore' | 'rtdb') || 'rtdb';
       }
-      return 'firestore';
+      return 'rtdb';
   });
 
   const [onRevertAsset, setOnRevertAsset] = useState<(assetId: string) => Promise<void>>(() => async () => {});
@@ -182,33 +183,70 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   // Real-time Connectivity Sync
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    
-    const handleBrowserConnectivityChange = () => {
-        setIsOnline(navigator.onLine);
-    };
+    const handleBrowserConnectivityChange = () => setIsOnline(navigator.onLine);
     window.addEventListener('online', handleBrowserConnectivityChange);
     window.addEventListener('offline', handleBrowserConnectivityChange);
-
     return () => {
       window.removeEventListener('online', handleBrowserConnectivityChange);
       window.removeEventListener('offline', handleBrowserConnectivityChange);
     };
   }, []);
 
-  // Initialization & Migration
+  // Real-time Global Config Listener (Broadcasting)
+  useEffect(() => {
+    if (!isOnline || !settingsLoaded) return;
+
+    let unsubscribe: () => void = () => {};
+
+    try {
+        if (activeDatabase === 'firestore' && db) {
+            const settingsRef = doc(db, 'config', 'settings');
+            unsubscribe = onSnapshot(settingsRef, async (snapshot) => {
+                if (snapshot.exists()) {
+                    const remoteSettings = snapshot.data() as AppSettings;
+                    setAppSettings(remoteSettings);
+                    await saveLocalSettings(remoteSettings);
+                }
+            });
+        } else if (activeDatabase === 'rtdb' && rtdb) {
+            const settingsRef = ref(rtdb, 'config/settings');
+            unsubscribe = onValue(settingsRef, async (snapshot) => {
+                if (snapshot.exists()) {
+                    const remoteSettings = snapshot.val() as AppSettings;
+                    setAppSettings(remoteSettings);
+                    await saveLocalSettings(remoteSettings);
+                }
+            });
+        }
+    } catch (e) {
+        logger.error("Broadcast Listener Error:", e);
+    }
+
+    return () => unsubscribe();
+  }, [isOnline, activeDatabase, settingsLoaded]);
+
+  // Initialization
   useEffect(() => {
     const initializeSettings = async () => {
         let settings: AppSettings | null = await getLocalSettings();
 
         if (navigator.onLine) {
             try {
+                // Try active source first
                 const cloudSettings = activeDatabase === 'rtdb' ? await getSettingsRTDB() : await getSettingsFS();
                 if (cloudSettings) {
                     settings = cloudSettings;
                     await saveLocalSettings(settings);
+                } else {
+                    // Fallback to other source
+                    const fallbackSettings = activeDatabase === 'rtdb' ? await getSettingsFS() : await getSettingsRTDB();
+                    if (fallbackSettings) {
+                        settings = fallbackSettings;
+                        await saveLocalSettings(settings);
+                    }
                 }
             } catch (e) {
-                logger.error("Failed to fetch settings from cloud", e);
+                logger.error("Initial Settings Fetch Error:", e);
             }
         }
 
@@ -224,47 +262,24 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     initializeSettings();
   }, [activeDatabase]);
 
-  // Real-time Global Config Listener (Broadcasting)
-  useEffect(() => {
-    if (!isOnline || !settingsLoaded) return;
-
-    let unsubscribe: () => void = () => {};
-
-    if (activeDatabase === 'firestore' && db) {
-        const settingsRef = doc(db, 'config', 'settings');
-        unsubscribe = onSnapshot(settingsRef, async (snapshot) => {
-            if (snapshot.exists()) {
-                const remoteSettings = snapshot.data() as AppSettings;
-                setAppSettings(remoteSettings);
-                await saveLocalSettings(remoteSettings);
-            }
-        });
-    } else if (activeDatabase === 'rtdb' && rtdb) {
-        const settingsRef = ref(rtdb, 'config/settings');
-        unsubscribe = onValue(settingsRef, async (snapshot) => {
-            if (snapshot.exists()) {
-                const remoteSettings = snapshot.val() as AppSettings;
-                setAppSettings(remoteSettings);
-                await saveLocalSettings(remoteSettings);
-            }
-        });
-    }
-
-    return () => unsubscribe();
-  }, [isOnline, activeDatabase, settingsLoaded]);
-
   const setActiveGrantId = async (id: string | null) => {
     if (!appSettings) return;
     const updated = { ...appSettings, activeGrantId: id };
     setAppSettings(updated);
     activeGrantIdSet(id);
     
-    const update = activeDatabase === 'firestore' ? updateSettingsFS : updateSettingsRTDB;
-    await update(updated);
-    
-    // Clear views for context swap
-    setAssets([]);
-    setManualDownloadTrigger(prev => prev + 1);
+    try {
+        const update = activeDatabase === 'firestore' ? updateSettingsFS : updateSettingsRTDB;
+        await update(updated);
+        await saveLocalSettings(updated);
+        
+        // Clear current view to force re-fetch of isolated project data
+        setAssets([]);
+        setManualDownloadTrigger(prev => prev + 1);
+        toast({ title: 'Project Context Switched', description: `Now managing assets for: ${appSettings.grants.find(g => g.id === id)?.name || 'Unknown'}` });
+    } catch (e) {
+        toast({ title: 'Activation Failed', variant: 'destructive' });
+    }
   };
 
   const setActiveDatabase = async (newDb: 'firestore' | 'rtdb') => {
@@ -274,7 +289,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       addNotification({ title: 'Switching Data Layer...', description: `Mirroring primary data to ${newDb.toUpperCase()}...` });
       
       try {
-          const currentData = await getLocalAssets();
           setActiveDatabaseInternal(newDb);
           if (typeof window !== 'undefined') {
               localStorage.setItem('assetain-active-db', newDb);
@@ -289,7 +303,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
               await update(updatedSettings);
           }
           
-          toast({ title: 'Source Switched', description: `Now using ${newDb.toUpperCase()}. Backup mirrored.` });
+          toast({ title: 'Source Switched', description: `Now using ${newDb.toUpperCase()} as primary source.` });
+      } catch (e) {
+          toast({ title: 'Switch Failed', variant: 'destructive' });
       } finally {
           setIsSyncing(false);
       }

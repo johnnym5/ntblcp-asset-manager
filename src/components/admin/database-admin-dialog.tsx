@@ -29,6 +29,7 @@ import {
     History,
     RotateCcw,
     Zap,
+    AlertTriangle,
 } from 'lucide-react';
 import { addNotification } from '@/hooks/use-notifications';
 import { useToast } from '@/hooks/use-toast';
@@ -36,6 +37,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Badge } from '../ui/badge';
 import { cn } from '@/lib/utils';
 import { Card, CardDescription, CardHeader, CardTitle } from '../ui/card';
+import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 
 interface DatabaseAdminDialogProps {
   isOpen: boolean;
@@ -55,7 +57,8 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       try {
           const fsData = await getAssetsFS(activeGrantId);
           await batchSetAssetsRTDB(fsData);
-          addNotification({ title: 'Backup Successful', description: `Cloned ${fsData.length} records to RTDB.` });
+          addNotification({ title: 'Backup Successful', description: `Cloned ${fsData.length} records to Realtime Database.` });
+          toast({ title: "Mirror Snapshot Created" });
       } catch (e) {
           toast({ title: 'Backup Failed', variant: 'destructive' });
       } finally {
@@ -69,7 +72,8 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       try {
           const rtdbData = await getAssetsRTDB(activeGrantId);
           await batchSetAssetsFS(rtdbData);
-          addNotification({ title: 'Migration Complete', description: `Pushed ${rtdbData.length} records to Firestore.` });
+          addNotification({ title: 'Migration Complete', description: `Pushed ${rtdbData.length} records to Cloud Firestore.` });
+          toast({ title: "Firestore Restored from Mirror" });
       } catch (e) {
           toast({ title: 'Migration Failed', variant: 'destructive' });
       } finally {
@@ -81,7 +85,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl flex flex-col h-[80vh] p-0 overflow-hidden rounded-3xl border-primary/10 shadow-2xl">
+        <DialogContent className="max-w-3xl flex flex-col h-[85vh] p-0 overflow-hidden rounded-3xl border-primary/10 shadow-2xl">
             <div className="px-8 pt-8 bg-muted/30 border-b">
                 <DialogHeader className="mb-6">
                     <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">
@@ -95,6 +99,14 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
 
             <ScrollArea className="flex-1 bg-background">
                 <div className="p-8 space-y-8">
+                    <Alert variant="destructive" className="border-2 bg-destructive/5">
+                        <AlertTriangle className="h-4 w-4" />
+                        <AlertTitle className="font-bold">Caution: Direct Data Manipulation</AlertTitle>
+                        <AlertDescription className="text-xs leading-relaxed opacity-80">
+                            Switching the primary data source will re-route all user traffic. Ensure your backup mirror is current before migrating production users.
+                        </AlertDescription>
+                    </Alert>
+
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <Card 
                             className={cn(
@@ -103,13 +115,13 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             )}
                             onClick={() => setActiveDatabase('firestore')}
                         >
-                            <CardHeader className="pb-2">
+                            <CardHeader className="pb-4">
                                 <div className="flex justify-between items-start">
                                     <DatabaseIcon className={cn("h-8 w-8", activeDatabase === 'firestore' ? "text-primary" : "text-muted-foreground")} />
-                                    {activeDatabase === 'firestore' && <Badge className="bg-primary font-black uppercase text-[9px]">Primary</Badge>}
+                                    {activeDatabase === 'firestore' && <Badge className="bg-primary font-black uppercase text-[9px]">Active</Badge>}
                                 </div>
                                 <CardTitle className="text-lg mt-2">Cloud Firestore</CardTitle>
-                                <CardDescription className="text-xs">Optimized for complex queries and regional filtering.</CardDescription>
+                                <CardDescription className="text-xs leading-tight">Complex regional queries and granular document security.</CardDescription>
                             </CardHeader>
                         </Card>
 
@@ -120,13 +132,13 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             )}
                             onClick={() => setActiveDatabase('rtdb')}
                         >
-                            <CardHeader className="pb-2">
+                            <CardHeader className="pb-4">
                                 <div className="flex justify-between items-start">
                                     <Zap className={cn("h-8 w-8", activeDatabase === 'rtdb' ? "text-primary" : "text-muted-foreground")} />
-                                    {activeDatabase === 'rtdb' && <Badge className="bg-primary font-black uppercase text-[9px]">Primary</Badge>}
+                                    {activeDatabase === 'rtdb' && <Badge className="bg-primary font-black uppercase text-[9px]">Active</Badge>}
                                 </div>
                                 <CardTitle className="text-lg mt-2">Realtime Database</CardTitle>
-                                <CardDescription className="text-xs">Ultra-fast sync and lower quota impact for field teams.</CardDescription>
+                                <CardDescription className="text-xs leading-tight">Low-latency sync and reduced quota impact for high-frequency updates.</CardDescription>
                             </CardHeader>
                         </Card>
                     </div>
@@ -134,19 +146,19 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                     <div className="p-6 rounded-2xl bg-muted/20 border-2 border-dashed space-y-4">
                         <div className="flex items-center gap-3">
                             <RotateCcw className="h-5 w-5 text-primary" />
-                            <h4 className="font-bold text-sm">Orchestration Tools</h4>
+                            <h4 className="font-bold text-sm">Mirror Orchestration</h4>
                         </div>
-                        <p className="text-xs text-muted-foreground">
-                            Manually push/pull project data between layers. Use this to prepare for migration or disaster recovery.
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Manually synchronize project data between layers. Use <strong>Snapshot</strong> to backup Firestore data to RTDB, or <strong>Restore</strong> to push RTDB changes back to Firestore.
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                            <Button variant="outline" className="h-12 font-bold justify-start" onClick={handleFullBackup} disabled={isProcessing}>
+                            <Button variant="outline" className="h-12 font-bold justify-start rounded-xl border-primary/20 bg-background" onClick={handleFullBackup} disabled={isProcessing}>
                                 {isProcessing ? <Loader2 className="mr-3 h-4 w-4 animate-spin"/> : <History className="mr-3 h-4 w-4 text-primary"/>}
                                 Snapshot: FS → RTDB
                             </Button>
-                            <Button variant="outline" className="h-12 font-bold justify-start" onClick={handleMigration} disabled={isProcessing}>
+                            <Button variant="outline" className="h-12 font-bold justify-start rounded-xl border-blue-200 bg-background" onClick={handleMigration} disabled={isProcessing}>
                                 <FileText className="mr-3 h-4 w-4 text-blue-500"/>
-                                Migration: RTDB → FS
+                                Restore: RTDB → FS
                             </Button>
                         </div>
                     </div>
@@ -154,7 +166,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
             </ScrollArea>
 
             <DialogFooter className="px-8 py-6 bg-muted/30 border-t">
-                <DialogClose asChild><Button variant="ghost">Exit Infrastructure</Button></DialogClose>
+                <DialogClose asChild><Button variant="ghost" className="font-bold">Close Infrastructure</Button></DialogClose>
             </DialogFooter>
         </DialogContent>
     </Dialog>
