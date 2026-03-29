@@ -9,14 +9,6 @@ import {
   AlertDialogDescription,
   AlertDialogFooter
 } from '@/components/ui/alert-dialog';
-import { Button } from './ui/button';
-import { Input } from './ui/input';
-import { Label } from './ui/label';
-import { Loader2, MapPin, AlertCircle, Boxes } from 'lucide-react';
-import type { AuthorizedUser } from '@/lib/types';
-import { Alert, AlertDescription, AlertTitle } from './ui/alert';
-import { useAuth } from '@/contexts/auth-context';
-import { useAppState } from '@/contexts/app-state-context';
 import {
   Select,
   SelectContent,
@@ -24,107 +16,101 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { isAllowed } from '@/lib/rate-limit';
-import { getInitialAdminCreds } from '@/lib/auth-constants';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Label } from './ui/label';
+import { Loader2, AlertCircle, Boxes } from 'lucide-react';
+import type { AuthorizedUser } from '@/lib/types';
+import { Alert, AlertDescription, AlertTitle } from './ui/alert';
+import { useAuth } from '@/contexts/auth-context';
+import { useAppState } from '@/contexts/app-state-context';
+import { Separator } from './ui/separator';
+
+const superAdmin: AuthorizedUser = {
+  loginName: 'admin',
+  displayName: 'Super Admin',
+  email: 'admin',
+  password: 'setup',
+  states: ['All'],
+  isAdmin: true,
+  isGuest: false,
+  canAddAssets: true,
+  canEditAssets: true,
+};
 
 export default function UserProfileSetup() {
-  const [loginName, setLoginName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
   const [foundUser, setFoundUser] = useState<AuthorizedUser | null>(null);
-  const [selectedInitialState, setSelectedInitialState] = useState<string>('');
+  const [selectedState, setSelectedState] = useState<string>('');
   
   const { login } = useAuth();
-  const { appSettings, setGlobalStateFilters } = useAppState();
+  const { appSettings } = useAppState();
 
-  const handleLogin = async () => {
-    if (!isAllowed('login-attempt', 3000)) {
-        return;
-    }
-
+  const handleLogin = () => {
     setError(null);
-    const sanitizedLoginName = loginName.trim().toLowerCase();
-    const sanitizedPassword = password.trim();
-
-    if (!sanitizedLoginName) {
-      setError("Please enter your login name.");
+    if (!email) {
+      setError("Please enter an email address.");
       return;
     }
-    
-    if (!appSettings) {
-        setError("System initializing. Please wait.");
-        return;
-    }
 
-    const { u: adminLogin, p: adminPass } = getInitialAdminCreds();
-    const superAdmin: AuthorizedUser = {
-      loginName: adminLogin,
-      displayName: 'Super Admin',
-      password: adminPass,
-      states: ['All'],
-      isAdmin: true,
-      isGuest: false,
-      canAddAssets: true,
-      canEditAssets: true,
-      canVerifyAssets: true,
-    };
-
-    const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
+    const allUsers = [...appSettings.authorizedUsers, superAdmin];
     const user = allUsers.find(
-      u => u.loginName.toLowerCase() === sanitizedLoginName
+      u => u.email.toLowerCase() === email.toLowerCase().trim()
     );
 
     if (!user) {
-      setError("Invalid credentials.");
+      setError("Invalid email or password.");
       return;
     }
 
     if (user.isGuest) {
-      if (user.states.length > 1) {
-          setFoundUser(user);
-      } else {
-          setIsSaving(true);
-          await login(user);
-          setIsSaving(false);
+      setFoundUser(user);
+      if (user.states.length === 1 && user.states[0] !== 'All') {
+        setSelectedState(user.states[0]);
+        handleConfirm(user, user.states[0]);
+      } else if (user.isAdmin) {
+        setSelectedState('All');
+        handleConfirm(user, 'All');
       }
       return; 
     }
     
-    if (!sanitizedPassword && !user.isGuest) {
+    if (!password) {
       setError("Please enter your password.");
       return;
     }
 
-    if (user.password === sanitizedPassword || user.isGuest) {
-      if (user.states.length > 1 && !user.isAdmin) {
-          setFoundUser(user);
-      } else {
-          setIsSaving(true);
-          await login(user);
-          setIsSaving(false);
+    if (user.password === password) {
+      setFoundUser(user);
+      if (user.states.length === 1 && user.states[0] !== 'All') {
+        setSelectedState(user.states[0]);
+        handleConfirm(user, user.states[0]);
+      } else if (user.isAdmin) {
+        setSelectedState('All');
+        handleConfirm(user, 'All');
       }
     } else {
-      setError("Invalid credentials.");
+      setError("Invalid email or password.");
+      setFoundUser(null);
     }
   };
 
-  const handleConfirmMultiState = async () => {
-      if (!foundUser || !selectedInitialState) return;
-      setIsSaving(true);
-      setGlobalStateFilters([selectedInitialState]);
-      await login(foundUser);
-      setIsSaving(false);
-  }
+  const handleConfirm = async (userToLogin: AuthorizedUser, stateToSet: string) => {
+    if (!userToLogin || !stateToSet) {
+        setError("An error occurred. Please try again.");
+        return;
+    }
+    
+    setIsSaving(true);
+    await login(userToLogin, stateToSet);
+    setIsSaving(false);
+  };
   
-  if (!appSettings) {
-     return (
-        <div className="flex h-screen w-full items-center justify-center bg-background">
-            <Loader2 className="h-10 w-10 animate-spin text-primary" />
-        </div>
-    );
-  }
+  const isMultiStateUser = foundUser && foundUser.states.length > 1 && !foundUser.isAdmin;
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
@@ -135,77 +121,72 @@ export default function UserProfileSetup() {
                     <div className="p-3 bg-primary/10 rounded-full mb-2">
                         <Boxes className="h-6 w-6 text-primary" />
                     </div>
-                    <AlertDialogTitle>Assetain</AlertDialogTitle>
+                    <AlertDialogTitle>NTBLCP Asset Manager</AlertDialogTitle>
                     <AlertDialogDescription>
-                        {foundUser ? "Select your starting location." : "Sign in to access your assets."}
+                        Please sign in to continue.
                     </AlertDialogDescription>
                 </AlertDialogHeader>
-                
                 <div className="py-4 space-y-4">
-                    {!foundUser ? (
-                        <>
-                            <div className="space-y-2">
-                                <Label htmlFor="loginName">Login Name</Label>
-                                <Input 
-                                id="loginName" 
-                                type="text"
-                                placeholder="e.g. lagos_admin"
-                                value={loginName} 
-                                onChange={(e) => setLoginName(e.target.value)}
-                                />
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="password">Password</Label>
-                                <Input 
-                                id="password" 
-                                type="password"
-                                value={password} 
-                                onChange={(e) => setPassword(e.target.value)}
-                                onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                                />
-                            </div>
-                        </>
-                    ) : (
-                        <div className="space-y-4">
-                            <div className="p-3 rounded-lg bg-muted/50 border border-dashed flex items-center gap-3">
-                                <div className="p-2 bg-background rounded-full border shadow-sm">
-                                    <MapPin className="h-4 w-4 text-primary" />
-                                </div>
-                                <div className="flex-1">
-                                    <p className="text-xs font-bold uppercase text-muted-foreground">Authorized Scopes</p>
-                                    <p className="text-sm font-medium">{foundUser.states.join(', ')}</p>
-                                </div>
-                            </div>
-                            <div className="space-y-2">
-                                <Label htmlFor="initial-state">Initial Filter Scope</Label>
-                                <Select value={selectedInitialState} onValueChange={setSelectedInitialState}>
-                                    <SelectTrigger id="initial-state">
-                                        <SelectValue placeholder="Select starting state..." />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {foundUser.states.map(state => (
-                                            <SelectItem key={state} value={state}>{state}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
+                {!foundUser || isMultiStateUser ? (
+                    <>
+                        <div className="space-y-2">
+                            <Label htmlFor="email">Email</Label>
+                            <Input 
+                            id="email" 
+                            type="email"
+                            placeholder="user@example.com"
+                            value={email} 
+                            onChange={(e) => setEmail(e.target.value)}
+                            />
                         </div>
-                    )}
+                        <div className="space-y-2">
+                            <Label htmlFor="password">Password</Label>
+                            <Input 
+                            id="password" 
+                            type="password"
+                            value={password} 
+                            onChange={(e) => setPassword(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                            />
+                        </div>
+                    </>
+                ) : null}
 
-                    {error && (
-                        <Alert variant="destructive">
-                            <AlertCircle className="h-4 w-4" />
-                            <AlertTitle>Login Error</AlertTitle>
-                            <AlertDescription>{error}</AlertDescription>
-                        </Alert>
-                    )}
+                {isMultiStateUser && (
+                    <>
+                     <Separator />
+                     <p className="text-sm text-center text-muted-foreground">Login successful. Please select your location for this session.</p>
+                     <div className="space-y-2">
+                        <Label htmlFor="state">Assigned Location</Label>
+                        <Select onValueChange={setSelectedState} value={selectedState}>
+                            <SelectTrigger id="state">
+                            <SelectValue placeholder="Select a location..." />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {foundUser.states.map((state) => (
+                                <SelectItem key={state} value={state}>
+                                    {state}
+                                </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                     </div>
+                    </>
+                )}
+
+                {error && (
+                    <Alert variant="destructive">
+                        <AlertCircle className="h-4 w-4" />
+                        <AlertTitle>Login Error</AlertTitle>
+                        <AlertDescription>{error}</AlertDescription>
+                    </Alert>
+                )}
                 </div>
-
                 <AlertDialogFooter>
-                    {foundUser ? (
-                        <Button className="w-full" onClick={handleConfirmMultiState} disabled={isSaving || !selectedInitialState}>
+                    {isMultiStateUser ? (
+                        <Button className="w-full" onClick={() => handleConfirm(foundUser!, selectedState)} disabled={isSaving || !selectedState}>
                             {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Initialize Session
+                            Confirm and Continue
                         </Button>
                     ) : (
                         <Button className="w-full" onClick={handleLogin} disabled={isSaving}>

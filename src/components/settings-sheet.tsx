@@ -2,14 +2,20 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetClose,
+} from '@/components/ui/sheet';
+import {
+  Tabs,
+  TabsContent,
+  TabsList,
+  TabsTrigger,
+} from '@/components/ui/tabs';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -23,18 +29,16 @@ import {
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
+import { Separator } from './ui/separator';
 import { useAppState } from '@/contexts/app-state-context';
-import { updateSettings as updateSettingsFS } from '@/lib/firestore';
-import { updateSettings as updateSettingsRTDB } from '@/lib/database';
+import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { 
-    Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, 
-    Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, 
-    Layers, LayoutGrid, Edit, CheckCircle2
-} from 'lucide-react';
-import type { SheetDefinition, AppSettings, AuthorizedUser, Grant } from '@/lib/types';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff } from 'lucide-react';
+import { ColumnCustomizationSheet } from './column-customization-sheet';
+import type { SheetDefinition, AppSettings } from '@/lib/types';
+import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { saveLocalSettings } from '@/lib/idb';
 import {
@@ -44,329 +48,336 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Separator } from './ui/separator';
-import { addNotification } from '@/hooks/use-notifications';
-import { ScrollArea } from './ui/scroll-area';
-import { Badge } from './ui/badge';
-import { Input } from './ui/input';
-import { cn, sanitizeForFirestore } from '@/lib/utils';
-import { v4 as uuidv4 } from 'uuid';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Card } from './ui/card';
-import { Tabs as TabsRoot, TabsList as TabsListRoot, TabsTrigger as TabsTriggerRoot, TabsContent as TabsContentRoot } from "@/components/ui/tabs";
 
 interface SettingsSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
-  initialTab?: string;
 }
 
-export function SettingsSheet({ isOpen, onOpenChange, initialTab }: SettingsSheetProps) {
+export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { 
-    appSettings, setAppSettings, activeGrantId, setActiveGrantId, 
-    isOnline, activeDatabase, dataActions 
-  } = useAppState();
+  const { appSettings, setAppSettings, dataActions } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
-  const [activeTab, setActiveTab] = useState(initialTab || 'general');
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   const [isConfirmOpen, setIsConfirmOpen] = useState(false);
-  
-  const [newGrantName, setNewGrantName] = useState('');
-  const [editingGrantId, setEditingGrantId] = useState<string | null>(null);
-  const [editingGrantName, setEditingGrantName] = useState('');
-  const [grantToDelete, setGrantToDelete] = useState<Grant | null>(null);
-  const [isSaving, setIsSaving] = useState(false);
+  const [isSheetFormOpen, setIsSheetFormOpen] = useState(false);
+  const [sheetToEdit, setSheetToEdit] = useState<SheetDefinition | null>(null);
+  const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   useEffect(() => {
-    if (isOpen && appSettings) {
-        setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
-        setActiveTab(initialTab || 'general');
+    if (isOpen) {
+      setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
+    } else {
+      setDraftSettings(null);
     }
-  }, [isOpen, appSettings, initialTab]);
+  }, [isOpen, appSettings]);
+
+  const hasChanges = useMemo(() => {
+    return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
+  }, [appSettings, draftSettings]);
   
-  const hasChanges = useMemo(() => JSON.stringify(appSettings) !== JSON.stringify(draftSettings), [appSettings, draftSettings]);
+  const calculatedChanges = useMemo(() => {
+    if (!draftSettings || !appSettings) return [];
+    const changes: string[] = [];
+    if (draftSettings.appMode !== appSettings.appMode) {
+      changes.push(`App mode will be set to: ${draftSettings.appMode}.`);
+    }
+    if (JSON.stringify(draftSettings.enabledSheets.sort()) !== JSON.stringify(appSettings.enabledSheets.sort())) {
+        changes.push(`Enabled sheets will be updated.`);
+    }
+    if (draftSettings.lockAssetList !== appSettings.lockAssetList) {
+        changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
+    }
+    if (JSON.stringify(draftSettings.authorizedUsers) !== JSON.stringify(appSettings.authorizedUsers)) {
+        changes.push('User details will be updated.');
+    }
+    if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
+      changes.push(`Sheet definitions will be updated.`);
+    }
+    return changes;
+  }, [draftSettings, appSettings]);
+
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
+    if (!draftSettings) return;
     setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
   };
 
-  const handleUsersChange = async (newUsers: AuthorizedUser[]) => {
-      handleSettingChange('authorizedUsers', newUsers);
+  const handleToggleSheet = (sheetName: string, checked: boolean) => {
+    if (!draftSettings) return;
+    let newEnabledSheets;
+    if (checked) {
+      newEnabledSheets = [...draftSettings.enabledSheets, sheetName];
+    } else {
+      newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetName);
+    }
+    handleSettingChange('enabledSheets', newEnabledSheets);
+  };
+  
+  const handleToggleAll = (enable: boolean) => {
+    if (!draftSettings) return;
+    const allSheetNames = Object.keys(draftSettings.sheetDefinitions);
+    handleSettingChange('enabledSheets', enable ? allSheetNames : []);
+  };
+
+  const handleEditSheet = (sheetName: string) => {
+    if (!draftSettings) return;
+    setSheetToEdit(draftSettings.sheetDefinitions[sheetName]);
+    setIsSheetFormOpen(true);
+  };
+  
+  const handleDeleteSheet = (sheetNameToDelete: string) => {
+    if (!draftSettings) return;
+    const newSheetDefinitions = { ...draftSettings.sheetDefinitions };
+    delete newSheetDefinitions[sheetNameToDelete];
+    const newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
+    setDraftSettings(prev => prev ? ({ ...prev, sheetDefinitions: newSheetDefinitions, enabledSheets: newEnabledSheets }) : null);
+  };
+
+  const handleImportTemplate = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!draftSettings) return;
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    try {
+      const templates = await parseExcelForTemplate(file);
+      let currentDefs = draftSettings.sheetDefinitions;
+      let currentEnabled = draftSettings.enabledSheets;
+      
+      templates.forEach(template => {
+        currentDefs[template.name] = template;
+        if (!currentEnabled.includes(template.name)) {
+          currentEnabled.push(template.name);
+        }
+      });
+      
+      handleSettingChange('sheetDefinitions', currentDefs);
+      handleSettingChange('enabledSheets', currentEnabled);
+
+      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added/updated.` });
+    } catch (error) {
+      toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   };
 
   const handleConfirmSave = async () => {
-    if (!draftSettings || !userProfile) return;
-    setIsSaving(true);
+    if (!draftSettings) return;
     try {
-      const settingsToSave: AppSettings = sanitizeForFirestore({
-          ...draftSettings,
-          lastModified: new Date().toISOString(),
-          lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName },
-      });
-      
-      await saveLocalSettings(settingsToSave);
-      setAppSettings(settingsToSave);
-      
-      if (isOnline) {
-          const update = activeDatabase === 'firestore' ? updateSettingsFS : updateSettingsRTDB;
-          await update(settingsToSave);
-          addNotification({ title: "Settings Broadcasted", description: "All active users will receive the updated configuration instantly." });
-      }
-      toast({ title: "Configuration Updated" });
+      await updateSettings(draftSettings);
+      await saveLocalSettings(draftSettings);
+      setAppSettings(draftSettings);
+      toast({ title: "Settings Saved", description: "Changes have been applied to the database." });
     } catch (e) {
-        toast({ title: "Sync Failed", variant: "destructive" });
+      toast({ title: "Save Failed", description: "Could not save settings.", variant: "destructive" });
     } finally {
-      setIsSaving(false);
       setIsConfirmOpen(false);
       onOpenChange(false);
     }
   };
-
-  const handleAddNewGrant = () => {
-    const name = newGrantName.trim();
-    if (!draftSettings || !name) return;
-    const g: Grant = { id: uuidv4(), name, sheetDefinitions: {} };
-    handleSettingChange('grants', [...(draftSettings.grants || []), g]);
-    setNewGrantName('');
-    toast({ title: "Project Created", description: "Initialize asset templates to begin." });
-  };
-
-  const handleRenameGrant = () => {
-      if (!draftSettings || !editingGrantId || !editingGrantName.trim()) return;
-      const updatedGrants = draftSettings.grants.map(g => 
-          g.id === editingGrantId ? { ...g, name: editingGrantName } : g
-      );
-      handleSettingChange('grants', updatedGrants);
-      setEditingGrantId(null);
-      setEditingGrantName('');
-  };
-
+  
   const isAdmin = userProfile?.isAdmin || false;
+  const isGuest = userProfile?.isGuest || false;
+  
   if (!draftSettings) return null;
+
+  const allSheetNames = Object.keys(draftSettings.sheetDefinitions);
+  const allEnabled = allSheetNames.length > 0 && draftSettings.enabledSheets.length === allSheetNames.length;
+  const noneEnabled = draftSettings.enabledSheets.length === 0;
 
   return (
     <>
-      <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl flex flex-col h-[90vh] p-0 overflow-hidden rounded-3xl border-primary/10 shadow-2xl">
-          <DialogHeader className="p-6 border-b bg-muted/20">
-            <div className='flex items-center gap-3'>
-                <div className="p-2 bg-primary rounded-xl"><SettingsIcon className="h-5 w-5 text-primary-foreground"/></div>
+      <Sheet open={isOpen} onOpenChange={onOpenChange}>
+        <SheetContent className="w-full sm:max-w-xl flex flex-col">
+          <SheetHeader>
+            <SheetTitle>Settings</SheetTitle>
+            <SheetDescription>
+              Manage application settings and preferences. Admin changes apply to all users.
+            </SheetDescription>
+          </SheetHeader>
+          <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-y-hidden">
+            <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
+                <TabsTrigger value="users" disabled={isGuest || !isAdmin}><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
+                <TabsTrigger value="sheets" disabled={isGuest || !isAdmin}><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
+                <TabsTrigger value="data" disabled={isGuest || !isAdmin}><Database className="mr-2 h-4 w-4" />Data</TabsTrigger>
+            </TabsList>
+            <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
                 <div>
-                    <DialogTitle className="text-xl font-black tracking-tight">System Configuration</DialogTitle>
-                    <DialogDescription className="text-xs font-bold uppercase tracking-widest opacity-60">Global Governance & Project Registers</DialogDescription>
+                    <h3 className="text-lg font-medium mb-4">Appearance</h3>
+                    <div className="rounded-lg border p-4 space-y-3">
+                        <Label className="flex items-center gap-2 text-sm font-medium"><Palette className="h-4 w-4" /> Theme</Label>
+                        <div className="flex justify-around">
+                            <Button variant="outline" size="sm" onClick={() => setTheme('light')}><Sun className="mr-2"/>Light</Button>
+                            <Button variant="outline" size="sm" onClick={() => setTheme('dark')}><Moon className="mr-2"/>Dark</Button>
+                            <Button variant="outline" size="sm" onClick={() => setTheme('system')}><Database className="mr-2"/>System</Button>
+                        </div>
+                    </div>
                 </div>
-            </div>
-          </DialogHeader>
-          
-          <TabsRoot value={activeTab} onValueChange={setActiveTab} className="flex-1 overflow-hidden flex flex-col">
-            <div className='px-6 pt-4 bg-background z-10'>
-                <TabsListRoot className="grid grid-cols-3 w-full h-11 p-1 bg-muted/50 rounded-xl border">
-                    <TabsTriggerRoot value="general" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm font-bold">General</TabsTriggerRoot>
-                    <TabsTriggerRoot value="projects" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm font-bold" disabled={!isAdmin}>Projects</TabsTriggerRoot>
-                    <TabsTriggerRoot value="users" className="rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm font-bold" disabled={!isAdmin}>Users</TabsTriggerRoot>
-                </TabsListRoot>
-            </div>
 
-            <ScrollArea className="flex-1 px-6 py-4">
-                <TabsContentRoot value="general" className="space-y-8 animate-in fade-in slide-in-from-bottom-2">
-                    <div className="space-y-4">
-                        <h3 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                            <Palette className="h-3 w-3"/> Visual Branding
-                        </h3>
-                        <Card className="p-4 bg-muted/5 border-dashed rounded-2xl">
-                            <Label className="text-xs font-bold text-muted-foreground">Interface Theme</Label>
-                            <div className="flex gap-2 mt-3">
-                                <Button variant="outline" size="sm" onClick={() => setTheme('light')} className="flex-1 rounded-xl h-10 font-bold border-primary/10">
-                                    <Sun className="mr-2 h-4 w-4 text-orange-500"/> Light
-                                </Button>
-                                <Button variant="outline" size="sm" onClick={() => setTheme('dark')} className="flex-1 rounded-xl h-10 font-bold border-primary/10">
-                                    <Moon className="mr-2 h-4 w-4 text-blue-500"/> Dark
-                                </Button>
-                            </div>
-                        </Card>
+                {isAdmin && (
+                  <div>
+                    <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
+                    <div className="rounded-lg border p-3 space-y-4 divide-y">
+                      <div className="flex items-center justify-between pt-1">
+                        <div className="space-y-1">
+                          <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
+                          <p className="text-xs text-muted-foreground">
+                            {draftSettings.appMode === 'management'
+                              ? 'Management: Data is locked for non-admins.'
+                              : 'Verification: Users can update status/remarks.'
+                            }
+                          </p>
+                        </div>
+                         <Select value={draftSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
+                          <SelectTrigger className="w-[150px]">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="management">Management</SelectItem>
+                            <SelectItem value="verification">Verification</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="flex items-center justify-between pt-4">
+                        <div className="space-y-1">
+                          <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
+                          <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
+                        </div>
+                        <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
+                      </div>
                     </div>
-
-                    {isAdmin && (
-                        <div className="space-y-4">
-                            <h3 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                                <ShieldCheck className="h-3 w-3"/> Global Rules
-                            </h3>
-                            <Card className="p-5 space-y-6 bg-muted/5 border-dashed rounded-2xl">
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-1">
-                                        <Label className="font-bold text-sm">Logic Engine Mode</Label>
-                                        <p className="text-[10px] text-muted-foreground leading-tight max-w-[200px]">Switch between Verification (Field Focus) or Management (Data Engineering).</p>
-                                    </div>
-                                    <Select value={draftSettings.appMode} onValueChange={v => handleSettingChange('appMode', v)}>
-                                        <SelectTrigger className="w-36 h-10 rounded-xl font-bold border-primary/20">
-                                            <SelectValue />
-                                        </SelectTrigger>
-                                        <SelectContent className='rounded-xl'>
-                                            <SelectItem value="management" className='font-bold'>Management</SelectItem>
-                                            <SelectItem value="verification" className='font-bold'>Verification</SelectItem>
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <Separator className='opacity-50' />
-                                <div className="flex items-center justify-between">
-                                    <div className="space-y-1">
-                                        <Label className="font-bold text-sm">Main List Lockdown</Label>
-                                        <p className="text-[10px] text-muted-foreground leading-tight max-w-[200px]">Freeze all modifications across all projects for standard users.</p>
-                                    </div>
-                                    <Switch checked={draftSettings.lockAssetList} onCheckedChange={v => handleSettingChange('lockAssetList', v)} />
-                                </div>
-                            </Card>
-                        </div>
-                    )}
-                </TabsContentRoot>
-
-                <TabsContentRoot value="projects" className="space-y-6 animate-in fade-in slide-in-from-bottom-2">
-                    <div className="space-y-4">
-                        <div className="flex items-center gap-2 bg-muted/30 p-2 rounded-2xl border border-dashed">
-                            <Input 
-                                placeholder="Initialize new project name..." 
-                                value={newGrantName} 
-                                onChange={e => setNewGrantName(e.target.value)} 
-                                className="h-11 rounded-xl border-none bg-background shadow-inner font-bold"
-                            />
-                            <Button onClick={handleAddNewGrant} disabled={!newGrantName.trim()} className="h-11 rounded-xl px-6 font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/20">
-                                <PlusCircle className="mr-2 h-4 w-4"/> Initialize
-                            </Button>
-                        </div>
-                        
-                        <Separator className='opacity-50' />
-                        
-                        <div className="space-y-3">
-                            {draftSettings.grants?.map(grant => (
-                                <Card key={grant.id} className={cn(
-                                    "transition-all border-2 overflow-hidden rounded-2xl",
-                                    draftSettings.activeGrantId === grant.id ? "border-primary bg-primary/5 ring-4 ring-primary/5" : "border-border hover:border-primary/20"
-                                )}>
-                                    <div className="p-4 flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                            <div className={cn("p-2 rounded-lg", draftSettings.activeGrantId === grant.id ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground")}>
-                                                <Layers className="h-4 w-4" />
-                                            </div>
-                                            {editingGrantId === grant.id ? (
-                                                <div className="flex items-center gap-2">
-                                                    <Input 
-                                                        value={editingGrantName} 
-                                                        onChange={e => setEditingGrantName(e.target.value)} 
-                                                        className="h-8 w-48 font-bold" 
-                                                        autoFocus 
-                                                    />
-                                                    <Button size="sm" onClick={handleRenameGrant} className="h-8">Save</Button>
-                                                    <Button size="sm" variant="ghost" onClick={() => setEditingGrantId(null)} className="h-8">Cancel</Button>
-                                                </div>
-                                            ) : (
-                                                <div className='flex flex-col'>
-                                                    <span className="font-bold text-sm">{grant.name}</span>
-                                                    <span className='text-[10px] font-bold text-muted-foreground uppercase opacity-60'>{Object.keys(grant.sheetDefinitions || {}).length} Asset Classes</span>
-                                                </div>
-                                            )}
-                                            {draftSettings.activeGrantId === grant.id && (
-                                                <Badge className="bg-primary text-[9px] uppercase font-black tracking-tighter h-5 px-1.5 ring-2 ring-background">Active Scope</Badge>
-                                            )}
-                                        </div>
-                                        <div className="flex gap-1">
-                                            {draftSettings.activeGrantId !== grant.id && (
-                                                <Button size="sm" variant="outline" className="h-8 rounded-lg text-[9px] font-black uppercase tracking-widest bg-background" onClick={() => handleSettingChange('activeGrantId', grant.id)}>
-                                                    Activate
-                                                </Button>
-                                            )}
-                                            <Button size="sm" variant="ghost" className="h-8 w-8 rounded-lg" onClick={() => { setEditingGrantId(grant.id); setEditingGrantName(grant.name); }}>
-                                                <Edit className="h-3.5 w-3.5"/>
-                                            </Button>
-                                            <Button size="sm" variant="ghost" className="h-8 w-8 rounded-lg text-destructive hover:bg-destructive/10" onClick={() => setGrantToDelete(grant)} disabled={draftSettings.grants.length <= 1}>
-                                                <Trash2 className="h-3.5 w-3.5"/>
-                                            </Button>
-                                        </div>
-                                    </div>
-                                    <Collapsible open={draftSettings.activeGrantId === grant.id}>
-                                        <CollapsibleContent className="p-4 pt-0 space-y-3 animate-in slide-in-from-top-2">
-                                            <Separator className="bg-primary/10" />
-                                            <div className="grid grid-cols-3 gap-2">
-                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase bg-background border border-primary/10 h-9 rounded-xl hover:bg-primary/5" onClick={() => addNotification({title: 'Manual Registry Ready'})}>
-                                                    <PlusCircle className="mr-1.5 h-3 w-3 text-primary"/> Manual
-                                                </Button>
-                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase bg-background border border-primary/10 h-9 rounded-xl hover:bg-primary/5" onClick={() => addNotification({title: 'Template Engine Loaded'})}>
-                                                    <FileUp className="mr-1.5 h-3 w-3 text-blue-500"/> Template
-                                                </Button>
-                                                <Button variant="ghost" size="sm" className="text-[9px] font-black uppercase bg-background border border-primary/10 h-9 rounded-xl hover:bg-primary/5" onClick={() => { onOpenChange(false); dataActions.onScanAndImport?.(); }}>
-                                                    <ScanSearch className="mr-1.5 h-3 w-3 text-purple-500"/> Scan Data
-                                                </Button>
-                                            </div>
-                                        </CollapsibleContent>
-                                    </Collapsible>
-                                </Card>
-                            ))}
-                        </div>
-                    </div>
-                </TabsContentRoot>
-
-                <TabsContentRoot value="users" className="pt-2 animate-in fade-in slide-in-from-bottom-2">
-                    <UserManagement users={draftSettings.authorizedUsers || []} onUsersChange={handleUsersChange} adminProfile={userProfile} />
-                </TabsContentRoot>
-            </ScrollArea>
-
-            <DialogFooter className="p-6 border-t bg-muted/20 sm:justify-between items-center">
-                <DialogClose asChild><Button variant="ghost" className="font-bold">Discard Draft</Button></DialogClose>
-                {hasChanges && (
-                    <Button onClick={() => setIsConfirmOpen(true)} className="rounded-xl shadow-lg shadow-primary/20 font-black uppercase text-xs tracking-widest px-10 h-12">
-                        {isSaving ? <Loader2 className="animate-spin mr-2 h-4 w-4"/> : <Save className="mr-2 h-4 w-4"/>}
-                        Deploy Configuration
-                    </Button>
+                  </div>
                 )}
-            </DialogFooter>
-          </TabsRoot>
-        </DialogContent>
-      </Dialog>
+            </TabsContent>
+            <TabsContent value="users" className="flex-1 overflow-y-auto pt-4 pr-2">
+                <div className="p-1">
+                    <UserManagement 
+                    users={draftSettings.authorizedUsers}
+                    onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)}
+                    adminProfile={userProfile}
+                    />
+                </div>
+            </TabsContent>
+            <TabsContent value="sheets" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
+                 <div>
+                    <h3 className="text-lg font-medium mb-4">Sheet Definitions</h3>
+                    <div className="flex items-center justify-between mb-4">
+                        <p className="text-sm font-medium">Toggle all sheets</p>
+                        <div className="flex gap-2">
+                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(true)} disabled={allEnabled}>Enable All</Button>
+                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(false)} disabled={noneEnabled}>Disable All</Button>
+                        </div>
+                    </div>
+                    <div className="rounded-lg border p-3">
+                        <div className="space-y-1">
+                          {allSheetNames.map(sheetName => (
+                            <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
+                              <div className="flex items-center">
+                                <Switch id={`switch-${sheetName}`} checked={draftSettings.enabledSheets.includes(sheetName)} onCheckedChange={(checked) => handleToggleSheet(sheetName, checked)}/>
+                                <Label htmlFor={`switch-${sheetName}`} className="text-sm pl-2 cursor-pointer">{sheetName}</Label>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditSheet(sheetName)}><Wrench className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSheet(sheetName)}><Trash2 className="h-4 w-4" /></Button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                    </div>
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                        <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
+                        <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import Templates from File</Button>
+                    </div>
+                  </div>
+            </TabsContent>
+             <TabsContent value="data" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
+                <div>
+                    <h3 className="text-lg font-medium mb-4">Data Management</h3>
+                    <div className="rounded-lg border p-4 space-y-3">
+                        <p className="text-sm text-muted-foreground">Perform global data operations.</p>
+                        <Separator />
+                        <div className="space-y-2">
+                            {dataActions.onAddAsset && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
+                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
+                                </Button>
+                            )}
+                            {dataActions.onImport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onImport} disabled={dataActions.isImporting}>
+                                    <FileUp className="mr-2 h-4 w-4" /> Import Full FAR
+                                </Button>
+                            )}
+                            {dataActions.onScanAndImport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport} disabled={dataActions.isImporting}>
+                                    <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
+                                </Button>
+                            )}
+                            {dataActions.onTravelReport && (
+                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
+                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
+                                </Button>
+                            )}
+                            <Separator />
+                            {dataActions.onClearAll && (
+                                <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>
+                                    <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
+                                </Button>
+                            )}
+                        </div>
+                    </div>
+                </div>
+            </TabsContent>
+          </Tabs>
+
+          <SheetFooter className="mt-auto pt-4 border-t sm:justify-between">
+            <SheetClose asChild><Button variant="outline">Cancel</Button></SheetClose>
+            <Button onClick={() => setIsConfirmOpen(true)} disabled={!hasChanges}>
+                <Save className="mr-2 h-4 w-4" />
+                Save Changes
+            </Button>
+          </SheetFooter>
+        </SheetContent>
+      </Sheet>
+      
+      {sheetToEdit && (
+        <ColumnCustomizationSheet
+          isOpen={isSheetFormOpen}
+          onOpenChange={setIsSheetFormOpen}
+          sheetDefinition={sheetToEdit}
+          onSave={(newDef) => {
+            const newDefs = { ...draftSettings!.sheetDefinitions, [newDef.name]: newDef };
+            handleSettingChange('sheetDefinitions', newDefs);
+          }}
+        />
+      )}
 
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
-        <AlertDialogContent className='rounded-3xl'>
+        <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle className='flex items-center gap-2'>
-                <ShieldCheck className='text-primary h-5 w-5'/> Deploy Global Governance?
-            </AlertDialogTitle>
-            <AlertDialogDescription className='font-medium'>
-                This will instantly update project logic, user roles, and regional scopes for all active users across the network.
+            <AlertDialogTitle>Confirm Changes</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to save these changes?
             </AlertDialogDescription>
           </AlertDialogHeader>
+          {calculatedChanges.length > 0 && (
+             <div className="py-4 text-sm text-foreground">
+                <p className="font-semibold mb-2">Summary:</p>
+                <ul className="list-disc pl-5 space-y-1">
+                    {calculatedChanges.map((change, i) => <li key={i}>{change}</li>)}
+                </ul>
+            </div>
+          )}
           <AlertDialogFooter>
-            <AlertDialogCancel className='rounded-xl font-bold'>Cancel Review</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSave} className="bg-primary font-black uppercase text-xs tracking-widest rounded-xl h-11 px-8">
-                Confirm & Broadcast
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!grantToDelete} onOpenChange={() => setGrantToDelete(null)}>
-        <AlertDialogContent className='rounded-3xl'>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="text-destructive flex items-center gap-2">
-                <AlertTriangle className='h-5 w-5'/> Permanent Purge: {grantToDelete?.name}?
-            </AlertDialogTitle>
-            <AlertDialogDescription className="font-medium">
-                Warning: All asset records, verification history, and templates associated with this project will be permanently erased from the cloud and all devices. This action is final.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className='rounded-xl font-bold'>Abort Deletion</AlertDialogCancel>
-            <AlertDialogAction onClick={async () => {
-                const updated = (draftSettings.grants || []).filter(g => g.id !== grantToDelete!.id);
-                handleSettingChange('grants', updated);
-                if (draftSettings.activeGrantId === grantToDelete!.id) {
-                    handleSettingChange('activeGrantId', updated[0]?.id || null);
-                }
-                setGrantToDelete(null);
-                toast({ title: "Project Slated for Purge" });
-            }} className="bg-destructive font-black uppercase text-xs tracking-widest rounded-xl h-11 px-8 text-white hover:bg-destructive/90">
-                Execute Purge
-            </AlertDialogAction>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSave}>Confirm & Save</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
