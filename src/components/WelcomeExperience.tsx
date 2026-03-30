@@ -9,27 +9,21 @@ import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Zap, 
-  ShieldCheck, 
-  Database, 
-  CloudOff, 
-  FileText, 
-  Search, 
+  LayoutGrid, 
+  Smartphone, 
   ArrowRight,
   CheckCircle2,
-  LayoutGrid,
-  BarChart3,
-  Smartphone
+  FileUp,
+  Search,
+  ShieldCheck,
+  Cloud,
+  Settings
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 interface Step {
@@ -52,25 +46,69 @@ const STEPS: Step[] = [
     ]
   },
   {
+    title: "Bring in your existing files",
+    description: "Upload Excel files and let the app detect records, headings, and grouped sections automatically.",
+    icon: FileUp,
+    benefits: [
+      "Auto-detects technical headers",
+      "Preserves document sections",
+      "Sandbox review before merging",
+      "Identifies duplicated serials"
+    ]
+  },
+  {
+    title: "Find exactly what you need",
+    description: "Use filters and sort options to narrow the list by location, section, condition, or any technical field.",
+    icon: Search,
+    benefits: [
+      "Filter by source sheet or batch",
+      "Multi-column sorting",
+      "Search by ID, S/N, or text",
+      "Save common filter layouts"
+    ]
+  },
+  {
+    title: "Check and update records easily",
+    description: "Open any record to review details, edit values, or mark items for verification in the field.",
+    icon: ShieldCheck,
+    benefits: [
+      "One-tap status updates",
+      "Attach photo evidence",
+      "Record custodian signatures",
+      "Automated field notes"
+    ]
+  },
+  {
     title: "The Structured Advantage",
     description: "Unlike a flat spreadsheet, Assetain understands the hierarchy of your data. We preserve the document, section, and subsection context of every record.",
     icon: LayoutGrid,
     benefits: [
       "Segment by State, LGA, or Facility",
-      "Custom table layouts for different assets",
-      "Visual color-coding by data source",
-      "Preserved source metadata (Row & Sheet info)"
+      "Custom table layouts per asset class",
+      "Visual color-coding by source",
+      "Preserved source row metadata"
     ]
   },
   {
-    title: "Verified in the Field",
-    description: "Our mobile-first design is optimized for auditors on the move. Verify assets with a single tap, even when you have no internet connectivity.",
-    icon: Smartphone,
+    title: "Work anywhere, anytime",
+    description: "You can continue working even without internet. Your changes are saved locally and synced when you're back online.",
+    icon: Cloud,
     benefits: [
-      "One-tap verification status",
-      "Visual proof (Photo evidence) support",
-      "Automatic sync when internet returns",
-      "Conflict-protected data entry"
+      "100% offline functionality",
+      "Automatic background syncing",
+      "Conflict resolution triggers",
+      "Pending sync visibility"
+    ]
+  },
+  {
+    title: "Ready to Start",
+    description: "You can change how records appear, how imports behave, and how help is shown in the settings panel.",
+    icon: Settings,
+    benefits: [
+      "Customize field visibility",
+      "Define regional authorized scopes",
+      "Manage system access levels",
+      "Export formatted reports"
     ]
   }
 ];
@@ -96,7 +134,7 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onComplete()}>
       <DialogContent className="max-w-2xl p-0 overflow-hidden border-none rounded-[2.5rem] shadow-2xl bg-background">
-        <div className="flex flex-col h-[550px]">
+        <div className="flex flex-col h-[580px]">
           {/* Header Pulse */}
           <div className="p-10 pb-6 bg-primary/5 border-b flex items-center justify-between">
             <div className="flex items-center gap-3">
@@ -105,7 +143,7 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
               </div>
               <div className="flex flex-col">
                 <span className="text-xl font-black tracking-tighter uppercase leading-none">Assetain</span>
-                <span className="text-[9px] font-black uppercase text-primary tracking-[0.3em] mt-1">Onboarding Pulse</span>
+                <span className="text-[9px] font-black uppercase text-primary tracking-[0.3em] mt-1">Tour Pulse {currentStep + 1} of {STEPS.length}</span>
               </div>
             </div>
             <div className="flex gap-1.5">
@@ -122,7 +160,7 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
           </div>
 
           {/* Content Surface */}
-          <div className="flex-1 p-10 flex flex-col justify-center text-center sm:text-left">
+          <div className="flex-1 p-10 flex flex-col justify-center">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
@@ -131,12 +169,12 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
                 exit={{ opacity: 0, x: -20 }}
                 className="space-y-8"
               >
-                <div className="flex flex-col sm:flex-row items-center gap-6">
-                  <div className="p-6 bg-primary/10 rounded-[2rem] shrink-0">
-                    <step.icon className="h-12 w-12 text-primary" />
+                <div className="flex flex-col sm:flex-row items-center gap-8 text-center sm:text-left">
+                  <div className="p-8 bg-primary/10 rounded-[2.5rem] shrink-0 shadow-inner">
+                    <step.icon className="h-14 w-14 text-primary" />
                   </div>
-                  <div className="space-y-2">
-                    <h2 className="text-3xl font-black tracking-tight uppercase text-foreground">{step.title}</h2>
+                  <div className="space-y-3">
+                    <h2 className="text-3xl font-black tracking-tight uppercase text-foreground leading-tight">{step.title}</h2>
                     <p className="text-sm font-medium text-muted-foreground leading-relaxed italic">
                       {step.description}
                     </p>
@@ -147,7 +185,7 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
                   {step.benefits.map((benefit, i) => (
                     <div key={i} className="flex items-center gap-3 p-4 rounded-2xl bg-muted/30 border border-transparent hover:border-primary/10 transition-colors">
                       <CheckCircle2 className="h-4 w-4 text-primary shrink-0" />
-                      <span className="text-[11px] font-black uppercase tracking-tight opacity-70">{benefit}</span>
+                      <span className="text-[11px] font-black uppercase tracking-tight opacity-70 leading-tight">{benefit}</span>
                     </div>
                   ))}
                 </div>
@@ -157,16 +195,23 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
 
           {/* Footer Control */}
           <div className="p-10 pt-0 flex items-center justify-between">
-            <Button variant="ghost" onClick={onComplete} className="font-bold text-xs uppercase opacity-40 hover:opacity-100">
-              Skip Guide
+            <Button variant="ghost" onClick={onComplete} className="font-bold text-xs uppercase opacity-40 hover:opacity-100 h-12 rounded-xl">
+              Skip Tour
             </Button>
-            <Button 
-              onClick={handleNext} 
-              className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-3 transition-transform hover:scale-105 active:scale-95"
-            >
-              {currentStep === STEPS.length - 1 ? 'Start Working' : 'Next Insight'}
-              <ArrowRight className="h-4 w-4" />
-            </Button>
+            <div className="flex items-center gap-3">
+              {currentStep > 0 && (
+                <Button variant="outline" onClick={() => setCurrentStep(currentStep - 1)} className="h-14 px-6 rounded-2xl font-black uppercase text-xs border-2">
+                  Back
+                </Button>
+              )}
+              <Button 
+                onClick={handleNext} 
+                className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-3 transition-transform hover:scale-105 active:scale-95"
+              >
+                {currentStep === STEPS.length - 1 ? 'Start Working' : 'Next Step'}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

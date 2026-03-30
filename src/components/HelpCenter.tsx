@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @fileOverview HelpCenter - Contextual Guidance & Support Drawer.
+ * @fileOverview HelpCenter - Contextual Guidance & Support Hub.
  */
 
 import React, { useState } from 'react';
@@ -12,54 +12,112 @@ import { Button } from '@/components/ui/button';
 import { 
   Search, 
   HelpCircle, 
-  FileText, 
-  Database, 
-  Cloud, 
-  Filter, 
-  ArrowUpDown, 
-  ShieldCheck,
+  BookOpen,
   ChevronRight,
-  Info,
-  BookOpen
+  Database,
+  FileUp,
+  Cloud,
+  ShieldCheck,
+  Filter,
+  ArrowUpDown,
+  Download,
+  Settings,
+  AlertCircle,
+  FileText
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface HelpTopic {
   id: string;
   title: string;
-  description: string;
   icon: any;
-  content: string;
+  whatItDoes: string;
+  whenToUse: string;
+  howToUse: string[];
+  tips: string[];
 }
 
 const TOPICS: HelpTopic[] = [
   {
     id: 'registry',
     title: 'Asset Registry',
-    description: 'View and manage all records in one place.',
     icon: Database,
-    content: "The Asset Registry is your primary workspace. Use the search bar to find records by ID or S/N. The 'View Mode' toggle allows you to switch between card and row layouts. You can also customize which fields are visible using the 'Field Setup' drawer."
+    whatItDoes: "View and manage all your asset records in one centralized location.",
+    whenToUse: "Use the registry to scan your inventory, search for specific items, or check technical specifications.",
+    howToUse: [
+      "Search by ID, S/N, or description using the search bar.",
+      "Switch between Grid and List views for better scanning.",
+      "Tap any record to see its full profile and history."
+    ],
+    tips: [
+      "Custom display names can be set in the 'Field Setup' drawer.",
+      "Hidden fields are always accessible in the detail view."
+    ]
   },
   {
     id: 'upload',
     title: 'Uploading Records',
-    description: 'Turn spreadsheets into structured data.',
-    icon: FileText,
-    content: "The Upload Center uses a deterministic analyzer to process Excel files. Every import is first placed in a 'Sandbox' for your review. This ensures that hierarchical data like sections and subsections are correctly identified before they hit the main registry."
+    icon: FileUp,
+    whatItDoes: "Upload existing Excel files and turn them into structured records.",
+    whenToUse: "Use this when you have new spreadsheets to ingest or legacy registers to migrate.",
+    howToUse: [
+      "Choose an Excel file from your computer.",
+      "Review the detected headings and sections in the Sandbox.",
+      "Click 'Merge to Registry' to finalize the import."
+    ],
+    tips: [
+      "The system detects document hierarchy (sections/subsections) automatically.",
+      "Imports are isolated in the Sandbox so you can review them safely."
+    ]
   },
   {
     id: 'sync',
-    title: 'Offline & Cloud Sync',
-    description: 'Working without internet connectivity.',
+    title: 'Pending Sync',
     icon: Cloud,
-    content: "Assetain is Offline-First. Every change you make is saved locally to your device immediately. When you're back online, the 'Pending Sync' queue automatically replays these changes to the cloud. You can also trigger a manual 'Pulse Reconciliation' from the sidebar."
+    whatItDoes: "Manage changes that are waiting to be sent to the cloud database.",
+    whenToUse: "Check this when you have been working offline or want to see the status of your background updates.",
+    howToUse: [
+      "View the list of pending modifications in the sidebar.",
+      "The system syncs automatically when your connection returns.",
+      "You can manually retry failed sync pulses if needed."
+    ],
+    tips: [
+      "A green cloud indicator means you are connected and up-to-date.",
+      "Zero data loss is guaranteed by our local encryption engine."
+    ]
   },
   {
     id: 'review',
     title: 'Records to Review',
-    description: 'Checking physical matches in the field.',
     icon: ShieldCheck,
-    content: "Field auditors use the 'Records to Review' screen to perform physical audits. Each card has quick assessment triggers. Once verified, records move out of the queue. Discrepancies are flagged for management review."
+    whatItDoes: "Check that records match real-world assets during physical field audits.",
+    whenToUse: "Use this screen when conducting on-site inspections or equipment health checks.",
+    howToUse: [
+      "Scan the tag ID of the physical asset.",
+      "Compare the real item to the record on your screen.",
+      "Use the quick-action triggers to mark as 'Verified' or 'Discrepancy'."
+    ],
+    tips: [
+      "One-tap verification is optimized for auditors on the move.",
+      "Discrepancies are flagged for immediate management review."
+    ]
+  },
+  {
+    id: 'filters',
+    title: 'Filtering Records',
+    icon: Filter,
+    whatItDoes: "Show only the records you need by narrowing the list.",
+    whenToUse: "Use filters when the list is too long or you want to focus on a specific location or condition.",
+    howToUse: [
+      "Open the Logic Engine panel.",
+      "Choose one or more fields (like State or Condition).",
+      "Apply the filter to update the view.",
+      "Clear individual chips or 'Purge' to see all records again."
+    ],
+    tips: [
+      "You can combine multiple filters for precision queries.",
+      "Filter by source sheet color to separate different project batches."
+    ]
   }
 ];
 
@@ -74,7 +132,7 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
 
   const filteredTopics = TOPICS.filter(t => 
     t.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    t.content.toLowerCase().includes(searchTerm.toLowerCase())
+    t.whatItDoes.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   return (
@@ -109,20 +167,56 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
         <ScrollArea className="flex-1 bg-background">
           <div className="p-8 space-y-6">
             {selectedTopic ? (
-              <div className="space-y-6 animate-in fade-in slide-in-from-right-4 duration-300">
-                <Button variant="ghost" onClick={() => setSelectedTopic(null)} className="p-0 h-auto font-black uppercase text-[10px] text-primary hover:bg-transparent">
-                  <ChevronRight className="h-3 w-3 rotate-180 mr-2" /> Back to Topics
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                <Button variant="ghost" onClick={() => setSelectedTopic(null)} className="p-0 h-auto font-black uppercase text-[10px] text-primary hover:bg-transparent transition-all hover:translate-x-[-4px]">
+                  <ChevronRight className="h-3 w-3 rotate-180 mr-2" /> Back to Support Topics
                 </Button>
-                <div className="space-y-4">
+                
+                <div className="space-y-6">
                   <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-2xl">
-                      <selectedTopic.icon className="h-6 w-6 text-primary" />
+                    <div className="p-4 bg-primary/10 rounded-2xl shadow-inner">
+                      <selectedTopic.icon className="h-8 w-8 text-primary" />
                     </div>
-                    <h3 className="text-xl font-black uppercase tracking-tight">{selectedTopic.title}</h3>
+                    <h3 className="text-2xl font-black uppercase tracking-tight leading-none">{selectedTopic.title}</h3>
                   </div>
-                  <p className="text-sm font-medium text-muted-foreground leading-relaxed whitespace-pre-wrap">
-                    {selectedTopic.content}
-                  </p>
+
+                  <div className="space-y-6">
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">What this does</h4>
+                      <p className="text-sm font-medium text-foreground leading-relaxed italic">{selectedTopic.whatItDoes}</p>
+                    </div>
+
+                    <div className="space-y-2">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">When to use it</h4>
+                      <p className="text-sm font-medium text-muted-foreground leading-relaxed">{selectedTopic.whenToUse}</p>
+                    </div>
+
+                    <div className="space-y-3">
+                      <h4 className="text-[10px] font-black uppercase tracking-widest text-primary">How to use it</h4>
+                      <div className="space-y-2">
+                        {selectedTopic.howToUse.map((step, i) => (
+                          <div key={i} className="flex gap-3 text-sm font-medium p-3 rounded-xl bg-muted/30 border border-transparent">
+                            <span className="text-primary font-black opacity-40">{i+1}</span>
+                            <span className="leading-tight">{step}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {selectedTopic.tips.length > 0 && (
+                      <div className="p-5 rounded-[1.5rem] bg-orange-500/5 border-2 border-dashed border-orange-500/20 space-y-2">
+                        <div className="flex items-center gap-2">
+                          <AlertCircle className="h-3.5 w-3.5 text-orange-600" />
+                          <h4 className="text-[10px] font-black uppercase tracking-widest text-orange-600">Pro Tips</h4>
+                        </div>
+                        <ul className="space-y-1.5">
+                          {selectedTopic.tips.map((tip, i) => (
+                            <li key={i} className="text-[11px] font-bold text-muted-foreground leading-relaxed">- {tip}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             ) : (
@@ -131,15 +225,15 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
                   <button 
                     key={topic.id}
                     onClick={() => setSelectedTopic(topic)}
-                    className="w-full text-left p-5 rounded-3xl border-2 border-border/40 hover:border-primary/20 bg-card transition-all group flex items-center justify-between"
+                    className="w-full text-left p-5 rounded-3xl border-2 border-border/40 hover:border-primary/20 bg-card transition-all group flex items-center justify-between shadow-sm active:scale-95"
                   >
                     <div className="flex items-center gap-4">
-                      <div className="p-3 bg-muted rounded-2xl group-hover:bg-primary/10 transition-colors">
+                      <div className="p-3 bg-muted rounded-2xl group-hover:bg-primary/10 transition-colors shadow-inner">
                         <topic.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
                       </div>
                       <div className="flex flex-col">
                         <span className="text-sm font-black uppercase tracking-tight">{topic.title}</span>
-                        <span className="text-[10px] font-bold text-muted-foreground opacity-60 uppercase">{topic.description}</span>
+                        <span className="text-[9px] font-bold text-muted-foreground opacity-60 uppercase tracking-tight line-clamp-1">{topic.whatItDoes}</span>
                       </div>
                     </div>
                     <ChevronRight className="h-4 w-4 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
@@ -152,7 +246,7 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
 
         <div className="p-8 border-t bg-muted/10 text-center">
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40">
-            Professional Registry Intelligence v5.0.2
+            Registry Intelligence Pulse v5.0.2
           </p>
         </div>
       </SheetContent>
