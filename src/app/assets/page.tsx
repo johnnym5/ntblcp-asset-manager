@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Registry Workspace - Header-Aware High-Performance Browser.
- * Phase 21: Integrated advanced filtering, multi-sort, and detail sheet orchestration.
+ * Phase 22: Integrated density modes, strict canonical headers, and register layouts.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -20,9 +19,6 @@ import {
   Boxes, 
   Loader2, 
   FileDown, 
-  FileUp, 
-  LayoutGrid, 
-  List, 
   Database,
   DatabaseZap,
   X,
@@ -30,7 +26,10 @@ import {
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  FilterX
+  FilterX,
+  LayoutGrid,
+  List,
+  CheckCircle2
 } from 'lucide-react';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
@@ -41,10 +40,11 @@ import { AssetForm } from '@/components/asset-form';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
-import type { RegistryHeader, AssetRecord, HeaderFilter } from '@/types/registry';
+import type { RegistryHeader, AssetRecord, HeaderFilter, DensityMode } from '@/types/registry';
 import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord } from '@/lib/registry-utils';
 import { Badge } from '@/components/ui/badge';
 import { ExcelService } from '@/services/excel-service';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 
 const ITEMS_PER_PAGE = 24;
 
@@ -67,6 +67,7 @@ export default function AssetRegistryPage() {
   const [headers, setHeaders] = useState<RegistryHeader[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
+  const [densityMode, setDensityMode] = useState<DensityMode>("expanded");
   
   // --- Drawers ---
   const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
@@ -108,9 +109,9 @@ export default function AssetRegistryPage() {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       results = results.filter(r => 
-        r.rawRow.description?.toLowerCase().includes(term) || 
-        r.rawRow.serialNumber?.toLowerCase().includes(term) ||
-        r.rawRow.assetIdCode?.toLowerCase().includes(term)
+        String(r.rawRow.description || '').toLowerCase().includes(term) || 
+        String(r.rawRow.serialNumber || '').toLowerCase().includes(term) ||
+        String(r.rawRow.assetIdCode || '').toLowerCase().includes(term)
       );
     }
 
@@ -189,16 +190,16 @@ export default function AssetRegistryPage() {
   return (
     <AppLayout>
       <div className="flex flex-col h-full gap-6 relative pb-32">
-        {/* Header Pulse */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 gap-4">
+        {/* Header Pulse: Grant Info & Source Switcher */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between px-2 gap-6">
           <div className="space-y-1">
-            <h2 className="text-3xl font-black tracking-tighter text-foreground uppercase leading-none">{activeProjectName}</h2>
+            <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase leading-none">{activeProjectName}</h2>
             <div className="flex items-center gap-3">
               <Badge variant="outline" className={cn(
                 "h-6 px-3 text-[9px] font-black tracking-widest rounded-full border-2",
                 dataSource === 'SANDBOX' ? "border-orange-500/20 bg-orange-50 text-orange-600" : "border-primary/20 bg-primary/5 text-primary shadow-sm"
               )}>
-                {processedRecords.length} RECORDS IN PULSE
+                {processedRecords.length} PULSES IN SCOPE
               </Badge>
               {dataSource === 'SANDBOX' && (
                 <Badge className="h-6 px-3 text-[9px] font-black tracking-widest bg-orange-500 text-white rounded-full shadow-lg shadow-orange-500/20">
@@ -208,13 +209,13 @@ export default function AssetRegistryPage() {
             </div>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center bg-muted/50 p-1.5 rounded-2xl border-2 border-border/40 shadow-inner">
               <Button 
                 variant={dataSource === 'PRODUCTION' ? 'secondary' : 'ghost'} 
                 size="sm" 
                 onClick={() => setDataSource('PRODUCTION')}
-                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2"
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 transition-all"
               >
                 <Database className="h-3.5 w-3.5" /> Production
               </Button>
@@ -222,24 +223,35 @@ export default function AssetRegistryPage() {
                 variant={dataSource === 'SANDBOX' ? 'secondary' : 'ghost'} 
                 size="sm" 
                 onClick={() => setDataSource('SANDBOX')}
-                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2"
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 transition-all"
               >
                 <DatabaseZap className="h-3.5 w-3.5" /> Sandbox
               </Button>
             </div>
+
+            <Tabs value={densityMode} onValueChange={(v) => setDensityMode(v as DensityMode)} className="bg-muted/50 p-1 rounded-2xl border-2">
+              <TabsList className="bg-transparent border-none p-0 h-9 gap-1">
+                <TabsTrigger value="compact" className="h-7 px-3 rounded-xl text-[9px] font-black uppercase data-[state=active]:bg-primary data-[state=active]:text-white">
+                  <List className="h-3 w-3 mr-1.5" /> Compact
+                </TabsTrigger>
+                <TabsTrigger value="expanded" className="h-7 px-3 rounded-xl text-[9px] font-black uppercase data-[state=active]:bg-primary data-[state=active]:text-white">
+                  <LayoutGrid className="h-3 w-3 mr-1.5" /> Expanded
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
             
             <Button 
               variant="outline" 
               size="icon" 
               onClick={() => setIsHeaderManagerOpen(true)}
-              className="h-12 w-12 rounded-2xl border-2 border-primary/10 shadow-sm tactile-pulse"
+              className="h-12 w-12 rounded-2xl border-2 border-primary/10 shadow-sm tactile-pulse bg-card"
             >
               <Columns className="h-5 w-5 text-primary" />
             </Button>
           </div>
         </div>
 
-        {/* Toolbar Pulse */}
+        {/* Toolbar Pulse: Global Search & Logic Triggers */}
         <div className="flex flex-col gap-4 px-2">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1 group">
@@ -258,7 +270,7 @@ export default function AssetRegistryPage() {
                 className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-lg hover:bg-primary/5 transition-all relative"
               >
                 <Filter className="h-4 w-4" /> 
-                Advanced Filter
+                Logic Engine
                 {filters.length > 0 && <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-white text-[10px] rounded-full flex items-center justify-center border-4 border-background animate-in zoom-in">{filters.length}</span>}
               </Button>
               <Button 
@@ -266,12 +278,12 @@ export default function AssetRegistryPage() {
                 onClick={() => setIsSortOpen(true)}
                 className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-lg hover:bg-primary/5 transition-all"
               >
-                <ArrowUpDown className="h-4 w-4" /> Sort Registry
+                <ArrowUpDown className="h-4 w-4" /> Sort Register
               </Button>
             </div>
           </div>
 
-          {/* Filter Chips Pulse */}
+          {/* Logic Chip Bar */}
           <AnimatePresence>
             {filters.length > 0 && (
               <motion.div 
@@ -280,13 +292,13 @@ export default function AssetRegistryPage() {
                 exit={{ opacity: 0, y: -10 }}
                 className="flex flex-wrap gap-2 items-center px-2"
               >
-                <div className="p-2 bg-primary/10 rounded-lg mr-2">
-                  <FilterX className="h-3 w-3 text-primary" onClick={() => setFilters([])} />
+                <div className="p-2 bg-primary/10 rounded-lg mr-2 cursor-pointer hover:bg-primary/20 transition-colors" onClick={() => setFilters([])}>
+                  <FilterX className="h-3 w-3 text-primary" />
                 </div>
                 {filters.map((f, i) => {
                   const h = headers.find(header => header.id === f.headerId);
                   return (
-                    <Badge key={`chip-${i}`} variant="secondary" className="h-8 pl-3 pr-1 rounded-xl bg-card border-2 border-border/40 font-bold text-[9px] uppercase tracking-tighter gap-2">
+                    <Badge key={`chip-${i}`} variant="secondary" className="h-8 pl-3 pr-1 rounded-xl bg-card border-2 border-border/40 font-bold text-[9px] uppercase tracking-tighter gap-2 shadow-sm">
                       <span className="opacity-40">{h?.displayName}:</span> {String(f.value || f.operator)}
                       <button onClick={() => setFilters(filters.filter((_, idx) => idx !== i))} className="p-1 hover:bg-muted rounded-lg transition-colors"><X className="h-3 w-3" /></button>
                     </Badge>
@@ -297,10 +309,13 @@ export default function AssetRegistryPage() {
           </AnimatePresence>
         </div>
 
-        {/* Registry Surface */}
+        {/* Register Surface: Multi-Density Card Grid */}
         <div className="flex-1 px-2">
           {paginatedRecords.length > 0 ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+            <div className={cn(
+              "grid gap-6",
+              densityMode === 'compact' ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 xxl:grid-cols-6" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+            )}>
               <AnimatePresence mode="popLayout">
                 {paginatedRecords.map((record) => (
                   <motion.div
@@ -313,21 +328,22 @@ export default function AssetRegistryPage() {
                     <RegistryCard 
                       record={record}
                       onInspect={handleInspect}
+                      densityMode={densityMode}
                     />
                   </motion.div>
                 ))}
               </AnimatePresence>
             </div>
           ) : (
-            <div className="h-96 flex flex-col items-center justify-center text-center p-10 opacity-20 border-4 border-dashed rounded-[3rem]">
+            <div className="h-[400px] flex flex-col items-center justify-center text-center p-10 opacity-20 border-4 border-dashed rounded-[3rem]">
               <Boxes className="h-24 w-24 mb-6" />
-              <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Registry Pulse Silent</h3>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] mt-2">Zero records detected matching current logic pulse.</p>
+              <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Register Silent</h3>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] mt-2">Zero records detected in current logic pulse.</p>
             </div>
           )}
         </div>
 
-        {/* Bottom Pagination Pulse */}
+        {/* Operational Pulse Bar: Navigation & Major Actions */}
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-2xl px-6 py-3 rounded-[2.5rem] border-2 border-primary/10 shadow-2xl flex items-center gap-6 ring-1 ring-white/10">
           <div className="flex items-center gap-2">
             <Button 
@@ -355,7 +371,7 @@ export default function AssetRegistryPage() {
           <div className="h-6 w-px bg-border/40" />
           <div className="flex items-center gap-2">
             <Button 
-              className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 tactile-pulse"
+              className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 tactile-pulse text-white"
               onClick={() => { setSelectedAssetForForm(undefined); setIsFormOpen(true); }}
             >
               <Plus className="mr-2 h-4 w-4" /> New Pulse
@@ -364,7 +380,7 @@ export default function AssetRegistryPage() {
               variant="ghost" 
               size="icon" 
               onClick={() => ExcelService.exportRegistry(currentRegistry)}
-              className="h-12 w-12 rounded-2xl tactile-pulse opacity-60 hover:opacity-100"
+              className="h-12 w-12 rounded-2xl tactile-pulse opacity-60 hover:opacity-100 transition-all"
             >
               <FileDown className="h-5 w-5" />
             </Button>
@@ -372,6 +388,7 @@ export default function AssetRegistryPage() {
         </div>
       </div>
 
+      {/* Orchestration Drawers */}
       <HeaderManagerDrawer 
         isOpen={isHeaderManagerOpen}
         onOpenChange={setIsHeaderManagerOpen}

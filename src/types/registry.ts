@@ -77,6 +77,8 @@ export interface HeaderFilter {
   endDate?: string;
 }
 
+export type DensityMode = "compact" | "expanded";
+
 export interface RegistryFilterState {
   searchQuery: string;
   filters: HeaderFilter[];
@@ -84,7 +86,7 @@ export interface RegistryFilterState {
   sortDirection?: "asc" | "desc";
   selectedAssetIds: string[];
   visibleHeaderIds: string[];
-  densityMode?: "compact" | "comfortable" | "expanded";
+  densityMode: DensityMode;
   viewMode?: "cards" | "rows";
 }
 
