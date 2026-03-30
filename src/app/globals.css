@@ -5,24 +5,24 @@
 @layer base {
   :root {
     /* Material You - Forward Mode (Light) */
-    /* Primary: Dynamic Blue/Purple Tint */
-    --background: 260 14% 98%;
-    --foreground: 260 10% 10%;
+    /* Primary: Sophisticated Gold Tint */
+    --background: 45 20% 98%;
+    --foreground: 45 10% 10%;
     
     --card: 0 0% 100%;
-    --card-foreground: 260 10% 10%;
+    --card-foreground: 45 10% 10%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 260 10% 10%;
+    --popover-foreground: 45 10% 10%;
     
-    --primary: 262 52% 47%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 45 90% 45%;
+    --primary-foreground: 45 50% 10%;
     
-    --secondary: 260 12% 92%;
-    --secondary-foreground: 262 52% 20%;
+    --secondary: 45 15% 92%;
+    --secondary-foreground: 45 90% 20%;
     
-    --muted: 260 12% 95%;
-    --muted-foreground: 260 5% 45%;
+    --muted: 45 12% 95%;
+    --muted-foreground: 45 5% 45%;
     
     --accent: 180 100% 25%;
     --accent-foreground: 210 40% 98%;
@@ -30,9 +30,9 @@
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     
-    --border: 260 10% 90%;
-    --input: 260 10% 90%;
-    --ring: 262 52% 47%;
+    --border: 45 10% 90%;
+    --input: 45 10% 90%;
+    --ring: 45 90% 45%;
     
     /* Material 3 uses larger radii */
     --radius: 1.5rem;
@@ -40,32 +40,32 @@
   .dark {
     /* Material You - AMOLED Night Mode */
     --background: 0 0% 0%; /* Pure Black for AMOLED */
-    --foreground: 260 10% 95%;
+    --foreground: 45 10% 95%;
     
-    --card: 260 10% 5%;
-    --card-foreground: 260 10% 95%;
+    --card: 45 10% 5%;
+    --card-foreground: 45 10% 95%;
     
-    --popover: 260 10% 3%;
-    --popover-foreground: 260 10% 95%;
+    --popover: 45 10% 3%;
+    --popover-foreground: 45 10% 95%;
     
-    --primary: 262 60% 70%;
-    --primary-foreground: 262 52% 10%;
+    --primary: 45 80% 60%;
+    --primary-foreground: 45 50% 10%;
     
-    --secondary: 260 10% 12%;
-    --secondary-foreground: 260 10% 95%;
+    --secondary: 45 10% 12%;
+    --secondary-foreground: 45 10% 95%;
     
-    --muted: 260 10% 10%;
-    --muted-foreground: 260 5% 65%;
+    --muted: 45 10% 10%;
+    --muted-foreground: 45 5% 65%;
     
     --accent: 180 80% 45%;
-    --accent-foreground: 260 10% 10%;
+    --accent-foreground: 45 10% 10%;
     
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     
-    --border: 260 10% 15%;
-    --input: 260 10% 15%;
-    --ring: 262 60% 70%;
+    --border: 45 10% 15%;
+    --input: 45 10% 15%;
+    --ring: 45 80% 60%;
   }
 }
 
@@ -104,8 +104,7 @@
 }
 
 /* Material You Elevation Surfaces */
-/* Use arbitrary values for non-standard Tailwind opacity steps */
-.surface-1 { @apply bg-primary/5; }
+.surface-1 { @apply bg-primary/[0.05]; }
 .surface-2 { @apply bg-primary/[0.08]; }
 .surface-3 { @apply bg-primary/[0.11]; }
 .surface-4 { @apply bg-primary/[0.12]; }
