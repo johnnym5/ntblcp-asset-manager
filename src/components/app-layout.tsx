@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
  * Refined for Phase 15 with role-based navigation and security pulse indicators.
+ * UX Refinement: Renamed labels for better user guidance.
  */
 
 import React, { useState } from 'react';
@@ -30,7 +31,8 @@ import {
   Activity,
   Zap,
   Database,
-  Globe
+  Globe,
+  HelpCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -40,7 +42,8 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { InboxSheet } from './inbox-sheet';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { HelpCenter } from './HelpCenter';
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Separator } from './ui/separator';
 
 interface NavItem {
@@ -53,19 +56,19 @@ interface NavItem {
 const PRIMARY_NAV: NavItem[] = [
   { label: 'Dashboard', href: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'Asset Registry', href: '/assets', icon: <Boxes className="h-4 w-4" /> },
-  { label: 'Verification Queue', href: '/verify', icon: <CheckCircle2 className="h-4 w-4" /> },
-  { label: 'Import Engine', href: '/import', icon: <FileUp className="h-4 w-4" /> },
+  { label: 'Records to Review', href: '/verify', icon: <CheckCircle2 className="h-4 w-4" /> },
+  { label: 'Upload Center', href: '/import', icon: <FileUp className="h-4 w-4" /> },
 ];
 
 const AUDIT_NAV: NavItem[] = [
   { label: 'Audit Reports', href: '/reports', icon: <FileText className="h-4 w-4" /> },
-  { label: 'Activity Log', href: '/audit-log', icon: <History className="h-4 w-4" /> },
-  { label: 'Offline Queue', href: '/sync-queue', icon: <ListTodo className="h-4 w-4" /> },
+  { label: 'Activity History', href: '/audit-log', icon: <History className="h-4 w-4" /> },
+  { label: 'Pending Sync', href: '/sync-queue', icon: <ListTodo className="h-4 w-4" /> },
 ];
 
 const ADMIN_NAV: NavItem[] = [
   { label: 'Users & Roles', href: '/users', icon: <Users className="h-4 w-4" />, adminOnly: true },
-  { label: 'Infrastructure', href: '/infrastructure', icon: <Monitor className="h-4 w-4" />, adminOnly: true },
+  { label: 'System Health', href: '/infrastructure', icon: <Monitor className="h-4 w-4" />, adminOnly: true },
   { label: 'Settings', href: '/settings', icon: <Settings className="h-4 w-4" />, adminOnly: true },
 ];
 
@@ -76,6 +79,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
 
   const isAdmin = userProfile?.isAdmin;
   const pendingCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
@@ -158,6 +162,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="mt-auto space-y-4 pt-6 border-t border-border/40">
+          <Button 
+            variant="ghost" 
+            onClick={() => setIsHelpOpen(true)}
+            className="w-full justify-start font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all group"
+          >
+            <HelpCircle className="mr-3 h-4 w-4 group-hover:scale-110 transition-transform" /> Support Hub
+          </Button>
           <div className="p-4 rounded-2xl bg-muted/20 border-2 border-dashed space-y-3">
             <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest opacity-40">
               <span>Security Pulse</span>
@@ -288,6 +299,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {isAdmin && (
         <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
       )}
+
+      <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
     </div>
   );
 }

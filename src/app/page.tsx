@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
  * Refined for Phase 25 with Unified Verification Pulse component.
+ * Added Welcome Experience integration.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -25,11 +25,14 @@ import {
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import UserProfileSetup from '@/components/user-profile-setup';
+import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArchiveService } from '@/lib/archive-service';
 import { VerificationPulse } from '@/components/registry/VerificationPulse';
+import { FirestoreService } from '@/services/firebase/firestore';
+import { storage } from '@/offline/storage';
 
 const container = {
   hidden: { opacity: 0 },
@@ -45,11 +48,12 @@ const item = {
 };
 
 export default function DashboardPage() {
-  const { assets, settingsLoaded, isOnline, appSettings, activeGrantId } = useAppState();
+  const { assets, settingsLoaded, isOnline, appSettings, activeGrantId, refreshRegistry } = useAppState();
   const { profileSetupComplete, loading: authLoading } = useAuth();
   
   const [integrityScore, setIntegrityScore] = useState(100);
   const [integrityConflicts, setIntegrityConflicts] = useState(0);
+  const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     if (assets.length > 0) {
@@ -59,6 +63,24 @@ export default function DashboardPage() {
       });
     }
   }, [assets]);
+
+  useEffect(() => {
+    if (settingsLoaded && appSettings && !appSettings.onboardingComplete) {
+      setShowWelcome(true);
+    }
+  }, [settingsLoaded, appSettings]);
+
+  const handleWelcomeComplete = async () => {
+    setShowWelcome(false);
+    if (appSettings) {
+      const updated = { ...appSettings, onboardingComplete: true };
+      await storage.saveSettings(updated);
+      if (isOnline) {
+        await FirestoreService.updateSettings(updated);
+      }
+      await refreshRegistry();
+    }
+  };
 
   const stats = useMemo(() => {
     if (!settingsLoaded || !assets) return null;
@@ -138,11 +160,16 @@ export default function DashboardPage() {
               </Badge>
             </div>
           </div>
-          <Button variant="ghost" className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] group hover:bg-primary/5 border-2 border-transparent hover:border-primary/10 transition-all" asChild>
-            <Link href="/assets">
-              Explore Registry <ArrowRight className="ml-3 h-4 w-4 transition-transform group-hover:translate-x-2" />
-            </Link>
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2" onClick={() => setShowWelcome(true)}>
+              App Guide
+            </Button>
+            <Button variant="ghost" className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] group hover:bg-primary/5 border-2 border-transparent hover:border-primary/10 transition-all" asChild>
+              <Link href="/assets">
+                Explore Registry <ArrowRight className="ml-3 h-4 w-4 transition-transform group-hover:translate-x-2" />
+              </Link>
+            </Button>
+          </div>
         </div>
 
         {/* Primary Verification Pulse */}
@@ -259,6 +286,11 @@ export default function DashboardPage() {
           </div>
         </div>
       </motion.div>
+
+      <WelcomeExperience 
+        isOpen={showWelcome} 
+        onComplete={handleWelcomeComplete} 
+      />
     </AppLayout>
   );
 }

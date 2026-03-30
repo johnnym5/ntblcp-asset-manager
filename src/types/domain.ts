@@ -6,6 +6,7 @@
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VIEWER';
 export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
 export type DataSource = 'PRODUCTION' | 'SANDBOX';
+export type UXMode = 'beginner' | 'advanced';
 
 export interface SectionHierarchy {
   document: string;
@@ -80,6 +81,11 @@ export interface AppSettings {
   activeGrantId: string | null;
   grants: Grant[];
   sourceBranding?: Record<string, string>; // Maps sheetName to HSL/Hex color
+  
+  // UX Preferences
+  uxMode: UXMode;
+  onboardingComplete: boolean;
+  showHelpTooltips: boolean;
 }
 
 export interface Grant {
