@@ -4,7 +4,6 @@
  */
 
 import { HEADER_DEFINITIONS } from '@/lib/constants';
-import type { SheetDefinition } from '@/lib/types';
 
 export function detectSchema(row: any[]): string | null {
   const normalizedRow = row.map(c => String(c || '').trim().toUpperCase());

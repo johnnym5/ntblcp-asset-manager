@@ -18,6 +18,7 @@ export function normalizeRow(
     metadata: {},
     status: 'UNVERIFIED',
     condition: 'Unassessed',
+    lastModified: new Date().toISOString(),
   };
 
   headerRow.forEach((rawHeader, index) => {

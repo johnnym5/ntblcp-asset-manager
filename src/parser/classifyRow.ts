@@ -31,7 +31,8 @@ export function classifyRow(row: any[], definitiveHeaders: string[]): { type: Ro
   const normalizedRow = row.map(c => String(c || '').trim().toUpperCase());
   const normalizedDefinitive = definitiveHeaders.map(h => h.toUpperCase());
   const matches = normalizedRow.filter(h => normalizedDefinitive.includes(h)).length;
-  if (matches / definitiveHeaders.length >= 0.7) {
+  
+  if (definitiveHeaders.length > 0 && matches / definitiveHeaders.length >= 0.7) {
     return { type: 'SCHEMA_HEADER' };
   }
 
