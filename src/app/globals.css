@@ -4,49 +4,68 @@
 
 @layer base {
   :root {
-    /* Navy Blue (#2E3192) - Stability and Trust */
-    --background: 210 31% 96%;
-    --foreground: 222 47% 11%;
+    /* Material You - Forward Mode (Light) */
+    /* Primary: Dynamic Blue/Purple Tint */
+    --background: 260 14% 98%;
+    --foreground: 260 10% 10%;
+    
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
+    --card-foreground: 260 10% 10%;
+    
     --popover: 0 0% 100%;
-    --popover-foreground: 222 47% 11%;
-    --primary: 238 52% 38%;
+    --popover-foreground: 260 10% 10%;
+    
+    --primary: 262 52% 47%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
-    /* Teal (#008080) - Attention and Action */
+    
+    --secondary: 260 12% 92%;
+    --secondary-foreground: 262 52% 20%;
+    
+    --muted: 260 12% 95%;
+    --muted-foreground: 260 5% 45%;
+    
     --accent: 180 100% 25%;
     --accent-foreground: 210 40% 98%;
+    
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 238 52% 38%;
-    --radius: 1.25rem;
+    
+    --border: 260 10% 90%;
+    --input: 260 10% 90%;
+    --ring: 262 52% 47%;
+    
+    /* Material 3 uses larger radii */
+    --radius: 1.5rem;
   }
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 180 100% 25%;
-    --accent-foreground: 210 40% 98%;
+    /* Material You - AMOLED Night Mode */
+    --background: 0 0% 0%; /* Pure Black for AMOLED */
+    --foreground: 260 10% 95%;
+    
+    --card: 260 10% 5%;
+    --card-foreground: 260 10% 95%;
+    
+    --popover: 260 10% 3%;
+    --popover-foreground: 260 10% 95%;
+    
+    --primary: 262 60% 70%;
+    --primary-foreground: 262 52% 10%;
+    
+    --secondary: 260 10% 12%;
+    --secondary-foreground: 260 10% 95%;
+    
+    --muted: 260 10% 10%;
+    --muted-foreground: 260 5% 65%;
+    
+    --accent: 180 80% 45%;
+    --accent-foreground: 260 10% 10%;
+    
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    
+    --border: 260 10% 15%;
+    --input: 260 10% 15%;
+    --ring: 262 60% 70%;
   }
 }
 
@@ -81,5 +100,13 @@
 }
 
 .glass-card {
-  @apply bg-card/60 backdrop-blur-xl border-2 border-white/10;
+  @apply bg-card/60 backdrop-blur-2xl border-2 border-white/5;
 }
+
+/* Material You Elevation Surfaces */
+/* Use arbitrary values for non-standard Tailwind opacity steps */
+.surface-1 { @apply bg-primary/5; }
+.surface-2 { @apply bg-primary/[0.08]; }
+.surface-3 { @apply bg-primary/[0.11]; }
+.surface-4 { @apply bg-primary/[0.12]; }
+.surface-5 { @apply bg-primary/[0.14]; }
