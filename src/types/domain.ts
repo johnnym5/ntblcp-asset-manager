@@ -53,6 +53,20 @@ export interface Asset {
   // System Fields
   lastModified: string; // ISO 8601
   lastModifiedBy: string;
+  lastModifiedByState?: string;
+
+  // Governance & Approval Workflow
+  approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
+  pendingChanges?: Partial<Asset>;
+  adminComment?: string;
+  changeSubmittedBy?: {
+    displayName: string;
+    loginName: string;
+    state: string;
+  };
+
+  // Restoration Buffer
+  previousState?: Partial<Asset>;
 }
 
 export interface AppSettings {
@@ -78,11 +92,11 @@ export interface AuthorizedUser {
   password?: string;
   states: string[];
   role: UserRole;
-  isAdmin: boolean; // Shim for legacy compatibility
+  isAdmin: boolean; 
   isGuest?: boolean;
 }
 
-export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE';
+export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE';
 export type QueueStatus = 'PENDING' | 'PROCESSING' | 'FAILED';
 
 export interface OfflineQueueEntry {

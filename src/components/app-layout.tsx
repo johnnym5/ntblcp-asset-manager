@@ -1,10 +1,10 @@
 'use client';
 
 /**
- * @fileOverview AppLayout - The Main Navigation Shell.
+ * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { 
@@ -18,7 +18,10 @@ import {
   LogOut,
   Bell,
   Menu,
-  X
+  Monitor,
+  Inbox,
+  History,
+  ShieldCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -27,6 +30,9 @@ import { useAppState } from '@/contexts/app-state-context';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { DatabaseAdminDialog } from './admin/database-admin-dialog';
+import { ActivityLogDialog } from './admin/activity-log-sheet';
+import { InboxSheet } from './inbox-sheet';
 
 interface NavItem {
   label: string;
@@ -45,8 +51,15 @@ const NAV_ITEMS: NavItem[] = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { userProfile, logout } = useAuth();
-  const { isOnline, setIsOnline, isSyncing } = useAppState();
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = React.useState(false);
+  const { isOnline, setIsOnline, isSyncing, assets } = useAppState();
+  
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAdminDBOpen, setIsAdminDBOpen] = useState(false);
+  const [isAuditLogOpen, setIsAuditLogOpen] = useState(false);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
+
+  const isAdmin = userProfile?.isAdmin;
+  const pendingCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
 
   const NavLinks = ({ className, onClick }: { className?: string, onClick?: () => void }) => (
     <nav className={cn("space-y-1", className)}>
@@ -74,7 +87,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       <aside className="hidden lg:flex flex-col w-72 border-r bg-card/50 backdrop-blur-xl p-6">
         <div className="flex items-center gap-3 mb-10 px-2">
           <div className="p-2 bg-primary rounded-xl shadow-lg">
-            <Boxes className="h-6 w-6 text-primary-foreground" />
+            <ShieldCheck className="h-6 w-6 text-primary-foreground" />
           </div>
           <div className="flex flex-col">
             <span className="text-xl font-black tracking-tighter">Assetain</span>
@@ -83,6 +96,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <NavLinks className="flex-1" />
+
+        {isAdmin && (
+          <div className="mb-6 space-y-1">
+            <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50">Governance</p>
+            <Button variant="ghost" onClick={() => setIsInboxOpen(true)} className="w-full justify-between px-4 font-black uppercase text-[10px] tracking-widest rounded-xl">
+              <span className="flex items-center gap-3"><Inbox className="h-4 w-4" /> Approval Queue</span>
+              {pendingCount > 0 && <Badge className="bg-primary text-[8px] h-4 min-w-4 flex items-center justify-center p-0">{pendingCount}</Badge>}
+            </Button>
+            <Button variant="ghost" onClick={() => setIsAuditLogOpen(true)} className="w-full justify-start gap-3 px-4 font-black uppercase text-[10px] tracking-widest rounded-xl">
+              <History className="h-4 w-4" /> Audit Trail
+            </Button>
+            <Button variant="ghost" onClick={() => setIsAdminDBOpen(true)} className="w-full justify-start gap-3 px-4 font-black uppercase text-[10px] tracking-widest rounded-xl">
+              <Monitor className="h-4 w-4" /> DB Workstation
+            </Button>
+          </div>
+        )}
 
         <div className="mt-auto space-y-4 pt-6 border-t border-border/40">
           <div className="flex items-center gap-3 px-2">
@@ -109,7 +138,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </SheetTrigger>
               <SheetContent side="left" className="w-72 p-6">
                 <div className="flex items-center gap-3 mb-10">
-                  <Boxes className="h-6 w-6 text-primary" />
+                  <ShieldCheck className="h-6 w-6 text-primary" />
                   <span className="text-xl font-black">Assetain</span>
                 </div>
                 <NavLinks onClick={() => setIsMobileMenuOpen(false)} />
@@ -149,6 +178,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
       </div>
+
+      {isAdmin && (
+        <>
+          <DatabaseAdminDialog isOpen={isAdminDBOpen} onOpenChange={setIsAdminDBOpen} />
+          <ActivityLogDialog isOpen={isAuditLogOpen} onOpenChange={setIsAuditLogOpen} onRevert={async () => {}} />
+          <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
+        </>
+      )}
     </div>
   );
 }
