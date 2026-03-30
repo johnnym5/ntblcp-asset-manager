@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
- * Phase 35: Standardized Keyboard Pulse Discovery (?).
+ * Phase 36: Hardened Super Admin Database Command trigger.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -34,7 +34,8 @@ import {
   HelpCircle,
   X,
   Search,
-  Command
+  Command,
+  Terminal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,7 @@ interface NavItem {
   href: string;
   icon: React.ReactNode;
   adminOnly?: boolean;
+  superAdminOnly?: boolean;
   shortcut?: string;
 }
 
@@ -74,6 +76,7 @@ const AUDIT_NAV: NavItem[] = [
 const ADMIN_NAV: NavItem[] = [
   { label: 'Identities', href: '/users', icon: <Users className="h-4 w-4" />, adminOnly: true },
   { label: 'System', href: '/infrastructure', icon: <Monitor className="h-4 w-4" />, adminOnly: true },
+  { label: 'Database', href: '/admin/database', icon: <Terminal className="h-4 w-4" />, superAdminOnly: true },
   { label: 'Settings', href: '/settings', icon: <Settings className="h-4 w-4" />, adminOnly: true, shortcut: ',' },
 ];
 
@@ -113,11 +116,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   }, [router, refreshRegistry, toast]);
 
   const isAdmin = userProfile?.isAdmin;
+  const isSuperAdmin = userProfile?.isSuperAdmin || userProfile?.isAdmin; // Fallback for transition
   const pendingCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
   const isAdvanced = appSettings?.uxMode === 'advanced';
 
   const NavGroup = ({ items, title }: { items: NavItem[], title?: string }) => {
-    const visibleItems = items.filter(i => !i.adminOnly || isAdmin);
+    const visibleItems = items.filter(i => {
+      if (i.superAdminOnly) return isSuperAdmin;
+      if (i.adminOnly) return isAdmin;
+      return true;
+    });
     if (visibleItems.length === 0) return null;
 
     return (

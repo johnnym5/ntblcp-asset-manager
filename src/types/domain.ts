@@ -7,6 +7,7 @@ export type UserRole = 'ADMIN' | 'MANAGER' | 'VIEWER';
 export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
 export type DataSource = 'PRODUCTION' | 'SANDBOX';
 export type UXMode = 'beginner' | 'advanced';
+export type StorageLayer = 'FIRESTORE' | 'RTDB' | 'LOCAL';
 
 export interface SectionHierarchy {
   document: string;
@@ -109,6 +110,7 @@ export interface AuthorizedUser {
   states: string[];
   role: UserRole;
   isAdmin: boolean; 
+  isSuperAdmin?: boolean; // Unlocks virtual database management
   isGuest?: boolean;
 }
 
