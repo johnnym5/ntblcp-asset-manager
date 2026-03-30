@@ -1,5 +1,9 @@
 "use client";
 
+/**
+ * @fileOverview TravelReportDialog - High-Fidelity Word Document Generator.
+ */
+
 import React, { useState, useMemo, useEffect } from 'react';
 import {
   Dialog,
@@ -15,20 +19,9 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
-import { NIGERIAN_STATES, NIGERIAN_STATE_CAPITALS, SPECIAL_LOCATIONS, ZONAL_STORES } from '@/lib/constants';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  SelectGroup,
-  SelectLabel,
-  SelectSeparator,
-} from '@/components/ui/select';
+import { NIGERIAN_STATE_CAPITALS, SPECIAL_LOCATIONS } from '@/lib/constants';
 import { ScrollArea } from './ui/scroll-area';
-import type { Asset } from '@/lib/types';
-import { PlaneTakeoff, Info, FileText } from 'lucide-react';
+import { PlaneTakeoff, Info, FileText, Check, Loader2 } from 'lucide-react';
 import { Badge } from './ui/badge';
 
 interface TravelReportDialogProps {
@@ -62,61 +55,46 @@ const defaultActivities = [
 
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
   const { userProfile } = useAuth();
-  const { assets, offlineAssets, dataSource, globalStateFilters, activeGrantId } = useAppState();
+  const { assets, appSettings } = useAppState();
   
   const [reportState, setReportState] = useState('');
   const [travelDate, setTravelDate] = useState('');
   const [objectives, setObjectives] = useState('');
   const [activities, setActivities] = useState(defaultActivities);
   const [approvedBy, setApprovedBy] = useState('');
-  
   const [observations, setObservations] = useState('');
   const [challenges, setChallenges] = useState('');
   const [recommendations, setRecommendations] = useState('');
+  const [isGenerating, setIsGenerating] = useState(false);
 
-  const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
+  const activeProject = useMemo(() => {
+    return appSettings?.grants.find(g => g.id === appSettings.activeGrantId)?.name || 'Registry';
+  }, [appSettings]);
 
-  const reportAssets = useMemo(() => {
-    if (!reportState || !activeGrantId) return [];
-    let projectAssets = activeAssets.filter(asset => asset.grantId === activeGrantId);
-
-    if (reportState === 'All Locations') return projectAssets;
-    
-    const lowerCaseFilter = reportState.toLowerCase().trim();
-    const capitalCity = NIGERIAN_STATE_CAPITALS[reportState]?.toLowerCase().trim();
-    
-    return projectAssets.filter(asset => {
-      const assetLocation = (asset.location || "").toLowerCase().trim();
-      const matchesState = assetLocation.startsWith(lowerCaseFilter);
-      const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
-      return matchesState || matchesCapital || (SPECIAL_LOCATIONS.includes(reportState) && assetLocation.includes(lowerCaseFilter));
-    });
-  }, [activeAssets, reportState, activeGrantId]);
-
+  // Generate statistics for the executive summary
   const stats = useMemo(() => {
-    const verified = reportAssets.filter(a => a.verifiedStatus === 'Verified');
-    const stolen = reportAssets.filter(a => a.condition === 'Stolen').length;
-    const bad = reportAssets.filter(a => ['Bad condition', 'Unsalvageable', 'Burnt'].includes(a.condition || '')).length;
+    const verified = assets.filter(a => a.status === 'VERIFIED');
+    const stolen = assets.filter(a => a.condition === 'Stolen').length;
+    const bad = assets.filter(a => ['Bad condition', 'Unsalvageable', 'Burnt'].includes(a.condition || '')).length;
     return {
-        total: reportAssets.length,
+        total: assets.length,
         verifiedCount: verified.length,
-        unverifiedCount: reportAssets.length - verified.length,
+        unverifiedCount: assets.length - verified.length,
         stolen,
         bad,
-        percentage: reportAssets.length > 0 ? Math.round((verified.length / reportAssets.length) * 100) : 0
+        percentage: assets.length > 0 ? Math.round((verified.length / assets.length) * 100) : 0
     };
-  }, [reportAssets]);
+  }, [assets]);
 
   useEffect(() => {
     if (isOpen) {
-      const initialState = globalStateFilters[0] || userProfile?.state || '';
+      const initialState = userProfile?.state || 'Global';
       setReportState(initialState);
       setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
-      setObjectives(`To conduct mandatory physical asset verification and condition assessment for ${initialState} state registry.`);
+      setObjectives(`To conduct mandatory physical asset verification and condition assessment for the ${activeProject} registry in ${initialState}.`);
       setActivities(defaultActivities);
-      setApprovedBy('');
       
-      // Smart Suggestion Logic
+      // Smart Suggestion Logic: Auto-draft observations based on registry data
       let obs = `Conducted physical audit of ${stats.total} registry records. Currently achieved ${stats.percentage}% verification coverage.`;
       if (stats.stolen > 0) obs += `\n- ALERT: Detected ${stats.stolen} stolen items requiring immediate security reporting.`;
       if (stats.bad > 0) obs += `\n- Detected ${stats.bad} assets in critical or unsalvageable condition.`;
@@ -125,104 +103,115 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
       setChallenges("Internet connectivity in remote LGAs was intermittent.\nDifficulty accessing locked storage rooms in certain facilities.");
       setRecommendations("Immediate replacement of obsolete IT equipment identified during assessment.\nStrengthen security protocols in LGAs with reported asset losses.");
     }
-  }, [isOpen, userProfile, globalStateFilters, stats.total, stats.stolen, stats.bad, stats.percentage]);
+  }, [isOpen, userProfile, stats, activeProject]);
 
   const generateWordDocument = async () => {
-    const { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, AlignmentType } = await import('docx');
-    const { saveAs } = await import('file-saver');
+    setIsGenerating(true);
+    try {
+        const { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, AlignmentType } = await import('docx');
+        const { saveAs } = await import('file-saver');
 
-    const cellStyles = { borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE } }};
+        const cellStyles = { borders: { top: { style: BorderStyle.SINGLE }, bottom: { style: BorderStyle.SINGLE }, left: { style: BorderStyle.SINGLE }, right: { style: BorderStyle.SINGLE } }};
 
-    const createBulletedParagraphs = (text: string) => {
-        return text.split('\n').filter(line => line.trim() !== '').map(line => {
-            return new Paragraph({
-                text: line.startsWith('- ') ? line.substring(2) : line,
-                bullet: { level: 0 },
-                style: "default-bullet-style",
+        const createBulletedParagraphs = (text: string) => {
+            return text.split('\n').filter(line => line.trim() !== '').map(line => {
+                return new Paragraph({
+                    text: line.startsWith('- ') ? line.substring(2) : line,
+                    bullet: { level: 0 },
+                    style: "default-bullet-style",
+                });
             });
-        });
-    };
-    
-    const assetsWithRemarks = reportAssets.filter(a => a.remarks && a.remarks.trim() !== '');
-    const tableHeader = new TableRow({
-        children: [
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "S/N", bold: true })]})], ...cellStyles }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Asset ID Code", bold: true })]})], ...cellStyles }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Description", bold: true })]})], ...cellStyles }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Field Observation", bold: true })]})], ...cellStyles }),
-        ],
-    });
-
-    const remarksRows = assetsWithRemarks.map((asset, index) => new TableRow({
-        children: [
-            new TableCell({ children: [new Paragraph(String(asset.sn || index + 1))], ...cellStyles }),
-            new TableCell({ children: [new Paragraph(asset.assetIdCode || '')], ...cellStyles }),
-            new TableCell({ children: [new Paragraph(asset.description || '')], ...cellStyles }),
-            new TableCell({ children: [new Paragraph(asset.remarks || '')], ...cellStyles }),
-        ],
-    }));
-
-    const doc = new Document({
-        styles: {
-            paragraphStyles: [{
-                id: "default-bullet-style",
-                name: "Default Bullet Style",
-                basedOn: "Normal",
-                next: "Normal",
-                run: { size: 22 },
-                paragraph: { indent: { left: 720, hanging: 360 } },
-            }]
-        },
-        sections: [{
+        };
+        
+        // Exceptions table header
+        const tableHeader = new TableRow({
             children: [
-                new Paragraph({ text: "ASSETAIN REGISTRY", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
-                new Paragraph({ text: "ASSET VERIFICATION TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
-                new Paragraph(" "),
-                new Paragraph({ text: `DATE OF TRAVEL:\t\t${travelDate}` }),
-                new Paragraph({ text: `LOCATION VISITED:\t\t${reportState}` }),
-                new Paragraph({ text: `OFFICER IN CHARGE:\t${userProfile?.displayName}` }),
-                new Paragraph(" "),
-                new Paragraph({ text: "VERIFICATION EXECUTIVE SUMMARY:", heading: HeadingLevel.HEADING_3 }),
-                new Paragraph({
-                    children: [
-                        new TextRun("Mandatory physical audit conducted in "),
-                        new TextRun({ text: reportState, bold: true }),
-                        new TextRun(". Out of a register total of "),
-                        new TextRun({ text: `${stats.total} assets`, bold: true }),
-                        new TextRun(", "),
-                        new TextRun({ text: `${stats.verifiedCount} were physically verified`, bold: true, color: "008000" }),
-                        new TextRun(" and "),
-                        new TextRun({ text: `${stats.unverifiedCount} remain in the unverified queue.`, bold: true, color: "FF0000" }),
-                    ],
-                }),
-                new Paragraph(" "),
-                new Paragraph({ text: "OBJECTIVES:", heading: HeadingLevel.HEADING_3 }),
-                ...createBulletedParagraphs(objectives),
-                new Paragraph(" "),
-                new Paragraph({ text: "ACTIVITIES PERFORMED:", heading: HeadingLevel.HEADING_3 }),
-                ...createBulletedParagraphs(activities),
-                new Paragraph(" "),
-                new Paragraph({ text: "KEY OBSERVATIONS:", heading: HeadingLevel.HEADING_3 }),
-                ...createBulletedParagraphs(observations),
-                new Paragraph(" "),
-                new Paragraph({ text: "CHALLENGES & BOTTLENECKS:", heading: HeadingLevel.HEADING_3 }),
-                ...createBulletedParagraphs(challenges),
-                new Paragraph(" "),
-                new Paragraph({ text: "MANAGEMENT RECOMMENDATIONS:", heading: HeadingLevel.HEADING_3 }),
-                ...createBulletedParagraphs(recommendations),
-                new Paragraph(" "),
-                new Paragraph({ text: "ASSET REGISTRY EXCEPTIONS (REMARKS):", heading: HeadingLevel.HEADING_3 }),
-                remarksRows.length > 0 ? new Table({ rows: [tableHeader, ...remarksRows], width: { size: 100, type: WidthType.PERCENTAGE } }) : new Paragraph("Zero registry exceptions with remarks noted."),
-                new Paragraph(" "),
-                new Paragraph({ text: `Authored by: ${userProfile?.displayName}` }),
-                new Paragraph({ text: `Approved by: ${approvedBy || '____________________'}` }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ID CODE", bold: true })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "DESCRIPTION", bold: true })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "OBSERVATION", bold: true })]})], ...cellStyles }),
             ],
-        }],
-    });
+        });
 
-    Packer.toBlob(doc).then(blob => {
-        saveAs(blob, `Assetain-Report-${reportState}-${userProfile?.displayName.replace(/\s+/g, '_')}.docx`);
-    });
+        // Get assets with critical remarks or conditions
+        const exceptions = assets.filter(a => (a.metadata?.remarks && String(a.metadata.remarks).trim() !== '') || a.status === 'DISCREPANCY');
+        const remarksRows = exceptions.map((asset) => new TableRow({
+            children: [
+                new TableCell({ children: [new Paragraph(asset.assetIdCode || 'N/A')], ...cellStyles }),
+                new TableCell({ children: [new Paragraph(asset.description || asset.name)], ...cellStyles }),
+                new TableCell({ children: [new Paragraph(String(asset.metadata?.remarks || 'Integrity Discrepancy'))], ...cellStyles }),
+            ],
+        }));
+
+        const doc = new Document({
+            styles: {
+                paragraphStyles: [{
+                    id: "default-bullet-style",
+                    name: "Default Bullet Style",
+                    basedOn: "Normal",
+                    next: "Normal",
+                    run: { size: 22 },
+                    paragraph: { indent: { left: 720, hanging: 360 } },
+                }]
+            },
+            sections: [{
+                children: [
+                    new Paragraph({ text: "ASSETAIN REGISTRY PULSE", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+                    new Paragraph({ text: "ASSET VERIFICATION TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
+                    new Paragraph(" "),
+                    new Paragraph({ text: `DATE OF TRAVEL:\t\t${travelDate}` }),
+                    new Paragraph({ text: `LOCATION VISITED:\t\t${reportState}` }),
+                    new Paragraph({ text: `OFFICER IN CHARGE:\t${userProfile?.displayName}` }),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "VERIFICATION EXECUTIVE SUMMARY:", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({
+                        children: [
+                            new TextRun("Mandatory physical audit conducted for "),
+                            new TextRun({ text: activeProject, bold: true }),
+                            new TextRun(" in "),
+                            new TextRun({ text: reportState, bold: true }),
+                            new TextRun(". Out of a register total of "),
+                            new TextRun({ text: `${stats.total} assets`, bold: true }),
+                            new TextRun(", "),
+                            new TextRun({ text: `${stats.verifiedCount} were physically verified`, bold: true, color: "008000" }),
+                            new TextRun(" and "),
+                            new TextRun({ text: `${stats.unverifiedCount} remain in the unverified queue.`, bold: true, color: "FF0000" }),
+                        ],
+                    }),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "OBJECTIVES:", heading: HeadingLevel.HEADING_3 }),
+                    ...createBulletedParagraphs(objectives),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "ACTIVITIES PERFORMED:", heading: HeadingLevel.HEADING_3 }),
+                    ...createBulletedParagraphs(activities),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "KEY OBSERVATIONS:", heading: HeadingLevel.HEADING_3 }),
+                    ...createBulletedParagraphs(observations),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "CHALLENGES & BOTTLENECKS:", heading: HeadingLevel.HEADING_3 }),
+                    ...createBulletedParagraphs(challenges),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "MANAGEMENT RECOMMENDATIONS:", heading: HeadingLevel.HEADING_3 }),
+                    ...createBulletedParagraphs(recommendations),
+                    new Paragraph(" "),
+                    new Paragraph({ text: "ASSET REGISTRY EXCEPTIONS:", heading: HeadingLevel.HEADING_3 }),
+                    remarksRows.length > 0 
+                        ? new Table({ rows: [tableHeader, ...remarksRows], width: { size: 100, type: WidthType.PERCENTAGE } }) 
+                        : new Paragraph("Zero registry exceptions with remarks noted."),
+                    new Paragraph(" "),
+                    new Paragraph({ text: `Authored by: ${userProfile?.displayName}` }),
+                    new Paragraph({ text: `Approved by: ${approvedBy || '____________________'}` }),
+                ],
+            }],
+        });
+
+        const blob = await Packer.toBlob(doc);
+        saveAs(blob, `Assetain-Report-${reportState.replace(/\s+/g, '_')}.docx`);
+        onOpenChange(false);
+    } catch (e) {
+        console.error("Report generation failure", e);
+    } finally {
+        setIsGenerating(false);
+    }
   };
 
   return (
@@ -235,7 +224,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                         <PlaneTakeoff className="text-primary h-8 w-8" /> Executive Travel Report
                     </DialogTitle>
                     <Badge variant="outline" className="h-8 px-4 rounded-xl font-black text-[10px] uppercase border-primary/20 text-primary">
-                        Coverage: {stats.percentage}%
+                        Registry Coverage: {stats.percentage}%
                     </Badge>
                 </div>
                 <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
@@ -253,7 +242,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                             <Input value={userProfile?.displayName || ''} readOnly disabled className="rounded-xl bg-muted/30 border-none font-bold text-xs" />
                         </div>
                         <div className="space-y-1.5">
-                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Target Location</Label>
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Target Scope</Label>
                             <Input value={reportState} readOnly disabled className="rounded-xl bg-muted/30 border-none font-bold text-xs" />
                         </div>
                     </div>
@@ -293,7 +282,8 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
 
         <DialogFooter className="p-8 bg-muted/20 border-t flex items-center justify-between">
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold rounded-xl px-8">Discard Draft</Button>
-          <Button onClick={generateWordDocument} disabled={reportAssets.length === 0} className="h-12 px-10 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20">
+          <Button onClick={generateWordDocument} disabled={isGenerating || stats.total === 0} className="h-12 px-10 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 min-w-[240px]">
+            {isGenerating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <Check className="h-4 w-4 mr-2" />}
             Export Word Document (.docx)
           </Button>
         </DialogFooter>
