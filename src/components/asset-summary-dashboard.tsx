@@ -13,6 +13,9 @@ import {
     ShieldAlert,
     ShieldCheck,
     TrendingUp,
+    Map,
+    Award,
+    PieChart
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
@@ -79,6 +82,20 @@ export function AssetSummaryDashboard() {
         const total = scoped.length;
         const verified = scoped.filter(a => a.verifiedStatus === 'Verified').length;
         
+        const stateStats = scoped.reduce((acc, a) => {
+            const loc = a.location || 'Unknown';
+            if (!acc[loc]) acc[loc] = { total: 0, verified: 0 };
+            acc[loc].total++;
+            if (a.verifiedStatus === 'Verified') acc[loc].verified++;
+            return acc;
+        }, {} as Record<string, { total: number, verified: number }>);
+
+        const conditionStats = scoped.reduce((acc, a) => {
+            const cond = a.condition || 'Not Assessed';
+            acc[cond] = (acc[cond] || 0) + 1;
+            return acc;
+        }, {} as Record<string, number>);
+
         const yearBuckets = scoped.reduce((acc, a) => {
             const year = a.yearBucket || 'Base Register';
             if (!acc[year]) acc[year] = { total: 0, verified: 0 };
@@ -99,6 +116,11 @@ export function AssetSummaryDashboard() {
         const unusable = scoped.filter(a => a.condition && criticalConditions.includes(a.condition));
         const missingContext = scoped.filter(a => !a.majorSection).length;
 
+        const achievementHub = Object.entries(stateStats)
+            .map(([name, stats]) => ({ name, percentage: Math.round((stats.verified / stats.total) * 100), ...stats }))
+            .sort((a, b) => b.percentage - a.percentage)
+            .slice(0, 5);
+
         return {
           total,
           verified,
@@ -108,6 +130,8 @@ export function AssetSummaryDashboard() {
           missingContext,
           yearBuckets: Object.entries(yearBuckets).sort((a, b) => String(b[0]).localeCompare(String(a[0]))),
           majorSections: Object.entries(majorSections).sort((a,b) => b[1].total - a[1].total),
+          achievementHub,
+          conditionStats: Object.entries(conditionStats).sort((a, b) => b[1] - a[1]),
         };
     }, [assets, offlineAssets, dataSource, activeGrantId, globalStateFilters]);
 
@@ -186,52 +210,85 @@ export function AssetSummaryDashboard() {
                     />
                 </div>
 
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-4">
-                    <Card className="bg-muted/10 border-2 border-dashed rounded-3xl overflow-hidden shadow-none">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 pb-4">
+                    {/* ACHIEVEMENTS */}
+                    <Card className="bg-muted/10 border-2 border-dashed rounded-3xl overflow-hidden shadow-none lg:col-span-1">
                         <CardHeader className="py-5 px-6 flex flex-row items-center justify-between space-y-0 bg-muted/20 border-b border-dashed">
                             <CardTitle className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-3">
-                                <History className="h-4 w-4 text-primary" /> Temporal Registry Breakdown
+                                <Award className="h-4 w-4 text-primary" /> Regional Achievement Hub
                             </CardTitle>
-                            <Badge variant="secondary" className="text-[9px] font-bold">BY ADDITION YEAR</Badge>
                         </CardHeader>
                         <CardContent className="p-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                {summary.yearBuckets.map(([year, stats]) => {
-                                    const percentage = Math.round((stats.verified / stats.total) * 100);
-                                    return (
-                                        <div key={year} className="space-y-2 p-4 bg-background rounded-2xl border-2 border-border/50 shadow-sm transition-all hover:border-primary/30">
-                                            <div className="flex justify-between items-center">
-                                                <span className="text-[11px] font-black uppercase text-primary tracking-tighter">{year}</span>
-                                                <span className="text-[10px] font-bold text-muted-foreground">{stats.verified}/{stats.total}</span>
+                            <div className="space-y-4">
+                                {summary.achievementHub.map((state, index) => (
+                                    <div key={state.name} className="flex items-center justify-between group">
+                                        <div className="flex items-center gap-3">
+                                            <span className="text-[10px] font-black text-muted-foreground/40 w-4">0{index + 1}</span>
+                                            <div className="flex flex-col">
+                                                <span className="text-xs font-black group-hover:text-primary transition-colors">{state.name}</span>
+                                                <span className="text-[9px] font-bold text-muted-foreground uppercase">{state.verified} of {state.total} Verified</span>
                                             </div>
-                                            <Progress value={percentage} className="h-1.5" />
-                                            <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-60">{percentage}% Coverage</p>
                                         </div>
-                                    );
-                                })}
+                                        <Badge variant="secondary" className="h-6 font-black text-[10px] bg-primary/5 text-primary border-primary/10">
+                                            {state.percentage}%
+                                        </Badge>
+                                    </div>
+                                ))}
                             </div>
                         </CardContent>
                     </Card>
 
-                    <Card className="bg-muted/10 border-2 border-dashed rounded-3xl overflow-hidden shadow-none">
+                    {/* TEMPORAL PROGRESS */}
+                    <Card className="bg-muted/10 border-2 border-dashed rounded-3xl overflow-hidden shadow-none lg:col-span-1">
                         <CardHeader className="py-5 px-6 flex flex-row items-center justify-between space-y-0 bg-muted/20 border-b border-dashed">
                             <CardTitle className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-3">
-                                <Layout className="h-4 w-4 text-primary" /> Major Register Contexts
+                                <History className="h-4 w-4 text-primary" /> Temporal Breakdown
                             </CardTitle>
-                            <Badge variant="secondary" className="text-[9px] font-bold">BY DOCUMENT SECTION</Badge>
                         </CardHeader>
-                        <CardContent className="p-6 pt-4">
-                            <ScrollArea className="h-[160px] pr-4">
-                                <div className="space-y-4">
-                                    {summary.majorSections.map(([section, stats]) => {
+                        <CardContent className="p-6">
+                            <ScrollArea className="h-[180px]">
+                                <div className="space-y-4 pr-4">
+                                    {summary.yearBuckets.map(([year, stats]) => {
                                         const percentage = Math.round((stats.verified / stats.total) * 100);
                                         return (
-                                            <div key={section} className="space-y-2">
-                                                <div className="flex justify-between text-[10px] font-black uppercase tracking-tight">
-                                                    <span className="truncate pr-4 text-foreground">{section}</span>
-                                                    <span className={cn(percentage > 80 ? "text-green-600" : "text-primary")}>{percentage}%</span>
+                                            <div key={year} className="space-y-1.5">
+                                                <div className="flex justify-between items-center text-[10px] font-black uppercase">
+                                                    <span>{year} Additions</span>
+                                                    <span className="text-primary">{percentage}%</span>
                                                 </div>
-                                                <Progress value={percentage} className={cn("h-1", percentage === 100 && "bg-green-100")} />
+                                                <Progress value={percentage} className="h-1" />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+
+                    {/* CONDITION MIX */}
+                    <Card className="bg-muted/10 border-2 border-dashed rounded-3xl overflow-hidden shadow-none lg:col-span-1">
+                        <CardHeader className="py-5 px-6 flex flex-row items-center justify-between space-y-0 bg-muted/20 border-b border-dashed">
+                            <CardTitle className="text-[11px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-3">
+                                <PieChart className="h-4 w-4 text-primary" /> Health Composition
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-6">
+                            <ScrollArea className="h-[180px]">
+                                <div className="space-y-3 pr-4">
+                                    {summary.conditionStats.map(([label, count]) => {
+                                        const percentage = Math.round((count / summary.total) * 100);
+                                        return (
+                                            <div key={label} className="flex items-center justify-between">
+                                                <div className="flex flex-col">
+                                                    <span className="text-xs font-black truncate max-w-[140px]">{label}</span>
+                                                    <span className="text-[9px] font-bold text-muted-foreground uppercase">{count} Records</span>
+                                                </div>
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-12 h-1.5 bg-muted rounded-full overflow-hidden">
+                                                        <div className="h-full bg-primary" style={{ width: `${percentage}%` }} />
+                                                    </div>
+                                                    <span className="text-[10px] font-black text-primary">{percentage}%</span>
+                                                </div>
                                             </div>
                                         );
                                     })}
