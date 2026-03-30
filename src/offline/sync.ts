@@ -28,15 +28,23 @@ export async function processSyncQueue(): Promise<void> {
 
   for (const op of pending) {
     try {
-      // 1. Process by collection type
-      if (op.collection === 'assets') {
-        if (op.operation === 'UPDATE' || op.operation === 'CREATE') {
-          // Use the abstracted service layer which has validation
+      // 1. Process by operation type
+      switch (op.operation) {
+        case 'CREATE':
+        case 'UPDATE':
           await FirestoreService.saveAsset(op.payload as any);
-        } else if (op.operation === 'DELETE') {
-          // Assuming delete logic exists in service
-          // await FirestoreService.deleteAsset(op.id);
-        }
+          break;
+        
+        case 'DELETE':
+          // The payload for a delete operation contains the ID
+          const idToDelete = (op.payload as any).id;
+          if (idToDelete) {
+            await FirestoreService.deleteAsset(idToDelete);
+          }
+          break;
+
+        default:
+          logger.warn(`Sync Engine: Unknown operation type [${op.operation}]`);
       }
 
       // 2. Dequeue on success
@@ -45,7 +53,7 @@ export async function processSyncQueue(): Promise<void> {
       
     } catch (error) {
       logger.error(`Sync Engine: Failed to process op [${op.id}]`, error);
-      // We stop the queue on error to prevent out-of-order state corruption
+      // We stop the queue on error to prevent out-of-order state corruption for the remaining items
       break; 
     }
   }

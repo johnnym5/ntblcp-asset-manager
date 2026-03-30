@@ -9,6 +9,7 @@ import {
   getDoc, 
   getDocs, 
   setDoc, 
+  deleteDoc,
   collection, 
   query, 
   where, 
@@ -40,7 +41,6 @@ export const FirestoreService = {
 
   /**
    * Updates global configuration.
-   * Deterministically sanitized.
    */
   updateSettings(settings: Partial<AppSettings>) {
     if (!db) return;
@@ -70,12 +70,10 @@ export const FirestoreService = {
 
   /**
    * Single record update with mandatory Zod validation.
-   * Blocks non-compliant data at the boundary.
    */
   async saveAsset(asset: Asset): Promise<void> {
     if (!db) return;
 
-    // DETERMINISTIC VALIDATION: Block dirty data at the boundary
     const validation = AssetSchema.safeParse(asset);
     if (!validation.success) {
       console.error("Firestore: Validation failed for asset write", validation.error);
@@ -89,6 +87,20 @@ export const FirestoreService = {
       await setDoc(assetRef, sanitized, { merge: true });
     } catch (err: any) {
       this.handlePermissionError(assetRef, 'update', err, sanitized);
+      throw err;
+    }
+  },
+
+  /**
+   * Permanent deletion from the cloud registry.
+   */
+  async deleteAsset(assetId: string): Promise<void> {
+    if (!db) return;
+    const assetRef = doc(db, 'assets', assetId);
+    try {
+      await deleteDoc(assetRef);
+    } catch (err: any) {
+      this.handlePermissionError(assetRef, 'delete', err);
       throw err;
     }
   },
