@@ -1,8 +1,6 @@
-import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
+/**
+ * @fileOverview [ARCHIVED] Genkit Initialization.
+ * This module is disabled per architectural rules forbidding probabilistic AI features.
+ */
 
-export const ai = genkit({
-  plugins: [
-    googleAI(),
-  ],
-});
+export const ai = null;

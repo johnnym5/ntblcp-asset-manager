@@ -27,19 +27,15 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import type { Asset, SheetDefinition, DisplayField, AppSettings } from "@/lib/types";
-import { Loader2, ArrowLeft, Share2, MoreVertical, Check, RotateCcw, Info, Camera, Zap, ShieldCheck, X, AlertCircle } from "lucide-react";
+import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
+import { Loader2, ArrowLeft, Share2, Check, Camera, ShieldCheck, X } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
 import { cn, getStatusClasses, sanitizeForFirestore } from "@/lib/utils";
 import { ScrollArea } from "./ui/scroll-area";
 import { ASSET_CONDITIONS } from "@/lib/constants";
-import { saveLocalSettings } from "@/lib/idb";
-import { updateSettings as updateSettingsFS } from "@/lib/firestore";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
 import { Badge } from "./ui/badge";
-import { analyzeAssetHealth } from "@/ai/flows/analyze-asset-flow";
-import { Alert, AlertDescription, AlertTitle } from "./ui/alert";
 
 const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
   path: ['category'],
@@ -74,7 +70,6 @@ export function AssetForm({
     onPrevious
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const { userProfile } = useAuth();
   const { appSettings, activeGrantId, globalStateFilters } = useAppState();
   
@@ -89,7 +84,6 @@ export function AssetForm({
   });
   
   const watchedStatus = form.watch('verifiedStatus') as 'Verified' | 'Unverified';
-  const watchedDescription = form.watch('description');
 
   const grant = useMemo(() => {
     return appSettings?.grants?.find(g => g.id === activeGrantId);
@@ -125,7 +119,6 @@ export function AssetForm({
     }
   }, [isOpen, asset, form, defaultCategory, globalStateFilters]);
 
-  // Camera Logic
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -160,25 +153,6 @@ export function AssetForm({
         setCapturedPhoto(dataUri);
         stopCamera();
       }
-    }
-  };
-
-  const handleAiAnalyze = async () => {
-    if (!capturedPhoto || !watchedDescription) return;
-    setIsAnalyzing(true);
-    try {
-      const analysis = await analyzeAssetHealth({
-        photoDataUri: capturedPhoto,
-        description: watchedDescription
-      });
-      if (analysis.suggestedCondition) {
-        form.setValue('condition', analysis.suggestedCondition);
-        form.setValue('remarks', `[AI Rationale]: ${analysis.reasoning}`);
-      }
-    } catch (e) {
-      console.error("AI Analysis Failed", e);
-    } finally {
-      setIsAnalyzing(false);
     }
   };
 
@@ -225,11 +199,6 @@ export function AssetForm({
                         <FormControl><SelectTrigger className="border-none bg-transparent p-0 h-auto font-bold text-base focus:ring-0 shadow-none flex-1"><SelectValue placeholder="Select condition" /></SelectTrigger></FormControl>
                         <SelectContent>{ASSET_CONDITIONS.map(cond => <SelectItem key={cond} value={cond}>{cond}</SelectItem>)}</SelectContent>
                     </Select>
-                    {capturedPhoto && !disabled && (
-                        <Button variant="ghost" size="icon" className="h-8 w-8 text-primary" onClick={handleAiAnalyze} disabled={isAnalyzing}>
-                            {isAnalyzing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 fill-primary" />}
-                        </Button>
-                    )}
                 </div>
             );
             break;
@@ -280,7 +249,6 @@ export function AssetForm({
         <ScrollArea className="flex-1 bg-background">
             <Form {...form}>
               <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)}>
-                  {/* Camera / Photo Evidence Section */}
                   {isCameraActive ? (
                     <div className="relative aspect-video bg-black overflow-hidden">
                         <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />

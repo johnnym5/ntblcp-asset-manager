@@ -1,73 +1,65 @@
 /**
- * @fileOverview Centralized Domain Models for Assetain.
- * Defines the core entities used throughout the Clean Architecture.
+ * @fileOverview Core Domain Models for Assetain Rebuild.
+ * Strictly typed, deterministic models for registry management.
  */
 
-export type VerificationStatus = 'Verified' | 'Unverified' | 'Discrepancy';
-export type SyncStatus = 'synced' | 'local' | 'syncing' | 'conflict';
-export type UserRole = 'SUPER_ADMIN' | 'ZONAL_MANAGER' | 'FIELD_OFFICER' | 'GUEST';
+export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
 
-export interface UserIdentity {
-  loginName: string;
-  displayName: string;
-  email: string;
-  role: UserRole;
-  states: string[]; // Regional scopes
-  assignedZone?: string;
+export interface SectionHierarchy {
+  document: string;
+  section: string;
+  subsection: string;
+  assetFamily: string;
+}
+
+export interface ImportMetadata {
+  sourceFile: string;
+  sheetName: string;
+  rowNumber: number;
+  importedAt: string;
 }
 
 export interface Asset {
   id: string;
-  category: string;
-  grantId: string;
-  
-  // Core Identification
-  sn?: string;
+  name: string;
   description: string;
-  serialNumber?: string;
-  assetIdCode?: string;
-  
-  // Regional Context
+  category: string;
   location: string;
-  lga?: string;
-  site?: string;
-  assignee?: string;
-
-  // Technical Metadata
-  manufacturer?: string;
-  modelNumber?: string;
+  custodian: string;
+  status: VerificationStatus;
   condition: string;
-  remarks?: string;
-  
-  // Hierarchy (From Parser)
-  majorSection?: string;
-  subsectionName?: string;
-  yearBucket?: number;
-  
-  // Traceability
-  verifiedStatus: VerificationStatus;
-  verifiedDate?: string;
+  purchaseDate: string; // ISO 8601
+  value: number;
+  serialNumber: string;
+  assetIdCode?: string;
+  hierarchy: SectionHierarchy;
+  importMetadata: ImportMetadata;
+  metadata: Record<string, string | number | boolean | null>;
   lastModified: string;
   lastModifiedBy: string;
-  
-  // System Metadata (Not persisted to Cloud)
-  syncStatus?: SyncStatus;
-  previousState?: Partial<Asset>; 
 }
 
-export interface ProjectGrant {
+export interface AuditLog {
   id: string;
-  name: string;
-  active: boolean;
-  config: {
-    lockRegistry: boolean;
-    requireVisualProof: boolean;
-    enabledCategories: string[];
+  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'VERIFY' | 'IMPORT';
+  user: string;
+  timestamp: string;
+  entityId: string;
+  payload?: {
+    before: Record<string, any> | null;
+    after: Record<string, any> | null;
   };
 }
 
-export interface SystemSettings {
-  activeGrantId: string | null;
-  activeDatabase: 'firestore' | 'rtdb';
-  appMode: 'management' | 'verification';
+export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE';
+export type QueueStatus = 'PENDING' | 'PROCESSING' | 'FAILED';
+
+export interface OfflineQueueEntry {
+  id: string;
+  operation: QueueOperation;
+  collection: string;
+  payload: any;
+  status: QueueStatus;
+  timestamp: number;
+  error?: string;
 }
