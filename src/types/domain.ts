@@ -25,6 +25,7 @@ export interface Asset {
   name: string;
   description: string;
   category: string;
+  grantId: string; // Link to the specific project/grant
   
   // Hierarchical Context
   section: string;

@@ -58,9 +58,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
       if (localSettings) setAppSettings(localSettings);
       
+      const currentGrantId = localSettings?.activeGrantId;
+
       // Filter main registry by active project context
-      const filteredAssets = localSettings?.activeGrantId 
-        ? localAssets.filter(a => a.hierarchy.document.includes(localSettings.activeGrantId!)) // Use document provenance as a proxy
+      const filteredAssets = currentGrantId 
+        ? localAssets.filter(a => a.grantId === currentGrantId)
         : localAssets;
 
       setAssets(filteredAssets);
@@ -78,7 +80,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           if (remoteSettings.activeGrantId) {
             const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId);
             if (remoteAssets.length > 0) {
-              await storage.saveAssets(remoteAssets);
+              // Update local storage with remote assets
+              const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
+              const combinedAssets = [...otherAssets, ...remoteAssets];
+              await storage.saveAssets(combinedAssets);
               setAssets(remoteAssets);
             }
           }

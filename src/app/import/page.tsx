@@ -33,7 +33,7 @@ import type { Asset } from '@/types/domain';
 
 export default function ImportPage() {
   const { toast } = useToast();
-  const { refreshRegistry } = useAppState();
+  const { refreshRegistry, activeGrantId } = useAppState();
   const [isProcessing, setIsProcessing] = useState(false);
   const [stagedAssets, setStagedAssets] = useState<Asset[]>([]);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -52,7 +52,12 @@ export default function ImportPage() {
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file) return;
+    if (!file || !activeGrantId) {
+      if (!activeGrantId) {
+        toast({ variant: "destructive", title: "Project Required", description: "Please select an active project in Settings before importing." });
+      }
+      return;
+    }
 
     setIsProcessing(true);
     setAnalysisProgress(10);
@@ -69,7 +74,14 @@ export default function ImportPage() {
         const sheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
         const assets = parseSheetToAssets(data as any[][], file.name, sheetName);
-        allParsedAssets = [...allParsedAssets, ...assets];
+        
+        // Tag assets with the current project ID
+        const taggedAssets = assets.map(a => ({
+          ...a,
+          grantId: activeGrantId
+        }));
+        
+        allParsedAssets = [...allParsedAssets, ...taggedAssets];
       }
 
       setAnalysisProgress(80);

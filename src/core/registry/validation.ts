@@ -10,6 +10,7 @@ export const AssetSchema = z.object({
   name: z.string().min(1, "Name is required"),
   description: z.string().min(2, "Description must be valid"),
   category: z.string().min(1, "Category is required"),
+  grantId: z.string().min(1, "Grant ID is required"),
   
   // Hierarchical Context
   section: z.string().default("General"),

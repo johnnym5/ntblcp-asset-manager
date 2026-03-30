@@ -63,7 +63,7 @@ export function AssetForm({
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const { appSettings } = useAppState();
+  const { appSettings, activeGrantId } = useAppState();
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -83,6 +83,7 @@ export function AssetForm({
         // Default initial state for new registration
         form.reset({
           id: crypto.randomUUID(),
+          grantId: activeGrantId || '',
           status: 'UNVERIFIED',
           condition: 'New',
           location: userProfile?.state || '',
@@ -93,12 +94,19 @@ export function AssetForm({
             section: 'General',
             subsection: 'Base Register',
             assetFamily: 'Uncategorized'
-          }
+          },
+          importMetadata: {
+            sourceFile: 'MANUAL',
+            sheetName: 'MANUAL',
+            rowNumber: 0,
+            importedAt: new Date().toISOString()
+          },
+          metadata: {}
         } as Asset);
         setCapturedPhoto(null);
       }
     }
-  }, [isOpen, asset, form, userProfile]);
+  }, [isOpen, asset, form, userProfile, activeGrantId]);
 
   const startCamera = async () => {
     try {
