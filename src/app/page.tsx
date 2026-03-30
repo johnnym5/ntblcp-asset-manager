@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
- * Phase 15: High-density KPI grid with Regional Benchmarking and Temporal Pulse.
+ * Phase 16: High-density KPI grid with Integrity Scrubbing & Regional Benchmarking.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import AppLayout from '@/components/app-layout';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -30,15 +30,16 @@ import {
   FileWarning,
   Map,
   History,
-  PieChart
+  PieChart,
+  ShieldHalf
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
 import UserProfileSetup from '@/components/user-profile-setup';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { ArchiveService } from '@/lib/archive-service';
 
 const container = {
   hidden: { opacity: 0 },
@@ -56,6 +57,18 @@ const item = {
 export default function DashboardPage() {
   const { assets, settingsLoaded, isSyncing, isOnline, appSettings, activeGrantId } = useAppState();
   const { profileSetupComplete, loading: authLoading, userProfile } = useAuth();
+  
+  const [integrityScore, setIntegrityScore] = useState(100);
+  const [integrityConflicts, setIntegrityConflicts] = useState(0);
+
+  useEffect(() => {
+    if (assets.length > 0) {
+      ArchiveService.runIntegrityAudit(assets).then(report => {
+        setIntegrityScore(report.score);
+        setIntegrityConflicts(report.conflicts);
+      });
+    }
+  }, [assets]);
 
   const stats = useMemo(() => {
     if (!settingsLoaded || !assets) return null;
@@ -247,27 +260,26 @@ export default function DashboardPage() {
               <Card className="border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden rounded-[2.5rem]">
                 <CardHeader className="bg-primary/5 border-b p-8">
                   <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-                    <Zap className="h-4 w-4 fill-current" /> System Integrity Pulse
+                    <ShieldHalf className="h-4 w-4 fill-current" /> Maintenance Integrity
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="p-8 space-y-8">
                   <div className="flex items-center justify-between border-b border-dashed pb-4">
                     <div className="flex items-center gap-4">
                       <div className="p-2.5 bg-green-100 rounded-xl"><ShieldCheck className="h-5 w-5 text-green-600" /></div>
-                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Fidelity State</span>
+                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Pulse Score</span>
                     </div>
-                    <span className="text-[10px] font-black uppercase text-green-600">Stable</span>
+                    <span className={cn("text-[10px] font-black uppercase", integrityScore > 90 ? "text-green-600" : "text-orange-600")}>
+                      {integrityScore}% Healthy
+                    </span>
                   </div>
                   <div className="flex items-center justify-between border-b border-dashed pb-4">
                     <div className="flex items-center gap-4">
-                      <div className="p-2.5 bg-orange-100 rounded-xl"><Activity className="h-5 w-5 text-orange-600" /></div>
-                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Sync Pulse</span>
+                      <div className="p-2.5 bg-orange-100 rounded-xl"><AlertCircle className="h-5 w-5 text-orange-600" /></div>
+                      <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Conflicts</span>
                     </div>
-                    <span className={cn(
-                      "text-[10px] font-black uppercase tracking-tighter",
-                      isSyncing ? "text-primary animate-pulse" : "text-orange-600"
-                    )}>
-                      {isSyncing ? 'Broadcasting' : 'Reconciled'}
+                    <span className={cn("text-[10px] font-black uppercase", integrityConflicts > 0 ? "text-destructive" : "text-green-600")}>
+                      {integrityConflicts} Detected
                     </span>
                   </div>
                   <div className="flex items-center justify-between">

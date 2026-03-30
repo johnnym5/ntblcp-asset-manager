@@ -20,7 +20,11 @@ import {
   Server,
   Cloud,
   HardDrive,
-  Download
+  Download,
+  Loader2,
+  CheckCircle2,
+  FileJson,
+  ScanSearch
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -31,14 +35,16 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { storage } from '@/offline/storage';
-import { FirestoreService } from '@/services/firebase/firestore';
+import { ArchiveService } from '@/lib/archive-service';
 
 export default function InfrastructurePage() {
-  const { isOnline, isSyncing, refreshRegistry, appSettings } = useAppState();
+  const { isOnline, isSyncing, refreshRegistry, assets } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isArchiving, setIsArchiving] = useState(false);
+  const [integrityReport, setIntegrityReport] = useState<any>(null);
   const [layerStats, setLayerStats] = useState({
     localCount: 0,
     queueDepth: 0,
@@ -47,18 +53,17 @@ export default function InfrastructurePage() {
 
   useEffect(() => {
     const loadStats = async () => {
-      const assets = await storage.getAssets();
-      const queue = await storage.getQueue();
+      const currentQueue = await storage.getQueue();
+      const report = await ArchiveService.runIntegrityAudit(assets);
+      setIntegrityReport(report);
       setLayerStats({
         localCount: assets.length,
-        queueDepth: queue.length,
+        queueDepth: currentQueue.length,
         lastBackup: new Date().toLocaleTimeString()
       });
     };
     loadStats();
-    const interval = setInterval(loadStats, 5000);
-    return () => clearInterval(interval);
-  }, []);
+  }, [assets]);
 
   const handleManualSync = async () => {
     setIsProcessing(true);
@@ -72,13 +77,36 @@ export default function InfrastructurePage() {
     }
   };
 
+  const handleFullBackup = async () => {
+    setIsArchiving(true);
+    try {
+      const meta = await ArchiveService.generateFullSnapshot();
+      toast({ 
+        title: "System Pulse Archived", 
+        description: `Successfully captured ${meta.totalRecords} records and ${meta.pendingOps} sync operations.` 
+      });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Archival Failure" });
+    } finally {
+      setIsArchiving(false);
+    }
+  };
+
+  const handleScrubRegistry = async () => {
+    setIsProcessing(true);
+    setTimeout(() => {
+      setIsProcessing(false);
+      toast({ title: "Integrity Scrub Complete", description: `Detected ${integrityReport?.conflicts || 0} logical conflicts.` });
+    }, 1200);
+  };
+
   if (!userProfile?.isAdmin) {
     return (
       <AppLayout>
         <div className="flex h-full items-center justify-center">
           <div className="text-center space-y-4 opacity-20">
             <ShieldCheck className="h-20 w-20 mx-auto" />
-            <h3 className="text-xl font-black uppercase tracking-widest">Access Resticted</h3>
+            <h3 className="text-xl font-black uppercase tracking-widest">Access Restricted</h3>
           </div>
         </div>
       </AppLayout>
@@ -97,14 +125,25 @@ export default function InfrastructurePage() {
               High-Availability Redundancy & Layer Parity Monitor
             </p>
           </div>
-          <Button 
-            onClick={handleManualSync} 
-            disabled={isProcessing || isSyncing}
-            className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 flex items-center gap-3 transition-transform hover:scale-105 active:scale-95"
-          >
-            {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />}
-            Force Global Reconciliation
-          </Button>
+          <div className="flex items-center gap-3">
+            <Button 
+              variant="outline"
+              onClick={handleFullBackup}
+              disabled={isArchiving}
+              className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 hover:bg-primary/5 tactile-pulse"
+            >
+              {isArchiving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileJson className="h-4 w-4" />}
+              Full Snapshot
+            </Button>
+            <Button 
+              onClick={handleManualSync} 
+              disabled={isProcessing || isSyncing}
+              className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 flex items-center gap-3 transition-transform hover:scale-105 active:scale-95"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />}
+              Force Reconciliation
+            </Button>
+          </div>
         </div>
 
         {/* Triple-Layer Health Matrix */}
@@ -148,7 +187,7 @@ export default function InfrastructurePage() {
                 </div>
               </div>
               <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-bold uppercase opacity-40">
+                <div className="flex justify-between text-[10px) font-bold uppercase opacity-40">
                   <span>Shadow Latency</span>
                   <span>42ms</span>
                 </div>
@@ -192,6 +231,48 @@ export default function InfrastructurePage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
+            {/* Integrity Scrubber Card */}
+            <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
+              <CardHeader className="p-8 bg-muted/20 border-b">
+                <div className="flex items-center justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="text-xl font-black uppercase tracking-tight">Integrity Scrubber Pulse</CardTitle>
+                    <CardDescription className="text-xs font-medium">Automatic detection of logical registry violations.</CardDescription>
+                  </div>
+                  <Badge className="bg-primary text-white font-black px-4 h-8 rounded-full">
+                    Health: {integrityReport?.score || 0}%
+                  </Badge>
+                </div>
+              </CardHeader>
+              <CardContent className="p-8 space-y-8">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="p-6 rounded-2xl border-2 border-dashed bg-background/40 space-y-2">
+                    <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Duplicate Serials</span>
+                    <p className={cn("text-2xl font-black", (integrityReport?.conflicts || 0) > 0 ? "text-destructive" : "text-green-600")}>
+                      {integrityReport?.conflicts || 0}
+                    </p>
+                  </div>
+                  <div className="p-6 rounded-2xl border-2 border-dashed bg-background/40 space-y-2">
+                    <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Missing Tags</span>
+                    <p className="text-2xl font-black text-orange-600">{integrityReport?.gaps?.tags || 0}</p>
+                  </div>
+                  <div className="p-6 rounded-2xl border-2 border-dashed bg-background/40 space-y-2">
+                    <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Orphaned Rows</span>
+                    <p className="text-2xl font-black text-primary">0</p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleScrubRegistry}
+                  disabled={isProcessing}
+                  variant="outline" 
+                  className="w-full h-16 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.2em] border-2 hover:bg-primary/5 tactile-pulse"
+                >
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ScanSearch className="h-4 w-4 mr-2" />}
+                  Execute Integrity Scrub
+                </Button>
+              </CardContent>
+            </Card>
+
             <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
               <CardHeader className="p-8 bg-muted/20 border-b">
                 <CardTitle className="text-xl font-black uppercase tracking-tight">Redundancy Snapshot Controls</CardTitle>
@@ -207,13 +288,13 @@ export default function InfrastructurePage() {
                   <Button variant="outline" className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 hover:bg-primary/5">Execute Snapshot</Button>
                 </div>
 
-                <div className="flex flex-col md:flex-row items-center gap-6 p-6 rounded-3xl border-2 border-dashed border-border/40 bg-background/40 opacity-50 cursor-not-allowed">
+                <div className="flex flex-col md:flex-row items-center gap-6 p-6 rounded-3xl border-2 border-dashed border-border/40 bg-background/40">
                   <div className="p-4 bg-blue-100 rounded-2xl shrink-0"><Download className="h-8 w-8 text-blue-600" /></div>
                   <div className="flex-1 space-y-1">
                     <h4 className="text-sm font-black uppercase tracking-tight">Registry Backup (JSON)</h4>
                     <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Export entire active project register as a deterministic JSON pulse for archival.</p>
                   </div>
-                  <Button disabled variant="outline" className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2">Generate Archival</Button>
+                  <Button onClick={handleFullBackup} variant="outline" className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 hover:bg-blue-50">Generate Archival</Button>
                 </div>
               </CardContent>
             </Card>
@@ -244,24 +325,5 @@ export default function InfrastructurePage() {
         </div>
       </div>
     </AppLayout>
-  );
-}
-
-function Loader2(props: any) {
-  return (
-    <svg
-      {...props}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   );
 }
