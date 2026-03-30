@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
- * Grouped navigation reflecting an operational asset management hierarchy.
- * Final Polish: Integrated Framer Motion and Triple-Layer Parity visualizers.
+ * Refined for Phase 15 with role-based navigation and security pulse indicators.
  */
 
 import React, { useState } from 'react';
@@ -48,7 +47,7 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
-  roles?: string[];
+  adminOnly?: boolean;
 }
 
 const PRIMARY_NAV: NavItem[] = [
@@ -65,9 +64,9 @@ const AUDIT_NAV: NavItem[] = [
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { label: 'Users & Roles', href: '/users', icon: <Users className="h-4 w-4" /> },
-  { label: 'Infrastructure', href: '/infrastructure', icon: <Monitor className="h-4 w-4" /> },
-  { label: 'Settings', href: '/settings', icon: <Settings className="h-4 w-4" /> },
+  { label: 'Users & Roles', href: '/users', icon: <Users className="h-4 w-4" />, adminOnly: true },
+  { label: 'Infrastructure', href: '/infrastructure', icon: <Monitor className="h-4 w-4" />, adminOnly: true },
+  { label: 'Settings', href: '/settings', icon: <Settings className="h-4 w-4" />, adminOnly: true },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -81,39 +80,44 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAdmin = userProfile?.isAdmin;
   const pendingCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
 
-  const NavGroup = ({ items, title }: { items: NavItem[], title?: string }) => (
-    <div className="space-y-1">
-      {title && (
-        <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50 mt-6">
-          {title}
-        </p>
-      )}
-      {items.map((item) => (
-        <Link
-          key={item.href}
-          href={item.href}
-          className={cn(
-            "flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all relative overflow-hidden group",
-            pathname === item.href 
-              ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" 
-              : "text-muted-foreground hover:bg-muted hover:text-foreground"
-          )}
-        >
-          <div className="z-10 flex items-center gap-3 w-full">
-            {item.icon}
-            <span className="flex-1">{item.label}</span>
-          </div>
-          {pathname === item.href && (
-            <motion.div 
-              layoutId="nav-active"
-              className="absolute inset-0 bg-primary z-0"
-              transition={{ type: "spring", stiffness: 380, damping: 30 }}
-            />
-          )}
-        </Link>
-      ))}
-    </div>
-  );
+  const NavGroup = ({ items, title }: { items: NavItem[], title?: string }) => {
+    const visibleItems = items.filter(i => !i.adminOnly || isAdmin);
+    if (visibleItems.length === 0) return null;
+
+    return (
+      <div className="space-y-1">
+        {title && (
+          <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50 mt-6">
+            {title}
+          </p>
+        )}
+        {visibleItems.map((item) => (
+          <Link
+            key={item.href}
+            href={item.href}
+            className={cn(
+              "flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all relative overflow-hidden group",
+              pathname === item.href 
+                ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" 
+                : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
+            <div className="z-10 flex items-center gap-3 w-full">
+              {item.icon}
+              <span className="flex-1">{item.label}</span>
+            </div>
+            {pathname === item.href && (
+              <motion.div 
+                layoutId="nav-active"
+                className="absolute inset-0 bg-primary z-0"
+                transition={{ type: "spring", stiffness: 380, damping: 30 }}
+              />
+            )}
+          </Link>
+        ))}
+      </div>
+    );
+  };
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden font-body selection:bg-primary/10">
@@ -132,7 +136,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2">
           <NavGroup items={PRIMARY_NAV} />
           <NavGroup items={AUDIT_NAV} title="Reporting & Pulse" />
-          {isAdmin && <NavGroup items={ADMIN_NAV} title="Governance" />}
+          <NavGroup items={ADMIN_NAV} title="Governance" />
 
           {isAdmin && (
             <div className="mt-6 space-y-1">
@@ -161,7 +165,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <div className="flex items-center gap-3">
               <Avatar className="h-10 w-10 border-2 border-primary/20 shadow-md">
-                <AvatarFallback className="font-black bg-muted text-primary text-xs">
+                <AvatarFallback className="font-black bg-muted text-primary text-xs uppercase">
                   {userProfile?.displayName?.[0] || 'U'}
                 </AvatarFallback>
               </Avatar>
@@ -199,22 +203,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <div className="flex-1 overflow-y-auto">
                     <NavGroup items={PRIMARY_NAV} />
                     <NavGroup items={AUDIT_NAV} title="Reporting & Pulse" />
-                    {isAdmin && <NavGroup items={ADMIN_NAV} title="Governance" />}
+                    <NavGroup items={ADMIN_NAV} title="Governance" />
                   </div>
                 </SheetContent>
               </Sheet>
             </div>
             <h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground hidden sm:flex items-center gap-2">
-              <span className="opacity-40">System context ›</span>
+              <span className="opacity-40">Context ›</span>
               <span className="text-foreground">
-                {pathname === '/' ? 'Inventory Pulse' : 
-                 pathname.split('/').pop()?.replace('-', ' ') || 'Workstation'}
+                {pathname === '/' ? 'Pulse' : pathname.split('/').pop()?.replace('-', ' ')}
               </span>
             </h1>
           </div>
 
           <div className="flex items-center gap-4">
-            {/* Triple-Layer Infrastructure visualizer */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -238,21 +240,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
                 </TooltipTrigger>
-                <TooltipContent side="bottom" className="p-4 rounded-2xl border-2 shadow-2xl space-y-3 min-w-[200px]">
-                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b pb-2">Infrastructure Parity</p>
-                  <div className="space-y-2">
-                    <div className="flex justify-between items-center text-[10px] font-bold">
+                <TooltipContent side="bottom" className="p-4 rounded-2xl border-2 shadow-2xl space-y-2 min-w-[200px]">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b pb-2">Parity Status</p>
+                  <div className="space-y-1 text-[10px] font-bold">
+                    <div className="flex justify-between">
                       <span className="opacity-60">Local Layer:</span>
-                      <span className="text-green-600">Encrypted DB (IDB)</span>
+                      <span className="text-green-600">Stable</span>
                     </div>
-                    <div className="flex justify-between items-center text-[10px] font-bold">
-                      <span className="opacity-60">Shadow Mirror:</span>
-                      <span className="text-blue-600">RTDB Replication</span>
-                    </div>
-                    <div className="flex justify-between items-center text-[10px] font-bold">
-                      <span className="opacity-60">Primary Layer:</span>
+                    <div className="flex justify-between">
+                      <span className="opacity-60">Primary Cloud:</span>
                       <span className={cn(isOnline ? "text-green-600" : "text-destructive")}>
-                        {isOnline ? 'Cloud Firestore' : 'Disconnected'}
+                        {isOnline ? 'Active Pulse' : 'Offline'}
                       </span>
                     </div>
                   </div>
@@ -263,7 +261,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="relative rounded-xl hover:bg-primary/5 hover:text-primary transition-all"
+              className="rounded-xl hover:bg-primary/5 hover:text-primary"
               onClick={() => setIsOnline(!isOnline)}
             >
               {isOnline ? <Cloud className="h-5 w-5" /> : <CloudOff className="h-5 w-5" />}
@@ -271,15 +269,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto custom-scrollbar bg-muted/10 relative">
+        <main className="flex-1 overflow-y-auto custom-scrollbar bg-muted/10">
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
-              initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
-              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
-              exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-              className="p-6 md:p-8"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="p-6 md:p-10"
             >
               {children}
             </motion.div>
