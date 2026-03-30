@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview TravelReportDialog - High-Fidelity Word Document Generator.
- * Refined for Phase 12 with intelligent exception tables and smart drafting.
+ * Phase 42: Integrated AI Narrative Pulse for Automated Summaries.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -21,8 +21,10 @@ import { Textarea } from './ui/textarea';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
 import { ScrollArea } from './ui/scroll-area';
-import { PlaneTakeoff, Info, FileText, Check, Loader2, FileWarning } from 'lucide-react';
+import { PlaneTakeoff, Info, FileText, Check, Loader2, FileWarning, Sparkles, BrainCircuit } from 'lucide-react';
 import { Badge } from './ui/badge';
+import { generateReportNarrative } from '@/ai/flows/report-narrative-flow';
+import { useToast } from '@/hooks/use-toast';
 
 interface TravelReportDialogProps {
   isOpen: boolean;
@@ -56,6 +58,7 @@ const defaultActivities = [
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
   const { userProfile } = useAuth();
   const { assets, appSettings } = useAppState();
+  const { toast } = useToast();
   
   const [reportState, setReportState] = useState('');
   const [travelDate, setTravelDate] = useState('');
@@ -66,12 +69,12 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
   const [challenges, setChallenges] = useState('');
   const [recommendations, setRecommendations] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isDrafting, setIsDrafting] = useState(false);
 
   const activeProject = useMemo(() => {
     return appSettings?.grants.find(g => g.id === appSettings.activeGrantId)?.name || 'Registry';
   }, [appSettings]);
 
-  // Generate statistics for the executive summary
   const stats = useMemo(() => {
     const verified = assets.filter(a => a.status === 'VERIFIED');
     const stolen = assets.filter(a => a.condition === 'Stolen').length;
@@ -99,7 +102,6 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
       setObjectives(`To conduct mandatory physical asset verification and condition assessment for the ${activeProject} registry in ${initialState}.`);
       setActivities(defaultActivities);
       
-      // Smart Suggestion Logic: Auto-draft observations based on registry data
       let obs = `Conducted physical audit of ${stats.total} registry records. Currently achieved ${stats.percentage}% verification coverage.`;
       if (stats.stolen > 0) obs += `\n- CRITICAL: Detected ${stats.stolen} stolen items requiring immediate security reporting.`;
       if (stats.bad > 0) obs += `\n- CONDITION: Identified ${stats.bad} assets in critical or unsalvageable state.`;
@@ -110,6 +112,38 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
       setRecommendations("Immediate replacement of obsolete equipment identified.\nImprove security protocols in facility stores with reported losses.\nConduct data cleaning exercise to capture missing serial numbers.");
     }
   }, [isOpen, userProfile, stats, activeProject]);
+
+  const handleAIDraft = async () => {
+    setIsDrafting(true);
+    toast({ title: "AI Intelligence Pulse", description: "Analyzing registry finds for report drafting..." });
+
+    try {
+      const topExceptions = assets
+        .filter(a => a.status === 'DISCREPANCY' || ['Stolen', 'Burnt'].includes(a.condition))
+        .map(a => `${a.description}: ${a.condition} (${a.location})`)
+        .slice(0, 10);
+
+      const narrative = await generateReportNarrative({
+        location: reportState,
+        projectName: activeProject,
+        stats: {
+          total: stats.total,
+          verified: stats.verifiedCount,
+          exceptions: stats.stolen + stats.bad,
+          dataGaps: stats.missingSerial + stats.missingTag
+        },
+        topExceptions
+      });
+
+      setObservations(narrative.summary + "\n\n" + narrative.findings);
+      setRecommendations(narrative.recommendations);
+      toast({ title: "AI Draft Complete", description: "Narrative generated from actual audit findings." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "AI Pulse Interrupted" });
+    } finally {
+      setIsDrafting(false);
+    }
+  };
 
   const generateWordDocument = async () => {
     setIsGenerating(true);
@@ -129,7 +163,6 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
             });
         };
         
-        // Exceptions table header
         const tableHeader = new TableRow({
             children: [
                 new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ID / TAG", bold: true })]})], ...cellStyles }),
@@ -138,7 +171,6 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
             ],
         });
 
-        // Get assets with critical remarks or conditions
         const exceptions = assets.filter(a => 
           (a.metadata?.remarks && String(a.metadata.remarks).trim() !== '') || 
           a.status === 'DISCREPANCY' || 
@@ -235,12 +267,24 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                     <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">
                         <PlaneTakeoff className="text-primary h-8 w-8" /> Executive Travel Report
                     </DialogTitle>
-                    <Badge variant="outline" className="h-8 px-4 rounded-xl font-black text-[10px] uppercase border-primary/20 text-primary">
-                        Registry Coverage: {stats.percentage}%
-                    </Badge>
+                    <div className="flex items-center gap-3">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={handleAIDraft}
+                        disabled={isDrafting}
+                        className="h-9 px-4 rounded-xl border-primary/20 text-primary hover:bg-primary/5 font-black uppercase text-[9px] tracking-widest gap-2"
+                      >
+                        {isDrafting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+                        AI Narrative Draft
+                      </Button>
+                      <Badge variant="outline" className="h-9 px-4 rounded-xl font-black text-[10px] uppercase border-primary/20 text-primary">
+                          Registry Coverage: {stats.percentage}%
+                      </Badge>
+                    </div>
                 </div>
                 <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-                    Automated report engine with Discrepancy Analysis.
+                    Automated report engine with AI Narrative Pulse.
                 </DialogDescription>
             </DialogHeader>
         </div>
