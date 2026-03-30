@@ -102,6 +102,16 @@ export default function AssetList() {
     return activeGrant?.enabledSheets || [];
   }, [appSettings.grants, activeGrantId]);
 
+  // Data initialization hook - MUST be at the top level
+  useEffect(() => {
+    const loadData = async () => {
+        const data = await getLocalAssetsFromDb();
+        setAssets(data);
+        setIsLoading(false);
+    };
+    loadData();
+  }, [setAssets]);
+
   const handleDownloadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
     setIsSyncing(true);
@@ -289,9 +299,6 @@ export default function AssetList() {
   }, [setDataActions]);
 
   if (isLoading && !activeAssets.length) {
-    useEffect(() => {
-        getLocalAssetsFromDb().then(data => { setAssets(data); setIsLoading(false); });
-    }, [setAssets]);
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 

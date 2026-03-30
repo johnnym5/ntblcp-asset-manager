@@ -1,6 +1,7 @@
+
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Sheet,
   SheetContent,
@@ -11,23 +12,15 @@ import {
   SheetClose,
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from './ui/scroll-area';
-import { ArrowDown, ArrowUp, GripVertical, PlusCircle, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, GripVertical, PlusCircle, Trash2, ArrowLeft, Type, DollarSign, Binary, CalendarDays } from 'lucide-react';
 import type { SheetDefinition, DisplayField, Asset } from '@/lib/types';
 import { Input } from './ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { HEADER_ALIASES } from '@/lib/constants';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
+import { cn } from '@/lib/utils';
 
 interface ColumnCustomizationSheetProps {
   isOpen: boolean;
@@ -36,6 +29,13 @@ interface ColumnCustomizationSheetProps {
   originalSheetName: string | null;
   onSave: (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => void;
 }
+
+const FormatIcon = () => (
+    <div className="flex flex-col items-center justify-center opacity-60">
+        <span className="text-[10px] font-black leading-none uppercase">abc</span>
+        <span className="text-[10px] font-black leading-none uppercase">123</span>
+    </div>
+);
 
 export function ColumnCustomizationSheet({
   isOpen,
@@ -46,7 +46,6 @@ export function ColumnCustomizationSheet({
 }: ColumnCustomizationSheetProps) {
   const [editedName, setEditedName] = useState('');
   const [editedFields, setEditedFields] = useState<DisplayField[]>([]);
-  const [customLabel, setCustomLabel] = useState('');
   const { toast } = useToast();
 
   useEffect(() => {
@@ -56,16 +55,7 @@ export function ColumnCustomizationSheet({
     }
   }, [isOpen, sheetDefinition]);
   
-  const handleAddField = () => {
-    if (!customLabel.trim()) {
-        toast({
-            title: 'Invalid Label',
-            description: 'Custom field label cannot be empty.',
-            variant: 'destructive',
-        });
-        return;
-    }
-
+  const handleAddField = (type: string) => {
     const customFieldKeys: (keyof Asset)[] = ['customField1', 'customField2', 'customField3', 'customField4', 'customField5'];
     const usedCustomKeys = new Set(editedFields.map(f => f.key).filter(k => customFieldKeys.includes(k as keyof Asset)));
     
@@ -73,8 +63,8 @@ export function ColumnCustomizationSheet({
 
     if (!availableCustomField) {
         toast({
-            title: 'No Custom Fields Available',
-            description: 'You have used all 5 available custom fields for this sheet.',
+            title: 'Registry Limit Reached',
+            description: 'You have reached the maximum of 5 custom fields for this category.',
             variant: 'destructive',
         });
         return;
@@ -82,7 +72,7 @@ export function ColumnCustomizationSheet({
     
     const newField: DisplayField = {
         key: availableCustomField,
-        label: customLabel.trim(),
+        label: `New ${type} Field`,
         table: true,
         quickView: true,
         inChecklist: false,
@@ -90,7 +80,7 @@ export function ColumnCustomizationSheet({
     };
 
     setEditedFields(current => [...current, newField]);
-    setCustomLabel('');
+    toast({ title: "Custom field added", description: "Rename the label to finalize." });
   };
 
   const handleRemoveField = (index: number) => {
@@ -102,22 +92,6 @@ export function ColumnCustomizationSheet({
       const newFields = [...currentFields];
       newFields[index] = { ...newFields[index], label: newLabel };
       return newFields;
-    });
-  };
-
-  const handleToggle = (index: number, prop: 'table' | 'quickView' | 'inChecklist') => {
-    setEditedFields(currentFields => {
-      const newFields = [...currentFields];
-      newFields[index] = { ...newFields[index], [prop]: !newFields[index][prop] };
-      return newFields;
-    });
-  };
-
-  const handleSectionChange = (index: number, section: 'required' | 'important') => {
-    setEditedFields(currentFields => {
-        const newFields = [...currentFields];
-        newFields[index] = { ...newFields[index], checklistSection: section };
-        return newFields;
     });
   };
 
@@ -133,13 +107,6 @@ export function ColumnCustomizationSheet({
   
   const handleSaveChanges = (applyToAll: boolean) => {
     const sanitizedName = editedName.replace(/[.$#\[\]/]/g, '_');
-    if (sanitizedName !== editedName) {
-      toast({
-        title: "Sheet Name Sanitized",
-        description: `The sheet name was changed to "${sanitizedName}" to remove invalid characters.`,
-      });
-    }
-
     const newDefinition: SheetDefinition = {
       ...sheetDefinition,
       name: sanitizedName,
@@ -152,130 +119,84 @@ export function ColumnCustomizationSheet({
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-4xl flex flex-col p-0 overflow-hidden">
-        <SheetHeader className="px-6 py-4 border-b bg-muted/20">
-          <SheetTitle>Configure Sheet Layout & Checklist</SheetTitle>
-          <SheetDescription>
-            Manage columns, visibility, and checklist requirements for the "{editedName}" category.
-          </SheetDescription>
-        </SheetHeader>
-        
-        <div className="px-6 py-4 flex items-center justify-between bg-background border-b">
-            <div className="flex-1 max-w-sm">
-                <Label htmlFor="sheet-name" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Internal Sheet Name</Label>
-                <Input id="sheet-name" value={editedName} onChange={(e) => setEditedName(e.target.value)} className="mt-1 h-9 font-bold" disabled={!!originalSheetName} />
-            </div>
-            <div className="flex gap-2">
-                <Badge variant="outline" className="h-6">Total Fields: {editedFields.length}</Badge>
-                <Badge variant="outline" className="h-6 text-primary border-primary/20">Checklist: {editedFields.filter(f => f.inChecklist).length}</Badge>
-            </div>
-        </div>
-
-        <div className="flex-grow overflow-hidden flex flex-col">
-          <div className="grid grid-cols-12 gap-2 px-6 py-2 border-b font-black text-[9px] uppercase tracking-widest bg-muted/30 text-muted-foreground">
-            <div className="col-span-1 text-center">Move</div>
-            <div className="col-span-4">Field Label</div>
-            <div className="col-span-1 text-center">Table</div>
-            <div className="col-span-1 text-center">Quick</div>
-            <div className="col-span-1 text-center">Check</div>
-            <div className="col-span-3">Checklist Section</div>
-            <div className="col-span-1"></div>
-          </div>
-          
-          <ScrollArea className="flex-1">
-            <div className="p-2 space-y-1">
-              {editedFields.map((field, index) => (
-                <div key={field.key} className="grid grid-cols-12 gap-2 items-center p-2 rounded-lg hover:bg-muted/50 border border-transparent transition-colors group">
-                  <div className="col-span-1 flex flex-col items-center">
-                    <button className="text-muted-foreground hover:text-primary disabled:opacity-20" onClick={() => handleMove(index, 'up')} disabled={index === 0}>
-                        <ArrowUp className="h-3 w-3" />
-                    </button>
-                    <GripVertical className="h-4 w-4 my-0.5 text-muted-foreground/30 cursor-grab" />
-                     <button className="text-muted-foreground hover:text-primary disabled:opacity-20" onClick={() => handleMove(index, 'down')} disabled={index === editedFields.length - 1}>
-                        <ArrowDown className="h-3 w-3" />
-                    </button>
-                  </div>
-                  <div className="col-span-4">
-                    <Input 
-                        value={field.label}
-                        onChange={(e) => handleLabelChange(index, e.target.value)}
-                        className="h-8 text-xs font-semibold bg-background"
-                    />
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    <Switch
-                      className="scale-75"
-                      checked={field.table}
-                      onCheckedChange={() => handleToggle(index, 'table')}
-                    />
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    <Switch
-                      className="scale-75"
-                      checked={field.quickView}
-                      onCheckedChange={() => handleToggle(index, 'quickView')}
-                    />
-                  </div>
-                  <div className="col-span-1 flex justify-center">
-                    <Switch
-                      className="scale-75"
-                      checked={field.inChecklist}
-                      onCheckedChange={() => handleToggle(index, 'inChecklist')}
-                    />
-                  </div>
-                  <div className="col-span-3">
-                    <Select 
-                        value={field.checklistSection || 'important'} 
-                        onValueChange={(v: any) => handleSectionChange(index, v)}
-                        disabled={!field.inChecklist}
-                    >
-                        <SelectTrigger className="h-8 text-[10px] font-bold uppercase">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="required" className="text-[10px] font-bold">REQUIRED</SelectItem>
-                            <SelectItem value="important" className="text-[10px] font-bold">IMPORTANT</SelectItem>
-                        </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="col-span-1 flex justify-end">
-                      {String(field.key).startsWith('customField') && (
-                          <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => handleRemoveField(index)}>
-                              <Trash2 className="h-3.5 w-3.5" />
-                          </Button>
-                      )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </ScrollArea>
-        </div>
-
-        <div className="px-6 py-4 border-t bg-muted/5 flex items-center gap-4">
-          <div className="flex-1">
-            <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground block mb-1.5">Add Custom Field</Label>
-            <div className="flex items-center gap-2">
-                <Input
-                placeholder="Enter field label (e.g. Warranty Expiry)..."
-                value={customLabel}
-                onChange={(e) => setCustomLabel(e.target.value)}
-                className="h-9 text-xs"
-                />
-                <Button variant="outline" size="sm" onClick={handleAddField} className="h-9 font-bold px-4">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Add
+      <SheetContent className="w-full sm:max-w-xl flex flex-col p-0 overflow-hidden bg-background">
+        {/* Header matching image structure */}
+        <div className="flex items-center justify-between p-6 border-b">
+            <div className="flex items-center gap-4">
+                <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-full">
+                    <ArrowLeft className="h-6 w-6" />
                 </Button>
+                <div className="flex flex-col">
+                    <h2 className="text-xl font-black uppercase tracking-tight">Configure Layout</h2>
+                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{editedName}</span>
+                </div>
             </div>
-          </div>
+            <Button variant="ghost" size="icon" className="text-destructive opacity-40 hover:opacity-100 transition-opacity">
+                <Trash2 className="h-6 w-6" />
+            </Button>
         </div>
 
-        <SheetFooter className="p-6 border-t bg-muted/20 sm:justify-between items-center">
-          <SheetClose asChild>
-            <Button variant="outline" className="font-bold">Cancel</Button>
-          </SheetClose>
-          <div className="flex gap-2">
-            <Button variant="secondary" className="font-bold" onClick={() => handleSaveChanges(true)}>Update All Categories</Button>
-            <Button className="font-bold shadow-lg shadow-primary/20" onClick={() => handleSaveChanges(false)}>Update This Category</Button>
-          </div>
+        <div className="px-8 py-4 bg-muted/20 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+            <span>Field label</span>
+            <span>Format</span>
+        </div>
+
+        <ScrollArea className="flex-1 px-6">
+            <div className="space-y-3 py-4">
+                {editedFields.map((field, index) => (
+                    <div key={`${field.key}-${index}`} className="group relative">
+                        <div className="absolute -left-4 top-1/2 -translate-y-1/2 flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+                            <button onClick={() => handleMove(index, 'up')} disabled={index === 0} className="hover:text-primary"><ArrowUp className="h-3 w-3" /></button>
+                            <button onClick={() => handleMove(index, 'down')} disabled={index === editedFields.length - 1} className="hover:text-primary"><ArrowDown className="h-3 w-3" /></button>
+                        </div>
+                        
+                        <div className="bg-card border-2 border-border/40 rounded-3xl p-5 flex items-center justify-between shadow-sm transition-all hover:border-primary/20 hover:shadow-md">
+                            <div className="flex-1 mr-4">
+                                <Input 
+                                    value={field.label}
+                                    onChange={(e) => handleLabelChange(index, e.target.value)}
+                                    className="border-none bg-transparent p-0 h-auto font-black text-base focus-visible:ring-0 shadow-none text-foreground placeholder:opacity-20"
+                                />
+                            </div>
+                            <div className="flex items-center gap-4">
+                                <FormatIcon />
+                                {String(field.key).startsWith('customField') && (
+                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/40 hover:text-destructive" onClick={() => handleRemoveField(index)}>
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                ))}
+            </div>
+        </ScrollArea>
+
+        {/* Bottom bar for "Add field" matching image */}
+        <div className="p-6 border-t bg-muted/10">
+            <div className="flex flex-col items-center gap-4">
+                <div className="w-12 h-1 bg-muted-foreground/20 rounded-full" />
+                <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Add field</span>
+                <div className="flex items-center justify-center gap-8 w-full">
+                    <button onClick={() => handleAddField('Text')} className="flex flex-col items-center gap-1 group">
+                        <div className="p-2 rounded-xl group-hover:bg-primary/10 transition-colors"><Type className="h-6 w-6 text-foreground" /></div>
+                    </button>
+                    <button onClick={() => handleAddField('Currency')} className="flex flex-col items-center gap-1 group">
+                        <div className="p-2 rounded-xl group-hover:bg-primary/10 transition-colors"><DollarSign className="h-6 w-6 text-foreground" /></div>
+                    </button>
+                    <button onClick={() => handleAddField('Number')} className="flex flex-col items-center gap-1 group">
+                        <div className="p-2 rounded-xl group-hover:bg-primary/10 transition-colors"><Binary className="h-6 w-6 text-foreground" /></div>
+                    </button>
+                    <button onClick={() => handleAddField('Date')} className="flex flex-col items-center gap-1 group">
+                        <div className="p-2 rounded-xl group-hover:bg-primary/10 transition-colors"><CalendarDays className="h-6 w-6 text-foreground" /></div>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <SheetFooter className="p-6 border-t bg-muted/20 flex flex-row items-center gap-2">
+            <Button variant="outline" className="flex-1 font-black uppercase text-[10px] tracking-widest h-12 rounded-2xl" onClick={() => handleSaveChanges(true)}>Update All</Button>
+            <Button className="flex-1 font-black uppercase text-[10px] tracking-widest h-12 rounded-2xl shadow-xl shadow-primary/20" onClick={() => handleSaveChanges(false)}>Commit Changes</Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>
