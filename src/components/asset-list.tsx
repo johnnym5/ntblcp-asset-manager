@@ -44,7 +44,7 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/contexts/app-state-context";
-import { getAssets } from "@/lib/firestore";
+import { getAssets, batchDeleteAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets } from "@/lib/idb";
 import { cn, sanitizeForFirestore } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
@@ -105,8 +105,18 @@ export default function AssetList() {
         const cloudAssets = await getAssets();
         const localAssets = await getLocalAssetsFromDb();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
-        const summary: SyncSummary = { newFromCloud: [], updatedFromCloud: [], keptLocal: [], toUpload: [], type: 'download' };
+        const cloudAssetsMap = new Map(cloudAssets.map(a => [a.id, a]));
         
+        const summary: SyncSummary = { 
+            newFromCloud: [], 
+            updatedFromCloud: [], 
+            keptLocal: [], 
+            toUpload: [], 
+            deletedOnCloud: [],
+            type: 'download' 
+        };
+        
+        // Find new/updated items
         for (const cloudAsset of cloudAssets) {
             if (activeGrantId && cloudAsset.grantId !== activeGrantId) continue;
             const localAsset = localAssetsMap.get(cloudAsset.id);
@@ -117,7 +127,16 @@ export default function AssetList() {
                 else if (haveAssetDetailsChanged(localAsset, cloudAsset)) summary.updatedFromCloud.push(cloudAsset);
             } else summary.newFromCloud.push(cloudAsset);
         }
-        if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0) {
+
+        // Detect items deleted on cloud
+        for (const localAsset of localAssets) {
+            if (activeGrantId && localAsset.grantId !== activeGrantId) continue;
+            if (!cloudAssetsMap.has(localAsset.id) && localAsset.syncStatus === 'synced') {
+                summary.deletedOnCloud!.push(localAsset);
+            }
+        }
+
+        if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0 && summary.deletedOnCloud!.length === 0) {
             addNotification({ title: 'Registry Up-to-Date' });
         } else { 
             setSyncSummary(summary); 
@@ -202,6 +221,50 @@ export default function AssetList() {
     setAssets(updated);
     setIsFormOpen(false);
     toast({ title: "Asset record updated locally." });
+  };
+
+  const handleSyncConfirmExecute = async () => {
+      if (!syncSummary) return;
+      setIsSyncing(true);
+      
+      try {
+          const localAssets = await getLocalAssetsFromDb();
+          let nextAssets = [...localAssets];
+
+          if (syncSummary.type === 'download') {
+              const { newFromCloud, updatedFromCloud, deletedOnCloud } = syncSummary;
+              const remoteItems = [...newFromCloud, ...updatedFromCloud];
+              const deleteIds = new Set(deletedOnCloud?.map(a => a.id));
+
+              // Apply remote items
+              const remoteMap = new Map(remoteItems.map(a => [a.id, a]));
+              nextAssets = nextAssets
+                .filter(a => !deleteIds.has(a.id))
+                .map(a => remoteMap.get(a.id) || a);
+              
+              const currentIds = new Set(nextAssets.map(a => a.id));
+              newFromCloud.forEach(a => {
+                  if (!currentIds.has(a.id)) nextAssets.push(a);
+              });
+
+              addNotification({ title: 'Download Successful', description: `Injected ${remoteItems.length} changes and purged ${deleteIds.size} records.` });
+          } else {
+              // Upload Logic
+              await batchSetAssets(syncSummary.toUpload);
+              const uploadedIds = new Set(syncSummary.toUpload.map(a => a.id));
+              nextAssets = nextAssets.map(a => uploadedIds.has(a.id) ? { ...a, syncStatus: 'synced' } : a);
+              addNotification({ title: 'Upload Successful', description: `Broadcast ${syncSummary.toUpload.length} changes to cloud.` });
+          }
+
+          await saveAssets(nextAssets);
+          setAssets(nextAssets);
+      } catch (e) {
+          addNotification({ title: 'Sync Failure', variant: 'destructive' });
+      } finally {
+          setIsSyncing(false);
+          setIsSyncConfirmOpen(false);
+          setSyncSummary(null);
+      }
   };
 
   useEffect(() => {
@@ -352,11 +415,7 @@ export default function AssetList() {
         isOpen={isSyncConfirmOpen} 
         onOpenChange={setIsSyncConfirmOpen} 
         summary={syncSummary} 
-        onConfirm={() => {
-            if (syncSummary?.type === 'download') {
-                // Confirm Sync Logic...
-            }
-        }} 
+        onConfirm={handleSyncConfirmExecute} 
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>

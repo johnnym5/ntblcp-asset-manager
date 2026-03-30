@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
@@ -206,6 +205,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   // 3. Asset Synchronization (Strictly Project-Scoped)
   useEffect(() => {
     if (!isOnline || !appSettings.activeGrantId) return;
+
+    // Flush current assets before re-subscribing to a new grant/database
+    setAssets([]);
 
     let unsubscribe: () => void = () => {};
 

@@ -70,8 +70,9 @@ export interface Asset {
   previousState?: Partial<Asset>;
 
   // Approval Workflow Fields
-  approvalStatus?: 'pending'; // Only set when there's a pending change
+  approvalStatus?: 'pending'; 
   pendingChanges?: Partial<Asset>;
+  adminComment?: string;
   changeSubmittedBy?: { 
     displayName: string;
     loginName: string;

@@ -174,7 +174,7 @@ export function InboxSheet({ isOpen, onOpenChange, onApprove, onReject, onRefres
             <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground/40 py-20">
               <Inbox className="h-16 w-16 mb-4 opacity-20" />
               <h3 className="text-lg font-black uppercase tracking-widest">Queue Clear</h3>
-              <p className="text-xs font-medium max-w-[200px] mt-2">No pending modifications require your review at this time.</p>
+              <p className="text-xs font-medium max-w-[250px] mt-2">No pending modifications require your review at this time.</p>
             </div>
           )}
         </ScrollArea>
