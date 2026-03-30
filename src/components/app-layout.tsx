@@ -21,7 +21,11 @@ import {
   Monitor,
   Inbox,
   History,
-  ShieldCheck
+  ShieldCheck,
+  CheckCircle2,
+  ListTodo,
+  Users,
+  Activity
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -38,13 +42,24 @@ interface NavItem {
   label: string;
   href: string;
   icon: React.ReactNode;
+  roles?: string[];
 }
 
-const NAV_ITEMS: NavItem[] = [
+const PRIMARY_NAV: NavItem[] = [
   { label: 'Dashboard', href: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
   { label: 'Asset Registry', href: '/assets', icon: <Boxes className="h-4 w-4" /> },
-  { label: 'Import Data', href: '/import', icon: <FileUp className="h-4 w-4" /> },
+  { label: 'Verification Queue', href: '/verify', icon: <CheckCircle2 className="h-4 w-4" /> },
+  { label: 'Import Engine', href: '/import', icon: <FileUp className="h-4 w-4" /> },
+];
+
+const AUDIT_NAV: NavItem[] = [
   { label: 'Audit Reports', href: '/reports', icon: <FileText className="h-4 w-4" /> },
+  { label: 'Activity Log', href: '/audit-log', icon: <History className="h-4 w-4" /> },
+  { label: 'Offline Queue', href: '/sync-queue', icon: <ListTodo className="h-4 w-4" /> },
+];
+
+const ADMIN_NAV: NavItem[] = [
+  { label: 'Users & Roles', href: '/users', icon: <Users className="h-4 w-4" /> },
   { label: 'Settings', href: '/settings', icon: <Settings className="h-4 w-4" /> },
 ];
 
@@ -61,13 +76,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAdmin = userProfile?.isAdmin;
   const pendingCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
 
-  const NavLinks = ({ className, onClick }: { className?: string, onClick?: () => void }) => (
-    <nav className={cn("space-y-1", className)}>
-      {NAV_ITEMS.map((item) => (
+  const NavGroup = ({ items, title }: { items: NavItem[], title?: string }) => (
+    <div className="space-y-1">
+      {title && <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50 mt-6">{title}</p>}
+      {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}
-          onClick={onClick}
           className={cn(
             "flex items-center gap-3 px-4 py-3 text-sm font-bold uppercase tracking-widest rounded-xl transition-all",
             pathname === item.href 
@@ -76,10 +91,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           )}
         >
           {item.icon}
-          {item.label}
+          <span className="flex-1">{item.label}</span>
         </Link>
       ))}
-    </nav>
+    </div>
   );
 
   return (
@@ -95,23 +110,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
-        <NavLinks className="flex-1" />
+        <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2">
+          <NavGroup items={PRIMARY_NAV} />
+          <NavGroup items={AUDIT_NAV} title="Reporting & Pulse" />
+          {isAdmin && <NavGroup items={ADMIN_NAV} title="Governance" />}
 
-        {isAdmin && (
-          <div className="mb-6 space-y-1">
-            <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50">Governance</p>
-            <Button variant="ghost" onClick={() => setIsInboxOpen(true)} className="w-full justify-between px-4 font-black uppercase text-[10px] tracking-widest rounded-xl">
-              <span className="flex items-center gap-3"><Inbox className="h-4 w-4" /> Approval Queue</span>
-              {pendingCount > 0 && <Badge className="bg-primary text-[8px] h-4 min-w-4 flex items-center justify-center p-0">{pendingCount}</Badge>}
-            </Button>
-            <Button variant="ghost" onClick={() => setIsAuditLogOpen(true)} className="w-full justify-start gap-3 px-4 font-black uppercase text-[10px] tracking-widest rounded-xl">
-              <History className="h-4 w-4" /> Audit Trail
-            </Button>
-            <Button variant="ghost" onClick={() => setIsAdminDBOpen(true)} className="w-full justify-start gap-3 px-4 font-black uppercase text-[10px] tracking-widest rounded-xl">
-              <Monitor className="h-4 w-4" /> DB Workstation
-            </Button>
-          </div>
-        )}
+          {isAdmin && (
+            <div className="mt-6 space-y-1">
+              <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50">Quick Actions</p>
+              <Button variant="ghost" onClick={() => setIsInboxOpen(true)} className="w-full justify-between px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12">
+                <span className="flex items-center gap-3"><Inbox className="h-4 w-4" /> Approvals</span>
+                {pendingCount > 0 && <Badge className="bg-primary text-[8px] h-4 min-w-4 flex items-center justify-center p-0">{pendingCount}</Badge>}
+              </Button>
+              <Button variant="ghost" onClick={() => setIsAdminDBOpen(true)} className="w-full justify-start gap-3 px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12">
+                <Monitor className="h-4 w-4" /> Infrastructure
+              </Button>
+            </div>
+          )}
+        </div>
 
         <div className="mt-auto space-y-4 pt-6 border-t border-border/40">
           <div className="flex items-center gap-3 px-2">
@@ -131,45 +147,53 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-6 z-30">
-          <div className="flex items-center gap-4 lg:hidden">
-            <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
-              <SheetTrigger asChild>
-                <Button variant="ghost" size="icon"><Menu className="h-6 w-6" /></Button>
-              </SheetTrigger>
-              <SheetContent side="left" className="w-72 p-6">
-                <div className="flex items-center gap-3 mb-10">
-                  <ShieldCheck className="h-6 w-6 text-primary" />
-                  <span className="text-xl font-black">Assetain</span>
-                </div>
-                <NavLinks onClick={() => setIsMobileMenuOpen(false)} />
-              </SheetContent>
-            </Sheet>
-            <span className="text-lg font-black tracking-tight">Assetain</span>
-          </div>
-
-          <div className="hidden lg:block">
-            <h1 className="text-sm font-black uppercase tracking-widest text-muted-foreground">
-              {NAV_ITEMS.find(i => i.href === pathname)?.label || 'Registry'}
+          <div className="flex items-center gap-4">
+            <div className="lg:hidden">
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon"><Menu className="h-6 w-6" /></Button>
+                </SheetTrigger>
+                <SheetContent side="left" className="w-72 p-6 flex flex-col">
+                  <div className="flex items-center gap-3 mb-10">
+                    <ShieldCheck className="h-6 w-6 text-primary" />
+                    <span className="text-xl font-black">Assetain</span>
+                  </div>
+                  <div className="flex-1 overflow-y-auto">
+                    <NavGroup items={PRIMARY_NAV} />
+                    <NavGroup items={AUDIT_NAV} title="Reporting & Pulse" />
+                    {isAdmin && <NavGroup items={ADMIN_NAV} title="Governance" />}
+                  </div>
+                </SheetContent>
+              </Sheet>
+            </div>
+            <h1 className="text-sm font-black uppercase tracking-widest text-muted-foreground hidden sm:block">
+              {pathname === '/' ? 'Inventory Pulse' : 
+               pathname.split('/').pop()?.replace('-', ' ') || 'Workstation'}
             </h1>
           </div>
 
           <div className="flex items-center gap-3">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => setIsOnline(!isOnline)}
-              className={cn(
-                "rounded-full px-4 font-black text-[10px] uppercase tracking-tighter",
-                isOnline ? "text-green-500 bg-green-500/10" : "text-destructive bg-destructive/10"
-              )}
-            >
-              {isOnline ? <Cloud className="mr-2 h-3.5 w-3.5" /> : <CloudOff className="mr-2 h-3.5 w-3.5" />}
-              {isOnline ? 'Online' : 'Offline'}
-            </Button>
+            <div className={cn(
+              "flex items-center gap-2 px-4 py-1.5 rounded-full border-2 transition-all",
+              isOnline ? "border-green-500/20 bg-green-500/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive"
+            )}>
+              {isOnline ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
+              <span className="text-[10px] font-black uppercase tracking-tighter">
+                {isOnline ? 'Cloud Active' : 'Offline Mode'}
+              </span>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-4 w-4 ml-1 hover:bg-transparent" 
+                onClick={() => setIsOnline(!isOnline)}
+              >
+                <Activity className="h-3 w-3 opacity-40" />
+              </Button>
+            </div>
             
             <Button variant="ghost" size="icon" className="relative rounded-full">
               <Bell className="h-5 w-5" />
-              <Badge className="absolute -top-1 -right-1 h-4 w-4 p-0 flex items-center justify-center bg-primary text-[8px] font-black">0</Badge>
+              <Badge className="absolute top-0 right-0 h-4 w-4 p-0 flex items-center justify-center bg-primary text-[8px] font-black">0</Badge>
             </Button>
           </div>
         </header>
@@ -182,7 +206,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {isAdmin && (
         <>
           <DatabaseAdminDialog isOpen={isAdminDBOpen} onOpenChange={setIsAdminDBOpen} />
-          <ActivityLogDialog isOpen={isAuditLogOpen} onOpenChange={setIsAuditLogOpen} onRevert={async () => {}} />
           <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
         </>
       )}
