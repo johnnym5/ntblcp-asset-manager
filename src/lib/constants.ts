@@ -12,6 +12,22 @@ export const TARGET_SHEETS = [
   'IHVN-GF N-THRIP', // Simplified: now a single sheet
 ];
 
+export const ASSET_CONDITIONS = [
+  "New",
+  "Used- good condition",
+  "Used but in good working condition",
+  "Used but requires occasional repair",
+  "Used but in poor condition",
+  "Bad condition",
+  "F2: Major repairs required-poor condition",
+  "Unsalvageable",
+  "Burnt",
+  "Stolen",
+  "Obsolete",
+  "Insurance settlement",
+  "Writeoff"
+];
+
 export const NIGERIAN_STATES = [
   "Abia", "Adamawa", "Akwa Ibom", "Anambra", "Bauchi", "Bayelsa", "Benue", "Borno",
   "Cross River", "Delta", "Ebonyi", "Edo", "Ekiti", "Enugu", "FCT - Abuja", "Gombe",
