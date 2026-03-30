@@ -9,14 +9,14 @@ export interface SectionHierarchy {
   document: string;
   section: string;
   subsection: string;
-  assetFamily: string;
+  asset_family: string;
 }
 
 export interface ImportMetadata {
-  sourceFile: string;
-  sheetName: string;
-  rowNumber: number;
-  importedAt: string;
+  source_file: string;
+  sheet_name: string;
+  row_number: number;
+  imported_at: string; // ISO 8601
 }
 
 export interface Asset {
@@ -24,30 +24,45 @@ export interface Asset {
   name: string;
   description: string;
   category: string;
+  
+  // Hierarchical Context
+  asset_family: string;
+  section: string;
+  subsection: string;
+  
+  // Location & Assignment
   location: string;
   custodian: string;
+  
+  // State & Assessment
   status: VerificationStatus;
   condition: string;
-  purchaseDate: string; // ISO 8601
+  
+  // Financial & Temporal
+  purchase_date: string; // ISO 8601
   value: number;
-  serialNumber: string;
-  assetIdCode?: string;
-  hierarchy: SectionHierarchy;
-  importMetadata: ImportMetadata;
+  serial_number: string;
+  asset_id_code?: string;
+
+  // Metadata & Traceability
   metadata: Record<string, string | number | boolean | null>;
-  lastModified: string;
-  lastModifiedBy: string;
+  hierarchy: SectionHierarchy;
+  import_metadata: ImportMetadata;
+  
+  // System Fields
+  last_modified: string; // ISO 8601
+  last_modified_by: string;
 }
 
 export interface AuditLog {
   id: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE' | 'VERIFY' | 'IMPORT';
   user: string;
-  timestamp: string;
-  entityId: string;
+  timestamp: string; // ISO 8601
+  entity_id: string;
   payload?: {
-    before: Record<string, any> | null;
-    after: Record<string, any> | null;
+    before: Record<string, unknown> | null;
+    after: Record<string, unknown> | null;
   };
 }
 
@@ -58,7 +73,7 @@ export interface OfflineQueueEntry {
   id: string;
   operation: QueueOperation;
   collection: string;
-  payload: any;
+  payload: Record<string, unknown>;
   status: QueueStatus;
   timestamp: number;
   error?: string;

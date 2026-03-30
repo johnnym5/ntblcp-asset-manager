@@ -5,7 +5,7 @@
 
 import { doc, collection, getDocs, setDoc, query, where, writeBatch } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { Asset } from '@/types/domain';
+import type { Asset } from '@/types/domain';
 import { validateAsset } from '@/core/registry/validation';
 
 export class RegistryService {
@@ -36,7 +36,7 @@ export class RegistryService {
     const docRef = doc(db, this.collectionName, asset.id);
     await setDoc(docRef, {
       ...asset,
-      lastModified: new Date().toISOString()
+      last_modified: new Date().toISOString()
     }, { merge: true });
   }
 

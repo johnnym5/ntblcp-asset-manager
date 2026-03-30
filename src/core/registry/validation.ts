@@ -7,29 +7,50 @@ import { z } from 'zod';
 
 export const AssetSchema = z.object({
   id: z.string().uuid(),
-  category: z.string().min(1, "Asset class is required"),
+  name: z.string().min(1, "Name is required"),
   description: z.string().min(2, "Description must be valid"),
-  grantId: z.string(),
-  location: z.string(),
-  condition: z.string().default("Unassessed"),
-  verifiedStatus: z.enum(["Verified", "Unverified", "Discrepancy"]),
-  lastModified: z.string().datetime(),
-  lastModifiedBy: z.string(),
+  category: z.string().min(1, "Category is required"),
   
-  // Optional but typed fields
-  sn: z.string().optional(),
-  serialNumber: z.string().optional(),
-  assetIdCode: z.string().optional(),
-  lga: z.string().optional(),
-  site: z.string().optional(),
-  assignee: z.string().optional(),
-  manufacturer: z.string().optional(),
-  modelNumber: z.string().optional(),
-  remarks: z.string().optional(),
-  majorSection: z.string().optional(),
-  subsectionName: z.string().optional(),
-  yearBucket: z.number().int().optional(),
-}).passthrough();
+  // Hierarchical Context
+  asset_family: z.string().default("Uncategorized"),
+  section: z.string().default("General"),
+  subsection: z.string().default("Base Register"),
+  
+  // Location & Assignment
+  location: z.string().min(1, "Location is required"),
+  custodian: z.string().default("Unassigned"),
+  
+  // State & Assessment
+  status: z.enum(["VERIFIED", "UNVERIFIED", "DISCREPANCY"]).default("UNVERIFIED"),
+  condition: z.string().default("Unassessed"),
+  
+  // Financial & Temporal
+  purchase_date: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  value: z.number().nonnegative().default(0),
+  serial_number: z.string().default("N/A"),
+  asset_id_code: z.string().optional(),
+
+  // Nested Structured Data
+  hierarchy: z.object({
+    document: z.string(),
+    section: z.string(),
+    subsection: z.string(),
+    asset_family: z.string(),
+  }),
+  
+  import_metadata: z.object({
+    source_file: z.string(),
+    sheet_name: z.string(),
+    row_number: z.number().int(),
+    imported_at: z.string().datetime(),
+  }),
+
+  metadata: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+  
+  // System Metadata
+  last_modified: z.string().datetime(),
+  last_modified_by: z.string(),
+});
 
 export type ValidatedAsset = z.infer<typeof AssetSchema>;
 
