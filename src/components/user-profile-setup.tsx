@@ -19,7 +19,7 @@ import {
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Loader2, AlertCircle, Boxes } from 'lucide-react';
+import { Loader2, AlertCircle, Package } from 'lucide-react';
 import type { AuthorizedUser } from '@/lib/types';
 import { Alert, AlertDescription, AlertTitle } from './ui/alert';
 import { useAuth } from '@/contexts/auth-context';
@@ -48,7 +48,7 @@ export default function UserProfileSetup() {
   const [selectedState, setSelectedState] = useState<string>('');
   
   const { login } = useAuth();
-  const { appSettings } = useAppState();
+  const { appSettings, settingsLoaded } = useAppState();
 
   const handleLogin = () => {
     setError(null);
@@ -57,7 +57,12 @@ export default function UserProfileSetup() {
       return;
     }
 
-    const allUsers = [...appSettings.authorizedUsers, superAdmin];
+    if (!settingsLoaded) {
+      setError("System still initializing. Please wait a moment.");
+      return;
+    }
+
+    const allUsers = [...(appSettings?.authorizedUsers || []), superAdmin];
     const searchTerm = email.toLowerCase().trim();
 
     const user = allUsers.find(
@@ -115,6 +120,14 @@ export default function UserProfileSetup() {
   
   const isMultiStateUser = foundUser && foundUser.states.length > 1 && !foundUser.isAdmin && !foundUser.states.includes('All');
 
+  if (!settingsLoaded) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm">
@@ -122,7 +135,7 @@ export default function UserProfileSetup() {
             <AlertDialogContent className="rounded-3xl border-primary/10">
                 <AlertDialogHeader className="text-center items-center">
                     <div className="p-3 bg-primary/10 rounded-full mb-2">
-                        <Boxes className="h-6 w-6 text-primary" />
+                        <Package className="h-6 w-6 text-primary" />
                     </div>
                     <AlertDialogTitle className="text-2xl font-black tracking-tight">Assetain Registry</AlertDialogTitle>
                     <AlertDialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">

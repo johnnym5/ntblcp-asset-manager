@@ -10,12 +10,10 @@ import {
   getDoc, 
   getDocs, 
   setDoc, 
-  deleteDoc, 
   collection, 
   query, 
   where, 
   writeBatch,
-  type Firestore,
   type DocumentReference
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -35,7 +33,9 @@ export const FirestoreService = {
       const snap = await getDoc(settingsRef);
       return snap.exists() ? (snap.data() as AppSettings) : null;
     } catch (err: any) {
-      this.handlePermissionError(settingsRef, 'get', err);
+      if (err?.code === 'permission-denied') {
+        this.handlePermissionError(settingsRef, 'get', err);
+      }
       throw err;
     }
   },

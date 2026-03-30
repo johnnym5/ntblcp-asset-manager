@@ -1,68 +1,109 @@
 /**
- * @fileOverview Core Domain Models for Assetain Rebuild.
- * Strictly typed, deterministic models for registry management.
+ * @fileOverview Unified Domain Models for Assetain.
+ * Strictly typed, deterministic models for registry management and system configuration.
  */
 
-export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
+export type VerificationStatus = 'Verified' | 'Unverified' | 'Discrepancy';
 
 export interface SectionHierarchy {
   document: string;
   section: string;
   subsection: string;
-  asset_family: string;
+  assetFamily: string;
 }
 
 export interface ImportMetadata {
-  source_file: string;
-  sheet_name: string;
-  row_number: number;
-  imported_at: string; // ISO 8601
+  sourceFile: string;
+  sheetName: string;
+  rowNumber: number;
+  importedAt: string; // ISO 8601
+}
+
+export interface DisplayField {
+  key: string;
+  label: string;
+  table: boolean;
+  quickView: boolean;
+  inChecklist?: boolean;
+  checklistSection?: 'required' | 'important';
+}
+
+export interface SheetDefinition {
+  name: string;
+  headers: string[];
+  displayFields: DisplayField[];
+  subSheetTriggers?: string[];
+}
+
+export interface Grant {
+  id: string;
+  name: string;
+  sheetDefinitions: Record<string, SheetDefinition>;
+  enabledSheets: string[];
+}
+
+export interface AuthorizedUser {
+  loginName: string;
+  displayName: string;
+  email: string;
+  password?: string;
+  states: string[];
+  isAdmin: boolean;
+  isZonalAdmin?: boolean;
+  assignedZone?: string;
+  isGuest?: boolean;
+  canAddAssets?: boolean;
+  canEditAssets?: boolean;
+}
+
+export interface AppSettings {
+  grants: Grant[];
+  activeGrantId: string | null;
+  authorizedUsers: AuthorizedUser[];
+  lockAssetList: boolean;
+  appMode: 'management' | 'verification';
+  activeDatabase: 'firestore' | 'rtdb';
+  lastModified?: string;
 }
 
 export interface Asset {
   id: string;
-  name: string;
-  description: string;
   category: string;
+  grantId?: string;
   
-  // Hierarchical Context
-  asset_family: string;
-  section: string;
-  subsection: string;
+  // Dynamic Fields (mapped from Excel)
+  sn?: string;
+  description?: string;
+  serialNumber?: string;
+  assetIdCode?: string;
+  location?: string;
+  lga?: string;
+  site?: string;
+  assignee?: string;
+  condition?: string;
+  remarks?: string;
   
-  // Location & Assignment
-  location: string;
-  custodian: string;
-  
-  // State & Assessment
-  status: VerificationStatus;
-  condition: string;
-  
-  // Financial & Temporal
-  purchase_date: string; // ISO 8601
-  value: number;
-  serial_number: string;
-  asset_id_code?: string;
-
-  // Metadata & Traceability
-  metadata: Record<string, string | number | boolean | null>;
+  // Custom Metadata
+  metadata: Record<string, unknown>;
   hierarchy: SectionHierarchy;
-  import_metadata: ImportMetadata;
+  importMetadata: ImportMetadata;
   
-  // System Fields
-  last_modified: string; // ISO 8601
-  last_modified_by: string;
-}
-
-export interface AuditLog {
-  id: string;
-  action: 'CREATE' | 'UPDATE' | 'DELETE' | 'VERIFY' | 'IMPORT';
-  user: string;
-  timestamp: string; // ISO 8601
-  entity_id: string;
-  payload?: {
-    before: Record<string, unknown> | null;
-    after: Record<string, unknown> | null;
+  // System Status
+  verifiedStatus: VerificationStatus;
+  verifiedDate?: string;
+  lastModified: string; // ISO 8601
+  lastModifiedBy: string;
+  lastModifiedByState?: string;
+  syncStatus?: 'synced' | 'local' | 'syncing';
+  
+  // UI/Audit Buffer
+  previousState?: Partial<Asset>;
+  approvalStatus?: 'pending';
+  pendingChanges?: Partial<Asset>;
+  changeSubmittedBy?: {
+    displayName: string;
+    loginName: string;
+    state: string;
   };
 }
 
