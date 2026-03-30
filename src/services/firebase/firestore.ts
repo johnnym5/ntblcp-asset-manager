@@ -86,7 +86,14 @@ export const FirestoreService = {
     const sanitized = sanitizeForFirestore(validation.data);
     
     try {
-      await setDoc(assetRef, sanitized, { merge: true });
+      // Before saving, try to get the current state for the restoration buffer
+      const currentSnap = await getDoc(assetRef);
+      const previousState = currentSnap.exists() ? currentSnap.data() : null;
+
+      await setDoc(assetRef, {
+        ...sanitized,
+        previousState: previousState ? sanitizeForFirestore(previousState) : null
+      }, { merge: true });
       
       // Log the mutation pulse
       await this.logActivity({
@@ -100,6 +107,47 @@ export const FirestoreService = {
 
     } catch (err: any) {
       this.handlePermissionError(assetRef, 'update', err, sanitized);
+      throw err;
+    }
+  },
+
+  /**
+   * Formal Reversion Pulse.
+   * Restores an asset to its previous state from the cloud buffer.
+   */
+  async restoreAsset(assetId: string, performedBy: string): Promise<void> {
+    if (!db) return;
+    const assetRef = doc(db, 'assets', assetId);
+    
+    try {
+      const snap = await getDoc(assetRef);
+      if (!snap.exists()) return;
+      const asset = snap.data() as Asset;
+      
+      if (!asset.previousState) {
+        throw new Error("No restoration pulse available for this record.");
+      }
+
+      const restoredData = {
+        ...asset.previousState,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: performedBy,
+        previousState: null // Clear buffer after use
+      };
+
+      await setDoc(assetRef, sanitizeForFirestore(restoredData));
+      
+      await this.logActivity({
+        assetId,
+        assetDescription: asset.description,
+        operation: 'RESTORE',
+        performedBy,
+        userState: 'SYSTEM',
+        changes: { status: { old: 'MODIFIED', new: 'RESTORED' } }
+      });
+
+    } catch (err: any) {
+      this.handlePermissionError(assetRef, 'update', err);
       throw err;
     }
   },
