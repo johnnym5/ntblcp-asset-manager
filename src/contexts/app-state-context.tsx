@@ -1,4 +1,3 @@
-
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
@@ -165,7 +164,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   // 2. Real-Time Cloud Listeners (Config Broadcast)
   useEffect(() => {
-    if (!isOnline || !db || !rtdb) return;
+    if (!isOnline || !db) return;
 
     let unsubscribe: () => void = () => {};
     
@@ -182,7 +181,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
           });
         }
       });
-    } else {
+    } else if (appSettings.activeDatabase === 'rtdb' && rtdb) {
       const settingsRef = ref(rtdb, 'config/settings');
       onValue(settingsRef, (snapshot) => {
         if (snapshot.exists()) {
@@ -203,17 +202,17 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
 
   // 3. Asset Synchronization (Project-Scoped)
   useEffect(() => {
-    if (!isOnline || !db || !appSettings.activeGrantId) return;
+    if (!isOnline || !appSettings.activeGrantId) return;
 
     let unsubscribe: () => void = () => {};
 
-    if (appSettings.activeDatabase === 'firestore') {
+    if (appSettings.activeDatabase === 'firestore' && db) {
       const q = query(collection(db, 'assets'), where('grantId', '==', appSettings.activeGrantId));
       unsubscribe = onSnapshot(q, (snapshot) => {
         const fetched = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
         setAssets(fetched);
       });
-    } else {
+    } else if (appSettings.activeDatabase === 'rtdb' && rtdb) {
       const assetsRef = ref(rtdb, 'assets');
       onValue(assetsRef, (snapshot) => {
         if (snapshot.exists()) {
@@ -222,6 +221,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             .map(([id, val]: [string, any]) => ({ ...val, id }))
             .filter(a => a.grantId === appSettings.activeGrantId);
           setAssets(fetched);
+        } else {
+          setAssets([]);
         }
       });
     }
