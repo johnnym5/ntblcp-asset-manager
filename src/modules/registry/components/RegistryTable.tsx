@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryTable - Virtualized performance-grade registry browser.
- * Now includes visual distinction between Online and Locally Saved states.
+ * Updated for Phase 2 with selection pulse and refined operational density.
  */
 
 import React from 'react';
@@ -16,7 +16,17 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, ShieldCheck, Clock, AlertCircle, Camera, Database, Globe } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
+import { 
+  MoreHorizontal, 
+  ShieldCheck, 
+  Clock, 
+  AlertCircle, 
+  Camera, 
+  Database, 
+  Globe,
+  ArrowUpDown
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/contexts/app-state-context';
 import type { Asset } from '@/types/domain';
@@ -24,43 +34,71 @@ import type { Asset } from '@/types/domain';
 interface RegistryTableProps {
   assets: Asset[];
   onInspect: (asset: Asset) => void;
+  selectedIds: Set<string>;
+  onToggleSelection: (id: string) => void;
+  onSelectAll: (checked: boolean) => void;
 }
 
-export function RegistryTable({ assets, onInspect }: RegistryTableProps) {
+export function RegistryTable({ 
+  assets, 
+  onInspect, 
+  selectedIds, 
+  onToggleSelection, 
+  onSelectAll 
+}: RegistryTableProps) {
   const { isOnline } = useAppState();
 
+  const allSelected = assets.length > 0 && selectedIds.size === assets.length;
+
   return (
-    <div className="rounded-3xl border border-border/40 overflow-hidden bg-card/50 shadow-2xl">
-      <div className="px-6 py-4 bg-muted/20 border-b flex items-center justify-between">
-        <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">
-          {isOnline ? <Globe className="h-3 w-3 text-green-600" /> : <Database className="h-3 w-3 text-orange-600" />}
-          {isOnline ? 'Active Online Registry' : 'Locally Saved Asset Store'}
-        </h3>
-        <Badge variant="outline" className="text-[9px] font-black border-primary/10 text-primary uppercase h-5 px-2">
-          {assets.length} Active Records
-        </Badge>
-      </div>
+    <div className="relative h-full overflow-auto custom-scrollbar">
       <Table>
-        <TableHeader className="bg-muted/10">
-          <TableRow className="border-b border-border/40 hover:bg-transparent">
-            <th className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Identification Pulse</th>
-            <th className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Hierarchical Context</th>
-            <th className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Regional Scope</th>
-            <th className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-left">Assessment</th>
-            <th className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Actions</th>
+        <TableHeader className="bg-muted/30 sticky top-0 z-10 backdrop-blur-md">
+          <TableRow className="border-b-2 border-border/40 hover:bg-transparent">
+            <TableHead className="w-12 px-6">
+              <Checkbox 
+                checked={allSelected} 
+                onCheckedChange={(v) => onSelectAll(!!v)} 
+                className="h-5 w-5 rounded-lg border-2 data-[state=checked]:bg-primary"
+              />
+            </TableHead>
+            <TableHead className="py-5 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+              <div className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors group">
+                Identification Pulse <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
+              </div>
+            </TableHead>
+            <TableHead className="py-5 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Hierarchical Context</TableHead>
+            <TableHead className="py-5 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Regional Scope</TableHead>
+            <TableHead className="py-5 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Assessment</TableHead>
+            <TableHead className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {assets.map((asset) => (
             <TableRow 
               key={asset.id} 
-              className="hover:bg-primary/[0.03] transition-all group cursor-pointer border-b border-border/10 last:border-0"
+              className={cn(
+                "hover:bg-primary/[0.03] transition-all group cursor-pointer border-b border-border/10 last:border-0",
+                selectedIds.has(asset.id) ? "bg-primary/[0.05]" : "bg-card/30"
+              )}
               onClick={() => onInspect(asset)}
             >
-              <TableCell className="py-5 px-6">
+              <TableCell className="px-6" onClick={(e) => e.stopPropagation()}>
+                <Checkbox 
+                  checked={selectedIds.has(asset.id)} 
+                  onCheckedChange={() => onToggleSelection(asset.id)}
+                  className="h-5 w-5 rounded-lg border-2"
+                />
+              </TableCell>
+              <TableCell className="py-5 px-4">
                 <div className="flex flex-col">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-black tracking-tight group-hover:text-primary transition-colors">{asset.description || asset.name}</span>
+                    <span className={cn(
+                      "text-sm font-black tracking-tight transition-colors",
+                      selectedIds.has(asset.id) ? "text-primary" : "text-foreground group-hover:text-primary"
+                    )}>
+                      {asset.description || asset.name}
+                    </span>
                     {asset.photoDataUri && <Camera className="h-3.5 w-3.5 text-primary opacity-60" />}
                   </div>
                   <span className="text-[10px] font-mono text-muted-foreground uppercase mt-1 tracking-tighter opacity-60">
@@ -68,9 +106,9 @@ export function RegistryTable({ assets, onInspect }: RegistryTableProps) {
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="py-5 px-6">
+              <TableCell className="py-5 px-4">
                 <div className="flex flex-col">
-                  <span className="text-[10px] font-black uppercase tracking-tight text-primary">
+                  <span className="text-[10px] font-black uppercase tracking-tight text-primary/80">
                     {asset.category}
                   </span>
                   <span className="text-[9px] text-muted-foreground font-bold truncate max-w-[180px] opacity-50 uppercase mt-0.5">
@@ -78,12 +116,12 @@ export function RegistryTable({ assets, onInspect }: RegistryTableProps) {
                   </span>
                 </div>
               </TableCell>
-              <TableCell className="py-5 px-6">
+              <TableCell className="py-5 px-4">
                 <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/20 bg-primary/5 text-primary rounded-lg h-6 px-3">
                   {asset.location}
                 </Badge>
               </TableCell>
-              <TableCell className="py-5 px-6">
+              <TableCell className="py-5 px-4">
                 <div className={cn(
                   "flex items-center gap-2 text-[10px] font-black uppercase tracking-widest",
                   asset.status === 'VERIFIED' ? "text-green-600" : asset.status === 'DISCREPANCY' ? "text-destructive" : "text-orange-600"
