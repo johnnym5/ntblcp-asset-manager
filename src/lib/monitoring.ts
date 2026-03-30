@@ -1,13 +1,11 @@
 /**
- * @fileOverview Professional Error Monitoring Service
- * 
- * Mimics behavior of tools like Sentry or LogRocket.
- * Captures stack traces, user context, and system metadata.
+ * @fileOverview Professional Error Monitoring & Event Tracking Service.
+ * Implements standard observability patterns for traceability.
  */
 
 'use client';
 
-export interface ErrorContext {
+export interface TraceContext {
   component?: string;
   action?: string;
   userId?: string;
@@ -21,24 +19,22 @@ class MonitoringService {
   init() {
     if (typeof window === 'undefined' || this.isInitialized) return;
 
-    // Catch unhandled global errors
     window.addEventListener('error', (event) => {
-      this.trackError(event.error, { context: 'Global Window Error' });
+      this.trackError(event.error, { action: 'GLOBAL_WINDOW_ERROR' });
     });
 
-    // Catch unhandled promise rejections (very common in async Firebase calls)
     window.addEventListener('unhandledrejection', (event) => {
-      this.trackError(event.reason, { context: 'Unhandled Promise Rejection' });
+      this.trackError(event.reason, { action: 'UNHANDLED_PROMISE_REJECTION' });
     });
 
     this.isInitialized = true;
-    console.log("🚀 Monitoring Service Initialized");
+    console.log("🚀 Assetain Monitoring Service Initialized");
   }
 
   /**
-   * Captures and reports an error with full metadata.
+   * Captures and reports an error with full system metadata.
    */
-  trackError(error: any, context: ErrorContext = {}) {
+  trackError(error: any, context: TraceContext = {}) {
     if (typeof window === 'undefined') return;
 
     const errorPayload = {
@@ -49,32 +45,28 @@ class MonitoringService {
       context: {
         ...context,
         browser: navigator.userAgent,
-        language: navigator.language,
         url: window.location.href,
         connection: (navigator as any).connection?.effectiveType || 'unknown',
       }
     };
 
-    // In a real production app, this would use fetch() to send data to Sentry/Datadog
-    // For now, we log a structured, high-visibility report to the console
-    console.group(`🛑 MONITORING REPORT: ${errorPayload.message}`);
+    // In production, this would send to Sentry or a custom logging endpoint.
+    console.group(`🛑 TRACEABLE ERROR: ${errorPayload.message}`);
     console.table({
-      Code: errorPayload.code,
-      Component: context.component || 'Unknown',
       Action: context.action || 'Unknown',
+      Component: context.component || 'System',
       User: context.userName || 'Anonymous',
     });
-    console.log("Full Payload:", errorPayload);
+    console.log("Trace Metadata:", errorPayload);
     console.groupEnd();
-
-    // Placeholder for actual SaaS integration:
-    // Sentry.captureException(error, { extra: errorPayload.context });
   }
 
+  /**
+   * Records a business event for the audit trail.
+   */
   trackEvent(name: string, data: any) {
-    // Logic for tracking user behavior/session events
     if (process.env.NODE_ENV !== 'production') {
-      console.log(`📊 EVENT: ${name}`, data);
+      console.log(`📊 AUDIT EVENT [${name}]:`, data);
     }
   }
 }

@@ -1,19 +1,23 @@
 'use client';
 
+/**
+ * @fileOverview AuthContext - Identity & Access Gateway.
+ * Hardened to prevent race conditions during system initialization.
+ */
+
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
-import type { AuthorizedUser } from '@/lib/types';
-
+import type { AuthorizedUser, UserRole } from '@/types/domain';
 
 export interface LocalUserProfile {
-  id: string; // Unique ID for this user session
+  id: string; 
   loginName: string;
   displayName: string;
   email: string;
   state: string; 
   isAdmin: boolean;
-  isGuest?: boolean;
+  role: UserRole;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
 }
@@ -29,6 +33,7 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// System Bootstrap Identity
 const superAdmin: AuthorizedUser = {
   loginName: 'admin',
   displayName: 'Super Admin',
@@ -36,9 +41,7 @@ const superAdmin: AuthorizedUser = {
   password: 'setup',
   states: ['All'],
   isAdmin: true,
-  isGuest: false,
-  canAddAssets: true,
-  canEditAssets: true,
+  role: 'ADMIN',
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -50,47 +53,41 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { appSettings, settingsLoaded } = useAppState();
 
   useEffect(() => {
-    if (!settingsLoaded) {
-      // Don't validate auth until the app settings (and thus authorized users) have been loaded.
+    // CRITICAL: Block initialization until the system settings heartbeat is stable
+    if (!settingsLoaded || !appSettings) {
       return;
     }
 
     try {
-      const savedProfile = localStorage.getItem('ntblcp-user-profile');
+      const savedProfile = localStorage.getItem('assetain-user-session');
       if (savedProfile) {
         const profile: LocalUserProfile = JSON.parse(savedProfile);
         
-        const allUsers = [...appSettings.authorizedUsers, superAdmin];
-        // Check if the user from local storage is still in the authorized list.
+        const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
         const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
-          // The user is valid, restore their session.
           setUserProfile(profile);
           setProfileSetupComplete(true);
         } else {
-          // The user is no longer authorized (or the list is empty), so clear their stale profile.
-          localStorage.removeItem('ntblcp-user-profile');
+          localStorage.removeItem('assetain-user-session');
           setUserProfile(null);
           setProfileSetupComplete(false);
         }
       } else {
-        // No profile in local storage, ensure state is cleared.
         setUserProfile(null);
         setProfileSetupComplete(false);
       }
     } catch (e) {
-      console.error("Failed to process user profile from local storage", e);
-      // Clear potentially corrupted data
-      localStorage.removeItem('ntblcp-user-profile');
+      console.error("Auth: Failed to restore session pulse", e);
+      localStorage.removeItem('assetain-user-session');
       setUserProfile(null);
       setProfileSetupComplete(false);
     } finally {
-      // Whether a user was found or not, we have completed the authentication check.
       setLoading(false);
       setAuthInitialized(true);
     }
-  }, [settingsLoaded, appSettings.authorizedUsers]);
+  }, [settingsLoaded, appSettings]);
 
   const login = async (user: AuthorizedUser, state: string) => {
     setLoading(true);
@@ -100,17 +97,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       displayName: user.displayName,
       email: user.email,
       state: state,
-      isAdmin: user.isAdmin,
-      isGuest: user.isGuest,
-      canAddAssets: user.canAddAssets,
-      canEditAssets: user.canEditAssets,
+      isAdmin: user.isAdmin || user.role === 'ADMIN',
+      role: user.role,
     };
+    
     try {
-      localStorage.setItem('ntblcp-user-profile', JSON.stringify(newProfile));
+      localStorage.setItem('assetain-user-session', JSON.stringify(newProfile));
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
     } catch(e) {
-      console.error("Failed to save user profile", e);
+      console.error("Auth: Failed to commit session to persistence", e);
     } finally {
       setLoading(false);
     }
@@ -118,7 +114,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     setLoading(true);
-    localStorage.removeItem('ntblcp-user-profile');
+    localStorage.removeItem('assetain-user-session');
     setUserProfile(null);
     setProfileSetupComplete(false);
     window.location.href = '/';
