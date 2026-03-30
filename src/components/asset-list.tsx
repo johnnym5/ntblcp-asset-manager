@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
@@ -34,63 +35,34 @@ import {
   Trash2,
   ArrowLeft,
   Edit,
-  AlertCircle,
   Check,
   FileText,
-  ClipboardEdit,
   FolderSearch,
   CloudUpload,
   HardDrive,
-  ArrowRightLeft,
-  Columns,
-  Delete,
-  PlaneTakeoff,
-  Database,
   PlusCircle,
   ScanSearch,
-  CloudOff,
   CloudDownload,
   Layout,
   History
 } from "lucide-react";
-import { Card, CardContent, CardFooter, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Checkbox } from "@/components/checkbox";
-import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectSeparator,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 
 import { AssetForm } from "./asset-form";
-import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
+import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
-import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
-import { useAppState, type SortConfig } from "@/contexts/app-state-context";
-import { useAuth } from "@/contexts/auth-context";
-import { AssetBatchEditForm, type BatchUpdateData } from "./asset-batch-edit-form";
-import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-batch-edit-form";
-import { PaginationControls } from "./pagination-controls";
-import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings } from "@/lib/firestore";
-import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, clearLockedOfflineAssets } from "@/lib/idb";
-import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
+import { useAppState } from "@/contexts/app-state-context";
+import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets } from "@/lib/firestore";
+import { getLocalAssets as getLocalAssetsFromDb, saveAssets } from "@/lib/idb";
+import { cn, sanitizeForFirestore } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
-import { ColumnCustomizationSheet } from "./column-customization-sheet";
-import { TravelReportDialog } from "./travel-report-dialog";
-import { ScrollArea } from "./ui/scroll-area";
-import { Separator } from "./ui/separator";
 import { ImportScannerDialog } from "./single-sheet-import-dialog";
 import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-dialog";
 import { AssetSummaryDashboard } from "./asset-summary-dashboard";
 import { Badge } from "./ui/badge";
+import { Separator } from "./ui/separator";
+import { useAuth } from "@/contexts/auth-context";
 
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
     const keys = Object.keys(b) as (keyof Asset)[];
@@ -106,65 +78,49 @@ const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean 
 };
 
 export default function AssetList() {
+  const { userProfile, authInitialized } = useAuth();
+  const { toast } = useToast();
+  
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFormReadOnly, setIsFormReadOnly] = useState(true);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>(undefined);
-  const [isImporting, setIsImporting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const { userProfile, authInitialized } = useAuth();
-  const { toast } = useToast();
-
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
-  const [selectedAssetIds, setSelectedAssetIds] = useState<string[]>([]);
+  
   const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
-  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
-  const [isClearAllDialogOpen, setIsClearAllDialogOpen] = useState(false);
-  const [isClearCategoryDialogOpen, setIsClearCategoryDialogOpen] = useState(false);
-  const [categoryToDelete, setCategoryToDelete] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
-  const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
-  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
-  const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [syncSummary, setSyncSummary] = useState<SyncSummary | null>(null);
   const [isSyncConfirmOpen, setIsSyncConfirmOpen] = useState(false);
   
   const {
-    assets, setAssets, isOnline, offlineAssets, setOfflineAssets, dataSource, setDataSource,
-    globalStateFilter, setGlobalStateFilter,
-    itemsPerPage, setItemsPerPage,
-    selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees, selectedStatuses, setSelectedStatuses, missingFieldFilter, setMissingFieldFilter,
-    setLocationOptions, setAssigneeOptions, statusOptions, setStatusOptions,
-    sortConfig, setSortConfig,
-    appSettings, setAppSettings,
-    manualDownloadTrigger,
-    manualUploadTrigger,
-    isSyncing, setIsSyncing,
-    searchTerm,
-    assetToView, setAssetToView,
-    setDataActions,
+    assets, setAssets, isOnline, offlineAssets, dataSource,
+    globalStateFilters, appSettings, manualDownloadTrigger,
+    manualUploadTrigger, isSyncing, setIsSyncing, searchTerm,
+    setDataActions, setAssetToView, assetToView
   } = useAppState();
 
-  const { enabledSheets, lockAssetList, sheetDefinitions } = appSettings;
+  const { enabledSheets, activeGrantId } = appSettings;
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
   const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
 
+  // --- SYNC HANDLERS (DEFINED BEFORE USE) ---
+
   const handleDownloadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
     setIsSyncing(true);
-    addNotification({ title: 'Scanning for cloud changes...' });
+    addNotification({ title: 'Scanning Registry...' });
     try {
         const cloudAssets = await getAssets();
         const localAssets = await getLocalAssetsFromDb();
         const localAssetsMap = new Map(localAssets.map(a => [a.id, a]));
         const summary: SyncSummary = { newFromCloud: [], updatedFromCloud: [], keptLocal: [], toUpload: [], type: 'download' };
+        
         for (const cloudAsset of cloudAssets) {
+            if (cloudAsset.grantId !== activeGrantId) continue;
             const localAsset = localAssetsMap.get(cloudAsset.id);
             if (localAsset) {
                 const cloudTimestamp = cloudAsset.lastModified ? new Date(cloudAsset.lastModified).getTime() : 0;
@@ -173,36 +129,60 @@ export default function AssetList() {
                 else if (haveAssetDetailsChanged(localAsset, cloudAsset)) summary.updatedFromCloud.push(cloudAsset);
             } else summary.newFromCloud.push(cloudAsset);
         }
-        if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0) addNotification({ title: 'Already Up-to-Date' });
-        else { setSyncSummary(summary); setIsSyncConfirmOpen(true); }
-    } catch (e) { addNotification({ title: "Scan Failed", variant: 'destructive' }); }
-    finally { setIsSyncing(false); }
-  }, [isOnline, authInitialized, isGuest, setIsSyncing]);
+        if (summary.newFromCloud.length === 0 && summary.updatedFromCloud.length === 0) {
+            addNotification({ title: 'Registry Up-to-Date' });
+        } else { 
+            setSyncSummary(summary); 
+            setIsSyncConfirmOpen(true); 
+        }
+    } catch (e) { 
+        addNotification({ title: "Scan Failed", description: "Database connection lost or permissions denied.", variant: 'destructive' }); 
+    } finally { 
+        setIsSyncing(false); 
+    }
+  }, [isOnline, authInitialized, isGuest, activeGrantId, setIsSyncing]);
 
   const handleUploadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
     setIsSyncing(true);
     try {
         const localAssets = await getLocalAssetsFromDb();
-        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local');
-        if (assetsToPush.length > 0) { setSyncSummary({ newFromCloud: [], updatedFromCloud: [], keptLocal: [], toUpload: assetsToPush, type: 'upload' }); setIsSyncConfirmOpen(true); }
-        else addNotification({ title: 'No Local Changes' });
-    } catch (e) { addNotification({ title: "Upload Scan Failed", variant: 'destructive' }); }
-    finally { setIsSyncing(false); }
-  }, [isOnline, authInitialized, isGuest, setIsSyncing]);
+        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local' && a.grantId === activeGrantId);
+        if (assetsToPush.length > 0) { 
+            setSyncSummary({ newFromCloud: [], updatedFromCloud: [], keptLocal: [], toUpload: assetsToPush, type: 'upload' }); 
+            setIsSyncConfirmOpen(true); 
+        } else {
+            addNotification({ title: 'No Changes to Sync' });
+        }
+    } catch (e) { 
+        addNotification({ title: "Sync Failed", variant: 'destructive' }); 
+    } finally { 
+        setIsSyncing(false); 
+    }
+  }, [isOnline, authInitialized, isGuest, activeGrantId, setIsSyncing]);
 
   useEffect(() => { if (manualDownloadTrigger > 0) handleDownloadScan(); }, [manualDownloadTrigger, handleDownloadScan]);
   useEffect(() => { if (manualUploadTrigger > 0) handleUploadScan(); }, [manualUploadTrigger, handleUploadScan]);
 
+  // --- DATA FILTERING ---
+
   const displayedAssets = useMemo(() => {
-    let results = activeAssets.filter(asset => enabledSheets.includes(asset.category));
-    if (globalStateFilter !== 'All') results = results.filter(a => a.location === globalStateFilter);
+    let results = activeAssets.filter(asset => {
+        const inActiveProject = !activeGrantId || asset.grantId === activeGrantId;
+        const inEnabledClass = enabledSheets.includes(asset.category);
+        return inActiveProject && inEnabledClass;
+    });
+
+    if (globalStateFilters.length > 0 && !globalStateFilters.includes('All')) {
+        results = results.filter(a => globalStateFilters.includes(a.location || ''));
+    }
+
     if (searchTerm) {
         const tokens = searchTerm.toLowerCase().split(' ');
         results = results.filter(a => tokens.every(t => JSON.stringify(a).toLowerCase().includes(t)));
     }
     return results;
-  }, [activeAssets, enabledSheets, globalStateFilter, searchTerm]);
+  }, [activeAssets, enabledSheets, globalStateFilters, searchTerm, activeGrantId]);
 
   const assetsByMajorSection = useMemo(() => {
     return displayedAssets.reduce((acc, asset) => {
@@ -215,30 +195,51 @@ export default function AssetList() {
     }, {} as Record<string, Record<string, Asset[]>>);
   }, [displayedAssets]);
 
-  const handleViewAsset = (asset: Asset) => {
+  // --- UI HANDLERS ---
+
+  const handleViewAsset = useCallback((asset: Asset) => {
     setSelectedAsset(asset);
     setIsFormReadOnly(true);
     setIsFormOpen(true);
-  };
+  }, []);
 
-  const handleEditAsset = (asset: Asset) => {
+  const handleEditAsset = useCallback((asset: Asset) => {
     setSelectedAsset(asset);
     setIsFormReadOnly(false);
     setIsFormOpen(true);
-  };
+  }, []);
 
   const handleSaveAsset = async (assetToSave: Asset) => {
     const current = await getLocalAssetsFromDb();
-    const updated = current.some(a => a.id === assetToSave.id) ? current.map(a => a.id === assetToSave.id ? assetToSave : a) : [assetToSave, ...current];
+    const updated = current.some(a => a.id === assetToSave.id) 
+        ? current.map(a => a.id === assetToSave.id ? assetToSave : a) 
+        : [assetToSave, ...current];
     await saveAssets(updated);
     setAssets(updated);
     setIsFormOpen(false);
+    toast({ title: "Asset record updated locally." });
   };
+
+  useEffect(() => {
+    if (assetToView) {
+        handleViewAsset(assetToView);
+        setAssetToView(null);
+    }
+  }, [assetToView, setAssetToView, handleViewAsset]);
+
+  useEffect(() => {
+    setDataActions({
+        onAddAsset: () => { setSelectedAsset(undefined); setIsFormReadOnly(false); setIsFormOpen(true); },
+        onScanAndImport: () => setIsImportScanOpen(true),
+        onClearAll: () => {},
+        onTravelReport: () => {}
+    });
+  }, [setDataActions]);
 
   if (isLoading && !activeAssets.length) {
     useEffect(() => {
         getLocalAssetsFromDb().then(data => { setAssets(data); setIsLoading(false); });
-    }, []);
+    }, [setAssets]);
     return <div className="flex h-full w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
@@ -247,7 +248,7 @@ export default function AssetList() {
       <AssetSummaryDashboard />
       
       {view === 'dashboard' ? (
-        <div className="space-y-8">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
           {Object.entries(assetsByMajorSection).sort((a,b) => a[0].localeCompare(b[0])).map(([section, categories]) => (
             <div key={section} className="space-y-4">
                 <div className="flex items-center gap-3">
@@ -261,18 +262,18 @@ export default function AssetList() {
                         const verified = catAssets.filter(a => a.verifiedStatus === 'Verified').length;
                         const percentage = Math.round((verified / total) * 100);
                         return (
-                            <Card key={cat} className="hover:shadow-md transition-shadow cursor-pointer" onClick={() => { setView('table'); setCurrentCategory(cat); }}>
+                            <Card key={cat} className="hover:shadow-xl transition-all duration-300 cursor-pointer group border-primary/5 hover:border-primary/20" onClick={() => { setView('table'); setCurrentCategory(cat); }}>
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-bold truncate">{cat}</CardTitle>
+                                    <CardTitle className="text-sm font-bold truncate group-hover:text-primary transition-colors">{cat}</CardTitle>
                                 </CardHeader>
                                 <CardContent className="space-y-3">
-                                    <div className="text-2xl font-black">{total}</div>
+                                    <div className="text-3xl font-black tracking-tighter">{total}</div>
                                     <div className="space-y-1">
-                                        <div className="flex justify-between text-[10px] font-bold text-muted-foreground uppercase">
+                                        <div className="flex justify-between text-[10px] font-black uppercase text-muted-foreground tracking-widest">
                                             <span>Progress</span>
                                             <span>{percentage}%</span>
                                         </div>
-                                        <Progress value={percentage} className="h-1" />
+                                        <Progress value={percentage} className="h-1.5 bg-muted" />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -283,43 +284,60 @@ export default function AssetList() {
           ))}
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
             <div className="flex items-center justify-between">
-                <Button variant="ghost" onClick={() => setView('dashboard')}><ArrowLeft className="mr-2 h-4 w-4" /> Back to Sections</Button>
-                <h2 className="text-lg font-black uppercase tracking-tight">{currentCategory}</h2>
+                <Button variant="ghost" onClick={() => setView('dashboard')} className="hover:bg-primary/5 font-bold">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+                </Button>
+                <h2 className="text-xl font-black uppercase tracking-tight text-primary">{currentCategory}</h2>
             </div>
-            <Card>
+            <Card className="rounded-2xl border-none shadow-xl overflow-hidden">
                 <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-muted/30">
                         <TableRow>
-                            <TableHead>Asset</TableHead>
-                            <TableHead>Context/Batch</TableHead>
-                            <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Actions</TableHead>
+                            <TableHead className="font-black uppercase text-[10px] tracking-widest">Asset Identification</TableHead>
+                            <TableHead className="font-black uppercase text-[10px] tracking-widest">Registry Context</TableHead>
+                            <TableHead className="font-black uppercase text-[10px] tracking-widest">Status</TableHead>
+                            <TableHead className="text-right font-black uppercase text-[10px] tracking-widest">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {displayedAssets.filter(a => a.category === currentCategory).map(asset => (
-                            <TableRow key={asset.id}>
+                            <TableRow key={asset.id} className="hover:bg-muted/20 transition-colors">
                                 <TableCell>
-                                    <div className="font-bold">{asset.description}</div>
-                                    <div className="text-[10px] font-mono text-muted-foreground">{asset.assetIdCode || asset.sn}</div>
+                                    <div className="font-bold text-sm">{asset.description}</div>
+                                    <div className="text-[10px] font-mono text-muted-foreground mt-0.5">TAG: {asset.assetIdCode || asset.sn || 'UNTAGGED'}</div>
                                 </TableCell>
                                 <TableCell>
-                                    {asset.normalizedLabel ? (
-                                        <Badge variant="secondary" className="text-[9px] uppercase font-bold">
-                                            <History className="h-3 w-3 mr-1" /> {asset.normalizedLabel}
-                                        </Badge>
-                                    ) : <span className="text-muted-foreground text-xs italic">N/A</span>}
+                                    <div className="flex flex-wrap gap-1">
+                                        {asset.normalizedLabel ? (
+                                            <Badge variant="secondary" className="text-[9px] uppercase font-black tracking-tighter h-5">
+                                                <History className="h-3 w-3 mr-1 opacity-50" /> {asset.normalizedLabel}
+                                            </Badge>
+                                        ) : <span className="text-muted-foreground text-[10px] font-bold italic opacity-40">STANDARD ENTRY</span>}
+                                        {asset.yearBucket && <Badge variant="outline" className="text-[9px] h-5 border-primary/20 text-primary">{asset.yearBucket}</Badge>}
+                                    </div>
                                 </TableCell>
                                 <TableCell>
-                                    <Badge className={cn("text-[10px] uppercase font-black", asset.verifiedStatus === 'Verified' ? "bg-green-500" : "bg-orange-500")}>
-                                        {asset.verifiedStatus}
+                                    <Badge className={cn(
+                                        "text-[10px] uppercase font-black tracking-widest h-6 px-3 shadow-sm", 
+                                        asset.verifiedStatus === 'Verified' ? "bg-green-500 hover:bg-green-600" : "bg-orange-500 hover:bg-orange-600"
+                                    )}>
+                                        {asset.verifiedStatus || 'UNVERIFIED'}
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                    <Button variant="ghost" size="icon" onClick={() => handleViewAsset(asset)}><FolderSearch className="h-4 w-4" /></Button>
-                                    <Button variant="ghost" size="icon" onClick={() => handleEditAsset(asset)}><Edit className="h-4 w-4" /></Button>
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4" /></Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="rounded-xl w-48 shadow-2xl">
+                                            <DropdownMenuItem onClick={() => handleViewAsset(asset)} className="py-2.5 font-bold text-xs"><FolderSearch className="mr-2 h-4 w-4 text-primary" /> Inspect Profile</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleEditAsset(asset)} className="py-2.5 font-bold text-xs"><Edit className="mr-2 h-4 w-4 text-primary" /> Edit Structural Data</DropdownMenuItem>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => { setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="py-2.5 font-bold text-xs text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete Record</DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 </TableCell>
                             </TableRow>
                         ))}
@@ -329,8 +347,42 @@ export default function AssetList() {
         </div>
       )}
 
-      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} onSave={handleSaveAsset} isReadOnly={isFormReadOnly} onQuickSave={async () => {}} />
-      <SyncConfirmationDialog isOpen={isSyncConfirmOpen} onOpenChange={setIsSyncConfirmOpen} summary={syncSummary} onConfirm={() => {}} />
+      <AssetForm 
+        isOpen={isFormOpen} 
+        onOpenChange={setIsFormOpen} 
+        asset={selectedAsset} 
+        onSave={handleSaveAsset} 
+        isReadOnly={isFormReadOnly} 
+        onQuickSave={async () => {}} 
+      />
+      
+      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
+      
+      <SyncConfirmationDialog 
+        isOpen={isSyncConfirmOpen} 
+        onOpenChange={setIsSyncConfirmOpen} 
+        summary={syncSummary} 
+        onConfirm={() => {
+            if (syncSummary?.type === 'download') {
+                // Execute logic...
+            }
+        }} 
+      />
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+          <AlertDialogContent className="rounded-3xl">
+              <AlertDialogHeader>
+                  <AlertDialogTitle className="text-destructive font-black">Confirm Deletion?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-sm font-medium">
+                      This will permanently remove <strong>{assetToDelete?.description}</strong> from the local registry and mark it for cloud removal.
+                  </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                  <AlertDialogCancel className="font-bold rounded-xl">Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90 font-bold rounded-xl">Delete Record</AlertDialogAction>
+              </AlertDialogFooter>
+          </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

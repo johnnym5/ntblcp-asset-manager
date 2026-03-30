@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
@@ -162,13 +163,13 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     initialize();
   }, []);
 
-  // 2. Real-Time Cloud Listeners (Config Broadcast)
+  // 2. Real-Time Cloud Listeners (Global Config Broadcast)
   useEffect(() => {
-    if (!isOnline || !db) return;
+    if (!isOnline) return;
 
     let unsubscribe: () => void = () => {};
     
-    if (appSettings.activeDatabase === 'firestore') {
+    if (appSettings.activeDatabase === 'firestore' && db) {
       unsubscribe = onSnapshot(doc(db, 'config', 'settings'), (docSnap) => {
         if (docSnap.exists()) {
           const remote = docSnap.data() as AppSettings;
@@ -180,6 +181,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
             return prev;
           });
         }
+      }, (error) => {
+          console.error("Config listener failed:", error);
       });
     } else if (appSettings.activeDatabase === 'rtdb' && rtdb) {
       const settingsRef = ref(rtdb, 'config/settings');
@@ -200,7 +203,7 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [isOnline, appSettings.activeDatabase]);
 
-  // 3. Asset Synchronization (Project-Scoped)
+  // 3. Asset Synchronization (Strictly Project-Scoped)
   useEffect(() => {
     if (!isOnline || !appSettings.activeGrantId) return;
 
@@ -211,6 +214,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       unsubscribe = onSnapshot(q, (snapshot) => {
         const fetched = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
         setAssets(fetched);
+      }, (error) => {
+          console.error("Asset Firestore listener failed:", error);
       });
     } else if (appSettings.activeDatabase === 'rtdb' && rtdb) {
       const assetsRef = ref(rtdb, 'assets');
