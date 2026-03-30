@@ -24,7 +24,7 @@ export interface RegistryHeader {
   dataType: DataType;
   orderIndex: number;         // display order
   locked?: boolean;           // essential headers cannot be removed
-  group?: string;             // optional grouping
+  group?: "Identity" | "Location" | "Classification" | "Procurement" | "Condition" | "Metadata" | "Hierarchy";
   schemaName?: string;        // schema variant this belongs to
 }
 
@@ -49,6 +49,7 @@ export interface AssetRecord {
   headers: RegistryHeader[];
   fields: RegistryFieldValue[];
   rawRow: Record<string, unknown>;
+  accentColor?: string; // HSL value for sheet-based color coding
 }
 
 export interface HeaderPreferenceState {
@@ -57,6 +58,7 @@ export interface HeaderPreferenceState {
   headerOrder: string[];
   renamedHeaders: Record<string, string>;
   activeSchemaName?: string;
+  activeArrangement: "quick" | "full" | "checklist";
 }
 
 export interface HeaderFilter {
@@ -77,7 +79,7 @@ export interface HeaderFilter {
   endDate?: string;
 }
 
-export type DensityMode = "compact" | "expanded";
+export type DensityMode = "compact" | "comfortable" | "expanded";
 
 export interface RegistryFilterState {
   searchQuery: string;
@@ -97,4 +99,12 @@ export interface RenderFieldConfig {
   visible: boolean;
   isPrimary?: boolean;
   isSecondary?: boolean;
+}
+
+export interface RegistryPreset {
+  id: string;
+  name: string;
+  description: string;
+  visibleHeaderNames: string[];
+  densityMode: DensityMode;
 }

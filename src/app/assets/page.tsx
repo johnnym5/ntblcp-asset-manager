@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview Registry Workspace - Header-Aware High-Performance Browser.
- * Phase 22: Integrated density modes, strict canonical headers, and register layouts.
+ * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
+ * Phase 22: Implements Sheet view, S/N anchoring, and preset orchestrations.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -29,7 +29,7 @@ import {
   FilterX,
   LayoutGrid,
   List,
-  CheckCircle2
+  Zap
 } from 'lucide-react';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
@@ -41,7 +41,7 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
 import type { RegistryHeader, AssetRecord, HeaderFilter, DensityMode } from '@/types/registry';
-import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord } from '@/lib/registry-utils';
+import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord, REGISTRY_PRESETS } from '@/lib/registry-utils';
 import { Badge } from '@/components/ui/badge';
 import { ExcelService } from '@/services/excel-service';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -67,7 +67,7 @@ export default function AssetRegistryPage() {
   const [headers, setHeaders] = useState<RegistryHeader[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
-  const [densityMode, setDensityMode] = useState<DensityMode>("expanded");
+  const [densityMode, setDensityMode] = useState<DensityMode>("compact");
   
   // --- Drawers ---
   const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
@@ -76,7 +76,7 @@ export default function AssetRegistryPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
 
-  // --- Logic State ---
+  // --- Logic State: Default S/N Anchor ---
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
   const [sortKey, setSortKey] = useState<string>('sn');
   const [sortDir, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -103,9 +103,10 @@ export default function AssetRegistryPage() {
 
   // --- Filtering & Sorting Logic Pulse ---
   const processedRecords = useMemo(() => {
+    // Transform all domain assets to header-aware records
     let results = currentRegistry.map(a => transformAssetToRecord(a, headers));
 
-    // 1. Keyword Search
+    // 1. Keyword Search (ID, S/N, Description)
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       results = results.filter(r => 
@@ -115,7 +116,7 @@ export default function AssetRegistryPage() {
       );
     }
 
-    // 2. Logic Filters
+    // 2. Hierarchical Logic Filters
     filters.forEach(f => {
       results = results.filter(r => {
         const field = r.fields.find(field => field.headerId === f.headerId);
@@ -133,10 +134,17 @@ export default function AssetRegistryPage() {
       });
     });
 
-    // 3. Sorting
+    // 3. Anchored Sorting (Default: S/N)
     results.sort((a, b) => {
-      const fieldA = a.fields.find(f => f.headerId === sortKey)?.rawValue || '';
-      const fieldB = b.fields.find(f => f.headerId === sortKey)?.rawValue || '';
+      const fieldA = a.fields.find(f => {
+        const h = headers.find(header => header.id === f.headerId);
+        return h?.normalizedName === sortKey;
+      })?.rawValue || '';
+      
+      const fieldB = b.fields.find(f => {
+        const h = headers.find(header => header.id === f.headerId);
+        return h?.normalizedName === sortKey;
+      })?.rawValue || '';
       
       const comparison = String(fieldA).localeCompare(String(fieldB), undefined, { numeric: true });
       return sortDir === 'asc' ? comparison : -comparison;
@@ -190,21 +198,16 @@ export default function AssetRegistryPage() {
   return (
     <AppLayout>
       <div className="flex flex-col h-full gap-6 relative pb-32">
-        {/* Header Pulse: Grant Info & Source Switcher */}
+        {/* Header Section: Arrangement & Preset Pulse */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between px-2 gap-6">
           <div className="space-y-1">
             <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase leading-none">{activeProjectName}</h2>
             <div className="flex items-center gap-3">
-              <Badge variant="outline" className={cn(
-                "h-6 px-3 text-[9px] font-black tracking-widest rounded-full border-2",
-                dataSource === 'SANDBOX' ? "border-orange-500/20 bg-orange-50 text-orange-600" : "border-primary/20 bg-primary/5 text-primary shadow-sm"
-              )}>
-                {processedRecords.length} PULSES IN SCOPE
+              <Badge variant="outline" className="h-6 px-3 text-[9px] font-black tracking-widest rounded-full border-2 border-primary/20 bg-primary/5 text-primary">
+                {processedRecords.length} PULSES DISCOVERED
               </Badge>
               {dataSource === 'SANDBOX' && (
-                <Badge className="h-6 px-3 text-[9px] font-black tracking-widest bg-orange-500 text-white rounded-full shadow-lg shadow-orange-500/20">
-                  SANDBOX ACTIVE
-                </Badge>
+                <Badge className="h-6 px-3 text-[9px] font-black tracking-widest bg-orange-500 text-white rounded-full">SANDBOX ACTIVE</Badge>
               )}
             </div>
           </div>
@@ -215,7 +218,7 @@ export default function AssetRegistryPage() {
                 variant={dataSource === 'PRODUCTION' ? 'secondary' : 'ghost'} 
                 size="sm" 
                 onClick={() => setDataSource('PRODUCTION')}
-                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 transition-all"
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2"
               >
                 <Database className="h-3.5 w-3.5" /> Production
               </Button>
@@ -223,7 +226,7 @@ export default function AssetRegistryPage() {
                 variant={dataSource === 'SANDBOX' ? 'secondary' : 'ghost'} 
                 size="sm" 
                 onClick={() => setDataSource('SANDBOX')}
-                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 transition-all"
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2"
               >
                 <DatabaseZap className="h-3.5 w-3.5" /> Sandbox
               </Button>
@@ -232,10 +235,10 @@ export default function AssetRegistryPage() {
             <Tabs value={densityMode} onValueChange={(v) => setDensityMode(v as DensityMode)} className="bg-muted/50 p-1 rounded-2xl border-2">
               <TabsList className="bg-transparent border-none p-0 h-9 gap-1">
                 <TabsTrigger value="compact" className="h-7 px-3 rounded-xl text-[9px] font-black uppercase data-[state=active]:bg-primary data-[state=active]:text-white">
-                  <List className="h-3 w-3 mr-1.5" /> Compact
+                  <Zap className="h-3 w-3 mr-1.5" /> Quick View
                 </TabsTrigger>
                 <TabsTrigger value="expanded" className="h-7 px-3 rounded-xl text-[9px] font-black uppercase data-[state=active]:bg-primary data-[state=active]:text-white">
-                  <LayoutGrid className="h-3 w-3 mr-1.5" /> Expanded
+                  <List className="h-3 w-3 mr-1.5" /> Full View
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -244,20 +247,20 @@ export default function AssetRegistryPage() {
               variant="outline" 
               size="icon" 
               onClick={() => setIsHeaderManagerOpen(true)}
-              className="h-12 w-12 rounded-2xl border-2 border-primary/10 shadow-sm tactile-pulse bg-card"
+              className="h-12 w-12 rounded-2xl border-2 border-primary/10 shadow-sm bg-card tactile-pulse"
             >
               <Columns className="h-5 w-5 text-primary" />
             </Button>
           </div>
         </div>
 
-        {/* Toolbar Pulse: Global Search & Logic Triggers */}
+        {/* Action Toolbar: Anchored Search & Logic */}
         <div className="flex flex-col gap-4 px-2">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1 group">
               <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
               <Input 
-                placeholder="Search by ID, Serial, or Description..." 
+                placeholder="Segment Registry by ID, S/N, or Description..." 
                 value={searchTerm}
                 onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
                 className="pl-12 h-14 rounded-2xl bg-card border-none shadow-xl focus-visible:ring-primary/20 text-sm font-medium transition-all"
@@ -267,23 +270,23 @@ export default function AssetRegistryPage() {
               <Button 
                 variant="outline" 
                 onClick={() => setIsFilterOpen(true)}
-                className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-lg hover:bg-primary/5 transition-all relative"
+                className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-lg hover:bg-primary/5 relative"
               >
                 <Filter className="h-4 w-4" /> 
                 Logic Engine
-                {filters.length > 0 && <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-white text-[10px] rounded-full flex items-center justify-center border-4 border-background animate-in zoom-in">{filters.length}</span>}
+                {filters.length > 0 && <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-white text-[10px] rounded-full flex items-center justify-center border-4 border-background">{filters.length}</span>}
               </Button>
               <Button 
                 variant="outline" 
                 onClick={() => setIsSortOpen(true)}
-                className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-lg hover:bg-primary/5 transition-all"
+                className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-lg hover:bg-primary/5"
               >
-                <ArrowUpDown className="h-4 w-4" /> Sort Register
+                <ArrowUpDown className="h-4 w-4" /> Sort Registry
               </Button>
             </div>
           </div>
 
-          {/* Logic Chip Bar */}
+          {/* Logic Pulse Chip Bar */}
           <AnimatePresence>
             {filters.length > 0 && (
               <motion.div 
@@ -309,12 +312,12 @@ export default function AssetRegistryPage() {
           </AnimatePresence>
         </div>
 
-        {/* Register Surface: Multi-Density Card Grid */}
+        {/* Registry Surface: Segmented List Context */}
         <div className="flex-1 px-2">
           {paginatedRecords.length > 0 ? (
             <div className={cn(
               "grid gap-6",
-              densityMode === 'compact' ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4 xxl:grid-cols-6" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              densityMode === 'compact' ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
             )}>
               <AnimatePresence mode="popLayout">
                 {paginatedRecords.map((record) => (
@@ -337,13 +340,13 @@ export default function AssetRegistryPage() {
           ) : (
             <div className="h-[400px] flex flex-col items-center justify-center text-center p-10 opacity-20 border-4 border-dashed rounded-[3rem]">
               <Boxes className="h-24 w-24 mb-6" />
-              <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Register Silent</h3>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] mt-2">Zero records detected in current logic pulse.</p>
+              <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Registry Pulse Silent</h3>
+              <p className="text-[10px] font-bold uppercase tracking-[0.2em] mt-2">Zero records detected in current hierarchical scope.</p>
             </div>
           )}
         </div>
 
-        {/* Operational Pulse Bar: Navigation & Major Actions */}
+        {/* Operational Pulse Bar */}
         <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-2xl px-6 py-3 rounded-[2.5rem] border-2 border-primary/10 shadow-2xl flex items-center gap-6 ring-1 ring-white/10">
           <div className="flex items-center gap-2">
             <Button 
@@ -374,7 +377,7 @@ export default function AssetRegistryPage() {
               className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 tactile-pulse text-white"
               onClick={() => { setSelectedAssetForForm(undefined); setIsFormOpen(true); }}
             >
-              <Plus className="mr-2 h-4 w-4" /> New Pulse
+              <Plus className="mr-2 h-4 w-4" /> New Registration
             </Button>
             <Button 
               variant="ghost" 
