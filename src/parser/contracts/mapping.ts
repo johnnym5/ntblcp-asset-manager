@@ -13,38 +13,32 @@ export type HeaderMap = Record<string, keyof Asset>;
  * Probabilistic keyword matching is forbidden.
  */
 export const REGISTRY_MAPPING_CONTRACT: HeaderMap = {
-  // Common Headers
-  'S/N': 'sn',
-  'DESCRIPTION': 'description',
-  'ASSET DESCRIPTION': 'description',
+  // Identification
+  'S/N': 'serialNumber',
   'SERIAL NUMBER': 'serialNumber',
   'ASSET SERIAL NUMBERS': 'serialNumber',
+  'DESCRIPTION': 'description',
+  'ASSET DESCRIPTION': 'description',
   'TAG NUMBER': 'assetIdCode',
   'ASSET ID CODE': 'assetIdCode',
-  'TAG NUMBERS': 'assetIdCode',
   
-  // Location Mapping
+  // Regional
   'LOCATION': 'location',
   'STATE': 'location',
-  'LGA': 'lga',
-  'SITE': 'site',
-  'ASSIGNEE': 'assignee',
-  'LOCATION/USER': 'assignee',
+  'LGA': 'location',
+  'ASSIGNEE': 'custodian',
+  'LOCATION/USER': 'custodian',
   
-  // Technical Mapping
-  'MANUFACTURER': 'manufacturer',
-  'MODEL NUMBER': 'modelNumber',
-  'MODEL NUMBERS': 'modelNumber',
+  // Technical
   'CONDITION': 'condition',
-  'REMARKS': 'remarks',
-  'COMMENTS': 'remarks'
+  'REMARKS': 'description', // Fallback for secondary description
 };
 
 /**
- * Determines if a row qualifies as a data row based on header intersections.
+ * Calculates how well a row matches the known registry contracts.
  */
 export function calculateHeaderIntegrity(row: string[]): number {
-  const normalizedRow = row.map(h => h.trim().toUpperCase());
+  const normalizedRow = row.map(h => String(h || '').trim().toUpperCase());
   const contractHeaders = Object.keys(REGISTRY_MAPPING_CONTRACT);
   
   const matches = normalizedRow.filter(h => contractHeaders.includes(h));

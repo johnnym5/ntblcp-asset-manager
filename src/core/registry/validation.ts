@@ -12,9 +12,9 @@ export const AssetSchema = z.object({
   category: z.string().min(1, "Category is required"),
   
   // Hierarchical Context
-  asset_family: z.string().default("Uncategorized"),
   section: z.string().default("General"),
   subsection: z.string().default("Base Register"),
+  assetFamily: z.string().default("Uncategorized"),
   
   // Location & Assignment
   location: z.string().min(1, "Location is required"),
@@ -24,39 +24,38 @@ export const AssetSchema = z.object({
   status: z.enum(["VERIFIED", "UNVERIFIED", "DISCREPANCY"]).default("UNVERIFIED"),
   condition: z.string().default("Unassessed"),
   
-  // Financial & Temporal
-  purchase_date: z.string().datetime().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  // Financial & Technical
+  purchaseDate: z.string().optional(),
   value: z.number().nonnegative().default(0),
-  serial_number: z.string().default("N/A"),
-  asset_id_code: z.string().optional(),
+  serialNumber: z.string().default("N/A"),
+  assetIdCode: z.string().optional(),
 
   // Nested Structured Data
   hierarchy: z.object({
     document: z.string(),
     section: z.string(),
     subsection: z.string(),
-    asset_family: z.string(),
+    assetFamily: z.string(),
   }),
   
-  import_metadata: z.object({
-    source_file: z.string(),
-    sheet_name: z.string(),
-    row_number: z.number().int(),
-    imported_at: z.string().datetime(),
+  importMetadata: z.object({
+    sourceFile: z.string(),
+    sheetName: z.string(),
+    rowNumber: z.number().int(),
+    importedAt: z.string().datetime(),
   }),
 
-  metadata: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])),
+  metadata: z.record(z.unknown()),
   
   // System Metadata
-  last_modified: z.string().datetime(),
-  last_modified_by: z.string(),
+  lastModified: z.string().datetime(),
+  lastModifiedBy: z.string(),
 });
 
 export type ValidatedAsset = z.infer<typeof AssetSchema>;
 
 /**
  * Validates a raw object from the parser or UI.
- * Throws structured errors if deterministic rules are violated.
  */
 export function validateAsset(data: unknown): ValidatedAsset {
   return AssetSchema.parse(data);

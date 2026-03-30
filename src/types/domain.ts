@@ -4,7 +4,7 @@
  */
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VIEWER';
-export type VerificationStatus = 'Verified' | 'Unverified' | 'Discrepancy';
+export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
 
 export interface SectionHierarchy {
   document: string;
@@ -20,27 +20,46 @@ export interface ImportMetadata {
   importedAt: string; // ISO 8601
 }
 
-export interface DisplayField {
-  key: string;
-  label: string;
-  table: boolean;
-  quickView: boolean;
-  inChecklist?: boolean;
-  checklistSection?: 'required' | 'important';
-}
-
-export interface SheetDefinition {
-  name: string;
-  headers: string[];
-  displayFields: DisplayField[];
-  subSheetTriggers?: string[];
-}
-
-export interface Grant {
+export interface Asset {
   id: string;
   name: string;
-  sheetDefinitions: Record<string, SheetDefinition>;
-  enabledSheets: string[];
+  description: string;
+  category: string;
+  
+  // Hierarchical Context
+  section: string;
+  subsection: string;
+  assetFamily: string;
+  
+  // Location & Assignment
+  location: string;
+  custodian: string;
+  
+  // State & Assessment
+  status: VerificationStatus;
+  condition: string;
+  
+  // Financial & Technical
+  purchaseDate?: string;
+  value: number;
+  serialNumber: string;
+  assetIdCode?: string;
+
+  // Metadata & Provenance
+  hierarchy: SectionHierarchy;
+  importMetadata: ImportMetadata;
+  metadata: Record<string, unknown>;
+  
+  // System Fields
+  lastModified: string; // ISO 8601
+  lastModifiedBy: string;
+}
+
+export interface AppSettings {
+  authorizedUsers: AuthorizedUser[];
+  lockAssetList: boolean;
+  appMode: 'management' | 'verification';
+  activeDatabase: 'firestore' | 'rtdb';
 }
 
 export interface AuthorizedUser {
@@ -50,59 +69,7 @@ export interface AuthorizedUser {
   password?: string;
   states: string[];
   role: UserRole;
-  isAdmin: boolean; // Legacy shim for auth-context compatibility
-  isGuest?: boolean;
-}
-
-export interface AppSettings {
-  grants: Grant[];
-  activeGrantId: string | null;
-  authorizedUsers: AuthorizedUser[];
-  lockAssetList: boolean;
-  appMode: 'management' | 'verification';
-  activeDatabase: 'firestore' | 'rtdb';
-  lastModified?: string;
-}
-
-export interface Asset {
-  id: string;
-  category: string;
-  grantId?: string;
-  
-  // Dynamic Fields (mapped from Excel)
-  sn?: string;
-  description?: string;
-  serialNumber?: string;
-  assetIdCode?: string;
-  location?: string;
-  lga?: string;
-  site?: string;
-  assignee?: string;
-  condition?: string;
-  remarks?: string;
-  
-  // Custom Metadata
-  metadata: Record<string, unknown>;
-  hierarchy: SectionHierarchy;
-  importMetadata: ImportMetadata;
-  
-  // System Status
-  verifiedStatus: VerificationStatus;
-  verifiedDate?: string;
-  lastModified: string; // ISO 8601
-  lastModifiedBy: string;
-  lastModifiedByState?: string;
-  syncStatus?: 'synced' | 'local' | 'syncing';
-  
-  // UI/Audit Buffer
-  previousState?: Partial<Asset>;
-  approvalStatus?: 'pending';
-  pendingChanges?: Partial<Asset>;
-  changeSubmittedBy?: {
-    displayName: string;
-    loginName: string;
-    state: string;
-  };
+  isAdmin: boolean; // Shim for legacy compatibility
 }
 
 export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE';
