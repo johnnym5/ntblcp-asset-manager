@@ -28,25 +28,36 @@ import {
 } from '@/components/ui/select';
 import { ScrollArea } from './ui/scroll-area';
 import type { Asset } from '@/lib/types';
+import { PlaneTakeoff, Info, FileText } from 'lucide-react';
+import { Badge } from './ui/badge';
 
 interface TravelReportDialogProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
 }
 
-const ReportInput = ({ label, id, value, onChange }: { label: string, id: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void }) => (
-    <div className="space-y-1.5">
-        <Label htmlFor={id} className="font-semibold">{label}</Label>
-        <Textarea id={id} value={value} onChange={onChange} className="min-h-[100px] text-sm" />
+const ReportInput = ({ label, id, value, onChange, placeholder }: { label: string, id: string, value: string, onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => void, placeholder?: string }) => (
+    <div className="space-y-2">
+        <Label htmlFor={id} className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+            <Info className="h-3 w-3 text-primary" /> {label}
+        </Label>
+        <Textarea 
+            id={id} 
+            value={value} 
+            onChange={onChange} 
+            placeholder={placeholder}
+            className="min-h-[100px] text-xs font-medium rounded-2xl bg-muted/20 border-2 border-transparent focus:border-primary/20 focus:ring-0 shadow-inner p-4 resize-none" 
+        />
     </div>
 );
 
 const defaultActivities = [
-  "Physical verification of all assets in the state.",
-  "On-the-spot-assessment of the assets condition.",
-  "Proper documentation of the verified assets.",
-  "Proper documentation of the unverified assets.",
-  "Syncing of all the data into the server."
+  "Physical verification of all assets in the state registry.",
+  "On-the-spot assessment of assets physical and operational condition.",
+  "Cross-referencing manufacturer serials with the cloud database.",
+  "Verification of asset tag IDs and placement accuracy.",
+  "Documentation of unverified or missing assets for management review.",
+  "Real-time synchronization of field findings to the cloud workstation."
 ].join('\n');
 
 export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogProps) {
@@ -63,50 +74,14 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
   const [challenges, setChallenges] = useState('');
   const [recommendations, setRecommendations] = useState('');
 
-  useEffect(() => {
-    if (isOpen) {
-      setReportState(globalStateFilters[0] || userProfile?.states[0] || '');
-      setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
-      setObjectives('To conduct physical verification of assets in the state.');
-      setActivities(defaultActivities);
-      setApprovedBy('');
-      setChallenges('');
-      setRecommendations('');
-    }
-  }, [isOpen, userProfile, globalStateFilters]);
-
-  const activeAssets = useMemo(() => {
-    return dataSource === 'cloud' ? assets : offlineAssets;
-  }, [dataSource, assets, offlineAssets]);
+  const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
 
   const reportAssets = useMemo(() => {
     if (!reportState || !activeGrantId) return [];
-    
     let projectAssets = activeAssets.filter(asset => asset.grantId === activeGrantId);
-
-    if (userProfile && !userProfile.isAdmin) {
-        projectAssets = projectAssets.filter(asset => {
-            const assetLocation = (asset.location || "").toLowerCase().trim();
-            return userProfile.states.some(state => {
-                const lowerState = state.toLowerCase().trim();
-                const capitalCity = NIGERIAN_STATE_CAPITALS[state]?.toLowerCase().trim();
-                return assetLocation.startsWith(lowerState) || (capitalCity && assetLocation.startsWith(capitalCity));
-            });
-        });
-    }
 
     if (reportState === 'All Locations') return projectAssets;
     
-    const isZonalStore = ZONAL_STORES.map(z => z.toLowerCase()).includes(reportState.toLowerCase());
-
-    if (isZonalStore) {
-        const lowerCaseZone = reportState.toLowerCase();
-        return projectAssets.filter(asset => {
-            const assetLocation = (asset.location || "").toLowerCase().trim();
-            return assetLocation.includes(lowerCaseZone) && assetLocation.includes("zonal store");
-        });
-    }
-
     const lowerCaseFilter = reportState.toLowerCase().trim();
     const capitalCity = NIGERIAN_STATE_CAPITALS[reportState]?.toLowerCase().trim();
     
@@ -116,11 +91,41 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
       const matchesCapital = capitalCity ? assetLocation.startsWith(capitalCity) : false;
       return matchesState || matchesCapital || (SPECIAL_LOCATIONS.includes(reportState) && assetLocation.includes(lowerCaseFilter));
     });
-  }, [activeAssets, reportState, activeGrantId, userProfile]);
+  }, [activeAssets, reportState, activeGrantId]);
 
-  const verifiedAssets = reportAssets.filter(asset => asset.verifiedStatus === 'Verified');
-  const unverifiedAssetsCount = reportAssets.length - verifiedAssets.length;
-  const assetsWithRemarks = reportAssets.filter(asset => asset.remarks && asset.remarks.trim() !== '');
+  const stats = useMemo(() => {
+    const verified = reportAssets.filter(a => a.verifiedStatus === 'Verified');
+    const stolen = reportAssets.filter(a => a.condition === 'Stolen').length;
+    const bad = reportAssets.filter(a => ['Bad condition', 'Unsalvageable', 'Burnt'].includes(a.condition || '')).length;
+    return {
+        total: reportAssets.length,
+        verifiedCount: verified.length,
+        unverifiedCount: reportAssets.length - verified.length,
+        stolen,
+        bad,
+        percentage: reportAssets.length > 0 ? Math.round((verified.length / reportAssets.length) * 100) : 0
+    };
+  }, [reportAssets]);
+
+  useEffect(() => {
+    if (isOpen) {
+      const initialState = globalStateFilters[0] || userProfile?.state || '';
+      setReportState(initialState);
+      setTravelDate(new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' }));
+      setObjectives(`To conduct mandatory physical asset verification and condition assessment for ${initialState} state registry.`);
+      setActivities(defaultActivities);
+      setApprovedBy('');
+      
+      // Smart Suggestion Logic
+      let obs = `Conducted physical audit of ${stats.total} registry records. Currently achieved ${stats.percentage}% verification coverage.`;
+      if (stats.stolen > 0) obs += `\n- ALERT: Detected ${stats.stolen} stolen items requiring immediate security reporting.`;
+      if (stats.bad > 0) obs += `\n- Detected ${stats.bad} assets in critical or unsalvageable condition.`;
+      setObservations(obs);
+
+      setChallenges("Internet connectivity in remote LGAs was intermittent.\nDifficulty accessing locked storage rooms in certain facilities.");
+      setRecommendations("Immediate replacement of obsolete IT equipment identified during assessment.\nStrengthen security protocols in LGAs with reported asset losses.");
+    }
+  }, [isOpen, userProfile, globalStateFilters, stats.total, stats.stolen, stats.bad, stats.percentage]);
 
   const generateWordDocument = async () => {
     const { Packer, Document, Paragraph, HeadingLevel, Table, TableRow, TableCell, WidthType, BorderStyle, TextRun, AlignmentType } = await import('docx');
@@ -138,12 +143,13 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         });
     };
     
+    const assetsWithRemarks = reportAssets.filter(a => a.remarks && a.remarks.trim() !== '');
     const tableHeader = new TableRow({
         children: [
             new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "S/N", bold: true })]})], ...cellStyles }),
             new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Asset ID Code", bold: true })]})], ...cellStyles }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Asset Description", bold: true })]})], ...cellStyles }),
-            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Remark/Comment", bold: true })]})], ...cellStyles }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Description", bold: true })]})], ...cellStyles }),
+            new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "Field Observation", bold: true })]})], ...cellStyles }),
         ],
     });
 
@@ -155,22 +161,6 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
             new TableCell({ children: [new Paragraph(asset.remarks || '')], ...cellStyles }),
         ],
     }));
-    
-    const remarksTable = new Table({
-        rows: [tableHeader, ...remarksRows],
-        width: { size: 100, type: WidthType.PERCENTAGE },
-    });
-
-    // Hierarchical Summary logic
-    const sectionsVerified = verifiedAssets.reduce((acc, a) => {
-        const section = a.majorSection || 'Base Register';
-        acc[section] = (acc[section] || 0) + 1;
-        return acc;
-    }, {} as Record<string, number>);
-
-    const sectionSummaryText = Object.entries(sectionsVerified)
-        .map(([name, count]) => `${count} items in ${name}`)
-        .join(', ');
 
     const doc = new Document({
         styles: {
@@ -185,95 +175,127 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         },
         sections: [{
             children: [
-                new Paragraph({ text: "ASSETAIN", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+                new Paragraph({ text: "ASSETAIN REGISTRY", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
                 new Paragraph({ text: "ASSET VERIFICATION TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
                 new Paragraph(" "),
                 new Paragraph({ text: `DATE OF TRAVEL:\t\t${travelDate}` }),
-                new Paragraph({ text: `STATE VISITED:\t\t${reportState}` }),
-                new Paragraph({ text: `NAME OF OFFICER:\t${userProfile?.displayName}` }),
+                new Paragraph({ text: `LOCATION VISITED:\t\t${reportState}` }),
+                new Paragraph({ text: `OFFICER IN CHARGE:\t${userProfile?.displayName}` }),
                 new Paragraph(" "),
-                new Paragraph({ text: "SUMMARY OF VERIFICATION:", heading: HeadingLevel.HEADING_3 }),
+                new Paragraph({ text: "VERIFICATION EXECUTIVE SUMMARY:", heading: HeadingLevel.HEADING_3 }),
                 new Paragraph({
                     children: [
-                        new TextRun("Physical verification was conducted in "),
+                        new TextRun("Mandatory physical audit conducted in "),
                         new TextRun({ text: reportState, bold: true }),
-                        new TextRun(". Out of "),
-                        new TextRun({ text: `${reportAssets.length} assets`, bold: true }),
+                        new TextRun(". Out of a register total of "),
+                        new TextRun({ text: `${stats.total} assets`, bold: true }),
                         new TextRun(", "),
-                        new TextRun({ text: `${verifiedAssets.length} were verified`, bold: true, color: "008000" }),
+                        new TextRun({ text: `${stats.verifiedCount} were physically verified`, bold: true, color: "008000" }),
                         new TextRun(" and "),
-                        new TextRun({ text: `${unverifiedAssetsCount} were unverified.`, bold: true, color: "FF0000" }),
-                    ],
-                }),
-                new Paragraph({
-                    children: [
-                        new TextRun({ text: "Registry Coverage: ", bold: true }),
-                        new TextRun(sectionSummaryText || "No hierarchical sections detected."),
+                        new TextRun({ text: `${stats.unverifiedCount} remain in the unverified queue.`, bold: true, color: "FF0000" }),
                     ],
                 }),
                 new Paragraph(" "),
                 new Paragraph({ text: "OBJECTIVES:", heading: HeadingLevel.HEADING_3 }),
                 ...createBulletedParagraphs(objectives),
                 new Paragraph(" "),
-                new Paragraph({ text: "ACTIVITIES DONE:", heading: HeadingLevel.HEADING_3 }),
+                new Paragraph({ text: "ACTIVITIES PERFORMED:", heading: HeadingLevel.HEADING_3 }),
                 ...createBulletedParagraphs(activities),
                 new Paragraph(" "),
-                new Paragraph({ text: "ASSETS WITH REMARKS:", heading: HeadingLevel.HEADING_3 }),
-                remarksRows.length > 0 ? remarksTable : new Paragraph("No assets with remarks were found."),
+                new Paragraph({ text: "KEY OBSERVATIONS:", heading: HeadingLevel.HEADING_3 }),
+                ...createBulletedParagraphs(observations),
                 new Paragraph(" "),
-                new Paragraph({ text: `Prepared by: ${userProfile?.displayName}` }),
+                new Paragraph({ text: "CHALLENGES & BOTTLENECKS:", heading: HeadingLevel.HEADING_3 }),
+                ...createBulletedParagraphs(challenges),
+                new Paragraph(" "),
+                new Paragraph({ text: "MANAGEMENT RECOMMENDATIONS:", heading: HeadingLevel.HEADING_3 }),
+                ...createBulletedParagraphs(recommendations),
+                new Paragraph(" "),
+                new Paragraph({ text: "ASSET REGISTRY EXCEPTIONS (REMARKS):", heading: HeadingLevel.HEADING_3 }),
+                remarksRows.length > 0 ? new Table({ rows: [tableHeader, ...remarksRows], width: { size: 100, type: WidthType.PERCENTAGE } }) : new Paragraph("Zero registry exceptions with remarks noted."),
+                new Paragraph(" "),
+                new Paragraph({ text: `Authored by: ${userProfile?.displayName}` }),
                 new Paragraph({ text: `Approved by: ${approvedBy || '____________________'}` }),
             ],
         }],
     });
 
     Packer.toBlob(doc).then(blob => {
-        saveAs(blob, `Travel-Report-${reportState}-${userProfile?.displayName}.docx`);
+        saveAs(blob, `Assetain-Report-${reportState}-${userProfile?.displayName.replace(/\s+/g, '_')}.docx`);
     });
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
-        <DialogHeader>
-          <DialogTitle>Travel Report Generator</DialogTitle>
-          <DialogDescription>
-            Generate a formal Word report including hierarchical registry coverage.
-          </DialogDescription>
-        </DialogHeader>
-        <ScrollArea className="max-h-[70vh] p-1">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4 pr-4">
-                <div className="space-y-4">
+      <DialogContent className="max-w-4xl flex flex-col h-[90vh] overflow-hidden p-0 border-primary/10 rounded-3xl bg-background shadow-2xl">
+        <div className="p-8 pb-4 bg-muted/20 border-b">
+            <DialogHeader>
+                <div className="flex items-center justify-between">
+                    <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">
+                        <PlaneTakeoff className="text-primary h-8 w-8" /> Executive Travel Report
+                    </DialogTitle>
+                    <Badge variant="outline" className="h-8 px-4 rounded-xl font-black text-[10px] uppercase border-primary/20 text-primary">
+                        Coverage: {stats.percentage}%
+                    </Badge>
+                </div>
+                <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
+                    Automated generator for formal field verification findings.
+                </DialogDescription>
+            </DialogHeader>
+        </div>
+
+        <ScrollArea className="flex-1 bg-background">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 p-8">
+                <div className="space-y-6">
                     <div className="grid grid-cols-2 gap-4">
                          <div className="space-y-1.5">
-                            <Label>Officer's Name</Label>
-                            <Input value={userProfile?.displayName || ''} readOnly disabled />
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Auditor Identity</Label>
+                            <Input value={userProfile?.displayName || ''} readOnly disabled className="rounded-xl bg-muted/30 border-none font-bold text-xs" />
                         </div>
                         <div className="space-y-1.5">
-                            <Label>State Visited</Label>
-                            <Input value={reportState} readOnly disabled />
+                            <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Target Location</Label>
+                            <Input value={reportState} readOnly disabled className="rounded-xl bg-muted/30 border-none font-bold text-xs" />
                         </div>
                     </div>
                     <div className="space-y-1.5">
-                        <Label>Date of Travel</Label>
-                        <Input value={travelDate} onChange={(e) => setTravelDate(e.target.value)} />
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Audit Period / Date</Label>
+                        <Input value={travelDate} onChange={(e) => setTravelDate(e.target.value)} className="rounded-xl font-bold text-xs border-2" />
                     </div>
-                    <ReportInput label="Objectives" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} />
-                    <ReportInput label="Activities Done" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} />
+                    <ReportInput label="Audit Objectives" id="objectives" value={objectives} onChange={(e) => setObjectives(e.target.value)} />
+                    <ReportInput label="Field Activities" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} />
                 </div>
-                <div className="space-y-4">
-                    <ReportInput label="Observations" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
-                    <ReportInput label="Challenges" id="challenges" value={challenges} onChange={(e) => setChallenges(e.target.value)} />
-                    <ReportInput label="Recommendations" id="recommendations" value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
+                <div className="space-y-6">
+                    <div className="p-5 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-2">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                            <FileText className="h-3.5 w-3.5" /> Live Registry Pulse
+                        </h4>
+                        <div className="grid grid-cols-2 gap-4 pt-2">
+                            <div className="flex flex-col">
+                                <span className="text-[9px] font-bold text-muted-foreground uppercase">Verified</span>
+                                <span className="text-xl font-black">{stats.verifiedCount} / {stats.total}</span>
+                            </div>
+                            <div className="flex flex-col text-right">
+                                <span className="text-[9px] font-bold text-muted-foreground uppercase">Exceptions</span>
+                                <span className="text-xl font-black text-destructive">{stats.stolen + stats.bad}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <ReportInput label="Key Findings & Observations" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
+                    <ReportInput label="Field Bottlenecks" id="challenges" value={challenges} onChange={(e) => setChallenges(e.target.value)} />
+                    <ReportInput label="Proposed Recommendations" id="recommendations" value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
                     <div className="space-y-1.5">
-                        <Label>Approved By</Label>
-                        <Input value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} placeholder="Enter manager name..." />
+                        <Label className="text-[10px] font-black uppercase tracking-widest opacity-60 pl-1">Approving Manager</Label>
+                        <Input value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} placeholder="Enter manager name..." className="rounded-xl border-2 font-bold text-xs" />
                     </div>
                 </div>
             </div>
         </ScrollArea>
-        <DialogFooter>
-          <Button onClick={generateWordDocument} disabled={reportAssets.length === 0}>Export Word Document</Button>
+
+        <DialogFooter className="p-8 bg-muted/20 border-t flex items-center justify-between">
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold rounded-xl px-8">Discard Draft</Button>
+          <Button onClick={generateWordDocument} disabled={reportAssets.length === 0} className="h-12 px-10 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20">
+            Export Word Document (.docx)
+          </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>

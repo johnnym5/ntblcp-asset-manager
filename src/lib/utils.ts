@@ -16,16 +16,38 @@ export const sanitizeForFirestore = <T extends object>(obj: T): T => {
     const sanitizedObj: { [key: string]: any } = {};
     for (const key in obj) {
         const value = (obj as any)[key];
+        // CRITICAL: Ensure audit buffer is NEVER pushed to the cloud
         if (key === 'previousState') continue;
         if (value !== undefined) {
             if (value instanceof Date) {
                 sanitizedObj[key] = Timestamp.fromDate(value);
+            } else if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Timestamp)) {
+                // Recursively sanitize nested objects (like changeSubmittedBy)
+                sanitizedObj[key] = sanitizeForFirestore(value);
             } else {
                 sanitizedObj[key] = value;
             }
         }
     }
     return sanitizedObj as T;
+};
+
+/**
+ * Performs a deep merge of two objects, specifically for restoration operations.
+ */
+export const deepMerge = (target: any, source: any) => {
+    const output = { ...target };
+    if (source && typeof source === 'object') {
+        Object.keys(source).forEach(key => {
+            if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+                if (!(key in target)) Object.assign(output, { [key]: source[key] });
+                else output[key] = deepMerge(target[key], source[key]);
+            } else {
+                Object.assign(output, { [key]: source[key] });
+            }
+        });
+    }
+    return output;
 };
 
 export const normalizeAssetLocation = (location?: string): string => {

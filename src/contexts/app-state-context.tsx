@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
-import { TARGET_SHEETS } from '@/lib/constants';
+import { TARGET_SHEETS, NIGERIAN_ZONES, ZONAL_STORES } from '@/lib/constants';
 import type { Asset, AppSettings, Grant } from '@/lib/types';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
 import { updateSettings as updateSettingsFS } from '@/lib/firestore';
@@ -141,7 +141,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [dataActions, setDataActions] = useState<DataActions>({});
 
-  // 1. Initial Load from IndexedDB
   useEffect(() => {
     const initialize = async () => {
       let local = await getLocalSettings();
@@ -162,7 +161,6 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     initialize();
   }, []);
 
-  // 2. Real-Time Cloud Listeners (Global Config Broadcast)
   useEffect(() => {
     if (!isOnline) return;
 
@@ -202,11 +200,9 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     return () => unsubscribe();
   }, [isOnline, appSettings.activeDatabase]);
 
-  // 3. Asset Synchronization (Strictly Project-Scoped)
   useEffect(() => {
     if (!isOnline || !appSettings.activeGrantId) return;
 
-    // Flush current assets before re-subscribing to a new grant/database
     setAssets([]);
 
     let unsubscribe: () => void = () => {};
