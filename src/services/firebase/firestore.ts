@@ -13,7 +13,9 @@ import {
   collection, 
   query, 
   where, 
-  writeBatch,
+  orderBy,
+  limit,
+  addDoc,
   type DocumentReference
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -21,7 +23,7 @@ import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors';
 import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
-import type { Asset, AppSettings } from '@/types/domain';
+import type { Asset, AppSettings, ActivityLogEntry, QueueOperation } from '@/types/domain';
 
 export const FirestoreService = {
   /**
@@ -69,9 +71,9 @@ export const FirestoreService = {
   },
 
   /**
-   * Single record update with mandatory Zod validation.
+   * Single record update with mandatory Zod validation and Activity Logging.
    */
-  async saveAsset(asset: Asset): Promise<void> {
+  async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
 
     const validation = AssetSchema.safeParse(asset);
@@ -85,9 +87,77 @@ export const FirestoreService = {
     
     try {
       await setDoc(assetRef, sanitized, { merge: true });
+      
+      // Log the mutation pulse
+      await this.logActivity({
+        assetId: asset.id,
+        assetDescription: asset.description,
+        operation,
+        performedBy: asset.lastModifiedBy,
+        userState: asset.lastModifiedByState || 'Unknown',
+        changes
+      });
+
     } catch (err: any) {
       this.handlePermissionError(assetRef, 'update', err, sanitized);
       throw err;
+    }
+  },
+
+  /**
+   * Records a mutation pulse in the append-only activity log.
+   */
+  async logActivity(entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>) {
+    if (!db) return;
+    const logRef = collection(db, 'activity_log');
+    try {
+      await addDoc(logRef, {
+        ...entry,
+        timestamp: new Date().toISOString()
+      });
+    } catch (e) {
+      console.error("Failed to log activity pulse", e);
+    }
+  },
+
+  /**
+   * Fetches activity history for a specific asset.
+   */
+  async getAssetHistory(assetId: string): Promise<ActivityLogEntry[]> {
+    if (!db) return [];
+    const logRef = collection(db, 'activity_log');
+    const q = query(
+      logRef, 
+      where('assetId', '==', assetId), 
+      orderBy('timestamp', 'desc'),
+      limit(50)
+    );
+    try {
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as ActivityLogEntry));
+    } catch (e) {
+      console.error("Failed to fetch asset history pulse", e);
+      return [];
+    }
+  },
+
+  /**
+   * Fetches global activity history.
+   */
+  async getGlobalActivity(limitCount: number = 100): Promise<ActivityLogEntry[]> {
+    if (!db) return [];
+    const logRef = collection(db, 'activity_log');
+    const q = query(
+      logRef, 
+      orderBy('timestamp', 'desc'),
+      limit(limitCount)
+    );
+    try {
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as ActivityLogEntry));
+    } catch (e) {
+      console.error("Failed to fetch global activity pulse", e);
+      return [];
     }
   },
 

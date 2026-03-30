@@ -111,3 +111,15 @@ export interface OfflineQueueEntry {
   timestamp: number;
   error?: string;
 }
+
+export interface ActivityLogEntry {
+  id: string;
+  assetId: string;
+  assetDescription: string;
+  operation: QueueOperation;
+  timestamp: string;
+  performedBy: string;
+  userState: string;
+  changes?: Record<string, { old: any; new: any }>;
+  metadata?: Record<string, any>;
+}
