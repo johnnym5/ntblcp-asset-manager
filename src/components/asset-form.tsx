@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 27: Integrated AI-Powered OCR Scanning Pulse.
+ * Phase 28: Integrated Fluid Responsive Auto-Fit.
  */
 
 import React, { useEffect, useState, useRef } from "react";
@@ -214,33 +214,23 @@ export function AssetForm({
   const handleAIScan = async () => {
     if (!capturedPhoto) return;
     setIsAnalyzing(true);
-    toast({ title: "AI Pulse Initialized", description: "Analyzing asset label for technical markers..." });
+    toast({ title: "AI Pulse Initialized", description: "Analyzing asset label..." });
 
     try {
       const result = await extractAssetData({ photoDataUri: capturedPhoto });
-      
       if (result.confidence > 0.4) {
-        // Map AI results to form
         if (result.serialNumber) form.setValue('serialNumber', result.serialNumber);
         if (result.modelNumber) form.setValue('metadata.modelNumber', result.modelNumber);
         if (result.manufacturer) form.setValue('metadata.manufacturer', result.manufacturer);
         if (result.description && !form.getValues('description')) {
           form.setValue('description', result.description);
         }
-        
-        toast({ 
-          title: "Technical Extraction Complete", 
-          description: `Identified S/N: ${result.serialNumber || 'Unclear'} with ${Math.round(result.confidence * 100)}% accuracy.` 
-        });
+        toast({ title: "Extraction Complete", description: `Accuracy: ${Math.round(result.confidence * 100)}%` });
       } else {
-        toast({ 
-          variant: "destructive", 
-          title: "Low Confidence Pulse", 
-          description: "AI was unable to verify technical markers. Please enter manually." 
-        });
+        toast({ variant: "destructive", title: "Low Confidence Pulse", description: "Please verify markers manually." });
       }
     } catch (e) {
-      toast({ variant: "destructive", title: "Intelligence Failure", description: "AI engine was unable to process the label pulse." });
+      toast({ variant: "destructive", title: "Intelligence Failure" });
     } finally {
       setIsAnalyzing(false);
     }
@@ -261,7 +251,7 @@ export function AssetForm({
   };
 
   const SectionHeader = ({ label, icon: Icon }: { label: string; icon: any }) => (
-    <div className="flex items-center gap-3 px-6 py-4 bg-muted/20 border-y border-border/40">
+    <div className="flex items-center gap-3 px-4 md:px-6 py-4 bg-muted/20 border-y border-border/40">
       <Icon className="h-4 w-4 text-primary opacity-60" />
       <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{label}</h4>
     </div>
@@ -269,7 +259,7 @@ export function AssetForm({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if(!open) stopCamera(); onOpenChange(open); }}>
-      <DialogContent className="max-w-xl w-full flex flex-col h-[100vh] sm:h-[95vh] p-0 overflow-hidden rounded-none sm:rounded-[2.5rem] border-none shadow-2xl bg-background">
+      <DialogContent className="max-w-2xl w-full flex flex-col h-full sm:h-[95vh] p-0 overflow-hidden sm:rounded-[2.5rem] border-none shadow-2xl bg-background">
         {/* Header Bar */}
         <div className="flex flex-col shrink-0">
           <div className="flex items-center justify-between p-4 border-b bg-background/80 backdrop-blur-md z-30">
@@ -278,22 +268,22 @@ export function AssetForm({
                       <ArrowLeft className="h-5 w-5" />
                   </Button>
                   <div className="flex flex-col">
-                    <DialogTitle className="text-sm font-black tracking-tight uppercase leading-none truncate max-w-[140px]">
+                    <DialogTitle className="text-xs md:text-sm font-black tracking-tight uppercase leading-none truncate max-w-[120px] md:max-w-xs">
                       {asset?.assetIdCode || 'NEW REGISTRATION'}
                     </DialogTitle>
-                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-[0.2em] mt-1 opacity-60">REGISTRY PULSE PROFILE</span>
+                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-[0.2em] mt-1 opacity-60">REGISTRY PULSE</span>
                   </div>
               </div>
               
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                   <div className="flex items-center bg-muted/50 rounded-xl p-1 mr-1">
                     <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-8 w-8 rounded-lg tactile-pulse"><ChevronLeft className="h-4 w-4" /></Button>
                     <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-8 w-8 rounded-lg tactile-pulse"><ChevronRight className="h-4 w-4" /></Button>
                   </div>
                   {!isReadOnly && (
-                      <Button variant="ghost" size="icon" onClick={startCamera} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10 transition-colors tactile-pulse"><Camera className="h-5 w-5" /></Button>
+                      <Button variant="ghost" size="icon" onClick={startCamera} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10 tactile-pulse"><Camera className="h-5 w-5" /></Button>
                   )}
-                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-40 hover:opacity-100 transition-opacity tactile-pulse"><Share2 className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-40 hover:opacity-100 tactile-pulse"><Share2 className="h-5 w-5" /></Button>
               </div>
           </div>
 
@@ -305,7 +295,7 @@ export function AssetForm({
                   <Info className="h-3 w-3" /> Profile
                 </TabsTrigger>
                 <TabsTrigger value="history" className="rounded-lg font-black uppercase text-[9px] tracking-widest gap-2">
-                  <History className="h-3 w-3" /> Lifecycle history
+                  <History className="h-3 w-3" /> History
                 </TabsTrigger>
               </TabsList>
             </Tabs>
@@ -317,9 +307,9 @@ export function AssetForm({
             <TabsContent value="details" className="m-0 h-full">
               <Form {...form}>
                 <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)} className="pb-32">
-                    {/* Evidence Viewport */}
+                    {/* Evidence Viewport - Adaptive Aspect */}
                     {isCameraActive ? (
-                      <div className="relative aspect-[4/3] bg-black overflow-hidden m-4 rounded-[2rem] border-4 border-primary/20">
+                      <div className="relative aspect-[4/3] bg-black overflow-hidden m-2 sm:m-4 rounded-[1.5rem] sm:rounded-[2rem] border-4 border-primary/20">
                           <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
                           <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-6">
                               <Button variant="destructive" size="icon" className="h-14 w-14 rounded-2xl shadow-xl tactile-pulse" onClick={stopCamera}><X className="h-6 w-6" /></Button>
@@ -329,7 +319,7 @@ export function AssetForm({
                           </div>
                       </div>
                     ) : capturedPhoto ? (
-                      <div className="relative group aspect-video bg-muted m-4 rounded-[2rem] overflow-hidden border-2 border-primary/10 shadow-lg">
+                      <div className="relative group aspect-video bg-muted m-2 sm:m-4 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden border-2 border-primary/10 shadow-lg">
                           <img src={capturedPhoto} className="w-full h-full object-cover" alt="Asset Evidence" />
                           <div className="absolute top-4 right-4 flex gap-2">
                             {!isReadOnly && (
@@ -338,144 +328,78 @@ export function AssetForm({
                                   size="sm" 
                                   onClick={handleAIScan} 
                                   disabled={isAnalyzing}
-                                  className="rounded-xl h-10 px-4 font-black uppercase text-[9px] tracking-widest gap-2 shadow-2xl transition-all hover:scale-105 active:scale-95"
+                                  className="rounded-xl h-10 px-4 font-black uppercase text-[9px] tracking-widest gap-2 shadow-2xl"
                                 >
                                   {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-primary" />}
-                                  AI Extract
+                                  AI Scan
                                 </Button>
                             )}
                             {!isReadOnly && (
-                                <Button variant="destructive" size="icon" className="h-10 w-10 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity tactile-pulse" onClick={() => setCapturedPhoto(null)}>
+                                <Button variant="destructive" size="icon" className="h-10 w-10 rounded-xl shadow-2xl" onClick={() => setCapturedPhoto(null)}>
                                   <X className="h-5 w-5" />
                                 </Button>
                             )}
                           </div>
-                          <Badge className="absolute bottom-4 left-4 bg-primary/90 backdrop-blur-md font-black uppercase text-[8px] tracking-[0.2em] px-3 h-6 rounded-lg">
-                            VISUAL PULSE PROOF ATTACHED
-                          </Badge>
                       </div>
                     ) : (
-                      <div className="m-4 h-48 border-2 border-dashed border-primary/10 rounded-[2rem] flex flex-col items-center justify-center gap-4 bg-primary/5 hover:bg-primary/[0.08] transition-colors cursor-pointer group" onClick={startCamera}>
+                      <div className="m-2 sm:m-4 h-40 md:h-48 border-2 border-dashed border-primary/10 rounded-[1.5rem] sm:rounded-[2rem] flex flex-col items-center justify-center gap-4 bg-primary/5 hover:bg-primary/[0.08] transition-colors cursor-pointer group" onClick={startCamera}>
                         <div className="p-4 bg-primary/10 rounded-2xl group-hover:scale-110 transition-transform"><Camera className="h-8 w-8 text-primary" /></div>
-                        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Capture Visual Proof</span>
+                        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Attach Proof Pulse</span>
                       </div>
                     )}
 
-                    {/* Identification Stack */}
+                    {/* Form Grids - Adaptive Columns */}
                     <SectionHeader label="Identification Pulse" icon={Tag} />
-                    <div className="px-6 py-6 space-y-6">
+                    <div className="px-4 md:px-6 py-6 space-y-6">
                       <FormField control={form.control} name="description" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('asset_description', 'Asset Description')}</FormLabel>
-                          <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('asset_description', 'Description')}</FormLabel>
+                          <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormItem>
                         </FormItem>
                       )}/>
                       
-                      <div className="grid grid-cols-2 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField control={form.control} name="assetIdCode" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('asset_id_code', 'Registry Tag ID')}</FormLabel>
+                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('asset_id_code', 'Registry Tag')}</FormLabel>
                             <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                           </FormItem>
                         )}/>
 
                         <FormField control={form.control} name="serialNumber" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('serial_number', 'Manufacturer Serial')}</FormLabel>
-                            <FormControl>
-                              <div className="relative">
-                                <Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner pr-10" />
-                                {form.getValues('serialNumber') && form.getValues('serialNumber') !== 'N/A' && (
-                                  <ShieldCheck className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
-                                )}
-                              </div>
-                            </FormControl>
+                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('serial_number', 'Serial')}</FormLabel>
+                            <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                           </FormItem>
                         )}/>
                       </div>
                     </div>
 
-                    {/* Location & Context Stack */}
-                    <SectionHeader label="Regional Scope & Context" icon={MapPin} />
-                    <div className="px-6 py-6 grid grid-cols-2 gap-4">
+                    <SectionHeader label="Location & Assessment" icon={MapPin} />
+                    <div className="px-4 md:px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField control={form.control} name="location" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('location', 'Physical Location')}</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('location', 'Location')}</FormLabel>
                           <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                         </FormItem>
                       )}/>
 
-                      <FormField control={form.control} name="custodian" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('assignee_location', 'Custodian / User')}</FormLabel>
-                          <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
-                        </FormItem>
-                      )}/>
-                    </div>
-
-                    {/* Procurement Stack */}
-                    <SectionHeader label="Financial & Procurement" icon={DollarSign} />
-                    <div className="px-6 py-6 grid grid-cols-2 gap-4">
-                      <FormField control={form.control} name="purchaseDate" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('date_purchased_received', 'Date Procured')}</FormLabel>
-                          <FormControl><Input type="date" {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-bold text-xs shadow-inner" /></FormControl>
-                        </FormItem>
-                      )}/>
-
-                      <FormField control={form.control} name="value" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('purchase_price_ngn', 'Original Value (NGN)')}</FormLabel>
-                          <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-bold text-xs shadow-inner" /></FormControl>
-                        </FormItem>
-                      )}/>
-                    </div>
-
-                    {/* Assessment Stack */}
-                    <SectionHeader label="Condition & Assessment" icon={Activity} />
-                    <div className="px-6 py-6 grid grid-cols-2 gap-4">
                       <FormField control={form.control} name="condition" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('condition', 'Field Assessment')}</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('condition', 'Condition')}</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
                             <FormControl><SelectTrigger className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:ring-primary/20 font-bold text-xs shadow-inner"><SelectValue /></SelectTrigger></FormControl>
-                            <SelectContent className="rounded-xl">{ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-xs font-bold rounded-lg">{c}</SelectItem>)}</SelectContent>
-                          </Select>
-                        </FormItem>
-                      )}/>
-
-                      <FormField control={form.control} name="status" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Verification Pulse</FormLabel>
-                          <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
-                            <FormControl><SelectTrigger className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:ring-primary/20 font-black uppercase text-[10px] tracking-widest shadow-inner"><SelectValue /></SelectTrigger></FormControl>
-                            <SelectContent className="rounded-xl">
-                              <SelectItem value="VERIFIED" className="text-[10px] font-black uppercase tracking-widest rounded-lg">VERIFIED</SelectItem>
-                              <SelectItem value="UNVERIFIED" className="text-[10px] font-black uppercase tracking-widest rounded-lg">UNVERIFIED</SelectItem>
-                              <SelectItem value="DISCREPANCY" className="text-[10px] font-black uppercase tracking-widest rounded-lg">DISCREPANCY</SelectItem>
-                            </SelectContent>
+                            <SelectContent className="rounded-xl">{ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-xs font-bold">{c}</SelectItem>)}</SelectContent>
                           </Select>
                         </FormItem>
                       )}/>
                     </div>
 
-                    {/* Hierarchy & Provenance */}
-                    <SectionHeader label="Fidelity & Provenance Pulse" icon={History} />
-                    <div className="p-6 grid grid-cols-2 gap-3 bg-muted/5">
-                      <FieldBlock label={getLabel('section_name', 'Major Section')} value={asset?.hierarchy?.section} icon={Database} />
-                      <FieldBlock label={getLabel('subsection_name', 'Temporal Subsection')} value={asset?.hierarchy?.subsection} icon={History} />
-                      <FieldBlock label="Asset Family" value={asset?.hierarchy?.assetFamily} icon={Tag} />
-                      <FieldBlock label={getLabel('row_number', 'Source Row')} value={asset?.importMetadata?.rowNumber} icon={Hash} />
-                      <FieldBlock label="Imported At" value={asset?.importMetadata?.importedAt ? new Date(asset.importMetadata.importedAt).toLocaleDateString() : 'MANUAL'} icon={CalendarDays} />
-                      <FieldBlock label="Last Auditor" value={asset?.lastModifiedBy} icon={User} />
-                    </div>
-
-                    {/* Remarks Pulse */}
-                    <div className="p-6">
+                    <div className="p-4 md:px-6">
                       <FormField control={form.control} name="metadata.remarks" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('remarks', 'Auditor Field Notes')}</FormLabel>
-                          <FormControl><Textarea {...(field as any)} readOnly={isReadOnly} className="min-h-[120px] rounded-2xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-medium text-sm shadow-inner p-4 resize-none" /></FormControl>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Field Remarks</FormLabel>
+                          <FormControl><Textarea {...(field as any)} readOnly={isReadOnly} className="min-h-[100px] rounded-2xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-medium text-sm shadow-inner p-4 resize-none" /></FormControl>
                         </FormItem>
                       )}/>
                     </div>
@@ -483,61 +407,41 @@ export function AssetForm({
               </Form>
             </TabsContent>
 
-            <TabsContent value="history" className="m-0">
-              <div className="p-6 space-y-8">
+            <TabsContent value="history" className="m-0 h-full">
+              <div className="p-4 md:p-6 space-y-6">
                 {loadingHistory ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-40">
                     <Loader2 className="h-10 w-10 animate-spin text-primary" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">Replaying Lifecycle Pulse...</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest">Replaying Pulse...</p>
                   </div>
                 ) : history.length > 0 ? (
                   <div className="space-y-6 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-0.5 before:bg-primary/10">
                     {history.map((entry, idx) => (
                       <div key={entry.id} className="relative pl-12">
                         <div className={cn(
-                          "absolute left-0 top-0 h-10 w-10 rounded-xl flex items-center justify-center shadow-lg border-2 z-10 transition-colors",
+                          "absolute left-0 top-0 h-10 w-10 rounded-xl flex items-center justify-center shadow-lg border-2 z-10",
                           idx === 0 ? "bg-primary border-primary text-white" : "bg-card border-primary/20 text-primary"
                         )}>
                           <Clock className="h-5 w-5" />
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
-                            <h4 className="font-black text-[11px] uppercase tracking-tight">
-                              {entry.operation === 'CREATE' ? 'Initial Registration' : entry.operation === 'RESTORE' ? 'State Restoration' : 'Registry Update'}
-                            </h4>
-                            <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">
+                            <h4 className="font-black text-[10px] uppercase tracking-tight">{entry.operation}</h4>
+                            <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">
                               {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
                             </span>
                           </div>
-                          <div className="p-4 rounded-2xl bg-muted/30 border border-border/40 space-y-3">
-                            <div className="flex items-center gap-3 text-[10px] font-bold text-muted-foreground uppercase">
-                              <User className="h-3 w-3" /> {entry.performedBy}
-                              <MapPin className="h-3 w-3 ml-2" /> {entry.userState}
-                            </div>
-                            {entry.changes && Object.keys(entry.changes).length > 0 && (
-                              <div className="space-y-1.5 pt-2 border-t border-dashed border-border/40">
-                                {Object.entries(entry.changes).map(([key, val]: [string, any]) => (
-                                  <div key={key} className="flex items-center gap-2 text-[9px] font-bold overflow-hidden">
-                                    <span className="text-muted-foreground uppercase shrink-0">{key}:</span>
-                                    <span className="line-through opacity-40 truncate max-w-[60px]">{String(val.old || '---')}</span>
-                                    <ArrowRight className="h-2.5 w-2.5 text-primary shrink-0" />
-                                    <span className="text-primary truncate">{String(val.new)}</span>
-                                  </div>
-                                ))}
-                              </div>
-                            )}
+                          <div className="p-4 rounded-2xl bg-muted/30 border border-border/40 text-[10px] font-bold text-muted-foreground uppercase">
+                            <User className="h-3 w-3 inline mr-2" /> {entry.performedBy}
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-32 opacity-20 text-center space-y-4">
-                    <History className="h-16 w-16" />
-                    <div className="space-y-1">
-                      <h3 className="text-xl font-black uppercase tracking-widest">History Silent</h3>
-                      <p className="text-[10px] font-bold uppercase tracking-widest">No mutation pulses recorded for this asset.</p>
-                    </div>
+                  <div className="flex flex-col items-center justify-center py-32 opacity-20 text-center">
+                    <History className="h-12 w-12 mb-4" />
+                    <h3 className="text-xl font-black uppercase tracking-widest">History Silent</h3>
                   </div>
                 )}
               </div>
@@ -545,11 +449,11 @@ export function AssetForm({
           </Tabs>
         </ScrollArea>
 
-        {/* Action Footer */}
+        {/* Footer - Fluid Stack */}
         {!isReadOnly && activeTab === 'details' && (
-            <div className="p-6 bg-background/80 backdrop-blur-xl border-t flex flex-row items-center gap-3 absolute bottom-0 left-0 right-0 z-40">
-                <Button variant="ghost" onClick={() => { stopCamera(); onOpenChange(false); }} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl tactile-pulse">DISCARD DRAFT</Button>
-                <Button type="submit" form="asset-form" disabled={isSaving} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-primary/30 rounded-2xl bg-primary text-primary-foreground tactile-pulse">
+            <div className="p-4 md:p-6 bg-background/80 backdrop-blur-xl border-t flex flex-col sm:flex-row items-center gap-3 absolute bottom-0 left-0 right-0 z-40">
+                <Button variant="ghost" onClick={() => { stopCamera(); onOpenChange(false); }} className="w-full sm:flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl">DISCARD</Button>
+                <Button type="submit" form="asset-form" disabled={isSaving} className="w-full sm:flex-1 h-14 font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-primary/30 rounded-2xl bg-primary text-primary-foreground">
                     {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ShieldCheck className="h-5 w-5 mr-2" />}
                     COMMIT PULSE
                 </Button>

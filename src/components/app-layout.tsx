@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
- * Refined for Phase 15 with role-based navigation and security pulse indicators.
- * UX Refinement: Renamed labels for better user guidance.
+ * Phase 28: Hardened for Fluid Responsive Auto-Fit.
  */
 
 import React, { useState } from 'react';
@@ -32,7 +31,8 @@ import {
   Zap,
   Database,
   Globe,
-  HelpCircle
+  HelpCircle,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -99,6 +99,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Link
             key={item.href}
             href={item.href}
+            onClick={() => setIsMobileMenuOpen(false)}
             className={cn(
               "flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all relative overflow-hidden group",
               pathname === item.href 
@@ -126,7 +127,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden font-body selection:bg-primary/10">
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:flex flex-col w-72 border-r bg-card/50 backdrop-blur-xl p-6">
+      <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r bg-card/50 backdrop-blur-xl p-6">
         <div className="flex items-center gap-3 mb-10 px-2">
           <div className="p-2.5 bg-primary rounded-2xl shadow-xl shadow-primary/20">
             <Zap className="h-6 w-6 text-primary-foreground fill-current" />
@@ -199,51 +200,61 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-6 z-30">
+        <header className="h-16 shrink-0 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-4 md:px-6 z-30">
           <div className="flex items-center gap-4">
             <div className="lg:hidden">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-xl"><Menu className="h-6 w-6" /></Button>
+                  <Button variant="ghost" size="icon" className="rounded-xl tactile-pulse"><Menu className="h-6 w-6" /></Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-72 p-6 flex flex-col rounded-r-3xl border-none">
-                  <div className="flex items-center gap-3 mb-10">
-                    <Zap className="h-6 w-6 text-primary fill-current" />
-                    <span className="text-xl font-black uppercase tracking-tighter">Assetain</span>
+                <SheetContent side="left" className="w-[85vw] max-w-sm p-0 flex flex-col rounded-r-[2.5rem] border-none bg-background shadow-2xl">
+                  <div className="p-8 pb-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Zap className="h-6 w-6 text-primary fill-current" />
+                      <span className="text-xl font-black uppercase tracking-tighter">Assetain</span>
+                    </div>
+                    <Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="rounded-xl"><X className="h-5 w-5" /></Button>
                   </div>
-                  <div className="flex-1 overflow-y-auto">
-                    <NavGroup items={PRIMARY_NAV} />
-                    <NavGroup items={AUDIT_NAV} title="Reporting & Pulse" />
-                    <NavGroup items={ADMIN_NAV} title="Governance" />
+                  <ScrollArea className="flex-1 px-6 py-4">
+                    <div className="pb-10">
+                      <NavGroup items={PRIMARY_NAV} />
+                      <NavGroup items={AUDIT_NAV} title="Reporting & Pulse" />
+                      <NavGroup items={ADMIN_NAV} title="Governance" />
+                    </div>
+                  </ScrollArea>
+                  <div className="p-8 border-t bg-muted/5 space-y-4">
+                    <Button variant="outline" className="w-full h-12 rounded-xl text-[10px] font-black uppercase tracking-widest border-2" onClick={() => logout()}>
+                      <LogOut className="mr-2 h-4 w-4" /> End Session
+                    </Button>
                   </div>
                 </SheetContent>
               </Sheet>
             </div>
-            <h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground hidden sm:flex items-center gap-2">
-              <span className="opacity-40">Context ›</span>
+            <h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">
+              <span className="opacity-40 hidden sm:inline">Context ›</span>
               <span className="text-foreground">
                 {pathname === '/' ? 'Pulse' : pathname.split('/').pop()?.replace('-', ' ')}
               </span>
             </h1>
           </div>
 
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 sm:gap-4">
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
                   <div className={cn(
-                    "flex items-center gap-3 px-4 py-2 rounded-2xl border-2 transition-all cursor-help",
+                    "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-2xl border-2 transition-all cursor-help",
                     isOnline 
                       ? "border-green-500/20 bg-green-500/5 text-green-600" 
                       : "border-destructive/20 bg-destructive/5 text-destructive"
                   )}>
                     <div className="flex items-center gap-1.5">
                       <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} />
-                      <span className="text-[10px] font-black uppercase tracking-tighter">
+                      <span className="text-[10px] font-black uppercase tracking-tighter hidden xs:inline">
                         {isOnline ? 'Active' : 'Offline'}
                       </span>
                     </div>
-                    <Separator orientation="vertical" className="h-4 opacity-20" />
+                    <Separator orientation="vertical" className="h-4 opacity-20 hidden xs:block" />
                     <div className="flex gap-1">
                       <Database className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} />
                       <Activity className={cn("h-3 w-3", isSyncing ? "text-primary animate-pulse" : "opacity-30")} />
@@ -272,7 +283,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="rounded-xl hover:bg-primary/5 hover:text-primary"
+              className="rounded-xl hover:bg-primary/5 hover:text-primary transition-all hidden xs:flex"
               onClick={() => setIsOnline(!isOnline)}
             >
               {isOnline ? <Cloud className="h-5 w-5" /> : <CloudOff className="h-5 w-5" />}
@@ -280,7 +291,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto custom-scrollbar bg-muted/10">
+        <main className="flex-1 overflow-y-auto custom-scrollbar bg-muted/10 relative">
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
@@ -288,9 +299,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.3 }}
-              className="p-6 md:p-10"
+              className="p-4 md:p-8 lg:p-10"
             >
-              {children}
+              <div className="max-w-[1600px] mx-auto h-full">
+                {children}
+              </div>
             </motion.div>
           </AnimatePresence>
         </main>
