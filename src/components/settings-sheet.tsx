@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -51,7 +50,8 @@ import {
     Palette, 
     FolderKanban, 
     CheckCircle2, 
-    PlaneTakeoff 
+    PlaneTakeoff,
+    RefreshCw
 } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
 import type { SheetDefinition, AppSettings, Grant } from '@/lib/types';
