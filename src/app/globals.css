@@ -25,7 +25,7 @@
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
     --ring: 238 52% 38%;
-    --radius: 1rem;
+    --radius: 1.25rem;
   }
   .dark {
     --background: 222.2 84% 4.9%;
@@ -55,7 +55,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body;
+    @apply bg-background text-foreground font-body antialiased;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline;
@@ -64,13 +64,22 @@
 
 @layer utilities {
   .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 8px;
+    height: 8px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-muted/20;
+    @apply bg-muted/30;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-colors;
+    @apply bg-primary/10 rounded-full hover:bg-primary/25 transition-colors border-4 border-transparent bg-clip-padding;
   }
+}
+
+/* Operational Polish Classes */
+.registry-shadow {
+  box-shadow: 0 35px 60px -15px rgba(0, 0, 0, 0.1);
+}
+
+.glass-card {
+  @apply bg-card/60 backdrop-blur-xl border-2 border-white/10;
 }

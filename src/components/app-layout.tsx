@@ -3,11 +3,13 @@
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
  * Grouped navigation reflecting an operational asset management hierarchy.
+ * Final Polish: Integrated Framer Motion and Triple-Layer Parity visualizers.
  */
 
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
   Boxes, 
@@ -27,7 +29,9 @@ import {
   ListTodo,
   Users,
   Activity,
-  ArrowRightLeft
+  Zap,
+  Database,
+  Globe
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -37,8 +41,8 @@ import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { DatabaseAdminDialog } from './admin/database-admin-dialog';
-import { ActivityLogDialog } from './admin/activity-log-sheet';
 import { InboxSheet } from './inbox-sheet';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface NavItem {
   label: string;
@@ -72,7 +76,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isAdminDBOpen, setIsAdminDBOpen] = useState(false);
-  const [isAuditLogOpen, setIsAuditLogOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
 
   const isAdmin = userProfile?.isAdmin;
@@ -90,30 +93,37 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           key={item.href}
           href={item.href}
           className={cn(
-            "flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all",
+            "flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all relative overflow-hidden group",
             pathname === item.href 
               ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" 
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
           )}
         >
           {item.icon}
-          <span className="flex-1">{item.label}</span>
+          <span className="flex-1 z-10">{item.label}</span>
+          {pathname === item.href && (
+            <motion.div 
+              layoutId="nav-active"
+              className="absolute inset-0 bg-primary z-0"
+              transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            />
+          )}
         </Link>
       ))}
     </div>
   );
 
   return (
-    <div className="flex h-screen w-full bg-background overflow-hidden">
+    <div className="flex h-screen w-full bg-background overflow-hidden font-body selection:bg-primary/10">
       {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-72 border-r bg-card/50 backdrop-blur-xl p-6">
         <div className="flex items-center gap-3 mb-10 px-2">
-          <div className="p-2 bg-primary rounded-xl shadow-lg">
-            <ShieldCheck className="h-6 w-6 text-primary-foreground" />
+          <div className="p-2.5 bg-primary rounded-2xl shadow-xl shadow-primary/20">
+            <Zap className="h-6 w-6 text-primary-foreground fill-current" />
           </div>
           <div className="flex flex-col">
-            <span className="text-xl font-black tracking-tighter">Assetain</span>
-            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em]">Enterprise</span>
+            <span className="text-xl font-black tracking-tighter uppercase leading-none">Assetain</span>
+            <span className="text-[9px] font-black uppercase text-primary tracking-[0.3em] mt-1">Enterprise Core</span>
           </div>
         </div>
 
@@ -128,11 +138,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Button 
                 variant="ghost" 
                 onClick={() => setIsInboxOpen(true)} 
-                className="w-full justify-between px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all"
+                className="w-full justify-between px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all group"
               >
-                <span className="flex items-center gap-3"><Inbox className="h-4 w-4" /> Approvals</span>
+                <span className="flex items-center gap-3"><Inbox className="h-4 w-4 group-hover:scale-110 transition-transform" /> Approvals</span>
                 {pendingCount > 0 && (
-                  <Badge className="bg-primary text-[8px] h-4 min-w-4 flex items-center justify-center p-0 rounded-full">
+                  <Badge className="bg-primary text-[8px] h-4 min-w-4 flex items-center justify-center p-0 rounded-full animate-pulse">
                     {pendingCount}
                   </Badge>
                 )}
@@ -140,34 +150,40 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Button 
                 variant="ghost" 
                 onClick={() => setIsAdminDBOpen(true)} 
-                className="w-full justify-start gap-3 px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all"
+                className="w-full justify-start gap-3 px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all group"
               >
-                <Monitor className="h-4 w-4" /> Infrastructure
+                <Monitor className="h-4 w-4 group-hover:scale-110 transition-transform" /> Infrastructure
               </Button>
             </div>
           )}
         </div>
 
         <div className="mt-auto space-y-4 pt-6 border-t border-border/40">
-          <div className="flex items-center gap-3 px-2">
-            <Avatar className="h-10 w-10 border-2 border-primary/20">
-              <AvatarFallback className="font-black bg-muted text-primary">
-                {userProfile?.displayName?.[0] || 'U'}
-              </AvatarFallback>
-            </Avatar>
-            <div className="flex flex-col min-w-0">
-              <span className="text-sm font-black truncate">{userProfile?.displayName}</span>
-              <span className="text-[10px] font-bold text-muted-foreground uppercase truncate">
-                {userProfile?.state || 'Global Scope'}
-              </span>
+          <div className="p-4 rounded-2xl bg-muted/20 border-2 border-dashed space-y-3">
+            <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest opacity-40">
+              <span>Security Pulse</span>
+              <div className="h-1.5 w-1.5 rounded-full bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)] animate-pulse" />
+            </div>
+            <div className="flex items-center gap-3">
+              <Avatar className="h-10 w-10 border-2 border-primary/20 shadow-md">
+                <AvatarFallback className="font-black bg-muted text-primary text-xs">
+                  {userProfile?.displayName?.[0] || 'U'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="flex flex-col min-w-0">
+                <span className="text-xs font-black truncate uppercase">{userProfile?.displayName}</span>
+                <span className="text-[9px] font-bold text-muted-foreground uppercase truncate tracking-tighter">
+                  {userProfile?.state || 'Global Scope'}
+                </span>
+              </div>
             </div>
           </div>
           <Button 
             variant="ghost" 
-            className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive font-black uppercase text-[10px] tracking-widest rounded-xl" 
+            className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive font-black uppercase text-[10px] tracking-widest rounded-xl h-12 transition-colors" 
             onClick={() => logout()}
           >
-            <LogOut className="mr-2 h-4 w-4" /> Sign Out
+            <LogOut className="mr-3 h-4 w-4" /> Sign Out System
           </Button>
         </div>
       </aside>
@@ -178,12 +194,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="lg:hidden">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild>
-                  <Button variant="ghost" size="icon"><Menu className="h-6 w-6" /></Button>
+                  <Button variant="ghost" size="icon" className="rounded-xl"><Menu className="h-6 w-6" /></Button>
                 </SheetTrigger>
-                <SheetContent side="left" className="w-72 p-6 flex flex-col">
+                <SheetContent side="left" className="w-72 p-6 flex flex-col rounded-r-3xl border-none">
                   <div className="flex items-center gap-3 mb-10">
-                    <ShieldCheck className="h-6 w-6 text-primary" />
-                    <span className="text-xl font-black">Assetain</span>
+                    <Zap className="h-6 w-6 text-primary fill-current" />
+                    <span className="text-xl font-black uppercase tracking-tighter">Assetain</span>
                   </div>
                   <div className="flex-1 overflow-y-auto">
                     <NavGroup items={PRIMARY_NAV} />
@@ -193,42 +209,86 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </SheetContent>
               </Sheet>
             </div>
-            <h1 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground hidden sm:block">
-              {pathname === '/' ? 'Inventory Pulse' : 
-               pathname.split('/').pop()?.replace('-', ' ') || 'Workstation'}
+            <h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground hidden sm:flex items-center gap-2">
+              <span className="opacity-40">System context ›</span>
+              <span className="text-foreground">
+                {pathname === '/' ? 'Inventory Pulse' : 
+                 pathname.split('/').pop()?.replace('-', ' ') || 'Workstation'}
+              </span>
             </h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            <div className={cn(
-              "flex items-center gap-2 px-4 py-1.5 rounded-full border-2 transition-all",
-              isOnline 
-                ? "border-green-500/20 bg-green-500/5 text-green-600" 
-                : "border-destructive/20 bg-destructive/5 text-destructive"
-            )}>
-              {isOnline ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
-              <span className="text-[10px] font-black uppercase tracking-tighter">
-                {isOnline ? 'Cloud Active' : 'Offline Mode'}
-              </span>
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-4 w-4 ml-1 hover:bg-transparent p-0" 
-                onClick={() => setIsOnline(!isOnline)}
-              >
-                <Activity className={cn("h-3 w-3 opacity-40", isSyncing && "animate-pulse text-primary opacity-100")} />
-              </Button>
-            </div>
+          <div className="flex items-center gap-4">
+            {/* Triple-Layer Infrastructure visualizer */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={cn(
+                    "flex items-center gap-3 px-4 py-2 rounded-2xl border-2 transition-all cursor-help",
+                    isOnline 
+                      ? "border-green-500/20 bg-green-500/5 text-green-600" 
+                      : "border-destructive/20 bg-destructive/5 text-destructive"
+                  )}>
+                    <div className="flex items-center gap-1.5">
+                      <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} />
+                      <span className="text-[10px] font-black uppercase tracking-tighter">
+                        {isOnline ? 'Active' : 'Offline'}
+                      </span>
+                    </div>
+                    <Separator orientation="vertical" className="h-4 opacity-20" />
+                    <div className="flex gap-1">
+                      <Database className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} />
+                      <Activity className={cn("h-3 w-3", isSyncing ? "text-primary animate-pulse" : "opacity-30")} />
+                      <Globe className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} />
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="p-4 rounded-2xl border-2 shadow-2xl space-y-3 min-w-[200px]">
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b pb-2">Infrastructure Parity</p>
+                  <div className="space-y-2">
+                    <div className="flex justify-between items-center text-[10px] font-bold">
+                      <span className="opacity-60">Local Layer:</span>
+                      <span className="text-green-600">Encrypted DB (IDB)</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-bold">
+                      <span className="opacity-60">Shadow Mirror:</span>
+                      <span className="text-blue-600">RTDB Replication</span>
+                    </div>
+                    <div className="flex justify-between items-center text-[10px] font-bold">
+                      <span className="opacity-60">Primary Layer:</span>
+                      <span className={cn(isOnline ? "text-green-600" : "text-destructive")}>
+                        {isOnline ? 'Cloud Firestore' : 'Disconnected'}
+                      </span>
+                    </div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
             
-            <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-muted">
-              <Bell className="h-5 w-5" />
-              <Badge className="absolute top-0 right-0 h-4 w-4 p-0 flex items-center justify-center bg-primary text-[8px] font-black">0</Badge>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="relative rounded-xl hover:bg-primary/5 hover:text-primary transition-all"
+              onClick={() => setIsOnline(!isOnline)}
+            >
+              {isOnline ? <Cloud className="h-5 w-5" /> : <CloudOff className="h-5 w-5" />}
             </Button>
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-6 bg-muted/20">
-          {children}
+        <main className="flex-1 overflow-y-auto custom-scrollbar bg-muted/10 relative">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 10, filter: 'blur(4px)' }}
+              animate={{ opacity: 1, y: 0, filter: 'blur(0px)' }}
+              exit={{ opacity: 0, y: -10, filter: 'blur(4px)' }}
+              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+              className="p-6 md:p-8"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
 
