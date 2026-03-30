@@ -255,21 +255,21 @@ export function AssetForm({
                   <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField control={form.control} name="description" render={({ field }) => (
                       <FormItem className="md:col-span-2">
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Asset Description</SectionHeader>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Asset Description</FormLabel>
                         <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                       </FormItem>
                     )}/>
                     
                     <FormField control={form.control} name="assetIdCode" render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Registry Tag ID</SectionHeader>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Registry Tag ID</FormLabel>
                         <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                       </FormItem>
                     )}/>
 
                     <FormField control={form.control} name="serialNumber" render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Manufacturer Serial</SectionHeader>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Manufacturer Serial</FormLabel>
                         <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                       </FormItem>
                     )}/>
@@ -280,14 +280,14 @@ export function AssetForm({
                   <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField control={form.control} name="location" render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Physical Location</SectionHeader>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Physical Location</FormLabel>
                         <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                       </FormItem>
                     )}/>
 
                     <FormField control={form.control} name="custodian" render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Custodian / User</SectionHeader>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Custodian / User</FormLabel>
                         <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                       </FormItem>
                     )}/>
@@ -298,7 +298,7 @@ export function AssetForm({
                   <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-6">
                     <FormField control={form.control} name="condition" render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Field Assessment</SectionHeader>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Field Assessment</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
                           <FormControl><SelectTrigger className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:ring-primary/20 font-bold text-xs shadow-inner"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent className="rounded-xl">{ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-xs font-bold rounded-lg">{c}</SelectItem>)}</SelectContent>
@@ -308,7 +308,7 @@ export function AssetForm({
 
                     <FormField control={form.control} name="status" render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Verification State</SectionHeader>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Verification State</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
                           <FormControl><SelectTrigger className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:ring-primary/20 font-black uppercase text-[10px] tracking-widest shadow-inner"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent className="rounded-xl">
@@ -337,7 +337,7 @@ export function AssetForm({
                   <div className="p-6">
                     <FormField control={form.control} name="metadata.remarks" render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Auditor Field Notes</SectionHeader>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Auditor Field Notes</FormLabel>
                         <FormControl><Textarea {...field} readOnly={isReadOnly} className="min-h-[120px] rounded-2xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-medium text-sm shadow-inner p-4 resize-none" /></FormControl>
                       </FormItem>
                     )}/>
