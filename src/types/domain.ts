@@ -71,6 +71,7 @@ export interface Asset {
 
   // Restoration Buffer
   previousState?: Partial<Asset>;
+  yearBucket?: number;
 }
 
 export interface AppSettings {
@@ -90,6 +91,7 @@ export interface AppSettings {
   // Automation Preferences
   autoSync: boolean;
   autoAnalyze: boolean;
+  autoSuggestFilters: boolean;
 }
 
 export interface Grant {

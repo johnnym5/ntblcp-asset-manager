@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
- * Phase 32: Activated Saved Views & Intelligent Suggestions.
+ * Phase 35: Activated Quick Selection Pulse & Intelligent Logic Chips.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -38,7 +37,9 @@ import {
   Palette,
   Bookmark,
   Sparkles,
-  Info
+  Info,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
@@ -263,6 +264,12 @@ export default function AssetRegistryPage() {
     }
   };
 
+  const handleQuickSelectFiltered = () => {
+    const allFilteredIds = new Set(processedRecords.map(r => r.id));
+    setSelectedIds(allFilteredIds);
+    toast({ title: "Logic Selection Complete", description: `Selected all ${allFilteredIds.size} records in current scope.` });
+  };
+
   const handleBatchPurge = async () => {
     setIsBatchDeleteDialogOpen(false);
     toast({ title: "Purge Initiated", description: `Discarding ${selectedIds.size} records.` });
@@ -411,7 +418,7 @@ export default function AssetRegistryPage() {
             </div>
 
             {/* Intelligent Filter Suggestions (Non-AI) */}
-            {isBeginner && filters.length === 0 && (
+            {(isBeginner || appSettings?.autoSuggestFilters) && filters.length === 0 && (
               <div className="flex items-center gap-3 px-2 animate-in fade-in slide-in-from-left-2 duration-500">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
                 <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Suggested Logic:</span>
@@ -473,7 +480,14 @@ export default function AssetRegistryPage() {
                   <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Registry Pulse Silent</h3>
                   <p className="text-xs font-bold uppercase tracking-widest max-w-xs mx-auto leading-relaxed">No records matched your current query scope. Adjust logic filters or search tokens to refresh discovery.</p>
                 </div>
-                <Button variant="outline" onClick={() => { setFilters([]); setSearchTerm(""); }} className="h-12 px-8 rounded-xl font-black uppercase text-[10px] tracking-widest border-2">Reset Query Pulse</Button>
+                <div className="flex gap-3 pt-4">
+                  <Button variant="outline" onClick={() => { setFilters([]); setSearchTerm(""); }} className="h-12 px-8 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 gap-2">
+                    <FilterX className="h-4 w-4" /> Reset Filters
+                  </Button>
+                  <Button onClick={() => { setSelectedAssetForForm(undefined); setIsFormOpen(true); }} className="h-12 px-8 rounded-xl font-black uppercase text-[10px] tracking-widest bg-primary text-white shadow-lg gap-2">
+                    <Plus className="h-4 w-4" /> New Registration
+                  </Button>
+                </div>
               </div>
             )}
           </motion.div>
@@ -484,7 +498,11 @@ export default function AssetRegistryPage() {
               <div className="flex items-center gap-4 md:gap-6 animate-in slide-in-from-bottom-2 duration-300 w-full justify-between sm:justify-start">
                 <div className="flex flex-col shrink-0">
                   <span className="text-[9px] md:text-[10px] font-black uppercase text-primary leading-none">{selectedIds.size} Selected</span>
-                  <span className="text-[7px] md:text-[8px] font-bold uppercase opacity-40 tracking-widest mt-1">Batch Command</span>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Button variant="ghost" className="h-4 p-0 text-[7px] font-bold uppercase text-primary hover:bg-transparent" onClick={handleQuickSelectFiltered}>Select all {processedRecords.length}</Button>
+                    <span className="text-[7px] opacity-20">/</span>
+                    <Button variant="ghost" className="h-4 p-0 text-[7px] font-bold uppercase text-muted-foreground hover:bg-transparent" onClick={() => setSelectedIds(new Set())}>Clear</Button>
+                  </div>
                 </div>
                 <div className="h-8 w-px bg-border/40 hidden xs:block" />
                 <div className="flex items-center gap-1 md:gap-2">

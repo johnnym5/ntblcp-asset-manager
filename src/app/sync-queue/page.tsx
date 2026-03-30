@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Pending Sync - Conflict & Retry Workspace.
- * Phase 34: Refined Layman Explanations for sync failures.
+ * Phase 35: Standardized Failure Explanations & High-Fidelity Retries.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -20,7 +19,8 @@ import {
   RotateCcw,
   Activity,
   Zap,
-  Box
+  Box,
+  ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -195,6 +195,11 @@ export default function SyncQueuePage() {
                                     <AlertTriangle className="h-3 w-3" /> Sync Interruption
                                   </p>
                                   <p className="text-xs font-medium text-foreground italic">{getLaymanError(entry.error)}</p>
+                                  <div className="pt-2">
+                                    <Button variant="ghost" onClick={() => handleRetry(entry)} className="h-8 px-3 rounded-lg text-[9px] font-black uppercase text-primary gap-2 hover:bg-primary/10">
+                                      <RotateCcw className="h-3 w-3" /> Retry Pulse <ArrowRight className="h-3 w-3" />
+                                    </Button>
+                                  </div>
                                 </div>
                               )}
                             </div>

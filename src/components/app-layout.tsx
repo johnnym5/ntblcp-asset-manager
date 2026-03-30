@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
- * Phase 32: Integrated Global Keyboard Orchestration & Mode-Aware Visuals.
+ * Phase 35: Standardized Keyboard Pulse Discovery (?).
  */
 
 import React, { useState, useEffect } from 'react';
@@ -49,6 +48,7 @@ import { HelpCenter } from './HelpCenter';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Separator } from './ui/separator';
 import { ScrollArea } from './ui/scroll-area';
+import { useToast } from '@/hooks/use-toast';
 
 interface NavItem {
   label: string;
@@ -81,6 +81,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const { userProfile, logout } = useAuth();
+  const { toast } = useToast();
   const { isOnline, setIsOnline, isSyncing, assets, appSettings, refreshRegistry } = useAppState();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -92,7 +93,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
-        // Trigger global search or command pulse
         toast({ title: "Command Pulse", description: "Global registry search initiated." });
       }
       
@@ -105,12 +105,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (e.key === 'v') router.push('/verify');
       if (e.key === 'q') router.push('/sync-queue');
       if (e.key === 's') refreshRegistry();
-      if (e.key === '?') setIsHelpOpen(true);
+      if (e.key === '?' || e.key === 'h') setIsHelpOpen(true);
     };
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [router, refreshRegistry]);
+  }, [router, refreshRegistry, toast]);
 
   const isAdmin = userProfile?.isAdmin;
   const pendingCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
@@ -143,7 +143,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               {item.icon}
               <span className="flex-1">{item.label}</span>
               {isAdvanced && item.shortcut && (
-                <span className="text-[8px] font-mono opacity-20 group-hover:opacity-60 border px-1 rounded-sm">{item.shortcut}</span>
+                <kbd className="text-[8px] font-mono opacity-20 group-hover:opacity-60 border px-1.5 py-0.5 rounded-md bg-muted/20">{item.shortcut}</kbd>
               )}
             </div>
             {pathname === item.href && (
@@ -204,7 +204,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             className="w-full justify-start font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all group"
           >
             <HelpCircle className="mr-3 h-4 w-4 group-hover:scale-110 transition-transform" /> Support Hub
-            {isAdvanced && <span className="ml-auto text-[8px] font-mono opacity-20 border px-1 rounded-sm">?</span>}
+            {isAdvanced && <kbd className="ml-auto text-[8px] font-mono opacity-20 border px-1.5 py-0.5 rounded-md bg-muted/20">?</kbd>}
           </Button>
           
           <div className="p-4 rounded-2xl bg-muted/20 border-2 border-dashed space-y-3">
@@ -278,7 +278,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-2 sm:gap-4">
             {isAdvanced && (
               <Button variant="outline" size="sm" className="hidden md:flex h-10 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 bg-muted/30 border-2">
-                <Command className="h-3 w-3" /> Pulse Command <span className="opacity-40 border px-1 rounded-sm ml-1">⌘K</span>
+                <Command className="h-3 w-3" /> Pulse Command <kbd className="opacity-40 border px-1.5 py-0.5 rounded-md ml-1 bg-muted/20">⌘K</kbd>
               </Button>
             )}
 

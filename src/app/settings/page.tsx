@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Operational Control Center.
- * Phase 30: Broadened categories, Automation pulses, and UX Mode Orchestration.
+ * Phase 35: Enabled Automation Pulses & Logic Centers.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -40,7 +40,8 @@ import {
   Activity,
   User,
   Info,
-  Smartphone
+  Smartphone,
+  MousePointer2
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -130,8 +131,11 @@ export default function SettingsPage() {
     </div>
   );
 
-  const SettingRow = ({ label, description, children, icon: Icon }: { label: string, description: string, children: React.ReactNode, icon?: any }) => (
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-3xl border-2 border-border/40 bg-card/50 hover:border-primary/20 transition-all gap-4">
+  const SettingRow = ({ label, description, children, icon: Icon, disabled = false }: { label: string, description: string, children: React.ReactNode, icon?: any, disabled?: boolean }) => (
+    <div className={cn(
+      "flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-3xl border-2 border-border/40 bg-card/50 hover:border-primary/20 transition-all gap-4",
+      disabled && "opacity-40 grayscale pointer-events-none"
+    )}>
       <div className="space-y-1">
         <div className="flex items-center gap-2">
           {Icon && <Icon className="h-3.5 w-3.5 text-primary opacity-60" />}
@@ -310,11 +314,15 @@ export default function SettingsPage() {
                   <SectionHeading title="Automation Center" description="Deterministic intelligence rules" icon={Cpu} />
                   <div className="space-y-4">
                     <SettingRow label="Auto-Sync Pulse" description="Automatically broadcast modifications to the cloud registry as soon as a stable connection is detected." icon={Cloud}>
-                      <Switch checked={true} disabled /> {/* Hardcoded for current architecture pulse */}
+                      <Switch checked={draftSettings.autoSync} onCheckedChange={(v) => handleSettingChange('autoSync', v)} />
                     </SettingRow>
                     
                     <SettingRow label="Predictive OCR" description="Automatically initialize the AI analysis pulse immediately after a photo is captured." icon={Zap}>
-                      <Switch checked={false} disabled /> {/* Placeholder for future intelligence automation */}
+                      <Switch checked={draftSettings.autoAnalyze} onCheckedChange={(v) => handleSettingChange('autoAnalyze', v)} />
+                    </SettingRow>
+
+                    <SettingRow label="Intelligent Logic" description="Auto-suggest filters and sorting sequences based on regional audit context." icon={MousePointer2}>
+                      <Switch checked={draftSettings.autoSuggestFilters} onCheckedChange={(v) => handleSettingChange('autoSuggestFilters', v)} />
                     </SettingRow>
                   </div>
                 </div>
