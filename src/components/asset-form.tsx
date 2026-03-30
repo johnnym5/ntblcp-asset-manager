@@ -32,7 +32,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Asset, SheetDefinition, DisplayField, AppSettings } from "@/lib/types";
-import { Loader2, FileText, Check, RotateCcw } from "lucide-react";
+import { Loader2, FileText, Check, RotateCcw, Info, Hash, Clock, FileJson } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
 import { cn, getStatusClasses, sanitizeForFirestore } from "@/lib/utils";
@@ -42,6 +42,8 @@ import { ASSET_CONDITIONS } from "@/lib/constants";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { saveLocalSettings } from "@/lib/idb";
 import { updateSettings as updateSettingsFS } from "@/lib/firestore";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
+import { Badge } from "./ui/badge";
 
 const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
   path: ['category'],
@@ -348,16 +350,16 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-4xl w-full flex flex-col max-h-[95vh] p-0 overflow-hidden">
+        <DialogContent className="sm:max-w-5xl w-full flex flex-col max-h-[95vh] p-0 overflow-hidden">
           <DialogHeader className="p-6 pb-2">
-            <DialogTitle>{asset?.id ? (initialIsReadOnly ? 'View Asset Details' : 'Edit Asset') : 'Add New Asset'}</DialogTitle>
+            <DialogTitle>{asset?.id ? (initialIsReadOnly ? 'View Asset Profile' : 'Edit Asset') : 'Add New Asset'}</DialogTitle>
             <DialogDescription>
-              {initialIsReadOnly ? 'Viewing asset details.' : (asset?.id ? 'Edit the details of the asset.' : 'Fill in the details for the new asset.')}
+              {initialIsReadOnly ? 'Reviewing structural data and hierarchical context.' : (asset?.id ? 'Modify asset specifications and verification status.' : 'Register a new asset into the current project.')}
             </DialogDescription>
           </DialogHeader>
 
-          <div className="grid md:grid-cols-3 gap-x-0 flex-1 overflow-hidden">
-              <ScrollArea className="md:col-span-2 p-6 pt-2">
+          <div className="grid md:grid-cols-4 gap-x-0 flex-1 overflow-hidden">
+              <ScrollArea className="md:col-span-3 p-6 pt-2">
                   <datalist id="location-datalist">
                       {(appSettings?.locations || []).map(loc => <option key={loc} value={loc} />)}
                   </datalist>
@@ -365,7 +367,7 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
                     <form
                       id="asset-form"
                       onSubmit={form.handleSubmit(onSubmit)}
-                      className="space-y-4 p-1"
+                      className="space-y-6 p-1"
                     >
                     {!sheetDefinition ? (
                           renderField({ key: 'category', label: 'Category', table: false, quickView: false })
@@ -373,6 +375,59 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
                           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               {sheetDefinition.displayFields.map(field => renderField(field))}
                           </div>
+                    )}
+
+                    {asset && (
+                        <Accordion type="single" collapsible className="w-full">
+                            <AccordionItem value="traceability" className="border-none">
+                                <AccordionTrigger className="hover:no-underline p-4 bg-muted/20 rounded-xl">
+                                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
+                                        <Info className="h-4 w-4 text-primary" /> Hierarchy & Registry Context
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="pt-4 px-4 pb-2 space-y-4">
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Register Section</p>
+                                            <div className="flex items-center gap-2 p-2 bg-background border rounded-lg">
+                                                <Hash className="h-3 w-3 text-muted-foreground" />
+                                                <span className="text-xs font-semibold">{asset.majorSection || 'Main Register'}</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Subsection / Batch</p>
+                                            <div className="flex items-center gap-2 p-2 bg-background border rounded-lg">
+                                                <Clock className="h-3 w-3 text-muted-foreground" />
+                                                <span className="text-xs font-semibold">{asset.rawLabel || 'Standard Entry'}</span>
+                                                {asset.yearBucket && <Badge variant="secondary" className="text-[9px] h-4">{asset.yearBucket}</Badge>}
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Source Registry</p>
+                                            <div className="flex items-center gap-2 p-2 bg-background border rounded-lg">
+                                                <FileJson className="h-3 w-3 text-muted-foreground" />
+                                                <span className="text-xs font-semibold">{asset.sourceSheet || asset.category}</span>
+                                            </div>
+                                        </div>
+                                        <div className="space-y-1">
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Original Row Index</p>
+                                            <div className="flex items-center gap-2 p-2 bg-background border rounded-lg">
+                                                <Hash className="h-3 w-3 text-muted-foreground" />
+                                                <span className="text-xs font-mono">{asset.sourceRow || 'N/A'}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    {asset.originalRowData && isAdmin && (
+                                        <div className="space-y-1 mt-2">
+                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Raw Row Data (JSON)</p>
+                                            <pre className="text-[9px] bg-muted/50 p-2 rounded-lg overflow-x-auto font-mono text-muted-foreground/80">
+                                                {asset.originalRowData}
+                                            </pre>
+                                        </div>
+                                    )}
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
                     )}
                     </form>
                   </Form>

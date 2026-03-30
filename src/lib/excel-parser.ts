@@ -16,12 +16,12 @@ const normalizeHeader = (header: unknown): string => {
 /**
  * Patterns for hierarchical classification
  */
-const TEMPORAL_PATTERN = /\b(20\d{2})\b.*\b(additional|additions|procured|newly)\b/i;
+const TEMPORAL_PATTERN = /\b(20\d{2})\b.*\b(additional|additions|procured|newly|added)\b/i;
 const QUANTITY_PATTERN = /\d+\s*(pieces|pcs|units)/i;
-const TRANSFER_PATTERN = /\b(transferred|transfer)\b/i;
-const DOC_HEADER_KEYWORDS = ['CONTROL PROGRAMME', 'PROJECT', 'REPORTING FORM', 'FOCAL PERSONS'];
-const MAJOR_SECTION_KEYWORDS = ['EQUIPMENT', 'COMPUTERS', 'INHERITED', 'ASSETS', 'GENERAL'];
-const ASSET_FAMILY_KEYWORDS = ['CHAIRS', 'TABLES', 'CABINETS', 'SHELVES', 'LAPTOPS', 'PRINTERS', 'SCANNERS', 'AC', 'UPS', 'GENERATORS', 'VEHICLES', 'MACHINES'];
+const TRANSFER_PATTERN = /\b(transferred|transfer|dfb_| LSMOH|IHVN|FHI360)\b.*\bassets\b/i;
+const DOC_HEADER_KEYWORDS = ['CONTROL PROGRAMME', 'PROJECT', 'REPORTING FORM', 'FOCAL PERSONS', 'NTBLCP', 'GENERAL'];
+const MAJOR_SECTION_KEYWORDS = ['EQUIPMENT', 'COMPUTERS', 'INHERITED', 'ASSETS', 'GENERAL', 'ELECTRONICS', 'FURNITURE'];
+const ASSET_FAMILY_KEYWORDS = ['CHAIRS', 'TABLES', 'CABINETS', 'SHELVES', 'LAPTOPS', 'PRINTERS', 'SCANNERS', 'AC', 'UPS', 'GENERATORS', 'VEHICLES', 'MACHINES', 'MONITORS'];
 
 /**
  * Classification Utility
@@ -38,42 +38,45 @@ const classifyRow = (row: any[], definitiveHeaders: string[]): { type: RowType, 
     const normalizedDefinitiveHeaders = definitiveHeaders.map(normalizeHeader);
     const normalizedRow = row.map(normalizeHeader);
     const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
-    if (matchCount / definitiveHeaders.length >= 0.6) {
+    
+    // Low threshold for IHVN and messy sheets, higher for standard ones
+    const threshold = definitiveHeaders.length > 10 ? 0.6 : 0.7;
+    if (matchCount / definitiveHeaders.length >= threshold) {
         return { type: 'schema_header' };
     }
 
-    // RULE C: TEMPORAL SUBSECTIONS
-    const temporalMatch = firstCell.match(TEMPORAL_PATTERN);
+    // RULE C: TEMPORAL SUBSECTIONS (e.g. 2024 ADDITIONAL ASSETS)
+    const temporalMatch = fullRowText.match(TEMPORAL_PATTERN);
     if (temporalMatch) {
-        return { type: 'temporal_subsection', label: firstCell, year: parseInt(temporalMatch[1]) };
+        return { type: 'temporal_subsection', label: firstCell || fullRowText, year: parseInt(temporalMatch[1]) };
     }
 
-    // RULE D: QUANTITY BATCH
-    if (QUANTITY_PATTERN.test(firstCell)) {
-        return { type: 'quantity_subsection', label: firstCell };
+    // RULE D: QUANTITY BATCH (e.g. 10 Pieces)
+    if (QUANTITY_PATTERN.test(fullRowText)) {
+        return { type: 'quantity_subsection', label: firstCell || fullRowText };
     }
 
-    // RULE E: TRANSFER
-    if (TRANSFER_PATTERN.test(firstCell)) {
-        return { type: 'transfer_section', label: firstCell };
+    // RULE E: TRANSFERRED ASSETS
+    if (TRANSFER_PATTERN.test(fullRowText)) {
+        return { type: 'transfer_section', label: firstCell || fullRowText };
     }
 
-    // RULE A: DOC HEADERS (Priority keywords or very top centered text)
+    // RULE A: DOC HEADERS
     if (DOC_HEADER_KEYWORDS.some(k => fullRowText.includes(k))) {
-        return { type: 'document_header', label: firstCell };
+        return { type: 'document_header', label: firstCell || fullRowText };
     }
 
     // RULE G: ASSET FAMILY
     if (ASSET_FAMILY_KEYWORDS.some(k => fullRowText.includes(k))) {
-        return { type: 'asset_family', label: firstCell };
+        return { type: 'asset_family', label: firstCell || fullRowText };
     }
 
     // RULE F: MAJOR SECTIONS
     if (MAJOR_SECTION_KEYWORDS.some(k => fullRowText.includes(k))) {
-        return { type: 'major_section', label: firstCell };
+        return { type: 'major_section', label: firstCell || fullRowText };
     }
 
-    // Fallback: If we have multiple columns filled, it might be an asset row if a schema is active
+    // Fallback: Potential data row if schema is active and we have data in multiple columns
     const dataCellCount = row.filter(c => c && String(c).trim() !== '').length;
     if (dataCellCount > 2) {
         return { type: 'asset_row' };
@@ -84,9 +87,16 @@ const classifyRow = (row: any[], definitiveHeaders: string[]): { type: RowType, 
 
 const normalizeLabel = (label: string, type: RowType): string => {
     let clean = label.toLowerCase().trim();
-    if (type === 'temporal_subsection') return clean.replace(/additional assets|additions/g, 'additions').trim();
-    if (type === 'quantity_subsection') return clean.replace(/pieces|pcs|units/g, 'batch').trim();
-    if (type === 'transfer_section') return clean.replace(/dfb_|transferred assets/g, 'transfer').trim();
+    if (type === 'temporal_subsection') {
+        const year = clean.match(/\b(20\d{2})\b/)?.[0] || '';
+        return `${year} additions`.trim();
+    }
+    if (type === 'quantity_subsection') {
+        return clean.replace(/ pieces|pcs|units/g, '').trim() + ' batch';
+    }
+    if (type === 'transfer_section') {
+        return clean.replace(/dfb_| LSMOH|IHVN|FHI360|transferred assets|transfer/gi, '').replace(/[()]/g, '').trim() + ' transfer';
+    }
     return clean;
 };
 
@@ -132,11 +142,11 @@ const parseAssetRow = (row: any[], headerRow: any[], context: any): Partial<Asse
 
 export async function parseExcelFile(
     fileOrBuffer: File | ArrayBuffer, 
-    sheetDefinitions: Record<string, SheetDefinition>,
-    lockAssetList: boolean,
+    appSettings: AppSettings, 
     existingAssets: Asset[],
     sheetsToImport?: any[]
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
+    const { sheetDefinitions, lockAssetList } = appSettings;
     
     const result: { assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] } = {
         assets: [],
@@ -152,41 +162,57 @@ export async function parseExcelFile(
 
         const processList = sheetsToImport || workbook.SheetNames.map(name => ({ sheetName: name }));
 
-        for (const { sheetName } of processList) {
+        for (const sheetInfo of processList) {
+            const sheetName = sheetInfo.sheetName;
             const sheet = workbook.Sheets[sheetName];
             if (!sheet) continue;
+
+            // Determine definition context
+            let definitionName = '';
+            for (const defName in sheetDefinitions) {
+                if (sheetName.toUpperCase().includes(defName.toUpperCase())) {
+                    definitionName = defName;
+                    break;
+                }
+            }
+            if (!definitionName) definitionName = Object.keys(sheetDefinitions)[0];
+            const currentDef = sheetDefinitions[definitionName];
 
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
             
             // Hierarchy State Machine
-            let context = {
+            let context: any = {
                 documentHeader: '',
                 majorSection: '',
                 subsectionName: '',
                 assetFamily: '',
-                yearBucket: undefined as number | undefined,
-                category: sheetName,
+                yearBucket: undefined,
+                category: definitionName,
                 sourceSheet: sheetName,
             };
             let activeHeaderRow: any[] | null = null;
-            let currentDef: SheetDefinition | null = null;
 
             for (let i = 0; i < sheetData.length; i++) {
                 const row = sheetData[i];
                 if (!Array.isArray(row) || row.length === 0) continue;
 
-                // Try to find a matching definition for this sheet if not already found
-                if (!currentDef) {
-                    for (const defName in sheetDefinitions) {
-                        if (sheetName.toUpperCase().includes(defName.toUpperCase())) {
-                            currentDef = sheetDefinitions[defName];
+                // For IHVN special case, we might need to check multiple header sets
+                let headersToMatch = currentDef.headers;
+                if (definitionName === 'IHVN-GF N-THRIP') {
+                    // Try to find which sub-definition fits this part of the sheet
+                    const normalizedRow = row.map(normalizeHeader);
+                    for (const subDef in IHVN_SUB_SHEET_DEFINITIONS) {
+                        const subHeaders = IHVN_SUB_SHEET_DEFINITIONS[subDef];
+                        const subMatches = subHeaders.filter(h => normalizedRow.includes(normalizeHeader(h))).length;
+                        if (subMatches / subHeaders.length >= 0.7) {
+                            headersToMatch = subHeaders;
+                            context.majorSection = subDef;
                             break;
                         }
                     }
-                    if (!currentDef) currentDef = Object.values(sheetDefinitions)[0]; // Fallback to first
                 }
 
-                const classification = classifyRow(row, currentDef.headers);
+                const classification = classifyRow(row, headersToMatch);
 
                 switch (classification.type) {
                     case 'document_header':
@@ -194,18 +220,27 @@ export async function parseExcelFile(
                         break;
                     case 'major_section':
                         context.majorSection = classification.label!;
-                        context.subsectionName = ''; // Reset subsections on major break
+                        context.subsectionName = '';
                         context.assetFamily = '';
                         break;
                     case 'temporal_subsection':
                         context.subsectionName = classification.label!;
                         context.yearBucket = classification.year;
+                        context.sectionType = 'temporal_subsection';
+                        context.rawLabel = classification.label;
+                        context.normalizedLabel = normalizeLabel(classification.label!, 'temporal_subsection');
                         break;
                     case 'transfer_section':
                         context.subsectionName = classification.label!;
+                        context.sectionType = 'transfer_section';
+                        context.rawLabel = classification.label;
+                        context.normalizedLabel = normalizeLabel(classification.label!, 'transfer_section');
                         break;
                     case 'quantity_subsection':
                         context.assetFamily = classification.label!;
+                        context.sectionType = 'quantity_subsection';
+                        context.rawLabel = classification.label;
+                        context.normalizedLabel = normalizeLabel(classification.label!, 'quantity_subsection');
                         break;
                     case 'asset_family':
                         context.assetFamily = classification.label!;
@@ -218,13 +253,11 @@ export async function parseExcelFile(
                             const parsed = parseAssetRow(row, activeHeaderRow, context);
                             parsed.sourceRow = i + 1;
                             parsed.originalRowData = JSON.stringify(row);
-                            parsed.rawLabel = context.subsectionName || context.majorSection;
-                            parsed.normalizedLabel = normalizeLabel(parsed.rawLabel || '', classification.type);
 
                             // Validation
                             const validation = AssetSchema.safeParse(parsed);
                             if (!validation.success) {
-                                result.errors.push(`Row ${i + 1}: ${validation.error.errors[0].message}`);
+                                result.errors.push(`Row ${i + 1} (${sheetName}): ${validation.error.errors[0].message}`);
                                 continue;
                             }
 
@@ -260,7 +293,7 @@ export async function parseExcelFile(
 
 export async function scanExcelFile(
   fileOrBuffer: File | ArrayBuffer,
-  sheetDefinitions: Record<string, SheetDefinition>,
+  appSettings: AppSettings,
 ): Promise<{ scannedSheets: any[], errors: string[] }> {
     const scannedSheets: any[] = [];
     const errors: string[] = [];
@@ -276,10 +309,11 @@ export async function scanExcelFile(
             
             let bestMatch: any = null;
 
-            for (const defName in sheetDefinitions) {
-                const definition = sheetDefinitions[defName];
+            for (const defName in appSettings.sheetDefinitions) {
+                const definition = appSettings.sheetDefinitions[defName];
                 const normalizedDefinitiveHeaders = definition.headers.map(normalizeHeader);
                 
+                // Scan first 50 rows for headers
                 for (let i = 0; i < Math.min(sheetData.length, 50); i++) {
                     const row = sheetData[i];
                     if (!Array.isArray(row)) continue;
@@ -289,7 +323,7 @@ export async function scanExcelFile(
                     const score = matchCount / normalizedDefinitiveHeaders.length;
 
                     if (score >= 0.6 && (!bestMatch || score > bestMatch.score)) {
-                        bestMatch = { definitionName: defName, headerRowIndex: i, score: score };
+                        bestMatch = { definitionName: defName, headerRowIndex: i, score: score, headers: row.filter(h => h) };
                     }
                 }
             }
@@ -299,7 +333,7 @@ export async function scanExcelFile(
                     sheetName,
                     definitionName: bestMatch.definitionName,
                     rowCount: sheetData.length,
-                    headers: sheetData[bestMatch.headerRowIndex],
+                    headers: bestMatch.headers,
                 });
             }
         }
