@@ -12,9 +12,20 @@ import UserProfileSetup from '@/components/user-profile-setup';
 import Link from 'next/link';
 
 export default function DashboardPage() {
-  const { userProfile, loading, profileSetupComplete } = useAuth();
+  const { loading, profileSetupComplete } = useAuth();
   const { assets, settingsLoaded } = useAppState();
 
+  // Move useMemo to the top to satisfy the Rules of Hooks
+  const stats = React.useMemo(() => {
+    const total = assets?.length || 0;
+    const verified = assets?.filter(a => a.verifiedStatus === 'Verified').length || 0;
+    const discrepancy = assets?.filter(a => a.verifiedStatus === 'Discrepancy').length || 0;
+    const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
+
+    return { total, verified, discrepancy, coverage };
+  }, [assets]);
+
+  // Conditional returns MUST happen after all hook calls
   if (loading || !settingsLoaded) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -26,15 +37,6 @@ export default function DashboardPage() {
   if (!profileSetupComplete) {
     return <UserProfileSetup />;
   }
-
-  const stats = React.useMemo(() => {
-    const total = assets.length;
-    const verified = assets.filter(a => a.verifiedStatus === 'Verified').length;
-    const discrepancy = assets.filter(a => a.verifiedStatus === 'Discrepancy').length;
-    const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
-
-    return { total, verified, discrepancy, coverage };
-  }, [assets]);
 
   return (
     <AppLayout>
