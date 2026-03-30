@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import AppLayout from '@/components/app-layout';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -19,7 +19,13 @@ import {
   List, 
   ArrowLeft,
   MoreVertical,
-  ArrowUpDown
+  ChevronLeft,
+  ChevronRight,
+  MapPin,
+  Tag,
+  ShieldCheck,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { RegistryTable } from '@/modules/registry/components/RegistryTable';
 import { AssetForm } from '@/components/asset-form';
@@ -31,6 +37,7 @@ import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Card, CardContent } from '@/components/ui/card';
 
 export type SortConfig = {
   key: keyof Asset | 'sn';
@@ -115,7 +122,6 @@ export default function AssetRegistryPage() {
       let aVal: any = a[sortConfig.key as keyof Asset] || '';
       let bVal: any = b[sortConfig.key as keyof Asset] || '';
 
-      // Special handling for numeric-ish fields if needed
       if (sortConfig.key === 'serialNumber' || sortConfig.key === 'assetIdCode') {
         return sortConfig.direction === 'asc' 
           ? String(aVal).localeCompare(String(bVal), undefined, { numeric: true })
@@ -148,6 +154,24 @@ export default function AssetRegistryPage() {
     setIsReadOnly(false);
     setIsFormOpen(true);
   };
+
+  // Detail Navigation Logic
+  const currentIndex = useMemo(() => {
+    if (!selectedAsset) return -1;
+    return filteredAndSortedAssets.findIndex(a => a.id === selectedAsset.id);
+  }, [selectedAsset, filteredAndSortedAssets]);
+
+  const handleNext = useCallback(() => {
+    if (currentIndex < filteredAndSortedAssets.length - 1) {
+      setSelectedAsset(filteredAndSortedAssets[currentIndex + 1]);
+    }
+  }, [currentIndex, filteredAndSortedAssets]);
+
+  const handlePrevious = useCallback(() => {
+    if (currentIndex > 0) {
+      setSelectedAsset(filteredAndSortedAssets[currentIndex - 1]);
+    }
+  }, [currentIndex, filteredAndSortedAssets]);
 
   const handleToggleSelection = (id: string) => {
     const next = new Set(selectedIds);
@@ -284,15 +308,56 @@ export default function AssetRegistryPage() {
         {/* Registry Surface */}
         <div className="flex-1 bg-card/50 rounded-[2.5rem] border-2 border-dashed border-border/40 overflow-hidden">
           {filteredAndSortedAssets.length > 0 ? (
-            <RegistryTable 
-              assets={filteredAndSortedAssets} 
-              onInspect={handleInspect}
-              selectedIds={selectedIds}
-              onToggleSelection={handleToggleSelection}
-              onSelectAll={handleSelectAll}
-              onSort={handleSort}
-              sortConfig={sortConfig}
-            />
+            viewMode === 'list' ? (
+              <RegistryTable 
+                assets={filteredAndSortedAssets} 
+                onInspect={handleInspect}
+                selectedIds={selectedIds}
+                onToggleSelection={handleToggleSelection}
+                onSelectAll={handleSelectAll}
+                onSort={handleSort}
+                sortConfig={sortConfig}
+              />
+            ) : (
+              <div className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 h-full overflow-y-auto custom-scrollbar">
+                {filteredAndSortedAssets.map((asset) => (
+                  <Card 
+                    key={asset.id} 
+                    className={cn(
+                      "border-2 border-border/40 hover:border-primary/20 transition-all rounded-[2rem] overflow-hidden group cursor-pointer",
+                      selectedIds.has(asset.id) ? "bg-primary/5 border-primary/20" : "bg-card"
+                    )}
+                    onClick={() => handleInspect(asset)}
+                  >
+                    <CardContent className="p-6 space-y-4">
+                      <div className="flex justify-between items-start">
+                        <div className="flex flex-col gap-1">
+                          <h3 className="font-black text-sm uppercase tracking-tight line-clamp-2">{asset.description || asset.name}</h3>
+                          <span className="text-[10px] font-mono text-muted-foreground uppercase opacity-60">ID: {asset.assetIdCode || 'UNSET'}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge variant="outline" className={cn(
+                            "text-[8px] font-black uppercase tracking-tighter h-5 border-2",
+                            asset.status === 'VERIFIED' ? "text-green-600 border-green-500/20" : "text-orange-600 border-orange-500/20"
+                          )}>
+                            {asset.status === 'VERIFIED' ? <ShieldCheck className="h-2 w-2 mr-1" /> : <Clock className="h-2 w-2 mr-1" />}
+                            {asset.status}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="pt-4 border-t border-dashed space-y-2">
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                          <MapPin className="h-3 w-3 text-primary opacity-40" /> {asset.location}
+                        </div>
+                        <div className="flex items-center gap-2 text-[10px] font-bold text-muted-foreground uppercase tracking-widest">
+                          <Tag className="h-3 w-3 text-primary opacity-40" /> {asset.category}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center p-20 opacity-20">
               <Boxes className="h-20 w-20 mb-6" />
@@ -330,6 +395,8 @@ export default function AssetRegistryPage() {
         isReadOnly={isReadOnly}
         onSave={handleSaveAsset}
         onQuickSave={async () => {}}
+        onNext={currentIndex < filteredAndSortedAssets.length - 1 ? handleNext : undefined}
+        onPrevious={currentIndex > 0 ? handlePrevious : undefined}
       />
 
       <AssetFilterDialog

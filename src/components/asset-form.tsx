@@ -32,7 +32,22 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, ArrowLeft, Share2, Check, Camera, ShieldCheck, X, FileText, MapPin, Hash, User, Tag } from "lucide-react";
+import { 
+  Loader2, 
+  ArrowLeft, 
+  Share2, 
+  Check, 
+  Camera, 
+  ShieldCheck, 
+  X, 
+  FileText, 
+  MapPin, 
+  Hash, 
+  User, 
+  Tag,
+  ChevronLeft,
+  ChevronRight
+} from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
 import { cn } from "@/lib/utils";
@@ -52,6 +67,8 @@ interface AssetFormProps {
   onSave: (assetToSave: Asset) => Promise<void>;
   onQuickSave: (assetId: string, data: any) => Promise<void>;
   isReadOnly: boolean;
+  onNext?: () => void;
+  onPrevious?: () => void;
 }
 
 export function AssetForm({ 
@@ -59,7 +76,9 @@ export function AssetForm({
     onOpenChange, 
     asset, 
     onSave, 
-    isReadOnly: initialIsReadOnly 
+    isReadOnly: initialIsReadOnly,
+    onNext,
+    onPrevious
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
@@ -177,9 +196,16 @@ export function AssetForm({
                 <Button variant="ghost" size="icon" onClick={() => { stopCamera(); onOpenChange(false); }} className="rounded-full">
                     <ArrowLeft className="h-6 w-6" />
                 </Button>
-                <DialogTitle className="text-xl font-black tracking-tight">{asset?.assetIdCode || 'VERIFICATION ENTRY'}</DialogTitle>
+                <div className="flex flex-col">
+                  <DialogTitle className="text-xl font-black tracking-tight">{asset?.assetIdCode || 'VERIFICATION ENTRY'}</DialogTitle>
+                  <span className="text-[9px] font-bold uppercase text-muted-foreground tracking-widest opacity-60">Record Analysis Context</span>
+                </div>
             </div>
             <div className="flex items-center gap-2">
+                <div className="flex items-center bg-muted/50 rounded-xl p-1 mr-2">
+                  <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-8 w-8 rounded-lg"><ChevronLeft className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-8 w-8 rounded-lg"><ChevronRight className="h-4 w-4" /></Button>
+                </div>
                 {!initialIsReadOnly && (
                     <Button variant="ghost" size="icon" onClick={startCamera} className="text-primary"><Camera className="h-5 w-5" /></Button>
                 )}
