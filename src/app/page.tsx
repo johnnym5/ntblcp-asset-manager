@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
- * Phase 44: Integrated Executive Health Pulse Charts.
+ * Phase 45: Removed AI interpretation pulses.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -21,14 +21,11 @@ import {
   Map,
   ShieldHalf,
   LayoutGrid,
-  Zap,
   FileUp,
   ClipboardCheck,
   History,
   Activity,
-  Sparkles,
   Camera,
-  BrainCircuit,
   AlertTriangle,
   BarChart3
 } from 'lucide-react';
@@ -118,7 +115,6 @@ export default function DashboardPage() {
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
 
-    // High-Fidelity Velocity Trend
     const velocityData = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -184,21 +180,17 @@ export default function DashboardPage() {
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 px-1">
           <motion.div variants={item} className="lg:col-span-2 space-y-8">
-            {/* AI Health Insight Pulse */}
-            <Card className="border-2 border-primary/10 bg-primary/[0.02] shadow-2xl rounded-[2.5rem] overflow-hidden relative group">
-              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
-                <BrainCircuit className="h-32 w-32 text-primary" />
-              </div>
+            <Card className="border-2 border-primary/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
               <CardHeader className="p-8 pb-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-primary/10 rounded-xl">
-                      <Sparkles className="h-5 w-5 text-primary" />
+                      <TrendingUp className="h-5 w-5 text-primary" />
                     </div>
-                    <CardTitle className="text-xl font-black uppercase tracking-tight">Executive Health Matrix</CardTitle>
+                    <CardTitle className="text-xl font-black uppercase tracking-tight">Audit Velocity</CardTitle>
                   </div>
                   <Badge variant="outline" className="border-primary/20 text-primary font-black uppercase text-[10px] gap-2">
-                    <Activity className="h-3 w-3" /> Velocity Pulse
+                    <Activity className="h-3 w-3" /> 7-Day Pulse
                   </Badge>
                 </div>
               </CardHeader>
@@ -237,12 +229,6 @@ export default function DashboardPage() {
                       </Bar>
                     </BarChart>
                   </ResponsiveContainer>
-                </div>
-                
-                <div className="p-6 rounded-3xl bg-background/60 border-2 border-dashed border-primary/20 backdrop-blur-md">
-                  <p className="text-sm font-medium text-foreground leading-relaxed italic">
-                    "Audit velocity is currently <span className="text-primary font-black">+12%</span> above baseline. Intelligence identifies <span className="text-primary font-black">{stats?.criticalHealth} critical risk pulses</span> in the current regional scope. Recommendation: Prioritize 'Stolen' status reconciliation."
-                  </p>
                 </div>
               </CardContent>
             </Card>

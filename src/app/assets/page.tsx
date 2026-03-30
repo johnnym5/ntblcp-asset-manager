@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
- * Phase 38: Integrated Intelligent Discovery Pulse & Interactive Metrics.
+ * Phase 45: Removed AI discovery suggestions.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -36,12 +37,10 @@ import {
   ShieldCheck,
   Palette,
   Bookmark,
-  Sparkles,
   Info,
   CheckSquare,
   Square,
-  Activity,
-  MousePointer2
+  Activity
 } from 'lucide-react';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
@@ -196,15 +195,6 @@ export default function AssetRegistryPage() {
     return { total, verified, exceptions, dataGaps };
   }, [currentRegistry]);
 
-  // --- Intelligent Suggestions Pulse ---
-  const suggestions = useMemo(() => {
-    const list = [];
-    if (metrics.exceptions > 0) list.push({ label: `Audit ${metrics.exceptions} Discrepancies`, type: 'exceptions' });
-    if (metrics.dataGaps > 0) list.push({ label: `Fix ${metrics.dataGaps} Data Gaps`, type: 'gaps' });
-    if (metrics.total - metrics.verified > 0) list.push({ label: `Complete ${metrics.total - metrics.verified} Pending Reviews`, type: 'pending' });
-    return list.slice(0, 3);
-  }, [metrics]);
-
   const applyMetricFilter = (type: 'verified' | 'exceptions' | 'gaps' | 'pending') => {
     let targetHeaderId = '';
     let targetValue = '';
@@ -334,7 +324,6 @@ export default function AssetRegistryPage() {
   };
 
   const activeProjectName = appSettings?.grants.find(g => g.id === activeGrantId)?.name || 'Registry Hub';
-  const isBeginner = appSettings?.uxMode === 'beginner';
 
   if (authLoading || !settingsLoaded) {
     return (
@@ -477,24 +466,6 @@ export default function AssetRegistryPage() {
                 </Button>
               </div>
             </div>
-
-            {/* Intelligent Discovery Pulse Bar */}
-            {isBeginner && suggestions.length > 0 && (
-              <div className="flex items-center gap-3 px-2 animate-in fade-in slide-in-from-left-2 duration-500 overflow-x-auto custom-scrollbar pb-2">
-                <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
-                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60 whitespace-nowrap">Recommended Actions:</span>
-                {suggestions.map((s, i) => (
-                  <Badge 
-                    key={`suggest-${i}`} 
-                    variant="ghost" 
-                    className="h-8 px-4 rounded-xl border-2 border-dashed border-primary/20 font-bold text-[9px] uppercase cursor-pointer hover:bg-primary/5 hover:border-primary/40 transition-all gap-2 whitespace-nowrap" 
-                    onClick={() => applyMetricFilter(s.type as any)}
-                  >
-                    <MousePointer2 className="h-3 w-3 opacity-40" /> {s.label}
-                  </Badge>
-                ))}
-              </div>
-            )}
 
             {/* Logic Pulse Chip Bar */}
             <AnimatePresence>

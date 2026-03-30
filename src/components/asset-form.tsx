@@ -1,8 +1,9 @@
+
 "use client";
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 43: Integrated Spatial Field Protocol & Geotagging.
+ * Phase 45: Removed AI OCR scanning.
  */
 
 import React, { useEffect, useState, useRef } from "react";
@@ -53,8 +54,6 @@ import {
   GitPullRequest,
   Clock,
   ArrowRight,
-  Sparkles,
-  Zap,
   Navigation
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
@@ -69,7 +68,6 @@ import type { Asset, ActivityLogEntry, Geotag } from "@/types/domain";
 import type { RegistryHeader } from "@/types/registry";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDistanceToNow } from "date-fns";
-import { extractAssetData } from "@/ai/flows/ocr-asset-flow";
 import { useToast } from "@/hooks/use-toast";
 
 interface AssetFormProps {
@@ -102,7 +100,6 @@ export function AssetForm({
     onPrevious
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
   const [history, setHistory] = useState<ActivityLogEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
@@ -193,7 +190,7 @@ export function AssetForm({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-      captureLocation(); // Auto-trigger spatial anchor on camera start
+      captureLocation(); 
     } catch (error) {
       console.error('Error accessing camera:', error);
     }
@@ -219,31 +216,6 @@ export function AssetForm({
         setCapturedPhoto(dataUri);
         stopCamera();
       }
-    }
-  };
-
-  const handleAIScan = async () => {
-    if (!capturedPhoto) return;
-    setIsAnalyzing(true);
-    toast({ title: "AI Pulse Initialized", description: "Analyzing asset label..." });
-
-    try {
-      const result = await extractAssetData({ photoDataUri: capturedPhoto });
-      if (result.confidence > 0.4) {
-        if (result.serialNumber) form.setValue('serialNumber', result.serialNumber);
-        if (result.modelNumber) form.setValue('metadata.modelNumber', result.modelNumber);
-        if (result.manufacturer) form.setValue('metadata.manufacturer', result.manufacturer);
-        if (result.description && !form.getValues('description')) {
-          form.setValue('description', result.description);
-        }
-        toast({ title: "Extraction Complete", description: `Accuracy: ${Math.round(result.confidence * 100)}%` });
-      } else {
-        toast({ variant: "destructive", title: "Low Confidence Pulse", description: "Please verify markers manually." });
-      }
-    } catch (e) {
-      toast({ variant: "destructive", title: "Intelligence Failure" });
-    } finally {
-      setIsAnalyzing(false);
     }
   };
 
@@ -326,18 +298,6 @@ export function AssetForm({
                       <div className="relative group aspect-video bg-muted m-2 sm:m-4 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden border-2 border-primary/10 shadow-lg">
                           <img src={capturedPhoto} className="w-full h-full object-cover" alt="Asset Evidence" />
                           <div className="absolute top-4 right-4 flex gap-2">
-                            {!isReadOnly && (
-                                <Button 
-                                  variant="secondary" 
-                                  size="sm" 
-                                  onClick={handleAIScan} 
-                                  disabled={isAnalyzing}
-                                  className="rounded-xl h-10 px-4 font-black uppercase text-[9px] tracking-widest gap-2 shadow-2xl"
-                                >
-                                  {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
-                                  AI Scan
-                                </Button>
-                            )}
                             {!isReadOnly && (
                                 <Button variant="destructive" size="icon" className="h-10 w-10 rounded-xl shadow-2xl" onClick={() => setCapturedPhoto(null)}>
                                   <X className="h-5 w-5" />
