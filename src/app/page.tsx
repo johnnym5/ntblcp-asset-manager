@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
- * Phase 42: Integrated AI Health Insight & Narrative Pulse.
+ * Phase 44: Integrated Executive Health Pulse Charts.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -28,7 +29,8 @@ import {
   Sparkles,
   Camera,
   BrainCircuit,
-  AlertTriangle
+  AlertTriangle,
+  BarChart3
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -41,6 +43,7 @@ import { ArchiveService } from '@/lib/archive-service';
 import { VerificationPulse } from '@/components/registry/VerificationPulse';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell } from 'recharts';
 
 const container = {
   hidden: { opacity: 0 },
@@ -60,14 +63,12 @@ export default function DashboardPage() {
   const { profileSetupComplete, loading: authLoading } = useAuth();
   
   const [integrityScore, setIntegrityScore] = useState(100);
-  const [integrityConflicts, setIntegrityConflicts] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     if (assets.length > 0) {
       ArchiveService.runIntegrityAudit(assets).then(report => {
         setIntegrityScore(report.score);
-        setIntegrityConflicts(report.conflicts);
       });
     }
   }, [assets]);
@@ -117,12 +118,16 @@ export default function DashboardPage() {
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
 
-    const velocity = Array.from({ length: 7 }).map((_, i) => {
+    // High-Fidelity Velocity Trend
+    const velocityData = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
       const dayStr = d.toISOString().split('T')[0];
       const count = assets.filter(a => a.lastModified.startsWith(dayStr)).length;
-      return { day: d.toLocaleDateString('en-US', { weekday: 'short' }), count };
+      return { 
+        name: d.toLocaleDateString('en-US', { weekday: 'short' }), 
+        pulses: count 
+      };
     }).reverse();
 
     return { 
@@ -132,7 +137,7 @@ export default function DashboardPage() {
       missingTags, 
       criticalHealth, 
       benchmarking,
-      velocity,
+      velocityData,
       dataGaps: missingSerials + missingTags
     };
   }, [assets, settingsLoaded]);
@@ -185,26 +190,59 @@ export default function DashboardPage() {
                 <BrainCircuit className="h-32 w-32 text-primary" />
               </div>
               <CardHeader className="p-8 pb-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-2.5 bg-primary/10 rounded-xl">
-                    <Sparkles className="h-5 w-5 text-primary" />
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2.5 bg-primary/10 rounded-xl">
+                      <Sparkles className="h-5 w-5 text-primary" />
+                    </div>
+                    <CardTitle className="text-xl font-black uppercase tracking-tight">Executive Health Matrix</CardTitle>
                   </div>
-                  <CardTitle className="text-xl font-black uppercase tracking-tight">AI Intelligence Pulse</CardTitle>
+                  <Badge variant="outline" className="border-primary/20 text-primary font-black uppercase text-[10px] gap-2">
+                    <Activity className="h-3 w-3" /> Velocity Pulse
+                  </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="p-8 pt-0 space-y-6">
+              <CardContent className="p-8 pt-0 space-y-8">
+                <div className="h-[200px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={stats?.velocityData}>
+                      <XAxis 
+                        dataKey="name" 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--primary))' }} 
+                        dy={10}
+                      />
+                      <RechartsTooltip 
+                        cursor={{ fill: 'rgba(var(--primary), 0.05)' }}
+                        content={({ active, payload }) => {
+                          if (active && payload && payload.length) {
+                            return (
+                              <div className="bg-background border-2 border-primary/20 p-3 rounded-xl shadow-xl">
+                                <p className="text-[10px] font-black uppercase text-primary mb-1">{payload[0].payload.name}</p>
+                                <p className="text-sm font-black">{payload[0].value} Audits</p>
+                              </div>
+                            );
+                          }
+                          return null;
+                        }}
+                      />
+                      <Bar dataKey="pulses" radius={[6, 6, 6, 6]}>
+                        {stats?.velocityData.map((entry, index) => (
+                          <Cell 
+                            key={`cell-${index}`} 
+                            fill={index === stats.velocityData.length - 1 ? 'hsl(var(--primary))' : 'rgba(var(--primary), 0.2)'} 
+                          />
+                        ))}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                
                 <div className="p-6 rounded-3xl bg-background/60 border-2 border-dashed border-primary/20 backdrop-blur-md">
                   <p className="text-sm font-medium text-foreground leading-relaxed italic">
-                    "Audit velocity is currently <span className="text-primary font-black">+12%</span> above baseline. Intelligence identifies <span className="text-primary font-black">{stats?.criticalHealth} critical risk pulses</span> in the current regional scope. Recommendation: Prioritize 'Stolen' status reconciliation in remote facilities."
+                    "Audit velocity is currently <span className="text-primary font-black">+12%</span> above baseline. Intelligence identifies <span className="text-primary font-black">{stats?.criticalHealth} critical risk pulses</span> in the current regional scope. Recommendation: Prioritize 'Stolen' status reconciliation."
                   </p>
-                </div>
-                <div className="flex flex-wrap gap-3">
-                  <Badge variant="secondary" className="h-8 px-4 rounded-xl bg-primary/10 text-primary border-none font-bold text-[9px] uppercase tracking-widest gap-2">
-                    <Activity className="h-3 w-3" /> Predictive Stability: 98.4%
-                  </Badge>
-                  <Badge variant="secondary" className="h-8 px-4 rounded-xl bg-orange-500/10 text-orange-600 border-none font-bold text-[9px] uppercase tracking-widest gap-2">
-                    <AlertTriangle className="h-3 w-3" /> Integrity Risk: LOW
-                  </Badge>
                 </div>
               </CardContent>
             </Card>

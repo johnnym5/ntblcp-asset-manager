@@ -1,9 +1,10 @@
+
 /**
  * @fileOverview RegistryCard - Source-Aware Professional Register Renderer.
- * Phase 39: Integrated Semantic Placeholders and data-ai-hints.
+ * Phase 44: Integrated AI Voice Pulse trigger for hands-free confirm.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -22,13 +23,17 @@ import {
   Truck,
   Monitor,
   Stethoscope,
-  Briefcase
+  Briefcase,
+  Volume2,
+  Loader2
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import type { AssetRecord, DensityMode } from '@/types/registry';
 import type { Asset } from '@/types/domain';
 import images from '@/app/lib/placeholder-images.json';
+import { speakAssetProfile } from '@/ai/flows/tts-flow';
+import { Button } from '../ui/button';
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -40,6 +45,7 @@ interface RegistryCardProps {
 
 export function RegistryCard({ record, onInspect, selected, onToggleSelect, densityMode = "expanded" }: RegistryCardProps) {
   const asset = record.rawRow as unknown as Asset;
+  const [isSpeaking, setIsSpeaking] = useState(false);
 
   const visibleFields = record.fields.filter(f => {
     const header = record.headers.find(h => h.id === f.headerId);
@@ -53,7 +59,26 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
     return h?.normalizedName === 'asset_description';
   });
 
-  // Semantic Image Selection Pulse
+  const handleVoicePulse = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (isSpeaking) return;
+    setIsSpeaking(true);
+    try {
+      const { audioUri } = await speakAssetProfile({
+        description: asset.description,
+        idCode: asset.assetIdCode,
+        status: asset.status,
+        condition: asset.condition
+      });
+      const audio = new Audio(audioUri);
+      audio.onended = () => setIsSpeaking(false);
+      audio.play();
+    } catch (err) {
+      console.error("Voice Pulse Failure", err);
+      setIsSpeaking(false);
+    }
+  };
+
   const getSemanticImage = () => {
     if (asset.photoDataUri) return { url: asset.photoDataUri, hint: "asset photo" };
     const cat = asset.category?.toLowerCase() || '';
@@ -95,7 +120,15 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
               </span>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={handleVoicePulse} 
+              className={cn("h-8 w-8 rounded-xl transition-all", isSpeaking ? "bg-primary text-white scale-110" : "hover:bg-primary/10 text-primary")}
+            >
+              {isSpeaking ? <Loader2 className="h-4 w-4 animate-spin" /> : <Volume2 className="h-4 w-4" />}
+            </Button>
             <div className="h-6 w-6 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm shrink-0 bg-muted">
               <img 
                 src={imagePulse.url} 
@@ -104,9 +137,6 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
                 data-ai-hint={imagePulse.hint}
               />
             </div>
-            <Badge variant="secondary" className="h-5 px-2 text-[8px] font-mono font-bold uppercase tracking-widest bg-muted/50 border-none">
-              PULSE #{record.rowNumber}
-            </Badge>
           </div>
         </div>
 

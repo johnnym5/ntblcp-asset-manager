@@ -1,12 +1,13 @@
+
 /**
  * @fileOverview Virtual Database Service.
  * Abstracted orchestration layer for cross-database management (Firestore, RTDB, Local).
- * Phase 41: Added Global Parity Scanning & Forensic Data Movement.
+ * Phase 44: Implemented high-integrity Purge Layer pulse.
  */
 
 import { FirestoreService } from './firebase/firestore';
 import { storage } from '@/offline/storage';
-import { getAssets as getRtdbAssets, getSettings as getRtdbSettings, batchSetAssets as setRtdbAssets } from '@/lib/database';
+import { getAssets as getRtdbAssets, getSettings as getRtdbSettings, batchSetAssets as setRtdbAssets, clearAssets as clearRtdbAssets } from '@/lib/database';
 import type { StorageLayer, DBNode } from '@/types/virtual-db';
 import type { Asset, AppSettings } from '@/types/domain';
 
@@ -120,6 +121,32 @@ export class VirtualDBService {
       console.error("VirtualDB: Parity scan failed", e);
     }
     return results;
+  }
+
+  /**
+   * Performs a deterministic wipe of a specific storage layer.
+   * High-risk administrative pulse.
+   */
+  static async purgeLayer(layer: StorageLayer): Promise<void> {
+    if (layer === 'FIRESTORE') {
+      const assets = await FirestoreService.getProjectAssets('ALL_PROJECTS');
+      for (const a of assets) {
+        await FirestoreService.deleteAsset(a.id);
+      }
+    } else if (layer === 'RTDB') {
+      await clearRtdbAssets();
+    } else if (layer === 'LOCAL') {
+      await storage.clearAssets();
+      await storage.clearSandbox();
+    }
+
+    await FirestoreService.logActivity({
+      assetId: 'SYSTEM',
+      assetDescription: `Wipe Pulse: ${layer}`,
+      operation: 'DELETE',
+      performedBy: 'Super Administrator',
+      userState: 'ROOT'
+    });
   }
 
   /**

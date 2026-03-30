@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Super Admin Database Mission Control.
- * Phase 43: Advanced Layer Purge & Reconstruction Pulses.
+ * Phase 44: Implemented real Infrastructure Purge logic and Audio Pulse visibility.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -173,10 +174,12 @@ export default function DatabaseExplorerPage() {
     if (!layerToPurge) return;
     setIsSaving(true);
     try {
-      // Mock logic for layer purge
-      await new Promise(r => setTimeout(r, 1500));
+      await VirtualDBService.purgeLayer(layerToPurge);
       toast({ title: "Layer Purged", description: `Deterministic wipe of ${layerToPurge} complete.` });
       loadRootNodes();
+      setSelectedNode(null);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Purge Failure", description: "Storage layer is currently locked." });
     } finally {
       setIsSaving(false);
       setIsPurgeDialogOpen(false);
@@ -291,13 +294,13 @@ export default function DatabaseExplorerPage() {
                     <Badge className={cn("font-black uppercase text-[8px] px-3 h-6", getSourceColor(selectedNode.source))}>{selectedNode.source}</Badge>
                   </div>
                   <div className="grid grid-cols-2 gap-3">
-                    <div className="p-4 rounded-2xl bg-background/50 border-2 border-dashed space-y-1">
+                    <div className="p-4 rounded-2xl bg-background/50 border-2 border-dashed border-border/40 space-y-1">
                       <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Registry Parity</span>
                       <p className={cn("text-[10px] font-bold uppercase", discrepancyIds.includes(selectedNode.rawKey) ? "text-destructive" : "text-green-600")}>
                         {discrepancyIds.includes(selectedNode.rawKey) ? 'Discrepancy' : 'Synchronized'}
                       </p>
                     </div>
-                    <div className="p-4 rounded-2xl bg-background/50 border-2 border-dashed space-y-1">
+                    <div className="p-4 rounded-2xl bg-background/50 border-2 border-dashed border-border/40 space-y-1">
                       <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Last Pulse</span>
                       <p className="text-[10px] font-bold uppercase truncate">{selectedNode.lastUpdated || 'Never'}</p>
                     </div>
@@ -360,7 +363,7 @@ export default function DatabaseExplorerPage() {
                         <div className="p-6 rounded-[2rem] bg-orange-500/5 border-2 border-dashed border-orange-500/20">
                           <div className="flex items-center gap-3 mb-4">
                             <ScanSearch className="h-5 w-5 text-orange-600" />
-                            <h4 className="text-sm font-black uppercase tracking-tight">Audit Buffer Detected</h4>
+                            <h4 className="text-sm font-black uppercase tracking-tight text-foreground">Audit Buffer Detected</h4>
                           </div>
                           <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
                             Compare the current pulse with its previous stable version. Use the reversion pulse to roll back unintended changes.
@@ -369,7 +372,7 @@ export default function DatabaseExplorerPage() {
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
                             <span className="text-[8px] font-black uppercase opacity-40">Previous State</span>
-                            <div className="p-4 rounded-xl bg-muted/20 border-2 font-mono text-[9px] overflow-hidden truncate">
+                            <div className="p-4 rounded-xl bg-muted/20 border-2 border-border/40 font-mono text-[9px] overflow-hidden truncate">
                               {JSON.stringify(forensics).substring(0, 100)}...
                             </div>
                           </div>
