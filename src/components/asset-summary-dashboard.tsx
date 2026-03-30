@@ -1,20 +1,20 @@
+
 'use client';
 
 import React, { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { 
-    FileWarning, 
     BarChart2, 
     ClipboardCheck,
     Activity,
     Tag,
     AlertCircle,
     ChevronsUpDown,
-    Calendar,
-    History
+    History,
+    Layout,
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
-import { cn, assetMatchesGlobalFilter } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
@@ -47,7 +47,7 @@ export function AssetSummaryDashboard() {
         dataSource, 
         setMissingFieldFilter, 
         missingFieldFilter, 
-        globalStateFilter, 
+        globalStateFilters, 
         activeGrantId, 
         setSelectedStatuses,
         selectedStatuses
@@ -58,8 +58,8 @@ export function AssetSummaryDashboard() {
         const source = dataSource === 'cloud' ? assets : offlineAssets;
         const scoped = source.filter(a => {
             const matchesGrant = !activeGrantId || a.grantId === activeGrantId;
-            const matchesGlobal = globalStateFilter === 'All' || a.location === globalStateFilter;
-            return matchesGrant && matchesGlobal;
+            const matchesRegion = globalStateFilters.length === 0 || globalStateFilters.includes(a.location || '');
+            return matchesGrant && matchesRegion;
         });
         
         const total = scoped.length;
@@ -73,6 +73,14 @@ export function AssetSummaryDashboard() {
             return acc;
         }, {} as Record<string | number, { total: number, verified: number }>);
 
+        const majorSections = scoped.reduce((acc, a) => {
+            const section = a.majorSection || 'Standard Entry';
+            if (!acc[section]) acc[section] = { total: 0, verified: 0 };
+            acc[section].total++;
+            if (a.verifiedStatus === 'Verified') acc[section].verified++;
+            return acc;
+        }, {} as Record<string, { total: number, verified: number }>);
+
         return {
           total,
           verified,
@@ -80,10 +88,10 @@ export function AssetSummaryDashboard() {
           unverified: total - verified,
           unusable: scoped.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen', 'Writeoff'].includes(a.condition)).length,
           missingId: scoped.filter(a => !a.assetIdCode?.trim()).length,
-          discrepancy: scoped.filter(a => a.verifiedStatus === 'Discrepancy').length,
           yearBuckets: Object.entries(yearBuckets).sort((a, b) => String(b[0]).localeCompare(String(a[0]))),
+          majorSections: Object.entries(majorSections).sort((a,b) => b[1].total - a[1].total),
         };
-    }, [assets, offlineAssets, dataSource, activeGrantId, globalStateFilter]);
+    }, [assets, offlineAssets, dataSource, activeGrantId, globalStateFilters]);
 
     return (
         <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
@@ -142,30 +150,58 @@ export function AssetSummaryDashboard() {
                     />
                 </div>
 
-                <Card className="bg-muted/5 border-dashed">
-                    <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
-                        <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-                            <History className="h-3 w-3 text-primary" /> Temporal breakdown (by Addition Year)
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="px-4 pb-4 pt-0">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-                            {summary.yearBuckets.map(([year, stats]) => {
-                                const percentage = Math.round((stats.verified / stats.total) * 100);
-                                return (
-                                    <div key={year} className="space-y-1.5 p-3 bg-background rounded-xl border border-border/50 shadow-sm">
-                                        <div className="flex justify-between items-center">
-                                            <span className="text-[10px] font-bold uppercase text-primary">{year}</span>
-                                            <Badge variant="outline" className="text-[9px] h-4">{stats.verified}/{stats.total}</Badge>
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    <Card className="bg-muted/5 border-dashed">
+                        <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
+                            <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                <History className="h-3 w-3 text-primary" /> Temporal breakdown (Addition Year)
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-4 pb-4 pt-0">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                {summary.yearBuckets.map(([year, stats]) => {
+                                    const percentage = Math.round((stats.verified / stats.total) * 100);
+                                    return (
+                                        <div key={year} className="space-y-1.5 p-3 bg-background rounded-xl border border-border/50 shadow-sm">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[10px] font-bold uppercase text-primary">{year}</span>
+                                                <Badge variant="outline" className="text-[9px] h-4">{stats.verified}/{stats.total}</Badge>
+                                            </div>
+                                            <Progress value={percentage} className="h-1" />
+                                            <p className="text-[9px] text-muted-foreground font-medium">{percentage}% Coverage</p>
                                         </div>
-                                        <Progress value={percentage} className="h-1" />
-                                        <p className="text-[9px] text-muted-foreground font-medium">{percentage}% Coverage</p>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    </CardContent>
-                </Card>
+                                    );
+                                })}
+                            </div>
+                        </CardContent>
+                    </Card>
+
+                    <Card className="bg-muted/5 border-dashed">
+                        <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
+                            <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                                <Layout className="h-3 w-3 text-primary" /> Major Register Sections
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="px-4 pb-4 pt-0">
+                            <ScrollArea className="h-[120px]">
+                                <div className="space-y-2">
+                                    {summary.majorSections.map(([section, stats]) => {
+                                        const percentage = Math.round((stats.verified / stats.total) * 100);
+                                        return (
+                                            <div key={section} className="space-y-1">
+                                                <div className="flex justify-between text-[10px] font-bold uppercase">
+                                                    <span className="truncate pr-2">{section}</span>
+                                                    <span>{percentage}%</span>
+                                                </div>
+                                                <Progress value={percentage} className="h-1" />
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            </ScrollArea>
+                        </CardContent>
+                    </Card>
+                </div>
             </CollapsibleContent>
         </Collapsible>
     );

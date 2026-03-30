@@ -1,3 +1,4 @@
+
 'use client';
 
 import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
@@ -5,11 +6,10 @@ import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
 import type { Asset, AppSettings, Grant } from '@/lib/types';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
-import { getSettings as getSettingsFS, updateSettings as updateSettingsFS } from '@/lib/firestore';
-import { getSettings as getSettingsRTDB } from '@/lib/database';
+import { updateSettings as updateSettingsFS } from '@/lib/firestore';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
 import { db } from '@/lib/firebase';
-import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { doc, onSnapshot, collection, query, where } from 'firebase/firestore';
 import { ref, onValue } from 'firebase/database';
 import { rtdb } from '@/lib/firebase';
 
@@ -37,8 +37,8 @@ interface AppStateContextType {
   setIsOnline: Dispatch<SetStateAction<boolean>>;
   searchTerm: string;
   setSearchTerm: Dispatch<SetStateAction<string>>;
-  globalStateFilter: string;
-  setGlobalStateFilter: Dispatch<SetStateAction<string>>;
+  globalStateFilters: string[];
+  setGlobalStateFilters: Dispatch<SetStateAction<string[]>>;
   itemsPerPage: number;
   setItemsPerPage: Dispatch<SetStateAction<number>>;
   dataSource: 'cloud' | 'local_locked';
@@ -50,6 +50,8 @@ interface AppStateContextType {
   setSelectedAssignees: Dispatch<SetStateAction<string[]>>;
   selectedStatuses: string[];
   setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
+  selectedConditions: string[];
+  setSelectedConditions: Dispatch<SetStateAction<string[]>>;
   missingFieldFilter: string;
   setMissingFieldFilter: Dispatch<SetStateAction<string>>;
   
@@ -59,6 +61,8 @@ interface AppStateContextType {
   setAssigneeOptions: Dispatch<SetStateAction<OptionType[]>>;
   statusOptions: OptionType[];
   setStatusOptions: Dispatch<SetStateAction<OptionType[]>>;
+  conditionOptions: OptionType[];
+  setConditionOptions: Dispatch<SetStateAction<OptionType[]>>;
   
   sortConfig: SortConfig | null;
   setSortConfig: Dispatch<SetStateAction<SortConfig | null>>;
@@ -101,25 +105,21 @@ const DEFAULT_GRANT: Grant = {
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
   const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
-  const [isOnline, setIsOnline] = useState(() => {
-    if (typeof window !== 'undefined') {
-      const savedStatus = localStorage.getItem('ntblcp-online-status');
-      return savedStatus ? JSON.parse(savedStatus) : true;
-    }
-    return true;
-  });
+  const [isOnline, setIsOnline] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
-  const [globalStateFilter, setGlobalStateFilter] = useState('All');
+  const [globalStateFilters, setGlobalStateFilters] = useState<string[]>([]);
   const [itemsPerPage, setItemsPerPage] = useState(25);
   
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
   
   const [locationOptions, setLocationOptions] = useState<OptionType[]>([]);
   const [assigneeOptions, setAssigneeOptions] = useState<OptionType[]>([]);
   const [statusOptions, setStatusOptions] = useState<OptionType[]>([]);
+  const [conditionOptions, setConditionOptions] = useState<OptionType[]>([]);
   
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'sn', direction: 'asc' });
 
@@ -163,15 +163,14 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     initialize();
   }, []);
 
-  // 2. Real-Time Cloud Listeners (Broadcast)
+  // 2. Real-Time Cloud Listeners (Config Broadcast)
   useEffect(() => {
     if (!isOnline || !db || !rtdb) return;
 
-    // Listen for Settings changes based on active database choice
-    let unsubscribeSettings: () => void = () => {};
+    let unsubscribe: () => void = () => {};
     
     if (appSettings.activeDatabase === 'firestore') {
-      unsubscribeSettings = onSnapshot(doc(db, 'config', 'settings'), (docSnap) => {
+      unsubscribe = onSnapshot(doc(db, 'config', 'settings'), (docSnap) => {
         if (docSnap.exists()) {
           const remote = docSnap.data() as AppSettings;
           setAppSettings(prev => {
@@ -199,26 +198,35 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
       });
     }
 
-    return () => unsubscribeSettings();
+    return () => unsubscribe();
   }, [isOnline, appSettings.activeDatabase]);
 
   // 3. Asset Synchronization (Project-Scoped)
   useEffect(() => {
     if (!isOnline || !db || !appSettings.activeGrantId) return;
 
-    let unsubscribeAssets: () => void = () => {};
+    let unsubscribe: () => void = () => {};
 
     if (appSettings.activeDatabase === 'firestore') {
       const q = query(collection(db, 'assets'), where('grantId', '==', appSettings.activeGrantId));
-      unsubscribeAssets = onSnapshot(q, (snapshot) => {
+      unsubscribe = onSnapshot(q, (snapshot) => {
         const fetched = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
         setAssets(fetched);
       });
     } else {
-      // RTDB project scoped query would go here if using large scale listeners
+      const assetsRef = ref(rtdb, 'assets');
+      onValue(assetsRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.val();
+          const fetched = Object.entries(data)
+            .map(([id, val]: [string, any]) => ({ ...val, id }))
+            .filter(a => a.grantId === appSettings.activeGrantId);
+          setAssets(fetched);
+        }
+      });
     }
 
-    return () => unsubscribeAssets();
+    return () => unsubscribe();
   }, [isOnline, appSettings.activeGrantId, appSettings.activeDatabase]);
 
   const setActiveGrantId = async (id: string | null) => {
@@ -240,15 +248,17 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     offlineAssets, setOfflineAssets,
     isOnline, setIsOnline,
     searchTerm, setSearchTerm,
-    globalStateFilter, setGlobalStateFilter,
+    globalStateFilters, setGlobalStateFilters,
     itemsPerPage, setItemsPerPage,
     selectedLocations, setSelectedLocations,
     selectedAssignees, setSelectedAssignees,
     selectedStatuses, setSelectedStatuses,
+    selectedConditions, setSelectedConditions,
     missingFieldFilter, setMissingFieldFilter,
     locationOptions, setLocationOptions,
     assigneeOptions, setAssigneeOptions,
     statusOptions, setStatusOptions,
+    conditionOptions, setConditionOptions,
     sortConfig, setSortConfig,
     appSettings, setAppSettings,
     settingsLoaded,

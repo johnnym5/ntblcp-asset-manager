@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -20,15 +21,15 @@ import {
   Cloud,
   CloudOff,
   Filter,
-  ArrowUpDown,
   Loader2,
   CloudDownload,
   CloudUpload,
   Bell,
-  CheckCheck,
   X,
   Inbox,
   ShieldCheck,
+  History,
+  CheckCircle2,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
@@ -42,6 +43,7 @@ import { Input } from "./ui/input";
 import { useDebounce } from "@/hooks/use-debounce";
 import { SettingsSheet } from "./settings-sheet";
 import { DatabaseAdminDialog } from "./admin/database-admin-dialog";
+import { ActivityLogDialog } from "./admin/activity-log-sheet";
 import {
   Sheet,
   SheetContent,
@@ -50,14 +52,14 @@ import {
   SheetFooter,
   SheetClose,
 } from '@/components/ui/sheet';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
-import { AssetFilterSheet } from "./asset-filter-sheet";
+import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from "./ui/tooltip";
+import { AssetFilterDialog } from "./asset-filter-sheet";
 import type { Asset } from "@/lib/types";
-import { Separator } from "./ui/separator";
 import { InboxSheet } from "./inbox-sheet";
 import { ScrollArea } from "./ui/scroll-area";
 import { saveAssets } from "@/lib/idb";
-import { sanitizeForFirestore } from "@/lib/excel-parser";
+import { sanitizeForFirestore } from "@/lib/utils";
+import { Badge } from "./ui/badge";
 
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
@@ -67,21 +69,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setAssets,
     isOnline, setIsOnline, 
     searchTerm, setSearchTerm, 
-    sortConfig, setSortConfig,
-    selectedLocations,
-    setSelectedLocations,
     setManualDownloadTrigger,
     setManualUploadTrigger,
     isSyncing,
     unreadInboxCount,
     setUnreadInboxCount,
     appSettings,
+    activeGrantId,
+    setSelectedLocations,
+    selectedLocations,
+    setSelectedAssignees,
+    selectedAssignees,
+    setSelectedStatuses,
+    selectedStatuses,
+    setSelectedConditions,
+    selectedConditions,
+    setMissingFieldFilter,
+    missingFieldFilter,
+    locationOptions,
+    assigneeOptions,
+    statusOptions,
+    conditionOptions,
   } = useAppState();
 
   const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
   const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isInfrastructureOpen, setIsInfrastructureOpen] = useState(false);
+  const [isActivityOpen, setIsActivityOpen] = useState(false);
   const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
@@ -125,7 +140,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         pendingChanges: undefined,
         changeSubmittedBy: undefined,
         syncStatus: 'local',
-    });
+    } as Asset);
 
     const newAssets = assets.map(a => a.id === assetId ? approvedAsset : a);
     setAssets(newAssets);
@@ -133,7 +148,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     addNotification({
         title: "Change Approved",
-        description: `Changes for "${approvedAsset.description}" have been applied and will be synced.`
+        description: `Changes for "${approvedAsset.description}" have been applied.`
     });
   };
 
@@ -155,8 +170,29 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
     addNotification({
         title: "Change Rejected",
-        description: `Pending changes for "${assetToReject.description}" have been discarded.`
+        description: `Pending changes for "${assetToReject.description}" were discarded.`
     });
+  };
+
+  const handleRevertAsset = async (assetId: string) => {
+      const assetToRevert = assets.find(a => a.id === assetId);
+      if (!assetToRevert || !assetToRevert.previousState) return;
+
+      const revertedAsset = sanitizeForFirestore({
+          ...assetToRevert,
+          ...assetToRevert.previousState,
+          previousState: undefined,
+          syncStatus: 'local',
+      } as Asset);
+
+      const newAssets = assets.map(a => a.id === assetId ? revertedAsset : a);
+      setAssets(newAssets);
+      await saveAssets(newAssets);
+
+      addNotification({
+          title: "Audit: Asset Reverted",
+          description: `"${revertedAsset.description}" has been restored to its previous state.`
+      });
   };
   
   const isAdmin = userProfile?.isAdmin || false;
@@ -170,6 +206,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [assets, isAdmin, setUnreadInboxCount]);
 
+  const activeGrantName = appSettings.grants.find(g => g.id === activeGrantId)?.name || 'Main Registry';
+
   return (
     <div className="flex flex-col w-full min-h-screen">
       <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:h-16 md:flex-nowrap md:py-0 md:px-6">
@@ -178,11 +216,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Boxes className="h-5 w-5 text-primary" />
             <div className="flex flex-col">
                 <span className="text-lg font-bold tracking-tight leading-none">Assetain</span>
-                {appSettings.activeGrantId && (
-                    <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest mt-0.5">
-                        Project: {appSettings.grants.find(g => g.id === appSettings.activeGrantId)?.name || 'Main Registry'}
-                    </span>
-                )}
+                <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest mt-0.5">
+                    {activeGrantName}
+                </span>
             </div>
         </div>
         
@@ -264,6 +300,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                             <ShieldCheck className="mr-2 h-4 w-4 text-primary"/>
                             Infrastructure Console
                         </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setIsActivityOpen(true)} className="py-2 cursor-pointer">
+                            <History className="mr-2 h-4 w-4 text-primary"/>
+                            Recent Activity Log
+                        </DropdownMenuItem>
                         <DropdownMenuSeparator />
                         <DropdownMenuItem onClick={() => setIsInboxOpen(true)} className="py-2 cursor-pointer">
                             <Inbox className="mr-2 h-4 w-4 text-primary" />
@@ -320,21 +360,25 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
       <DatabaseAdminDialog isOpen={isInfrastructureOpen} onOpenChange={setIsInfrastructureOpen} />
+      <ActivityLogDialog isOpen={isActivityOpen} onOpenChange={setIsActivityOpen} onRevert={handleRevertAsset} />
       
-      <AssetFilterSheet
+      <AssetFilterDialog
         isOpen={isFilterSheetOpen}
         onOpenChange={setIsFilterSheetOpen}
-        locationOptions={[]}
-        selectedLocations={[]}
-        setSelectedLocations={() => {}}
-        assigneeOptions={[]}
-        selectedAssignees={[]}
-        setSelectedAssignees={() => {}}
-        statusOptions={[]}
-        selectedStatuses={[]}
-        setSelectedStatuses={() => {}}
-        missingFieldFilter={""}
-        setMissingFieldFilter={() => {}}
+        locationOptions={locationOptions}
+        selectedLocations={selectedLocations}
+        setSelectedLocations={setSelectedLocations}
+        assigneeOptions={assigneeOptions}
+        selectedAssignees={selectedAssignees}
+        setSelectedAssignees={setSelectedAssignees}
+        statusOptions={statusOptions}
+        selectedStatuses={selectedStatuses}
+        setSelectedStatuses={setSelectedStatuses}
+        conditionOptions={conditionOptions}
+        selectedConditions={selectedConditions}
+        setSelectedConditions={setSelectedConditions}
+        missingFieldFilter={missingFieldFilter}
+        setMissingFieldFilter={setMissingFieldFilter}
       />
 
        <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} onApprove={handleApprove} onReject={handleReject} />
@@ -346,7 +390,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </SheetHeader>
             <ScrollArea className="flex-1">
               {notifications.length > 0 ? (
-                notifications.map((notification, index) => (
+                notifications.map((notification) => (
                   <div key={notification.id} className="relative p-4 border-b hover:bg-muted/30 transition-colors group">
                       <p className={cn("text-sm font-bold", !notification.read ? "text-foreground" : "text-muted-foreground")}>{notification.title}</p>
                       {notification.description && <p className="text-xs text-muted-foreground mt-1">{notification.description}</p>}

@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -26,10 +27,10 @@ import {
     ShieldCheck, 
     DatabaseIcon,
     History,
-    RotateCcw,
     Zap,
     AlertTriangle,
     FileText,
+    RotateCcw,
 } from 'lucide-react';
 import { addNotification } from '@/hooks/use-notifications';
 import { useToast } from '@/hooks/use-toast';
@@ -55,10 +56,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       if (!activeGrantId) return;
       setIsProcessing(true);
       try {
+          // Snapshot: FS -> RTDB
           const fsData = await getAssetsFS();
           const projectData = fsData.filter(a => a.grantId === activeGrantId);
           await batchSetAssetsRTDB(projectData);
-          addNotification({ title: 'Mirror Snapshot Created', description: `Cloned ${projectData.length} project records to Realtime Database.` });
+          addNotification({ title: 'Mirror Snapshot Created', description: `Cloned ${projectData.length} records to Realtime Database.` });
           toast({ title: "Snapshot Complete" });
       } catch (e) {
           toast({ title: 'Backup Failed', variant: 'destructive' });
@@ -71,6 +73,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       if (!activeGrantId) return;
       setIsProcessing(true);
       try {
+          // Restore: RTDB -> FS
           const rtdbData = await getAssetsRTDB(activeGrantId);
           await batchSetAssetsFS(rtdbData);
           addNotification({ title: 'Firestore Restored', description: `Pushed ${rtdbData.length} records back to Cloud Firestore.` });
@@ -93,7 +96,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                         <ShieldCheck className="text-primary h-10 w-10"/> Infrastructure Console
                     </DialogTitle>
                     <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-                        Primary Data Layer & Mirror Orchestration
+                        Registry Data Layers & Orchestration
                     </DialogDescription>
                 </DialogHeader>
             </div>
@@ -102,9 +105,9 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                 <div className="p-8 space-y-8">
                     <Alert variant="destructive" className="border-2 bg-destructive/5">
                         <AlertTriangle className="h-4 w-4" />
-                        <AlertTitle className="font-bold">Caution: Direct Data Manipulation</AlertTitle>
+                        <AlertTitle className="font-bold">Caution: Production Traffic Routing</AlertTitle>
                         <AlertDescription className="text-xs leading-relaxed opacity-80">
-                            Switching the primary data source will re-route all user traffic. Ensure your backup mirror is current before migrating production users.
+                            Switching the primary source instantly re-routes all users. Ensure the target layer is synchronized before proceeding.
                         </AlertDescription>
                     </Alert>
 
@@ -122,7 +125,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                     {activeDatabase === 'firestore' && <Badge className="bg-primary font-black uppercase text-[9px]">Active</Badge>}
                                 </div>
                                 <CardTitle className="text-lg mt-2">Cloud Firestore</CardTitle>
-                                <CardDescription className="text-xs leading-tight">Complex regional queries and granular document security.</CardDescription>
+                                <CardDescription className="text-xs leading-tight">Advanced document security and regional audit trails.</CardDescription>
                             </CardHeader>
                         </Card>
 
@@ -139,7 +142,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                                     {activeDatabase === 'rtdb' && <Badge className="bg-primary font-black uppercase text-[9px]">Active</Badge>}
                                 </div>
                                 <CardTitle className="text-lg mt-2">Realtime Database</CardTitle>
-                                <CardDescription className="text-xs leading-tight">Low-latency sync and reduced quota impact for high-frequency updates.</CardDescription>
+                                <CardDescription className="text-xs leading-tight">Low-latency mirroring for high-integrity field operations.</CardDescription>
                             </CardHeader>
                         </Card>
                     </div>
@@ -150,7 +153,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
                             <h4 className="font-bold text-sm">Mirror Orchestration</h4>
                         </div>
                         <p className="text-xs text-muted-foreground leading-relaxed">
-                            Manually synchronize project data between layers. Use <strong>Snapshot</strong> to backup Firestore data to RTDB, or <strong>Restore</strong> to push RTDB changes back to Firestore.
+                            Manually sync project data between layers. Switching databases automatically turns the other into a backup point. Use <strong>Snapshot</strong> to update your backup.
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
                             <Button variant="outline" className="h-12 font-bold justify-start rounded-xl border-primary/20 bg-background" onClick={handleFullBackup} disabled={isProcessing}>
