@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - The Unified Data Facade.
  * Orchestrates UI requests with Offline Storage, Sandbox, and Sync Engine.
+ * Phase 14: Support for PRODUCTION vs SANDBOX context switching.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';

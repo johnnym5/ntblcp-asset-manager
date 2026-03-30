@@ -5,7 +5,7 @@
  * Phase 14: Unified Production/Sandbox context switching.
  */
 
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import AppLayout from '@/components/app-layout';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -24,19 +24,17 @@ import {
   List, 
   MapPin,
   Tag,
-  User,
   ChevronRight,
   ChevronLeft,
   X,
-  Info,
   Database,
-  DatabaseZap
+  DatabaseZap,
+  Trash2,
+  CheckCircle2
 } from 'lucide-react';
 import { RegistryTable } from '@/modules/registry/components/RegistryTable';
 import { AssetForm } from '@/components/asset-form';
 import { AssetFilterDialog, type FilterOption } from '@/components/asset-filter-sheet';
-import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
-import { ImportPreviewDialog } from '@/components/import-preview-dialog';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import { useToast } from '@/hooks/use-toast';
@@ -69,7 +67,6 @@ export default function AssetRegistryPage() {
   
   const { userProfile, loading: authLoading } = useAuth();
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // View States
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
@@ -83,10 +80,7 @@ export default function AssetRegistryPage() {
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
-  const [isImportPreviewOpen, setIsImportPreviewOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
-  const [stagedAssets, setStagedAssets] = useState<Asset[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>();
   const [isReadOnly, setIsReadOnly] = useState(false);
 
@@ -192,11 +186,37 @@ export default function AssetRegistryPage() {
       }
       
       await refreshRegistry();
-      toast({ title: "Registry Updated", description: "Operation committed to background sync pulse." });
+      toast({ title: "Registry Updated", description: "Operation committed to local pulse." });
       setIsFormOpen(false);
     } catch (e) {
       toast({ variant: "destructive", title: "Operation Failed" });
     }
+  };
+
+  const handleMergeSandbox = async () => {
+    if (sandboxAssets.length === 0) return;
+    setIsProcessing(true);
+    try {
+      for (const asset of sandboxAssets) {
+        await enqueueMutation('CREATE', 'assets', asset);
+      }
+      const current = await storage.getAssets();
+      await storage.saveAssets([...sandboxAssets, ...current]);
+      await storage.clearSandbox();
+      await refreshRegistry();
+      setDataSource('PRODUCTION');
+      toast({ title: "Registry Reconciled", description: `Successfully merged ${sandboxAssets.length} sandbox records.` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Merge Failure" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handlePurgeSandbox = async () => {
+    await storage.clearSandbox();
+    await refreshRegistry();
+    toast({ title: "Sandbox Purged", description: "Staging area cleared." });
   };
 
   const activeProjectName = appSettings?.grants.find(g => g.id === activeGrantId)?.name || 'Global Registry';
@@ -218,7 +238,10 @@ export default function AssetRegistryPage() {
             <div className="flex flex-col">
               <h2 className="text-xl font-black tracking-tight uppercase truncate max-w-[200px] md:max-w-md">{activeProjectName}</h2>
               <div className="flex items-center gap-2 mt-1">
-                <Badge variant="outline" className="h-5 px-2 text-[8px] font-black tracking-tighter border-primary/20 bg-primary/5 text-primary rounded-full">
+                <Badge variant="outline" className={cn(
+                  "h-5 px-2 text-[8px] font-black tracking-tighter rounded-full border-2",
+                  dataSource === 'SANDBOX' ? "border-orange-500/20 bg-orange-50 text-orange-600" : "border-primary/20 bg-primary/5 text-primary"
+                )}>
                   {filteredAndSortedAssets.length} RECORDS
                 </Badge>
                 {dataSource === 'SANDBOX' && (
@@ -232,31 +255,31 @@ export default function AssetRegistryPage() {
 
           <div className="flex items-center gap-2">
             {/* Data Layer Switcher */}
-            <div className="flex items-center bg-muted/50 p-1 rounded-xl">
+            <div className="flex items-center bg-muted/50 p-1.5 rounded-2xl border-2 border-border/40">
               <Button 
                 variant={dataSource === 'PRODUCTION' ? 'secondary' : 'ghost'} 
                 size="sm" 
                 onClick={() => setDataSource('PRODUCTION')}
-                className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest gap-2"
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 shadow-sm transition-all"
               >
-                <Database className="h-3 w-3" /> Production
+                <Database className="h-3.5 w-3.5" /> Production
               </Button>
               <Button 
                 variant={dataSource === 'SANDBOX' ? 'secondary' : 'ghost'} 
                 size="sm" 
                 onClick={() => setDataSource('SANDBOX')}
-                className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest gap-2"
+                className="h-9 px-4 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 shadow-sm transition-all"
               >
-                <DatabaseZap className="h-3 w-3" /> Sandbox
+                <DatabaseZap className="h-3.5 w-3.5" /> Sandbox
               </Button>
             </div>
 
-            <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl">
+            <div className="flex items-center gap-1.5 bg-muted/50 p-1.5 rounded-2xl border-2 border-border/40">
               <Button 
                 variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
                 size="sm" 
                 onClick={() => setViewMode('list')}
-                className="h-8 w-8 p-0 rounded-lg tactile-pulse"
+                className="h-9 w-9 p-0 rounded-xl tactile-pulse"
               >
                 <List className="h-4 w-4" />
               </Button>
@@ -264,7 +287,7 @@ export default function AssetRegistryPage() {
                 variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
                 size="sm" 
                 onClick={() => setViewMode('grid')}
-                className="h-8 w-8 p-0 rounded-lg tactile-pulse"
+                className="h-9 w-9 p-0 rounded-xl tactile-pulse"
               >
                 <LayoutGrid className="h-4 w-4" />
               </Button>
@@ -321,7 +344,10 @@ export default function AssetRegistryPage() {
         {/* Registry Surface */}
         <motion.div 
           layout
-          className="flex-1 bg-card/50 rounded-[2rem] border-2 border-dashed border-border/40 overflow-hidden shadow-inner min-h-[300px]"
+          className={cn(
+            "flex-1 bg-card/50 rounded-[2rem] border-2 border-dashed overflow-hidden shadow-inner min-h-[300px]",
+            dataSource === 'SANDBOX' ? "border-orange-500/20" : "border-border/40"
+          )}
         >
           {paginatedAssets.length > 0 ? (
             viewMode === 'list' ? (
@@ -348,7 +374,8 @@ export default function AssetRegistryPage() {
                   <Card 
                     key={asset.id}
                     className={cn(
-                      "border-2 border-border/40 hover:border-primary/20 transition-all rounded-[1.5rem] overflow-hidden group cursor-pointer shadow-md tactile-pulse",
+                      "border-2 transition-all rounded-[1.5rem] overflow-hidden group cursor-pointer shadow-md tactile-pulse",
+                      dataSource === 'SANDBOX' ? "hover:border-orange-500/20" : "hover:border-primary/20",
                       selectedIds.has(asset.id) ? "bg-primary/5 border-primary/20 shadow-primary/5" : "bg-card"
                     )}
                     onClick={() => handleInspect(asset)}
@@ -418,12 +445,28 @@ export default function AssetRegistryPage() {
               <Filter className="h-5 w-5" />
               {Object.values(filters).flat().length > 0 && <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-primary rounded-full" />}
             </Button>
-            <Button className="h-12 w-12 rounded-2xl font-black shadow-xl bg-primary" onClick={() => { setSelectedAsset(undefined); setIsReadOnly(false); setIsFormOpen(true); }}>
-              <Plus className="h-6 w-6" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl tactile-pulse" onClick={() => window.location.href = '/import'}>
-              <FileUp className="h-5 w-5" />
-            </Button>
+            
+            {dataSource === 'SANDBOX' ? (
+              <>
+                <Button variant="ghost" size="icon" onClick={handlePurgeSandbox} className="h-12 w-12 rounded-xl text-destructive hover:bg-destructive/10">
+                  <Trash2 className="h-5 w-5" />
+                </Button>
+                <Button onClick={handleMergeSandbox} disabled={isProcessing || sandboxAssets.length === 0} className="h-12 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-orange-500 shadow-xl shadow-orange-500/20">
+                  {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4 mr-2" />}
+                  Merge
+                </Button>
+              </>
+            ) : (
+              <>
+                <Button className="h-12 w-12 rounded-2xl font-black shadow-xl bg-primary" onClick={() => { setSelectedAsset(undefined); setIsReadOnly(false); setIsFormOpen(true); }}>
+                  <Plus className="h-6 w-6" />
+                </Button>
+                <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl tactile-pulse" onClick={() => window.location.href = '/import'}>
+                  <FileUp className="h-5 w-5" />
+                </Button>
+              </>
+            )}
+            
             <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl tactile-pulse" onClick={() => ExcelService.exportRegistry(currentRegistry)}>
               <FileDown className="h-5 w-5" />
             </Button>
