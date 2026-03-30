@@ -13,6 +13,7 @@ import { AssetFilterDialog, type FilterOption } from '@/components/asset-filter-
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
 
 export default function AssetRegistryPage() {
