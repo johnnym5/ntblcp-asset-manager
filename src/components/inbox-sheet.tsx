@@ -14,6 +14,8 @@ import { Inbox, User, Clock, GitPullRequest, Check, X, RefreshCw, Loader2, Arrow
 import { formatDistanceToNow } from 'date-fns';
 import type { Asset } from '@/types/domain';
 import { Badge } from '@/components/ui/badge';
+import { FirestoreService } from '@/services/firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 
 const ChangeDetail = ({ label, oldValue, newValue }: { label: string, oldValue?: any, newValue?: any }) => {
@@ -32,6 +34,7 @@ const ChangeDetail = ({ label, oldValue, newValue }: { label: string, oldValue?:
 
 export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenChange: (open: boolean) => void }) {
   const { assets, isSyncing, refreshRegistry } = useAppState();
+  const { toast } = useToast();
   const [isProcessing, setIsProcessing] = useState(false);
 
   const pendingAssets = assets
@@ -40,12 +43,18 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
 
   const handleAction = async (assetId: string, action: 'APPROVE' | 'REJECT') => {
       setIsProcessing(true);
-      // Logic for committing the pending change or discarding it would be triggered here
-      // via the facade. For Phase 6, we implement the UI state.
-      setTimeout(async () => {
+      try {
+        await FirestoreService.adjudicateAssetPulse(assetId, action);
         await refreshRegistry();
+        toast({ 
+          title: action === 'APPROVE' ? "Pulse Applied" : "Request Discarded", 
+          description: `Registry successfully adjudicated.` 
+        });
+      } catch (e) {
+        toast({ variant: "destructive", title: "Adjudication Failure" });
+      } finally {
         setIsProcessing(false);
-      }, 800);
+      }
   };
 
   return (

@@ -105,6 +105,63 @@ export const FirestoreService = {
   },
 
   /**
+   * Formal Adjudication Pulse for Pending Modifications.
+   */
+  async adjudicateAssetPulse(assetId: string, action: 'APPROVE' | 'REJECT', adminComment?: string) {
+    if (!db) return;
+    const assetRef = doc(db, 'assets', assetId);
+    
+    try {
+      const snap = await getDoc(assetRef);
+      if (!snap.exists()) return;
+      const asset = snap.data() as Asset;
+
+      if (action === 'APPROVE' && asset.pendingChanges) {
+        const approvedData = {
+          ...asset,
+          ...asset.pendingChanges,
+          approvalStatus: undefined,
+          pendingChanges: undefined,
+          changeSubmittedBy: undefined,
+          adminComment,
+          lastModified: new Date().toISOString(),
+          lastModifiedBy: 'System Governance'
+        };
+        await setDoc(assetRef, sanitizeForFirestore(approvedData));
+        await this.logActivity({
+          assetId,
+          assetDescription: asset.description,
+          operation: 'UPDATE',
+          performedBy: 'Governance Hub',
+          userState: 'ADMIN',
+          changes: { approval: { old: 'PENDING', new: 'APPROVED' } }
+        });
+      } else {
+        const rejectedData = {
+          ...asset,
+          approvalStatus: undefined,
+          pendingChanges: undefined,
+          changeSubmittedBy: undefined,
+          adminComment,
+          lastModified: new Date().toISOString(),
+        };
+        await setDoc(assetRef, sanitizeForFirestore(rejectedData));
+        await this.logActivity({
+          assetId,
+          assetDescription: asset.description,
+          operation: 'UPDATE',
+          performedBy: 'Governance Hub',
+          userState: 'ADMIN',
+          changes: { approval: { old: 'PENDING', new: 'REJECTED' } }
+        });
+      }
+    } catch (err: any) {
+      this.handlePermissionError(assetRef, 'update', err);
+      throw err;
+    }
+  },
+
+  /**
    * Records a mutation pulse in the append-only activity log.
    */
   async logActivity(entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>) {
