@@ -69,7 +69,6 @@ export function AssetBatchEditForm({
   const { appSettings } = useAppState();
   
   const isAdmin = userProfile?.isAdmin || false;
-  const isVerificationMode = appSettings?.appMode === 'verification';
 
   // Field Selection States
   const [applyLocation, setApplyLocation] = useState(false);
@@ -163,10 +162,10 @@ export function AssetBatchEditForm({
 
   return (
     <Sheet open={isOpen} onOpenChange={handleOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl flex flex-col p-0 border-primary/10 bg-background/95 backdrop-blur-xl rounded-l-[2.5rem] shadow-2xl">
+      <SheetContent className="w-full sm:max-w-xl flex flex-col p-0 border-primary/10 bg-background rounded-l-[2.5rem] shadow-2xl overflow-hidden">
         <div className="p-8 pb-4 bg-muted/20 border-b">
           <SheetHeader>
-            <SheetTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">
+            <SheetTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase">
               <div className="p-2 bg-primary/10 rounded-xl">
                 <ArrowRightLeft className="text-primary h-6 w-6" />
               </div>
@@ -231,7 +230,7 @@ export function AssetBatchEditForm({
           <Button 
             onClick={handleSubmit} 
             disabled={isSaving || !canSave} 
-            className="flex-1 h-12 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
+            className="flex-1 h-12 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground"
           >
             {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Check className="mr-2 h-4 w-4" />}
             Apply Logic Pulse

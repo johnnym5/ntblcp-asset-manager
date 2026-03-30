@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Registry Workspace - High-Performance Asset Browser.
- * Phase 14: Unified Production/Sandbox context switching.
+ * Phase 18: Activated Batch Operations & Selection Bar Hardening.
  */
 
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import AppLayout from '@/components/app-layout';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -30,11 +30,14 @@ import {
   Database,
   DatabaseZap,
   Trash2,
-  CheckCircle2
+  CheckCircle2,
+  AlertCircle,
+  ClipboardEdit
 } from 'lucide-react';
 import { RegistryTable } from '@/modules/registry/components/RegistryTable';
 import { AssetForm } from '@/components/asset-form';
 import { AssetFilterDialog, type FilterOption } from '@/components/asset-filter-sheet';
+import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import { useToast } from '@/hooks/use-toast';
@@ -43,6 +46,16 @@ import type { Asset } from '@/types/domain';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { ExcelService } from '@/services/excel-service';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export type SortConfig = {
   key: keyof Asset | 'sn';
@@ -80,6 +93,8 @@ export default function AssetRegistryPage() {
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [isBatchDeleteOpen, setIsBatchDeleteOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>();
   const [isReadOnly, setIsReadOnly] = useState(false);
@@ -179,7 +194,6 @@ export default function AssetRegistryPage() {
           : [readyAsset, ...currentAssets];
         await storage.saveAssets(updated);
       } else {
-        // Sandbox Update
         const currentSandbox = await storage.getSandbox();
         const updated = currentSandbox.map(a => a.id === assetToSave.id ? assetToSave : a);
         await storage.saveToSandbox(updated);
@@ -190,6 +204,69 @@ export default function AssetRegistryPage() {
       setIsFormOpen(false);
     } catch (e) {
       toast({ variant: "destructive", title: "Operation Failed" });
+    }
+  };
+
+  const handleBatchSave = async (data: BatchUpdateData) => {
+    setIsProcessing(true);
+    try {
+      const ids = Array.from(selectedIds);
+      const updates = currentRegistry.filter(a => ids.includes(a.id)).map(asset => ({
+        ...asset,
+        ...data,
+        previousState: dataSource === 'PRODUCTION' ? { ...asset, previousState: undefined } : undefined,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: userProfile?.displayName || 'System Batch'
+      }));
+
+      if (dataSource === 'PRODUCTION') {
+        for (const asset of updates) {
+          await enqueueMutation('UPDATE', 'assets', asset);
+        }
+        const currentAssets = await storage.getAssets();
+        const assetMap = new Map(currentAssets.map(a => [a.id, a]));
+        updates.forEach(a => assetMap.set(a.id, a as Asset));
+        await storage.saveAssets(Array.from(assetMap.values()));
+      } else {
+        const currentSandbox = await storage.getSandbox();
+        const sandboxMap = new Map(currentSandbox.map(a => [a.id, a]));
+        updates.forEach(a => sandboxMap.set(a.id, a as Asset));
+        await storage.saveToSandbox(Array.from(sandboxMap.values()));
+      }
+
+      await refreshRegistry();
+      setSelectedAssetIds(new Set());
+      toast({ title: "Batch Pulse Complete", description: `Updated ${updates.length} records.` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Batch Pulse Failed" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    setIsProcessing(true);
+    try {
+      const ids = Array.from(selectedIds);
+      if (dataSource === 'PRODUCTION') {
+        for (const id of ids) {
+          await enqueueMutation('DELETE', 'assets', { id });
+        }
+        const currentAssets = await storage.getAssets();
+        await storage.saveAssets(currentAssets.filter(a => !ids.includes(a.id)));
+      } else {
+        const currentSandbox = await storage.getSandbox();
+        await storage.saveToSandbox(currentSandbox.filter(a => !ids.includes(a.id)));
+      }
+
+      await refreshRegistry();
+      setSelectedAssetIds(new Set());
+      setIsBatchDeleteOpen(false);
+      toast({ title: "Batch Purge Complete", description: `Removed ${ids.length} records.` });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Purge Failed" });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -254,7 +331,6 @@ export default function AssetRegistryPage() {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Data Layer Switcher */}
             <div className="flex items-center bg-muted/50 p-1.5 rounded-2xl border-2 border-border/40">
               <Button 
                 variant={dataSource === 'PRODUCTION' ? 'secondary' : 'ghost'} 
@@ -313,8 +389,12 @@ export default function AssetRegistryPage() {
                   <span className="font-black uppercase text-[10px] tracking-widest">{selectedIds.size} SELECTED</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10 tactile-pulse">BATCH EDIT</Button>
-                  <Button variant="ghost" size="sm" className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-red-500/20 tactile-pulse">DELETE</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10 tactile-pulse">
+                    <ClipboardEdit className="h-3.5 w-3.5 mr-2" /> BATCH EDIT
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsBatchDeleteOpen(true)} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-red-500/20 tactile-pulse">
+                    <Trash2 className="h-3.5 w-3.5 mr-2" /> DELETE
+                  </Button>
                 </div>
               </motion.div>
             ) : showSearch ? (
@@ -383,7 +463,20 @@ export default function AssetRegistryPage() {
                     <CardContent className="p-5 space-y-4">
                       <div className="flex justify-between items-start gap-4">
                         <div className="flex flex-col gap-1 min-w-0">
-                          <h3 className="font-black text-sm uppercase tracking-tight truncate text-foreground">{asset.description || asset.name}</h3>
+                          <div className="flex items-center gap-2">
+                            <Checkbox 
+                              checked={selectedIds.has(asset.id)} 
+                              onCheckedChange={() => {
+                                const next = new Set(selectedIds);
+                                if (next.has(asset.id)) next.delete(asset.id);
+                                else next.add(asset.id);
+                                setSelectedAssetIds(next);
+                              }}
+                              className="h-4 w-4 rounded-md border-2"
+                              onClick={(e) => e.stopPropagation()}
+                            />
+                            <h3 className="font-black text-sm uppercase tracking-tight truncate text-foreground">{asset.description || asset.name}</h3>
+                          </div>
                           <Badge variant="secondary" className="h-5 px-1.5 text-[8px] font-black uppercase tracking-tighter bg-muted border border-border/40 w-fit">
                             S/N: {asset.serialNumber || 'UNSET'}
                           </Badge>
@@ -483,6 +576,13 @@ export default function AssetRegistryPage() {
         onQuickSave={async () => {}}
       />
 
+      <AssetBatchEditForm
+        isOpen={isBatchEditOpen}
+        onOpenChange={setIsBatchEditOpen}
+        selectedAssetCount={selectedIds.size}
+        onSave={handleBatchSave}
+      />
+
       <AssetFilterDialog
         isOpen={isFilterOpen}
         onOpenChange={setIsFilterOpen}
@@ -494,6 +594,23 @@ export default function AssetRegistryPage() {
         setFilters={setFilters}
         onReset={() => setFilters({ sections: [], subsections: [], locations: [], statuses: [] })}
       />
+
+      <AlertDialog open={isBatchDeleteOpen} onOpenChange={setIsBatchDeleteOpen}>
+        <AlertDialogContent className="rounded-[2rem] border-primary/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Purge Selection?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium">
+              This will permanently delete <strong>{selectedIds.size} selected records</strong> from the {dataSource.toLowerCase()} registry. This action is irreversible.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="font-bold rounded-xl">Discard Action</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBatchDelete} className="bg-destructive hover:bg-destructive/90 font-black uppercase text-[10px] tracking-widest h-11 px-6 rounded-xl">
+              Execute Purge Pulse
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
