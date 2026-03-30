@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useCallback } from 'react';
+import React, { useMemo, useState, useCallback, useRef } from 'react';
 import AppLayout from '@/components/app-layout';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -25,12 +25,14 @@ import {
   Clock,
   CheckCircle2,
   Trash2,
-  ChevronRight
+  ChevronRight,
+  Database
 } from 'lucide-react';
 import { RegistryTable } from '@/modules/registry/components/RegistryTable';
 import { AssetForm } from '@/components/asset-form';
 import { AssetFilterDialog, type FilterOption } from '@/components/asset-filter-sheet';
 import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
+import { ImportPreviewDialog } from '@/components/import-preview-dialog';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import { useToast } from '@/hooks/use-toast';
@@ -39,6 +41,7 @@ import type { Asset } from '@/types/domain';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
+import { ExcelService } from '@/services/excel-service';
 
 export type SortConfig = {
   key: keyof Asset | 'sn';
@@ -46,9 +49,10 @@ export type SortConfig = {
 };
 
 export default function AssetRegistryPage() {
-  const { assets, searchTerm, setSearchTerm, refreshRegistry, settingsLoaded, activeGrantId, appSettings } = useAppState();
+  const { assets, searchTerm, setSearchTerm, refreshRegistry, settingsLoaded, activeGrantId, appSettings, isOnline } = useAppState();
   const { userProfile, loading: authLoading } = useAuth();
   const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // View States
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
@@ -61,6 +65,9 @@ export default function AssetRegistryPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [isImportPreviewOpen, setIsImportPreviewOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [stagedAssets, setStagedAssets] = useState<Asset[]>([]);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>();
   const [isReadOnly, setIsReadOnly] = useState(false);
 
@@ -289,6 +296,58 @@ export default function AssetRegistryPage() {
     }
   };
 
+  // --- Import/Export Pulses ---
+  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !activeGrantId) return;
+
+    setIsProcessing(true);
+    try {
+      const parsed = await ExcelService.parseWorkbook(file);
+      const tagged = parsed.map(a => ({
+        ...a,
+        grantId: activeGrantId,
+        lastModifiedBy: userProfile?.displayName || 'System Import'
+      }));
+      setStagedAssets(tagged);
+      setIsImportPreviewOpen(true);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Parsing Failed", description: "The workbook hierarchy is corrupted or non-deterministic." });
+    } finally {
+      setIsProcessing(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleConfirmImport = async () => {
+    setIsProcessing(true);
+    try {
+      for (const asset of stagedAssets) {
+        await enqueueMutation('CREATE', 'assets', asset);
+      }
+      const current = await storage.getAssets();
+      await storage.saveAssets([...stagedAssets, ...current]);
+      await refreshRegistry();
+      toast({ title: "Registry Merged", description: `${stagedAssets.length} hierarchical records enqueued for cloud pulse.` });
+      setIsImportPreviewOpen(false);
+      setStagedAssets([]);
+    } catch (err) {
+      toast({ variant: "destructive", title: "Merge Failed" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleExportRegistry = async () => {
+    if (filteredAndSortedAssets.length === 0) return;
+    try {
+      await ExcelService.exportRegistry(filteredAndSortedAssets, `Registry-Pulse-${new Date().toISOString().split('T')[0]}.xlsx`);
+      toast({ title: "Export Complete", description: "Structure-preserving report generated." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Export Failed" });
+    }
+  };
+
   const activeProjectName = appSettings?.grants.find(g => g.id === activeGrantId)?.name || 'Global Registry';
 
   if (authLoading || !settingsLoaded) {
@@ -302,6 +361,9 @@ export default function AssetRegistryPage() {
   return (
     <AppLayout>
       <div className="flex flex-col h-full gap-6 relative pb-24">
+        {/* Hidden File Trigger */}
+        <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
+
         {/* Top Operational Bar */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
           <div className="space-y-1">
@@ -311,9 +373,17 @@ export default function AssetRegistryPage() {
                 {filteredAndSortedAssets.length} Records
               </Badge>
             </div>
-            <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
-              Primary Audit Workstation › Registry Context
-            </p>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
+                Primary Audit Workstation › Registry Context
+              </p>
+              <Badge variant="outline" className={cn(
+                "h-5 px-2 text-[8px] font-black uppercase tracking-tighter",
+                isOnline ? "text-green-600 border-green-200 bg-green-50" : "text-orange-600 border-orange-200 bg-orange-50"
+              )}>
+                {isOnline ? "Online Registry" : "Locally Saved Assets"}
+              </Badge>
+            </div>
           </div>
 
           <div className="flex items-center gap-2">
@@ -464,10 +534,18 @@ export default function AssetRegistryPage() {
             <Plus className="h-4 w-4" /> New Registration
           </Button>
           <Separator orientation="vertical" className="h-10 opacity-50" />
-          <Button variant="outline" className="h-14 w-14 p-0 rounded-2xl bg-card border-border/40 hover:bg-primary/5 transition-all">
+          <Button 
+            variant="outline" 
+            className="h-14 w-14 p-0 rounded-2xl bg-card border-border/40 hover:bg-primary/5 transition-all"
+            onClick={() => fileInputRef.current?.click()}
+          >
             <FileUp className="h-5 w-5 text-muted-foreground" />
           </Button>
-          <Button variant="outline" className="h-14 w-14 p-0 rounded-2xl bg-card border-border/40 hover:bg-primary/5 transition-all">
+          <Button 
+            variant="outline" 
+            className="h-14 w-14 p-0 rounded-2xl bg-card border-border/40 hover:bg-primary/5 transition-all"
+            onClick={handleExportRegistry}
+          >
             <FileDown className="h-5 w-5 text-muted-foreground" />
           </Button>
         </div>
@@ -502,6 +580,14 @@ export default function AssetRegistryPage() {
         onOpenChange={setIsBatchEditOpen} 
         selectedAssetCount={selectedIds.size} 
         onSave={handleSaveBatchEdit} 
+      />
+
+      <ImportPreviewDialog 
+        isOpen={isImportPreviewOpen}
+        onOpenChange={setIsImportPreviewOpen}
+        assets={stagedAssets}
+        onConfirm={handleConfirmImport}
+        isProcessing={isProcessing}
       />
     </AppLayout>
   );
