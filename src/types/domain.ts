@@ -86,6 +86,10 @@ export interface AppSettings {
   uxMode: UXMode;
   onboardingComplete: boolean;
   showHelpTooltips: boolean;
+  
+  // Automation Preferences
+  autoSync: boolean;
+  autoAnalyze: boolean;
 }
 
 export interface Grant {

@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview SettingsWorkstation - Global Environment Control Panel.
- * Phase 20: Activated Dynamic Schema Evolution & Field Mapping.
+ * @fileOverview SettingsWorkstation - Operational Control Center.
+ * Phase 30: Broadened categories, Automation pulses, and UX Mode Orchestration.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -29,10 +29,21 @@ import {
   ScanSearch,
   PlaneTakeoff,
   Columns,
-  Wrench
+  Wrench,
+  GraduationCap,
+  Cpu,
+  Lock,
+  Cloud,
+  History,
+  FileUp,
+  FileDown,
+  Activity,
+  User,
+  Info,
+  Smartphone
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,7 +58,8 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
 import { cn } from '@/lib/utils';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
-import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
+import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 export default function SettingsPage() {
   const { appSettings, refreshRegistry, settingsLoaded, isSyncing } = useAppState();
@@ -78,74 +90,6 @@ export default function SettingsPage() {
     setDraftSettings({ ...draftSettings, [key]: value });
   };
 
-  const handleAddGrant = () => {
-    if (!draftSettings) return;
-    const newGrant: Grant = {
-      id: crypto.randomUUID(),
-      name: 'New Asset Registry',
-      enabledSheets: [],
-      sheetDefinitions: { ...HEADER_DEFINITIONS },
-    };
-    handleSettingChange('grants', [...draftSettings.grants, newGrant]);
-  };
-
-  const handleRenameGrant = (id: string, name: string) => {
-    if (!draftSettings) return;
-    handleSettingChange('grants', draftSettings.grants.map(g => g.id === id ? { ...g, name } : g));
-  };
-
-  const handleDeleteGrant = (id: string) => {
-    if (!draftSettings) return;
-    if (draftSettings.grants.length <= 1) {
-      toast({ variant: "destructive", title: "Action Denied", description: "The system requires at least one active project." });
-      return;
-    }
-    const filtered = draftSettings.grants.filter(g => g.id !== id);
-    let activeId = draftSettings.activeGrantId;
-    if (activeId === id) activeId = filtered[0].id;
-    setDraftSettings({ ...draftSettings, grants: filtered, activeGrantId: activeId });
-  };
-
-  const handleConfigureSchema = (grantId: string, sheetName: string) => {
-    const grant = draftSettings?.grants.find(g => g.id === grantId);
-    if (!grant) return;
-    const def = grant.sheetDefinitions[sheetName];
-    if (def) {
-      setSelectedSheetDef(def);
-      setActiveGrantIdForSchema(grantId);
-      setIsColumnSheetOpen(true);
-    }
-  };
-
-  const handleSaveSchema = (originalName: string | null, newDef: SheetDefinition, applyToAll: boolean) => {
-    if (!draftSettings || !activeGrantForSchema) return;
-
-    const updatedGrants = draftSettings.grants.map(grant => {
-      if (grant.id === activeGrantForSchema) {
-        const newSheetDefs = { ...grant.sheetDefinitions };
-        if (applyToAll) {
-          // Propagate this field structure to all categories in the grant
-          Object.keys(newSheetDefs).forEach(key => {
-            newSheetDefs[key] = {
-              ...newDef,
-              name: key // Keep the individual category names
-            };
-          });
-        } else {
-          newSheetDefs[newDef.name] = newDef;
-          if (originalName && originalName !== newDef.name) {
-            delete newSheetDefs[originalName];
-          }
-        }
-        return { ...grant, sheetDefinitions: newSheetDefs };
-      }
-      return grant;
-    });
-
-    handleSettingChange('grants', updatedGrants);
-    toast({ title: "Schema Pulse Staged", description: "Save configuration to broadcast changes." });
-  };
-
   const handleCommitChanges = async () => {
     if (!draftSettings) return;
     setIsSaving(true);
@@ -153,12 +97,17 @@ export default function SettingsPage() {
       await FirestoreService.updateSettings(draftSettings);
       await storage.saveSettings(draftSettings);
       await refreshRegistry();
-      toast({ title: "Configuration Broadcasted", description: "Global environment state has been updated." });
+      toast({ title: "Environment Synchronized", description: "Global configuration pulse broadcasted successfully." });
     } catch (e) {
-      toast({ variant: "destructive", title: "Broadcast Failure" });
+      toast({ variant: "destructive", title: "Broadcast Failure", description: "Could not establish cloud parity for settings." });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const resetOnboarding = () => {
+    handleSettingChange('onboardingComplete', false);
+    toast({ title: "Tour Pulse Reset", description: "The welcome guide will appear on your next dashboard visit." });
   };
 
   if (authLoading || !settingsLoaded || !draftSettings) {
@@ -169,18 +118,46 @@ export default function SettingsPage() {
     );
   }
 
-  const activeGrant = draftSettings.grants.find(g => g.id === draftSettings.activeGrantId);
+  const SectionHeading = ({ title, description, icon: Icon }: { title: string, description: string, icon: any }) => (
+    <div className="flex items-center gap-4 mb-6">
+      <div className="p-3 bg-primary/10 rounded-2xl">
+        <Icon className="h-5 w-5 text-primary" />
+      </div>
+      <div>
+        <h3 className="text-lg font-black uppercase tracking-tight leading-none">{title}</h3>
+        <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-widest mt-1 opacity-60">{description}</p>
+      </div>
+    </div>
+  );
+
+  const SettingRow = ({ label, description, children, icon: Icon }: { label: string, description: string, children: React.ReactNode, icon?: any }) => (
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-6 rounded-3xl border-2 border-border/40 bg-card/50 hover:border-primary/20 transition-all gap-4">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          {Icon && <Icon className="h-3.5 w-3.5 text-primary opacity-60" />}
+          <Label className="text-sm font-black uppercase tracking-tight">{label}</Label>
+        </div>
+        <p className="text-[10px] text-muted-foreground font-medium leading-relaxed max-w-sm italic">
+          {description}
+        </p>
+      </div>
+      <div className="flex items-center gap-3">
+        {children}
+      </div>
+    </div>
+  );
 
   return (
     <AppLayout>
-      <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="max-w-6xl mx-auto space-y-8 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-700">
+        {/* Header Pulse */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
           <div className="space-y-1">
             <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
-              <Settings className="text-primary h-8 w-8" /> Settings Workstation
+              <Settings className="text-primary h-8 w-8" /> Control Center
             </h2>
             <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-              Global Environment Orchestration & Governance
+              Broadband Configuration & Automation Hub
             </p>
           </div>
           <Button 
@@ -189,145 +166,181 @@ export default function SettingsPage() {
             className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 flex items-center gap-3 transition-transform hover:scale-105 active:scale-95"
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Broadcast Config
+            Commit Configuration
           </Button>
         </div>
 
-        <Tabs defaultValue="projects" className="space-y-8">
-          <TabsList className="bg-muted/30 p-1.5 rounded-2xl h-auto flex flex-wrap gap-2 border-2 border-border/40 w-fit">
-            <TabsTrigger value="projects" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
-              <FolderKanban className="h-3.5 w-3.5" /> Registry Projects
+        <Tabs defaultValue="environment" className="space-y-8">
+          <TabsList className="bg-muted/30 p-1.5 rounded-[2rem] h-auto flex flex-wrap gap-2 border-2 border-border/40 w-fit">
+            <TabsTrigger value="environment" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+              <GraduationCap className="h-3.5 w-3.5" /> Environment
             </TabsTrigger>
-            <TabsTrigger value="identity" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
-              <UserCog className="h-3.5 w-3.5" /> Identity & RBAC
+            <TabsTrigger value="registry" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+              <Columns className="h-3.5 w-3.5" /> Registry
             </TabsTrigger>
-            <TabsTrigger value="ux" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
-              <Palette className="h-3.5 w-3.5" /> Interface Pulse
+            <TabsTrigger value="workflows" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+              <Cpu className="h-3.5 w-3.5" /> Workflows
             </TabsTrigger>
-            <TabsTrigger value="infrastructure" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
-              <Database className="h-3.5 w-3.5" /> Infrastructure
+            <TabsTrigger value="security" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+              <Lock className="h-3.5 w-3.5" /> Governance
+            </TabsTrigger>
+            <TabsTrigger value="system" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+              <RefreshCw className="h-3.5 w-3.5" /> System
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="projects" className="space-y-6 outline-none">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-              <div className="lg:col-span-2 space-y-6">
-                <div className="flex items-center justify-between px-2">
-                  <h3 className="text-sm font-black uppercase tracking-[0.2em] text-primary">Multi-Registry Management</h3>
-                  <Button variant="outline" size="sm" onClick={handleAddGrant} className="font-bold text-[10px] uppercase border-primary/20 text-primary rounded-xl h-9">
-                    <PlusCircle className="mr-2 h-3.5 w-3.5" /> Add Project
-                  </Button>
-                </div>
+          {/* Tab 1: Environment Pulse */}
+          <TabsContent value="environment" className="space-y-10 outline-none">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="space-y-10">
+                <div>
+                  <SectionHeading title="User Experience" description="Interface logic & accessibility rules" icon={GraduationCap} />
+                  <div className="space-y-4">
+                    <SettingRow label="Operational Mode" description="Switch between beginner-friendly guidance and high-speed expert pulses." icon={Smartphone}>
+                      <Select value={draftSettings.uxMode} onValueChange={(v) => handleSettingChange('uxMode', v as UXMode)}>
+                        <SelectTrigger className="w-36 h-11 rounded-xl font-black uppercase text-[10px] tracking-tighter">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent className="rounded-xl">
+                          <SelectItem value="beginner" className="text-[10px] font-black uppercase">Beginner Mode</SelectItem>
+                          <SelectItem value="advanced" className="text-[10px] font-black uppercase">Advanced Mode</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </SettingRow>
+                    
+                    <SettingRow label="Help Tooltips" description="Show descriptive pulses when hovering over buttons and technical labels." icon={Info}>
+                      <Switch checked={draftSettings.showHelpTooltips} onCheckedChange={(v) => handleSettingChange('showHelpTooltips', v)} />
+                    </SettingRow>
 
-                <div className="space-y-4">
-                  {draftSettings.grants.map((grant) => (
-                    <Card key={grant.id} className={cn(
-                      "border-2 transition-all duration-500 rounded-[2rem] overflow-hidden",
-                      draftSettings.activeGrantId === grant.id 
-                        ? "border-primary bg-primary/5 shadow-2xl shadow-primary/10" 
-                        : "border-border/40 hover:border-primary/20 bg-card/50 shadow-lg"
-                    )}>
-                      <CardHeader className="p-6 pb-4 flex flex-row items-center justify-between space-y-0">
-                        <div className="flex-1 flex items-center gap-4">
-                          {draftSettings.activeGrantId === grant.id ? (
-                            <div className="p-2 bg-primary rounded-xl shadow-lg shadow-primary/20"><CheckCircle2 className="h-5 w-5 text-white" /></div>
-                          ) : (
-                            <div className="h-9 w-9 rounded-xl border-2 border-dashed border-muted flex items-center justify-center font-black text-[10px] opacity-30">OFF</div>
-                          )}
-                          <div className="flex-1">
-                            <Input 
-                              value={grant.name} 
-                              onChange={(e) => handleRenameGrant(grant.id, e.target.value)}
-                              className="border-none bg-transparent font-black text-lg focus-visible:ring-0 p-0 h-auto"
-                            />
-                            <p className="text-[9px] font-mono text-muted-foreground opacity-50 mt-0.5">UUID: {grant.id}</p>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {draftSettings.activeGrantId !== grant.id && (
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              onClick={() => handleSettingChange('activeGrantId', grant.id)}
-                              className="font-black text-[10px] uppercase tracking-widest text-primary hover:bg-primary/10"
-                            >
-                              Activate Pulse
-                            </Button>
-                          )}
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            onClick={() => handleDeleteGrant(grant.id)}
-                            className="text-destructive opacity-40 hover:opacity-100 hover:bg-destructive/10 transition-all rounded-xl"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </div>
-                      </CardHeader>
-                      <CardContent className="px-6 pb-6 pt-0 space-y-4">
-                        <div className="flex flex-wrap gap-2">
-                          <Badge variant="secondary" className="rounded-lg text-[9px] font-black uppercase tracking-tighter bg-background border">
-                            {Object.keys(grant.sheetDefinitions || {}).length} Asset Classes
-                          </Badge>
-                        </div>
-                        <Separator className="opacity-40 border-dashed" />
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                          {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
-                            <div key={sheetName} className="flex items-center justify-between p-3 rounded-xl bg-background/50 border border-border/40 hover:border-primary/20 transition-all group">
-                              <span className="text-[10px] font-black uppercase tracking-tight truncate max-w-[120px]">{sheetName}</span>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                className="h-7 w-7 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
-                                onClick={() => handleConfigureSchema(grant.id, sheetName)}
-                              >
-                                <Columns className="h-3.5 w-3.5" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
+                    <SettingRow label="Welcome Guide" description="Replay the onboarding walkthrough to refresh system knowledge." icon={History}>
+                      <Button variant="outline" size="sm" onClick={resetOnboarding} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">Reset Tour</Button>
+                    </SettingRow>
+                  </div>
                 </div>
               </div>
 
+              <div className="space-y-10">
+                <div>
+                  <SectionHeading title="Visual Identity" description="Theming & surface language" icon={Palette} />
+                  <div className="space-y-4">
+                    <SettingRow label="System Theme" description="Choose between high-contrast light mode or dark AMOLED auditor view." icon={Sun}>
+                      <div className="flex gap-2 p-1 bg-muted/50 rounded-xl border-2">
+                        <Button variant={theme === 'light' ? 'secondary' : 'ghost'} size="sm" onClick={() => setTheme('light')} className="h-8 rounded-lg font-black uppercase text-[9px] tracking-widest gap-2">
+                          <Sun className="h-3 w-3" /> Light
+                        </Button>
+                        <Button variant={theme === 'dark' ? 'secondary' : 'ghost'} size="sm" onClick={() => setTheme('dark')} className="h-8 rounded-lg font-black uppercase text-[9px] tracking-widest gap-2">
+                          <Moon className="h-3 w-3" /> Dark
+                        </Button>
+                      </div>
+                    </SettingRow>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Tab 2: Registry Pulse */}
+          <TabsContent value="registry" className="space-y-10 outline-none">
+            <SectionHeading title="Registry Display" description="Table layout & field visibility setup" icon={Columns} />
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+              <div className="lg:col-span-2 space-y-4">
+                {draftSettings.grants.map((grant) => (
+                  <Card key={grant.id} className={cn(
+                    "border-2 transition-all duration-500 rounded-[2.5rem] overflow-hidden",
+                    draftSettings.activeGrantId === grant.id ? "border-primary bg-primary/5 shadow-2xl" : "border-border/40 bg-card/50"
+                  )}>
+                    <CardHeader className="p-8 pb-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-4">
+                          <div className={cn("p-2 rounded-xl", draftSettings.activeGrantId === grant.id ? "bg-primary text-white" : "bg-muted")}>
+                            <FolderKanban className="h-5 w-5" />
+                          </div>
+                          <div>
+                            <Input 
+                              value={grant.name} 
+                              onChange={(e) => handleSettingChange('grants', draftSettings.grants.map(g => g.id === grant.id ? { ...g, name: e.target.value } : g))}
+                              className="border-none bg-transparent font-black text-xl uppercase tracking-tighter p-0 h-auto focus-visible:ring-0"
+                            />
+                            <p className="text-[9px] font-mono text-muted-foreground uppercase mt-1">ID: {grant.id}</p>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/20 bg-primary/5 text-primary">
+                          {Object.keys(grant.sheetDefinitions || {}).length} Categories
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-8 pt-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
+                          <div key={sheetName} className="flex items-center justify-between p-4 rounded-2xl bg-background/50 border border-border/40 group hover:border-primary/20 transition-all">
+                            <span className="text-[10px] font-black uppercase truncate">{sheetName}</span>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
+                              className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
+                            >
+                              <Wrench className="h-3.5 w-3.5" />
+                            </Button>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
               <aside className="space-y-6">
-                <Card className="rounded-[2.5rem] border-2 border-dashed border-border/40 shadow-none bg-muted/5 overflow-hidden">
+                <Card className="rounded-[2.5rem] border-2 border-dashed border-border/40 bg-muted/5 shadow-none overflow-hidden">
                   <CardHeader className="bg-primary/5 p-6 border-b border-dashed">
-                    <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Registry Protocol</CardTitle>
+                    <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Layout Protocol</CardTitle>
                   </CardHeader>
-                  <CardContent className="p-6 space-y-6">
-                    <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
-                      Schema Orchestration allows you to redefine table headers and field mappings per category. Changes are broadcast during the next config pulse.
-                    </p>
-                    <div className="p-5 bg-background rounded-2xl border-2 shadow-inner space-y-4">
-                      <div className="flex items-center justify-between text-[10px] font-black uppercase">
-                        <span className="opacity-40">Active Project</span>
-                        <span className="text-primary truncate max-w-[120px]">{activeGrant?.name || 'NONE'}</span>
-                      </div>
-                      <div className="flex items-center justify-between text-[10px] font-black uppercase">
-                        <span className="opacity-40">Status</span>
-                        <span className="text-green-600">Stable Heartbeat</span>
-                      </div>
-                    </div>
+                  <CardContent className="p-8 text-[10px] font-medium text-muted-foreground leading-relaxed italic">
+                    Registry arrangement allows you to redefine table headers and field mappings per category. Changes are broadcast during the next config pulse and will update all auditor viewports.
                   </CardContent>
                 </Card>
               </aside>
             </div>
           </TabsContent>
 
-          <TabsContent value="identity" className="space-y-6 outline-none">
-            <Card className="border-2 border-border/40 rounded-[2.5rem] overflow-hidden shadow-2xl bg-card/50">
-              <CardHeader className="p-8 bg-muted/20 border-b">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="text-xl font-black uppercase tracking-tight">Identity & Access Pulse</CardTitle>
-                    <CardDescription className="text-xs font-medium mt-1">Manage system auditors, regional scopes, and cryptographic access levels.</CardDescription>
+          {/* Tab 3: Workflows Pulse */}
+          <TabsContent value="workflows" className="space-y-10 outline-none">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className="space-y-10">
+                <div>
+                  <SectionHeading title="Automation Center" description="Deterministic intelligence rules" icon={Cpu} />
+                  <div className="space-y-4">
+                    <SettingRow label="Auto-Sync Pulse" description="Automatically broadcast modifications to the cloud registry as soon as a stable connection is detected." icon={Cloud}>
+                      <Switch checked={true} disabled /> {/* Hardcoded for current architecture pulse */}
+                    </SettingRow>
+                    
+                    <SettingRow label="Predictive OCR" description="Automatically initialize the AI analysis pulse immediately after a photo is captured." icon={Zap}>
+                      <Switch checked={false} disabled /> {/* Placeholder for future intelligence automation */}
+                    </SettingRow>
                   </div>
-                  <ShieldCheck className="h-8 w-8 text-primary opacity-40" />
                 </div>
-              </CardHeader>
+              </div>
+
+              <div className="space-y-10">
+                <div>
+                  <SectionHeading title="Data Exchange" description="Import & Export governance" icon={FileUp} />
+                  <div className="space-y-4">
+                    <SettingRow label="Sandbox Mandatory" description="Force all new imports into the Sandbox Store for reconciliation before merging." icon={ShieldCheck}>
+                      <Switch checked={true} disabled />
+                    </SettingRow>
+                    
+                    <SettingRow label="Legacy Structure" description="Include original row data and unmapped columns in exports for 100% fidelity." icon={FileDown}>
+                      <Switch checked={true} disabled />
+                    </SettingRow>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </TabsContent>
+
+          {/* Tab 4: Security Pulse */}
+          <TabsContent value="security" className="space-y-10 outline-none">
+            <SectionHeading title="Identity Governance" description="System auditors & regional scopes" icon={Lock} />
+            <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
               <CardContent className="p-8">
                 <UserManagement 
                   users={draftSettings.authorizedUsers}
@@ -338,119 +351,40 @@ export default function SettingsPage() {
             </Card>
           </TabsContent>
 
-          <TabsContent value="ux" className="space-y-6 outline-none">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-              <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-xl bg-card/50">
-                <CardHeader className="p-8">
-                  <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-3">
-                    <Palette className="h-4 w-4 text-primary" /> Visual Identity
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-8 pb-8 space-y-6">
-                  <div className="space-y-3">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground pl-1">Theme Preference</Label>
-                    <div className="grid grid-cols-2 gap-3">
-                      <Button 
-                        variant={theme === 'light' ? 'default' : 'outline'} 
-                        onClick={() => setTheme('light')}
-                        className="h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2"
-                      >
-                        <Sun className="h-4 w-4" /> Management Light
-                      </Button>
-                      <Button 
-                        variant={theme === 'dark' ? 'default' : 'outline'} 
-                        onClick={() => setTheme('dark')}
-                        className="h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2"
-                      >
-                        <Moon className="h-4 w-4" /> Night Auditor
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-xl bg-card/50">
-                <CardHeader className="p-8">
-                  <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-3">
-                    <Zap className="h-4 w-4 text-primary" /> Operational Mode
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="px-8 pb-8 space-y-6">
-                  <div className="flex items-center justify-between p-6 rounded-2xl border-2 bg-muted/5 group hover:bg-primary/5 transition-all">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-black uppercase tracking-tight">Application Protocol</Label>
-                      <p className="text-[10px] text-muted-foreground font-medium max-w-[200px]">Verification mode enables field auditors to submit assessment updates.</p>
-                    </div>
-                    <Select 
-                      value={draftSettings.appMode} 
-                      onValueChange={(v) => handleSettingChange('appMode', v as 'management' | 'verification')}
-                    >
-                      <SelectTrigger className="w-36 h-10 rounded-xl font-black uppercase text-[10px] tracking-tighter">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="rounded-xl">
-                        <SelectItem value="management" className="text-[10px] font-black">MANAGEMENT</SelectItem>
-                        <SelectItem value="verification" className="text-[10px] font-black">VERIFICATION</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center justify-between p-6 rounded-2xl border-2 bg-muted/5 group hover:bg-destructive/5 transition-all">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-black uppercase tracking-tight">Global Registry Lock</Label>
-                      <p className="text-[10px] text-muted-foreground font-medium max-w-[200px]">Prevents field auditors from creating or deleting assets directly.</p>
-                    </div>
-                    <Switch 
-                      checked={draftSettings.lockAssetList} 
-                      onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} 
-                    />
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="infrastructure" className="space-y-6 outline-none">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <Card className="md:col-span-2 rounded-[2.5rem] border-2 border-border/40 shadow-xl bg-card/50 overflow-hidden">
-                <CardHeader className="p-8 bg-muted/20 border-b">
-                  <CardTitle className="text-sm font-black uppercase tracking-widest flex items-center gap-3">
-                    <RefreshCw className="h-4 w-4 text-primary" /> Registry Heartbeat Tools
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-8 space-y-6">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Button variant="outline" className="h-16 justify-start font-black text-xs tracking-widest uppercase rounded-2xl border-2 hover:bg-primary/5 hover:border-primary/30 group" onClick={refreshRegistry}>
-                      <div className="p-2 bg-primary/10 rounded-lg mr-4 group-hover:bg-primary/20 transition-colors"><RefreshCw className={cn("h-5 w-5 text-primary", isSyncing && "animate-spin")} /></div>
-                      Manual Reconciliation
+          {/* Tab 5: System Pulse */}
+          <TabsContent value="system" className="space-y-10 outline-none">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div>
+                <SectionHeading title="Infrastructure Health" description="Triple-layer parity monitoring" icon={RefreshCw} />
+                <div className="space-y-4">
+                  <SettingRow label="Manual Reconciliation" description="Force a full state-refresh across Local, Shadow, and Cloud layers." icon={Activity}>
+                    <Button variant="outline" size="sm" onClick={refreshRegistry} disabled={isSyncing} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">
+                      {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
+                      Sync Now
                     </Button>
-                    <Button variant="outline" className="h-16 justify-start font-black text-xs tracking-widest uppercase rounded-2xl border-2 hover:bg-primary/5 hover:border-primary/30 group">
-                      <div className="p-2 bg-primary/10 rounded-lg mr-4 group-hover:bg-primary/20 transition-colors"><PlaneTakeoff className="h-5 w-5 text-primary" /></div>
-                      Export Master Audit
-                    </Button>
-                  </div>
-                  <Separator className="opacity-50 border-dashed" />
-                  <div className="p-6 rounded-2xl bg-orange-500/5 border-2 border-dashed border-orange-500/20 space-y-2">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-orange-600">Danger Zone Pulse</h4>
-                    <p className="text-[10px] text-muted-foreground font-medium leading-relaxed italic">The following operations are destructive and will be broadcast to all regional sessions immediately.</p>
-                    <Button variant="destructive" className="w-full mt-4 h-12 rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-destructive/20 opacity-80 hover:opacity-100">
-                      <Trash2 className="mr-2 h-4 w-4" /> Wipe Local Registry Cache
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className="rounded-[2.5rem] border-2 border-dashed border-border/40 shadow-none bg-muted/5 p-8 text-center flex flex-col items-center justify-center space-y-4">
-                <div className="p-6 bg-primary/10 rounded-full mb-2">
-                  <Zap className="h-10 w-10 text-primary" />
+                  </SettingRow>
+                  
+                  <SettingRow label="Registry Snapshot" description="Export the entire active register as a deterministic JSON archive." icon={PlaneTakeoff}>
+                    <Button variant="outline" size="sm" className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">Backup Pulse</Button>
+                  </SettingRow>
                 </div>
-                <h4 className="text-sm font-black uppercase tracking-tight">System Integrity</h4>
-                <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
-                  Registry version: v5.0.2<br />
-                  Cloud Cluster: PROD-NORTH-01<br />
-                  Shadow Replication: ACTIVE
-                </p>
-              </Card>
+              </div>
+
+              <div>
+                <SectionHeading title="Danger Zone" description="Immutable state operations" icon={Trash2} />
+                <div className="p-8 rounded-[2.5rem] bg-orange-500/5 border-2 border-dashed border-orange-500/20 space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Trash2 className="h-5 w-5 text-orange-600" />
+                    <h4 className="text-sm font-black uppercase tracking-tight text-orange-700">Wipe Registry Cache</h4>
+                  </div>
+                  <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase opacity-60">
+                    Purging the local encrypted store is irreversible. This should only be performed during critical state corruption.
+                  </p>
+                  <Button variant="ghost" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 transition-all">
+                    Reset Local Pulse
+                  </Button>
+                </div>
+              </div>
             </div>
           </TabsContent>
         </Tabs>
@@ -462,7 +396,22 @@ export default function SettingsPage() {
           onOpenChange={setIsColumnSheetOpen}
           sheetDefinition={selectedSheetDef}
           originalSheetName={selectedSheetDef.name}
-          onSave={handleSaveSchema}
+          onSave={(orig, newDef, all) => {
+            const updatedGrants = draftSettings.grants.map(grant => {
+              if (grant.id === activeGrantForSchema) {
+                const newSheetDefs = { ...grant.sheetDefinitions };
+                if (all) {
+                  Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
+                } else {
+                  newSheetDefs[newDef.name] = newDef;
+                  if (orig && orig !== newDef.name) delete newSheetDefs[orig];
+                }
+                return { ...grant, sheetDefinitions: newSheetDefs };
+              }
+              return grant;
+            });
+            handleSettingChange('grants', updatedGrants);
+          }}
         />
       )}
     </AppLayout>
