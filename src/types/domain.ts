@@ -134,3 +134,38 @@ export interface ActivityLogEntry {
   changes?: Record<string, { old: any; new: any }>;
   metadata?: Record<string, any>;
 }
+
+export type ErrorSeverity = 'CRITICAL' | 'WARNING' | 'INFO';
+export type ErrorLogStatus = 'PENDING' | 'RESOLVED' | 'IGNORED' | 'ESCALATED';
+
+export interface ErrorLogEntry {
+  id: string;
+  timestamp: string;
+  severity: ErrorSeverity;
+  status: ErrorLogStatus;
+  user: {
+    id: string;
+    name: string;
+    role: string;
+  };
+  context: {
+    page: string;
+    module: string;
+    action: string;
+    browser: string;
+    isOnline: boolean;
+  };
+  error: {
+    type: string;
+    message: string;
+    technicalMessage: string;
+    laymanExplanation: string;
+    stack?: string;
+  };
+  recovery: {
+    attempted: boolean;
+    action?: string;
+    result?: string;
+  };
+  adminNotes?: string;
+}

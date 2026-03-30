@@ -16,6 +16,7 @@ import {
   orderBy,
   limit,
   addDoc,
+  updateDoc,
   type DocumentReference
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -23,7 +24,8 @@ import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors';
 import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
-import type { Asset, AppSettings, ActivityLogEntry, QueueOperation } from '@/types/domain';
+import { monitoring } from '@/lib/monitoring';
+import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry } from '@/types/domain';
 
 export const FirestoreService = {
   /**
@@ -78,7 +80,11 @@ export const FirestoreService = {
 
     const validation = AssetSchema.safeParse(asset);
     if (!validation.success) {
-      console.error("Firestore: Validation failed for asset write", validation.error);
+      monitoring.trackError(new Error("Validation Failure"), { 
+        module: 'Firestore', 
+        action: 'WRITE_VALIDATION', 
+        assetId: asset.id 
+      }, 'WARNING');
       return;
     }
 
@@ -86,7 +92,6 @@ export const FirestoreService = {
     const sanitized = sanitizeForFirestore(validation.data);
     
     try {
-      // Before saving, try to get the current state for the restoration buffer
       const currentSnap = await getDoc(assetRef);
       const previousState = currentSnap.exists() ? currentSnap.data() : null;
 
@@ -95,7 +100,6 @@ export const FirestoreService = {
         previousState: previousState ? sanitizeForFirestore(previousState) : null
       }, { merge: true });
       
-      // Log the mutation pulse
       await this.logActivity({
         assetId: asset.id,
         assetDescription: asset.description,
@@ -112,105 +116,62 @@ export const FirestoreService = {
   },
 
   /**
-   * Formal Reversion Pulse.
-   * Restores an asset to its previous state from the cloud buffer.
+   * Permanent deletion from the cloud registry.
    */
-  async restoreAsset(assetId: string, performedBy: string): Promise<void> {
+  async deleteAsset(assetId: string): Promise<void> {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
-    
     try {
-      const snap = await getDoc(assetRef);
-      if (!snap.exists()) return;
-      const asset = snap.data() as Asset;
-      
-      if (!asset.previousState) {
-        throw new Error("No restoration pulse available for this record.");
-      }
-
-      const restoredData = {
-        ...asset.previousState,
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: performedBy,
-        previousState: null // Clear buffer after use
-      };
-
-      await setDoc(assetRef, sanitizeForFirestore(restoredData));
-      
-      await this.logActivity({
-        assetId,
-        assetDescription: asset.description,
-        operation: 'RESTORE',
-        performedBy,
-        userState: 'SYSTEM',
-        changes: { status: { old: 'MODIFIED', new: 'RESTORED' } }
-      });
-
+      await deleteDoc(assetRef);
     } catch (err: any) {
-      this.handlePermissionError(assetRef, 'update', err);
+      this.handlePermissionError(assetRef, 'delete', err);
       throw err;
     }
   },
 
   /**
-   * Formal Adjudication Pulse for Pending Modifications.
+   * Commits an Error Log to the Administrative Audit collection.
    */
-  async adjudicateAssetPulse(assetId: string, action: 'APPROVE' | 'REJECT', adminComment?: string) {
+  async logErrorAudit(entry: ErrorLogEntry) {
     if (!db) return;
-    const assetRef = doc(db, 'assets', assetId);
-    
     try {
-      const snap = await getDoc(assetRef);
-      if (!snap.exists()) return;
-      const asset = snap.data() as Asset;
-
-      if (action === 'APPROVE' && asset.pendingChanges) {
-        const approvedData = {
-          ...asset,
-          ...asset.pendingChanges,
-          approvalStatus: undefined,
-          pendingChanges: undefined,
-          changeSubmittedBy: undefined,
-          adminComment,
-          lastModified: new Date().toISOString(),
-          lastModifiedBy: 'System Governance'
-        };
-        await setDoc(assetRef, sanitizeForFirestore(approvedData));
-        await this.logActivity({
-          assetId,
-          assetDescription: asset.description,
-          operation: 'UPDATE',
-          performedBy: 'Governance Hub',
-          userState: 'ADMIN',
-          changes: { approval: { old: 'PENDING', new: 'APPROVED' } }
-        });
-      } else {
-        const rejectedData = {
-          ...asset,
-          approvalStatus: undefined,
-          pendingChanges: undefined,
-          changeSubmittedBy: undefined,
-          adminComment,
-          lastModified: new Date().toISOString(),
-        };
-        await setDoc(assetRef, sanitizeForFirestore(rejectedData));
-        await this.logActivity({
-          assetId,
-          assetDescription: asset.description,
-          operation: 'UPDATE',
-          performedBy: 'Governance Hub',
-          userState: 'ADMIN',
-          changes: { approval: { old: 'PENDING', new: 'REJECTED' } }
-        });
-      }
-    } catch (err: any) {
-      this.handlePermissionError(assetRef, 'update', err);
-      throw err;
+      await setDoc(doc(db, 'error_logs', entry.id), entry);
+    } catch (e) {
+      console.error("CRITICAL: Failed to archive error log", e);
     }
   },
 
   /**
-   * Records a mutation pulse in the append-only activity log.
+   * Fetches all error logs for administrative review.
+   */
+  async getErrorLogs(): Promise<ErrorLogEntry[]> {
+    if (!db) return [];
+    const logsRef = collection(db, 'error_logs');
+    const q = query(logsRef, orderBy('timestamp', 'desc'), limit(100));
+    try {
+      const snap = await getDocs(q);
+      return snap.docs.map(d => d.data() as ErrorLogEntry);
+    } catch (e) {
+      console.error("Failed to fetch error logs", e);
+      return [];
+    }
+  },
+
+  /**
+   * Updates an error log status (e.g., Resolved).
+   */
+  async updateErrorStatus(logId: string, status: ErrorLogEntry['status'], notes?: string) {
+    if (!db) return;
+    const logRef = doc(db, 'error_logs', logId);
+    try {
+      await updateDoc(logRef, { status, adminNotes: notes });
+    } catch (e) {
+      console.error("Failed to update error status", e);
+    }
+  },
+
+  /**
+   * Formal Activity Logging pulse.
    */
   async logActivity(entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>) {
     if (!db) return;
@@ -252,11 +213,7 @@ export const FirestoreService = {
   async getGlobalActivity(limitCount: number = 100): Promise<ActivityLogEntry[]> {
     if (!db) return [];
     const logRef = collection(db, 'activity_log');
-    const q = query(
-      logRef, 
-      orderBy('timestamp', 'desc'),
-      limit(limitCount)
-    );
+    const q = query(logRef, orderBy('timestamp', 'desc'), limit(limitCount));
     try {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as ActivityLogEntry));
@@ -267,22 +224,70 @@ export const FirestoreService = {
   },
 
   /**
-   * Permanent deletion from the cloud registry.
+   * Formal Adjudication Pulse.
    */
-  async deleteAsset(assetId: string): Promise<void> {
+  async adjudicateAssetPulse(assetId: string, action: 'APPROVE' | 'REJECT', adminComment?: string) {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
     try {
-      await deleteDoc(assetRef);
+      const snap = await getDoc(assetRef);
+      if (!snap.exists()) return;
+      const asset = snap.data() as Asset;
+
+      if (action === 'APPROVE' && asset.pendingChanges) {
+        const approvedData = {
+          ...asset,
+          ...asset.pendingChanges,
+          approvalStatus: undefined,
+          pendingChanges: undefined,
+          changeSubmittedBy: undefined,
+          adminComment,
+          lastModified: new Date().toISOString(),
+          lastModifiedBy: 'System Governance'
+        };
+        await setDoc(assetRef, sanitizeForFirestore(approvedData));
+      } else {
+        const rejectedData = {
+          ...asset,
+          approvalStatus: undefined,
+          pendingChanges: undefined,
+          changeSubmittedBy: undefined,
+          adminComment,
+          lastModified: new Date().toISOString(),
+        };
+        await setDoc(assetRef, sanitizeForFirestore(rejectedData));
+      }
     } catch (err: any) {
-      this.handlePermissionError(assetRef, 'delete', err);
+      this.handlePermissionError(assetRef, 'update', err);
       throw err;
     }
   },
 
   /**
-   * Internal helper to wrap and emit Firestore permission errors.
+   * Reversion Pulse.
    */
+  async restoreAsset(assetId: string, performedBy: string): Promise<void> {
+    if (!db) return;
+    const assetRef = doc(db, 'assets', assetId);
+    try {
+      const snap = await getDoc(assetRef);
+      if (!snap.exists()) return;
+      const asset = snap.data() as Asset;
+      if (!asset.previousState) throw new Error("No restoration pulse available.");
+
+      const restoredData = {
+        ...asset.previousState,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: performedBy,
+        previousState: null
+      };
+      await setDoc(assetRef, sanitizeForFirestore(restoredData));
+    } catch (err: any) {
+      this.handlePermissionError(assetRef, 'update', err);
+      throw err;
+    }
+  },
+
   handlePermissionError(refOrPath: string | DocumentReference, operation: SecurityRuleContext['operation'], error: any, data?: any) {
     if (error?.code === 'permission-denied') {
       const path = typeof refOrPath === 'string' ? refOrPath : refOrPath.path;
@@ -292,6 +297,7 @@ export const FirestoreService = {
         requestResourceData: data,
       });
       errorEmitter.emit('permission-error', permissionError);
+      monitoring.trackError(permissionError, { action: operation, module: 'Firestore' }, 'CRITICAL');
     }
   }
 };

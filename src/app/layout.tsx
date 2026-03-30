@@ -5,6 +5,7 @@ import { AuthProvider } from '@/contexts/auth-context';
 import { AppStateProvider } from '@/contexts/app-state-context';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
+import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 export const metadata: Metadata = {
   title: 'Assetain',
@@ -31,13 +32,15 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <AppStateProvider>
-            <AuthProvider>
-              {children}
-              <Toaster />
-              <FirebaseErrorListener />
-            </AuthProvider>
-          </AppStateProvider>
+          <ErrorBoundary isGlobal module="Assetain Global Shell">
+            <AppStateProvider>
+              <AuthProvider>
+                {children}
+                <Toaster />
+                <FirebaseErrorListener />
+              </AuthProvider>
+            </AppStateProvider>
+          </ErrorBoundary>
         </ThemeProvider>
       </body>
     </html>
