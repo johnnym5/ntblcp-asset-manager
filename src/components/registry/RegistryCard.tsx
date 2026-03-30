@@ -1,34 +1,34 @@
 /**
  * @fileOverview RegistryCard - Source-Aware Professional Register Renderer.
- * Phase 38: Added friendly sync-state indicators and responsive typography.
+ * Phase 39: Integrated Semantic Placeholders and data-ai-hints.
  */
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
-  MoreHorizontal, 
   Tag, 
   MapPin, 
   User, 
   Activity, 
   Hash, 
   Calendar,
-  Box,
-  Truck,
   ShieldCheck,
   Package,
-  Layers,
   Database,
   Camera,
   Cloud,
-  Smartphone
+  Smartphone,
+  Truck,
+  Monitor,
+  Stethoscope,
+  Briefcase
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import type { AssetRecord, DensityMode } from '@/types/registry';
 import type { Asset } from '@/types/domain';
+import images from '@/app/lib/placeholder-images.json';
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -41,7 +41,6 @@ interface RegistryCardProps {
 export function RegistryCard({ record, onInspect, selected, onToggleSelect, densityMode = "expanded" }: RegistryCardProps) {
   const asset = record.rawRow as unknown as Asset;
 
-  // Arrangement Filtering
   const visibleFields = record.fields.filter(f => {
     const header = record.headers.find(h => h.id === f.headerId);
     if (!header || !header.visible) return false;
@@ -53,6 +52,19 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
     const h = record.headers.find(header => header.id === f.headerId);
     return h?.normalizedName === 'asset_description';
   });
+
+  // Semantic Image Selection Pulse
+  const getSemanticImage = () => {
+    if (asset.photoDataUri) return { url: asset.photoDataUri, hint: "asset photo" };
+    const cat = asset.category?.toLowerCase() || '';
+    if (cat.includes('vehicle') || cat.includes('motorcycle')) return images.asset_categories.vehicles;
+    if (cat.includes('computer') || cat.includes('laptop') || cat.includes('it')) return images.asset_categories.it_equipment;
+    if (cat.includes('medical') || cat.includes('device') || cat.includes('truenat')) return images.asset_categories.medical_devices;
+    if (cat.includes('furniture')) return images.asset_categories.furniture;
+    return images.placeholders.default;
+  };
+
+  const imagePulse = getSemanticImage();
 
   return (
     <Card 
@@ -84,11 +96,14 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {asset.photoDataUri && (
-              <div className="h-6 w-6 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm shrink-0">
-                <img src={asset.photoDataUri} className="h-full w-full object-cover" alt="Evidence" />
-              </div>
-            )}
+            <div className="h-6 w-6 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm shrink-0 bg-muted">
+              <img 
+                src={imagePulse.url} 
+                className="h-full w-full object-cover" 
+                alt="Asset Evidence" 
+                data-ai-hint={imagePulse.hint}
+              />
+            </div>
             <Badge variant="secondary" className="h-5 px-2 text-[8px] font-mono font-bold uppercase tracking-widest bg-muted/50 border-none">
               PULSE #{record.rowNumber}
             </Badge>

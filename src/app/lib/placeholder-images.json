@@ -15,6 +15,10 @@
     "furniture": {
       "url": "https://picsum.photos/seed/office/600/400",
       "hint": "office furniture"
+    },
+    "infrastructure": {
+      "url": "https://picsum.photos/seed/power/600/400",
+      "hint": "generator infrastructure"
     }
   },
   "placeholders": {
