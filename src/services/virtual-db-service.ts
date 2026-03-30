@@ -1,6 +1,7 @@
 /**
  * @fileOverview Virtual Database Service.
  * Abstracted orchestration layer for cross-database management (Firestore, RTDB, Local).
+ * Phase 41: Added Global Parity Scanning & Forensic Data Movement.
  */
 
 import { FirestoreService } from './firebase/firestore';
@@ -9,7 +10,6 @@ import { getAssets as getRtdbAssets, getSettings as getRtdbSettings, batchSetAss
 import type { StorageLayer, DBNode } from '@/types/virtual-db';
 import type { Asset, AppSettings } from '@/types/domain';
 
-// Logical mapping for Friendly Names
 const PATH_MAPPING: Record<string, string> = {
   'assets': 'Asset Registry',
   'config/settings': 'Governance Settings',
@@ -25,8 +25,6 @@ export class VirtualDBService {
    */
   static async getLogicalGroups(layer: StorageLayer): Promise<DBNode[]> {
     const groups: DBNode[] = [];
-    
-    // Core collections known to the app
     const keys = ['assets', 'config/settings', 'activity_log', 'error_logs'];
     if (layer === 'LOCAL') keys.push('queue', 'sandbox');
 
@@ -40,7 +38,6 @@ export class VirtualDBService {
         path: key
       });
     }
-
     return groups;
   }
 
@@ -49,11 +46,9 @@ export class VirtualDBService {
    */
   static async getDocuments(layer: StorageLayer, collectionPath: string): Promise<DBNode[]> {
     const nodes: DBNode[] = [];
-
     try {
       if (layer === 'FIRESTORE') {
         if (collectionPath === 'assets') {
-          // Fetch from primary cloud
           const assets = await FirestoreService.getProjectAssets('ALL_PROJECTS'); 
           assets.forEach(a => nodes.push(this.mapAssetToNode(a, layer, 'assets')));
         } else if (collectionPath === 'config/settings') {
@@ -80,37 +75,50 @@ export class VirtualDBService {
     } catch (e) {
       console.error(`VirtualDB: Failed to list docs for ${layer}:${collectionPath}`, e);
     }
-
     return nodes;
+  }
+
+  /**
+   * Performs a global parity scan to identify records with "Sync Drift".
+   */
+  static async getGlobalDiscrepancies(): Promise<string[]> {
+    const [fAssets, lAssets] = await Promise.all([
+      FirestoreService.getProjectAssets('ALL_PROJECTS'),
+      storage.getAssets()
+    ]);
+
+    const discrepancies: string[] = [];
+    const localMap = new Map(lAssets.map(a => [a.id, a]));
+
+    fAssets.forEach(cloudAsset => {
+      const local = localMap.get(cloudAsset.id);
+      if (local && JSON.stringify(cloudAsset) !== JSON.stringify(local)) {
+        discrepancies.push(cloudAsset.id);
+      }
+    });
+
+    return discrepancies;
   }
 
   /**
    * Performs a side-by-side comparison of a node across all layers.
    */
   static async compareNodeAcrossLayers(path: string): Promise<Record<StorageLayer, any>> {
-    const results: Record<StorageLayer, any> = {
-      'FIRESTORE': null,
-      'RTDB': null,
-      'LOCAL': null
-    };
-
+    const results: Record<StorageLayer, any> = { 'FIRESTORE': null, 'RTDB': null, 'LOCAL': null };
     const [collection, id] = path.split('/');
 
     try {
-      // Parallel fetch across the stack
       const [fData, rData, lData] = await Promise.all([
         collection === 'assets' ? FirestoreService.getProjectAssets('ALL_PROJECTS').then(list => list.find(a => a.id === id)) : null,
         collection === 'assets' ? getRtdbAssets('ALL_PROJECTS').then(list => list.find(a => a.id === id)) : null,
         collection === 'assets' ? storage.getAssets().then(list => list.find(a => a.id === id)) : null,
       ]);
-
       results.FIRESTORE = fData || null;
       results.RTDB = rData || null;
       results.LOCAL = lData || null;
     } catch (e) {
       console.error("VirtualDB: Parity scan failed", e);
     }
-
     return results;
   }
 
@@ -119,9 +127,8 @@ export class VirtualDBService {
    */
   static async updateNode(layer: StorageLayer, path: string, data: any): Promise<void> {
     const [collection] = path.split('/');
-    
     if (layer === 'FIRESTORE') {
-      if (collection === 'assets') await FirestoreService.saveAsset(data);
+      if (collection === 'assets') await FirestoreService.saveAsset(data, 'UPDATE');
       else if (collection === 'config') await FirestoreService.updateSettings(data);
     } else if (layer === 'RTDB') {
       if (collection === 'assets') await setRtdbAssets([data]);
@@ -136,13 +143,41 @@ export class VirtualDBService {
   }
 
   /**
-   * Forces a node from one layer to overwrite another (Deterministic Sync).
+   * Moves a record from one collection path to another (Hierarchical restructuring).
    */
+  static async moveNode(layer: StorageLayer, oldPath: string, newPath: string, data: any): Promise<void> {
+    await this.deleteNode(layer, oldPath);
+    await this.updateNode(layer, newPath, data);
+  }
+
+  /**
+   * Deletes a node from a specific layer.
+   */
+  static async deleteNode(layer: StorageLayer, path: string): Promise<void> {
+    const [collection, id] = path.split('/');
+    if (layer === 'FIRESTORE') await FirestoreService.deleteAsset(id);
+    else if (layer === 'LOCAL') {
+      const assets = await storage.getAssets();
+      await storage.saveAssets(assets.filter(a => a.id !== id));
+    }
+  }
+
+  /**
+   * Restores a record to its previous state buffer.
+   */
+  static async restoreNode(layer: StorageLayer, path: string): Promise<void> {
+    const layers = await this.compareNodeAcrossLayers(path);
+    const data = layers[layer];
+    if (data?.previousState) {
+      const restored = { ...data.previousState, lastModified: new Date().toISOString() };
+      await this.updateNode(layer, path, restored);
+    }
+  }
+
   static async syncNode(path: string, fromLayer: StorageLayer, toLayer: StorageLayer): Promise<void> {
     const layers = await this.compareNodeAcrossLayers(path);
     const data = layers[fromLayer];
     if (!data) throw new Error(`Source layer [${fromLayer}] is empty at path [${path}]`);
-
     await this.updateNode(toLayer, path, data);
   }
 

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Super Admin Database Mission Control.
- * Phase 39: Integrated Forensic Parity Diff & High-Density Pulse Auditing.
+ * Phase 41: Global Discrepancy Finder & Forensic Reconciliation Pulse.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -29,7 +29,10 @@ import {
   ScanSearch,
   History,
   Cloud,
-  ArrowRight
+  ArrowRight,
+  AlertTriangle,
+  RotateCcw,
+  Zap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -60,9 +63,11 @@ export default function DatabaseExplorerPage() {
   
   const [parityData, setParityData] = useState<Record<StorageLayer, any> | null>(null);
   const [isComparing, setIsComparing] = useState(false);
+  const [discrepancyIds, setDiscrepancyIds] = useState<string[]>([]);
 
   useEffect(() => {
     loadRootNodes();
+    runGlobalScan();
   }, [activeLayer]);
 
   const loadRootNodes = async () => {
@@ -73,6 +78,11 @@ export default function DatabaseExplorerPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const runGlobalScan = async () => {
+    const ids = await VirtualDBService.getGlobalDiscrepancies();
+    setDiscrepancyIds(ids);
   };
 
   const loadParity = async (path: string) => {
@@ -135,8 +145,21 @@ export default function DatabaseExplorerPage() {
       await VirtualDBService.syncNode(selectedNode.path, from, to);
       toast({ title: "Parity Established", description: `Synchronized ${from} -> ${to}.` });
       loadParity(selectedNode.path);
+      runGlobalScan();
     } catch (e) {
       toast({ variant: "destructive", title: "Sync Failure" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRestoreNode = async () => {
+    if (!selectedNode) return;
+    setIsSaving(true);
+    try {
+      await VirtualDBService.restoreNode(selectedNode.source, selectedNode.path);
+      toast({ title: "Reversion Pulse Complete" });
+      loadRootNodes();
     } finally {
       setIsSaving(false);
     }
@@ -193,6 +216,7 @@ export default function DatabaseExplorerPage() {
         </div>
 
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
+          {/* Tree Explorer */}
           <Card className="lg:col-span-3 rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
             <CardHeader className="bg-muted/20 border-b p-6 space-y-4">
               <div className="grid grid-cols-3 bg-background/50 p-1 rounded-2xl border-2 border-border/40 shadow-inner h-12">
@@ -212,23 +236,30 @@ export default function DatabaseExplorerPage() {
                     <Loader2 className="h-8 w-8 animate-spin" />
                     <span className="text-[10px] font-black uppercase">Retrieving...</span>
                   </div>
-                ) : nodes.map((node) => (
-                  <button key={node.id} onClick={() => toggleExpand(node)} className={cn("w-full text-left px-4 py-3 rounded-xl transition-all group flex items-center justify-between border-2 border-transparent hover:bg-primary/5", selectedNode?.id === node.id ? "bg-primary/10 border-primary/20 shadow-sm" : "")}>
-                    <div className="flex flex-col min-w-0">
-                      <span className="text-[11px] font-black uppercase tracking-tight truncate">{displayMode === 'TECHNICAL' ? node.rawKey : node.displayName}</span>
-                      {displayMode !== 'FRIENDLY' && <span className="text-[8px] font-mono text-muted-foreground opacity-60 truncate">{node.path}</span>}
-                    </div>
-                    {node.type === 'COLLECTION' ? (
-                      <ChevronRight className={cn("h-3 w-3 opacity-20 transition-transform", expandedPaths.has(node.path) && "rotate-90")} />
-                    ) : (
-                      <FileJson className={cn("h-3 w-3 opacity-40", getSourceColor(node.source))} />
-                    )}
-                  </button>
-                ))}
+                ) : nodes.map((node) => {
+                  const isConflict = discrepancyIds.includes(node.rawKey);
+                  return (
+                    <button key={node.id} onClick={() => toggleExpand(node)} className={cn("w-full text-left px-4 py-3 rounded-xl transition-all group flex items-center justify-between border-2 border-transparent hover:bg-primary/5", selectedNode?.id === node.id ? "bg-primary/10 border-primary/20 shadow-sm" : "")}>
+                      <div className="flex flex-col min-w-0">
+                        <div className="flex items-center gap-2">
+                          <span className={cn("text-[11px] font-black uppercase tracking-tight truncate", isConflict && "text-destructive")}>{displayMode === 'TECHNICAL' ? node.rawKey : node.displayName}</span>
+                          {isConflict && <AlertTriangle className="h-2.5 w-2.5 text-destructive" />}
+                        </div>
+                        {displayMode !== 'FRIENDLY' && <span className="text-[8px] font-mono text-muted-foreground opacity-60 truncate">{node.path}</span>}
+                      </div>
+                      {node.type === 'COLLECTION' ? (
+                        <ChevronRight className={cn("h-3 w-3 opacity-20 transition-transform", expandedPaths.has(node.path) && "rotate-90")} />
+                      ) : (
+                        <FileJson className={cn("h-3 w-3 opacity-40", getSourceColor(node.source))} />
+                      )}
+                    </button>
+                  );
+                })}
               </div>
             </ScrollArea>
           </Card>
 
+          {/* Context & Parity Panel */}
           <Card className="lg:col-span-5 rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
             <CardHeader className="bg-muted/20 border-b p-6">
               {selectedNode ? (
@@ -239,11 +270,13 @@ export default function DatabaseExplorerPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-4 rounded-2xl bg-background/50 border-2 border-dashed space-y-1">
-                      <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Parity Status</span>
-                      <p className="text-[10px] font-bold uppercase">Audited</p>
+                      <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Registry Parity</span>
+                      <p className={cn("text-[10px] font-bold uppercase", discrepancyIds.includes(selectedNode.rawKey) ? "text-destructive" : "text-green-600")}>
+                        {discrepancyIds.includes(selectedNode.rawKey) ? 'Discrepancy' : 'Synchronized'}
+                      </p>
                     </div>
                     <div className="p-4 rounded-2xl bg-background/50 border-2 border-dashed space-y-1">
-                      <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Last Updated</span>
+                      <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Last Pulse</span>
                       <p className="text-[10px] font-bold uppercase truncate">{selectedNode.lastUpdated || 'Never'}</p>
                     </div>
                   </div>
@@ -291,8 +324,8 @@ export default function DatabaseExplorerPage() {
                         <div className="p-6 rounded-3xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-4">
                           <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Authority Reconciler</h4>
                           <div className="grid grid-cols-2 gap-2">
-                            <Button variant="outline" onClick={() => handleReconcile('LOCAL', 'FIRESTORE')} className="h-10 text-[8px] font-black uppercase gap-2"><Cloud className="h-3 w-3" /> Force Local -> Cloud</Button>
-                            <Button variant="outline" onClick={() => handleReconcile('FIRESTORE', 'LOCAL')} className="h-10 text-[8px] font-black uppercase gap-2"><HardDrive className="h-3 w-3" /> Force Cloud -> Local</Button>
+                            <Button variant="outline" onClick={() => handleReconcile('LOCAL', 'FIRESTORE')} className="h-10 text-[8px] font-black uppercase gap-2"><Cloud className="h-3 w-3" /> Local -> Cloud</Button>
+                            <Button variant="outline" onClick={() => handleReconcile('FIRESTORE', 'LOCAL')} className="h-10 text-[8px] font-black uppercase gap-2"><HardDrive className="h-3 w-3" /> Cloud -> Local</Button>
                           </div>
                         </div>
                       </div>
@@ -308,25 +341,25 @@ export default function DatabaseExplorerPage() {
                             <h4 className="text-sm font-black uppercase tracking-tight">Audit Buffer Detected</h4>
                           </div>
                           <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                            This record contains a historical state buffer. You can compare the current pulse with its previous stable version.
+                            Compare the current pulse with its previous stable version. Use the reversion pulse to roll back unintended changes.
                           </p>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <span className="text-[8px] font-black uppercase opacity-40">Previous Version</span>
+                            <span className="text-[8px] font-black uppercase opacity-40">Previous State</span>
                             <div className="p-4 rounded-xl bg-muted/20 border-2 font-mono text-[9px] overflow-hidden truncate">
                               {JSON.stringify(forensics).substring(0, 100)}...
                             </div>
                           </div>
                           <div className="space-y-2">
-                            <span className="text-[8px] font-black uppercase opacity-40">Current Version</span>
+                            <span className="text-[8px] font-black uppercase opacity-40">Active State</span>
                             <div className="p-4 rounded-xl bg-primary/5 border-2 border-primary/20 font-mono text-[9px] overflow-hidden truncate">
                               {JSON.stringify(selectedNode?.data).substring(0, 100)}...
                             </div>
                           </div>
                         </div>
-                        <Button variant="outline" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2">
-                          <History className="h-4 w-4" /> Full Visual Diff
+                        <Button variant="outline" onClick={handleRestoreNode} className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-blue-600 border-blue-200">
+                          <RotateCcw className="h-4 w-4" /> Restore Previous Pulse
                         </Button>
                       </div>
                     ) : (
@@ -341,6 +374,7 @@ export default function DatabaseExplorerPage() {
             </ScrollArea>
           </Card>
 
+          {/* Record Mutator Panel */}
           <Card className="lg:col-span-4 rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
             {selectedNode ? (
               <>
