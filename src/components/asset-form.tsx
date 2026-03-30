@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -9,9 +10,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
 } from "@/components/ui/dialog";
 import {
   Form,
@@ -19,7 +17,6 @@ import {
   FormField,
   FormItem,
   FormLabel,
-  FormMessage,
 } from "@/components/ui/form";
 import {
   Select,
@@ -32,7 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { Asset, SheetDefinition, DisplayField, AppSettings } from "@/lib/types";
-import { Loader2, FileText, Check, RotateCcw, Info, Hash, Clock, FileJson } from "lucide-react";
+import { Loader2, ArrowLeft, Share2, MoreVertical, Check, RotateCcw, Info, Hash, Clock, FileJson } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
 import { cn, getStatusClasses, sanitizeForFirestore } from "@/lib/utils";
@@ -44,6 +41,7 @@ import { saveLocalSettings } from "@/lib/idb";
 import { updateSettings as updateSettingsFS } from "@/lib/firestore";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "./ui/accordion";
 import { Badge } from "./ui/badge";
+import { Separator } from "./ui/separator";
 
 const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.category, {
   path: ['category'],
@@ -52,7 +50,6 @@ const assetFormSchema = z.record(z.string().optional()).refine(data => !!data.ca
     path: ['description'],
     message: 'Description is required.',
 });
-
 
 export type AssetFormValues = z.infer<typeof assetFormSchema>;
 
@@ -64,12 +61,35 @@ interface AssetFormProps {
   onQuickSave: (assetId: string, data: { remarks?: string; condition?: string; verifiedStatus?: 'Verified' | 'Unverified'; verifiedDate?: string; }) => Promise<void>;
   isReadOnly: boolean;
   defaultCategory?: string;
+  onNext?: () => void;
+  onPrevious?: () => void;
 }
 
-export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: initialIsReadOnly, defaultCategory }: AssetFormProps) {
+const FxIcon = () => (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="opacity-40">
+        <path d="M9 17c2 0 2.8-1 2.8-2.8V10c0-2 1-3.3 3.2-3" />
+        <path d="M9 11.2h5.7" />
+        <path d="M15 17c-2 0-2.8-1-2.8-2.8V10c0-2-1-3.3-3.2-3" />
+    </svg>
+);
+
+const OneTwoIcon = () => (
+    <div className="border border-current rounded px-0.5 py-0.25 text-[10px] font-black scale-90 opacity-40">12</div>
+);
+
+export function AssetForm({ 
+    isOpen, 
+    onOpenChange, 
+    asset, 
+    onSave, 
+    isReadOnly: initialIsReadOnly, 
+    defaultCategory,
+    onNext,
+    onPrevious
+}: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, dataSource, activeGrantId, assets: cloudAssets, offlineAssets, globalStateFilter } = useAppState();
+  const { appSettings, setAppSettings, dataSource, activeGrantId, assets: cloudAssets, offlineAssets, globalStateFilters } = useAppState();
   const isAdmin = userProfile?.isAdmin || false;
   
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
@@ -102,73 +122,20 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
             if (!defaultValues.verifiedStatus) defaultValues.verifiedStatus = 'Unverified';
             
             if (!defaultValues.location) {
-              if (globalStateFilter && globalStateFilter !== 'All') {
-                  defaultValues.location = globalStateFilter;
-              } else if (userProfile?.states && userProfile.states.length === 1 && userProfile.states[0] !== 'All') {
-                  defaultValues.location = userProfile.states[0];
+              if (globalStateFilters.length > 0 && globalStateFilters[0] !== 'All') {
+                  defaultValues.location = globalStateFilters[0];
               }
             }
         } else {
             defaultValues.verifiedStatus = 'Unverified';
-
-            if (globalStateFilter && globalStateFilter !== 'All') {
-              defaultValues.location = globalStateFilter;
-            } else if (userProfile?.states && userProfile.states.length === 1 && userProfile.states[0] !== 'All') {
-                defaultValues.location = userProfile.states[0];
+            if (globalStateFilters.length > 0 && globalStateFilters[0] !== 'All') {
+              defaultValues.location = globalStateFilters[0];
             }
-            
-            if (defaultCategory) {
-              defaultValues.category = defaultCategory;
-              
-              const allCurrentAssets = dataSource === 'cloud' ? cloudAssets : offlineAssets;
-              const categoryAssets = allCurrentAssets.filter(a => a.category === defaultCategory);
-
-              if (categoryAssets.length > 0) {
-                  const currentSheetDef = grant?.sheetDefinitions?.[defaultCategory];
-                  if (currentSheetDef) {
-                      const excludedKeys = new Set<string>([
-                          'id', 'category', 'sn', 'serialNumber', 'assetIdCode', 'assignee', 'location', 'lga', 'site',
-                          'verifiedStatus', 'verifiedDate', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState',
-                          'previousState', 'approvalStatus', 'pendingChanges', 'changeSubmittedBy'
-                      ]);
-
-                      const fieldsToConsider = currentSheetDef.displayFields
-                          .map(f => f.key)
-                          .filter(key => !excludedKeys.has(key));
-                      
-                      fieldsToConsider.forEach(fieldKey => {
-                          const values = categoryAssets.map(a => a[fieldKey as keyof Asset]).filter(val => val !== null && val !== undefined && String(val).trim() !== '');
-                          if (values.length > 0) {
-                              const valueCounts = values.reduce((acc, value) => {
-                                  const v = String(value).trim();
-                                  acc[v] = (acc[v] || 0) + 1;
-                                  return acc;
-                              }, {} as Record<string, number>);
-
-                              const mostCommon = Object.entries(valueCounts).sort((a, b) => b[1] - a[1])[0];
-                              
-                              if (mostCommon && (mostCommon[1] / categoryAssets.length > 0.5)) {
-                                  defaultValues[fieldKey as string] = mostCommon[0];
-                              }
-                          }
-                      });
-                  }
-              }
-            }
+            if (defaultCategory) defaultValues.category = defaultCategory;
         }
         form.reset(defaultValues);
     }
-  }, [isOpen, asset, form, userProfile, defaultCategory, globalStateFilter, dataSource, cloudAssets, offlineAssets, grant]);
-
-  const watchedStatusInForm = form.watch('verifiedStatus');
-  useEffect(() => {
-    if (watchedStatusInForm === 'Verified' && !form.getValues('verifiedDate')) {
-        form.setValue('verifiedDate', new Date().toLocaleDateString('en-CA'));
-    } else if (watchedStatusInForm !== 'Verified' && !initialIsReadOnly) {
-        form.setValue('verifiedDate', '');
-    }
-  }, [watchedStatusInForm, form, initialIsReadOnly]);
-
+  }, [isOpen, asset, form, defaultCategory, globalStateFilters]);
 
   const onSubmit = async (data: AssetFormValues) => {
     setIsSaving(true);
@@ -184,24 +151,6 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
     } catch (e) {
     } finally {
         setIsSaving(false);
-    }
-  };
-
-  const handleRollback = async () => {
-    if (!asset || !asset.previousState) return;
-
-    setIsSaving(true);
-    try {
-      const rolledBackAsset: Asset = sanitizeForFirestore({
-        ...asset,
-        ...asset.previousState,
-        previousState: undefined,
-      });
-      await onSave(rolledBackAsset);
-      onOpenChange(false);
-    } catch (e) {
-    } finally {
-      setIsSaving(false);
     }
   };
 
@@ -221,69 +170,21 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
         lastModifiedBy: { displayName: userProfile.displayName, loginName: userProfile.loginName } 
     };
     
-    // Save locally first
     await saveLocalSettings(settings);
     setAppSettings(settings);
-    
-    // Immediate broadcast to all users
-    try {
-        await updateSettingsFS(settings);
-    } catch (e) {
-        // Falling back to manual sync logic is handled by updateSettingsFS itself if offline
-    }
+    try { await updateSettingsFS(settings); } catch (e) {}
   };
   
     const renderField = (field: DisplayField) => {
         const fieldName = field.key as keyof AssetFormValues;
-        
         let disabled = initialIsReadOnly;
-        const isVerificationField = ['verifiedStatus', 'remarks', 'condition'].includes(fieldName);
+        
+        if (fieldName === 'verifiedDate') disabled = true;
+        if (fieldName === 'location' && !isAdmin) disabled = true; 
+        if (fieldName === 'category' && (!!asset?.id || (!!defaultCategory && !asset?.id))) disabled = true;
 
-        if (!disabled && appSettings) {
-            if (isAdmin) {
-                // Admin Lock Logic
-                if (appSettings.lockAssetList && dataSource === 'cloud') {
-                    if (appSettings.appMode === 'verification') {
-                        if (!isVerificationField) {
-                            disabled = true;
-                        }
-                    } else {
-                        disabled = true;
-                    }
-                }
-            } else {
-                // Non-Admin Permission Logic
-                if (!userProfile?.canEditAssets) {
-                    disabled = true;
-                } else {
-                    // Respect the Global List Lock even if user has edit permission
-                    if (appSettings.lockAssetList) {
-                        // Structural fields are locked if the list is locked.
-                        // If in verification mode, only allow verification fields.
-                        if (appSettings.appMode === 'verification') {
-                            if (!isVerificationField) {
-                                disabled = true;
-                            }
-                        } else {
-                            disabled = true; // In management mode, locked means completely read-only
-                        }
-                    }
-                    // If list is NOT locked, user with canEditAssets can edit all structural fields
-                    // (Their edits will be routed through the Request/Approval system in the save logic)
-                }
-            }
-        }
-
-        // Hardcoded UI constraints
-        if (fieldName === 'verifiedDate') {
-            disabled = true;
-        }
-        if (fieldName === 'location' && !isAdmin) {
-            disabled = true; 
-        }
-        if (fieldName === 'category' && (!!asset?.id || (!!defaultCategory && !asset?.id))) {
-            disabled = true;
-        }
+        const isNumeric = ['sn', 'assetIdCode', 'serialNumber', 'modelNumber', 'usefulLifeYears', 'qty', 'imei', 'remarks'].includes(fieldName);
+        const isFinancial = ['costNgn', 'costUsd', 'cost'].includes(fieldName);
         
         let component;
         switch(fieldName) {
@@ -291,184 +192,150 @@ export function AssetForm({ isOpen, onOpenChange, asset, onSave, isReadOnly: ini
                 const categoryOptions = grant?.sheetDefinitions ? Object.keys(grant.sheetDefinitions) : [];
                 component = (
                      <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                            {categoryOptions.map(sheet => (
-                            <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>
-                            ))}
-                        </SelectContent>
+                        <FormControl><SelectTrigger className="border-none bg-transparent p-0 h-auto font-bold text-base focus:ring-0 shadow-none"><SelectValue placeholder="Select a category" /></SelectTrigger></FormControl>
+                        <SelectContent>{categoryOptions.map(sheet => <SelectItem key={sheet} value={sheet}>{sheet}</SelectItem>)}</SelectContent>
                     </Select>
                 );
-                break;
-            case 'location':
-                component = <FormControl><Input {...form.register(fieldName)} readOnly={disabled} list="location-datalist" /></FormControl>;
                 break;
             case 'condition':
                  component = (
                     <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
-                        <FormControl><SelectTrigger><SelectValue placeholder="Select condition" /></SelectTrigger></FormControl>
-                        <SelectContent>
-                            {ASSET_CONDITIONS.map(cond => <SelectItem key={cond} value={cond}>{cond}</SelectItem>)}
-                        </SelectContent>
+                        <FormControl><SelectTrigger className="border-none bg-transparent p-0 h-auto font-bold text-base focus:ring-0 shadow-none"><SelectValue placeholder="Select condition" /></SelectTrigger></FormControl>
+                        <SelectContent>{ASSET_CONDITIONS.map(cond => <SelectItem key={cond} value={cond}>{cond}</SelectItem>)}</SelectContent>
                     </Select>
                 );
                 break;
             case 'verifiedStatus':
                 component = (
                     <Select onValueChange={form.setValue.bind(form, fieldName)} value={form.getValues(fieldName)} disabled={disabled}>
-                        <FormControl><SelectTrigger className={cn(getStatusClasses(watchedStatus))}><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
+                        <FormControl><SelectTrigger className={cn("border-none bg-transparent p-0 h-auto font-bold text-base focus:ring-0 shadow-none", getStatusClasses(watchedStatus))}><SelectValue placeholder="Select status" /></SelectTrigger></FormControl>
                         <SelectContent>
-                            <SelectItem value="Unverified"><div className="flex items-center"><FileText className="mr-2 h-4 w-4"/>Unverified</div></SelectItem>
-                            <SelectItem value="Verified"><div className="flex items-center"><Check className="mr-2 h-4 w-4"/>Verified</div></SelectItem>
+                            <SelectItem value="Unverified">Unverified</SelectItem>
+                            <SelectItem value="Verified">Verified</SelectItem>
                         </SelectContent>
                     </Select>
                 );
                 break;
             case 'remarks':
-                 component = <FormControl><Textarea {...form.register(fieldName)} readOnly={disabled} /></FormControl>;
+                 component = <FormControl><Textarea {...form.register(fieldName)} readOnly={disabled} className="border-none bg-transparent p-0 min-h-[40px] h-auto font-bold text-base focus-visible:ring-0 shadow-none resize-none" /></FormControl>;
                  break;
             default:
-                 component = <FormControl><Input {...form.register(fieldName)} readOnly={disabled} /></FormControl>;
+                 component = <FormControl><Input {...form.register(fieldName)} readOnly={disabled} className="border-none bg-transparent p-0 h-auto font-bold text-base focus-visible:ring-0 shadow-none" /></FormControl>;
         }
         
         return (
-            <FormField
-                key={fieldName}
-                control={form.control}
-                name={fieldName}
-                render={() => (
-                <FormItem>
-                    <FormLabel>{field.label}</FormLabel>
-                    {component}
-                    <FormMessage />
-                </FormItem>
-                )}
-            />
+            <div key={fieldName} className="px-6 py-4 border-b border-border/40 group last:border-0">
+                <div className="flex justify-between items-center">
+                    <div className="flex-1">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider mb-1 block">
+                            {field.label}
+                        </span>
+                        <div className="flex items-center">
+                            {component}
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                        {isNumeric && <OneTwoIcon />}
+                        {isFinancial && <FxIcon />}
+                    </div>
+                </div>
+            </div>
         );
     };
 
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-5xl w-full flex flex-col max-h-[95vh] p-0 overflow-hidden">
-          <DialogHeader className="p-6 pb-2">
-            <DialogTitle>{asset?.id ? (initialIsReadOnly ? 'View Asset Profile' : 'Edit Asset') : 'Add New Asset'}</DialogTitle>
-            <DialogDescription>
-              {initialIsReadOnly ? 'Reviewing structural data and hierarchical context.' : (asset?.id ? 'Modify asset specifications and verification status.' : 'Register a new asset into the current project.')}
-            </DialogDescription>
-          </DialogHeader>
+        <DialogContent className="max-w-xl w-full flex flex-col h-[100vh] sm:h-[90vh] p-0 overflow-hidden rounded-none sm:rounded-3xl border-none">
+          {/* Custom Header matching image */}
+          <div className="flex items-center justify-between p-4 border-b bg-background sticky top-0 z-20">
+              <div className="flex items-center gap-4">
+                  <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-full">
+                      <ArrowLeft className="h-6 w-6" />
+                  </Button>
+                  <DialogTitle className="text-xl font-bold">{asset?.sn || 'New'}</DialogTitle>
+              </div>
+              <div className="flex items-center gap-4">
+                  {asset?.sourceRow && (
+                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Row {asset.sourceRow}</span>
+                  )}
+                  <Button variant="ghost" size="icon" className="rounded-full"><Share2 className="h-5 w-5 opacity-60" /></Button>
+                  <Button variant="ghost" size="icon" className="rounded-full"><MoreVertical className="h-5 w-5 opacity-60" /></Button>
+              </div>
+          </div>
 
-          <div className="grid md:grid-cols-4 gap-x-0 flex-1 overflow-hidden">
-              <ScrollArea className="md:col-span-3 p-6 pt-2">
-                  <datalist id="location-datalist">
-                      {(appSettings?.locations || []).map(loc => <option key={loc} value={loc} />)}
-                  </datalist>
-                  <Form {...form}>
-                    <form
-                      id="asset-form"
-                      onSubmit={form.handleSubmit(onSubmit)}
-                      className="space-y-6 p-1"
-                    >
+          <ScrollArea className="flex-1 bg-background">
+              <Form {...form}>
+                <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)}>
                     {!sheetDefinition ? (
-                          renderField({ key: 'category', label: 'Category', table: false, quickView: false })
+                        <div className="p-6">
+                            <span className="text-xs font-bold text-muted-foreground uppercase mb-2 block">Category</span>
+                            <div className="p-4 bg-muted/20 rounded-xl">Define a category to start.</div>
+                        </div>
                     ) : (
-                          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                              {sheetDefinition.displayFields.map(field => renderField(field))}
-                          </div>
+                        <div className="flex flex-col">
+                            {sheetDefinition.displayFields.map(field => renderField(field))}
+                        </div>
                     )}
 
                     {asset && (
-                        <Accordion type="single" collapsible className="w-full">
-                            <AccordionItem value="traceability" className="border-none">
-                                <AccordionTrigger className="hover:no-underline p-4 bg-muted/20 rounded-xl">
-                                    <div className="flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground">
-                                        <Info className="h-4 w-4 text-primary" /> Hierarchy & Registry Context
-                                    </div>
-                                </AccordionTrigger>
-                                <AccordionContent className="pt-4 px-4 pb-2 space-y-4">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Register Section</p>
-                                            <div className="flex items-center gap-2 p-2 bg-background border rounded-lg">
-                                                <Hash className="h-3 w-3 text-muted-foreground" />
-                                                <span className="text-xs font-semibold">{asset.majorSection || 'Main Register'}</span>
+                        <div className="px-6 py-8 bg-muted/5 space-y-6">
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-2">Added Assets (By Period)</h4>
+                            <Accordion type="single" collapsible className="w-full">
+                                <AccordionItem value="traceability" className="border-none">
+                                    <AccordionTrigger className="hover:no-underline p-4 bg-background border rounded-2xl shadow-sm">
+                                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
+                                            <Info className="h-4 w-4 text-primary" /> Registry Context
+                                        </div>
+                                    </AccordionTrigger>
+                                    <AccordionContent className="pt-4 space-y-4">
+                                        <div className="grid grid-cols-2 gap-4">
+                                            <div className="p-3 bg-background border rounded-xl">
+                                                <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1">Major Section</p>
+                                                <p className="text-xs font-bold">{asset.majorSection || 'Main Register'}</p>
+                                            </div>
+                                            <div className="p-3 bg-background border rounded-xl">
+                                                <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1">Subsection</p>
+                                                <p className="text-xs font-bold">{asset.subsectionName || 'Base'}</p>
                                             </div>
                                         </div>
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Subsection / Batch</p>
-                                            <div className="flex items-center gap-2 p-2 bg-background border rounded-lg">
-                                                <Clock className="h-3 w-3 text-muted-foreground" />
-                                                <span className="text-xs font-semibold">{asset.rawLabel || 'Standard Entry'}</span>
-                                                {asset.yearBucket && <Badge variant="secondary" className="text-[9px] h-4">{asset.yearBucket}</Badge>}
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Source Registry</p>
-                                            <div className="flex items-center gap-2 p-2 bg-background border rounded-lg">
-                                                <FileJson className="h-3 w-3 text-muted-foreground" />
-                                                <span className="text-xs font-semibold">{asset.sourceSheet || asset.category}</span>
-                                            </div>
-                                        </div>
-                                        <div className="space-y-1">
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Original Row Index</p>
-                                            <div className="flex items-center gap-2 p-2 bg-background border rounded-lg">
-                                                <Hash className="h-3 w-3 text-muted-foreground" />
-                                                <span className="text-xs font-mono">{asset.sourceRow || 'N/A'}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    {asset.originalRowData && isAdmin && (
-                                        <div className="space-y-1 mt-2">
-                                            <p className="text-[10px] font-bold text-muted-foreground uppercase">Raw Row Data (JSON)</p>
-                                            <pre className="text-[9px] bg-muted/50 p-2 rounded-lg overflow-x-auto font-mono text-muted-foreground/80">
-                                                {asset.originalRowData}
-                                            </pre>
-                                        </div>
-                                    )}
-                                </AccordionContent>
-                            </AccordionItem>
-                        </Accordion>
+                                    </AccordionContent>
+                                </AccordionItem>
+                            </Accordion>
+                        </div>
                     )}
-                    </form>
-                  </Form>
-              </ScrollArea>
-              <div className="hidden md:block md:col-span-1 border-l bg-muted/10">
-                  <ScrollArea className="h-full p-6 pt-2">
-                      <AssetChecklist 
-                        values={form.watch()} 
-                        displayFields={sheetDefinition?.displayFields} 
-                        isAdmin={isAdmin}
-                        onEdit={() => setIsColumnSheetOpen(true)}
-                      />
-                  </ScrollArea>
-              </div>
-          </div>
+                </form>
+              </Form>
+          </ScrollArea>
           
-          <DialogFooter className="mt-auto p-6 border-t sm:justify-between bg-muted/5">
-            {asset?.previousState && !initialIsReadOnly && (
-              <Button
-                variant="ghost"
-                type="button"
-                className="text-destructive hover:text-destructive justify-start"
-                onClick={handleRollback}
-                disabled={isSaving}
+          <div className="grid grid-cols-2 border-t bg-background">
+              <Button 
+                variant="ghost" 
+                className="h-14 font-black uppercase text-[11px] tracking-widest text-primary rounded-none border-r"
+                onClick={onPrevious}
+                disabled={!onPrevious}
               >
-                <RotateCcw className="mr-2 h-4 w-4" />
-                Undo Last Change
+                  Previous
               </Button>
-            )}
-            <div className="flex sm:justify-end gap-2 ml-auto">
-              <DialogClose asChild>
-                <Button variant="outline">Close</Button>
-              </DialogClose>
-              {!initialIsReadOnly && (
-                <Button type="submit" form="asset-form" disabled={isSaving || !form.formState.isValid}>
-                    {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                    Save Changes
-                </Button>
-              )}
-            </div>
-          </DialogFooter>
+              <Button 
+                variant="ghost" 
+                className="h-14 font-black uppercase text-[11px] tracking-widest text-primary rounded-none"
+                onClick={onNext}
+                disabled={!onNext}
+              >
+                  Next
+              </Button>
+          </div>
+
+          {!initialIsReadOnly && (
+              <div className="p-4 bg-muted/10 border-t flex justify-end gap-2">
+                  <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
+                  <Button type="submit" form="asset-form" disabled={isSaving}>
+                      {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Check className="h-4 w-4 mr-2" />}
+                      Save Profile
+                  </Button>
+              </div>
+          )}
         </DialogContent>
       </Dialog>
 
