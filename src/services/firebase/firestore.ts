@@ -70,6 +70,7 @@ export const FirestoreService = {
 
   /**
    * Single record update with mandatory Zod validation.
+   * Blocks non-compliant data at the boundary.
    */
   async saveAsset(asset: Asset): Promise<void> {
     if (!db) return;

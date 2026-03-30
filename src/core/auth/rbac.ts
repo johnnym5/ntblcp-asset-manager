@@ -17,6 +17,7 @@ export type Action =
 
 /**
  * Checks if a user has the base permission for an action.
+ * This is role-based and does not consider data-level scoping.
  */
 export function hasPermission(user: AuthorizedUser, action: Action): boolean {
   const role = user.role;
@@ -42,17 +43,20 @@ export function hasPermission(user: AuthorizedUser, action: Action): boolean {
 
 /**
  * Validates if an operation on a specific asset is within the user's regional scope.
+ * Supports State-level and Zonal-level inheritance.
  */
 export function isWithinScope(user: AuthorizedUser, asset: Asset): boolean {
+  // Admins or users with global scope bypass regional checks
   if (user.role === 'ADMIN' || user.states.includes('All')) return true;
 
   const assetLocation = asset.location || '';
   
-  // Direct state match
+  // 1. Direct State Match
   if (user.states.includes(assetLocation)) return true;
 
-  // Zonal inheritance check
-  // If user is assigned a zone, they have scope for all states in that zone
+  // 2. Zonal Inheritance Check
+  // If a user is assigned a Geopolitical Zone (e.g. "North Central"), 
+  // they have scope for all states within that zone.
   for (const assignedStateOrZone of user.states) {
     const zoneStates = NIGERIAN_ZONES[assignedStateOrZone as keyof typeof NIGERIAN_ZONES];
     if (zoneStates && zoneStates.includes(assetLocation)) {
@@ -65,6 +69,7 @@ export function isWithinScope(user: AuthorizedUser, asset: Asset): boolean {
 
 /**
  * Aggregated check for UI and Service layers.
+ * Evaluates both role-based and scope-based constraints.
  */
 export function canPerform(user: AuthorizedUser, action: Action, asset?: Asset): boolean {
   if (!hasPermission(user, action)) return false;
