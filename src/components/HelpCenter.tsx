@@ -1,7 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview HelpCenter - Contextual Guidance & Support Hub.
+ * Phase 32: Added keyboard shortcut guide for Advanced Mode.
  */
 
 import React, { useState } from 'react';
@@ -11,7 +13,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import { 
   Search, 
-  HelpCircle, 
   BookOpen,
   ChevronRight,
   Database,
@@ -19,13 +20,12 @@ import {
   Cloud,
   ShieldCheck,
   Filter,
-  ArrowUpDown,
-  Download,
-  Settings,
   AlertCircle,
-  FileText
+  Command,
+  Keyboard
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAppState } from '@/contexts/app-state-context';
 
 interface HelpTopic {
   id: string;
@@ -107,7 +107,7 @@ const TOPICS: HelpTopic[] = [
     title: 'Filtering Records',
     icon: Filter,
     whatItDoes: "Show only the records you need by narrowing the list.",
-    whenToUse: "Use filters when the list is too long or you want to focus on a specific location or condition.",
+    whenToUse: "Use filters when the list is too long or you want to focus on a specific group.",
     howToUse: [
       "Open the Logic Engine panel.",
       "Choose one or more fields (like State or Condition).",
@@ -127,6 +127,7 @@ interface HelpCenterProps {
 }
 
 export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
+  const { appSettings } = useAppState();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTopic, setSelectedTopic] = useState<HelpTopic | null>(null);
 
@@ -134,6 +135,8 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
     t.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
     t.whatItDoes.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const isAdvanced = appSettings?.uxMode === 'advanced';
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
@@ -156,7 +159,7 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
           <div className="relative group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
             <Input 
-              placeholder="Search help by keyword..." 
+              placeholder="Search help pulse..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10 h-12 rounded-2xl bg-background border-none shadow-inner text-sm font-medium"
@@ -165,7 +168,7 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
         </div>
 
         <ScrollArea className="flex-1 bg-background">
-          <div className="p-8 space-y-6">
+          <div className="p-8 space-y-8">
             {selectedTopic ? (
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                 <Button variant="ghost" onClick={() => setSelectedTopic(null)} className="p-0 h-auto font-black uppercase text-[10px] text-primary hover:bg-transparent transition-all hover:translate-x-[-4px]">
@@ -220,33 +223,62 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
                 </div>
               </div>
             ) : (
-              <div className="space-y-3">
-                {filteredTopics.map(topic => (
-                  <button 
-                    key={topic.id}
-                    onClick={() => setSelectedTopic(topic)}
-                    className="w-full text-left p-5 rounded-3xl border-2 border-border/40 hover:border-primary/20 bg-card transition-all group flex items-center justify-between shadow-sm active:scale-95"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="p-3 bg-muted rounded-2xl group-hover:bg-primary/10 transition-colors shadow-inner">
-                        <topic.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+              <>
+                {isAdvanced && (
+                  <div className="space-y-4 animate-in zoom-in-95 duration-500">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-2">
+                      <Keyboard className="h-3.5 w-3.5" /> Fast Work Shortcuts
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="p-4 rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase opacity-60">Dashboard</span>
+                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5">D</Badge>
                       </div>
-                      <div className="flex flex-col">
-                        <span className="text-sm font-black uppercase tracking-tight">{topic.title}</span>
-                        <span className="text-[9px] font-bold text-muted-foreground opacity-60 uppercase tracking-tight line-clamp-1">{topic.whatItDoes}</span>
+                      <div className="p-4 rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase opacity-60">Registry</span>
+                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5">R</Badge>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase opacity-60">Search</span>
+                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5">⌘K</Badge>
+                      </div>
+                      <div className="p-4 rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-between">
+                        <span className="text-[9px] font-black uppercase opacity-60">Sync Pulse</span>
+                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5">S</Badge>
                       </div>
                     </div>
-                    <ChevronRight className="h-4 w-4 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-                  </button>
-                ))}
-              </div>
+                  </div>
+                )}
+
+                <div className="space-y-3">
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-60 px-1">Browse Topics</h4>
+                  {filteredTopics.map(topic => (
+                    <button 
+                      key={topic.id}
+                      onClick={() => setSelectedTopic(topic)}
+                      className="w-full text-left p-5 rounded-3xl border-2 border-border/40 hover:border-primary/20 bg-card transition-all group flex items-center justify-between shadow-sm active:scale-95"
+                    >
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-muted rounded-2xl group-hover:bg-primary/10 transition-colors shadow-inner">
+                          <topic.icon className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                        </div>
+                        <div className="flex flex-col">
+                          <span className="text-sm font-black uppercase tracking-tight">{topic.title}</span>
+                          <span className="text-[9px] font-bold text-muted-foreground opacity-60 uppercase tracking-tight line-clamp-1">{topic.whatItDoes}</span>
+                        </div>
+                      </div>
+                      <ChevronRight className="h-4 w-4 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                    </button>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </ScrollArea>
 
         <div className="p-8 border-t bg-muted/10 text-center">
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40">
-            Registry Intelligence Pulse v5.0.2
+            Registry Intelligence Pulse v5.0.3
           </p>
         </div>
       </SheetContent>

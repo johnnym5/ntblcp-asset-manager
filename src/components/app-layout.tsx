@@ -1,13 +1,14 @@
+
 'use client';
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
- * Phase 29: Hardened for Fluid Motion & Continuous Page Orchestration.
+ * Phase 32: Integrated Global Keyboard Orchestration & Mode-Aware Visuals.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
@@ -32,7 +33,9 @@ import {
   Database,
   Globe,
   HelpCircle,
-  X
+  X,
+  Search,
+  Command
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -52,38 +55,66 @@ interface NavItem {
   href: string;
   icon: React.ReactNode;
   adminOnly?: boolean;
+  shortcut?: string;
 }
 
 const PRIMARY_NAV: NavItem[] = [
-  { label: 'Dashboard', href: '/', icon: <LayoutDashboard className="h-4 w-4" /> },
-  { label: 'Asset Registry', href: '/assets', icon: <Boxes className="h-4 w-4" /> },
-  { label: 'Records to Review', href: '/verify', icon: <CheckCircle2 className="h-4 w-4" /> },
-  { label: 'Upload Center', href: '/import', icon: <FileUp className="h-4 w-4" /> },
+  { label: 'Pulse', href: '/', icon: <LayoutDashboard className="h-4 w-4" />, shortcut: 'D' },
+  { label: 'Registry', href: '/assets', icon: <Boxes className="h-4 w-4" />, shortcut: 'R' },
+  { label: 'Review', href: '/verify', icon: <CheckCircle2 className="h-4 w-4" />, shortcut: 'V' },
+  { label: 'Upload', href: '/import', icon: <FileUp className="h-4 w-4" />, shortcut: 'U' },
 ];
 
 const AUDIT_NAV: NavItem[] = [
-  { label: 'Audit Reports', href: '/reports', icon: <FileText className="h-4 w-4" /> },
-  { label: 'Activity History', href: '/audit-log', icon: <History className="h-4 w-4" /> },
-  { label: 'Pending Sync', href: '/sync-queue', icon: <ListTodo className="h-4 w-4" /> },
+  { label: 'Reports', href: '/reports', icon: <FileText className="h-4 w-4" /> },
+  { label: 'Ledger', href: '/audit-log', icon: <History className="h-4 w-4" />, shortcut: 'L' },
+  { label: 'Sync Queue', href: '/sync-queue', icon: <ListTodo className="h-4 w-4" />, shortcut: 'Q' },
 ];
 
 const ADMIN_NAV: NavItem[] = [
-  { label: 'Users & Roles', href: '/users', icon: <Users className="h-4 w-4" />, adminOnly: true },
-  { label: 'System Health', href: '/infrastructure', icon: <Monitor className="h-4 w-4" />, adminOnly: true },
-  { label: 'Settings', href: '/settings', icon: <Settings className="h-4 w-4" />, adminOnly: true },
+  { label: 'Identities', href: '/users', icon: <Users className="h-4 w-4" />, adminOnly: true },
+  { label: 'System', href: '/infrastructure', icon: <Monitor className="h-4 w-4" />, adminOnly: true },
+  { label: 'Settings', href: '/settings', icon: <Settings className="h-4 w-4" />, adminOnly: true, shortcut: ',' },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { userProfile, logout } = useAuth();
-  const { isOnline, setIsOnline, isSyncing, assets } = useAppState();
+  const { isOnline, setIsOnline, isSyncing, assets, appSettings, refreshRegistry } = useAppState();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
 
+  // Global Keyboard Pulse
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        // Trigger global search or command pulse
+        toast({ title: "Command Pulse", description: "Global registry search initiated." });
+      }
+      
+      // Prevent shortcut triggers if user is typing in an input
+      if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+
+      if (e.key === 'r') router.push('/assets');
+      if (e.key === 'd') router.push('/');
+      if (e.key === 'u') router.push('/import');
+      if (e.key === 'v') router.push('/verify');
+      if (e.key === 'q') router.push('/sync-queue');
+      if (e.key === 's') refreshRegistry();
+      if (e.key === '?') setIsHelpOpen(true);
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [router, refreshRegistry]);
+
   const isAdmin = userProfile?.isAdmin;
   const pendingCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
+  const isAdvanced = appSettings?.uxMode === 'advanced';
 
   const NavGroup = ({ items, title }: { items: NavItem[], title?: string }) => {
     const visibleItems = items.filter(i => !i.adminOnly || isAdmin);
@@ -111,6 +142,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="z-10 flex items-center gap-3 w-full">
               {item.icon}
               <span className="flex-1">{item.label}</span>
+              {isAdvanced && item.shortcut && (
+                <span className="text-[8px] font-mono opacity-20 group-hover:opacity-60 border px-1 rounded-sm">{item.shortcut}</span>
+              )}
             </div>
             {pathname === item.href && (
               <motion.div 
@@ -170,7 +204,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             className="w-full justify-start font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all group"
           >
             <HelpCircle className="mr-3 h-4 w-4 group-hover:scale-110 transition-transform" /> Support Hub
+            {isAdvanced && <span className="ml-auto text-[8px] font-mono opacity-20 border px-1 rounded-sm">?</span>}
           </Button>
+          
           <div className="p-4 rounded-2xl bg-muted/20 border-2 border-dashed space-y-3">
             <div className="flex items-center justify-between text-[9px] font-black uppercase tracking-widest opacity-40">
               <span>Security Pulse</span>
@@ -240,6 +276,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2 sm:gap-4">
+            {isAdvanced && (
+              <Button variant="outline" size="sm" className="hidden md:flex h-10 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 bg-muted/30 border-2">
+                <Command className="h-3 w-3" /> Pulse Command <span className="opacity-40 border px-1 rounded-sm ml-1">⌘K</span>
+              </Button>
+            )}
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -301,7 +343,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               exit={{ opacity: 0, y: -10, scale: 0.99 }}
               transition={{ 
                 duration: 0.4, 
-                ease: [0.22, 1, 0.36, 1] /* Modern Premium Easing */
+                ease: [0.22, 1, 0.36, 1] 
               }}
               className="p-4 md:p-8 lg:p-10"
             >
