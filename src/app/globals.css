@@ -4,9 +4,8 @@
 
 @layer base {
   :root {
-    /* Material You - Forward Mode (Light) */
-    /* Primary: Sophisticated Gold Tint */
-    --background: 45 20% 98%;
+    /* Material You - Gold Forward Mode */
+    --background: 45 30% 98%;
     --foreground: 45 10% 10%;
     
     --card: 0 0% 100%;
@@ -15,57 +14,56 @@
     --popover: 0 0% 100%;
     --popover-foreground: 45 10% 10%;
     
-    --primary: 45 90% 45%;
+    --primary: 45 95% 40%;
     --primary-foreground: 45 50% 10%;
     
-    --secondary: 45 15% 92%;
-    --secondary-foreground: 45 90% 20%;
+    --secondary: 45 20% 92%;
+    --secondary-foreground: 45 90% 15%;
     
-    --muted: 45 12% 95%;
-    --muted-foreground: 45 5% 45%;
+    --muted: 45 15% 94%;
+    --muted-foreground: 45 5% 40%;
     
-    --accent: 180 100% 25%;
+    --accent: 180 100% 22%;
     --accent-foreground: 210 40% 98%;
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     
-    --border: 45 10% 90%;
-    --input: 45 10% 90%;
-    --ring: 45 90% 45%;
+    --border: 45 15% 88%;
+    --input: 45 15% 88%;
+    --ring: 45 95% 40%;
     
-    /* Material 3 uses larger radii */
     --radius: 1.5rem;
   }
   .dark {
-    /* Material You - AMOLED Night Mode */
-    --background: 0 0% 0%; /* Pure Black for AMOLED */
+    /* Material You - Gold AMOLED Night Mode */
+    --background: 0 0% 0%; /* Pure Black */
     --foreground: 45 10% 95%;
     
-    --card: 45 10% 5%;
+    --card: 45 10% 4%;
     --card-foreground: 45 10% 95%;
     
     --popover: 45 10% 3%;
     --popover-foreground: 45 10% 95%;
     
-    --primary: 45 80% 60%;
-    --primary-foreground: 45 50% 10%;
+    --primary: 45 90% 60%;
+    --primary-foreground: 45 50% 5%;
     
-    --secondary: 45 10% 12%;
+    --secondary: 45 10% 10%;
     --secondary-foreground: 45 10% 95%;
     
-    --muted: 45 10% 10%;
-    --muted-foreground: 45 5% 65%;
+    --muted: 45 10% 8%;
+    --muted-foreground: 45 5% 60%;
     
     --accent: 180 80% 45%;
-    --accent-foreground: 45 10% 10%;
+    --accent-foreground: 45 10% 5%;
     
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     
-    --border: 45 10% 15%;
-    --input: 45 10% 15%;
-    --ring: 45 80% 60%;
+    --border: 45 10% 12%;
+    --input: 45 10% 12%;
+    --ring: 45 90% 60%;
   }
 }
 
@@ -77,35 +75,34 @@
     @apply bg-background text-foreground font-body antialiased;
   }
   h1, h2, h3, h4, h5, h6 {
-    @apply font-headline;
+    @apply font-headline font-black uppercase tracking-tight;
   }
 }
 
 @layer utilities {
   .custom-scrollbar::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 6px;
+    height: 6px;
   }
   .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-muted/30;
+    @apply bg-transparent;
   }
   .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-primary/10 rounded-full hover:bg-primary/25 transition-colors border-4 border-transparent bg-clip-padding;
+    @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-colors;
+  }
+  
+  /* Operational Surface Utilities */
+  .surface-1 { @apply bg-primary/[0.04]; }
+  .surface-2 { @apply bg-primary/[0.07]; }
+  .surface-3 { @apply bg-primary/[0.10]; }
+  .surface-4 { @apply bg-primary/[0.12]; }
+  .surface-5 { @apply bg-primary/[0.14]; }
+
+  .glass-card {
+    @apply bg-card/70 backdrop-blur-xl border border-white/10 shadow-2xl;
+  }
+
+  .tactile-pulse {
+    @apply active:scale-95 transition-transform duration-200;
   }
 }
-
-/* Operational Polish Classes */
-.registry-shadow {
-  box-shadow: 0 35px 60px -15px rgba(0, 0, 0, 0.1);
-}
-
-.glass-card {
-  @apply bg-card/60 backdrop-blur-2xl border-2 border-white/5;
-}
-
-/* Material You Elevation Surfaces */
-.surface-1 { @apply bg-primary/[0.05]; }
-.surface-2 { @apply bg-primary/[0.08]; }
-.surface-3 { @apply bg-primary/[0.11]; }
-.surface-4 { @apply bg-primary/[0.12]; }
-.surface-5 { @apply bg-primary/[0.14]; }

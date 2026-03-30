@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - High-Performance Asset Browser.
- * Operational Overhaul: Aligned with "Glass Cockpit" UI/UX requirements.
+ * Phase 13: Refined Grid Card following "Mobile-First Operational" goals.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -20,21 +20,16 @@ import {
   Loader2, 
   FileDown, 
   FileUp, 
-  Settings2, 
   LayoutGrid, 
   List, 
-  ArrowLeft,
-  MoreVertical,
   MapPin,
   Tag,
-  ShieldCheck,
-  Clock,
-  CheckCircle2,
-  Trash2,
+  User,
+  Hash,
   ChevronRight,
-  Database,
   ChevronLeft,
-  X
+  X,
+  Info
 } from 'lucide-react';
 import { RegistryTable } from '@/modules/registry/components/RegistryTable';
 import { AssetForm } from '@/components/asset-form';
@@ -47,10 +42,8 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import { ExcelService } from '@/services/excel-service';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export type SortConfig = {
   key: keyof Asset | 'sn';
@@ -60,13 +53,13 @@ export type SortConfig = {
 const ITEMS_PER_PAGE = 25;
 
 export default function AssetRegistryPage() {
-  const { assets, searchTerm, setSearchTerm, refreshRegistry, settingsLoaded, activeGrantId, appSettings, isOnline } = useAppState();
+  const { assets, searchTerm, setSearchTerm, refreshRegistry, settingsLoaded, activeGrantId, appSettings } = useAppState();
   const { userProfile, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // View States
-  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('grid');
   const [selectedIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
   const [showSearch, setShowSearch] = useState(false);
@@ -386,8 +379,8 @@ export default function AssetRegistryPage() {
         <div className="flex items-center justify-between px-2 h-14 shrink-0">
           <div className="flex items-center gap-4">
             <h2 className="text-xl font-black tracking-tight uppercase truncate max-w-[200px] md:max-w-md">{activeProjectName}</h2>
-            <Badge variant="outline" className="h-6 px-2 text-[10px] font-black tracking-tighter border-primary/20 bg-primary/5 text-primary rounded-full">
-              {filteredAndSortedAssets.length} PULSES
+            <Badge variant="outline" className="h-6 px-2 text-[9px] font-black tracking-tighter border-primary/20 bg-primary/5 text-primary rounded-full">
+              {filteredAndSortedAssets.length} RECORDS
             </Badge>
           </div>
 
@@ -396,7 +389,7 @@ export default function AssetRegistryPage() {
               variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
               size="sm" 
               onClick={() => setViewMode('list')}
-              className="h-8 w-8 p-0 rounded-lg"
+              className="h-8 w-8 p-0 rounded-lg tactile-pulse"
             >
               <List className="h-4 w-4" />
             </Button>
@@ -404,7 +397,7 @@ export default function AssetRegistryPage() {
               variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
               size="sm" 
               onClick={() => setViewMode('grid')}
-              className="h-8 w-8 p-0 rounded-lg"
+              className="h-8 w-8 p-0 rounded-lg tactile-pulse"
             >
               <LayoutGrid className="h-4 w-4" />
             </Button>
@@ -423,15 +416,15 @@ export default function AssetRegistryPage() {
                 className="bg-primary text-primary-foreground p-3 rounded-2xl flex items-center justify-between shadow-xl"
               >
                 <div className="flex items-center gap-3">
-                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 h-8 w-8" onClick={() => setSelectedAssetIds(new Set())}>
+                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 h-8 w-8 rounded-lg" onClick={() => setSelectedAssetIds(new Set())}>
                     <X className="h-4 w-4" />
                   </Button>
                   <span className="font-black uppercase text-[10px] tracking-widest">{selectedIds.size} SELECTED</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={handleBulkVerify} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10">VERIFY</Button>
-                  <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10">MOVE</Button>
-                  <Button variant="ghost" size="sm" onClick={handleBulkDelete} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-red-500/20">PURGE</Button>
+                  <Button variant="ghost" size="sm" onClick={handleBulkVerify} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10 tactile-pulse">VERIFY</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10 tactile-pulse">MOVE</Button>
+                  <Button variant="ghost" size="sm" onClick={handleBulkDelete} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-red-500/20 tactile-pulse">PURGE</Button>
                 </div>
               </motion.div>
             ) : showSearch ? (
@@ -495,16 +488,22 @@ export default function AssetRegistryPage() {
                     <motion.div key={asset.id} layout>
                       <Card 
                         className={cn(
-                          "border-2 border-border/40 hover:border-primary/20 transition-all rounded-3xl overflow-hidden group cursor-pointer shadow-md",
-                          selectedIds.has(asset.id) ? "bg-primary/5 border-primary/20 shadow-primary/5" : "bg-card hover:shadow-xl"
+                          "border-2 border-border/40 hover:border-primary/20 transition-all rounded-[1.5rem] overflow-hidden group cursor-pointer shadow-md tactile-pulse",
+                          selectedIds.has(asset.id) ? "bg-primary/5 border-primary/20 shadow-primary/5" : "bg-card"
                         )}
                         onClick={() => handleInspect(asset)}
                       >
-                        <CardContent className="p-5 space-y-4">
-                          <div className="flex justify-between items-start">
+                        <CardContent className="p-0">
+                          {/* Card Header Logic */}
+                          <div className="p-5 border-b border-dashed border-border/40 flex justify-between items-start gap-4">
                             <div className="flex flex-col gap-1.5 min-w-0">
-                              <h3 className="font-black text-sm uppercase tracking-tight truncate leading-none">{asset.description || asset.name}</h3>
-                              <span className="text-[9px] font-mono text-muted-foreground uppercase opacity-60 tracking-widest truncate">TAG: {asset.assetIdCode || 'UNSET'}</span>
+                              <h3 className="font-black text-sm uppercase tracking-tight truncate leading-none text-foreground">{asset.description || asset.name}</h3>
+                              <div className="flex items-center gap-2">
+                                <Badge variant="secondary" className="h-5 px-1.5 text-[8px] font-black uppercase tracking-tighter bg-muted border border-border/40">
+                                  S/N: {asset.serialNumber || 'UNSET'}
+                                </Badge>
+                                <span className="text-[8px] font-mono font-bold text-muted-foreground uppercase opacity-60">ROW: {asset.importMetadata?.rowNumber || 'MAN'}</span>
+                              </div>
                             </div>
                             <Badge variant="outline" className={cn(
                               "text-[8px] font-black uppercase tracking-widest h-6 px-2 shrink-0 border-2 rounded-lg shadow-sm",
@@ -513,12 +512,37 @@ export default function AssetRegistryPage() {
                               {asset.status}
                             </Badge>
                           </div>
-                          <div className="pt-4 border-t border-dashed space-y-2">
-                            <div className="flex items-center gap-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                              <MapPin className="h-3.5 w-3.5 text-primary opacity-40 shrink-0" /> <span className="truncate">{asset.location}</span>
+
+                          {/* Info Stacks following Design Goal */}
+                          <div className="p-5 space-y-4">
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
+                                  <MapPin className="h-2.5 w-2.5" /> Scope
+                                </div>
+                                <p className="text-[10px] font-black uppercase truncate text-foreground">{asset.location || 'GLOBAL'}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
+                                  <User className="h-2.5 w-2.5" /> Assignee
+                                </div>
+                                <p className="text-[10px] font-black uppercase truncate text-foreground">{asset.custodian || 'UNASSIGNED'}</p>
+                              </div>
                             </div>
-                            <div className="flex items-center gap-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
-                              <Tag className="h-3.5 w-3.5 text-primary opacity-40 shrink-0" /> <span className="truncate">{asset.category}</span>
+
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
+                                  <Tag className="h-2.5 w-2.5" /> Registry ID
+                                </div>
+                                <p className="text-[10px] font-mono font-bold uppercase truncate text-primary">{asset.assetIdCode || 'UNSET'}</p>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
+                                  <Info className="h-2.5 w-2.5" /> Category
+                                </div>
+                                <p className="text-[10px] font-black uppercase truncate text-foreground/60">{asset.category}</p>
+                              </div>
                             </div>
                           </div>
                         </CardContent>
@@ -539,7 +563,7 @@ export default function AssetRegistryPage() {
                 </div>
                 <div className="space-y-1">
                   <h3 className="text-xl font-black uppercase tracking-widest">Registry Silent</h3>
-                  <p className="text-[10px] font-bold max-w-[200px] mx-auto uppercase tracking-widest opacity-60">Zero pulses discovered in current logic filter.</p>
+                  <p className="text-[10px] font-bold max-w-[200px] mx-auto uppercase tracking-widest opacity-60">Zero records discovered in current pulse.</p>
                 </div>
               </motion.div>
             )}
@@ -554,7 +578,7 @@ export default function AssetRegistryPage() {
               size="icon" 
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(prev => prev - 1)}
-              className="h-10 w-10 rounded-xl"
+              className="h-10 w-10 rounded-xl tactile-pulse"
             >
               <ChevronLeft className="h-4 w-4" />
             </Button>
@@ -566,32 +590,32 @@ export default function AssetRegistryPage() {
               size="icon" 
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(prev => prev + 1)}
-              className="h-10 w-10 rounded-xl"
+              className="h-10 w-10 rounded-xl tactile-pulse"
             >
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
 
           <div className="flex flex-1 items-center justify-around gap-1">
-            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl" onClick={() => setShowSearch(true)}>
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl tactile-pulse" onClick={() => setShowSearch(true)}>
               <Search className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl relative" onClick={() => setIsFilterOpen(true)}>
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl relative tactile-pulse" onClick={() => setIsFilterOpen(true)}>
               <Filter className="h-5 w-5" />
               {Object.values(filters).flat().length > 0 && (
                 <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-primary rounded-full shadow-lg border-2 border-white" />
               )}
             </Button>
             <Button 
-              className="h-12 w-12 rounded-2xl font-black shadow-xl shadow-primary/20 transition-all active:scale-95 bg-primary"
+              className="h-12 w-12 rounded-2xl font-black shadow-xl shadow-primary/20 transition-all tactile-pulse bg-primary"
               onClick={handleCreateNew}
             >
               <Plus className="h-6 w-6" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl" onClick={() => fileInputRef.current?.click()}>
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl tactile-pulse" onClick={() => fileInputRef.current?.click()}>
               <FileUp className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl" onClick={handleExportRegistry}>
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl tactile-pulse" onClick={handleExportRegistry}>
               <FileDown className="h-5 w-5" />
             </Button>
           </div>

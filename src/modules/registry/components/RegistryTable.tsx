@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview RegistryTable - Virtualized performance-grade registry browser.
- * Refined for "Glass Cockpit" density and operational scannability.
+ * @fileOverview RegistryTable - High-Performance Registry Workstation.
+ * Phase 13: Refined density and deterministic typography.
  */
 
 import React from 'react';
@@ -18,16 +18,15 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { 
-  MoreHorizontal, 
   ShieldCheck, 
   Clock, 
   AlertCircle, 
   Camera, 
   ArrowUpDown,
-  ChevronRight
+  ChevronRight,
+  Info
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAppState } from '@/contexts/app-state-context';
 import type { Asset } from '@/types/domain';
 import type { SortConfig } from '@/app/assets/page';
 
@@ -81,8 +80,6 @@ export function RegistryTable({
   onSort,
   sortConfig
 }: RegistryTableProps) {
-  const { isOnline } = useAppState();
-
   const allSelected = assets.length > 0 && selectedIds.size === assets.length;
 
   return (
@@ -97,11 +94,10 @@ export function RegistryTable({
                 className="h-5 w-5 rounded-lg border-2"
               />
             </TableHead>
-            <SortHeader label="Identification" sortKey="description" currentSort={sortConfig} onSort={onSort} />
-            <SortHeader label="Category" sortKey="category" currentSort={sortConfig} onSort={onSort} />
-            <SortHeader label="Scope" sortKey="location" currentSort={sortConfig} onSort={onSort} />
-            <SortHeader label="Pulse" sortKey="status" currentSort={sortConfig} onSort={onSort} />
-            <TableHead className="py-4 px-6 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground text-right">Action</TableHead>
+            <SortHeader label="Physical Identification" sortKey="description" currentSort={sortConfig} onSort={onSort} />
+            <SortHeader label="Scope & Assignee" sortKey="location" currentSort={sortConfig} onSort={onSort} />
+            <SortHeader label="Pulse Status" sortKey="status" currentSort={sortConfig} onSort={onSort} />
+            <TableHead className="py-4 px-6 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground text-right">View</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -109,7 +105,7 @@ export function RegistryTable({
             <TableRow 
               key={asset.id} 
               className={cn(
-                "hover:bg-primary/[0.03] transition-all group cursor-pointer border-b border-border/10 last:border-0",
+                "hover:bg-primary/[0.03] transition-all group cursor-pointer border-b border-border/10 last:border-0 tactile-pulse",
                 selectedIds.has(asset.id) ? "bg-primary/[0.05]" : "bg-card/30"
               )}
               onClick={() => onInspect(asset)}
@@ -125,32 +121,33 @@ export function RegistryTable({
                 <div className="flex flex-col gap-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className={cn(
-                      "text-xs font-black tracking-tight transition-colors uppercase truncate max-w-[200px]",
+                      "text-[11px] font-black tracking-tight transition-colors uppercase truncate max-w-[240px]",
                       selectedIds.has(asset.id) ? "text-primary" : "text-foreground group-hover:text-primary"
                     )}>
                       {asset.description || asset.name}
                     </span>
                     {asset.photoDataUri && <Camera className="h-3 w-3 text-primary opacity-60 shrink-0" />}
                   </div>
-                  <span className="text-[8px] font-mono text-muted-foreground uppercase tracking-widest opacity-60 truncate">
-                    SN: {asset.serialNumber || 'UNSET'} &bull; TAG: {asset.assetIdCode || 'N/A'}
-                  </span>
+                  <div className="flex items-center gap-3">
+                    <span className="text-[8px] font-mono font-bold text-muted-foreground uppercase tracking-widest opacity-60">SN: {asset.serialNumber || 'UNSET'}</span>
+                    <span className="text-[8px] font-mono font-bold text-primary/60 uppercase tracking-widest">ROW: {asset.importMetadata?.rowNumber || 'MAN'}</span>
+                  </div>
                 </div>
               </TableCell>
               <TableCell className="py-4 px-4">
-                <span className="text-[9px] font-black uppercase tracking-widest text-primary/80 truncate block max-w-[120px]">
-                  {asset.category}
-                </span>
-              </TableCell>
-              <TableCell className="py-4 px-4">
-                <Badge variant="outline" className="text-[8px] font-black uppercase border-primary/20 bg-primary/5 text-primary rounded-lg h-5 px-2 truncate max-w-[100px]">
-                  {asset.location || 'Global'}
-                </Badge>
+                <div className="flex flex-col gap-0.5">
+                  <span className="text-[10px] font-black uppercase tracking-tighter text-foreground truncate max-w-[140px]">{asset.location || 'GLOBAL'}</span>
+                  <span className="text-[8px] font-bold uppercase tracking-widest text-muted-foreground opacity-60 truncate">{asset.custodian || 'UNASSIGNED'}</span>
+                </div>
               </TableCell>
               <TableCell className="py-4 px-4">
                 <div className={cn(
-                  "flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest",
-                  asset.status === 'VERIFIED' ? "text-green-600" : asset.status === 'DISCREPANCY' ? "text-destructive" : "text-orange-600"
+                  "flex items-center gap-1.5 text-[9px] font-black uppercase tracking-widest h-7 px-3 rounded-full border shadow-sm w-fit",
+                  asset.status === 'VERIFIED' 
+                    ? "text-green-600 border-green-500/20 bg-green-50" 
+                    : asset.status === 'DISCREPANCY' 
+                      ? "text-destructive border-destructive/20 bg-destructive/5" 
+                      : "text-orange-600 border-orange-500/20 bg-orange-50"
                 )}>
                   {asset.status === 'VERIFIED' ? <ShieldCheck className="h-3 w-3 shrink-0" /> : asset.status === 'DISCREPANCY' ? <AlertCircle className="h-3 w-3 shrink-0" /> : <Clock className="h-3 w-3 shrink-0" />}
                   <span className="truncate">{asset.status || 'UNVERIFIED'}</span>

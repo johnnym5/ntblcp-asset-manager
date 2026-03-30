@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * @fileOverview AssetForm - Operational detail workstation.
- * Rebuilt with "Stacked Field Blocks" and "Glass Cockpit" design patterns.
+ * @fileOverview AssetForm - Operational Detail Workstation.
+ * Phase 13: Perfectly stacked field blocks with "Mobile-First" density.
  */
 
 import React, { useEffect, useState, useRef } from "react";
@@ -35,7 +35,6 @@ import {
   Loader2, 
   ArrowLeft, 
   Share2, 
-  Check, 
   Camera, 
   ShieldCheck, 
   X, 
@@ -48,7 +47,9 @@ import {
   Activity,
   User,
   History,
-  Info
+  Info,
+  DollarSign,
+  CalendarDays
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -81,12 +82,12 @@ const FieldBlock = ({
   icon?: any; 
   className?: string 
 }) => (
-  <div className={cn("space-y-1.5 p-1", className)}>
+  <div className={cn("space-y-1 p-3 rounded-2xl bg-muted/30 border border-transparent hover:border-primary/10 transition-colors", className)}>
     <div className="flex items-center gap-2 opacity-40">
-      {Icon && <Icon className="h-3 w-3" />}
-      <span className="text-[9px] font-black uppercase tracking-widest">{label}</span>
+      {Icon && <Icon className="h-2.5 w-2.5" />}
+      <span className="text-[8px] font-black uppercase tracking-[0.2em]">{label}</span>
     </div>
-    <div className="text-sm font-black uppercase tracking-tight text-foreground truncate min-h-[1.25rem]">
+    <div className="text-[11px] font-black uppercase tracking-tight text-foreground truncate leading-tight">
       {value || '---'}
     </div>
   </div>
@@ -199,12 +200,12 @@ export function AssetForm({
         {/* Header Bar */}
         <div className="flex items-center justify-between p-4 border-b bg-background/80 backdrop-blur-md sticky top-0 z-30 shrink-0">
             <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" onClick={() => { stopCamera(); onOpenChange(false); }} className="rounded-xl h-10 w-10">
+                <Button variant="ghost" size="icon" onClick={() => { stopCamera(); onOpenChange(false); }} className="rounded-xl h-10 w-10 tactile-pulse">
                     <ArrowLeft className="h-5 w-5" />
                 </Button>
                 <div className="flex flex-col">
-                  <DialogTitle className="text-base font-black tracking-tight uppercase leading-none truncate max-w-[120px]">
-                    {asset?.assetIdCode || 'NEW ENTRY'}
+                  <DialogTitle className="text-sm font-black tracking-tight uppercase leading-none truncate max-w-[140px]">
+                    {asset?.assetIdCode || 'NEW REGISTRATION'}
                   </DialogTitle>
                   <span className="text-[8px] font-black uppercase text-muted-foreground tracking-[0.2em] mt-1 opacity-60">REGISTRY PULSE PROFILE</span>
                 </div>
@@ -212,13 +213,13 @@ export function AssetForm({
             
             <div className="flex items-center gap-1.5">
                 <div className="flex items-center bg-muted/50 rounded-xl p-1 mr-1">
-                  <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-8 w-8 rounded-lg"><ChevronLeft className="h-4 w-4" /></Button>
-                  <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-8 w-8 rounded-lg"><ChevronRight className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-8 w-8 rounded-lg tactile-pulse"><ChevronLeft className="h-4 w-4" /></Button>
+                  <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-8 w-8 rounded-lg tactile-pulse"><ChevronRight className="h-4 w-4" /></Button>
                 </div>
                 {!isReadOnly && (
-                    <Button variant="ghost" size="icon" onClick={startCamera} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10 transition-colors"><Camera className="h-5 w-5" /></Button>
+                    <Button variant="ghost" size="icon" onClick={startCamera} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10 transition-colors tactile-pulse"><Camera className="h-5 w-5" /></Button>
                 )}
-                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-40 hover:opacity-100 transition-opacity"><Share2 className="h-5 w-5" /></Button>
+                <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-40 hover:opacity-100 transition-opacity tactile-pulse"><Share2 className="h-5 w-5" /></Button>
             </div>
         </div>
 
@@ -230,8 +231,8 @@ export function AssetForm({
                     <div className="relative aspect-[4/3] bg-black overflow-hidden m-4 rounded-[2rem] border-4 border-primary/20">
                         <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
                         <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-6">
-                            <Button variant="destructive" size="icon" className="h-14 w-14 rounded-2xl shadow-xl" onClick={stopCamera}><X className="h-6 w-6" /></Button>
-                            <Button className="h-16 w-16 rounded-full bg-white text-black shadow-2xl border-[6px] border-black/10" onClick={capturePhoto}>
+                            <Button variant="destructive" size="icon" className="h-14 w-14 rounded-2xl shadow-xl tactile-pulse" onClick={stopCamera}><X className="h-6 w-6" /></Button>
+                            <Button className="h-16 w-16 rounded-full bg-white text-black shadow-2xl border-[6px] border-black/10 tactile-pulse" onClick={capturePhoto}>
                               <div className="h-10 w-10 border-4 border-black rounded-full" />
                             </Button>
                         </div>
@@ -240,7 +241,7 @@ export function AssetForm({
                     <div className="relative group aspect-video bg-muted m-4 rounded-[2rem] overflow-hidden border-2 border-primary/10 shadow-lg">
                         <img src={capturedPhoto} className="w-full h-full object-cover" alt="Asset Evidence" />
                         {!isReadOnly && (
-                            <Button variant="destructive" size="icon" className="absolute top-4 right-4 h-10 w-10 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => setCapturedPhoto(null)}>
+                            <Button variant="destructive" size="icon" className="absolute top-4 right-4 h-10 w-10 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity tactile-pulse" onClick={() => setCapturedPhoto(null)}>
                               <X className="h-5 w-5" />
                             </Button>
                         )}
@@ -252,32 +253,34 @@ export function AssetForm({
 
                   {/* Identification Stack */}
                   <SectionHeader label="Identification Pulse" icon={Tag} />
-                  <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="px-6 py-6 space-y-6">
                     <FormField control={form.control} name="description" render={({ field }) => (
-                      <FormItem className="md:col-span-2">
+                      <FormItem>
                         <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Asset Description</FormLabel>
                         <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                       </FormItem>
                     )}/>
                     
-                    <FormField control={form.control} name="assetIdCode" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Registry Tag ID</FormLabel>
-                        <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
-                      </FormItem>
-                    )}/>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FormField control={form.control} name="assetIdCode" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Registry Tag ID</FormLabel>
+                          <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
+                        </FormItem>
+                      )}/>
 
-                    <FormField control={form.control} name="serialNumber" render={({ field }) => (
-                      <FormItem>
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Manufacturer Serial</FormLabel>
-                        <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
-                      </FormItem>
-                    )}/>
+                      <FormField control={form.control} name="serialNumber" render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Manufacturer Serial</FormLabel>
+                          <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
+                        </FormItem>
+                      )}/>
+                    </div>
                   </div>
 
                   {/* Location & Context Stack */}
                   <SectionHeader label="Regional Scope & Context" icon={MapPin} />
-                  <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="px-6 py-6 grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="location" render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Physical Location</FormLabel>
@@ -293,9 +296,27 @@ export function AssetForm({
                     )}/>
                   </div>
 
+                  {/* Procurement Stack */}
+                  <SectionHeader label="Financial & Procurement" icon={DollarSign} />
+                  <div className="px-6 py-6 grid grid-cols-2 gap-4">
+                    <FormField control={form.control} name="purchaseDate" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Date Procured</FormLabel>
+                        <FormControl><Input type="date" {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-bold text-xs shadow-inner" /></FormControl>
+                      </FormItem>
+                    )}/>
+
+                    <FormField control={form.control} name="value" render={({ field }) => (
+                      <FormItem>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Original Value (NGN)</FormLabel>
+                        <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-bold text-xs shadow-inner" /></FormControl>
+                      </FormItem>
+                    )}/>
+                  </div>
+
                   {/* Assessment Stack */}
                   <SectionHeader label="Condition & Assessment" icon={Activity} />
-                  <div className="px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="px-6 py-6 grid grid-cols-2 gap-4">
                     <FormField control={form.control} name="condition" render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Field Assessment</FormLabel>
@@ -308,7 +329,7 @@ export function AssetForm({
 
                     <FormField control={form.control} name="status" render={({ field }) => (
                       <FormItem>
-                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Verification State</FormLabel>
+                        <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Verification Pulse</FormLabel>
                         <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
                           <FormControl><SelectTrigger className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:ring-primary/20 font-black uppercase text-[10px] tracking-widest shadow-inner"><SelectValue /></SelectTrigger></FormControl>
                           <SelectContent className="rounded-xl">
@@ -321,16 +342,15 @@ export function AssetForm({
                     )}/>
                   </div>
 
-                  {/* Metadata & Fidelity Pulse */}
-                  <SectionHeader label="Hierarchy & Provenance Pulse" icon={History} />
-                  <div className="px-6 py-6 bg-muted/5">
-                    <div className="grid grid-cols-2 gap-x-8 gap-y-6">
-                      <FieldBlock label="Major Section" value={asset?.hierarchy?.section} icon={Database} />
-                      <FieldBlock label="Subsection" value={asset?.hierarchy?.subsection} icon={History} />
-                      <FieldBlock label="Asset Family" value={asset?.hierarchy?.assetFamily} icon={Tag} />
-                      <FieldBlock label="Source Row" value={asset?.importMetadata?.rowNumber} icon={Info} />
-                      <FieldBlock label="Last Auditor" value={asset?.lastModifiedBy} icon={User} className="md:col-span-2" />
-                    </div>
+                  {/* Hierarchy & Provenance */}
+                  <SectionHeader label="Fidelity & Provenance Pulse" icon={History} />
+                  <div className="p-6 grid grid-cols-2 gap-3 bg-muted/5">
+                    <FieldBlock label="Major Section" value={asset?.hierarchy?.section} icon={Database} />
+                    <FieldBlock label="Temporal Subsection" value={asset?.hierarchy?.subsection} icon={History} />
+                    <FieldBlock label="Asset Family" value={asset?.hierarchy?.assetFamily} icon={Tag} />
+                    <FieldBlock label="Source Row" value={asset?.importMetadata?.rowNumber} icon={Hash} />
+                    <FieldBlock label="Imported At" value={asset?.importMetadata?.importedAt ? new Date(asset.importMetadata.importedAt).toLocaleDateString() : 'MANUAL'} icon={CalendarDays} />
+                    <FieldBlock label="Last Auditor" value={asset?.lastModifiedBy} icon={User} />
                   </div>
 
                   {/* Remarks Pulse */}
@@ -338,7 +358,7 @@ export function AssetForm({
                     <FormField control={form.control} name="metadata.remarks" render={({ field }) => (
                       <FormItem>
                         <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Auditor Field Notes</FormLabel>
-                        <FormControl><Textarea {...field} readOnly={isReadOnly} className="min-h-[120px] rounded-2xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-medium text-sm shadow-inner p-4 resize-none" /></FormControl>
+                        <FormControl><Textarea {...(field as any)} readOnly={isReadOnly} className="min-h-[120px] rounded-2xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-medium text-sm shadow-inner p-4 resize-none" /></FormControl>
                       </FormItem>
                     )}/>
                   </div>
@@ -349,10 +369,10 @@ export function AssetForm({
         {/* Action Footer */}
         {!isReadOnly && (
             <div className="p-6 bg-background/80 backdrop-blur-xl border-t flex flex-row items-center gap-3 absolute bottom-0 left-0 right-0 z-40">
-                <Button variant="ghost" onClick={() => { stopCamera(); onOpenChange(false); }} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl">DISCARD DRAFT</Button>
-                <Button type="submit" form="asset-form" disabled={isSaving} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-primary/30 rounded-2xl bg-primary text-primary-foreground">
+                <Button variant="ghost" onClick={() => { stopCamera(); onOpenChange(false); }} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl tactile-pulse">DISCARD DRAFT</Button>
+                <Button type="submit" form="asset-form" disabled={isSaving} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-primary/30 rounded-2xl bg-primary text-primary-foreground tactile-pulse">
                     {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ShieldCheck className="h-5 w-5 mr-2" />}
-                    COMMIT ASSESSMENT
+                    COMMIT PULSE
                 </Button>
             </div>
         )}
