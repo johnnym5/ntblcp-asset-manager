@@ -1,6 +1,6 @@
 /**
  * @fileOverview RegistryCard - Source-Aware Professional Register Renderer.
- * Phase 22: Implements Sheet-based color coding and multi-arrangement field stacks.
+ * Phase 23: Added photo evidence thumbnails and multi-select support.
  */
 
 import React from 'react';
@@ -19,11 +19,14 @@ import {
   ShieldCheck,
   Package,
   Layers,
-  Database
+  Database,
+  Camera
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import type { AssetRecord, DensityMode } from '@/types/registry';
+import type { Asset } from '@/types/domain';
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -34,6 +37,8 @@ interface RegistryCardProps {
 }
 
 export function RegistryCard({ record, onInspect, selected, onToggleSelect, densityMode = "expanded" }: RegistryCardProps) {
+  const asset = record.rawRow as unknown as Asset;
+
   // Primary Identification Pulse
   const descriptionField = record.fields.find(f => {
     const h = record.headers.find(header => header.id === f.headerId);
@@ -55,7 +60,7 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
     <Card 
       className={cn(
         "border-2 transition-all duration-300 rounded-[1.5rem] overflow-hidden group cursor-pointer shadow-md tactile-pulse relative",
-        selected ? "bg-primary/5 border-primary/20 shadow-primary/5" : "bg-card hover:border-primary/20"
+        selected ? "bg-primary/5 border-primary shadow-primary/5" : "bg-card hover:border-primary/20"
       )}
       style={{ borderLeft: `6px solid ${record.accentColor || 'var(--primary)'}` }}
       onClick={() => onInspect(record.id)}
@@ -65,12 +70,13 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
         <div className="px-5 py-3 bg-muted/30 border-b flex items-center justify-between">
           <div className="flex items-center gap-3">
             {onToggleSelect && (
-              <input 
-                type="checkbox" 
-                checked={selected} 
-                onChange={(e) => { e.stopPropagation(); onToggleSelect(record.id); }}
-                className="h-4 w-4 rounded border-2 border-primary/20 bg-background accent-primary"
-              />
+              <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
+                <Checkbox 
+                  checked={selected} 
+                  onCheckedChange={() => onToggleSelect(record.id)}
+                  className="h-4 w-4 rounded border-2 border-primary/20 bg-background accent-primary"
+                />
+              </div>
             )}
             <div className="flex items-center gap-2">
               <Box className="h-3 w-3 opacity-40" style={{ color: record.accentColor }} />
@@ -80,6 +86,11 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {asset.photoDataUri && (
+              <div className="h-6 w-6 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm shrink-0">
+                <img src={asset.photoDataUri} className="h-full w-full object-cover" alt="Evidence" />
+              </div>
+            )}
             <Badge variant="secondary" className="h-5 px-2 text-[8px] font-mono font-bold uppercase tracking-widest bg-muted/50 border-none">
               Record #{record.rowNumber}
             </Badge>

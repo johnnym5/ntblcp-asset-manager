@@ -1,9 +1,6 @@
-
-"use client";
-
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity Detail Workstation.
- * Implements the Glass Cockpit design standard for individual record inspection.
+ * Phase 23: Added visual evidence viewport.
  */
 
 import React from 'react';
@@ -25,10 +22,12 @@ import {
   Info,
   Database,
   ShieldCheck,
-  X
+  X,
+  Camera
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord, RegistryFieldValue } from '@/types/registry';
+import type { Asset } from '@/types/domain';
 
 interface AssetDetailSheetProps {
   isOpen: boolean;
@@ -56,6 +55,7 @@ const DetailField = ({ label, value, icon: Icon, isFullWidth = false }: { label:
 
 export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext, onPrevious }: AssetDetailSheetProps) {
   if (!record) return null;
+  const asset = record.rawRow as unknown as Asset;
 
   const getFieldValue = (normalizedName: string) => {
     const field = record.fields.find(f => {
@@ -94,6 +94,18 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
 
         <ScrollArea className="flex-1 bg-background custom-scrollbar">
           <div className="pb-32">
+            {/* Visual Evidence Pulse */}
+            {asset.photoDataUri && (
+              <div className="px-8 pt-8">
+                <div className="relative group aspect-video bg-muted rounded-[2rem] overflow-hidden border-2 border-primary/10 shadow-lg">
+                  <img src={asset.photoDataUri} className="w-full h-full object-cover" alt="Asset Evidence" />
+                  <Badge className="absolute bottom-4 left-4 bg-primary/90 backdrop-blur-md font-black uppercase text-[8px] tracking-[0.2em] px-3 h-6 rounded-lg">
+                    <Camera className="h-3 w-3 mr-2" /> VERIFIED VISUAL PULSE
+                  </Badge>
+                </div>
+              </div>
+            )}
+
             {/* Primary ID Pulse */}
             <div className="p-8 space-y-6">
               <div className="flex flex-col gap-2">

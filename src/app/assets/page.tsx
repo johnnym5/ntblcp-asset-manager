@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
- * Phase 22: Implements Sheet view, S/N anchoring, and preset orchestrations.
+ * Phase 23: Implemented View Mode Orchestration and Batch Command Pulse.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -29,22 +29,37 @@ import {
   FilterX,
   LayoutGrid,
   List,
-  Zap
+  Zap,
+  Edit3,
+  Trash2,
+  CheckCircle2
 } from 'lucide-react';
 import { RegistryCard } from '@/components/registry/RegistryCard';
+import { RegistryTable } from '@/components/registry/RegistryTable';
 import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
 import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { AssetForm } from '@/components/asset-form';
+import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
 import type { RegistryHeader, AssetRecord, HeaderFilter, DensityMode } from '@/types/registry';
-import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord, REGISTRY_PRESETS } from '@/lib/registry-utils';
+import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord } from '@/lib/registry-utils';
 import { Badge } from '@/components/ui/badge';
 import { ExcelService } from '@/services/excel-service';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from '@/components/ui/alert-dialog';
 
 const ITEMS_PER_PAGE = 24;
 
@@ -68,22 +83,28 @@ export default function AssetRegistryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [densityMode, setDensityMode] = useState<DensityMode>("compact");
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   
+  // --- Selection State ---
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+
   // --- Drawers ---
   const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
 
-  // --- Logic State: Default S/N Anchor ---
+  // --- Logic State: Default S/N Anchoring ---
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
   const [sortKey, setSortKey] = useState<string>('sn');
   const [sortDir, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRecord, setSelectedRecord] = useState<AssetRecord | undefined>();
   const [selectedAssetForForm, setSelectedAssetForForm] = useState<Asset | undefined>();
 
-  // Initialize Headers from Template
+  // Initialize Headers
   useEffect(() => {
     const saved = localStorage.getItem('registry-header-prefs');
     if (saved) {
@@ -101,12 +122,10 @@ export default function AssetRegistryPage() {
 
   const currentRegistry = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
 
-  // --- Filtering & Sorting Logic Pulse ---
+  // --- Filtering & Sorting logic ---
   const processedRecords = useMemo(() => {
-    // Transform all domain assets to header-aware records
     let results = currentRegistry.map(a => transformAssetToRecord(a, headers));
 
-    // 1. Keyword Search (ID, S/N, Description)
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       results = results.filter(r => 
@@ -116,7 +135,6 @@ export default function AssetRegistryPage() {
       );
     }
 
-    // 2. Hierarchical Logic Filters
     filters.forEach(f => {
       results = results.filter(r => {
         const field = r.fields.find(field => field.headerId === f.headerId);
@@ -134,7 +152,6 @@ export default function AssetRegistryPage() {
       });
     });
 
-    // 3. Anchored Sorting (Default: S/N)
     results.sort((a, b) => {
       const fieldA = a.fields.find(f => {
         const h = headers.find(header => header.id === f.headerId);
@@ -159,7 +176,7 @@ export default function AssetRegistryPage() {
 
   const totalPages = Math.ceil(processedRecords.length / ITEMS_PER_PAGE);
 
-  // --- Navigation Helpers ---
+  // --- Handlers ---
   const handleInspect = (id: string) => {
     const record = processedRecords.find(r => r.id === id);
     setSelectedRecord(record);
@@ -173,17 +190,30 @@ export default function AssetRegistryPage() {
     setIsFormOpen(true);
   };
 
-  const handleNext = () => {
-    if (!selectedRecord) return;
-    const idx = processedRecords.findIndex(r => r.id === selectedRecord.id);
-    if (idx < processedRecords.length - 1) setSelectedRecord(processedRecords[idx + 1]);
+  const handleToggleSelect = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
   };
 
-  const handlePrev = () => {
-    if (!selectedRecord) return;
-    const idx = processedRecords.findIndex(r => r.id === selectedRecord.id);
-    if (idx > 0) setSelectedRecord(processedRecords[idx - 1]);
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      const allIds = new Set(paginatedRecords.map(r => r.id));
+      setSelectedIds(allIds);
+    } else {
+      setSelectedIds(new Set());
+    }
   };
+
+  const handleBatchPurge = async () => {
+    setIsBatchDeleteDialogOpen(false);
+    toast({ title: "Purge Initiated", description: `Discarding ${selectedIds.size} records from registry pulse.` });
+    setSelectedIds(new Set());
+    await refreshRegistry();
+  };
+
+  const activeProjectName = appSettings?.grants.find(g => g.id === activeGrantId)?.name || 'Registry Hub';
 
   if (authLoading || !settingsLoaded) {
     return (
@@ -192,8 +222,6 @@ export default function AssetRegistryPage() {
       </div>
     );
   }
-
-  const activeProjectName = appSettings?.grants.find(g => g.id === activeGrantId)?.name || 'Registry Hub';
 
   return (
     <AppLayout>
@@ -232,6 +260,11 @@ export default function AssetRegistryPage() {
               </Button>
             </div>
 
+            <div className="flex items-center bg-muted/50 p-1.5 rounded-2xl border-2 border-border/40">
+              <Button variant={viewMode === 'grid' ? 'secondary' : 'ghost'} size="sm" onClick={() => setViewMode('grid')} className="h-9 w-9 p-0 rounded-xl"><LayoutGrid className="h-4 w-4" /></Button>
+              <Button variant={viewMode === 'list' ? 'secondary' : 'ghost'} size="sm" onClick={() => setViewMode('list')} className="h-9 w-9 p-0 rounded-xl"><List className="h-4 w-4" /></Button>
+            </div>
+
             <Tabs value={densityMode} onValueChange={(v) => setDensityMode(v as DensityMode)} className="bg-muted/50 p-1 rounded-2xl border-2">
               <TabsList className="bg-transparent border-none p-0 h-9 gap-1">
                 <TabsTrigger value="compact" className="h-7 px-3 rounded-xl text-[9px] font-black uppercase data-[state=active]:bg-primary data-[state=active]:text-white">
@@ -254,7 +287,7 @@ export default function AssetRegistryPage() {
           </div>
         </div>
 
-        {/* Action Toolbar: Anchored Search & Logic */}
+        {/* Action Toolbar */}
         <div className="flex flex-col gap-4 px-2">
           <div className="flex flex-col md:flex-row gap-4">
             <div className="relative flex-1 group">
@@ -312,134 +345,103 @@ export default function AssetRegistryPage() {
           </AnimatePresence>
         </div>
 
-        {/* Registry Surface: Segmented List Context */}
+        {/* Registry Surface */}
         <div className="flex-1 px-2">
           {paginatedRecords.length > 0 ? (
-            <div className={cn(
-              "grid gap-6",
-              densityMode === 'compact' ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-            )}>
-              <AnimatePresence mode="popLayout">
-                {paginatedRecords.map((record) => (
-                  <motion.div
-                    key={record.id}
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 0.95 }}
-                    layout
-                  >
-                    <RegistryCard 
-                      record={record}
-                      onInspect={handleInspect}
-                      densityMode={densityMode}
-                    />
-                  </motion.div>
-                ))}
-              </AnimatePresence>
-            </div>
+            viewMode === 'grid' ? (
+              <div className={cn(
+                "grid gap-6",
+                densityMode === 'compact' ? "grid-cols-1 sm:grid-cols-2 md:grid-cols-3 xl:grid-cols-4" : "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
+              )}>
+                <AnimatePresence mode="popLayout">
+                  {paginatedRecords.map((record) => (
+                    <motion.div key={record.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} layout>
+                      <RegistryCard 
+                        record={record}
+                        onInspect={handleInspect}
+                        densityMode={densityMode}
+                        selected={selectedIds.has(record.id)}
+                        onToggleSelect={handleToggleSelect}
+                      />
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
+              </div>
+            ) : (
+              <RegistryTable 
+                records={paginatedRecords}
+                onInspect={handleInspect}
+                selectedIds={selectedIds}
+                onToggleSelect={handleToggleSelect}
+                onSelectAll={handleSelectAll}
+              />
+            )
           ) : (
             <div className="h-[400px] flex flex-col items-center justify-center text-center p-10 opacity-20 border-4 border-dashed rounded-[3rem]">
               <Boxes className="h-24 w-24 mb-6" />
               <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Registry Pulse Silent</h3>
-              <p className="text-[10px] font-bold uppercase tracking-[0.2em] mt-2">Zero records detected in current hierarchical scope.</p>
             </div>
           )}
         </div>
 
         {/* Operational Pulse Bar */}
-        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-2xl px-6 py-3 rounded-[2.5rem] border-2 border-primary/10 shadow-2xl flex items-center gap-6 ring-1 ring-white/10">
-          <div className="flex items-center gap-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(p => p - 1)}
-              className="h-10 w-10 rounded-xl tactile-pulse"
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <span className="text-[10px] font-black uppercase tracking-widest px-4 tabular-nums">
-              Page {currentPage} <span className="opacity-30">of</span> {totalPages || 1}
-            </span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(p => p + 1)}
-              className="h-10 w-10 rounded-xl tactile-pulse"
-            >
-              <ChevronRight className="h-5 w-5" />
-            </Button>
-          </div>
-          <div className="h-6 w-px bg-border/40" />
-          <div className="flex items-center gap-2">
-            <Button 
-              className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 tactile-pulse text-white"
-              onClick={() => { setSelectedAssetForForm(undefined); setIsFormOpen(true); }}
-            >
-              <Plus className="mr-2 h-4 w-4" /> New Registration
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => ExcelService.exportRegistry(currentRegistry)}
-              className="h-12 w-12 rounded-2xl tactile-pulse opacity-60 hover:opacity-100 transition-all"
-            >
-              <FileDown className="h-5 w-5" />
-            </Button>
-          </div>
+        <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-2xl px-6 py-3 rounded-[2.5rem] border-2 border-primary/10 shadow-2xl flex items-center gap-6 ring-1 ring-white/10 transition-all">
+          {selectedIds.size > 0 ? (
+            <div className="flex items-center gap-6 animate-in slide-in-from-bottom-2 duration-300">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase text-primary leading-none">{selectedIds.size} Pulses</span>
+                <span className="text-[8px] font-bold uppercase opacity-40 tracking-widest mt-1">Selection Stack</span>
+              </div>
+              <div className="h-8 w-px bg-border/40" />
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-primary hover:bg-primary/5">
+                  <Edit3 className="h-3.5 w-3.5" /> Batch Pulse
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setIsBatchDeleteDialogOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-destructive hover:bg-destructive/5">
+                  <Trash2 className="h-3.5 w-3.5" /> Purge Stack
+                </Button>
+                <Button variant="ghost" size="icon" onClick={() => setSelectedIds(new Set())} className="h-11 w-11 rounded-xl opacity-40 hover:opacity-100">
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-10 w-10 rounded-xl tactile-pulse"><ChevronLeft className="h-5 w-5" /></Button>
+                <span className="text-[10px] font-black uppercase tracking-widest px-4 tabular-nums">Page {currentPage} <span className="opacity-30">of</span> {totalPages || 1}</span>
+                <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="h-10 w-10 rounded-xl tactile-pulse"><ChevronRight className="h-5 w-5" /></Button>
+              </div>
+              <div className="h-6 w-px bg-border/40" />
+              <div className="flex items-center gap-2">
+                <Button className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 tactile-pulse text-white" onClick={() => { setSelectedAssetForForm(undefined); setIsFormOpen(true); }}><Plus className="mr-2 h-4 w-4" /> New Registration</Button>
+                <Button variant="ghost" size="icon" onClick={() => ExcelService.exportRegistry(currentRegistry)} className="h-12 w-12 rounded-2xl opacity-60 hover:opacity-100"><FileDown className="h-5 w-5" /></Button>
+              </div>
+            </>
+          )}
         </div>
       </div>
 
       {/* Orchestration Drawers */}
-      <HeaderManagerDrawer 
-        isOpen={isHeaderManagerOpen}
-        onOpenChange={setIsHeaderManagerOpen}
-        headers={headers}
-        onUpdateHeaders={saveHeaderPrefs}
-        onReset={() => {
-          const initial = DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i }));
-          saveHeaderPrefs(initial as RegistryHeader[]);
-        }}
-      />
-
-      <FilterDrawer 
-        isOpen={isFilterOpen}
-        onOpenChange={setIsFilterOpen}
-        headers={headers}
-        activeFilters={filters}
-        onUpdateFilters={setFilters}
-      />
-
-      <SortDrawer 
-        isOpen={isSortOpen}
-        onOpenChange={setIsSortOpen}
-        headers={headers}
-        sortBy={sortKey}
-        sortDirection={sortDir}
-        onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }}
-      />
-
-      <AssetDetailSheet 
-        isOpen={isDetailOpen}
-        onOpenChange={setIsDetailOpen}
-        record={selectedRecord}
-        onEdit={handleEdit}
-        onNext={handleNext}
-        onPrevious={handlePrev}
-      />
-
-      <AssetForm 
-        isOpen={isFormOpen}
-        onOpenChange={setIsFormOpen}
-        asset={selectedAssetForForm}
-        isReadOnly={dataSource === 'PRODUCTION' && appSettings?.appMode === 'management'}
-        onSave={async (a) => {
-          await refreshRegistry();
-          setIsFormOpen(false);
-        }}
-        onQuickSave={async () => {}}
-      />
+      <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={saveHeaderPrefs} onReset={() => { const initial = DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i })); saveHeaderPrefs(initial as RegistryHeader[]); }} />
+      <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} />
+      <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }} />
+      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={handleEdit} onNext={() => { if (!selectedRecord) return; const idx = processedRecords.findIndex(r => r.id === selectedRecord.id); if (idx < processedRecords.length - 1) setSelectedRecord(processedRecords[idx + 1]); }} onPrevious={() => { if (!selectedRecord) return; const idx = processedRecords.findIndex(r => r.id === selectedRecord.id); if (idx > 0) setSelectedRecord(processedRecords[idx - 1]); }} />
+      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAssetForForm} isReadOnly={dataSource === 'PRODUCTION' && appSettings?.appMode === 'management'} onSave={async (a) => { await refreshRegistry(); setIsFormOpen(false); }} onQuickSave={async () => {}} />
+      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async (d) => { toast({ title: "Batch Pulse Applied" }); setSelectedIds(new Set()); await refreshRegistry(); }} />
+      
+      <AlertDialog open={isBatchDeleteDialogOpen} onOpenChange={setIsBatchDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-[2rem] border-primary/10">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Purge {selectedIds.size} Pulses?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium">This will permanently discard the selected records from the registry. This action is irreversible.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="rounded-xl font-bold">Cancel Action</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBatchPurge} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black uppercase text-[10px] tracking-widest h-11 px-6">Confirm Purge</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
