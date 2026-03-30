@@ -197,7 +197,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                                             {draftSettings.activeGrantId !== grant.id && (
                                                 <Button variant="ghost" size="sm" className="h-8 font-black text-[10px] uppercase text-primary hover:bg-primary/10" onClick={() => handleSettingChange('activeGrantId', grant.id)}>Activate</Button>
                                             )}
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-40 hover:opacity-100 transition-opacity" onClick={() => handleDeleteGrant(grant.id)}><Trash2 className="h-4 w-4" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive opacity-40 hover:opacity-100 transition-opacity" onClick={() => handleDeleteGrant(id)}><Trash2 className="h-4 w-4" /></Button>
                                         </div>
                                     </CardHeader>
                                     <CardContent className="px-4 pb-4 pt-0">
@@ -217,15 +217,16 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
                                 </h3>
                                 <div className="rounded-2xl border bg-muted/10 p-4 space-y-4">
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                        {Object.keys(activeGrantInDraft.sheetDefinitions).map(sn => (
+                                        {Object.keys(activeGrantInDraft.sheetDefinitions || {}).map(sn => (
                                             <div key={sn} className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border/50 shadow-sm">
                                                 <span className="text-[11px] font-bold truncate max-w-[150px]">{sn}</span>
                                                 <Switch 
-                                                    checked={activeGrantInDraft.enabledSheets.includes(sn)} 
+                                                    checked={(activeGrantInDraft.enabledSheets || []).includes(sn)} 
                                                     onCheckedChange={(checked) => {
+                                                        const currentEnabled = activeGrantInDraft.enabledSheets || [];
                                                         const newEnabled = checked 
-                                                            ? [...activeGrantInDraft.enabledSheets, sn]
-                                                            : activeGrantInDraft.enabledSheets.filter(s => s !== sn);
+                                                            ? [...currentEnabled, sn]
+                                                            : currentEnabled.filter(s => s !== sn);
                                                         handleSettingChange('grants', draftSettings.grants.map(g => g.id === activeGrantInDraft.id ? { ...g, enabledSheets: newEnabled } : g));
                                                     }}
                                                 />
