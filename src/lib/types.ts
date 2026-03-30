@@ -3,6 +3,7 @@ import type { Timestamp } from 'firebase/firestore';
 export interface Asset {
   id: string;
   category: string;
+  grantId?: string;
   
   // Core fields
   sn?: string;
@@ -42,6 +43,21 @@ export interface Asset {
   qty?: string;
   imei?: string;
 
+  // Hierarchical Metadata
+  documentHeader?: string;
+  majorSection?: string;
+  subsectionName?: string;
+  assetFamily?: string;
+  yearBucket?: number;
+  sectionType?: 'document_header' | 'major_section' | 'temporal_subsection' | 'quantity_subsection' | 'transfer_section' | 'asset_family';
+  rawLabel?: string;
+  normalizedLabel?: string;
+  
+  // Traceability
+  sourceSheet?: string;
+  sourceRow?: number;
+  originalRowData?: any;
+
   // Status fields
   verifiedStatus?: 'Verified' | 'Unverified' | 'Discrepancy';
   verifiedDate?: string;
@@ -77,6 +93,8 @@ export interface DisplayField {
   label: string;
   table: boolean;
   quickView: boolean;
+  inChecklist?: boolean;
+  checklistSection?: 'required' | 'important';
 }
 
 export interface SheetDefinition {

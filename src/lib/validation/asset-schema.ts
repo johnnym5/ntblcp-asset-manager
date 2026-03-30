@@ -26,6 +26,20 @@ export const AssetSchema = z.object({
   lastModifiedBy: z.string().optional(),
   lastModifiedByState: z.string().optional(),
   grantId: z.string().optional(),
+  
+  // Hierarchical Metadata
+  documentHeader: z.string().optional(),
+  majorSection: z.string().optional(),
+  subsectionName: z.string().optional(),
+  assetFamily: z.string().optional(),
+  yearBucket: z.number().optional(),
+  sectionType: z.string().optional(),
+  rawLabel: z.string().optional(),
+  normalizedLabel: z.string().optional(),
+  
+  // Traceability
+  sourceSheet: z.string().optional(),
+  sourceRow: z.number().optional(),
 }).passthrough();
 
 export type ValidatedAsset = z.infer<typeof AssetSchema>;
