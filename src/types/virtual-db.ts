@@ -4,7 +4,7 @@
 
 import type { StorageLayer } from './domain';
 
-export type NodeType = 'COLLECTION' | 'DOCUMENT' | 'RECORD' | 'DATABASE';
+export type NodeType = 'COLLECTION' | 'DOCUMENT' | 'RECORD' | 'DATABASE' | 'SYSTEM';
 
 export interface DBNode {
   id: string;
@@ -15,13 +15,18 @@ export interface DBNode {
   path: string;
   data?: any;
   childCount?: number;
+  versionCount?: number;
   lastUpdated?: string;
   syncStatus?: 'SYNCED' | 'PENDING' | 'CONFLICT' | 'LOCAL_ONLY';
+  parentPath?: string;
 }
 
-export interface DBMapping {
-  path: string;
-  displayName: string;
-  canonicalName: string;
-  icon?: string;
+export interface DatabaseStats {
+  recordCount: number;
+  pendingChanges: number;
+  conflictCount: number;
+  lastPulse: string;
+  status: 'ONLINE' | 'OFFLINE' | 'SYNCING';
 }
+
+export type DisplayMode = 'FRIENDLY' | 'MIXED' | 'TECHNICAL';
