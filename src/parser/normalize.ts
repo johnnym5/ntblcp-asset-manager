@@ -10,7 +10,8 @@ import { v4 as uuidv4 } from 'uuid';
 export function normalizeRow(
   row: any[], 
   headerRow: any[], 
-  context: Partial<Asset>
+  context: Partial<Asset>,
+  customMapping?: Record<string, string>
 ): Partial<Asset> {
   const asset: any = {
     id: uuidv4(),
@@ -22,17 +23,22 @@ export function normalizeRow(
     lastModifiedBy: context.lastModifiedBy || 'System Import',
   };
 
+  const activeMapping = customMapping || REGISTRY_MAPPING_CONTRACT;
+
   headerRow.forEach((rawHeader, index) => {
     if (!rawHeader) return;
-    const normalizedHeader = String(rawHeader).trim().toUpperCase();
-    const fieldName = REGISTRY_MAPPING_CONTRACT[normalizedHeader];
+    const headerString = String(rawHeader).trim();
+    const normalizedKey = headerString.toUpperCase();
+    
+    // Check custom mapping first, then fall back to contract, then to metadata
+    const fieldName = customMapping ? customMapping[headerString] : (REGISTRY_MAPPING_CONTRACT as any)[normalizedKey];
     const cellValue = row[index];
 
-    if (fieldName) {
+    if (fieldName && fieldName !== 'metadata') {
       asset[fieldName] = cellValue !== null && cellValue !== undefined ? String(cellValue).trim() : '';
     } else if (cellValue !== null && cellValue !== undefined) {
       // Collect unmapped columns into metadata for fidelity
-      asset.metadata[normalizedHeader] = cellValue;
+      asset.metadata[headerString] = cellValue;
     }
   });
 

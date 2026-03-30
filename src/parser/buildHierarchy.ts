@@ -16,7 +16,8 @@ import type { Asset, SectionHierarchy } from '@/types/domain';
 export function parseSheetToAssets(
   sheetData: any[][], 
   sourceFileName: string, 
-  sheetName: string
+  sheetName: string,
+  customMapping?: Record<string, string>
 ): Asset[] {
   const assets: Asset[] = [];
   
@@ -72,7 +73,7 @@ export function parseSheetToAssets(
               rowNumber: i + 1,
               importedAt: new Date().toISOString()
             }
-          } as any);
+          } as any, customMapping);
           assets.push(normalized as Asset);
         }
         break;

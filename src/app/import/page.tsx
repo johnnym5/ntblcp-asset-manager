@@ -1,12 +1,11 @@
-
 'use client';
 
 /**
  * @fileOverview Guided Import Wizard - Deterministic Hierarchical Ingestion.
- * Phase 32: Formal Stepper implementation with mobile Step-Fit.
+ * Phase 40: Integrated Interactive Schema Mapper for Data Engineering.
  */
 
-import React, { useState, useRef, useEffect, useMemo } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import AppLayout from '@/components/app-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -18,18 +17,18 @@ import {
   DatabaseZap, 
   CheckCircle2,
   Trash2,
-  AlertTriangle,
   ChevronRight,
   ChevronLeft,
   Activity,
-  Search,
-  Layers
+  Layers,
+  Columns
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { parseSheetToAssets } from '@/parser/buildHierarchy';
 import { ReconciliationView } from '@/modules/import/components/ReconciliationView';
+import { SchemaMapper } from '@/modules/import/components/SchemaMapper';
 import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
 import { useAppState } from '@/contexts/app-state-context';
@@ -39,11 +38,12 @@ import * as XLSX from 'xlsx';
 import type { Asset } from '@/types/domain';
 import { motion, AnimatePresence } from 'framer-motion';
 
-type ImportStep = 'INGEST' | 'TRAVERSAL' | 'RECONCILIATION' | 'COMMIT';
+type ImportStep = 'INGEST' | 'TRAVERSAL' | 'MAPPER' | 'RECONCILIATION' | 'COMMIT';
 
 const STEPS: { id: ImportStep; label: string; description: string; icon: any }[] = [
   { id: 'INGEST', label: 'Ingest', description: 'Upload Workbook', icon: FileUp },
-  { id: 'TRAVERSAL', label: 'Traversal', description: 'Analyze Hierarchy', icon: ScanSearch },
+  { id: 'TRAVERSAL', label: 'Traversal', description: 'Scan Headers', icon: ScanSearch },
+  { id: 'MAPPER', label: 'Mapper', description: 'Align Schema', icon: Columns },
   { id: 'RECONCILIATION', label: 'Reconciliation', description: 'Review Sandbox', icon: Layers },
   { id: 'COMMIT', label: 'Commit', description: 'Registry Merge', icon: DatabaseZap },
 ];
@@ -57,6 +57,10 @@ export default function ImportPage() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [stagedAssets, setStagedAssets] = useState<Asset[]>([]);
   const [analysisProgress, setAnalysisProgress] = useState(0);
+  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
+  const [rawSheetData, setRawSheetData] = useState<{ name: string; data: any[][] }[]>([]);
+  const [activeFileName, setActiveFileName] = useState('');
+  
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -80,6 +84,7 @@ export default function ImportPage() {
       return;
     }
 
+    setActiveFileName(file.name);
     setCurrentStep('TRAVERSAL');
     setIsProcessing(true);
     setAnalysisProgress(10);
@@ -90,40 +95,75 @@ export default function ImportPage() {
       const workbook = XLSX.read(buffer, { type: 'array' });
       setAnalysisProgress(40);
 
-      let allParsedAssets: Asset[] = [];
+      const sheets: { name: string; data: any[][] }[] = [];
+      const headers = new Set<string>();
       
-      for (const sheetName of workbook.SheetNames) {
-        const sheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
-        const assets = parseSheetToAssets(data as any[][], file.name, sheetName);
+      workbook.SheetNames.forEach(name => {
+        const sheet = workbook.Sheets[name];
+        const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
+        sheets.push({ name, data });
         
-        const taggedAssets = assets.map(a => ({
-          ...a,
-          grantId: activeGrantId,
-          lastModifiedBy: userProfile?.displayName || 'System Import',
-          name: a.name || a.description
-        }));
-        
-        allParsedAssets = [...allParsedAssets, ...taggedAssets];
-      }
+        // Scan for headers in first 50 rows
+        data.slice(0, 50).forEach(row => {
+          if (Array.isArray(row)) {
+            row.forEach(cell => {
+              if (typeof cell === 'string' && cell.length > 1) headers.add(cell.trim());
+            });
+          }
+        });
+      });
 
-      setAnalysisProgress(80);
-      await storage.saveToSandbox(allParsedAssets);
+      setRawSheetData(sheets);
+      setDetectedHeaders(Array.from(headers));
+      setAnalysisProgress(100);
       
       setTimeout(() => {
-        setStagedAssets(allParsedAssets);
-        setAnalysisProgress(100);
         setIsProcessing(false);
-        setCurrentStep('RECONCILIATION');
-        monitoring.trackEvent('IMPORT_PARSED', { count: allParsedAssets.length });
-        toast({ title: "Analysis Pulse Complete", description: `Reconciled ${allParsedAssets.length} hierarchical records.` });
+        setCurrentStep('MAPPER');
       }, 800);
 
     } catch (error) {
       setIsProcessing(false);
       setCurrentStep('INGEST');
-      monitoring.trackError(error, { action: 'IMPORT_FAILURE' });
-      toast({ variant: "destructive", title: "Structural Failure", description: "The workbook pulse is non-deterministic or corrupted." });
+      monitoring.trackError(error, { action: 'INGEST_FAILURE' });
+      toast({ variant: "destructive", title: "Ingestion Failure", description: "The workbook pulse is non-deterministic." });
+    }
+  };
+
+  const handleConfirmMapping = async (mapping: Record<string, string>) => {
+    setIsProcessing(true);
+    setCurrentStep('TRAVERSAL'); // Show analysis state while parsing with map
+    setAnalysisProgress(20);
+
+    try {
+      let allParsedAssets: Asset[] = [];
+      
+      rawSheetData.forEach((sheet, idx) => {
+        const assets = parseSheetToAssets(sheet.data, activeFileName, sheet.name, mapping);
+        const taggedAssets = assets.map(a => ({
+          ...a,
+          grantId: activeGrantId!,
+          lastModifiedBy: userProfile?.displayName || 'System Import',
+        }));
+        allParsedAssets = [...allParsedAssets, ...taggedAssets];
+        setAnalysisProgress(20 + ((idx + 1) / rawSheetData.length) * 60);
+      });
+
+      await storage.saveToSandbox(allParsedAssets);
+      setStagedAssets(allParsedAssets);
+      setAnalysisProgress(100);
+      
+      setTimeout(() => {
+        setIsProcessing(false);
+        setCurrentStep('RECONCILIATION');
+        toast({ title: "Schema Applied", description: `Reconciled ${allParsedAssets.length} hierarchical records.` });
+      }, 800);
+
+    } catch (e) {
+      setIsProcessing(false);
+      setCurrentStep('MAPPER');
+      monitoring.trackError(e, { action: 'MAPPING_FAILURE' });
+      toast({ variant: "destructive", title: "Mapping Failure" });
     }
   };
 
@@ -157,6 +197,7 @@ export default function ImportPage() {
   const handleDiscardSandbox = async () => {
     await storage.clearSandbox();
     setStagedAssets([]);
+    setRawSheetData([]);
     setCurrentStep('INGEST');
     toast({ title: "Sandbox Purged", description: "Staged records removed." });
   };
@@ -176,19 +217,19 @@ export default function ImportPage() {
               Import Wizard
             </h2>
             <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-              Step-Based Hierarchical Ingestion & Fidelity Pulse
+              Data Engineering & Hierarchical Ingestion Pulse
             </p>
           </div>
-          {currentStep === 'RECONCILIATION' && (
+          {currentStep !== 'INGEST' && (
             <Button variant="outline" onClick={handleDiscardSandbox} className="h-12 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest text-destructive hover:bg-destructive/10 border-2">
-              <Trash2 className="mr-2 h-3.5 w-3.5" /> Discard Batch
+              <Trash2 className="mr-2 h-3.5 w-3.5" /> Discard Pulse
             </Button>
           )}
         </div>
 
         {/* Stepper Pulse */}
-        <div className="px-2">
-          <div className="flex items-center justify-between relative">
+        <div className="px-2 overflow-x-auto pb-4 custom-scrollbar">
+          <div className="flex items-center justify-between relative min-w-[600px] px-4">
             <div className="absolute top-1/2 left-0 w-full h-0.5 bg-muted/30 -translate-y-1/2 -z-10" />
             <div 
               className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 -z-10 transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" 
@@ -239,7 +280,7 @@ export default function ImportPage() {
                   <div className="space-y-4">
                     <h3 className="text-3xl font-black tracking-tight uppercase">Upload Pulse</h3>
                     <p className="text-sm font-medium text-muted-foreground max-w-sm mx-auto leading-relaxed italic opacity-70">
-                      Rule-based analyzer detects document context markers and preserves hierarchical metadata automatically.
+                      Rule-based analyzer detects document context markers and prepares technical headers for mapping.
                     </p>
                   </div>
                   <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 mt-10 transition-all hover:-translate-y-1">
@@ -257,31 +298,24 @@ export default function ImportPage() {
                       <div className="flex gap-4">
                         <div className="h-6 w-6 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 mt-0.5"><span className="text-[10px] font-black text-primary">01</span></div>
                         <div className="space-y-1">
-                          <p className="text-xs font-black uppercase">Ancestry Logic</p>
-                          <p className="text-[10px] text-muted-foreground font-medium italic leading-tight">Assets inherit regional metadata from detected document markers.</p>
+                          <p className="text-xs font-black uppercase">Schema Mapping</p>
+                          <p className="text-[10px] text-muted-foreground font-medium italic leading-tight">Interactively align legacy columns to the production registry pulse.</p>
                         </div>
                       </div>
                       <div className="flex gap-4">
                         <div className="h-6 w-6 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 mt-0.5"><span className="text-[10px] font-black text-primary">02</span></div>
                         <div className="space-y-1">
-                          <p className="text-xs font-black uppercase">Sandbox First</p>
-                          <p className="text-[10px] text-muted-foreground font-medium italic leading-tight">Imports are isolated for review before permanent registry merge.</p>
+                          <p className="text-xs font-black uppercase">Metadata Sequestration</p>
+                          <p className="text-[10px] text-muted-foreground font-medium italic leading-tight">Unmapped technical columns are safely isolated into record metadata.</p>
                         </div>
                       </div>
                     </div>
                   </Card>
-                  
-                  {appSettings?.uxMode === 'beginner' && (
-                    <div className="p-8 rounded-[2rem] bg-blue-500/5 border-2 border-dashed border-blue-500/20 space-y-3 shadow-inner">
-                      <h4 className="text-[10px] font-black uppercase tracking-widest text-blue-600 flex items-center gap-2"><Activity className="h-3.5 w-3.5" /> Discovery Hint</h4>
-                      <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase opacity-60">You can upload files with multiple sheets. The system will attempt to traversal all identifiable registry blocks.</p>
-                    </div>
-                  )}
                 </div>
               </motion.div>
             )}
 
-            {currentStep === 'TRAVERSAL' && (
+            {(currentStep === 'TRAVERSAL') && (
               <motion.div 
                 key="step-traversal"
                 initial={{ opacity: 0, scale: 0.95 }}
@@ -297,13 +331,39 @@ export default function ImportPage() {
                   </div>
                 </div>
                 <div className="space-y-4 max-w-sm">
-                  <h3 className="text-2xl font-black uppercase tracking-widest">Traversing Hierarchy</h3>
-                  <p className="text-[10px] font-black uppercase text-muted-foreground opacity-60 tracking-[0.2em]">Extracting context markers & temporal subsections...</p>
+                  <h3 className="text-2xl font-black uppercase tracking-widest">Processing Registry Pulse</h3>
+                  <p className="text-[10px] font-black uppercase text-muted-foreground opacity-60 tracking-[0.2em]">Executing rule-based hierarchical traversal...</p>
                   <div className="space-y-2 pt-4">
                     <Progress value={analysisProgress} className="h-2 rounded-full" />
-                    <span className="text-[9px] font-mono font-bold text-primary">{analysisProgress}% COMPLETE</span>
+                    <span className="text-[9px] font-mono font-bold text-primary">{Math.round(analysisProgress)}% COMPLETE</span>
                   </div>
                 </div>
+              </motion.div>
+            )}
+
+            {currentStep === 'MAPPER' && (
+              <motion.div 
+                key="step-mapper"
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -20 }}
+                className="space-y-8"
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-primary rounded-xl shadow-lg shadow-primary/20"><Columns className="h-5 w-5 text-white" /></div>
+                    <h3 className="text-xl font-black uppercase tracking-tight text-foreground">Interactive Schema Mapper</h3>
+                  </div>
+                  <Badge variant="outline" className="h-8 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px]">
+                    {detectedHeaders.length} HEADERS DISCOVERED
+                  </Badge>
+                </div>
+
+                <SchemaMapper 
+                  headers={detectedHeaders} 
+                  onConfirm={handleConfirmMapping}
+                  isProcessing={isProcessing}
+                />
               </motion.div>
             )}
 
@@ -320,7 +380,7 @@ export default function ImportPage() {
                     <h3 className="text-xl font-black uppercase tracking-tight">Sandbox Reconciliation</h3>
                   </div>
                   <Badge variant="outline" className="h-8 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px]">
-                    {stagedAssets.length} PULSES DISCOVERED
+                    {stagedAssets.length} RECORDS ANALYZED
                   </Badge>
                 </div>
 
@@ -328,9 +388,9 @@ export default function ImportPage() {
 
                 <div className="p-10 rounded-[3rem] bg-card border-2 border-primary/10 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-primary/20 transition-all">
                   <div className="space-y-2">
-                    <h4 className="text-2xl font-black uppercase tracking-tight text-foreground">Initialize Merge Pulse?</h4>
+                    <h4 className="text-2xl font-black uppercase tracking-tight text-foreground">Finalize Ingestion Pulse?</h4>
                     <p className="text-sm font-medium text-muted-foreground italic leading-relaxed opacity-70">
-                      Once confirmed, these records will be enqueued for cloud synchronization and persistent local storage.
+                      Once confirmed, these records will be merged into the production registry and enqueued for cloud synchronization.
                     </p>
                   </div>
                   <Button 
