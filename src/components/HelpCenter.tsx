@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview HelpCenter - Contextual Guidance & Support Hub.
- * Phase 32: Added keyboard shortcut guide for Advanced Mode.
+ * Phase 34: Expanded Glossary and Keyboard Shortcut Guide.
  */
 
 import React, { useState } from 'react';
@@ -22,10 +22,14 @@ import {
   Filter,
   AlertCircle,
   Command,
-  Keyboard
+  Keyboard,
+  Info,
+  Layers,
+  ArrowRightLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/contexts/app-state-context';
+import { Badge } from './ui/badge';
 
 interface HelpTopic {
   id: string;
@@ -36,6 +40,15 @@ interface HelpTopic {
   howToUse: string[];
   tips: string[];
 }
+
+const GLOSSARY = [
+  { term: "Registry", definition: "The central structured database of all assets." },
+  { term: "Discrepancy", definition: "A mismatch detected between physical assessment and recorded data." },
+  { term: "Sync Pulse", definition: "The process of matching local changes with the cloud server." },
+  { term: "Regional Scope", definition: "The specific geographical area (State or Zone) an auditor is authorized to view." },
+  { term: "Mutation", definition: "Any action that creates, updates, or deletes a record." },
+  { term: "Sandbox", definition: "A safe staging area for reviewing imports before they join the main registry." }
+];
 
 const TOPICS: HelpTopic[] = [
   {
@@ -130,6 +143,7 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
   const { appSettings } = useAppState();
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedTopic, setSelectedTopic] = useState<HelpTopic | null>(null);
+  const [showGlossary, setShowGlossary] = useState(false);
 
   const filteredTopics = TOPICS.filter(t => 
     t.title.toLowerCase().includes(searchTerm.toLowerCase()) || 
@@ -168,7 +182,7 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
         </div>
 
         <ScrollArea className="flex-1 bg-background">
-          <div className="p-8 space-y-8">
+          <div className="p-8 space-y-10">
             {selectedTopic ? (
               <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
                 <Button variant="ghost" onClick={() => setSelectedTopic(null)} className="p-0 h-auto font-black uppercase text-[10px] text-primary hover:bg-transparent transition-all hover:translate-x-[-4px]">
@@ -222,6 +236,23 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
                   </div>
                 </div>
               </div>
+            ) : showGlossary ? (
+              <div className="space-y-8 animate-in fade-in slide-in-from-right-4 duration-300">
+                <Button variant="ghost" onClick={() => setShowGlossary(false)} className="p-0 h-auto font-black uppercase text-[10px] text-primary hover:bg-transparent transition-all hover:translate-x-[-4px]">
+                  <ChevronRight className="h-3 w-3 rotate-180 mr-2" /> Back to Support Topics
+                </Button>
+                <div className="space-y-6">
+                  <h3 className="text-2xl font-black uppercase tracking-tight leading-none">Glossary of Terms</h3>
+                  <div className="space-y-4">
+                    {GLOSSARY.map((item, i) => (
+                      <div key={i} className="p-5 rounded-2xl border-2 border-border/40 bg-card">
+                        <h4 className="text-xs font-black uppercase text-primary mb-1">{item.term}</h4>
+                        <p className="text-xs font-medium text-muted-foreground italic leading-relaxed">{item.definition}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
             ) : (
               <>
                 {isAdvanced && (
@@ -232,26 +263,26 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
                     <div className="grid grid-cols-2 gap-3">
                       <div className="p-4 rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-between">
                         <span className="text-[9px] font-black uppercase opacity-60">Dashboard</span>
-                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5">D</Badge>
+                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5 border-primary/20 text-primary bg-primary/5">D</Badge>
                       </div>
                       <div className="p-4 rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-between">
                         <span className="text-[9px] font-black uppercase opacity-60">Registry</span>
-                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5">R</Badge>
+                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5 border-primary/20 text-primary bg-primary/5">R</Badge>
                       </div>
                       <div className="p-4 rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-between">
                         <span className="text-[9px] font-black uppercase opacity-60">Search</span>
-                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5">⌘K</Badge>
+                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5 border-primary/20 text-primary bg-primary/5">⌘K</Badge>
                       </div>
                       <div className="p-4 rounded-2xl bg-muted/20 border border-border/40 flex items-center justify-between">
                         <span className="text-[9px] font-black uppercase opacity-60">Sync Pulse</span>
-                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5">S</Badge>
+                        <Badge variant="outline" className="font-mono text-[9px] h-5 px-1.5 border-primary/20 text-primary bg-primary/5">S</Badge>
                       </div>
                     </div>
                   </div>
                 )}
 
                 <div className="space-y-3">
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-60 px-1">Browse Topics</h4>
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-60 px-1">Knowledge Modules</h4>
                   {filteredTopics.map(topic => (
                     <button 
                       key={topic.id}
@@ -270,6 +301,22 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
                       <ChevronRight className="h-4 w-4 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
                     </button>
                   ))}
+                  
+                  <button 
+                    onClick={() => setShowGlossary(true)}
+                    className="w-full text-left p-5 rounded-3xl border-2 border-dashed border-border/40 hover:border-primary/20 bg-card transition-all group flex items-center justify-between"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-muted rounded-2xl group-hover:bg-primary/10 transition-colors">
+                        <Info className="h-5 w-5 text-muted-foreground group-hover:text-primary" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-sm font-black uppercase tracking-tight">Glossary of Terms</span>
+                        <span className="text-[9px] font-bold text-muted-foreground opacity-60 uppercase tracking-tight">Plain-English Definitions</span>
+                      </div>
+                    </div>
+                    <ChevronRight className="h-4 w-4 opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                  </button>
                 </div>
               </>
             )}
@@ -278,7 +325,7 @@ export function HelpCenter({ isOpen, onOpenChange }: HelpCenterProps) {
 
         <div className="p-8 border-t bg-muted/10 text-center">
           <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40">
-            Registry Intelligence Pulse v5.0.3
+            Registry Intelligence Pulse v5.0.4
           </p>
         </div>
       </SheetContent>

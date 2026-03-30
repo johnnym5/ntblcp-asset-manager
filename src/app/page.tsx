@@ -1,9 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
- * Refined for Phase 25 with Unified Verification Pulse component.
- * Added Welcome Experience integration.
+ * Phase 34: Added Quick Pulse Actions & Knowledge Discovery cluster.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -20,7 +20,13 @@ import {
   Globe,
   Map,
   ShieldHalf,
-  LayoutGrid
+  LayoutGrid,
+  Zap,
+  FileUp,
+  ClipboardCheck,
+  History,
+  ShieldAlert,
+  Sparkles
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -141,10 +147,10 @@ export default function DashboardPage() {
         variants={container}
         initial="hidden"
         animate="show"
-        className="space-y-10 pb-20 max-w-7xl mx-auto"
+        className="space-y-10 pb-32 max-w-7xl mx-auto"
       >
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
           <div className="space-y-1">
             <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase leading-none">Intelligence Hub</h2>
             <div className="flex items-center gap-3 mt-2">
@@ -164,7 +170,7 @@ export default function DashboardPage() {
             <Button variant="outline" className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2" onClick={() => setShowWelcome(true)}>
               App Guide
             </Button>
-            <Button variant="ghost" className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] group hover:bg-primary/5 border-2 border-transparent hover:border-primary/10 transition-all" asChild>
+            <Button className="h-12 px-8 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 group" asChild>
               <Link href="/assets">
                 Explore Registry <ArrowRight className="ml-3 h-4 w-4 transition-transform group-hover:translate-x-2" />
               </Link>
@@ -178,10 +184,11 @@ export default function DashboardPage() {
           verified={stats?.verified || 0}
           exceptions={stats?.criticalHealth || 0}
           dataGaps={stats?.dataGaps || 0}
+          className="px-1"
         />
 
         {/* Intelligence Breakdown Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 px-1">
           {/* Regional Benchmarking Matrix */}
           <motion.div variants={item} className="lg:col-span-2">
             <Card className="border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden rounded-[2.5rem]">
@@ -189,7 +196,7 @@ export default function DashboardPage() {
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
                     <CardTitle className="text-2xl font-black tracking-tight uppercase flex items-center gap-3">
-                      <Map className="h-6 w-6 text-primary" /> Regional Performance Matrix
+                      <Map className="h-6 w-6 text-primary" /> Regional Matrix
                     </CardTitle>
                     <p className="text-[10px] font-bold uppercase text-muted-foreground tracking-[0.2em] mt-1">Verification coverage by authorized jurisdiction</p>
                   </div>
@@ -228,8 +235,48 @@ export default function DashboardPage() {
             </Card>
           </motion.div>
 
-          {/* System Integrity Stack */}
+          {/* Quick Pulse Actions & System Integrity */}
           <div className="space-y-8">
+            <motion.div variants={item} className="grid grid-cols-1 gap-4">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground px-2">Common Operations</h4>
+              <Link href="/import" className="group">
+                <div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors"><FileUp className="h-5 w-5 text-primary" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black uppercase tracking-tight">Upload Center</span>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Ingest Workbook Pulse</span>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 group-hover:opacity-100 transition-all" />
+                </div>
+              </Link>
+              <Link href="/verify" className="group">
+                <div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-green-500/10 rounded-xl group-hover:bg-green-500/20 transition-colors"><ClipboardCheck className="h-5 w-5 text-green-600" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black uppercase tracking-tight">Records to Review</span>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Audit Field findings</span>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 group-hover:opacity-100 transition-all" />
+                </div>
+              </Link>
+              <Link href="/audit-log" className="group">
+                <div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-blue-500/10 rounded-xl group-hover:bg-blue-500/20 transition-colors"><History className="h-5 w-5 text-blue-600" /></div>
+                    <div className="flex flex-col">
+                      <span className="text-sm font-black uppercase tracking-tight">Activity Ledger</span>
+                      <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Traceability Heartbeat</span>
+                    </div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 group-hover:opacity-100 transition-all" />
+                </div>
+              </Link>
+            </motion.div>
+
             <motion.div variants={item}>
               <Card className="border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden rounded-[2.5rem]">
                 <CardHeader className="bg-primary/5 border-b p-8">
@@ -265,23 +312,6 @@ export default function DashboardPage() {
                   </div>
                 </CardContent>
               </Card>
-            </motion.div>
-
-            <motion.div variants={item}>
-              <div className="p-10 rounded-[3rem] bg-muted/5 border-2 border-dashed border-border/40 text-center space-y-8 group hover:bg-primary/[0.02] transition-all">
-                <div className="p-6 bg-primary/10 rounded-full w-24 h-24 mx-auto flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform duration-500">
-                  <LayoutGrid className="h-12 w-12 text-primary" />
-                </div>
-                <div className="space-y-3">
-                  <h4 className="text-lg font-black uppercase tracking-tight text-primary">Verification Flow</h4>
-                  <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase tracking-widest opacity-60 px-4">
-                    Execute physical assessments across your authorized regional scope.
-                  </p>
-                </div>
-                <Button className="w-full h-16 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 transition-all hover:-translate-y-1" asChild>
-                  <Link href="/verify">Execute Audit Pulse</Link>
-                </Button>
-              </div>
             </motion.div>
           </div>
         </div>

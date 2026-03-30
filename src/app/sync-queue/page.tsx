@@ -1,26 +1,23 @@
+
 'use client';
 
 /**
- * @fileOverview Offline Queue Management - Sync Conflict & Retry Workspace.
- * Orchestrates the visualization of the Write-Ahead Log.
+ * @fileOverview Pending Sync - Conflict & Retry Workspace.
+ * Phase 34: Refined Layman Explanations for sync failures.
  */
 
 import React, { useEffect, useState } from 'react';
 import AppLayout from '@/components/app-layout';
 import { 
-  ListTodo, 
   RefreshCw, 
   AlertTriangle, 
   CheckCircle2, 
-  ShieldAlert, 
   Database, 
   Cloud, 
   Clock, 
   Tag,
   Trash2,
   RotateCcw,
-  Search,
-  Eye,
   Activity,
   Zap,
   Box
@@ -51,7 +48,7 @@ export default function SyncQueuePage() {
 
   useEffect(() => {
     loadQueue();
-    const interval = setInterval(loadQueue, 3000); // Poll for queue changes
+    const interval = setInterval(loadQueue, 3000); 
     return () => clearInterval(interval);
   }, []);
 
@@ -68,17 +65,26 @@ export default function SyncQueuePage() {
     loadQueue();
   };
 
+  const getLaymanError = (error?: string) => {
+    if (!error) return "Awaiting internet heartbeat...";
+    const msg = error.toLowerCase();
+    if (msg.includes('permission')) return "The system blocked this update because you lack administrative clearance.";
+    if (msg.includes('offline') || msg.includes('network')) return "The connection was interrupted. Please retry when the cloud indicator is green.";
+    if (msg.includes('not found')) return "The record you are trying to update no longer exists in the central registry.";
+    return "A technical glitch prevented the sync pulse. You can try to replay the operation manually.";
+  };
+
   const pendingCount = queue.filter(q => q.status === 'PENDING').length;
   const failedCount = queue.filter(q => q.status === 'FAILED').length;
   const healthPercent = queue.length > 0 ? Math.round(((queue.length - failedCount) / queue.length) * 100) : 100;
 
   return (
     <AppLayout>
-      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-20 max-w-5xl mx-auto">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+      <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-32 max-w-5xl mx-auto">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
           <div className="space-y-2">
             <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
-              <Activity className="h-8 w-8 text-primary" /> Synchronicity Workspace
+              <Activity className="h-8 w-8 text-primary" /> Pending Sync
             </h2>
             <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
               Write-Ahead Ledger & Conflict Resolution Pulses
@@ -95,7 +101,7 @@ export default function SyncQueuePage() {
         </div>
 
         {/* Sync Health Matrix */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
           <Card className="border-2 border-border/40 shadow-xl bg-card/50 rounded-[2rem] group hover:border-primary/20 transition-all">
             <CardHeader className="pb-2">
               <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
@@ -140,7 +146,7 @@ export default function SyncQueuePage() {
 
         {queue.length > 0 ? (
           <div className="space-y-6">
-            <div className="flex items-center justify-between px-2">
+            <div className="flex items-center justify-between px-4">
               <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-3">
                 <Clock className="h-4 w-4" /> Operational Write-Log
               </h3>
@@ -149,7 +155,7 @@ export default function SyncQueuePage() {
               </Badge>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 px-2">
               <AnimatePresence mode="popLayout">
                 {queue.map((entry) => (
                   <motion.div
@@ -183,10 +189,12 @@ export default function SyncQueuePage() {
                                 <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {formatDistanceToNow(entry.timestamp, { addSuffix: true })}</span>
                                 <span className="flex items-center gap-1.5"><Tag className="h-3 w-3" /> UUID: {entry.id.split('-')[0]}</span>
                               </div>
-                              {entry.error && (
-                                <div className="mt-3 p-3 rounded-xl bg-destructive/10 border border-destructive/20 font-mono text-[10px] text-destructive leading-relaxed italic">
-                                  <AlertTriangle className="h-3.5 w-3.5 inline mr-2" />
-                                  SYNC_FAILURE: {entry.error}
+                              {entry.status === 'FAILED' && (
+                                <div className="mt-3 p-4 rounded-[1.5rem] bg-destructive/10 border-2 border-dashed border-destructive/20 space-y-1">
+                                  <p className="text-[9px] font-black uppercase text-destructive tracking-widest flex items-center gap-2">
+                                    <AlertTriangle className="h-3 w-3" /> Sync Interruption
+                                  </p>
+                                  <p className="text-xs font-medium text-foreground italic">{getLaymanError(entry.error)}</p>
                                 </div>
                               )}
                             </div>

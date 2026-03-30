@@ -1,6 +1,7 @@
+
 /**
  * @fileOverview HeaderManager - The Advanced Registry Checklist.
- * Phase 22: Supports hierarchical grouping, presets, and locked field orchestration.
+ * Phase 34: Hardened Header Indicators (Filterable, Sortable, Locked).
  */
 
 import React, { useState } from 'react';
@@ -22,14 +23,17 @@ import {
   ShieldCheck,
   Tag,
   MapPin,
-  Truck,
   History,
-  Info
+  Info,
+  Filter,
+  ArrowUpDown,
+  Lock
 } from 'lucide-react';
 import type { RegistryHeader, RegistryPreset } from '@/types/registry';
 import { REGISTRY_PRESETS } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '../ui/tooltip';
 
 interface HeaderManagerProps {
   isOpen: boolean;
@@ -81,14 +85,14 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <Columns className="text-primary h-6 w-6" />
                 </div>
-                Registry Checklist
+                Field Setup
               </SheetTitle>
               <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl">
                 <X className="h-5 w-5" />
               </Button>
             </div>
             <SheetDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-              Manage field visibility and arrangement for the operational register.
+              Technical Orchestration & Field Visibility Checklist
             </SheetDescription>
           </SheetHeader>
         </div>
@@ -97,9 +101,9 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
           <div className="relative group">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
             <Input 
-              placeholder="Search available fields..." 
+              placeholder="Search registry fields..." 
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-9 h-12 rounded-2xl bg-background border-none shadow-inner text-xs font-bold"
             />
           </div>
@@ -133,7 +137,7 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                 <div key={groupName} className="space-y-4">
                   <div className="flex items-center gap-3 px-1">
                     <GroupIcon group={groupName} />
-                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">{groupName} Pulse</h4>
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">{groupName} Configuration</h4>
                   </div>
                   
                   <div className="space-y-2">
@@ -141,25 +145,49 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
                       <div 
                         key={header.id}
                         className={cn(
-                          "p-4 rounded-2xl border-2 transition-all flex items-center justify-between group",
-                          header.visible ? "bg-card border-border/40 hover:border-primary/20" : "bg-muted/30 border-transparent opacity-60"
+                          "p-5 rounded-3xl border-2 transition-all flex items-center justify-between group relative",
+                          header.visible ? "bg-card border-border/40 hover:border-primary/20 shadow-sm" : "bg-muted/30 border-transparent opacity-60"
                         )}
                       >
-                        <div className="flex items-center gap-4 flex-1">
+                        <div className="flex items-center gap-4 flex-1 min-w-0">
                           <div className="cursor-grab opacity-20 group-hover:opacity-100 transition-opacity">
                             <GripVertical className="h-4 w-4" />
                           </div>
-                          <div className="space-y-1 flex-1">
-                            <Input 
-                              value={header.displayName}
-                              onChange={(e) => renameHeader(header.id, e.target.value)}
-                              className="border-none bg-transparent p-0 h-auto font-black text-sm uppercase tracking-tight focus-visible:ring-0 shadow-none"
-                              disabled={!header.editable}
-                            />
-                            <div className="text-[8px] font-mono font-bold text-muted-foreground uppercase opacity-40">Source: {header.rawName}</div>
+                          <div className="space-y-1.5 flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <Input 
+                                value={header.displayName}
+                                onChange={(e) => renameHeader(header.id, e.target.value)}
+                                className="border-none bg-transparent p-0 h-auto font-black text-sm uppercase tracking-tight focus-visible:ring-0 shadow-none truncate"
+                                disabled={!header.editable}
+                              />
+                              {header.locked && <Lock className="h-3 w-3 text-primary opacity-40 shrink-0" />}
+                            </div>
+                            
+                            <div className="flex items-center gap-3">
+                              <span className="text-[8px] font-mono font-bold text-muted-foreground uppercase opacity-40 truncate">SRC: {header.rawName}</span>
+                              <div className="flex items-center gap-1.5">
+                                {header.filterable && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger><Filter className="h-3 w-3 text-primary opacity-20 hover:opacity-60" /></TooltipTrigger>
+                                      <TooltipContent className="text-[9px] font-black uppercase">Filterable</TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                                {header.sortEnabled && (
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger><ArrowUpDown className="h-3 w-3 text-primary opacity-20 hover:opacity-60" /></TooltipTrigger>
+                                      <TooltipContent className="text-[9px] font-black uppercase">Sortable</TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                )}
+                              </div>
+                            </div>
                           </div>
                         </div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 shrink-0">
                           <Switch 
                             checked={header.visible} 
                             onCheckedChange={() => toggleVisibility(header.id)}
@@ -185,7 +213,7 @@ export function HeaderManagerDrawer({ isOpen, onOpenChange, headers, onUpdateHea
           </Button>
           <SheetClose asChild>
             <Button className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground">
-              Apply Checklist
+              Commit Arrangement
             </Button>
           </SheetClose>
         </SheetFooter>
