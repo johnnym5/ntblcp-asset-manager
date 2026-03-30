@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useState } from 'react';
@@ -10,9 +11,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Loader2, KeyRound, UserPlus, Edit, Trash2, MapPin } from 'lucide-react';
+import { Loader2, UserPlus, Edit, Trash2, MapPin, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
-import type { AuthorizedUser } from '@/lib/types';
+import type { AuthorizedUser } from '@/types/domain';
 import { UserEditForm } from './user-edit-form';
 import {
   AlertDialog,
@@ -24,11 +25,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Badge } from '../ui/badge';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 interface UserManagementProps {
   users: AuthorizedUser[];
-  onUsersChange: (users: AuthorizedUser[]) => Promise<void>;
+  onUsersChange: (users: AuthorizedUser[]) => void;
   adminProfile: { loginName: string } | null;
 }
 
@@ -57,89 +59,99 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
       : -1;
 
     if (newUsers.some(u => u.loginName === userToSave.loginName && u.loginName !== originalLoginName)) {
-      toast({ title: "Save Failed", description: `The login name "${userToSave.loginName}" is already in use.`, variant: "destructive" });
+      toast({ variant: "destructive", title: "Identity Conflict", description: `The login ID "${userToSave.loginName}" is already claimed.` });
       return;
     }
     
     if (findIndex > -1) {
-      const existingUser = newUsers[findIndex];
       newUsers[findIndex] = {
-        ...existingUser,
+        ...newUsers[findIndex],
         ...userToSave,
-        password: userToSave.password || existingUser.password
       };
     } else {
       newUsers.push(userToSave as AuthorizedUser);
     }
     
-    await onUsersChange(newUsers);
+    onUsersChange(newUsers);
     setIsEditFormOpen(false);
+    toast({ title: "Identity Staged", description: "Save workstation changes to commit to cloud." });
   };
 
-  const handleDeleteUser = async () => {
+  const handleDeleteUser = () => {
     if (!userToDelete) return;
-
     const newUsers = (users || []).filter(u => u.loginName !== userToDelete.loginName);
-    await onUsersChange(newUsers);
-    
+    onUsersChange(newUsers);
     setUserToDelete(null);
+    toast({ title: "Identity Removed", description: "The auditor has been staged for deletion." });
   };
   
   return (
-    <div>
-      <div className="flex justify-between items-center mb-4">
-        <h3 className="text-sm font-medium text-muted-foreground">Manage user accounts and state assignments</h3>
-        <Button onClick={handleAddNewUser} size="sm">
-          <UserPlus className="mr-2 h-4 w-4" /> Add User
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div className="space-y-1">
+          <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
+            <UserIcon className="h-4 w-4" /> Auditor Directory
+          </h3>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 tracking-tighter">Authorized personnel and regional jurisdictions.</p>
+        </div>
+        <Button onClick={handleAddNewUser} className="h-10 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg shadow-primary/10">
+          <UserPlus className="h-3.5 w-3.5" /> Provision Auditor
         </Button>
       </div>
-      <div className="rounded-lg border bg-background">
+
+      <div className="rounded-2xl border-2 border-border/40 overflow-hidden bg-background">
         <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Display Name</TableHead>
-              <TableHead>Login Name</TableHead>
-              <TableHead>Role</TableHead>
-              <TableHead>States</TableHead>
-              <TableHead className="text-right">Actions</TableHead>
+          <TableHeader className="bg-muted/30">
+            <TableRow className="hover:bg-transparent border-b-2">
+              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4 pl-6">Auditor Identity</TableHead>
+              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4">Auth Tier</TableHead>
+              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4">Jurisdiction</TableHead>
+              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4 text-right pr-6">Pulse Control</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {users && users.map(user => (
-              <TableRow key={user.loginName} className="group">
-                <TableCell className="font-medium">{user.displayName}</TableCell>
-                <TableCell className="text-muted-foreground font-mono text-xs">{user.loginName}</TableCell>
-                <TableCell>
-                  {user.isAdmin ? (
-                    <Badge variant="default" className="font-normal">Admin</Badge>
-                  ) : user.isGuest ? (
-                    <Badge variant="outline" className="font-normal text-blue-500 border-blue-200">Guest</Badge>
-                  ) : (
-                    <Badge variant="secondary" className="font-normal">User</Badge>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <div className="flex flex-wrap gap-1 max-w-[200px]">
-                    {user.states?.map(s => (
-                      <Badge key={s} variant="outline" className="text-[10px] h-5 py-0 px-1.5 flex items-center gap-1">
-                        <MapPin className="h-2 w-2" /> {s}
-                      </Badge>
-                    ))}
+              <TableRow key={user.loginName} className="group hover:bg-primary/[0.02] transition-colors border-b last:border-0">
+                <TableCell className="py-4 pl-6">
+                  <div className="flex flex-col">
+                    <span className="font-black text-sm tracking-tight">{user.displayName}</span>
+                    <span className="text-[10px] font-mono text-muted-foreground uppercase tracking-tighter opacity-60">ID: {user.loginName}</span>
                   </div>
                 </TableCell>
-                <TableCell className="text-right space-x-1">
-                   <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => handleEditUser(user)}>
-                    <Edit className="h-4 w-4" />
-                  </Button>
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10" 
-                    onClick={() => setUserToDelete(user)} 
-                    disabled={adminProfile?.loginName === user.loginName}
-                  >
-                      <Trash2 className="h-4 w-4" />
-                  </Button>
+                <TableCell className="py-4">
+                  <Badge variant="outline" className={cn(
+                    "text-[9px] font-black uppercase tracking-widest h-6 px-3 rounded-lg border-2",
+                    user.isAdmin ? "border-primary/20 bg-primary/5 text-primary" : "border-muted-foreground/20 text-muted-foreground"
+                  )}>
+                    {user.isAdmin ? <ShieldCheck className="mr-1.5 h-3 w-3" /> : null}
+                    {user.role}
+                  </Badge>
+                </TableCell>
+                <TableCell className="py-4">
+                  <div className="flex flex-wrap gap-1.5 max-w-[200px]">
+                    {user.states?.slice(0, 3).map(s => (
+                      <Badge key={s} variant="secondary" className="text-[8px] font-black uppercase h-5 px-2 bg-muted/50 border border-border/40">
+                        {s}
+                      </Badge>
+                    ))}
+                    {user.states?.length > 3 && <span className="text-[9px] font-bold text-muted-foreground">+{user.states.length - 3} More</span>}
+                  </div>
+                </TableCell>
+                <TableCell className="py-4 text-right pr-6">
+                   <div className="flex items-center justify-end gap-1">
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 hover:text-primary transition-all" onClick={() => handleEditUser(user)}>
+                      <Edit className="h-4 w-4" />
+                    </Button>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="h-9 w-9 rounded-xl text-destructive/40 hover:text-destructive hover:bg-destructive/10 transition-all" 
+                      onClick={() => setUserToDelete(user)} 
+                      disabled={adminProfile?.loginName === user.loginName}
+                    >
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                   </div>
                 </TableCell>
               </TableRow>
             ))}
@@ -155,17 +167,17 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
       />
       
       <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
-        <AlertDialogContent>
+        <AlertDialogContent className="rounded-[2rem] border-primary/10">
           <AlertDialogHeader>
-            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
-            <AlertDialogDescription>
-              This will permanently remove <strong>{userToDelete?.displayName}</strong> from the system. This action cannot be undone.
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Revoke Identity?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium">
+              This will permanently revoke all access for <strong>{userToDelete?.displayName}</strong>. This auditor will no longer be able to synchronize pulses to the central registry.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive hover:bg-destructive/90">
-              Yes, remove user
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="font-bold rounded-xl">Discard Action</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive hover:bg-destructive/90 font-black uppercase text-[10px] tracking-widest h-11 px-6 rounded-xl">
+              Revoke Authorization
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
