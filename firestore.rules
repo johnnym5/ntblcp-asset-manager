@@ -1,43 +1,62 @@
 rules_version = '2';
 
 /**
- * ASSETAIN CUSTOM REGISTRY RULES v3.0
+ * ASSETAIN PRODUCTION SECURITY RULES v4.0
  * 
- * This configuration supports the custom local authentication system.
- * Access control is managed at the application level via regional scoping.
+ * Implements strict hierarchical RBAC and regional data isolation.
  */
 
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // --- PERMISSIVE COLLECTIONS ---
+    // --- HELPER FUNCTIONS ---
     
-    // Allow read/write for assets to support regional synchronization
-    match /assets/{assetId=**} {
-      allow read, write: if true;
+    function isAuthenticated() {
+      return request.auth != null;
     }
 
-    // Allow access to config for application bootstrapping and user registry
-    match /config/{document=**} {
-      allow read, write: if true;
+    // --- COLLECTION RULES ---
+
+    // 1. Global Configuration
+    match /config/settings {
+      // Readable by all system identities for bootstrap
+      allow read: if isAuthenticated();
+      // Writeable strictly by ADMIN role (assumed custom claim or specific list)
+      allow write: if isAuthenticated() && (
+        request.auth.token.role == 'ADMIN' || 
+        get(/databases/$(database)/documents/config/settings).data.authorizedUsers[request.auth.uid].role == 'ADMIN'
+      );
     }
 
-    // --- PROTECTED COLLECTIONS ---
+    // 2. Asset Registry
+    match /assets/{assetId} {
+      // Deterministic read for synchronization
+      allow read: if isAuthenticated();
+      
+      // Write logic enforcing regional scoping
+      allow create, update: if isAuthenticated() && (
+        // Must provide valid grantId
+        request.resource.data.grantId != null &&
+        // Context-based regional lock (User must be assigned to the asset's location)
+        (
+          request.auth.token.role == 'ADMIN' ||
+          request.resource.data.location in request.auth.token.authorizedStates
+        )
+      );
 
-    // Projects & Grants
-    match /projects/{document=**} {
-      allow read, write: if true;
+      // Deletion strictly restricted to ADMIN
+      allow delete: if isAuthenticated() && request.auth.token.role == 'ADMIN';
     }
 
-    // Activity Logs / Audit Trails
-    match /activity_log/{logId=**} {
-      allow read: if true;
-      allow create: if true;
-      // Logs remain immutable for audit integrity
+    // 3. Activity Log (Audit Trail)
+    match /activity_log/{logId} {
+      allow read: if isAuthenticated();
+      // Immutable log: only creation allowed
+      allow create: if isAuthenticated();
       allow update, delete: if false;
     }
 
-    // Default Deny: All other access is forbidden
+    // Default Deny
     match /{document=**} {
       allow read, write: if false;
     }

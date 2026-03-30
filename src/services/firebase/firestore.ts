@@ -1,8 +1,6 @@
-'use client';
-
 /**
- * @fileOverview Abstraction layer for Firestore operations.
- * Implements strict error handling, batching, and data sanitization.
+ * @fileOverview Hardened Firestore Service.
+ * Implements deterministic validation and strict RBAC context.
  */
 
 import { 
@@ -20,6 +18,7 @@ import { db } from '@/lib/firebase';
 import { errorEmitter } from '@/lib/error-emitter';
 import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors';
 import { sanitizeForFirestore } from '@/lib/utils';
+import { AssetSchema } from '@/core/registry/validation';
 import type { Asset, AppSettings } from '@/types/domain';
 
 export const FirestoreService = {
@@ -33,21 +32,22 @@ export const FirestoreService = {
       const snap = await getDoc(settingsRef);
       return snap.exists() ? (snap.data() as AppSettings) : null;
     } catch (err: any) {
-      if (err?.code === 'permission-denied') {
-        this.handlePermissionError(settingsRef, 'get', err);
-      }
+      this.handlePermissionError(settingsRef, 'get', err);
       throw err;
     }
   },
 
   /**
-   * Updates global application configuration with merge.
+   * Updates global configuration.
+   * Deterministically sanitized.
    */
   updateSettings(settings: Partial<AppSettings>) {
     if (!db) return;
     const settingsRef = doc(db, 'config', 'settings');
-    setDoc(settingsRef, settings, { merge: true }).catch(err => {
-      this.handlePermissionError(settingsRef, 'update', err, settings);
+    const sanitized = sanitizeForFirestore(settings);
+    
+    setDoc(settingsRef, sanitized, { merge: true }).catch(err => {
+      this.handlePermissionError(settingsRef, 'update', err, sanitized);
     });
   },
 
@@ -68,38 +68,24 @@ export const FirestoreService = {
   },
 
   /**
-   * Single record update.
+   * Single record update with mandatory Zod validation.
    */
   saveAsset(asset: Asset) {
     if (!db) return;
+
+    // DETERMINISTIC VALIDATION: Block dirty data at the boundary
+    const validation = AssetSchema.safeParse(asset);
+    if (!validation.success) {
+      console.error("Firestore: Validation failed for asset write", validation.error);
+      return;
+    }
+
     const assetRef = doc(db, 'assets', asset.id);
-    const sanitized = sanitizeForFirestore(asset);
+    const sanitized = sanitizeForFirestore(validation.data);
+    
     setDoc(assetRef, sanitized, { merge: true }).catch(err => {
       this.handlePermissionError(assetRef, 'update', err, sanitized);
     });
-  },
-
-  /**
-   * Atomic batch write for high-volume synchronization.
-   */
-  batchSaveAssets(assets: Asset[]) {
-    if (!db) return;
-    const batchSize = 500;
-    for (let i = 0; i < assets.length; i += batchSize) {
-      const batch = writeBatch(db);
-      const chunk = assets.slice(i, i + batchSize);
-      chunk.forEach(asset => {
-        const ref = doc(db, 'assets', asset.id);
-        batch.set(ref, sanitizeForFirestore(asset), { merge: true });
-      });
-      batch.commit().catch(err => {
-        errorEmitter.emit('permission-error', new FirestorePermissionError({
-          path: 'assets',
-          operation: 'update',
-          requestResourceData: { note: `Batch upload failed for ${chunk.length} items.` }
-        }));
-      });
-    }
   },
 
   /**

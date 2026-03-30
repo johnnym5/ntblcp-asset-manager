@@ -3,6 +3,7 @@
  * Strictly typed, deterministic models for registry management and system configuration.
  */
 
+export type UserRole = 'ADMIN' | 'MANAGER' | 'VIEWER';
 export type VerificationStatus = 'Verified' | 'Unverified' | 'Discrepancy';
 
 export interface SectionHierarchy {
@@ -48,12 +49,9 @@ export interface AuthorizedUser {
   email: string;
   password?: string;
   states: string[];
-  isAdmin: boolean;
-  isZonalAdmin?: boolean;
-  assignedZone?: string;
+  role: UserRole;
+  isAdmin: boolean; // Legacy shim for auth-context compatibility
   isGuest?: boolean;
-  canAddAssets?: boolean;
-  canEditAssets?: boolean;
 }
 
 export interface AppSettings {
