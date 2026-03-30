@@ -9,13 +9,17 @@ import {
     Activity,
     Tag,
     AlertCircle,
-    ChevronsUpDown
+    ChevronsUpDown,
+    Calendar,
+    History
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn, assetMatchesGlobalFilter } from '@/lib/utils';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
+import { Progress } from './ui/progress';
+import { Separator } from './ui/separator';
 
 const StatCard = ({ title, value, description, icon, onAction, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, isActive?: boolean }) => {
     return (
@@ -43,9 +47,7 @@ export function AssetSummaryDashboard() {
         dataSource, 
         setMissingFieldFilter, 
         missingFieldFilter, 
-        globalStateFilters, 
-        conditionFilter, 
-        setConditionFilter, 
+        globalStateFilter, 
         activeGrantId, 
         setSelectedStatuses,
         selectedStatuses
@@ -54,11 +56,23 @@ export function AssetSummaryDashboard() {
     
     const summary = useMemo(() => {
         const source = dataSource === 'cloud' ? assets : offlineAssets;
-        const scoped = source.filter(a => a.grantId === activeGrantId && assetMatchesGlobalFilter(a, globalStateFilters));
+        const scoped = source.filter(a => {
+            const matchesGrant = !activeGrantId || a.grantId === activeGrantId;
+            const matchesGlobal = globalStateFilter === 'All' || a.location === globalStateFilter;
+            return matchesGrant && matchesGlobal;
+        });
         
         const total = scoped.length;
         const verified = scoped.filter(a => a.verifiedStatus === 'Verified').length;
         
+        const yearBuckets = scoped.reduce((acc, a) => {
+            const year = a.yearBucket || 'Base Register';
+            if (!acc[year]) acc[year] = { total: 0, verified: 0 };
+            acc[year].total++;
+            if (a.verifiedStatus === 'Verified') acc[year].verified++;
+            return acc;
+        }, {} as Record<string | number, { total: number, verified: number }>);
+
         return {
           total,
           verified,
@@ -67,8 +81,9 @@ export function AssetSummaryDashboard() {
           unusable: scoped.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen', 'Writeoff'].includes(a.condition)).length,
           missingId: scoped.filter(a => !a.assetIdCode?.trim()).length,
           discrepancy: scoped.filter(a => a.verifiedStatus === 'Discrepancy').length,
+          yearBuckets: Object.entries(yearBuckets).sort((a, b) => String(b[0]).localeCompare(String(a[0]))),
         };
-    }, [assets, offlineAssets, dataSource, activeGrantId, globalStateFilters]);
+    }, [assets, offlineAssets, dataSource, activeGrantId, globalStateFilter]);
 
     return (
         <Collapsible open={isOpen} onOpenChange={setIsOpen} className="w-full">
@@ -80,7 +95,7 @@ export function AssetSummaryDashboard() {
                         </div>
                         <div>
                             <h3 className="text-lg font-bold tracking-tight">Inventory Pulse</h3>
-                            <p className="text-xs text-muted-foreground">Scoping {summary.total} records in current context.</p>
+                            <p className="text-xs text-muted-foreground">Scoping {summary.total} hierarchical records.</p>
                         </div>
                     </div>
                     <div className="flex items-center gap-3">
@@ -92,8 +107,8 @@ export function AssetSummaryDashboard() {
                 </div>
             </CollapsibleTrigger>
             
-            <CollapsibleContent className="animate-in fade-in slide-in-from-top-2 duration-300">
-                <div className="flex overflow-x-auto pb-4 pt-2 px-1 gap-4 custom-scrollbar">
+            <CollapsibleContent className="animate-in fade-in slide-in-from-top-2 duration-300 space-y-4">
+                <div className="flex overflow-x-auto pb-2 pt-2 px-1 gap-4 custom-scrollbar">
                     <StatCard
                         title="Verification Coverage"
                         value={`${summary.percentage}%`}
@@ -123,18 +138,34 @@ export function AssetSummaryDashboard() {
                         value={summary.unusable}
                         description="Assets reported as stolen, burnt, or unsalvageable."
                         icon={<AlertCircle className="h-4 w-4 text-destructive" />}
-                        onAction={() => setConditionFilter(c => c.length > 0 ? [] : ['Unsalvageable', 'Burnt', 'Stolen', 'Writeoff'])}
-                        isActive={conditionFilter.length > 0}
-                    />
-                    <StatCard
-                        title="Audit Exceptions"
-                        value={summary.discrepancy}
-                        description="Records with field data conflicts."
-                        icon={<FileWarning className="h-4 w-4 text-destructive" />}
-                        onAction={() => setSelectedStatuses(s => s.includes('Discrepancy') ? [] : ['Discrepancy'])}
-                        isActive={selectedStatuses.includes('Discrepancy')}
+                        isActive={false}
                     />
                 </div>
+
+                <Card className="bg-muted/5 border-dashed">
+                    <CardHeader className="py-3 px-4 flex flex-row items-center justify-between space-y-0">
+                        <CardTitle className="text-xs font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+                            <History className="h-3 w-3 text-primary" /> Temporal breakdown (by Addition Year)
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="px-4 pb-4 pt-0">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                            {summary.yearBuckets.map(([year, stats]) => {
+                                const percentage = Math.round((stats.verified / stats.total) * 100);
+                                return (
+                                    <div key={year} className="space-y-1.5 p-3 bg-background rounded-xl border border-border/50 shadow-sm">
+                                        <div className="flex justify-between items-center">
+                                            <span className="text-[10px] font-bold uppercase text-primary">{year}</span>
+                                            <Badge variant="outline" className="text-[9px] h-4">{stats.verified}/{stats.total}</Badge>
+                                        </div>
+                                        <Progress value={percentage} className="h-1" />
+                                        <p className="text-[9px] text-muted-foreground font-medium">{percentage}% Coverage</p>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    </CardContent>
+                </Card>
             </CollapsibleContent>
         </Collapsible>
     );

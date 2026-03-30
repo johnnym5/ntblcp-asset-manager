@@ -29,9 +29,7 @@ const ASSET_FAMILY_KEYWORDS = ['CHAIRS', 'TABLES', 'CABINETS', 'SHELVES', 'LAPTO
 type RowType = 'document_header' | 'major_section' | 'temporal_subsection' | 'quantity_subsection' | 'transfer_section' | 'asset_family' | 'schema_header' | 'asset_row' | 'empty';
 
 const classifyRow = (row: any[], definitiveHeaders: string[]): { type: RowType, label?: string, year?: number } => {
-    const firstCell = String(row[0] || '').trim();
     const fullRowText = row.map(c => String(c || '').trim()).join(' ').toUpperCase();
-    
     if (row.every(cell => !cell || String(cell).trim() === '')) return { type: 'empty' };
 
     // RULE B: SCHEMA HEADER ROWS
@@ -39,44 +37,42 @@ const classifyRow = (row: any[], definitiveHeaders: string[]): { type: RowType, 
     const normalizedRow = row.map(normalizeHeader);
     const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
     
-    // Low threshold for IHVN and messy sheets, higher for standard ones
     const threshold = definitiveHeaders.length > 10 ? 0.6 : 0.7;
     if (matchCount / definitiveHeaders.length >= threshold) {
         return { type: 'schema_header' };
     }
 
-    // RULE C: TEMPORAL SUBSECTIONS (e.g. 2024 ADDITIONAL ASSETS)
+    // RULE C: TEMPORAL SUBSECTIONS
     const temporalMatch = fullRowText.match(TEMPORAL_PATTERN);
     if (temporalMatch) {
-        return { type: 'temporal_subsection', label: firstCell || fullRowText, year: parseInt(temporalMatch[1]) };
+        return { type: 'temporal_subsection', label: row.find(c => c) || fullRowText, year: parseInt(temporalMatch[1]) };
     }
 
-    // RULE D: QUANTITY BATCH (e.g. 10 Pieces)
+    // RULE D: QUANTITY BATCH
     if (QUANTITY_PATTERN.test(fullRowText)) {
-        return { type: 'quantity_subsection', label: firstCell || fullRowText };
+        return { type: 'quantity_subsection', label: row.find(c => c) || fullRowText };
     }
 
     // RULE E: TRANSFERRED ASSETS
     if (TRANSFER_PATTERN.test(fullRowText)) {
-        return { type: 'transfer_section', label: firstCell || fullRowText };
+        return { type: 'transfer_section', label: row.find(c => c) || fullRowText };
     }
 
     // RULE A: DOC HEADERS
     if (DOC_HEADER_KEYWORDS.some(k => fullRowText.includes(k))) {
-        return { type: 'document_header', label: firstCell || fullRowText };
+        return { type: 'document_header', label: row.find(c => c) || fullRowText };
     }
 
     // RULE G: ASSET FAMILY
     if (ASSET_FAMILY_KEYWORDS.some(k => fullRowText.includes(k))) {
-        return { type: 'asset_family', label: firstCell || fullRowText };
+        return { type: 'asset_family', label: row.find(c => c) || fullRowText };
     }
 
     // RULE F: MAJOR SECTIONS
     if (MAJOR_SECTION_KEYWORDS.some(k => fullRowText.includes(k))) {
-        return { type: 'major_section', label: firstCell || fullRowText };
+        return { type: 'major_section', label: row.find(c => c) || fullRowText };
     }
 
-    // Fallback: Potential data row if schema is active and we have data in multiple columns
     const dataCellCount = row.filter(c => c && String(c).trim() !== '').length;
     if (dataCellCount > 2) {
         return { type: 'asset_row' };
@@ -92,10 +88,10 @@ const normalizeLabel = (label: string, type: RowType): string => {
         return `${year} additions`.trim();
     }
     if (type === 'quantity_subsection') {
-        return clean.replace(/ pieces|pcs|units/g, '').trim() + ' batch';
+        return clean.replace(/\s*-\s*\d+\s*(pieces|pcs|units).*/gi, '').trim() + ' batch';
     }
     if (type === 'transfer_section') {
-        return clean.replace(/dfb_| LSMOH|IHVN|FHI360|transferred assets|transfer/gi, '').replace(/[()]/g, '').trim() + ' transfer';
+        return clean.replace(/transferred assets|transfer/gi, '').replace(/dfb_|lsmoh|ihvn|fhi360/gi, '').replace(/[()]/g, '').trim() + ' transfer';
     }
     return clean;
 };
@@ -111,9 +107,6 @@ for (const key in HEADER_ALIASES) {
     }
 }
 
-/**
- * Parses a single Excel row into an Asset object based on context and headers.
- */
 const parseAssetRow = (row: any[], headerRow: any[], context: any): Partial<Asset> => {
     const assetObject: Partial<Asset> = { 
         ...context,
@@ -167,7 +160,6 @@ export async function parseExcelFile(
             const sheet = workbook.Sheets[sheetName];
             if (!sheet) continue;
 
-            // Determine definition context
             let definitionName = '';
             for (const defName in sheetDefinitions) {
                 if (sheetName.toUpperCase().includes(defName.toUpperCase())) {
@@ -180,7 +172,6 @@ export async function parseExcelFile(
 
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
             
-            // Hierarchy State Machine
             let context: any = {
                 documentHeader: '',
                 majorSection: '',
@@ -196,10 +187,8 @@ export async function parseExcelFile(
                 const row = sheetData[i];
                 if (!Array.isArray(row) || row.length === 0) continue;
 
-                // For IHVN special case, we might need to check multiple header sets
                 let headersToMatch = currentDef.headers;
                 if (definitionName === 'IHVN-GF N-THRIP') {
-                    // Try to find which sub-definition fits this part of the sheet
                     const normalizedRow = row.map(normalizeHeader);
                     for (const subDef in IHVN_SUB_SHEET_DEFINITIONS) {
                         const subHeaders = IHVN_SUB_SHEET_DEFINITIONS[subDef];
@@ -226,19 +215,16 @@ export async function parseExcelFile(
                     case 'temporal_subsection':
                         context.subsectionName = classification.label!;
                         context.yearBucket = classification.year;
-                        context.sectionType = 'temporal_subsection';
                         context.rawLabel = classification.label;
                         context.normalizedLabel = normalizeLabel(classification.label!, 'temporal_subsection');
                         break;
                     case 'transfer_section':
                         context.subsectionName = classification.label!;
-                        context.sectionType = 'transfer_section';
                         context.rawLabel = classification.label;
                         context.normalizedLabel = normalizeLabel(classification.label!, 'transfer_section');
                         break;
                     case 'quantity_subsection':
                         context.assetFamily = classification.label!;
-                        context.sectionType = 'quantity_subsection';
                         context.rawLabel = classification.label;
                         context.normalizedLabel = normalizeLabel(classification.label!, 'quantity_subsection');
                         break;
@@ -254,7 +240,6 @@ export async function parseExcelFile(
                             parsed.sourceRow = i + 1;
                             parsed.originalRowData = JSON.stringify(row);
 
-                            // Validation
                             const validation = AssetSchema.safeParse(parsed);
                             if (!validation.success) {
                                 result.errors.push(`Row ${i + 1} (${sheetName}): ${validation.error.errors[0].message}`);
@@ -313,7 +298,6 @@ export async function scanExcelFile(
                 const definition = appSettings.sheetDefinitions[defName];
                 const normalizedDefinitiveHeaders = definition.headers.map(normalizeHeader);
                 
-                // Scan first 50 rows for headers
                 for (let i = 0; i < Math.min(sheetData.length, 50); i++) {
                     const row = sheetData[i];
                     if (!Array.isArray(row)) continue;

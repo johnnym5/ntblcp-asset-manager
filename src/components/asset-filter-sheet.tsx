@@ -1,4 +1,3 @@
-
 "use client";
 
 import React from 'react';
@@ -12,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Check } from 'lucide-react';
+import { Check, Hash, Calendar as CalendarIcon, Layout } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
@@ -68,11 +67,12 @@ const fieldsToFilter: { label: string, value: keyof Asset }[] = [
     { label: 'Asset Class', value: 'assetClass' },
 ];
 
-const FilterSection = ({ title, options, selected, onChange }: {
+const FilterSection = ({ title, options, selected, onChange, icon }: {
   title: string;
   options: OptionType[];
   selected: string[];
   onChange: (value: string[]) => void;
+  icon?: React.ReactNode;
 }) => {
   const handleSelect = (value: string) => {
     if (selected.includes(value)) {
@@ -84,7 +84,9 @@ const FilterSection = ({ title, options, selected, onChange }: {
 
   return (
     <div className="space-y-2">
-      <Label className="font-semibold">{title}</Label>
+      <Label className="font-semibold flex items-center gap-2">
+        {icon} {title}
+      </Label>
       <div className="rounded-md border">
         <ScrollArea className="h-[150px]">
           <div className="p-1">
@@ -151,7 +153,24 @@ export function AssetFilterDialog({
   setMissingFieldFilter,
 }: AssetFilterDialogProps) {
   
-  const { appSettings, setDateFilter } = useAppState();
+  const { appSettings, setDateFilter, assets, offlineAssets, dataSource } = useAppState();
+
+  const hierarchicalOptions = React.useMemo(() => {
+      const source = dataSource === 'cloud' ? assets : offlineAssets;
+      const majorSections = new Map<string, number>();
+      const years = new Map<string, number>();
+
+      source.forEach(a => {
+          if (a.majorSection) majorSections.set(a.majorSection, (majorSections.get(a.majorSection) || 0) + 1);
+          if (a.yearBucket) years.set(String(a.yearBucket), (years.get(String(a.yearBucket)) || 0) + 1);
+      });
+
+      return {
+          sections: Array.from(majorSections.entries()).map(([label, count]) => ({ label, value: label, count })),
+          years: Array.from(years.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => b.label.localeCompare(a.label))
+      };
+  }, [assets, offlineAssets, dataSource]);
+
   const handleClearAll = () => {
     setSelectedLocations([]);
     setSelectedAssignees([]);
@@ -165,14 +184,31 @@ export function AssetFilterDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col max-h-[90vh]">
+      <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-xl">
         <DialogHeader>
-          <DialogTitle>Filter Assets</DialogTitle>
+          <DialogTitle>Semantic Filter Engine</DialogTitle>
           <DialogDescription>
-            Refine the asset list by selecting criteria below.
+            Refine your view using hierarchical register metadata.
           </DialogDescription>
         </DialogHeader>
         <div className="flex-1 space-y-6 overflow-y-auto pr-2 py-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <FilterSection
+                title="Major Section"
+                options={hierarchicalOptions.sections}
+                selected={[]}
+                onChange={() => {}}
+                icon={<Layout className="h-4 w-4 text-primary" />}
+              />
+              <FilterSection
+                title="Addition Year"
+                options={hierarchicalOptions.years}
+                selected={[]}
+                onChange={() => {}}
+                icon={<CalendarIcon className="h-4 w-4 text-primary" />}
+              />
+          </div>
+          <Separator />
           <FilterSection
             title="Location"
             options={locationOptions}
@@ -206,8 +242,8 @@ export function AssetFilterDialog({
           )}
           <Separator />
            <div className="space-y-3">
-            <Label className="font-semibold">Find Assets with Missing Fields</Label>
-            <RadioGroup value={missingFieldFilter} onValueChange={(value) => { setMissingFieldFilter(value); setDateFilter(null);}}>
+            <Label className="font-semibold flex items-center gap-2"><Hash className="h-4 w-4" /> Data Integrity Exceptions</Label>
+            <RadioGroup value={missingFieldFilter} onValueChange={(value) => { setMissingFieldFilter(value); setDateFilter?.(null);}}>
               <ScrollArea className="h-[150px] rounded-md border p-2">
                 <div className="space-y-1">
                  <div className="flex items-center space-x-2 p-1">
@@ -230,7 +266,7 @@ export function AssetFilterDialog({
             Clear All Filters
           </Button>
           <DialogClose asChild>
-            <Button>Done</Button>
+            <Button>Apply Logic</Button>
           </DialogClose>
         </DialogFooter>
       </DialogContent>
