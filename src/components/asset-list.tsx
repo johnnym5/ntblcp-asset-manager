@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
@@ -15,7 +14,6 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-  DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -36,7 +34,10 @@ import {
   Edit,
   FolderSearch,
   Layout,
-  History
+  History,
+  Camera,
+  CheckCircle2,
+  Clock
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
@@ -45,7 +46,7 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/contexts/app-state-context";
-import { getAssets, batchDeleteAssets } from "@/lib/firestore";
+import { getAssets, batchSetAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets } from "@/lib/idb";
 import { cn, sanitizeForFirestore } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
@@ -53,7 +54,6 @@ import { ImportScannerDialog } from "./single-sheet-import-dialog";
 import { SyncConfirmationDialog, type SyncSummary } from "./sync-confirmation-dialog";
 import { AssetSummaryDashboard } from "./asset-summary-dashboard";
 import { Badge } from "./ui/badge";
-import { Separator } from "./ui/separator";
 import { useAuth } from "@/contexts/auth-context";
 
 const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
@@ -150,6 +150,8 @@ export default function AssetList() {
         if (summary.newFromCloud.length > 0 || summary.updatedFromCloud.length > 0 || summary.deletedOnCloud!.length > 0) {
             setSyncSummary(summary); 
             setIsSyncConfirmOpen(true); 
+        } else {
+            addNotification({ title: 'Already In Sync', description: 'Your registry matches the cloud exactly.' });
         }
     } catch (e) { 
         addNotification({ title: "Scan Failed", variant: 'destructive' }); 
@@ -167,6 +169,8 @@ export default function AssetList() {
         if (assetsToPush.length > 0) { 
             setSyncSummary({ newFromCloud: [], updatedFromCloud: [], keptLocal: [], toUpload: assetsToPush, type: 'upload' }); 
             setIsSyncConfirmOpen(true); 
+        } else {
+            addNotification({ title: 'Zero Modifications', description: 'No local pulses detected for broadcast.' });
         }
     } catch (e) { 
         addNotification({ title: "Sync Failed", variant: 'destructive' }); 
@@ -298,44 +302,67 @@ export default function AssetList() {
                         <CardTitle className="text-sm font-black uppercase tracking-tight">{cat}</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="text-4xl font-black">{catAssets.length}</div>
-                        <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Records</p>
+                        <div className="flex items-center justify-between">
+                            <div className="text-4xl font-black">{catAssets.length}</div>
+                            {catAssets.some(a => !!a.photoDataUri) && (
+                                <Badge className="bg-primary/10 text-primary border-primary/20 h-6 px-2 font-black uppercase text-[8px] gap-1">
+                                    <Camera className="h-3 w-3" /> Visual Proof
+                                </Badge>
+                            )}
+                        </div>
+                        <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Registry Records</p>
                     </CardContent>
                 </Card>
             ))}
         </div>
       ) : (
         <div className="space-y-4 pb-20">
-            <div className="flex items-center justify-between">
-                <Button variant="ghost" onClick={() => setView('dashboard')} className="font-bold rounded-xl"><ArrowLeft className="mr-2 h-4 w-4" /> Back</Button>
+            <div className="flex items-center justify-between px-2">
+                <Button variant="ghost" onClick={() => setView('dashboard')} className="font-bold rounded-xl"><ArrowLeft className="mr-2 h-4 w-4" /> Exit Layer</Button>
                 <h2 className="text-2xl font-black uppercase tracking-tight text-primary">{currentCategory}</h2>
             </div>
             <Card className="rounded-3xl border-2 shadow-2xl overflow-hidden">
                 <Table>
                     <TableHeader className="bg-muted/30">
                         <TableRow>
-                            <TableHead className="font-black uppercase text-[10px] py-4 px-6">Description</TableHead>
-                            <TableHead className="font-black uppercase text-[10px] py-4">ID/Serial</TableHead>
+                            <TableHead className="font-black uppercase text-[10px] py-4 px-6">Physical Identification</TableHead>
+                            <TableHead className="font-black uppercase text-[10px] py-4">Evidence</TableHead>
                             <TableHead className="font-black uppercase text-[10px] py-4">Status</TableHead>
                             <TableHead className="text-right font-black uppercase text-[10px] py-4 px-6">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {categoryAssets.map(asset => (
-                            <TableRow key={asset.id} className="hover:bg-primary/5 cursor-pointer" onClick={() => handleViewAsset(asset)}>
-                                <TableCell className="py-4 px-6 font-bold">{asset.description}</TableCell>
-                                <TableCell className="py-4 font-mono text-[10px]">{asset.assetIdCode || asset.sn || 'N/A'}</TableCell>
+                            <TableRow key={asset.id} className="hover:bg-primary/5 cursor-pointer group" onClick={() => handleViewAsset(asset)}>
+                                <TableCell className="py-4 px-6">
+                                    <div className="flex flex-col">
+                                        <span className="font-black text-sm">{asset.description}</span>
+                                        <span className="text-[10px] font-mono text-muted-foreground uppercase mt-0.5 tracking-tighter">ID: {asset.assetIdCode || asset.sn || 'UNTAGGED'}</span>
+                                    </div>
+                                </TableCell>
                                 <TableCell className="py-4">
-                                    <Badge className={cn("text-[10px] font-black h-6", asset.verifiedStatus === 'Verified' ? "bg-green-500" : "bg-orange-500")}>
+                                    {asset.photoDataUri ? (
+                                        <div className="flex items-center gap-2">
+                                            <div className="h-8 w-8 rounded-lg overflow-hidden border border-primary/20">
+                                                <img src={asset.photoDataUri} className="h-full w-full object-cover" />
+                                            </div>
+                                            <Badge variant="outline" className="text-[8px] font-black uppercase border-green-500/20 text-green-600 bg-green-500/5">Verified with Image</Badge>
+                                        </div>
+                                    ) : (
+                                        <Badge variant="outline" className="text-[8px] font-black uppercase opacity-20">No Visual Proof</Badge>
+                                    )}
+                                </TableCell>
+                                <TableCell className="py-4">
+                                    <Badge className={cn("text-[10px] font-black h-6 uppercase tracking-widest", asset.verifiedStatus === 'Verified' ? "bg-green-500" : "bg-orange-500")}>
                                         {asset.verifiedStatus || 'UNVERIFIED'}
                                     </Badge>
                                 </TableCell>
                                 <TableCell className="text-right py-4 px-6" onClick={e => e.stopPropagation()}>
                                     <DropdownMenu>
-                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="rounded-xl">
-                                            <DropdownMenuItem onClick={() => handleViewAsset(asset)} className="font-bold cursor-pointer">Inspect Profile</DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleEditAsset(asset)} className="font-bold cursor-pointer">Edit Data</DropdownMenuItem>
+                                        <DropdownMenuTrigger asChild><Button variant="ghost" size="icon" className="group-hover:bg-muted"><MoreHorizontal className="h-5 w-5" /></Button></DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="rounded-xl border-2 shadow-2xl">
+                                            <DropdownMenuItem onClick={() => handleViewAsset(asset)} className="font-bold cursor-pointer"><FolderSearch className="mr-2 h-4 w-4" /> Inspect Profile</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleEditAsset(asset)} className="font-bold cursor-pointer"><Edit className="mr-2 h-4 w-4" /> Audit Data</DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>

@@ -24,6 +24,15 @@ export interface Asset {
   condition?: string;
   remarks?: string; // From "Remarks" or "Comments"
   
+  // Visual Evidence
+  photoDataUri?: string; // Base64 encoded field photo
+  aiAnalysis?: {
+    suggestedCondition?: string;
+    confidenceScore?: number;
+    reasoning?: string;
+    analyzedAt?: string;
+  };
+
   // Vehicle Specific
   chasisNo?: string;
   engineNo?: string;
