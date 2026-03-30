@@ -2,18 +2,46 @@
 
 /**
  * @fileOverview Users & Roles - Identity Governance Workspace.
+ * Refined for Phase 7 with high-fidelity administrative controls.
  */
 
 import React from 'react';
 import AppLayout from '@/components/app-layout';
-import { Users, UserPlus, ShieldCheck, Mail, MapPin, Search, Filter } from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { Users, ShieldCheck, Settings, ShieldAlert, KeyRound } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { UserManagement } from '@/components/admin/user-management';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { FirestoreService } from '@/services/firebase/firestore';
+import { storage } from '@/offline/storage';
+import { useToast } from '@/hooks/use-toast';
+import type { AuthorizedUser } from '@/types/domain';
 
 export default function UsersRolesPage() {
   const { appSettings, refreshRegistry } = useAppState();
+  const { userProfile } = useAuth();
+  const { toast } = useToast();
+
+  const handleUsersChange = async (newUsers: AuthorizedUser[]) => {
+    if (!appSettings) return;
+    
+    try {
+      const updatedSettings = { ...appSettings, authorizedUsers: newUsers };
+      
+      // 1. Commit to Cloud if Online
+      await FirestoreService.updateSettings(updatedSettings);
+      
+      // 2. Commit to Local Persistence
+      await storage.saveSettings(updatedSettings);
+      
+      // 3. Trigger Global Reconciliation
+      await refreshRegistry();
+      
+      toast({ title: "Identity Ledger Updated", description: "Authorization changes broadcasted to all regional sessions." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Update Failed", description: "Governance heartbeat interruption." });
+    }
+  };
 
   return (
     <AppLayout>
@@ -35,11 +63,8 @@ export default function UsersRolesPage() {
               <CardContent className="p-8">
                 <UserManagement 
                   users={appSettings?.authorizedUsers || []}
-                  onUsersChange={async (newUsers) => {
-                    // This will be handled by Phase 7 logic
-                    console.log("Identity update pulse staged.");
-                  }}
-                  adminProfile={null}
+                  onUsersChange={handleUsersChange}
+                  adminProfile={userProfile}
                 />
               </CardContent>
             </Card>
@@ -57,11 +82,28 @@ export default function UsersRolesPage() {
             </Card>
 
             <div className="p-8 rounded-[2rem] bg-orange-500/5 border-2 border-dashed border-orange-500/20 space-y-4 shadow-inner">
-              <h4 className="text-[10px] font-black uppercase tracking-widest text-orange-600">Identity Rule</h4>
+              <div className="flex items-center gap-2">
+                <ShieldAlert className="h-4 w-4 text-orange-600" />
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-orange-600">Identity Rule</h4>
+              </div>
               <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase opacity-60">
                 Only Super Administrators can provision new auditors or modify regional jurisdictions.
               </p>
             </div>
+
+            <Card className="border-border/40 rounded-3xl bg-muted/20">
+              <CardContent className="p-6 space-y-4">
+                <h4 className="text-[10px] font-black uppercase tracking-widest opacity-60">Security Pulse</h4>
+                <div className="flex items-center justify-between text-[10px] font-black uppercase">
+                  <span>WAF Protection</span>
+                  <span className="text-green-600">Active</span>
+                </div>
+                <div className="flex items-center justify-between text-[10px] font-black uppercase">
+                  <span>Session TTL</span>
+                  <span className="text-primary">24H Pulse</span>
+                </div>
+              </CardContent>
+            </Card>
           </aside>
         </div>
       </div>

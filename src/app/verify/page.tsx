@@ -2,20 +2,49 @@
 
 /**
  * @fileOverview Verification Queue - Field Auditor Assessment Workspace.
+ * Optimized for high-speed field verification flows.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import AppLayout from '@/components/app-layout';
-import { CheckCircle2, Search, Filter, ClipboardCheck, Clock, MapPin } from 'lucide-react';
+import { CheckCircle2, Search, Filter, ClipboardCheck, Clock, MapPin, ArrowRight, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { AssetForm } from '@/components/asset-form';
+import type { Asset } from '@/types/domain';
+import { enqueueMutation } from '@/offline/queue';
+import { storage } from '@/offline/storage';
+import { useToast } from '@/hooks/use-toast';
 
 export default function VerificationQueuePage() {
-  const { assets } = useAppState();
+  const { assets, refreshRegistry } = useAppState();
+  const { toast } = useToast();
+  
+  const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>();
+  const [isFormOpen, setIsFormOpen] = useState(false);
+
   const unverified = assets.filter(a => a.status === 'UNVERIFIED');
+
+  const handleOpenAssessment = (asset: Asset) => {
+    setSelectedAsset(asset);
+    setIsFormOpen(true);
+  };
+
+  const handleSaveVerification = async (assetToSave: Asset) => {
+    try {
+      await enqueueMutation('UPDATE', 'assets', assetToSave);
+      const current = await storage.getAssets();
+      await storage.saveAssets(current.map(a => a.id === assetToSave.id ? assetToSave : a));
+      await refreshRegistry();
+      toast({ title: "Assessment Committed", description: "Verification pulse injected into sync queue." });
+      setIsFormOpen(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Assessment Failure" });
+    }
+  };
 
   return (
     <AppLayout>
@@ -29,13 +58,13 @@ export default function VerificationQueuePage() {
           </div>
           <div className="flex items-center gap-3">
             <Badge variant="outline" className="h-10 px-4 rounded-xl font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary">
-              {unverified.length} Items Pending
+              {unverified.length} Items Pending Assessment
             </Badge>
           </div>
         </div>
 
         <div className="flex flex-col md:flex-row items-center gap-4">
-          <div className="relative flex-1">
+          <div className="relative flex-1 w-full">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40" />
             <Input 
               placeholder="Scan Asset ID or Search Queue..." 
@@ -49,8 +78,8 @@ export default function VerificationQueuePage() {
 
         {unverified.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {unverified.slice(0, 9).map(asset => (
-              <Card key={asset.id} className="border-2 border-border/40 hover:border-primary/20 transition-all rounded-[2rem] overflow-hidden group">
+            {unverified.map(asset => (
+              <Card key={asset.id} className="border-2 border-border/40 hover:border-primary/20 transition-all rounded-[2rem] overflow-hidden group cursor-pointer bg-card/50" onClick={() => handleOpenAssessment(asset)}>
                 <CardContent className="p-0">
                   <div className="p-6 space-y-4">
                     <div className="flex items-start justify-between">
@@ -71,7 +100,7 @@ export default function VerificationQueuePage() {
                     <div className="pt-4 border-t border-dashed flex items-center justify-between">
                       <div className="flex items-center gap-2 text-orange-600">
                         <Clock className="h-3.5 w-3.5" />
-                        <span className="text-[10px] font-black uppercase tracking-widest">Unverified</span>
+                        <span className="text-[10px] font-black uppercase tracking-widest">Awaiting field assessment</span>
                       </div>
                       <Button variant="ghost" size="sm" className="text-[10px] font-black uppercase tracking-widest hover:text-primary p-0 h-auto">
                         Assessment Pulse <ArrowRight className="ml-1 h-3 w-3" />
@@ -89,13 +118,22 @@ export default function VerificationQueuePage() {
                 <CheckCircle2 className="h-20 w-20" />
               </div>
               <div className="space-y-2">
-                <h3 className="text-2xl font-black uppercase tracking-widest">Queue Status: Clear</h3>
+                <h3 className="text-2xl font-black uppercase tracking-widest">Queue Status: Reconciled</h3>
                 <p className="text-sm font-medium max-w-xs mx-auto">All assets in your regional scope have been verified. Field audit pulses are complete.</p>
               </div>
             </div>
           </div>
         )}
       </div>
+
+      <AssetForm
+        isOpen={isFormOpen}
+        onOpenChange={setIsFormOpen}
+        asset={selectedAsset}
+        isReadOnly={false}
+        onSave={handleSaveVerification}
+        onQuickSave={async () => {}}
+      />
     </AppLayout>
   );
 }
