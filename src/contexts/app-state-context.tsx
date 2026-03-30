@@ -1,50 +1,32 @@
 'use client';
 
 /**
- * @fileOverview AppStateContext - Data Facade.
- * Coordinates UI requests with the Offline Storage and Cloud Services.
+ * @fileOverview AppStateContext - The Data Facade.
+ * Orchestrates the UI requests with the Offline Storage and Sync Engine.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { storage } from '@/offline/storage';
+import { processSyncQueue } from '@/offline/sync';
 import { FirestoreService } from '@/services/firebase/firestore';
-import type { Asset, AppSettings, Grant } from '@/lib/types';
+import type { Asset, AppSettings } from '@/types/domain';
 import { addNotification } from '@/hooks/use-notifications';
-import { HEADER_DEFINITIONS, TARGET_SHEETS } from '@/lib/constants';
 
 interface AppStateContextType {
   assets: Asset[];
-  setAssets: React.Dispatch<React.SetStateAction<Asset[]>>;
   offlineAssets: Asset[];
-  setOfflineAssets: React.Dispatch<React.SetStateAction<Asset[]>>;
   isOnline: boolean;
   setIsOnline: (status: boolean) => void;
   searchTerm: string;
-  setSearchTerm: React.Dispatch<React.SetStateAction<string>>;
+  setSearchTerm: (term: string) => void;
   isSyncing: boolean;
-  setIsSyncing: React.Dispatch<React.SetStateAction<boolean>>;
-  appSettings: AppSettings;
+  appSettings: AppSettings | null;
   settingsLoaded: boolean;
-  loadInitialData: () => Promise<void>;
+  refreshRegistry: () => Promise<void>;
   globalStateFilters: string[];
-  activeGrantId: string | null;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
-
-const DEFAULT_SETTINGS: AppSettings = {
-  grants: [{
-    id: 'default-grant',
-    name: 'Primary Asset Project',
-    sheetDefinitions: HEADER_DEFINITIONS,
-    enabledSheets: TARGET_SHEETS,
-  }],
-  activeGrantId: 'default-grant',
-  authorizedUsers: [],
-  lockAssetList: false,
-  appMode: 'management',
-  activeDatabase: 'firestore',
-};
 
 export const AppStateProvider = ({ children }: { children: React.ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -52,69 +34,63 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [isOnline, setIsOnlineStatus] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
-  const [appSettings, setAppSettings] = useState<AppSettings>(DEFAULT_SETTINGS);
+  const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
-  const [globalStateFilters, setGlobalStateFilters] = useState<string[]>(['All']);
 
   const setIsOnline = (status: boolean) => {
     setIsOnlineStatus(status);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('assetain_online_mode', JSON.stringify(status));
-    }
     addNotification({ 
-      title: status ? 'Cloud Pulse Active' : 'Offline Mode Enabled',
-      description: status ? 'Re-establishing high-availability synchronization.' : 'Running on isolated local storage engine.'
+      title: status ? 'Cloud Sync Active' : 'Offline Mode Enabled',
+      description: status ? 'Re-establishing heartbeat with the central registry.' : 'Data is being stored in the local write-ahead queue.'
     });
   };
 
-  const loadInitialData = useCallback(async () => {
+  const refreshRegistry = useCallback(async () => {
+    setIsSyncing(true);
     try {
-      // 1. Load from IndexedDB
       const localAssets = await storage.getAssets();
       setAssets(localAssets);
       
       const localSandbox = await storage.getSandbox();
       setOfflineAssets(localSandbox);
 
-      // 2. Fetch remote settings if online
+      const localSettings = await storage.getSettings();
+      if (localSettings) setAppSettings(localSettings);
+
       if (isOnline) {
+        // Background sync check
+        await processSyncQueue();
         const remoteSettings = await FirestoreService.getSettings();
         if (remoteSettings) {
           setAppSettings(remoteSettings);
+          await storage.saveSettings(remoteSettings);
         }
       }
-      setSettingsLoaded(true);
     } catch (e) {
-      console.error("Context: Failed to load registry state", e);
-      setSettingsLoaded(true); // Still mark as loaded to unblock Auth
+      console.error("Facade: Failed to sync registry", e);
+    } finally {
+      setIsSyncing(false);
+      setSettingsLoaded(true);
     }
   }, [isOnline]);
 
   useEffect(() => {
-    loadInitialData();
-    if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('assetain_online_mode');
-      if (saved) setIsOnlineStatus(JSON.parse(saved));
-    }
-  }, [loadInitialData]);
+    refreshRegistry();
+  }, [refreshRegistry]);
 
   return (
     <AppStateContext.Provider value={{
       assets,
-      setAssets,
       offlineAssets,
-      setOfflineAssets,
       isOnline,
       setIsOnline,
       searchTerm,
       setSearchTerm,
       isSyncing,
-      setIsSyncing,
       appSettings,
       settingsLoaded,
-      loadInitialData,
-      globalStateFilters,
-      activeGrantId: appSettings.activeGrantId
+      refreshRegistry,
+      globalStateFilters: ['All']
     }}>
       {children}
     </AppStateContext.Provider>

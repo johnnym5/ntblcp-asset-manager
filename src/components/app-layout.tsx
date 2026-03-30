@@ -1,5 +1,8 @@
-
 'use client';
+
+/**
+ * @fileOverview AppLayout - The Main Navigation Shell.
+ */
 
 import React from 'react';
 import Link from 'next/link';
@@ -68,7 +71,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
-      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-72 border-r bg-card/50 backdrop-blur-xl p-6">
         <div className="flex items-center gap-3 mb-10 px-2">
           <div className="p-2 bg-primary rounded-xl shadow-lg">
@@ -98,7 +100,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-6 z-30">
           <div className="flex items-center gap-4 lg:hidden">

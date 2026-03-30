@@ -1,31 +1,29 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import AppLayout from '@/components/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
-import { TrendingUp, ShieldCheck, AlertCircle, Activity, ArrowRight, Loader2 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { TrendingUp, ShieldCheck, AlertCircle, Activity, Loader2, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import UserProfileSetup from '@/components/user-profile-setup';
 import Link from 'next/link';
+import UserProfileSetup from '@/components/user-profile-setup';
 
 export default function DashboardPage() {
-  const { loading, profileSetupComplete } = useAuth();
-  const { assets, settingsLoaded } = useAppState();
+  const { assets, settingsLoaded, isSyncing } = useAppState();
+  const { profileSetupComplete, loading } = useAuth();
 
-  // Move useMemo to the top to satisfy the Rules of Hooks
-  const stats = React.useMemo(() => {
-    const total = assets?.length || 0;
-    const verified = assets?.filter(a => a.verifiedStatus === 'Verified').length || 0;
-    const discrepancy = assets?.filter(a => a.verifiedStatus === 'Discrepancy').length || 0;
+  const stats = useMemo(() => {
+    const total = assets.length;
+    const verified = assets.filter(a => a.status === 'VERIFIED').length;
+    const discrepancies = assets.filter(a => a.status === 'DISCREPANCY').length;
     const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
 
-    return { total, verified, discrepancy, coverage };
+    return { total, verified, discrepancies, coverage };
   }, [assets]);
 
-  // Conditional returns MUST happen after all hook calls
   if (loading || !settingsLoaded) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -77,7 +75,7 @@ export default function DashboardPage() {
               <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Exceptions</CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="text-4xl font-black tracking-tighter text-destructive">{stats.discrepancy}</div>
+              <div className="text-4xl font-black tracking-tighter text-destructive">{stats.discrepancies}</div>
               <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Integrity Failures</p>
             </CardContent>
           </Card>
@@ -105,12 +103,12 @@ export default function DashboardPage() {
                         <Activity className="h-4 w-4 text-muted-foreground" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-sm font-black">{asset.description}</span>
+                        <span className="text-sm font-black">{asset.description || asset.name}</span>
                         <span className="text-[10px] font-bold text-muted-foreground uppercase">{asset.location} • {asset.category}</span>
                       </div>
                     </div>
                     <div className="text-[10px] font-black uppercase tracking-widest opacity-60">
-                      {asset.verifiedStatus || 'UNVERIFIED'}
+                      {asset.status}
                     </div>
                   </div>
                 ))}
@@ -149,7 +147,7 @@ export default function DashboardPage() {
                     <AlertCircle className="h-5 w-5 text-orange-500" />
                     <span className="text-xs font-bold uppercase tracking-tight">Sync Status</span>
                   </div>
-                  <span className="text-xs font-black">All Clear</span>
+                  <span className="text-xs font-black">{isSyncing ? 'Syncing...' : 'All Clear'}</span>
                 </div>
               </CardContent>
             </Card>
