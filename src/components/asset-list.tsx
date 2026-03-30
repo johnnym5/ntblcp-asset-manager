@@ -1,7 +1,6 @@
-
 "use client";
 
-import React, { useEffect, useState, useRef, useMemo, useCallback } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   Table,
   TableBody,
@@ -16,7 +15,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   DropdownMenuSeparator,
-  DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
@@ -35,14 +33,7 @@ import {
   Trash2,
   ArrowLeft,
   Edit,
-  Check,
-  FileText,
   FolderSearch,
-  CloudUpload,
-  HardDrive,
-  PlusCircle,
-  ScanSearch,
-  CloudDownload,
   Layout,
   History
 } from "lucide-react";
@@ -53,7 +44,7 @@ import { AssetForm } from "./asset-form";
 import type { Asset } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
 import { useAppState } from "@/contexts/app-state-context";
-import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets } from "@/lib/firestore";
+import { getAssets } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets } from "@/lib/idb";
 import { cn, sanitizeForFirestore } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
@@ -88,7 +79,6 @@ export default function AssetList() {
   const [view, setView] = useState<'dashboard' | 'table'>('dashboard');
   const [currentCategory, setCurrentCategory] = useState<string | null>(null);
   
-  const [isBatchDeleting, setIsBatchDeleting] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
@@ -107,8 +97,6 @@ export default function AssetList() {
   const isGuest = userProfile?.isGuest || false;
   const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
 
-  // --- SYNC HANDLERS (DEFINED BEFORE USE) ---
-
   const handleDownloadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
     setIsSyncing(true);
@@ -120,7 +108,7 @@ export default function AssetList() {
         const summary: SyncSummary = { newFromCloud: [], updatedFromCloud: [], keptLocal: [], toUpload: [], type: 'download' };
         
         for (const cloudAsset of cloudAssets) {
-            if (cloudAsset.grantId !== activeGrantId) continue;
+            if (activeGrantId && cloudAsset.grantId !== activeGrantId) continue;
             const localAsset = localAssetsMap.get(cloudAsset.id);
             if (localAsset) {
                 const cloudTimestamp = cloudAsset.lastModified ? new Date(cloudAsset.lastModified).getTime() : 0;
@@ -147,7 +135,7 @@ export default function AssetList() {
     setIsSyncing(true);
     try {
         const localAssets = await getLocalAssetsFromDb();
-        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local' && a.grantId === activeGrantId);
+        const assetsToPush = localAssets.filter(a => a.syncStatus === 'local' && (!activeGrantId || a.grantId === activeGrantId));
         if (assetsToPush.length > 0) { 
             setSyncSummary({ newFromCloud: [], updatedFromCloud: [], keptLocal: [], toUpload: assetsToPush, type: 'upload' }); 
             setIsSyncConfirmOpen(true); 
@@ -163,8 +151,6 @@ export default function AssetList() {
 
   useEffect(() => { if (manualDownloadTrigger > 0) handleDownloadScan(); }, [manualDownloadTrigger, handleDownloadScan]);
   useEffect(() => { if (manualUploadTrigger > 0) handleUploadScan(); }, [manualUploadTrigger, handleUploadScan]);
-
-  // --- DATA FILTERING ---
 
   const displayedAssets = useMemo(() => {
     let results = activeAssets.filter(asset => {
@@ -194,8 +180,6 @@ export default function AssetList() {
         return acc;
     }, {} as Record<string, Record<string, Asset[]>>);
   }, [displayedAssets]);
-
-  // --- UI HANDLERS ---
 
   const handleViewAsset = useCallback((asset: Asset) => {
     setSelectedAsset(asset);
@@ -248,13 +232,13 @@ export default function AssetList() {
       <AssetSummaryDashboard />
       
       {view === 'dashboard' ? (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500 pb-20">
           {Object.entries(assetsByMajorSection).sort((a,b) => a[0].localeCompare(b[0])).map(([section, categories]) => (
             <div key={section} className="space-y-4">
                 <div className="flex items-center gap-3">
                     <div className="p-1.5 bg-primary/10 rounded-lg"><Layout className="h-4 w-4 text-primary" /></div>
                     <h3 className="text-sm font-black uppercase tracking-widest text-muted-foreground">{section}</h3>
-                    <Separator className="flex-1" />
+                    <Separator className="flex-1 opacity-50" />
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                     {Object.entries(categories).map(([cat, catAssets]) => {
@@ -262,18 +246,21 @@ export default function AssetList() {
                         const verified = catAssets.filter(a => a.verifiedStatus === 'Verified').length;
                         const percentage = Math.round((verified / total) * 100);
                         return (
-                            <Card key={cat} className="hover:shadow-xl transition-all duration-300 cursor-pointer group border-primary/5 hover:border-primary/20" onClick={() => { setView('table'); setCurrentCategory(cat); }}>
+                            <Card key={cat} className="hover:shadow-2xl transition-all duration-500 cursor-pointer group border-2 border-primary/5 hover:border-primary/20 bg-card rounded-3xl" onClick={() => { setView('table'); setCurrentCategory(cat); }}>
                                 <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-bold truncate group-hover:text-primary transition-colors">{cat}</CardTitle>
+                                    <CardTitle className="text-sm font-black truncate group-hover:text-primary transition-colors uppercase tracking-tight">{cat}</CardTitle>
                                 </CardHeader>
-                                <CardContent className="space-y-3">
-                                    <div className="text-3xl font-black tracking-tighter">{total}</div>
-                                    <div className="space-y-1">
-                                        <div className="flex justify-between text-[10px] font-black uppercase text-muted-foreground tracking-widest">
-                                            <span>Progress</span>
-                                            <span>{percentage}%</span>
+                                <CardContent className="space-y-4">
+                                    <div className="flex items-baseline gap-2">
+                                        <div className="text-4xl font-black tracking-tighter">{total}</div>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase opacity-60">Records</span>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between text-[9px] font-black uppercase text-muted-foreground tracking-widest">
+                                            <span>Sync Progress</span>
+                                            <span className={cn(percentage === 100 ? "text-green-600" : "text-primary")}>{percentage}%</span>
                                         </div>
-                                        <Progress value={percentage} className="h-1.5 bg-muted" />
+                                        <Progress value={percentage} className={cn("h-1.5 bg-muted", percentage === 100 && "bg-green-100")} />
                                     </div>
                                 </CardContent>
                             </Card>
@@ -284,58 +271,61 @@ export default function AssetList() {
           ))}
         </div>
       ) : (
-        <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="space-y-4 animate-in fade-in slide-in-from-right-2 duration-300 pb-20">
             <div className="flex items-center justify-between">
-                <Button variant="ghost" onClick={() => setView('dashboard')} className="hover:bg-primary/5 font-bold">
-                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Dashboard
+                <Button variant="ghost" onClick={() => setView('dashboard')} className="hover:bg-primary/5 font-bold rounded-xl px-4">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Back to Sections
                 </Button>
-                <h2 className="text-xl font-black uppercase tracking-tight text-primary">{currentCategory}</h2>
+                <div className="flex flex-col items-end">
+                    <h2 className="text-2xl font-black uppercase tracking-tight text-primary leading-none">{currentCategory}</h2>
+                    <span className="text-[9px] font-black uppercase text-muted-foreground tracking-widest mt-1">Registry Detail View</span>
+                </div>
             </div>
-            <Card className="rounded-2xl border-none shadow-xl overflow-hidden">
+            <Card className="rounded-3xl border-2 shadow-2xl overflow-hidden border-border/50">
                 <Table>
                     <TableHeader className="bg-muted/30">
-                        <TableRow>
-                            <TableHead className="font-black uppercase text-[10px] tracking-widest">Asset Identification</TableHead>
-                            <TableHead className="font-black uppercase text-[10px] tracking-widest">Registry Context</TableHead>
-                            <TableHead className="font-black uppercase text-[10px] tracking-widest">Status</TableHead>
-                            <TableHead className="text-right font-black uppercase text-[10px] tracking-widest">Actions</TableHead>
+                        <TableRow className="border-b-2">
+                            <TableHead className="font-black uppercase text-[10px] tracking-widest py-4 px-6">Asset Identification</TableHead>
+                            <TableHead className="font-black uppercase text-[10px] tracking-widest py-4">Registry Context</TableHead>
+                            <TableHead className="font-black uppercase text-[10px] tracking-widest py-4">Status</TableHead>
+                            <TableHead className="text-right font-black uppercase text-[10px] tracking-widest py-4 px-6">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {displayedAssets.filter(a => a.category === currentCategory).map(asset => (
-                            <TableRow key={asset.id} className="hover:bg-muted/20 transition-colors">
-                                <TableCell>
-                                    <div className="font-bold text-sm">{asset.description}</div>
-                                    <div className="text-[10px] font-mono text-muted-foreground mt-0.5">TAG: {asset.assetIdCode || asset.sn || 'UNTAGGED'}</div>
+                            <TableRow key={asset.id} className="hover:bg-primary/5 transition-colors border-b last:border-0 group">
+                                <TableCell className="py-4 px-6">
+                                    <div className="font-black text-sm text-foreground">{asset.description}</div>
+                                    <div className="text-[10px] font-mono text-muted-foreground mt-1 group-hover:text-primary transition-colors">TAG: {asset.assetIdCode || asset.sn || 'UNTAGGED'}</div>
                                 </TableCell>
-                                <TableCell>
-                                    <div className="flex flex-wrap gap-1">
+                                <TableCell className="py-4">
+                                    <div className="flex flex-wrap gap-2">
                                         {asset.normalizedLabel ? (
-                                            <Badge variant="secondary" className="text-[9px] uppercase font-black tracking-tighter h-5">
-                                                <History className="h-3 w-3 mr-1 opacity-50" /> {asset.normalizedLabel}
+                                            <Badge variant="secondary" className="text-[9px] uppercase font-black tracking-widest h-5 bg-muted/50">
+                                                <History className="h-3 w-3 mr-1.5 opacity-50" /> {asset.normalizedLabel}
                                             </Badge>
-                                        ) : <span className="text-muted-foreground text-[10px] font-bold italic opacity-40">STANDARD ENTRY</span>}
-                                        {asset.yearBucket && <Badge variant="outline" className="text-[9px] h-5 border-primary/20 text-primary">{asset.yearBucket}</Badge>}
+                                        ) : <span className="text-muted-foreground text-[10px] font-bold italic opacity-30">BASE REGISTER</span>}
+                                        {asset.yearBucket && <Badge variant="outline" className="text-[9px] h-5 border-primary/30 text-primary font-black">{asset.yearBucket}</Badge>}
                                     </div>
                                 </TableCell>
-                                <TableCell>
+                                <TableCell className="py-4">
                                     <Badge className={cn(
-                                        "text-[10px] uppercase font-black tracking-widest h-6 px-3 shadow-sm", 
-                                        asset.verifiedStatus === 'Verified' ? "bg-green-500 hover:bg-green-600" : "bg-orange-500 hover:bg-orange-600"
+                                        "text-[10px] uppercase font-black tracking-widest h-6 px-4 rounded-lg shadow-xl", 
+                                        asset.verifiedStatus === 'Verified' ? "bg-green-500 hover:bg-green-600 shadow-green-500/20" : "bg-orange-500 hover:bg-orange-600 shadow-orange-500/20"
                                     )}>
                                         {asset.verifiedStatus || 'UNVERIFIED'}
                                     </Badge>
                                 </TableCell>
-                                <TableCell className="text-right">
+                                <TableCell className="text-right py-4 px-6">
                                     <DropdownMenu>
                                         <DropdownMenuTrigger asChild>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full"><MoreHorizontal className="h-4 w-4" /></Button>
+                                            <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl hover:bg-primary/10 transition-all"><MoreHorizontal className="h-5 w-5" /></Button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="rounded-xl w-48 shadow-2xl">
-                                            <DropdownMenuItem onClick={() => handleViewAsset(asset)} className="py-2.5 font-bold text-xs"><FolderSearch className="mr-2 h-4 w-4 text-primary" /> Inspect Profile</DropdownMenuItem>
-                                            <DropdownMenuItem onClick={() => handleEditAsset(asset)} className="py-2.5 font-bold text-xs"><Edit className="mr-2 h-4 w-4 text-primary" /> Edit Structural Data</DropdownMenuItem>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => { setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="py-2.5 font-bold text-xs text-destructive focus:bg-destructive/10"><Trash2 className="mr-2 h-4 w-4" /> Delete Record</DropdownMenuItem>
+                                        <DropdownMenuContent align="end" className="rounded-2xl w-56 shadow-2xl p-2 border-2">
+                                            <DropdownMenuItem onClick={() => handleViewAsset(asset)} className="py-3 font-bold text-xs rounded-xl cursor-pointer"><FolderSearch className="mr-3 h-4 w-4 text-primary" /> Inspect Registry Profile</DropdownMenuItem>
+                                            <DropdownMenuItem onClick={() => handleEditAsset(asset)} className="py-3 font-bold text-xs rounded-xl cursor-pointer"><Edit className="mr-3 h-4 w-4 text-primary" /> Edit Structural Data</DropdownMenuItem>
+                                            <DropdownMenuSeparator className="my-2" />
+                                            <DropdownMenuItem onClick={() => { setAssetToDelete(asset); setIsDeleteDialogOpen(true); }} className="py-3 font-bold text-xs text-destructive focus:bg-destructive/10 rounded-xl cursor-pointer"><Trash2 className="mr-3 h-4 w-4" /> Delete Entry</DropdownMenuItem>
                                         </DropdownMenuContent>
                                     </DropdownMenu>
                                 </TableCell>
@@ -364,22 +354,22 @@ export default function AssetList() {
         summary={syncSummary} 
         onConfirm={() => {
             if (syncSummary?.type === 'download') {
-                // Execute logic...
+                // Confirm Sync Logic...
             }
         }} 
       />
 
       <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
-          <AlertDialogContent className="rounded-3xl">
+          <AlertDialogContent className="rounded-3xl border-destructive/10">
               <AlertDialogHeader>
-                  <AlertDialogTitle className="text-destructive font-black">Confirm Deletion?</AlertDialogTitle>
-                  <AlertDialogDescription className="text-sm font-medium">
-                      This will permanently remove <strong>{assetToDelete?.description}</strong> from the local registry and mark it for cloud removal.
+                  <AlertDialogTitle className="text-destructive text-2xl font-black tracking-tight">Confirm Record Deletion?</AlertDialogTitle>
+                  <AlertDialogDescription className="text-sm font-medium leading-relaxed">
+                      This will permanently remove <strong>{assetToDelete?.description}</strong> from the local registry and mark it for cloud removal during the next sync pulse.
                   </AlertDialogDescription>
               </AlertDialogHeader>
-              <AlertDialogFooter>
-                  <AlertDialogCancel className="font-bold rounded-xl">Cancel</AlertDialogCancel>
-                  <AlertDialogAction onClick={handleDeleteConfirm} className="bg-destructive hover:bg-destructive/90 font-bold rounded-xl">Delete Record</AlertDialogAction>
+              <AlertDialogFooter className="mt-4">
+                  <AlertDialogCancel className="font-bold rounded-xl px-6">Cancel</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => {}} className="bg-destructive hover:bg-destructive/90 font-black uppercase tracking-widest text-xs h-11 px-8 rounded-xl shadow-xl shadow-destructive/20">Delete Record</AlertDialogAction>
               </AlertDialogFooter>
           </AlertDialogContent>
       </AlertDialog>

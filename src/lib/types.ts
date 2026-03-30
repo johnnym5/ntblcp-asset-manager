@@ -66,6 +66,9 @@ export interface Asset {
   lastModifiedBy?: string; // displayName of user who last modified
   lastModifiedByState?: string; // state of user who last modified
 
+  // Client-side undo/audit buffer
+  previousState?: Partial<Asset>;
+
   // Approval Workflow Fields
   approvalStatus?: 'pending'; // Only set when there's a pending change
   pendingChanges?: Partial<Asset>;
@@ -74,6 +77,13 @@ export interface Asset {
     loginName: string;
     state: string;
   };
+
+  // Custom fields
+  customField1?: string;
+  customField2?: string;
+  customField3?: string;
+  customField4?: string;
+  customField5?: string;
 }
 
 export interface AuthorizedUser {
