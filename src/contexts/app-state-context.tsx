@@ -1,13 +1,17 @@
 'use client';
 
-import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect, useMemo } from 'react';
+import { createContext, useContext, useState, type ReactNode, type Dispatch, type SetStateAction, useEffect } from 'react';
 import type { OptionType } from '@/components/asset-filter-sheet';
 import { TARGET_SHEETS } from '@/lib/constants';
-import type { Asset, AppSettings, AuthorizedUser } from '@/lib/types';
+import type { Asset, AppSettings, Grant } from '@/lib/types';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
-import { getSettings } from '@/lib/firestore';
+import { getSettings as getSettingsFS, updateSettings as updateSettingsFS } from '@/lib/firestore';
+import { getSettings as getSettingsRTDB } from '@/lib/database';
 import { getLocalSettings, saveLocalSettings } from '@/lib/idb';
-
+import { db } from '@/lib/firebase';
+import { doc, onSnapshot, collection, query, where, getDocs } from 'firebase/firestore';
+import { ref, onValue } from 'firebase/database';
+import { rtdb } from '@/lib/firebase';
 
 export interface SortConfig {
   key: keyof import('@/lib/types').Asset;
@@ -40,7 +44,6 @@ interface AppStateContextType {
   dataSource: 'cloud' | 'local_locked';
   setDataSource: Dispatch<SetStateAction<'cloud' | 'local_locked'>>;
   
-  // Filters
   selectedLocations: string[];
   setSelectedLocations: Dispatch<SetStateAction<string[]>>;
   selectedAssignees: string[];
@@ -50,7 +53,6 @@ interface AppStateContextType {
   missingFieldFilter: string;
   setMissingFieldFilter: Dispatch<SetStateAction<string>>;
   
-  // Filter Options
   locationOptions: OptionType[];
   setLocationOptions: Dispatch<SetStateAction<OptionType[]>>;
   assigneeOptions: OptionType[];
@@ -58,16 +60,16 @@ interface AppStateContextType {
   statusOptions: OptionType[];
   setStatusOptions: Dispatch<SetStateAction<OptionType[]>>;
   
-  // Sorting
   sortConfig: SortConfig | null;
   setSortConfig: Dispatch<SetStateAction<SortConfig | null>>;
 
-  // App Settings
   appSettings: AppSettings;
   setAppSettings: Dispatch<SetStateAction<AppSettings>>;
   settingsLoaded: boolean;
   
-  // Sync Settings
+  activeGrantId: string | null;
+  setActiveGrantId: (id: string | null) => void;
+
   manualDownloadTrigger: number;
   setManualDownloadTrigger: Dispatch<SetStateAction<number>>;
   manualUploadTrigger: number;
@@ -75,18 +77,26 @@ interface AppStateContextType {
   isSyncing: boolean;
   setIsSyncing: Dispatch<SetStateAction<boolean>>;
 
-  // Inbox count for UI display
   unreadInboxCount: number;
   setUnreadInboxCount: Dispatch<SetStateAction<number>>;
 
-  // Cross-component communication
   assetToView: Asset | null;
   setAssetToView: Dispatch<SetStateAction<Asset | null>>;
   dataActions: DataActions;
   setDataActions: Dispatch<SetStateAction<DataActions>>;
+  
+  activeDatabase: 'firestore' | 'rtdb';
+  setActiveDatabase: (db: 'firestore' | 'rtdb') => void;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
+
+const DEFAULT_GRANT: Grant = {
+  id: 'default-registry',
+  name: 'Main Asset Register',
+  sheetDefinitions: HEADER_DEFINITIONS,
+  enabledSheets: TARGET_SHEETS,
+};
 
 export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -114,11 +124,12 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [sortConfig, setSortConfig] = useState<SortConfig | null>({ key: 'sn', direction: 'asc' });
 
   const [appSettings, setAppSettings] = useState<AppSettings>({
+    grants: [DEFAULT_GRANT],
+    activeGrantId: DEFAULT_GRANT.id,
     authorizedUsers: [],
-    sheetDefinitions: HEADER_DEFINITIONS,
-    enabledSheets: TARGET_SHEETS,
     lockAssetList: true,
     appMode: 'management',
+    activeDatabase: 'firestore',
   });
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
@@ -127,59 +138,102 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
   const [isSyncing, setIsSyncing] = useState(false);
   
   const [unreadInboxCount, setUnreadInboxCount] = useState(0);
-
   const [dataSource, setDataSource] = useState<'cloud' | 'local_locked'>('cloud');
   const [assetToView, setAssetToView] = useState<Asset | null>(null);
   const [dataActions, setDataActions] = useState<DataActions>({});
 
-
+  // 1. Initial Load from IndexedDB
   useEffect(() => {
-    const initializeSettings = async () => {
-      // 1. Load local settings first for a fast offline-first experience.
-      let localSettings = await getLocalSettings();
-
-      if (!localSettings) {
-        localSettings = {
+    const initialize = async () => {
+      let local = await getLocalSettings();
+      if (!local) {
+        local = {
+          grants: [DEFAULT_GRANT],
+          activeGrantId: DEFAULT_GRANT.id,
           authorizedUsers: [],
-          sheetDefinitions: HEADER_DEFINITIONS,
-          enabledSheets: TARGET_SHEETS,
           lockAssetList: true,
           appMode: 'management',
+          activeDatabase: 'firestore',
         };
-        await saveLocalSettings(localSettings);
+        await saveLocalSettings(local);
       }
-      setAppSettings(localSettings);
+      setAppSettings(local);
       setSettingsLoaded(true);
-
-      // 2. After loading local settings, try to fetch the latest from the cloud.
-      if (isOnline) {
-        try {
-          const remoteSettings = await getSettings();
-          if (remoteSettings && JSON.stringify(remoteSettings) !== JSON.stringify(localSettings)) {
-            console.log("Found newer settings in Firestore, updating local state.");
-            setAppSettings(remoteSettings);
-            await saveLocalSettings(remoteSettings);
-          }
-        } catch (error) {
-          console.warn("Could not fetch remote settings. Using local version.", error);
-        }
-      }
     };
+    initialize();
+  }, []);
 
-    initializeSettings();
-  }, [isOnline]);
-
+  // 2. Real-Time Cloud Listeners (Broadcast)
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('ntblcp-online-status', JSON.stringify(isOnline));
-    }
-  }, [isOnline]);
+    if (!isOnline || !db || !rtdb) return;
 
-  useEffect(() => {
-    if (appSettings.appMode === 'management') {
-      setSelectedStatuses([]);
+    // Listen for Settings changes based on active database choice
+    let unsubscribeSettings: () => void = () => {};
+    
+    if (appSettings.activeDatabase === 'firestore') {
+      unsubscribeSettings = onSnapshot(doc(db, 'config', 'settings'), (docSnap) => {
+        if (docSnap.exists()) {
+          const remote = docSnap.data() as AppSettings;
+          setAppSettings(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(remote)) {
+              saveLocalSettings(remote);
+              return remote;
+            }
+            return prev;
+          });
+        }
+      });
+    } else {
+      const settingsRef = ref(rtdb, 'config/settings');
+      onValue(settingsRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const remote = snapshot.val() as AppSettings;
+          setAppSettings(prev => {
+            if (JSON.stringify(prev) !== JSON.stringify(remote)) {
+              saveLocalSettings(remote);
+              return remote;
+            }
+            return prev;
+          });
+        }
+      });
     }
-  }, [appSettings.appMode]);
+
+    return () => unsubscribeSettings();
+  }, [isOnline, appSettings.activeDatabase]);
+
+  // 3. Asset Synchronization (Project-Scoped)
+  useEffect(() => {
+    if (!isOnline || !db || !appSettings.activeGrantId) return;
+
+    let unsubscribeAssets: () => void = () => {};
+
+    if (appSettings.activeDatabase === 'firestore') {
+      const q = query(collection(db, 'assets'), where('grantId', '==', appSettings.activeGrantId));
+      unsubscribeAssets = onSnapshot(q, (snapshot) => {
+        const fetched = snapshot.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
+        setAssets(fetched);
+      });
+    } else {
+      // RTDB project scoped query would go here if using large scale listeners
+    }
+
+    return () => unsubscribeAssets();
+  }, [isOnline, appSettings.activeGrantId, appSettings.activeDatabase]);
+
+  const setActiveGrantId = async (id: string | null) => {
+    const updated = { ...appSettings, activeGrantId: id };
+    setAppSettings(updated);
+    await saveLocalSettings(updated);
+    if (isOnline) await updateSettingsFS(updated);
+  };
+
+  const setActiveDatabase = async (choice: 'firestore' | 'rtdb') => {
+    const updated = { ...appSettings, activeDatabase: choice };
+    setAppSettings(updated);
+    await saveLocalSettings(updated);
+    if (isOnline) await updateSettingsFS(updated);
+  };
 
   const value = {
     assets, setAssets,
@@ -198,6 +252,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     sortConfig, setSortConfig,
     appSettings, setAppSettings,
     settingsLoaded,
+    activeGrantId: appSettings.activeGrantId,
+    setActiveGrantId,
     manualDownloadTrigger, setManualDownloadTrigger,
     manualUploadTrigger, setManualUploadTrigger,
     isSyncing, setIsSyncing,
@@ -205,6 +261,8 @@ export const AppStateProvider = ({ children }: { children: ReactNode }) => {
     dataSource, setDataSource,
     assetToView, setAssetToView,
     dataActions, setDataActions,
+    activeDatabase: appSettings.activeDatabase,
+    setActiveDatabase,
   };
 
   return (

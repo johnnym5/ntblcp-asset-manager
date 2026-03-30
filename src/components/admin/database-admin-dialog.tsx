@@ -24,12 +24,12 @@ import { useAuth } from '@/contexts/auth-context';
 import { 
     Loader2, 
     ShieldCheck, 
-    FileText,
     DatabaseIcon,
     History,
     RotateCcw,
     Zap,
     AlertTriangle,
+    FileText,
 } from 'lucide-react';
 import { addNotification } from '@/hooks/use-notifications';
 import { useToast } from '@/hooks/use-toast';
@@ -55,10 +55,11 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       if (!activeGrantId) return;
       setIsProcessing(true);
       try {
-          const fsData = await getAssetsFS(activeGrantId);
-          await batchSetAssetsRTDB(fsData);
-          addNotification({ title: 'Backup Successful', description: `Cloned ${fsData.length} records to Realtime Database.` });
-          toast({ title: "Mirror Snapshot Created" });
+          const fsData = await getAssetsFS();
+          const projectData = fsData.filter(a => a.grantId === activeGrantId);
+          await batchSetAssetsRTDB(projectData);
+          addNotification({ title: 'Mirror Snapshot Created', description: `Cloned ${projectData.length} project records to Realtime Database.` });
+          toast({ title: "Snapshot Complete" });
       } catch (e) {
           toast({ title: 'Backup Failed', variant: 'destructive' });
       } finally {
@@ -72,8 +73,8 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       try {
           const rtdbData = await getAssetsRTDB(activeGrantId);
           await batchSetAssetsFS(rtdbData);
-          addNotification({ title: 'Migration Complete', description: `Pushed ${rtdbData.length} records to Cloud Firestore.` });
-          toast({ title: "Firestore Restored from Mirror" });
+          addNotification({ title: 'Firestore Restored', description: `Pushed ${rtdbData.length} records back to Cloud Firestore.` });
+          toast({ title: "Restore Complete" });
       } catch (e) {
           toast({ title: 'Migration Failed', variant: 'destructive' });
       } finally {
@@ -81,7 +82,7 @@ export function DatabaseAdminDialog({ isOpen, onOpenChange }: DatabaseAdminDialo
       }
   };
 
-  if (userProfile?.loginName !== 'admin') return null;
+  if (!userProfile?.isAdmin) return null;
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>

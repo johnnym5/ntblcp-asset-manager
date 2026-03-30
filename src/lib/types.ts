@@ -71,7 +71,7 @@ export interface Asset {
   pendingChanges?: Partial<Asset>;
   changeSubmittedBy?: { 
     displayName: string;
-    loginName: string; // for potential future notifications
+    loginName: string;
     state: string;
   };
 }
@@ -83,6 +83,8 @@ export interface AuthorizedUser {
   password?: string;
   states: string[];
   isAdmin: boolean;
+  isZonalAdmin?: boolean;
+  assignedZone?: string;
   isGuest?: boolean;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
@@ -101,15 +103,26 @@ export interface SheetDefinition {
   name: string;
   headers: string[];
   displayFields: DisplayField[];
-  // Optional array of header keywords that can trigger the start of this sheet's data block
-  // Useful for files where multiple tables are in one sheet.
   subSheetTriggers?: string[]; 
 }
 
-export interface AppSettings {
-  authorizedUsers: AuthorizedUser[];
+export interface Grant {
+  id: string;
+  name: string;
   sheetDefinitions: Record<string, SheetDefinition>;
   enabledSheets: string[];
+}
+
+export interface AppSettings {
+  grants: Grant[];
+  activeGrantId: string | null;
+  authorizedUsers: AuthorizedUser[];
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
+  activeDatabase: 'firestore' | 'rtdb';
+  lastModified?: string;
+  lastModifiedBy?: {
+    displayName: string;
+    loginName: string;
+  };
 }

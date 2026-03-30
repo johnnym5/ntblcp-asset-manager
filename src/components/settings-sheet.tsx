@@ -35,9 +35,9 @@ import { updateSettings } from '@/lib/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
-import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, PlaneTakeoff } from 'lucide-react';
+import { Sun, Moon, Database, Trash2, FileUp, PlusCircle, Loader2, UserCog, Settings as SettingsIcon, Wrench, Save, ScanSearch, Palette, FolderKanban, CheckCircle2, Pencil } from 'lucide-react';
 import { ColumnCustomizationSheet } from './column-customization-sheet';
-import type { SheetDefinition, AppSettings } from '@/lib/types';
+import type { SheetDefinition, AppSettings, Grant } from '@/lib/types';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { UserManagement } from './admin/user-management';
 import { saveLocalSettings } from '@/lib/idb';
@@ -48,6 +48,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { ScrollArea } from './ui/scroll-area';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from './ui/card';
+import { cn } from '@/lib/utils';
 
 interface SettingsSheetProps {
   isOpen: boolean;
@@ -56,7 +61,7 @@ interface SettingsSheetProps {
 
 export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   const { userProfile } = useAuth();
-  const { appSettings, setAppSettings, dataActions } = useAppState();
+  const { appSettings, setAppSettings, dataActions, setActiveGrantId } = useAppState();
   const { toast } = useToast();
   const { setTheme } = useTheme();
 
@@ -69,103 +74,44 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
   useEffect(() => {
     if (isOpen) {
       setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
-    } else {
-      setDraftSettings(null);
     }
   }, [isOpen, appSettings]);
 
   const hasChanges = useMemo(() => {
     return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
   }, [appSettings, draftSettings]);
-  
-  const calculatedChanges = useMemo(() => {
-    if (!draftSettings || !appSettings) return [];
-    const changes: string[] = [];
-    if (draftSettings.appMode !== appSettings.appMode) {
-      changes.push(`App mode will be set to: ${draftSettings.appMode}.`);
-    }
-    if (JSON.stringify(draftSettings.enabledSheets.sort()) !== JSON.stringify(appSettings.enabledSheets.sort())) {
-        changes.push(`Enabled sheets will be updated.`);
-    }
-    if (draftSettings.lockAssetList !== appSettings.lockAssetList) {
-        changes.push(`Asset list lock will be set to: ${draftSettings.lockAssetList}.`);
-    }
-    if (JSON.stringify(draftSettings.authorizedUsers) !== JSON.stringify(appSettings.authorizedUsers)) {
-        changes.push('User details will be updated.');
-    }
-    if (JSON.stringify(draftSettings.sheetDefinitions) !== JSON.stringify(appSettings.sheetDefinitions)) {
-      changes.push(`Sheet definitions will be updated.`);
-    }
-    return changes;
-  }, [draftSettings, appSettings]);
-
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     if (!draftSettings) return;
     setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
   };
 
-  const handleToggleSheet = (sheetName: string, checked: boolean) => {
+  const handleAddGrant = () => {
     if (!draftSettings) return;
-    let newEnabledSheets;
-    if (checked) {
-      newEnabledSheets = [...draftSettings.enabledSheets, sheetName];
-    } else {
-      newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetName);
+    const newGrant: Grant = {
+      id: crypto.randomUUID(),
+      name: 'New Asset Project',
+      sheetDefinitions: {},
+      enabledSheets: [],
+    };
+    handleSettingChange('grants', [...draftSettings.grants, newGrant]);
+  };
+
+  const handleRenameGrant = (id: string, name: string) => {
+    if (!draftSettings) return;
+    handleSettingChange('grants', draftSettings.grants.map(g => g.id === id ? { ...g, name } : g));
+  };
+
+  const handleDeleteGrant = (id: string) => {
+    if (!draftSettings) return;
+    if (draftSettings.grants.length <= 1) {
+      toast({ title: "Cannot Delete", description: "At least one project must remain.", variant: "destructive" });
+      return;
     }
-    handleSettingChange('enabledSheets', newEnabledSheets);
-  };
-  
-  const handleToggleAll = (enable: boolean) => {
-    if (!draftSettings) return;
-    const allSheetNames = Object.keys(draftSettings.sheetDefinitions);
-    handleSettingChange('enabledSheets', enable ? allSheetNames : []);
-  };
-
-  const handleEditSheet = (sheetName: string) => {
-    if (!draftSettings) return;
-    setSheetToEdit(draftSettings.sheetDefinitions[sheetName]);
-    setIsSheetFormOpen(true);
-  };
-  
-  const handleDeleteSheet = (sheetNameToDelete: string) => {
-    if (!draftSettings) return;
-    const newSheetDefinitions = { ...draftSettings.sheetDefinitions };
-    delete newSheetDefinitions[sheetNameToDelete];
-    const newEnabledSheets = draftSettings.enabledSheets.filter(name => name !== sheetNameToDelete);
-    setDraftSettings(prev => prev ? ({ ...prev, sheetDefinitions: newSheetDefinitions, enabledSheets: newEnabledSheets }) : null);
-  };
-
-  const handleImportTemplate = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileImport = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (!draftSettings) return;
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    try {
-      const templates = await parseExcelForTemplate(file);
-      let currentDefs = draftSettings.sheetDefinitions;
-      let currentEnabled = draftSettings.enabledSheets;
-      
-      templates.forEach(template => {
-        currentDefs[template.name] = template;
-        if (!currentEnabled.includes(template.name)) {
-          currentEnabled.push(template.name);
-        }
-      });
-      
-      handleSettingChange('sheetDefinitions', currentDefs);
-      handleSettingChange('enabledSheets', currentEnabled);
-
-      toast({ title: 'Templates Imported', description: `${templates.length} sheet definitions were added/updated.` });
-    } catch (error) {
-      toast({ title: 'Import Failed', description: (error as Error).message, variant: 'destructive' });
-    } finally {
-      if (fileInputRef.current) fileInputRef.current.value = "";
-    }
+    const filtered = draftSettings.grants.filter(g => g.id !== id);
+    let activeId = draftSettings.activeGrantId;
+    if (activeId === id) activeId = filtered[0].id;
+    setDraftSettings({ ...draftSettings, grants: filtered, activeGrantId: activeId });
   };
 
   const handleConfirmSave = async () => {
@@ -174,210 +120,184 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       await updateSettings(draftSettings);
       await saveLocalSettings(draftSettings);
       setAppSettings(draftSettings);
-      toast({ title: "Settings Saved", description: "Changes have been applied to the database." });
+      toast({ title: "Settings Saved" });
     } catch (e) {
-      toast({ title: "Save Failed", description: "Could not save settings.", variant: "destructive" });
+      toast({ title: "Save Failed", variant: "destructive" });
     } finally {
       setIsConfirmOpen(false);
       onOpenChange(false);
     }
   };
-  
+
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
-  
   if (!draftSettings) return null;
 
-  const allSheetNames = Object.keys(draftSettings.sheetDefinitions);
-  const allEnabled = allSheetNames.length > 0 && draftSettings.enabledSheets.length === allSheetNames.length;
-  const noneEnabled = draftSettings.enabledSheets.length === 0;
+  const activeGrantInDraft = draftSettings.grants.find(g => g.id === draftSettings.activeGrantId);
 
   return (
     <>
       <Sheet open={isOpen} onOpenChange={onOpenChange}>
-        <SheetContent className="w-full sm:max-w-xl flex flex-col">
-          <SheetHeader>
-            <SheetTitle>Settings</SheetTitle>
-            <SheetDescription>
-              Manage application settings and preferences. Admin changes apply to all users.
-            </SheetDescription>
+        <SheetContent className="w-full sm:max-w-2xl flex flex-col p-0 overflow-hidden">
+          <SheetHeader className="p-6 border-b bg-muted/20">
+            <SheetTitle className="flex items-center gap-2"><SettingsIcon className="h-5 w-5 text-primary"/> System Configuration</SheetTitle>
+            <SheetDescription>Control global operational parameters and project environments.</SheetDescription>
           </SheetHeader>
-          <Tabs defaultValue="general" className="flex-1 flex flex-col overflow-y-hidden">
-            <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="general"><SettingsIcon className="mr-2 h-4 w-4" />General</TabsTrigger>
-                <TabsTrigger value="users" disabled={isGuest || !isAdmin}><UserCog className="mr-2 h-4 w-4" />Users</TabsTrigger>
-                <TabsTrigger value="sheets" disabled={isGuest || !isAdmin}><Wrench className="mr-2 h-4 w-4" />Sheets</TabsTrigger>
-                <TabsTrigger value="data" disabled={isGuest || !isAdmin}><Database className="mr-2 h-4 w-4" />Data</TabsTrigger>
-            </TabsList>
-            <TabsContent value="general" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
-                <div>
-                    <h3 className="text-lg font-medium mb-4">Appearance</h3>
-                    <div className="rounded-lg border p-4 space-y-3">
-                        <Label className="flex items-center gap-2 text-sm font-medium"><Palette className="h-4 w-4" /> Theme</Label>
-                        <div className="flex justify-around">
-                            <Button variant="outline" size="sm" onClick={() => setTheme('light')}><Sun className="mr-2"/>Light</Button>
-                            <Button variant="outline" size="sm" onClick={() => setTheme('dark')}><Moon className="mr-2"/>Dark</Button>
-                            <Button variant="outline" size="sm" onClick={() => setTheme('system')}><Database className="mr-2"/>System</Button>
-                        </div>
-                    </div>
-                </div>
 
-                {isAdmin && (
-                  <div>
-                    <h3 className="text-lg font-medium mb-4">Global Admin Settings</h3>
-                    <div className="rounded-lg border p-3 space-y-4 divide-y">
-                      <div className="flex items-center justify-between pt-1">
-                        <div className="space-y-1">
-                          <Label htmlFor="app-mode" className="text-sm font-medium">Application Mode</Label>
-                          <p className="text-xs text-muted-foreground">
-                            {draftSettings.appMode === 'management'
-                              ? 'Management: Data is locked for non-admins.'
-                              : 'Verification: Users can update status/remarks.'
-                            }
-                          </p>
+          <Tabs defaultValue="projects" className="flex-1 flex flex-col overflow-hidden">
+            <div className="px-6 py-2 bg-muted/10 border-b">
+                <TabsList className="grid w-full grid-cols-4 bg-background">
+                    <TabsTrigger value="projects" className="text-xs font-bold uppercase"><FolderKanban className="mr-2 h-3.5 w-3.5" /> Projects</TabsTrigger>
+                    <TabsTrigger value="users" disabled={isGuest || !isAdmin} className="text-xs font-bold uppercase"><UserCog className="mr-2 h-3.5 w-3.5" /> Identity</TabsTrigger>
+                    <TabsTrigger value="general" className="text-xs font-bold uppercase"><Palette className="mr-2 h-3.5 w-3.5" /> UI/UX</TabsTrigger>
+                    <TabsTrigger value="data" disabled={isGuest || !isAdmin} className="text-xs font-bold uppercase"><Database className="mr-2 h-3.5 w-3.5" /> Actions</TabsTrigger>
+                </TabsList>
+            </div>
+
+            <ScrollArea className="flex-1">
+                <div className="p-6">
+                    <TabsContent value="projects" className="space-y-6 m-0">
+                        <div className="flex items-center justify-between">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-primary">Project Environments</h3>
+                            <Button size="sm" onClick={handleAddGrant} variant="outline" className="h-8 font-bold text-[10px] uppercase">
+                                <PlusCircle className="mr-2 h-3.5 w-3.5" /> Add Project
+                            </Button>
                         </div>
-                         <Select value={draftSettings.appMode} onValueChange={(value) => handleSettingChange('appMode', value)}>
-                          <SelectTrigger className="w-[150px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="management">Management</SelectItem>
-                            <SelectItem value="verification">Verification</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      <div className="flex items-center justify-between pt-4">
-                        <div className="space-y-1">
-                          <Label htmlFor="lock-assets" className="text-sm">Lock Asset List</Label>
-                          <p className="text-xs text-muted-foreground">Prevent adding/deleting from main list.</p>
+
+                        <div className="space-y-3">
+                            {draftSettings.grants.map((grant) => (
+                                <Card key={grant.id} className={cn("border-2 transition-all", draftSettings.activeGrantId === grant.id ? "border-primary bg-primary/5" : "border-border/50")}>
+                                    <CardHeader className="p-4 flex flex-row items-center justify-between space-y-0">
+                                        <div className="flex-1 flex items-center gap-3">
+                                            {draftSettings.activeGrantId === grant.id ? <CheckCircle2 className="h-5 w-5 text-primary" /> : <div className="h-5 w-5 rounded-full border-2 border-muted" />}
+                                            <Input 
+                                                value={grant.name} 
+                                                onChange={(e) => handleRenameGrant(grant.id, e.target.value)}
+                                                className="border-none bg-transparent font-bold text-base focus-visible:ring-0 p-0 h-auto"
+                                            />
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            {draftSettings.activeGrantId !== grant.id && (
+                                                <Button variant="ghost" size="sm" className="h-8 font-black text-[10px] uppercase text-primary" onClick={() => handleSettingChange('activeGrantId', grant.id)}>Activate</Button>
+                                            )}
+                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive" onClick={() => handleDeleteGrant(grant.id)}><Trash2 className="h-4 w-4" /></Button>
+                                        </div>
+                                    </CardHeader>
+                                    <CardContent className="px-4 pb-4 pt-0">
+                                        <div className="flex gap-2">
+                                            <Badge variant="secondary" className="text-[9px] font-bold uppercase">{Object.keys(grant.sheetDefinitions || {}).length} Asset Classes</Badge>
+                                            <Badge variant="outline" className="text-[9px] font-bold uppercase">{grant.id.split('-')[0]}</Badge>
+                                        </div>
+                                    </CardContent>
+                                </Card>
+                            ))}
                         </div>
-                        <Switch id="lock-assets" checked={draftSettings.lockAssetList} onCheckedChange={(checked) => handleSettingChange('lockAssetList', checked)}/>
-                      </div>
-                    </div>
-                  </div>
-                )}
-            </TabsContent>
-            <TabsContent value="users" className="flex-1 overflow-y-auto pt-4 pr-2">
-                <div className="p-1">
-                    <UserManagement 
-                    users={draftSettings.authorizedUsers}
-                    onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)}
-                    adminProfile={userProfile}
-                    />
-                </div>
-            </TabsContent>
-            <TabsContent value="sheets" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
-                 <div>
-                    <h3 className="text-lg font-medium mb-4">Sheet Definitions</h3>
-                    <div className="flex items-center justify-between mb-4">
-                        <p className="text-sm font-medium">Toggle all sheets</p>
-                        <div className="flex gap-2">
-                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(true)} disabled={allEnabled}>Enable All</Button>
-                            <Button size="sm" variant="outline" onClick={() => handleToggleAll(false)} disabled={noneEnabled}>Disable All</Button>
-                        </div>
-                    </div>
-                    <div className="rounded-lg border p-3">
-                        <div className="space-y-1">
-                          {allSheetNames.map(sheetName => (
-                            <div key={sheetName} className="flex items-center justify-between pr-2 hover:bg-muted/50 rounded-md">
-                              <div className="flex items-center">
-                                <Switch id={`switch-${sheetName}`} checked={draftSettings.enabledSheets.includes(sheetName)} onCheckedChange={(checked) => handleToggleSheet(sheetName, checked)}/>
-                                <Label htmlFor={`switch-${sheetName}`} className="text-sm pl-2 cursor-pointer">{sheetName}</Label>
-                              </div>
-                              <div className="flex items-center gap-1">
-                                <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEditSheet(sheetName)}><Wrench className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDeleteSheet(sheetName)}><Trash2 className="h-4 w-4" /></Button>
-                              </div>
+
+                        {activeGrantInDraft && (
+                            <div className="space-y-4 pt-4 border-t">
+                                <h3 className="text-sm font-black uppercase tracking-widest text-primary">Active Registry: {activeGrantInDraft.name}</h3>
+                                <div className="rounded-2xl border bg-muted/10 p-4 space-y-4">
+                                    <div className="flex items-center justify-between">
+                                        <Label className="text-xs font-bold uppercase">Toggle Asset Classes</Label>
+                                        <div className="flex gap-2">
+                                            <Button size="xs" variant="link" className="h-auto p-0 text-[10px]" onClick={() => handleRenameGrant(activeGrantInDraft.id, activeGrantInDraft.name)}>Enable All</Button>
+                                        </div>
+                                    </div>
+                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                        {Object.keys(activeGrantInDraft.sheetDefinitions).map(sn => (
+                                            <div key={sn} className="flex items-center justify-between p-2 rounded-lg bg-background border">
+                                                <span className="text-xs font-medium truncate">{sn}</span>
+                                                <Switch checked={activeGrantInDraft.enabledSheets.includes(sn)} />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <Button variant="outline" className="w-full h-10 font-bold border-dashed">
+                                        <ScanSearch className="mr-2 h-4 w-4" /> Scan Workbook for New Templates
+                                    </Button>
+                                </div>
                             </div>
-                          ))}
-                        </div>
-                    </div>
-                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
-                        <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx, .xls" className="hidden" />
-                        <Button variant="outline" className="w-full" onClick={handleImportTemplate}><FileUp className="mr-2" /> Import Templates from File</Button>
-                    </div>
-                  </div>
-            </TabsContent>
-             <TabsContent value="data" className="flex-1 overflow-y-auto pt-4 space-y-6 pr-2">
-                <div>
-                    <h3 className="text-lg font-medium mb-4">Data Management</h3>
-                    <div className="rounded-lg border p-4 space-y-3">
-                        <p className="text-sm text-muted-foreground">Perform global data operations.</p>
-                        <Separator />
-                        <div className="space-y-2">
-                            {dataActions.onAddAsset && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onAddAsset}>
-                                    <PlusCircle className="mr-2 h-4 w-4" /> Add New Asset
-                                </Button>
-                            )}
-                            {dataActions.onImport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onImport} disabled={dataActions.isImporting}>
-                                    <FileUp className="mr-2 h-4 w-4" /> Import Full FAR
-                                </Button>
-                            )}
-                            {dataActions.onScanAndImport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onScanAndImport} disabled={dataActions.isImporting}>
-                                    <ScanSearch className="mr-2 h-4 w-4" /> Scan and Import Workbook
-                                </Button>
-                            )}
-                            {dataActions.onTravelReport && (
-                                <Button variant="outline" className="w-full justify-start" onClick={dataActions.onTravelReport}>
-                                    <PlaneTakeoff className="mr-2 h-4 w-4" /> Create Travel Report
-                                </Button>
-                            )}
-                            <Separator />
-                            {dataActions.onClearAll && (
-                                <Button variant="destructive" className="w-full justify-start" onClick={dataActions.onClearAll}>
-                                    <Trash2 className="mr-2 h-4 w-4" /> Clear All Assets
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            </TabsContent>
-          </Tabs>
+                        )}
+                    </TabsContent>
 
-          <SheetFooter className="mt-auto pt-4 border-t sm:justify-between">
-            <SheetClose asChild><Button variant="outline">Cancel</Button></SheetClose>
-            <Button onClick={() => setIsConfirmOpen(true)} disabled={!hasChanges}>
-                <Save className="mr-2 h-4 w-4" />
-                Save Changes
-            </Button>
-          </SheetFooter>
+                    <TabsContent value="users" className="m-0">
+                        <UserManagement 
+                            users={draftSettings.authorizedUsers}
+                            onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)}
+                            adminProfile={userProfile}
+                        />
+                    </TabsContent>
+
+                    <TabsContent value="general" className="space-y-6 m-0">
+                        <div className="space-y-4">
+                            <h3 className="text-sm font-black uppercase tracking-widest text-primary">Branding & Logic</h3>
+                            <Card className="p-4 bg-muted/5 border-dashed">
+                                <Label className="text-xs font-bold text-muted-foreground">App Theme</Label>
+                                <div className="flex gap-2 mt-2">
+                                    <Button variant="outline" size="sm" onClick={() => setTheme('light')} className="flex-1"><Sun className="mr-2 h-4 w-4"/> Light</Button>
+                                    <Button variant="outline" size="sm" onClick={() => setTheme('dark')} className="flex-1"><Moon className="mr-2 h-4 w-4"/> Dark</Button>
+                                </div>
+                            </Card>
+
+                            <Card className="p-4 bg-muted/5 border-dashed space-y-4">
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-xs font-bold uppercase">Application Mode</Label>
+                                        <p className="text-[10px] text-muted-foreground">Verification mode allows status updates.</p>
+                                    </div>
+                                    <Select value={draftSettings.appMode} onValueChange={(v) => handleSettingChange('appMode', v)}>
+                                        <SelectTrigger className="w-32 h-8 text-xs font-bold"><SelectValue /></SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="management" className="text-xs font-bold">Management</SelectItem>
+                                            <SelectItem value="verification" className="text-xs font-bold">Verification</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <Separator />
+                                <div className="flex items-center justify-between">
+                                    <div className="space-y-0.5">
+                                        <Label className="text-xs font-bold uppercase">Lock Master List</Label>
+                                        <p className="text-[10px] text-muted-foreground">Prevent direct record creation in cloud.</p>
+                                    </div>
+                                    <Switch checked={draftSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
+                                </div>
+                            </Card>
+                        </div>
+                    </TabsContent>
+
+                    <TabsContent value="data" className="space-y-4 m-0">
+                        <h3 className="text-sm font-black uppercase tracking-widest text-primary">Master Data Controls</h3>
+                        <div className="grid grid-cols-1 gap-3">
+                            <Button variant="outline" className="h-12 justify-start font-bold" onClick={dataActions.onAddAsset}><PlusCircle className="mr-3 h-5 w-5 text-primary" /> Add New Record</Button>
+                            <Button variant="outline" className="h-12 justify-start font-bold" onClick={dataActions.onScanAndImport}><ScanSearch className="mr-3 h-5 w-5 text-primary" /> Scan Registry Workbook</Button>
+                            <Button variant="outline" className="h-12 justify-start font-bold" onClick={dataActions.onTravelReport}><PlaneTakeoff className="mr-3 h-5 w-5 text-primary" /> Generate Travel Report</Button>
+                            <Separator className="my-2" />
+                            <Button variant="destructive" className="h-12 justify-start font-bold opacity-80" onClick={dataActions.onClearAll}><Trash2 className="mr-3 h-5 w-5" /> Clear All Records</Button>
+                        </div>
+                    </TabsContent>
+                </div>
+            </ScrollArea>
+
+            <SheetFooter className="p-6 border-t bg-muted/20 sm:justify-between items-center">
+                <SheetClose asChild><Button variant="ghost" className="font-bold">Cancel</Button></SheetClose>
+                <Button onClick={() => setIsConfirmOpen(true)} disabled={!hasChanges} className="h-11 font-black uppercase text-xs tracking-widest shadow-lg shadow-primary/20 px-8">
+                    <Save className="mr-2 h-4 w-4" /> Save Master Config
+                </Button>
+            </SheetFooter>
+          </Tabs>
         </SheetContent>
       </Sheet>
-      
-      {sheetToEdit && (
-        <ColumnCustomizationSheet
-          isOpen={isSheetFormOpen}
-          onOpenChange={setIsSheetFormOpen}
-          sheetDefinition={sheetToEdit}
-          onSave={(newDef) => {
-            const newDefs = { ...draftSettings!.sheetDefinitions, [newDef.name]: newDef };
-            handleSettingChange('sheetDefinitions', newDefs);
-          }}
-        />
-      )}
 
       <AlertDialog open={isConfirmOpen} onOpenChange={setIsConfirmOpen}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Confirm Changes</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to save these changes?
+            <AlertDialogTitle className="text-primary">Apply Master Configuration?</AlertDialogTitle>
+            <AlertDialogDescription className="font-medium">
+              These changes will be broadcast to all users instantly. This will re-scope the entire organization into the active project and update permissions.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          {calculatedChanges.length > 0 && (
-             <div className="py-4 text-sm text-foreground">
-                <p className="font-semibold mb-2">Summary:</p>
-                <ul className="list-disc pl-5 space-y-1">
-                    {calculatedChanges.map((change, i) => <li key={i}>{change}</li>)}
-                </ul>
-            </div>
-          )}
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleConfirmSave}>Confirm & Save</AlertDialogAction>
+            <AlertDialogCancel className="font-bold">Discard</AlertDialogCancel>
+            <AlertDialogAction onClick={handleConfirmSave} className="font-bold shadow-lg shadow-primary/20">Execute Apply</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

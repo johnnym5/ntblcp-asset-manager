@@ -68,7 +68,6 @@
 }
 
 @layer utilities {
-  /* High-visibility scrollbar for data-heavy panels */
   .custom-scrollbar {
     scrollbar-width: auto;
     scrollbar-color: hsl(var(--primary) / 0.5) hsl(var(--muted) / 0.2);
@@ -93,54 +92,5 @@
 
   .custom-scrollbar::-webkit-scrollbar-thumb:hover {
     background-color: hsl(var(--primary) / 0.8);
-  }
-
-  /* Force showing scrollbars for Radix ScrollArea in data-heavy views */
-  .show-scrollbar [data-radix-scroll-area-viewport] {
-    scrollbar-width: auto !important;
-    -ms-overflow-style: auto !important;
-    overflow-y: scroll !important;
-  }
-  
-  .show-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar {
-    display: block !important;
-    width: 10px !important;
-  }
-
-  .show-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-track {
-    background: hsl(var(--muted) / 0.5) !important;
-    border-radius: 10px;
-  }
-
-  .show-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--primary) / 0.6) !important;
-    border-radius: 10px;
-    border: 2px solid transparent;
-    background-clip: padding-box;
-  }
-
-  .show-scrollbar [data-radix-scroll-area-viewport]::-webkit-scrollbar-thumb:hover {
-    background-color: hsl(var(--primary)) !important;
-  }
-
-  .table-scroll-wrapper {
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: hsl(var(--primary) / 0.4) transparent;
-  }
-
-  .table-scroll-wrapper::-webkit-scrollbar {
-    height: 5px;
-  }
-
-  .table-scroll-wrapper::-webkit-scrollbar-track {
-    background: hsl(var(--muted) / 0.2);
-    border-radius: 10px;
-  }
-
-  .table-scroll-wrapper::-webkit-scrollbar-thumb {
-    background-color: hsl(var(--primary) / 0.5);
-    border-radius: 10px;
   }
 }
