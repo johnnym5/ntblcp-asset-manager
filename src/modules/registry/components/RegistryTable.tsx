@@ -23,7 +23,8 @@ import {
   Clock, 
   AlertCircle, 
   Camera, 
-  ArrowUpDown
+  ArrowUpDown,
+  ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/contexts/app-state-context';
