@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
- * Phase 24: Implemented Arrangement Profiles and Synchronized Export.
+ * Phase 26: Activated Source Branding Orchestration.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -33,13 +33,15 @@ import {
   Edit3,
   Trash2,
   Settings2,
-  ShieldCheck
+  ShieldCheck,
+  Palette
 } from 'lucide-react';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
 import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
 import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
+import { SourceBrandingDrawer } from '@/components/registry/SourceBrandingDrawer';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { AssetForm } from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
@@ -101,6 +103,7 @@ export default function AssetRegistryPage() {
   const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
+  const [isBrandingOpen, setIsBrandingOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
@@ -147,7 +150,7 @@ export default function AssetRegistryPage() {
 
   // --- Filtering & Sorting logic ---
   const processedRecords = useMemo(() => {
-    let results = currentRegistry.map(a => transformAssetToRecord(a, headers));
+    let results = currentRegistry.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding));
 
     // Search Pulse
     if (searchTerm) {
@@ -187,7 +190,7 @@ export default function AssetRegistryPage() {
     });
 
     return results;
-  }, [currentRegistry, searchTerm, headers, filters, sortKey, sortDir]);
+  }, [currentRegistry, searchTerm, headers, filters, sortKey, sortDir, appSettings?.sourceBranding]);
 
   const paginatedRecords = useMemo(() => {
     return processedRecords.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -315,15 +318,26 @@ export default function AssetRegistryPage() {
               </DropdownMenuContent>
             </DropdownMenu>
             
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={() => setIsHeaderManagerOpen(true)}
-              className="h-12 w-12 rounded-2xl border-2 border-primary/10 shadow-sm bg-card tactile-pulse"
-              title="Header Manager"
-            >
-              <Settings2 className="h-5 w-5 text-primary" />
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setIsBrandingOpen(true)}
+                className="h-12 w-12 rounded-2xl border-2 border-primary/10 shadow-sm bg-card tactile-pulse"
+                title="Source Branding"
+              >
+                <Palette className="h-5 w-5 text-primary" />
+              </Button>
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => setIsHeaderManagerOpen(true)}
+                className="h-12 w-12 rounded-2xl border-2 border-primary/10 shadow-sm bg-card tactile-pulse"
+                title="Header Manager"
+              >
+                <Settings2 className="h-5 w-5 text-primary" />
+              </Button>
+            </div>
           </div>
         </div>
 
@@ -463,6 +477,7 @@ export default function AssetRegistryPage() {
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={saveHeaderPrefs} onReset={() => { const initial = DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i })); saveHeaderPrefs(initial as RegistryHeader[]); }} />
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }} />
+      <SourceBrandingDrawer isOpen={isBrandingOpen} onOpenChange={setIsBrandingOpen} />
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={handleEdit} onNext={() => { if (!selectedRecord) return; const idx = processedRecords.findIndex(r => r.id === selectedRecord.id); if (idx < processedRecords.length - 1) setSelectedRecord(processedRecords[idx + 1]); }} onPrevious={() => { if (!selectedRecord) return; const idx = processedRecords.findIndex(r => r.id === selectedRecord.id); if (idx > 0) setSelectedRecord(processedRecords[idx - 1]); }} />
       <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAssetForForm} headers={headers} isReadOnly={dataSource === 'PRODUCTION' && appSettings?.appMode === 'management'} onSave={async (a) => { await refreshRegistry(); setIsFormOpen(false); }} onQuickSave={async () => {}} />
       <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async (d) => { toast({ title: "Batch Pulse Applied" }); setSelectedIds(new Set()); await refreshRegistry(); }} />

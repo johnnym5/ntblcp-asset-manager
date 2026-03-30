@@ -32,9 +32,12 @@ export function normalizeHeaderName(name: string): string {
 /**
  * Deterministic Color Coding Engine.
  * Generates consistent HSL accents for sheet separation.
+ * Supports manual override via branding map.
  */
-export function getColorForSource(source: string): string {
+export function getColorForSource(source: string, branding?: Record<string, string>): string {
+  if (branding && branding[source]) return branding[source];
   if (!source) return "hsl(45, 95%, 40%)"; // Default Gold
+  
   let hash = 0;
   for (let i = 0; i < source.length; i++) {
     hash = source.charCodeAt(i) + ((hash << 5) - hash);
@@ -113,7 +116,7 @@ export const REGISTRY_PRESETS: RegistryPreset[] = [
 /**
  * Transforms a Domain Asset to an AssetRecord.
  */
-export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[]): AssetRecord {
+export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], branding?: Record<string, string>): AssetRecord {
   const fields: RegistryFieldValue[] = headers.map(header => {
     let rawValue: any = "";
     
@@ -158,7 +161,7 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[]):
     headers,
     fields,
     rawRow: { ...asset } as any,
-    accentColor: getColorForSource(sheetName)
+    accentColor: getColorForSource(sheetName, branding)
   };
 }
 

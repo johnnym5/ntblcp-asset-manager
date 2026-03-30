@@ -79,6 +79,7 @@ export interface AppSettings {
   activeDatabase: 'firestore' | 'rtdb';
   activeGrantId: string | null;
   grants: Grant[];
+  sourceBranding?: Record<string, string>; // Maps sheetName to HSL/Hex color
 }
 
 export interface Grant {
