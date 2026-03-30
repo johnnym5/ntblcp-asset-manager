@@ -19,17 +19,18 @@ import {
   List, 
   ArrowLeft,
   MoreVertical,
-  ChevronLeft,
-  ChevronRight,
   MapPin,
   Tag,
   ShieldCheck,
   Clock,
-  AlertCircle
+  CheckCircle2,
+  Trash2,
+  ChevronRight
 } from 'lucide-react';
 import { RegistryTable } from '@/modules/registry/components/RegistryTable';
 import { AssetForm } from '@/components/asset-form';
 import { AssetFilterDialog, type FilterOption } from '@/components/asset-filter-sheet';
+import { AssetBatchEditForm, type BatchUpdateData } from '@/components/asset-batch-edit-form';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import { useToast } from '@/hooks/use-toast';
@@ -59,6 +60,7 @@ export default function AssetRegistryPage() {
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>();
   const [isReadOnly, setIsReadOnly] = useState(false);
 
@@ -101,7 +103,6 @@ export default function AssetRegistryPage() {
   }, [assets]);
 
   const filteredAndSortedAssets = useMemo(() => {
-    // 1. Filtering
     let results = assets.filter(a => {
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
@@ -117,7 +118,6 @@ export default function AssetRegistryPage() {
       return true;
     });
 
-    // 2. Sorting
     results.sort((a, b) => {
       let aVal: any = a[sortConfig.key as keyof Asset] || '';
       let bVal: any = b[sortConfig.key as keyof Asset] || '';
@@ -155,7 +155,6 @@ export default function AssetRegistryPage() {
     setIsFormOpen(true);
   };
 
-  // Detail Navigation Logic
   const currentIndex = useMemo(() => {
     if (!selectedAsset) return -1;
     return filteredAndSortedAssets.findIndex(a => a.id === selectedAsset.id);
@@ -187,11 +186,17 @@ export default function AssetRegistryPage() {
 
   const handleSaveAsset = async (assetToSave: Asset) => {
     try {
-      await enqueueMutation('UPDATE', 'assets', assetToSave);
+      const original = assets.find(a => a.id === assetToSave.id);
+      const readyAsset = {
+        ...assetToSave,
+        previousState: original ? { ...original, previousState: undefined } : undefined
+      };
+
+      await enqueueMutation('UPDATE', 'assets', readyAsset);
       const currentAssets = await storage.getAssets();
       const updated = currentAssets.find(a => a.id === assetToSave.id)
-        ? currentAssets.map(a => a.id === assetToSave.id ? assetToSave : a)
-        : [assetToSave, ...currentAssets];
+        ? currentAssets.map(a => a.id === assetToSave.id ? readyAsset : a)
+        : [readyAsset, ...currentAssets];
       
       await storage.saveAssets(updated);
       await refreshRegistry();
@@ -200,6 +205,87 @@ export default function AssetRegistryPage() {
       setIsFormOpen(false);
     } catch (e) {
       toast({ variant: "destructive", title: "Operation Failed", description: "Registry integrity check failed." });
+    }
+  };
+
+  const handleBulkVerify = async () => {
+    if (selectedIds.size === 0) return;
+    const targets = assets.filter(a => selectedIds.has(a.id));
+    
+    try {
+      const updates = targets.map(asset => ({
+        ...asset,
+        status: 'VERIFIED' as const,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: userProfile?.displayName || 'Bulk Action',
+        previousState: { ...asset, previousState: undefined }
+      }));
+
+      for (const updatedAsset of updates) {
+        await enqueueMutation('UPDATE', 'assets', updatedAsset);
+      }
+
+      const allAssets = await storage.getAssets();
+      const updatedMap = new Map(updates.map(a => [a.id, a]));
+      const nextAssets = allAssets.map(a => updatedMap.get(a.id) || a);
+      
+      await storage.saveAssets(nextAssets);
+      await refreshRegistry();
+      
+      toast({ title: "Bulk Verification Complete", description: `${selectedIds.size} records marked as verified.` });
+      setSelectedAssetIds(new Set());
+    } catch (e) {
+      toast({ variant: "destructive", title: "Bulk Action Failed" });
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedIds.size === 0) return;
+    try {
+      for (const id of selectedIds) {
+        await enqueueMutation('DELETE', 'assets', { id });
+      }
+
+      const allAssets = await storage.getAssets();
+      const nextAssets = allAssets.filter(a => !selectedIds.has(a.id));
+      
+      await storage.saveAssets(nextAssets);
+      await refreshRegistry();
+      
+      toast({ title: "Registry Purged", description: `${selectedIds.size} records removed from pulse.` });
+      setSelectedAssetIds(new Set());
+    } catch (e) {
+      toast({ variant: "destructive", title: "Deletion Failed" });
+    }
+  };
+
+  const handleSaveBatchEdit = async (data: BatchUpdateData) => {
+    const targets = assets.filter(a => selectedIds.has(a.id));
+    try {
+      const updates = targets.map(asset => ({
+        ...asset,
+        ...data,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: userProfile?.displayName || 'Bulk Edit',
+        previousState: { ...asset, previousState: undefined }
+      }));
+
+      for (const updatedAsset of updates) {
+        await enqueueMutation('UPDATE', 'assets', updatedAsset);
+      }
+
+      const allAssets = await storage.getAssets();
+      const updatedMap = new Map(updates.map(a => [a.id, a]));
+      const nextAssets = allAssets.map(a => updatedMap.get(a.id) || a);
+      
+      await storage.saveAssets(nextAssets);
+      await refreshRegistry();
+      
+      toast({ title: "Bulk Update Broadcasted", description: `Applied changes to ${selectedIds.size} records.` });
+      setSelectedAssetIds(new Set());
+      setIsBatchEditOpen(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Batch Edit Failed" });
     }
   };
 
@@ -297,10 +383,10 @@ export default function AssetRegistryPage() {
               <span className="font-black uppercase text-xs tracking-widest">{selectedIds.size} Records Selected</span>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" size="sm" className="font-bold text-[10px] uppercase text-white hover:bg-white/10">Mark Verified</Button>
-              <Button variant="ghost" size="sm" className="font-bold text-[10px] uppercase text-white hover:bg-white/10">Move Section</Button>
+              <Button variant="ghost" size="sm" onClick={handleBulkVerify} className="font-bold text-[10px] uppercase text-white hover:bg-white/10">Mark Verified</Button>
+              <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="font-bold text-[10px] uppercase text-white hover:bg-white/10">Move / Edit</Button>
               <Separator orientation="vertical" className="h-6 bg-white/20" />
-              <Button variant="ghost" size="sm" className="font-bold text-[10px] uppercase text-white hover:bg-red-500/20">Delete</Button>
+              <Button variant="ghost" size="sm" onClick={handleBulkDelete} className="font-bold text-[10px] uppercase text-white hover:bg-red-500/20">Delete</Button>
             </div>
           </div>
         )}
@@ -409,6 +495,13 @@ export default function AssetRegistryPage() {
         filters={filters}
         setFilters={setFilters}
         onReset={() => setFilters({ sections: [], subsections: [], locations: [], statuses: [] })}
+      />
+
+      <AssetBatchEditForm 
+        isOpen={isBatchEditOpen} 
+        onOpenChange={setIsBatchEditOpen} 
+        selectedAssetCount={selectedIds.size} 
+        onSave={handleSaveBatchEdit} 
       />
     </AppLayout>
   );
