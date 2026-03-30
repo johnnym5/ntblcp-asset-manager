@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 28: Integrated Fluid Responsive Auto-Fit.
+ * Phase 43: Integrated Spatial Field Protocol & Geotagging.
  */
 
 import React, { useEffect, useState, useRef } from "react";
@@ -54,7 +54,8 @@ import {
   Clock,
   ArrowRight,
   Sparkles,
-  Zap
+  Zap,
+  Navigation
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -64,7 +65,7 @@ import { ASSET_CONDITIONS } from "@/lib/constants";
 import { Badge } from "@/components/ui/badge";
 import { AssetSchema } from "@/core/registry/validation";
 import { FirestoreService } from "@/services/firebase/firestore";
-import type { Asset, ActivityLogEntry } from "@/types/domain";
+import type { Asset, ActivityLogEntry, Geotag } from "@/types/domain";
 import type { RegistryHeader } from "@/types/registry";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDistanceToNow } from "date-fns";
@@ -83,25 +84,10 @@ interface AssetFormProps {
   onPrevious?: () => void;
 }
 
-const FieldBlock = ({ 
-  label, 
-  value, 
-  icon: Icon, 
-  className 
-}: { 
-  label: string; 
-  value?: string | number; 
-  icon?: any; 
-  className?: string 
-}) => (
-  <div className={cn("space-y-1 p-3 rounded-2xl bg-muted/30 border border-transparent hover:border-primary/10 transition-colors", className)}>
-    <div className="flex items-center gap-2 opacity-40">
-      {Icon && <Icon className="h-2.5 w-2.5" />}
-      <span className="text-[8px] font-black uppercase tracking-[0.2em]">{label}</span>
-    </div>
-    <div className="text-[11px] font-black uppercase tracking-tight text-foreground truncate leading-tight">
-      {value || '---'}
-    </div>
+const SectionHeader = ({ label, icon: Icon }: { label: string; icon: any }) => (
+  <div className="flex items-center gap-3 px-4 md:px-6 py-4 bg-muted/20 border-y border-border/40">
+    <Icon className="h-4 w-4 text-primary opacity-60" />
+    <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{label}</h4>
   </div>
 );
 
@@ -176,6 +162,30 @@ export function AssetForm({
     }
   };
 
+  const captureLocation = () => {
+    if (!navigator.geolocation) {
+      toast({ variant: "destructive", title: "GPS Unavailable", description: "Your browser does not support geolocation." });
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const geotag: Geotag = {
+          lat: pos.coords.latitude,
+          lng: pos.coords.longitude,
+          accuracy: pos.coords.accuracy,
+          timestamp: new Date().toISOString()
+        };
+        form.setValue('geotag', geotag);
+        toast({ title: "Spatial Pulse Anchored", description: `Location captured within ${Math.round(pos.coords.accuracy)}m.` });
+      },
+      (err) => {
+        toast({ variant: "destructive", title: "Location Pulse Failed", description: "Please enable GPS permissions for field audits." });
+      },
+      { enableHighAccuracy: true }
+    );
+  };
+
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -183,6 +193,7 @@ export function AssetForm({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
+      captureLocation(); // Auto-trigger spatial anchor on camera start
     } catch (error) {
       console.error('Error accessing camera:', error);
     }
@@ -249,13 +260,6 @@ export function AssetForm({
         setIsSaving(false);
     }
   };
-
-  const SectionHeader = ({ label, icon: Icon }: { label: string; icon: any }) => (
-    <div className="flex items-center gap-3 px-4 md:px-6 py-4 bg-muted/20 border-y border-border/40">
-      <Icon className="h-4 w-4 text-primary opacity-60" />
-      <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">{label}</h4>
-    </div>
-  );
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if(!open) stopCamera(); onOpenChange(open); }}>
@@ -330,7 +334,7 @@ export function AssetForm({
                                   disabled={isAnalyzing}
                                   className="rounded-xl h-10 px-4 font-black uppercase text-[9px] tracking-widest gap-2 shadow-2xl"
                                 >
-                                  {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-primary" />}
+                                  {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
                                   AI Scan
                                 </Button>
                             )}
@@ -345,6 +349,22 @@ export function AssetForm({
                       <div className="m-2 sm:m-4 h-40 md:h-48 border-2 border-dashed border-primary/10 rounded-[1.5rem] sm:rounded-[2rem] flex flex-col items-center justify-center gap-4 bg-primary/5 hover:bg-primary/[0.08] transition-colors cursor-pointer group" onClick={startCamera}>
                         <div className="p-4 bg-primary/10 rounded-2xl group-hover:scale-110 transition-transform"><Camera className="h-8 w-8 text-primary" /></div>
                         <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Attach Proof Pulse</span>
+                      </div>
+                    )}
+
+                    {/* Geotag Indicator */}
+                    {form.watch('geotag') && (
+                      <div className="px-4 md:px-6">
+                        <div className="p-4 rounded-2xl bg-green-500/5 border-2 border-dashed border-green-500/20 flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <div className="p-2 bg-green-100 rounded-xl"><Navigation className="h-4 w-4 text-green-600" /></div>
+                            <div className="flex flex-col">
+                              <span className="text-[10px] font-black uppercase text-green-700">Spatial Protocol Active</span>
+                              <span className="text-[8px] font-mono font-bold opacity-40">{form.watch('geotag.lat').toFixed(4)}, {form.watch('geotag.lng').toFixed(4)}</span>
+                            </div>
+                          </div>
+                          <Badge className="bg-green-500 font-black text-[8px] uppercase">Anchored</Badge>
+                        </div>
                       </div>
                     )}
 

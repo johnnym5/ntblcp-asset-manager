@@ -5,6 +5,13 @@
 
 import { z } from 'zod';
 
+export const GeotagSchema = z.object({
+  lat: z.number(),
+  lng: z.number(),
+  accuracy: z.number(),
+  timestamp: z.string().datetime(),
+});
+
 export const AssetSchema = z.object({
   id: z.string().uuid(),
   name: z.string().optional(),
@@ -31,6 +38,7 @@ export const AssetSchema = z.object({
   serialNumber: z.string().default("N/A"),
   assetIdCode: z.string().optional(),
   photoDataUri: z.string().optional(),
+  geotag: GeotagSchema.optional(),
 
   // Nested Structured Data
   hierarchy: z.object({

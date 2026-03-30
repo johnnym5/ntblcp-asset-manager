@@ -23,6 +23,13 @@ export interface ImportMetadata {
   importedAt: string; // ISO 8601
 }
 
+export interface Geotag {
+  lat: number;
+  lng: number;
+  accuracy: number;
+  timestamp: string;
+}
+
 export interface Asset {
   id: string;
   name?: string;
@@ -49,6 +56,7 @@ export interface Asset {
   serialNumber: string;
   assetIdCode?: string;
   photoDataUri?: string; // Visual evidence pulse
+  geotag?: Geotag; // Spatial field protocol
 
   // Metadata & Provenance
   hierarchy: SectionHierarchy;

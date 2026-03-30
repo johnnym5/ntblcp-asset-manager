@@ -1,6 +1,6 @@
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity Detail Workstation.
- * Phase 23: Added visual evidence viewport.
+ * Phase 43: Integrated Spatial Pulse & Geotag evidence.
  */
 
 import React from 'react';
@@ -23,7 +23,8 @@ import {
   Database,
   ShieldCheck,
   X,
-  Camera
+  Camera,
+  Navigation
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord, RegistryFieldValue } from '@/types/registry';
@@ -122,6 +123,29 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                 <DetailField label="Manufacturer Serial" value={getFieldValue('serial_number')} icon={ShieldCheck} />
               </div>
             </div>
+
+            {/* Spatial Pulse */}
+            {asset.geotag && (
+              <>
+                <div className="px-8 py-4 bg-muted/20 border-y border-border/40 flex items-center gap-3">
+                  <Navigation className="h-4 w-4 text-primary opacity-60" />
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Spatial Field Protocol</h4>
+                </div>
+                <div className="p-8 space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <DetailField label="Latitude Anchor" value={asset.geotag.lat.toFixed(6)} icon={MapPin} />
+                    <DetailField label="Longitude Anchor" value={asset.geotag.lng.toFixed(6)} icon={MapPin} />
+                  </div>
+                  <div className="p-5 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 flex items-center justify-between">
+                    <div className="space-y-1">
+                      <span className="text-[8px] font-black uppercase opacity-40">Anchor Precision</span>
+                      <p className="text-xs font-bold text-primary">+/- {Math.round(asset.geotag.accuracy)} Meters</p>
+                    </div>
+                    <Badge variant="outline" className="h-6 px-2 text-[8px] font-black uppercase border-primary/20">Verified GPS Pulse</Badge>
+                  </div>
+                </div>
+              </>
+            )}
 
             {/* Regional Pulse */}
             <div className="px-8 py-4 bg-muted/20 border-y border-border/40 flex items-center gap-3">
