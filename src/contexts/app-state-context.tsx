@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - The Unified Data Facade.
- * Orchestrates the UI requests with the Offline Storage and Sync Engine.
- * Hardened: Implementing automated Shadow Fallback (RTDB fallback logic).
+ * Orchestrates UI requests with Offline Storage, Sandbox, and Sync Engine.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
@@ -11,12 +10,14 @@ import { storage } from '@/offline/storage';
 import { processSyncQueue } from '@/offline/sync';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { getAssets as getRtdbAssets, getSettings as getRtdbSettings } from '@/lib/database';
-import type { Asset, AppSettings, Grant } from '@/types/domain';
+import type { Asset, AppSettings, DataSource } from '@/types/domain';
 import { addNotification } from '@/hooks/use-notifications';
 
 interface AppStateContextType {
   assets: Asset[];
-  offlineAssets: Asset[];
+  sandboxAssets: Asset[];
+  dataSource: DataSource;
+  setDataSource: (source: DataSource) => void;
   isOnline: boolean;
   setIsOnline: (status: boolean) => void;
   searchTerm: string;
@@ -33,7 +34,8 @@ const AppStateContext = createContext<AppStateContextType | undefined>(undefined
 
 export const AppStateProvider = ({ children }: { children: React.ReactNode }) => {
   const [assets, setAssets] = useState<Asset[]>([]);
-  const [offlineAssets, setOfflineAssets] = useState<Asset[]>([]);
+  const [sandboxAssets, setSandboxAssets] = useState<Asset[]>([]);
+  const [dataSource, setDataSourceStatus] = useState<DataSource>('PRODUCTION');
   const [isOnline, setIsOnlineStatus] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
@@ -42,22 +44,32 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
+  const setDataSource = (source: DataSource) => {
+    setDataSourceStatus(source);
+    addNotification({ 
+      title: source === 'PRODUCTION' ? 'Production Registry Active' : 'Sandbox Store Active',
+      description: source === 'PRODUCTION' ? 'Working with synced registry data.' : 'Reviewing hierarchical imports in the sandbox.'
+    });
+  };
+
   const setIsOnline = (status: boolean) => {
     setIsOnlineStatus(status);
     addNotification({ 
       title: status ? 'Cloud Heartbeat Active' : 'Offline Registry Active',
-      description: status ? 'Online Registry View: re-establishing cloud parity.' : 'Locally Saved Assets View: modifications queued locally.'
+      description: status ? 'Establishing cloud parity.' : 'Modifications will be queued locally.'
     });
   };
 
   const refreshRegistry = useCallback(async () => {
     setIsSyncing(true);
     try {
-      // 1. Load Local State Pulse
+      // 1. Load Local & Sandbox Persistence
       const localAssets = await storage.getAssets();
+      const localSandbox = await storage.getSandbox();
       const localSettings = await storage.getSettings();
 
       if (localSettings) setAppSettings(localSettings);
+      setSandboxAssets(localSandbox);
       
       const currentGrantId = localSettings?.activeGrantId;
       const initialFiltered = currentGrantId 
@@ -72,11 +84,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         
         let remoteSettings = null;
         try {
-          // Attempt Primary Layer (Firestore)
           remoteSettings = await FirestoreService.getSettings();
         } catch (e) {
-          console.warn("Primary Layer Unreachable. Attempting Shadow Fallback (RTDB)...");
-          // Attempt Shadow Layer (Realtime Database)
+          console.warn("Primary Layer Unreachable. Attempting Shadow Fallback...");
           remoteSettings = await getRtdbSettings();
         }
 
@@ -103,7 +113,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         }
       }
     } catch (e) {
-      console.error("Facade Error: Failed to reconcile registry pulse", e);
+      console.error("Facade Error: Registry reconciliation failed", e);
     } finally {
       setIsSyncing(false);
       setSettingsLoaded(true);
@@ -128,7 +138,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   return (
     <AppStateContext.Provider value={{
       assets,
-      offlineAssets,
+      sandboxAssets,
+      dataSource,
+      setDataSource,
       isOnline,
       setIsOnline,
       searchTerm,

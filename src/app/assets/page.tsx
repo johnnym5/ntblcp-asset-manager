@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - High-Performance Asset Browser.
- * Phase 13: Refined Grid Card following "Mobile-First Operational" goals.
+ * Phase 14: Unified Production/Sandbox context switching.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -25,11 +25,12 @@ import {
   MapPin,
   Tag,
   User,
-  Hash,
   ChevronRight,
   ChevronLeft,
   X,
-  Info
+  Info,
+  Database,
+  DatabaseZap
 } from 'lucide-react';
 import { RegistryTable } from '@/modules/registry/components/RegistryTable';
 import { AssetForm } from '@/components/asset-form';
@@ -53,7 +54,19 @@ export type SortConfig = {
 const ITEMS_PER_PAGE = 25;
 
 export default function AssetRegistryPage() {
-  const { assets, searchTerm, setSearchTerm, refreshRegistry, settingsLoaded, activeGrantId, appSettings } = useAppState();
+  const { 
+    assets, 
+    sandboxAssets, 
+    dataSource, 
+    setDataSource, 
+    searchTerm, 
+    setSearchTerm, 
+    refreshRegistry, 
+    settingsLoaded, 
+    activeGrantId, 
+    appSettings 
+  } = useAppState();
+  
   const { userProfile, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -77,6 +90,9 @@ export default function AssetRegistryPage() {
   const [selectedAsset, setSelectedAsset] = useState<Asset | undefined>();
   const [isReadOnly, setIsReadOnly] = useState(false);
 
+  // Active Context Data
+  const currentRegistry = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
+
   // Filter State
   const [filters, setFilters] = useState({
     sections: [] as string[],
@@ -85,14 +101,13 @@ export default function AssetRegistryPage() {
     statuses: [] as string[]
   });
 
-  // Derivative Options for Filters
   const filterOptions = useMemo(() => {
     const sections = new Map<string, number>();
     const subsections = new Map<string, number>();
     const locations = new Map<string, number>();
     const statuses = new Map<string, number>();
 
-    assets.forEach(a => {
+    currentRegistry.forEach(a => {
       const s = a.section || 'General';
       const ss = a.subsection || 'Base Register';
       const l = a.location || 'Global';
@@ -113,10 +128,10 @@ export default function AssetRegistryPage() {
       locations: toOption(locations),
       statuses: toOption(statuses)
     };
-  }, [assets]);
+  }, [currentRegistry]);
 
   const filteredAndSortedAssets = useMemo(() => {
-    let results = assets.filter(a => {
+    let results = currentRegistry.filter(a => {
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         const match = (a.description || '').toLowerCase().includes(term) ||
@@ -135,227 +150,52 @@ export default function AssetRegistryPage() {
       let aVal: any = a[sortConfig.key as keyof Asset] || '';
       let bVal: any = b[sortConfig.key as keyof Asset] || '';
 
-      if (sortConfig.key === 'serialNumber' || sortConfig.key === 'assetIdCode') {
-        return sortConfig.direction === 'asc' 
-          ? String(aVal).localeCompare(String(bVal), undefined, { numeric: true })
-          : String(bVal).localeCompare(String(aVal), undefined, { numeric: true });
-      }
-
       if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
       if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
     });
 
     return results;
-  }, [assets, searchTerm, filters, sortConfig]);
+  }, [currentRegistry, searchTerm, filters, sortConfig]);
 
-  // Pagination Logic
-  const totalPages = Math.ceil(filteredAndSortedAssets.length / ITEMS_PER_PAGE);
   const paginatedAssets = useMemo(() => {
     return filteredAndSortedAssets.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
   }, [filteredAndSortedAssets, currentPage]);
 
-  const handleSort = (key: keyof Asset) => {
-    setSortConfig(current => ({
-      key,
-      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
-    }));
-  };
+  const totalPages = Math.ceil(filteredAndSortedAssets.length / ITEMS_PER_PAGE);
 
   const handleInspect = (asset: Asset) => {
     setSelectedAsset(asset);
-    setIsReadOnly(true);
+    setIsReadOnly(dataSource === 'PRODUCTION' && appSettings?.appMode === 'management');
     setIsFormOpen(true);
-  };
-
-  const handleCreateNew = () => {
-    setSelectedAsset(undefined);
-    setIsReadOnly(false);
-    setIsFormOpen(true);
-  };
-
-  const currentIndex = useMemo(() => {
-    if (!selectedAsset) return -1;
-    return filteredAndSortedAssets.findIndex(a => a.id === selectedAsset.id);
-  }, [selectedAsset, filteredAndSortedAssets]);
-
-  const handleNext = useCallback(() => {
-    if (currentIndex < filteredAndSortedAssets.length - 1) {
-      setSelectedAsset(filteredAndSortedAssets[currentIndex + 1]);
-    }
-  }, [currentIndex, filteredAndSortedAssets]);
-
-  const handlePrevious = useCallback(() => {
-    if (currentIndex > 0) {
-      setSelectedAsset(filteredAndSortedAssets[currentIndex - 1]);
-    }
-  }, [currentIndex, filteredAndSortedAssets]);
-
-  const handleToggleSelection = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id);
-    else next.add(id);
-    setSelectedAssetIds(next);
-  };
-
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedAssetIds(new Set(filteredAndSortedAssets.map(a => a.id)));
-    else setSelectedAssetIds(new Set());
   };
 
   const handleSaveAsset = async (assetToSave: Asset) => {
     try {
-      const original = assets.find(a => a.id === assetToSave.id);
-      const readyAsset = {
-        ...assetToSave,
-        previousState: original ? { ...original, previousState: undefined } : undefined
-      };
-
-      await enqueueMutation('UPDATE', 'assets', readyAsset);
-      const currentAssets = await storage.getAssets();
-      const updated = currentAssets.find(a => a.id === assetToSave.id)
-        ? currentAssets.map(a => a.id === assetToSave.id ? readyAsset : a)
-        : [readyAsset, ...currentAssets];
+      if (dataSource === 'PRODUCTION') {
+        const original = assets.find(a => a.id === assetToSave.id);
+        const readyAsset = {
+          ...assetToSave,
+          previousState: original ? { ...original, previousState: undefined } : undefined
+        };
+        await enqueueMutation('UPDATE', 'assets', readyAsset);
+        const currentAssets = await storage.getAssets();
+        const updated = currentAssets.find(a => a.id === assetToSave.id)
+          ? currentAssets.map(a => a.id === assetToSave.id ? readyAsset : a)
+          : [readyAsset, ...currentAssets];
+        await storage.saveAssets(updated);
+      } else {
+        // Sandbox Update
+        const currentSandbox = await storage.getSandbox();
+        const updated = currentSandbox.map(a => a.id === assetToSave.id ? assetToSave : a);
+        await storage.saveToSandbox(updated);
+      }
       
-      await storage.saveAssets(updated);
       await refreshRegistry();
-      
       toast({ title: "Registry Updated", description: "Operation committed to background sync pulse." });
       setIsFormOpen(false);
     } catch (e) {
-      toast({ variant: "destructive", title: "Operation Failed", description: "Registry integrity check failed." });
-    }
-  };
-
-  const handleBulkVerify = async () => {
-    if (selectedIds.size === 0) return;
-    const targets = assets.filter(a => selectedIds.has(a.id));
-    
-    try {
-      const updates = targets.map(asset => ({
-        ...asset,
-        status: 'VERIFIED' as const,
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: userProfile?.displayName || 'Bulk Action',
-        previousState: { ...asset, previousState: undefined }
-      }));
-
-      for (const updatedAsset of updates) {
-        await enqueueMutation('UPDATE', 'assets', updatedAsset);
-      }
-
-      const allAssets = await storage.getAssets();
-      const updatedMap = new Map(updates.map(a => [a.id, a]));
-      const nextAssets = allAssets.map(a => updatedMap.get(a.id) || a);
-      
-      await storage.saveAssets(nextAssets);
-      await refreshRegistry();
-      
-      toast({ title: "Bulk Verification Complete", description: `${selectedIds.size} records marked as verified.` });
-      setSelectedAssetIds(new Set());
-    } catch (e) {
-      toast({ variant: "destructive", title: "Bulk Action Failed" });
-    }
-  };
-
-  const handleBulkDelete = async () => {
-    if (selectedIds.size === 0) return;
-    try {
-      for (const id of selectedIds) {
-        await enqueueMutation('DELETE', 'assets', { id });
-      }
-
-      const allAssets = await storage.getAssets();
-      const nextAssets = allAssets.filter(a => !selectedIds.has(a.id));
-      
-      await storage.saveAssets(nextAssets);
-      await refreshRegistry();
-      
-      toast({ title: "Registry Purged", description: `${selectedIds.size} records removed from pulse.` });
-      setSelectedAssetIds(new Set());
-    } catch (e) {
-      toast({ variant: "destructive", title: "Deletion Failed" });
-    }
-  };
-
-  const handleSaveBatchEdit = async (data: BatchUpdateData) => {
-    const targets = assets.filter(a => selectedIds.has(a.id));
-    try {
-      const updates = targets.map(asset => ({
-        ...asset,
-        ...data,
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: userProfile?.displayName || 'Bulk Edit',
-        previousState: { ...asset, previousState: undefined }
-      }));
-
-      for (const updatedAsset of updates) {
-        await enqueueMutation('UPDATE', 'assets', updatedAsset);
-      }
-
-      const allAssets = await storage.getAssets();
-      const updatedMap = new Map(updates.map(a => [a.id, a]));
-      const nextAssets = allAssets.map(a => updatedMap.get(a.id) || a);
-      
-      await storage.saveAssets(nextAssets);
-      await refreshRegistry();
-      
-      toast({ title: "Bulk Update Broadcasted", description: `Applied changes to ${selectedIds.size} records.` });
-      setSelectedAssetIds(new Set());
-      setIsBatchEditOpen(false);
-    } catch (e) {
-      toast({ variant: "destructive", title: "Batch Edit Failed" });
-    }
-  };
-
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !activeGrantId) return;
-
-    setIsProcessing(true);
-    try {
-      const parsed = await ExcelService.parseWorkbook(file);
-      const tagged = parsed.map(a => ({
-        ...a,
-        grantId: activeGrantId,
-        lastModifiedBy: userProfile?.displayName || 'System Import'
-      }));
-      setStagedAssets(tagged);
-      setIsImportPreviewOpen(true);
-    } catch (err) {
-      toast({ variant: "destructive", title: "Parsing Failed", description: "The workbook hierarchy is corrupted or non-deterministic." });
-    } finally {
-      setIsProcessing(false);
-      if (fileInputRef.current) fileInputRef.current.value = '';
-    }
-  };
-
-  const handleConfirmImport = async () => {
-    setIsProcessing(true);
-    try {
-      for (const asset of stagedAssets) {
-        await enqueueMutation('CREATE', 'assets', asset);
-      }
-      const current = await storage.getAssets();
-      await storage.saveAssets([...stagedAssets, ...current]);
-      await refreshRegistry();
-      toast({ title: "Registry Merged", description: `${stagedAssets.length} hierarchical records enqueued for cloud pulse.` });
-      setIsImportPreviewOpen(false);
-      setStagedAssets([]);
-    } catch (err) {
-      toast({ variant: "destructive", title: "Merge Failed" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleExportRegistry = async () => {
-    if (filteredAndSortedAssets.length === 0) return;
-    try {
-      await ExcelService.exportRegistry(filteredAndSortedAssets, `Registry-Pulse-${new Date().toISOString().split('T')[0]}.xlsx`);
-      toast({ title: "Export Complete", description: "Structure-preserving report generated." });
-    } catch (err) {
-      toast({ variant: "destructive", title: "Export Failed" });
+      toast({ variant: "destructive", title: "Operation Failed" });
     }
   };
 
@@ -372,40 +212,68 @@ export default function AssetRegistryPage() {
   return (
     <AppLayout>
       <div className="flex flex-col h-full gap-4 relative pb-32">
-        {/* Hidden File Trigger */}
-        <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
-
         {/* Top Operational Header */}
-        <div className="flex items-center justify-between px-2 h-14 shrink-0">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between px-2 gap-4 shrink-0">
           <div className="flex items-center gap-4">
-            <h2 className="text-xl font-black tracking-tight uppercase truncate max-w-[200px] md:max-w-md">{activeProjectName}</h2>
-            <Badge variant="outline" className="h-6 px-2 text-[9px] font-black tracking-tighter border-primary/20 bg-primary/5 text-primary rounded-full">
-              {filteredAndSortedAssets.length} RECORDS
-            </Badge>
+            <div className="flex flex-col">
+              <h2 className="text-xl font-black tracking-tight uppercase truncate max-w-[200px] md:max-w-md">{activeProjectName}</h2>
+              <div className="flex items-center gap-2 mt-1">
+                <Badge variant="outline" className="h-5 px-2 text-[8px] font-black tracking-tighter border-primary/20 bg-primary/5 text-primary rounded-full">
+                  {filteredAndSortedAssets.length} RECORDS
+                </Badge>
+                {dataSource === 'SANDBOX' && (
+                  <Badge className="h-5 px-2 text-[8px] font-black tracking-tighter bg-orange-500 text-white rounded-full">
+                    SANDBOX MODE
+                  </Badge>
+                )}
+              </div>
+            </div>
           </div>
 
-          <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl">
-            <Button 
-              variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-              size="sm" 
-              onClick={() => setViewMode('list')}
-              className="h-8 w-8 p-0 rounded-lg tactile-pulse"
-            >
-              <List className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
-              size="sm" 
-              onClick={() => setViewMode('grid')}
-              className="h-8 w-8 p-0 rounded-lg tactile-pulse"
-            >
-              <LayoutGrid className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center gap-2">
+            {/* Data Layer Switcher */}
+            <div className="flex items-center bg-muted/50 p-1 rounded-xl">
+              <Button 
+                variant={dataSource === 'PRODUCTION' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                onClick={() => setDataSource('PRODUCTION')}
+                className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest gap-2"
+              >
+                <Database className="h-3 w-3" /> Production
+              </Button>
+              <Button 
+                variant={dataSource === 'SANDBOX' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                onClick={() => setDataSource('SANDBOX')}
+                className="h-8 px-3 rounded-lg text-[9px] font-black uppercase tracking-widest gap-2"
+              >
+                <DatabaseZap className="h-3 w-3" /> Sandbox
+              </Button>
+            </div>
+
+            <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl">
+              <Button 
+                variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                onClick={() => setViewMode('list')}
+                className="h-8 w-8 p-0 rounded-lg tactile-pulse"
+              >
+                <List className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
+                size="sm" 
+                onClick={() => setViewMode('grid')}
+                className="h-8 w-8 p-0 rounded-lg tactile-pulse"
+              >
+                <LayoutGrid className="h-4 w-4" />
+              </Button>
+            </div>
           </div>
         </div>
 
-        {/* Dynamic Context Header (Search or Selection) */}
-        <div className="relative z-20 shrink-0">
+        {/* Search & Selection Bars */}
+        <div className="relative z-20 shrink-0 h-14">
           <AnimatePresence mode="wait">
             {selectedIds.size > 0 ? (
               <motion.div 
@@ -422,9 +290,8 @@ export default function AssetRegistryPage() {
                   <span className="font-black uppercase text-[10px] tracking-widest">{selectedIds.size} SELECTED</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <Button variant="ghost" size="sm" onClick={handleBulkVerify} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10 tactile-pulse">VERIFY</Button>
-                  <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10 tactile-pulse">MOVE</Button>
-                  <Button variant="ghost" size="sm" onClick={handleBulkDelete} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-red-500/20 tactile-pulse">PURGE</Button>
+                  <Button variant="ghost" size="sm" className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10 tactile-pulse">BATCH EDIT</Button>
+                  <Button variant="ghost" size="sm" className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-red-500/20 tactile-pulse">DELETE</Button>
                 </div>
               </motion.div>
             ) : showSearch ? (
@@ -456,142 +323,89 @@ export default function AssetRegistryPage() {
           layout
           className="flex-1 bg-card/50 rounded-[2rem] border-2 border-dashed border-border/40 overflow-hidden shadow-inner min-h-[300px]"
         >
-          <AnimatePresence mode="wait">
-            {paginatedAssets.length > 0 ? (
-              viewMode === 'list' ? (
-                <motion.div 
-                  key="list-view"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="h-full"
-                >
-                  <RegistryTable 
-                    assets={paginatedAssets} 
-                    onInspect={handleInspect}
-                    selectedIds={selectedIds}
-                    onToggleSelection={handleToggleSelection}
-                    onSelectAll={handleSelectAll}
-                    onSort={handleSort}
-                    sortConfig={sortConfig}
-                  />
-                </motion.div>
-              ) : (
-                <motion.div 
-                  key="grid-view"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 h-full overflow-y-auto custom-scrollbar"
-                >
-                  {paginatedAssets.map((asset) => (
-                    <motion.div key={asset.id} layout>
-                      <Card 
-                        className={cn(
-                          "border-2 border-border/40 hover:border-primary/20 transition-all rounded-[1.5rem] overflow-hidden group cursor-pointer shadow-md tactile-pulse",
-                          selectedIds.has(asset.id) ? "bg-primary/5 border-primary/20 shadow-primary/5" : "bg-card"
-                        )}
-                        onClick={() => handleInspect(asset)}
-                      >
-                        <CardContent className="p-0">
-                          {/* Card Header Logic */}
-                          <div className="p-5 border-b border-dashed border-border/40 flex justify-between items-start gap-4">
-                            <div className="flex flex-col gap-1.5 min-w-0">
-                              <h3 className="font-black text-sm uppercase tracking-tight truncate leading-none text-foreground">{asset.description || asset.name}</h3>
-                              <div className="flex items-center gap-2">
-                                <Badge variant="secondary" className="h-5 px-1.5 text-[8px] font-black uppercase tracking-tighter bg-muted border border-border/40">
-                                  S/N: {asset.serialNumber || 'UNSET'}
-                                </Badge>
-                                <span className="text-[8px] font-mono font-bold text-muted-foreground uppercase opacity-60">ROW: {asset.importMetadata?.rowNumber || 'MAN'}</span>
-                              </div>
-                            </div>
-                            <Badge variant="outline" className={cn(
-                              "text-[8px] font-black uppercase tracking-widest h-6 px-2 shrink-0 border-2 rounded-lg shadow-sm",
-                              asset.status === 'VERIFIED' ? "text-green-600 border-green-500/20 bg-green-50" : "text-orange-600 border-orange-500/20 bg-orange-50"
-                            )}>
-                              {asset.status}
-                            </Badge>
-                          </div>
-
-                          {/* Info Stacks following Design Goal */}
-                          <div className="p-5 space-y-4">
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
-                                  <MapPin className="h-2.5 w-2.5" /> Scope
-                                </div>
-                                <p className="text-[10px] font-black uppercase truncate text-foreground">{asset.location || 'GLOBAL'}</p>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
-                                  <User className="h-2.5 w-2.5" /> Assignee
-                                </div>
-                                <p className="text-[10px] font-black uppercase truncate text-foreground">{asset.custodian || 'UNASSIGNED'}</p>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
-                                  <Tag className="h-2.5 w-2.5" /> Registry ID
-                                </div>
-                                <p className="text-[10px] font-mono font-bold uppercase truncate text-primary">{asset.assetIdCode || 'UNSET'}</p>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
-                                  <Info className="h-2.5 w-2.5" /> Category
-                                </div>
-                                <p className="text-[10px] font-black uppercase truncate text-foreground/60">{asset.category}</p>
-                              </div>
-                            </div>
-                          </div>
-                        </CardContent>
-                      </Card>
-                    </motion.div>
-                  ))}
-                </motion.div>
-              )
+          {paginatedAssets.length > 0 ? (
+            viewMode === 'list' ? (
+              <RegistryTable 
+                assets={paginatedAssets} 
+                onInspect={handleInspect}
+                selectedIds={selectedIds}
+                onToggleSelection={(id) => {
+                  const next = new Set(selectedIds);
+                  if (next.has(id)) next.delete(id);
+                  else next.add(id);
+                  setSelectedAssetIds(next);
+                }}
+                onSelectAll={(checked) => {
+                  if (checked) setSelectedAssetIds(new Set(filteredAndSortedAssets.map(a => a.id)));
+                  else setSelectedAssetIds(new Set());
+                }}
+                onSort={(key) => setSortConfig(c => ({ key, direction: c.key === key && c.direction === 'asc' ? 'desc' : 'asc' }))}
+                sortConfig={sortConfig}
+              />
             ) : (
-              <motion.div 
-                key="empty-view"
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="h-full flex flex-col items-center justify-center text-center p-10 opacity-20"
-              >
-                <div className="p-8 bg-muted rounded-[2rem] mb-6 shadow-inner">
-                  <Boxes className="h-16 w-16" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-xl font-black uppercase tracking-widest">Registry Silent</h3>
-                  <p className="text-[10px] font-bold max-w-[200px] mx-auto uppercase tracking-widest opacity-60">Zero records discovered in current pulse.</p>
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
+              <div className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 h-full overflow-y-auto custom-scrollbar">
+                {paginatedAssets.map((asset) => (
+                  <Card 
+                    key={asset.id}
+                    className={cn(
+                      "border-2 border-border/40 hover:border-primary/20 transition-all rounded-[1.5rem] overflow-hidden group cursor-pointer shadow-md tactile-pulse",
+                      selectedIds.has(asset.id) ? "bg-primary/5 border-primary/20 shadow-primary/5" : "bg-card"
+                    )}
+                    onClick={() => handleInspect(asset)}
+                  >
+                    <CardContent className="p-5 space-y-4">
+                      <div className="flex justify-between items-start gap-4">
+                        <div className="flex flex-col gap-1 min-w-0">
+                          <h3 className="font-black text-sm uppercase tracking-tight truncate text-foreground">{asset.description || asset.name}</h3>
+                          <Badge variant="secondary" className="h-5 px-1.5 text-[8px] font-black uppercase tracking-tighter bg-muted border border-border/40 w-fit">
+                            S/N: {asset.serialNumber || 'UNSET'}
+                          </Badge>
+                        </div>
+                        <Badge variant="outline" className={cn(
+                          "text-[8px] font-black uppercase tracking-widest h-6 px-2 shrink-0 border-2 rounded-lg shadow-sm",
+                          asset.status === 'VERIFIED' ? "text-green-600 border-green-500/20 bg-green-50" : "text-orange-600 border-orange-500/20 bg-orange-50"
+                        )}>
+                          {asset.status}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 gap-4 pt-2">
+                        <div className="space-y-1">
+                          <span className="flex items-center gap-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
+                            <MapPin className="h-2.5 w-2.5" /> Scope
+                          </span>
+                          <p className="text-[10px] font-black uppercase truncate text-foreground">{asset.location || 'GLOBAL'}</p>
+                        </div>
+                        <div className="space-y-1 text-right">
+                          <span className="flex items-center justify-end gap-1.5 text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-40">
+                            <Tag className="h-2.5 w-2.5" /> Registry ID
+                          </span>
+                          <p className="text-[10px] font-mono font-bold uppercase truncate text-primary">{asset.assetIdCode || 'UNSET'}</p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )
+          ) : (
+            <div className="h-full flex flex-col items-center justify-center text-center p-10 opacity-20">
+              <Boxes className="h-16 w-16 mb-4" />
+              <h3 className="text-xl font-black uppercase tracking-widest">Registry Silent</h3>
+              <p className="text-[10px] font-bold uppercase tracking-widest">Zero records found in current context.</p>
+            </div>
+          )}
         </motion.div>
 
         {/* Bottom Action Pulse Bar */}
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-background/80 backdrop-blur-2xl p-2.5 rounded-[2rem] border-2 border-primary/10 shadow-2xl ring-1 ring-white/10 w-[95%] max-w-lg">
           <div className="flex items-center gap-1 pr-2 border-r border-border/40">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === 1}
-              onClick={() => setCurrentPage(prev => prev - 1)}
-              className="h-10 w-10 rounded-xl tactile-pulse"
-            >
+            <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-10 w-10 rounded-xl tactile-pulse">
               <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-[9px] font-black uppercase tracking-tighter px-2 tabular-nums">
+            <span className="text-[9px] font-black uppercase tracking-tighter px-2">
               {currentPage}/{totalPages || 1}
             </span>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              disabled={currentPage === totalPages}
-              onClick={() => setCurrentPage(prev => prev + 1)}
-              className="h-10 w-10 rounded-xl tactile-pulse"
-            >
+            <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="h-10 w-10 rounded-xl tactile-pulse">
               <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
@@ -602,27 +416,21 @@ export default function AssetRegistryPage() {
             </Button>
             <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl relative tactile-pulse" onClick={() => setIsFilterOpen(true)}>
               <Filter className="h-5 w-5" />
-              {Object.values(filters).flat().length > 0 && (
-                <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-primary rounded-full shadow-lg border-2 border-white" />
-              )}
+              {Object.values(filters).flat().length > 0 && <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-primary rounded-full" />}
             </Button>
-            <Button 
-              className="h-12 w-12 rounded-2xl font-black shadow-xl shadow-primary/20 transition-all tactile-pulse bg-primary"
-              onClick={handleCreateNew}
-            >
+            <Button className="h-12 w-12 rounded-2xl font-black shadow-xl bg-primary" onClick={() => { setSelectedAsset(undefined); setIsReadOnly(false); setIsFormOpen(true); }}>
               <Plus className="h-6 w-6" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl tactile-pulse" onClick={() => fileInputRef.current?.click()}>
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl tactile-pulse" onClick={() => window.location.href = '/import'}>
               <FileUp className="h-5 w-5" />
             </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl tactile-pulse" onClick={handleExportRegistry}>
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl tactile-pulse" onClick={() => ExcelService.exportRegistry(currentRegistry)}>
               <FileDown className="h-5 w-5" />
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Overlays */}
       <AssetForm
         isOpen={isFormOpen}
         onOpenChange={setIsFormOpen}
@@ -630,8 +438,6 @@ export default function AssetRegistryPage() {
         isReadOnly={isReadOnly}
         onSave={handleSaveAsset}
         onQuickSave={async () => {}}
-        onNext={currentIndex < filteredAndSortedAssets.length - 1 ? handleNext : undefined}
-        onPrevious={currentIndex > 0 ? handlePrevious : undefined}
       />
 
       <AssetFilterDialog
@@ -644,21 +450,6 @@ export default function AssetRegistryPage() {
         filters={filters}
         setFilters={setFilters}
         onReset={() => setFilters({ sections: [], subsections: [], locations: [], statuses: [] })}
-      />
-
-      <AssetBatchEditForm 
-        isOpen={isBatchEditOpen} 
-        onOpenChange={setIsBatchEditOpen} 
-        selectedAssetCount={selectedIds.size} 
-        onSave={handleSaveBatchEdit} 
-      />
-
-      <ImportPreviewDialog 
-        isOpen={isImportPreviewOpen}
-        onOpenChange={setIsImportPreviewOpen}
-        assets={stagedAssets}
-        onConfirm={handleConfirmImport}
-        isProcessing={isProcessing}
       />
     </AppLayout>
   );

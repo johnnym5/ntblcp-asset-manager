@@ -5,6 +5,7 @@
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VIEWER';
 export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
+export type DataSource = 'PRODUCTION' | 'SANDBOX';
 
 export interface SectionHierarchy {
   document: string;
