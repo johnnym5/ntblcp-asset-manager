@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useEffect } from "react";
@@ -30,10 +29,11 @@ import {
   ShieldCheck,
   History,
   CheckCircle2,
+  Zap,
 } from "lucide-react";
 import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
-import { cn } from "@/lib/utils";
+import { cn, sanitizeForFirestore } from "@/lib/utils";
 
 import { Button } from "./ui/button";
 import { useAuth } from "@/contexts/auth-context";
@@ -58,7 +58,6 @@ import type { Asset } from "@/lib/types";
 import { InboxSheet } from "./inbox-sheet";
 import { ScrollArea } from "./ui/scroll-area";
 import { saveAssets } from "@/lib/idb";
-import { sanitizeForFirestore } from "@/lib/utils";
 import { Badge } from "./ui/badge";
 
 
@@ -384,30 +383,45 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
        <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} onApprove={handleApprove} onReject={handleReject} />
        
        <Sheet open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
-        <SheetContent className="w-full sm:max-w-sm p-0 flex flex-col">
-            <SheetHeader className="p-6 border-b">
-                <SheetTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary"/> Project Updates</SheetTitle>
+        <SheetContent className="w-full sm:max-w-sm p-0 flex flex-col bg-background/95 backdrop-blur-xl">
+            <SheetHeader className="p-8 pb-6 border-b">
+                <SheetTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
+                    <Bell className="h-6 w-6 text-primary fill-primary/10"/> Project Updates
+                </SheetTitle>
             </SheetHeader>
             <ScrollArea className="flex-1">
               {notifications.length > 0 ? (
                 notifications.map((notification) => (
-                  <div key={notification.id} className="relative p-4 border-b hover:bg-muted/30 transition-colors group">
-                      <p className={cn("text-sm font-bold", !notification.read ? "text-foreground" : "text-muted-foreground")}>{notification.title}</p>
-                      {notification.description && <p className="text-xs text-muted-foreground mt-1">{notification.description}</p>}
-                      <p className="text-[9px] font-black uppercase tracking-tighter text-muted-foreground/60 mt-2">{formatDistanceToNow(notification.date, { addSuffix: true })}</p>
-                      <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6 opacity-0 group-hover:opacity-100" onClick={() => removeNotification(notification.id)}><X className="h-3 w-3" /></Button>
+                  <div key={notification.id} className="relative p-6 border-b hover:bg-primary/[0.02] transition-colors group">
+                      <div className="flex flex-col gap-1">
+                          <p className={cn("text-base font-black tracking-tight", !notification.read ? "text-foreground" : "text-muted-foreground")}>{notification.title}</p>
+                          {notification.description && <p className="text-sm text-muted-foreground/80 font-medium leading-relaxed">{notification.description}</p>}
+                          <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/40 mt-3">{formatDistanceToNow(notification.date, { addSuffix: true })}</p>
+                      </div>
+                      <Button variant="ghost" size="icon" className="absolute top-4 right-4 h-8 w-8 opacity-0 group-hover:opacity-100 rounded-xl hover:bg-destructive/10 hover:text-destructive transition-all" onClick={() => removeNotification(notification.id)}><X className="h-4 w-4" /></Button>
                   </div>
                 ))
               ) : (
-                <div className="flex flex-col items-center justify-center p-12 text-center text-muted-foreground/40">
-                  <CheckCircle2 className="h-12 w-12 mb-4" />
-                  <p className="text-sm font-bold uppercase tracking-widest">Feed Clear</p>
+                <div className="flex flex-col items-center justify-center p-12 text-center h-[60vh]">
+                  <div className="p-6 bg-muted/20 rounded-full mb-6">
+                    <CheckCircle2 className="h-12 w-12 text-muted-foreground/20" />
+                  </div>
+                  <p className="text-sm font-black uppercase tracking-widest text-muted-foreground/40">Register Pulse Clear</p>
                 </div>
               )}
             </ScrollArea>
-            <SheetFooter className="p-4 border-t bg-muted/10">
-              <Button variant="ghost" size="sm" className="w-full text-xs font-bold" onClick={() => clearAll()}>Clear All Notifications</Button>
-            </SheetFooter>
+            <div className="p-8 border-t bg-muted/10">
+              <Button 
+                variant="outline" 
+                className="w-full h-14 rounded-2xl font-black uppercase text-xs tracking-widest gap-3 border-2 hover:bg-primary/5 hover:border-primary/20 transition-all group" 
+                onClick={() => clearAll()}
+              >
+                <div className="p-1.5 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+                    <Zap className="h-4 w-4 text-primary fill-primary" />
+                </div>
+                Clear All Notifications
+              </Button>
+            </div>
         </SheetContent>
       </Sheet>
     </div>

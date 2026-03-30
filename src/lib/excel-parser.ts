@@ -2,8 +2,8 @@ import * as XLSX from 'xlsx';
 import type { Asset, AppSettings, SheetDefinition, DisplayField } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, IHVN_SUB_SHEET_DEFINITIONS } from './constants';
-import { Timestamp } from 'firebase/firestore';
 import { AssetSchema } from './validation/asset-schema';
+import { sanitizeForFirestore } from './utils';
 
 /**
  * Normalizes a header string by trimming and converting to uppercase.
@@ -96,22 +96,6 @@ for (const key in HEADER_ALIASES) {
         }
     }
 }
-
-export const sanitizeForFirestore = <T extends object>(obj: T): T => {
-    const sanitizedObj: { [key: string]: any } = {};
-    for (const key in obj) {
-        const value = (obj as any)[key];
-        if (key === 'previousState') continue;
-        if (value !== undefined) {
-            if (value instanceof Date) {
-                sanitizedObj[key] = Timestamp.fromDate(value);
-            } else {
-                sanitizedObj[key] = value;
-            }
-        }
-    }
-    return sanitizedObj as T;
-};
 
 const parseAssetRow = (row: any[], headerRow: any[], context: any): Partial<Asset> => {
     const assetObject: Partial<Asset> = { 
