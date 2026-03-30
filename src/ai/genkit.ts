@@ -1,6 +1,13 @@
 /**
- * @fileOverview [ARCHIVED] Genkit Initialization.
- * This module is disabled per architectural rules forbidding probabilistic AI features.
+ * @fileOverview Genkit Framework Initialization.
+ * Configures the primary AI engine for multimodal asset analysis.
  */
 
-export const ai = null as any;
+import { genkit } from 'genkit';
+import { googleAI } from '@genkit-ai/google-genai';
+
+export const ai = genkit({
+  plugins: [
+    googleAI()
+  ],
+});

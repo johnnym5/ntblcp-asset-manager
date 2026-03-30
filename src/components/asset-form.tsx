@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 24: Schema-Driven Label Resolution and Dynamic Pulse Rendering.
+ * Phase 27: Integrated AI-Powered OCR Scanning Pulse.
  */
 
 import React, { useEffect, useState, useRef } from "react";
@@ -52,7 +52,9 @@ import {
   CalendarDays,
   GitPullRequest,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Sparkles,
+  Zap
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -66,6 +68,8 @@ import type { Asset, ActivityLogEntry } from "@/types/domain";
 import type { RegistryHeader } from "@/types/registry";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDistanceToNow } from "date-fns";
+import { extractAssetData } from "@/ai/flows/ocr-asset-flow";
+import { useToast } from "@/hooks/use-toast";
 
 interface AssetFormProps {
   isOpen: boolean;
@@ -112,11 +116,13 @@ export function AssetForm({
     onPrevious
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
+  const [isAnalyzing, setIsAnalyzing] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
   const [history, setHistory] = useState<ActivityLogEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const { userProfile } = useAuth();
   const { activeGrantId, isOnline } = useAppState();
+  const { toast } = useToast();
   
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
@@ -127,7 +133,6 @@ export function AssetForm({
     mode: 'onChange',
   });
 
-  // Resolve custom labels from headers
   const getLabel = (normalizedName: string, fallback: string) => {
     const header = headers.find(h => h.normalizedName === normalizedName);
     return header?.displayName || fallback;
@@ -203,6 +208,41 @@ export function AssetForm({
         setCapturedPhoto(dataUri);
         stopCamera();
       }
+    }
+  };
+
+  const handleAIScan = async () => {
+    if (!capturedPhoto) return;
+    setIsAnalyzing(true);
+    toast({ title: "AI Pulse Initialized", description: "Analyzing asset label for technical markers..." });
+
+    try {
+      const result = await extractAssetData({ photoDataUri: capturedPhoto });
+      
+      if (result.confidence > 0.4) {
+        // Map AI results to form
+        if (result.serialNumber) form.setValue('serialNumber', result.serialNumber);
+        if (result.modelNumber) form.setValue('metadata.modelNumber', result.modelNumber);
+        if (result.manufacturer) form.setValue('metadata.manufacturer', result.manufacturer);
+        if (result.description && !form.getValues('description')) {
+          form.setValue('description', result.description);
+        }
+        
+        toast({ 
+          title: "Technical Extraction Complete", 
+          description: `Identified S/N: ${result.serialNumber || 'Unclear'} with ${Math.round(result.confidence * 100)}% accuracy.` 
+        });
+      } else {
+        toast({ 
+          variant: "destructive", 
+          title: "Low Confidence Pulse", 
+          description: "AI was unable to verify technical markers. Please enter manually." 
+        });
+      }
+    } catch (e) {
+      toast({ variant: "destructive", title: "Intelligence Failure", description: "AI engine was unable to process the label pulse." });
+    } finally {
+      setIsAnalyzing(false);
     }
   };
 
@@ -291,16 +331,35 @@ export function AssetForm({
                     ) : capturedPhoto ? (
                       <div className="relative group aspect-video bg-muted m-4 rounded-[2rem] overflow-hidden border-2 border-primary/10 shadow-lg">
                           <img src={capturedPhoto} className="w-full h-full object-cover" alt="Asset Evidence" />
-                          {!isReadOnly && (
-                              <Button variant="destructive" size="icon" className="absolute top-4 right-4 h-10 w-10 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity tactile-pulse" onClick={() => setCapturedPhoto(null)}>
-                                <X className="h-5 w-5" />
-                              </Button>
-                          )}
+                          <div className="absolute top-4 right-4 flex gap-2">
+                            {!isReadOnly && (
+                                <Button 
+                                  variant="secondary" 
+                                  size="sm" 
+                                  onClick={handleAIScan} 
+                                  disabled={isAnalyzing}
+                                  className="rounded-xl h-10 px-4 font-black uppercase text-[9px] tracking-widest gap-2 shadow-2xl transition-all hover:scale-105 active:scale-95"
+                                >
+                                  {isAnalyzing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5 text-primary" />}
+                                  AI Extract
+                                </Button>
+                            )}
+                            {!isReadOnly && (
+                                <Button variant="destructive" size="icon" className="h-10 w-10 rounded-xl shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity tactile-pulse" onClick={() => setCapturedPhoto(null)}>
+                                  <X className="h-5 w-5" />
+                                </Button>
+                            )}
+                          </div>
                           <Badge className="absolute bottom-4 left-4 bg-primary/90 backdrop-blur-md font-black uppercase text-[8px] tracking-[0.2em] px-3 h-6 rounded-lg">
                             VISUAL PULSE PROOF ATTACHED
                           </Badge>
                       </div>
-                    ) : null}
+                    ) : (
+                      <div className="m-4 h-48 border-2 border-dashed border-primary/10 rounded-[2rem] flex flex-col items-center justify-center gap-4 bg-primary/5 hover:bg-primary/[0.08] transition-colors cursor-pointer group" onClick={startCamera}>
+                        <div className="p-4 bg-primary/10 rounded-2xl group-hover:scale-110 transition-transform"><Camera className="h-8 w-8 text-primary" /></div>
+                        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Capture Visual Proof</span>
+                      </div>
+                    )}
 
                     {/* Identification Stack */}
                     <SectionHeader label="Identification Pulse" icon={Tag} />
@@ -323,7 +382,14 @@ export function AssetForm({
                         <FormField control={form.control} name="serialNumber" render={({ field }) => (
                           <FormItem>
                             <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('serial_number', 'Manufacturer Serial')}</FormLabel>
-                            <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
+                            <FormControl>
+                              <div className="relative">
+                                <Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner pr-10" />
+                                {form.getValues('serialNumber') && form.getValues('serialNumber') !== 'N/A' && (
+                                  <ShieldCheck className="absolute right-3 top-1/2 -translate-y-1/2 h-4 w-4 text-green-500" />
+                                )}
+                              </div>
+                            </FormControl>
                           </FormItem>
                         )}/>
                       </div>
