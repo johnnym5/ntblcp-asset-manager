@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import { motion } from "framer-motion"
 import { cn } from "@/lib/utils"
@@ -14,11 +13,16 @@ const Card = React.forwardRef<
     <motion.div
       ref={ref}
       className={cn(
-        "rounded-xl border bg-card/60 text-card-foreground shadow-xl backdrop-blur-lg transition-shadow duration-300 hover:shadow-primary/20",
+        "rounded-[1.5rem] border-2 bg-card/60 text-card-foreground shadow-xl backdrop-blur-lg transition-all duration-300",
         className
       )}
-      whileHover={!isMobile ? { y: -5, scale: 1.02 } : {}}
-      transition={{ type: "spring", stiffness: 300, damping: 10 }}
+      whileHover={!isMobile ? { 
+        y: -8, 
+        scale: 1.01,
+        borderColor: "rgba(var(--primary), 0.2)",
+        boxShadow: "0 25px 50px -12px rgba(var(--primary), 0.1)"
+      } : {}}
+      transition={{ type: "spring", stiffness: 400, damping: 25 }}
       {...(props as any)}
     />
   )

@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* Material You - Gold Forward Mode */
+    /* Material You - Gold Forward Mode - Refined for Softness */
     --background: 45 30% 98%;
     --foreground: 45 10% 10%;
     
@@ -33,7 +33,7 @@
     --input: 45 15% 88%;
     --ring: 45 95% 40%;
     
-    --radius: 1.5rem;
+    --radius: 1.5rem; /* Soft Organic Curves */
   }
   .dark {
     /* Material You - Gold AMOLED Night Mode */
@@ -72,7 +72,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body antialiased;
+    @apply bg-background text-foreground font-body antialiased selection:bg-primary/20;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline font-black uppercase tracking-tight;
@@ -108,8 +108,14 @@
     @apply bg-card/70 backdrop-blur-xl border border-white/10 shadow-2xl;
   }
 
+  /* Tactile Feedback Pulse */
   .tactile-pulse {
     @apply active:scale-95 transition-transform duration-200;
+  }
+
+  /* Fluid Entrance Animation */
+  .animate-pulse-slow {
+    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
   }
 
   .text-responsive-h1 {

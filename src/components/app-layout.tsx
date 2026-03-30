@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
- * Phase 28: Hardened for Fluid Responsive Auto-Fit.
+ * Phase 29: Hardened for Fluid Motion & Continuous Page Orchestration.
  */
 
 import React, { useState } from 'react';
@@ -45,6 +45,7 @@ import { InboxSheet } from './inbox-sheet';
 import { HelpCenter } from './HelpCenter';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { Separator } from './ui/separator';
+import { ScrollArea } from './ui/scroll-area';
 
 interface NavItem {
   label: string;
@@ -295,10 +296,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <AnimatePresence mode="wait">
             <motion.div
               key={pathname}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              transition={{ duration: 0.3 }}
+              initial={{ opacity: 0, y: 10, scale: 0.99 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: -10, scale: 0.99 }}
+              transition={{ 
+                duration: 0.4, 
+                ease: [0.22, 1, 0.36, 1] /* Modern Premium Easing */
+              }}
               className="p-4 md:p-8 lg:p-10"
             >
               <div className="max-w-[1600px] mx-auto h-full">
