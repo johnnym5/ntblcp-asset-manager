@@ -1,3 +1,4 @@
+
 "use client";
 
 import React, { useEffect, useState, useMemo, useCallback } from "react";
@@ -89,13 +90,17 @@ export default function AssetList() {
     assets, setAssets, isOnline, offlineAssets, dataSource,
     globalStateFilters, appSettings, manualDownloadTrigger,
     manualUploadTrigger, isSyncing, setIsSyncing, searchTerm,
-    setDataActions, setAssetToView, assetToView
+    setDataActions, setAssetToView, assetToView, activeGrantId
   } = useAppState();
 
-  const { enabledSheets, activeGrantId } = appSettings;
   const isAdmin = userProfile?.isAdmin || false;
   const isGuest = userProfile?.isGuest || false;
   const activeAssets = useMemo(() => dataSource === 'cloud' ? assets : offlineAssets, [dataSource, assets, offlineAssets]);
+
+  const enabledSheets = useMemo(() => {
+    const activeGrant = appSettings.grants.find(g => g.id === activeGrantId);
+    return activeGrant?.enabledSheets || [];
+  }, [appSettings.grants, activeGrantId]);
 
   const handleDownloadScan = useCallback(async () => {
     if (!isOnline || !authInitialized || isGuest) return;
