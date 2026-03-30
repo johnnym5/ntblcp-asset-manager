@@ -3,7 +3,7 @@
  * Defines explicit rules for converting Excel headers to domain fields.
  */
 
-import { Asset } from '@/types/domain';
+import type { Asset } from '@/types/domain';
 
 export type HeaderMap = Record<string, keyof Asset>;
 
@@ -42,5 +42,6 @@ export function calculateHeaderIntegrity(row: string[]): number {
   const contractHeaders = Object.keys(REGISTRY_MAPPING_CONTRACT);
   
   const matches = normalizedRow.filter(h => contractHeaders.includes(h));
+  if (contractHeaders.length === 0) return 0;
   return matches.length / contractHeaders.length;
 }

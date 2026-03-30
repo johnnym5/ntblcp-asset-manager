@@ -60,6 +60,15 @@ export interface AppSettings {
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   activeDatabase: 'firestore' | 'rtdb';
+  activeGrantId: string | null;
+  grants: Grant[];
+}
+
+export interface Grant {
+  id: string;
+  name: string;
+  enabledSheets: string[];
+  sheetDefinitions: Record<string, any>;
 }
 
 export interface AuthorizedUser {
@@ -70,6 +79,7 @@ export interface AuthorizedUser {
   states: string[];
   role: UserRole;
   isAdmin: boolean; // Shim for legacy compatibility
+  isGuest?: boolean;
 }
 
 export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE';
