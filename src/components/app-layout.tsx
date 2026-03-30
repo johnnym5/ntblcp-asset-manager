@@ -7,7 +7,7 @@
  */
 
 import React, { useState } from 'react';
-import Link from 'next/link';
+import Link from 'next/navigation';
 import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -43,6 +43,7 @@ import { Badge } from '@/components/ui/badge';
 import { DatabaseAdminDialog } from './admin/database-admin-dialog';
 import { InboxSheet } from './inbox-sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Separator } from './ui/separator';
 
 interface NavItem {
   label: string;
@@ -99,8 +100,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
           )}
         >
-          {item.icon}
-          <span className="flex-1 z-10">{item.label}</span>
+          <div className="z-10 flex items-center gap-3 w-full">
+            {item.icon}
+            <span className="flex-1">{item.label}</span>
+          </div>
           {pathname === item.href && (
             <motion.div 
               layoutId="nav-active"

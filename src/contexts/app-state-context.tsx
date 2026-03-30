@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - The Unified Data Facade.
  * Orchestrates the UI requests with the Offline Storage and Sync Engine.
+ * Final Hardening: Correct grantId association and project-aware filtering.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
@@ -44,7 +45,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     setIsOnlineStatus(status);
     addNotification({ 
       title: status ? 'Cloud Heartbeat Active' : 'Offline Registry Active',
-      description: status ? 'Online Assets View: re-establishing cloud parity.' : 'Locally Saved Assets View: modifications queued locally.'
+      description: status ? 'Online Registry View: re-establishing cloud parity.' : 'Locally Saved Assets View: modifications queued locally.'
     });
   };
 
@@ -60,7 +61,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       
       const currentGrantId = localSettings?.activeGrantId;
 
-      // Filter main registry by active project context
+      // Filter main registry by active project context using grantId
       const filteredAssets = currentGrantId 
         ? localAssets.filter(a => a.grantId === currentGrantId)
         : localAssets;
@@ -80,7 +81,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           if (remoteSettings.activeGrantId) {
             const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId);
             if (remoteAssets.length > 0) {
-              // Update local storage with remote assets
+              // Update local storage with remote assets for this project
               const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
               const combinedAssets = [...otherAssets, ...remoteAssets];
               await storage.saveAssets(combinedAssets);
@@ -105,6 +106,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (isOnline) {
       FirestoreService.updateSettings({ activeGrantId: id });
     }
+    // Refresh to update assets for the new project context
     await refreshRegistry();
   };
 

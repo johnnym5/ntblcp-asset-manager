@@ -31,6 +31,7 @@ import Link from 'next/link';
 import UserProfileSetup from '@/components/user-profile-setup';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
 const container = {
   hidden: { opacity: 0 },
@@ -48,7 +49,7 @@ const item = {
 };
 
 export default function DashboardPage() {
-  const { assets, settingsLoaded, isSyncing, isOnline, appSettings } = useAppState();
+  const { assets, settingsLoaded, isSyncing, isOnline, appSettings, activeGrantId } = useAppState();
   const { profileSetupComplete, loading: authLoading } = useAuth();
 
   const stats = useMemo(() => {
@@ -74,7 +75,7 @@ export default function DashboardPage() {
     return <UserProfileSetup />;
   }
 
-  const activeProjectName = appSettings?.grants.find(g => g.id === appSettings.activeGrantId)?.name || 'Global Registry';
+  const activeProjectName = appSettings?.grants.find(g => g.id === activeGrantId)?.name || 'Global Registry';
 
   return (
     <AppLayout>
@@ -97,7 +98,7 @@ export default function DashboardPage() {
                 isOnline ? "text-green-600 border-green-200 bg-green-50" : "text-orange-600 border-orange-200 bg-orange-50"
               )}>
                 {isOnline ? <Globe className="mr-2 h-3 w-3 inline" /> : <Database className="mr-2 h-3 w-3 inline" />}
-                {isOnline ? 'Online Assets' : 'Locally Saved Assets'}
+                {isOnline ? 'Online Registry' : 'Locally Saved Assets'}
               </Badge>
             </div>
           </div>
