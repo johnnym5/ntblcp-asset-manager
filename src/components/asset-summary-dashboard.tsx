@@ -1,4 +1,3 @@
-
 'use client';
 
 import React, { useMemo, useState } from 'react';
@@ -12,6 +11,7 @@ import {
     ChevronsUpDown,
     History,
     Layout,
+    ShieldAlert,
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
@@ -19,22 +19,31 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Badge } from './ui/badge';
 import { Button } from './ui/button';
 import { Progress } from './ui/progress';
-import { Separator } from './ui/separator';
+import { ScrollArea } from './ui/scroll-area';
 
-const StatCard = ({ title, value, description, icon, onAction, isActive }: { title: string, value: string | number, description: string, icon: React.ReactNode, onAction?: () => void, isActive?: boolean }) => {
+const StatCard = ({ title, value, description, icon, onAction, isActive, variant = "default" }: { 
+    title: string, 
+    value: string | number, 
+    description: string, 
+    icon: React.ReactNode, 
+    onAction?: () => void, 
+    isActive?: boolean,
+    variant?: "default" | "warning" | "danger"
+}) => {
     return (
         <button 
             onClick={onAction} 
             className={cn(
                 "text-left outline-none rounded-xl shrink-0 transition-all duration-300 w-64 h-full border p-4",
-                isActive ? "bg-primary/10 border-primary shadow-lg shadow-primary/10" : "bg-card hover:bg-muted/50 shadow-sm"
+                isActive ? "bg-primary/10 border-primary shadow-lg shadow-primary/10" : "bg-card hover:bg-muted/50 shadow-sm",
+                variant === "danger" && !isActive && "border-destructive/20 hover:bg-destructive/5"
             )}
         >
             <div className="flex items-center justify-between mb-2">
                 <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">{title}</span>
                 <div className={cn("p-2 rounded-full", isActive ? "bg-primary/20" : "bg-muted")}>{icon}</div>
             </div>
-            <div className="text-2xl font-black tracking-tight">{value}</div>
+            <div className={cn("text-2xl font-black tracking-tight", variant === "danger" && "text-destructive")}>{value}</div>
             <p className="text-[11px] text-muted-foreground mt-1 leading-tight line-clamp-2">{description}</p>
         </button>
     );
@@ -81,6 +90,8 @@ export function AssetSummaryDashboard() {
             return acc;
         }, {} as Record<string, { total: number, verified: number }>);
 
+        const missingContext = scoped.filter(a => !a.majorSection).length;
+
         return {
           total,
           verified,
@@ -88,6 +99,7 @@ export function AssetSummaryDashboard() {
           unverified: total - verified,
           unusable: scoped.filter(a => a.condition && ['Unsalvageable', 'Burnt', 'Stolen', 'Writeoff'].includes(a.condition)).length,
           missingId: scoped.filter(a => !a.assetIdCode?.trim()).length,
+          missingContext,
           yearBuckets: Object.entries(yearBuckets).sort((a, b) => String(b[0]).localeCompare(String(a[0]))),
           majorSections: Object.entries(majorSections).sort((a,b) => b[1].total - a[1].total),
         };
@@ -134,19 +146,18 @@ export function AssetSummaryDashboard() {
                         isActive={selectedStatuses.includes('Unverified')}
                     />
                     <StatCard
-                        title="Missing Asset ID"
-                        value={summary.missingId}
-                        description="Assets lacking a unique tag or system ID code."
-                        icon={<Tag className="h-4 w-4 text-orange-500" />}
-                        onAction={() => setMissingFieldFilter(f => f === 'assetIdCode' ? '' : 'assetIdCode')}
-                        isActive={missingFieldFilter === 'assetIdCode'}
+                        title="Data Fidelity Alert"
+                        value={summary.missingContext}
+                        description="Legacy assets missing registry hierarchy metadata."
+                        icon={<ShieldAlert className="h-4 w-4 text-orange-500" />}
+                        variant="warning"
                     />
                     <StatCard
                         title="Critical Condition"
                         value={summary.unusable}
                         description="Assets reported as stolen, burnt, or unsalvageable."
                         icon={<AlertCircle className="h-4 w-4 text-destructive" />}
-                        isActive={false}
+                        variant="danger"
                     />
                 </div>
 

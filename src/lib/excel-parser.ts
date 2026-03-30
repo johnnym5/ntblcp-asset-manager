@@ -1,9 +1,9 @@
-import type { Asset, SheetDefinition, DisplayField, AppSettings } from './types';
+import * as XLSX from 'xlsx';
+import type { Asset, AppSettings, SheetDefinition, DisplayField } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, IHVN_SUB_SHEET_DEFINITIONS } from './constants';
 import { Timestamp } from 'firebase/firestore';
 import { AssetSchema } from './validation/asset-schema';
-import { sanitizeForFirestore } from './utils';
 
 /**
  * Normalizes a header string by trimming and converting to uppercase.
@@ -23,16 +23,12 @@ const DOC_HEADER_KEYWORDS = ['CONTROL PROGRAMME', 'PROJECT', 'REPORTING FORM', '
 const MAJOR_SECTION_KEYWORDS = ['EQUIPMENT', 'COMPUTERS', 'INHERITED', 'ASSETS', 'GENERAL', 'ELECTRONICS', 'FURNITURE'];
 const ASSET_FAMILY_KEYWORDS = ['CHAIRS', 'TABLES', 'CABINETS', 'SHELVES', 'LAPTOPS', 'PRINTERS', 'SCANNERS', 'AC', 'UPS', 'GENERATORS', 'VEHICLES', 'MACHINES', 'MONITORS'];
 
-/**
- * Classification Utility
- */
 type RowType = 'document_header' | 'major_section' | 'temporal_subsection' | 'quantity_subsection' | 'transfer_section' | 'asset_family' | 'schema_header' | 'asset_row' | 'empty';
 
 const classifyRow = (row: any[], definitiveHeaders: string[]): { type: RowType, label?: string, year?: number } => {
     const fullRowText = row.map(c => String(c || '').trim()).join(' ').toUpperCase();
     if (row.every(cell => !cell || String(cell).trim() === '')) return { type: 'empty' };
 
-    // RULE B: SCHEMA HEADER ROWS
     const normalizedDefinitiveHeaders = definitiveHeaders.map(normalizeHeader);
     const normalizedRow = row.map(normalizeHeader);
     const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
@@ -42,33 +38,27 @@ const classifyRow = (row: any[], definitiveHeaders: string[]): { type: RowType, 
         return { type: 'schema_header' };
     }
 
-    // RULE C: TEMPORAL SUBSECTIONS
     const temporalMatch = fullRowText.match(TEMPORAL_PATTERN);
     if (temporalMatch) {
         return { type: 'temporal_subsection', label: row.find(c => c) || fullRowText, year: parseInt(temporalMatch[1]) };
     }
 
-    // RULE D: QUANTITY BATCH
     if (QUANTITY_PATTERN.test(fullRowText)) {
         return { type: 'quantity_subsection', label: row.find(c => c) || fullRowText };
     }
 
-    // RULE E: TRANSFERRED ASSETS
     if (TRANSFER_PATTERN.test(fullRowText)) {
         return { type: 'transfer_section', label: row.find(c => c) || fullRowText };
     }
 
-    // RULE A: DOC HEADERS
     if (DOC_HEADER_KEYWORDS.some(k => fullRowText.includes(k))) {
         return { type: 'document_header', label: row.find(c => c) || fullRowText };
     }
 
-    // RULE G: ASSET FAMILY
     if (ASSET_FAMILY_KEYWORDS.some(k => fullRowText.includes(k))) {
         return { type: 'asset_family', label: row.find(c => c) || fullRowText };
     }
 
-    // RULE F: MAJOR SECTIONS
     if (MAJOR_SECTION_KEYWORDS.some(k => fullRowText.includes(k))) {
         return { type: 'major_section', label: row.find(c => c) || fullRowText };
     }
@@ -107,6 +97,22 @@ for (const key in HEADER_ALIASES) {
     }
 }
 
+export const sanitizeForFirestore = <T extends object>(obj: T): T => {
+    const sanitizedObj: { [key: string]: any } = {};
+    for (const key in obj) {
+        const value = (obj as any)[key];
+        if (key === 'previousState') continue;
+        if (value !== undefined) {
+            if (value instanceof Date) {
+                sanitizedObj[key] = Timestamp.fromDate(value);
+            } else {
+                sanitizedObj[key] = value;
+            }
+        }
+    }
+    return sanitizedObj as T;
+};
+
 const parseAssetRow = (row: any[], headerRow: any[], context: any): Partial<Asset> => {
     const assetObject: Partial<Asset> = { 
         ...context,
@@ -135,12 +141,11 @@ const parseAssetRow = (row: any[], headerRow: any[], context: any): Partial<Asse
 
 export async function parseExcelFile(
     fileOrBuffer: File | ArrayBuffer, 
-    appSettings: AppSettings, 
+    sheetDefinitions: Record<string, SheetDefinition>,
+    lockAssetList: boolean,
     existingAssets: Asset[],
     sheetsToImport?: any[]
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
-    const { sheetDefinitions, lockAssetList } = appSettings;
-    
     const result: { assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] } = {
         assets: [],
         updatedAssets: [],
@@ -278,13 +283,12 @@ export async function parseExcelFile(
 
 export async function scanExcelFile(
   fileOrBuffer: File | ArrayBuffer,
-  appSettings: AppSettings,
+  sheetDefinitions: Record<string, SheetDefinition>,
 ): Promise<{ scannedSheets: any[], errors: string[] }> {
     const scannedSheets: any[] = [];
     const errors: string[] = [];
 
     try {
-        const XLSX = await import('xlsx');
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
         const workbook = XLSX.read(buffer, { type: 'array' });
 
@@ -294,8 +298,8 @@ export async function scanExcelFile(
             
             let bestMatch: any = null;
 
-            for (const defName in appSettings.sheetDefinitions) {
-                const definition = appSettings.sheetDefinitions[defName];
+            for (const defName in sheetDefinitions) {
+                const definition = sheetDefinitions[defName];
                 const normalizedDefinitiveHeaders = definition.headers.map(normalizeHeader);
                 
                 for (let i = 0; i < Math.min(sheetData.length, 50); i++) {
@@ -329,7 +333,6 @@ export async function scanExcelFile(
 }
 
 export async function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, SheetDefinition>, fileName: string): Promise<void> {
-    const XLSX = await import('xlsx');
     const workbook = XLSX.utils.book_new();
 
     const assetsByCategory = assets.reduce((acc, asset) => {
@@ -344,18 +347,34 @@ export async function exportToExcel(assets: Asset[], sheetDefinitions: Record<st
         if (!definition) continue;
 
         const headerArray = [...definition.headers];
+        
+        // Add hierarchical metadata columns for future parity
+        if (!headerArray.includes("Major Section")) headerArray.push("Major Section");
+        if (!headerArray.includes("Subsection")) headerArray.push("Subsection");
+        if (!headerArray.includes("Addition Year")) headerArray.push("Addition Year");
+        if (!headerArray.includes("Verified Status")) headerArray.push("Verified Status");
+        if (!headerArray.includes("Verified Date")) headerArray.push("Verified Date");
+
         const sheetData = assetsByCategory[category].map(asset => {
             const row: Record<string, unknown> = {};
             headerArray.forEach(header => {
                 const normalizedHeader = normalizeHeader(header);
-                let assetKey: keyof Asset | undefined;
-                for (const key in HEADER_ALIASES) {
-                    if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES]?.map(normalizeHeader).includes(normalizedHeader)) {
-                        assetKey = key as keyof Asset;
-                        break;
+                
+                if (normalizedHeader === 'MAJOR SECTION') row[header] = asset.majorSection || '';
+                else if (normalizedHeader === 'SUBSECTION') row[header] = asset.subsectionName || '';
+                else if (normalizedHeader === 'ADDITION YEAR') row[header] = asset.yearBucket || '';
+                else if (normalizedHeader === 'VERIFIED STATUS') row[header] = asset.verifiedStatus || 'Unverified';
+                else if (normalizedHeader === 'VERIFIED DATE') row[header] = asset.verifiedDate || '';
+                else {
+                    let assetKey: keyof Asset | undefined;
+                    for (const key in HEADER_ALIASES) {
+                        if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES]?.map(normalizeHeader).includes(normalizedHeader)) {
+                            assetKey = key as keyof Asset;
+                            break;
+                        }
                     }
+                    if (assetKey) row[header] = asset[assetKey] ?? '';
                 }
-                if (assetKey) row[header] = asset[assetKey] ?? '';
             });
             return row;
         });
@@ -368,7 +387,6 @@ export async function exportToExcel(assets: Asset[], sheetDefinitions: Record<st
 }
 
 export async function parseExcelForTemplate(file: File): Promise<SheetDefinition[]> {
-  const XLSX = await import('xlsx');
   const templates: SheetDefinition[] = [];
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
