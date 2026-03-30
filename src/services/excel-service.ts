@@ -1,6 +1,6 @@
 /**
  * @fileOverview Consolidated Excel Workstation Service.
- * Orchestrates hierarchical parsing and structure-preserving exports.
+ * Phase 24: Hardened to be Header-Aware and Arrangement-Synchronized.
  */
 
 import * as XLSX from 'xlsx';
@@ -8,6 +8,7 @@ import { saveAs } from 'file-saver';
 import { parseSheetToAssets } from '@/parser/buildHierarchy';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
 import type { Asset } from '@/types/domain';
+import type { RegistryHeader } from '@/types/registry';
 
 export const ExcelService = {
   /**
@@ -30,8 +31,13 @@ export const ExcelService = {
 
   /**
    * Generates a structure-preserving Excel report from the current registry state.
+   * respects the user's custom display names and arrangement order.
    */
-  async exportRegistry(assets: Asset[], fileName: string = 'Registry-Export.xlsx') {
+  async exportRegistry(
+    assets: Asset[], 
+    activeHeaders?: RegistryHeader[],
+    fileName: string = `Registry-Export-${new Date().toISOString().split('T')[0]}.xlsx`
+  ) {
     const workbook = XLSX.utils.book_new();
 
     // Group assets by category to create separate sheets
@@ -43,37 +49,62 @@ export const ExcelService = {
     }, {} as Record<string, Asset[]>);
 
     for (const [category, categoryAssets] of Object.entries(grouped)) {
-      // Get the canonical headers for this category
-      const definition = HEADER_DEFINITIONS[category] || HEADER_DEFINITIONS['NTBLCP-TB-FAR'];
-      const headers = [...definition.headers];
+      // 1. Determine Headers: Priority to User's Active Headers, fallback to Defaults
+      let exportHeaders: { key: string, label: string }[] = [];
+      
+      if (activeHeaders && activeHeaders.length > 0) {
+        // Use visible headers in their current order
+        exportHeaders = activeHeaders
+          .filter(h => h.visible)
+          .map(h => ({
+            key: h.normalizedName,
+            label: h.displayName
+          }));
+      } else {
+        // Fallback to static definitions
+        const definition = HEADER_DEFINITIONS[category] || HEADER_DEFINITIONS['NTBLCP-TB-FAR'];
+        exportHeaders = definition.headers.map(h => ({
+          key: h.toLowerCase().replace(/ /g, '_'),
+          label: h
+        }));
+      }
 
-      // Add hierarchical metadata columns if missing
-      const metaHeaders = ['Section', 'Subsection', 'Asset Family', 'Verified Status', 'Condition'];
-      metaHeaders.forEach(h => { if (!headers.includes(h)) headers.push(h); });
-
+      // 2. Map domain fields back to these headers
       const sheetData = categoryAssets.map(asset => {
         const row: Record<string, any> = {};
         
-        // Map domain fields back to canonical headers
-        headers.forEach(h => {
-          const upper = h.toUpperCase();
-          if (upper.includes('DESCRIPTION')) row[h] = asset.description;
-          else if (upper.includes('SERIAL') || upper === 'S/N') row[h] = asset.serialNumber;
-          else if (upper.includes('TAG') || upper.includes('ID CODE')) row[h] = asset.assetIdCode;
-          else if (upper.includes('LOCATION') || upper === 'STATE') row[h] = asset.location;
-          else if (upper.includes('ASSIGNEE') || upper === 'CUSTODIAN') row[h] = asset.custodian;
-          else if (h === 'Section') row[h] = asset.section;
-          else if (h === 'Subsection') row[h] = asset.subsection;
-          else if (h === 'Asset Family') row[h] = asset.assetFamily;
-          else if (h === 'Verified Status') row[h] = asset.status;
-          else if (h === 'Condition') row[h] = asset.condition;
-          else row[h] = (asset.metadata as any)[upper] || '';
+        exportHeaders.forEach(h => {
+          const key = h.key;
+          const label = h.label;
+
+          // Map normalized keys to asset properties
+          switch(key) {
+            case 'sn': row[label] = asset.serialNumber; break;
+            case 'location': row[label] = asset.location; break;
+            case 'assignee_location': row[label] = asset.custodian; break;
+            case 'asset_description': row[label] = asset.description; break;
+            case 'asset_id_code': row[label] = asset.assetIdCode; break;
+            case 'asset_class': row[label] = asset.category; break;
+            case 'condition': row[label] = asset.condition; break;
+            case 'purchase_price_ngn': row[label] = asset.value; break;
+            case 'date_purchased_received': row[label] = asset.purchaseDate; break;
+            case 'serial_number': row[label] = asset.serialNumber; break;
+            case 'source_sheet': row[label] = asset.importMetadata?.sheetName; break;
+            case 'row_number': row[label] = asset.importMetadata?.rowNumber; break;
+            case 'section_name': row[label] = asset.section; break;
+            case 'subsection_name': row[label] = asset.subsection; break;
+            case 'status': row[label] = asset.status; break;
+            default:
+              row[label] = (asset.metadata as any)[key] || '';
+          }
         });
 
         return row;
       });
 
-      const worksheet = XLSX.utils.json_to_sheet(sheetData, { header: headers });
+      const worksheet = XLSX.utils.json_to_sheet(sheetData, { 
+        header: exportHeaders.map(h => h.label) 
+      });
       XLSX.utils.book_append_sheet(workbook, worksheet, category.substring(0, 31));
     }
 

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 17: Multi-tab layout with Lifecycle History pulse.
+ * Phase 24: Schema-Driven Label Resolution and Dynamic Pulse Rendering.
  */
 
 import React, { useEffect, useState, useRef } from "react";
@@ -63,6 +63,7 @@ import { Badge } from "@/components/ui/badge";
 import { AssetSchema } from "@/core/registry/validation";
 import { FirestoreService } from "@/services/firebase/firestore";
 import type { Asset, ActivityLogEntry } from "@/types/domain";
+import type { RegistryHeader } from "@/types/registry";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { formatDistanceToNow } from "date-fns";
 
@@ -70,6 +71,7 @@ interface AssetFormProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   asset?: Asset;
+  headers?: RegistryHeader[];
   onSave: (assetToSave: Asset) => Promise<void>;
   onQuickSave: (assetId: string, data: any) => Promise<void>;
   isReadOnly: boolean;
@@ -102,7 +104,8 @@ const FieldBlock = ({
 export function AssetForm({ 
     isOpen, 
     onOpenChange, 
-    asset, 
+    asset,
+    headers = [],
     onSave, 
     isReadOnly,
     onNext,
@@ -123,6 +126,12 @@ export function AssetForm({
     resolver: zodResolver(AssetSchema),
     mode: 'onChange',
   });
+
+  // Resolve custom labels from headers
+  const getLabel = (normalizedName: string, fallback: string) => {
+    const header = headers.find(h => h.normalizedName === normalizedName);
+    return header?.displayName || fallback;
+  };
 
   useEffect(() => {
     if (isOpen) {
@@ -298,7 +307,7 @@ export function AssetForm({
                     <div className="px-6 py-6 space-y-6">
                       <FormField control={form.control} name="description" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Asset Description</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('asset_description', 'Asset Description')}</FormLabel>
                           <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                         </FormItem>
                       )}/>
@@ -306,14 +315,14 @@ export function AssetForm({
                       <div className="grid grid-cols-2 gap-4">
                         <FormField control={form.control} name="assetIdCode" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Registry Tag ID</FormLabel>
+                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('asset_id_code', 'Registry Tag ID')}</FormLabel>
                             <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                           </FormItem>
                         )}/>
 
                         <FormField control={form.control} name="serialNumber" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Manufacturer Serial</FormLabel>
+                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('serial_number', 'Manufacturer Serial')}</FormLabel>
                             <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                           </FormItem>
                         )}/>
@@ -325,14 +334,14 @@ export function AssetForm({
                     <div className="px-6 py-6 grid grid-cols-2 gap-4">
                       <FormField control={form.control} name="location" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Physical Location</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('location', 'Physical Location')}</FormLabel>
                           <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                         </FormItem>
                       )}/>
 
                       <FormField control={form.control} name="custodian" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Custodian / User</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('assignee_location', 'Custodian / User')}</FormLabel>
                           <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                         </FormItem>
                       )}/>
@@ -343,14 +352,14 @@ export function AssetForm({
                     <div className="px-6 py-6 grid grid-cols-2 gap-4">
                       <FormField control={form.control} name="purchaseDate" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Date Procured</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('date_purchased_received', 'Date Procured')}</FormLabel>
                           <FormControl><Input type="date" {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-bold text-xs shadow-inner" /></FormControl>
                         </FormItem>
                       )}/>
 
                       <FormField control={form.control} name="value" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Original Value (NGN)</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('purchase_price_ngn', 'Original Value (NGN)')}</FormLabel>
                           <FormControl><Input type="number" {...field} onChange={e => field.onChange(parseFloat(e.target.value))} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-bold text-xs shadow-inner" /></FormControl>
                         </FormItem>
                       )}/>
@@ -361,7 +370,7 @@ export function AssetForm({
                     <div className="px-6 py-6 grid grid-cols-2 gap-4">
                       <FormField control={form.control} name="condition" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Field Assessment</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('condition', 'Field Assessment')}</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
                             <FormControl><SelectTrigger className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:ring-primary/20 font-bold text-xs shadow-inner"><SelectValue /></SelectTrigger></FormControl>
                             <SelectContent className="rounded-xl">{ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-xs font-bold rounded-lg">{c}</SelectItem>)}</SelectContent>
@@ -387,10 +396,10 @@ export function AssetForm({
                     {/* Hierarchy & Provenance */}
                     <SectionHeader label="Fidelity & Provenance Pulse" icon={History} />
                     <div className="p-6 grid grid-cols-2 gap-3 bg-muted/5">
-                      <FieldBlock label="Major Section" value={asset?.hierarchy?.section} icon={Database} />
-                      <FieldBlock label="Temporal Subsection" value={asset?.hierarchy?.subsection} icon={History} />
+                      <FieldBlock label={getLabel('section_name', 'Major Section')} value={asset?.hierarchy?.section} icon={Database} />
+                      <FieldBlock label={getLabel('subsection_name', 'Temporal Subsection')} value={asset?.hierarchy?.subsection} icon={History} />
                       <FieldBlock label="Asset Family" value={asset?.hierarchy?.assetFamily} icon={Tag} />
-                      <FieldBlock label="Source Row" value={asset?.importMetadata?.rowNumber} icon={Hash} />
+                      <FieldBlock label={getLabel('row_number', 'Source Row')} value={asset?.importMetadata?.rowNumber} icon={Hash} />
                       <FieldBlock label="Imported At" value={asset?.importMetadata?.importedAt ? new Date(asset.importMetadata.importedAt).toLocaleDateString() : 'MANUAL'} icon={CalendarDays} />
                       <FieldBlock label="Last Auditor" value={asset?.lastModifiedBy} icon={User} />
                     </div>
@@ -399,7 +408,7 @@ export function AssetForm({
                     <div className="p-6">
                       <FormField control={form.control} name="metadata.remarks" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Auditor Field Notes</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('remarks', 'Auditor Field Notes')}</FormLabel>
                           <FormControl><Textarea {...(field as any)} readOnly={isReadOnly} className="min-h-[120px] rounded-2xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-medium text-sm shadow-inner p-4 resize-none" /></FormControl>
                         </FormItem>
                       )}/>
