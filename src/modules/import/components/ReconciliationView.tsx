@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview ReconciliationView - The Discovery Pulse visualization.
+ * Provides visual feedback on detected hierarchical structures.
  */
 
 import React from 'react';
@@ -10,10 +11,8 @@ import { Badge } from '@/components/ui/badge';
 import { 
   LayoutGrid, 
   Layers, 
-  FileText, 
   CheckCircle2, 
   History, 
-  AlertCircle,
   Database,
   Search
 } from 'lucide-react';
@@ -25,13 +24,13 @@ interface ReconciliationViewProps {
 
 export function ReconciliationView({ assets }: ReconciliationViewProps) {
   const stats = React.useMemo(() => {
-    const sections = new Set(assets.map(a => a.section));
-    const subsections = new Set(assets.map(a => a.subsection));
-    const families = new Set(assets.map(a => a.assetFamily));
+    const sections = new Set(assets.map(a => a.section || 'General'));
+    const subsections = new Set(assets.map(a => a.subsection || 'Base Register'));
+    const families = new Set(assets.map(a => a.assetFamily || 'Uncategorized'));
     
-    // Group assets by section for provenance summary
     const sectionCounts = assets.reduce((acc, a) => {
-      acc[a.section] = (acc[a.section] || 0) + 1;
+      const key = a.section || 'General';
+      acc[key] = (acc[key] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
 
@@ -104,7 +103,7 @@ export function ReconciliationView({ assets }: ReconciliationViewProps) {
           </div>
           <div className="space-y-3">
             {stats.sectionSummary.map(([section, count], idx) => (
-              <div key={section} className="flex items-center justify-between p-5 rounded-[1.5rem] bg-card border-2 border-border/20 shadow-sm transition-all hover:border-primary/30 group">
+              <div key={`section-summary-${section}-${idx}`} className="flex items-center justify-between p-5 rounded-[1.5rem] bg-card border-2 border-border/20 shadow-sm transition-all hover:border-primary/30 group">
                 <div className="flex items-center gap-4">
                   <div className="h-8 w-8 rounded-xl bg-muted flex items-center justify-center text-[10px] font-black opacity-40 group-hover:bg-primary/10 group-hover:text-primary transition-colors">
                     {String(idx + 1).padStart(2, '0')}
@@ -144,8 +143,8 @@ export function ReconciliationView({ assets }: ReconciliationViewProps) {
               <div className="pt-6 border-t border-dashed border-border/40">
                 <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground mb-5">Discovered Batch Contexts</p>
                 <div className="flex flex-wrap gap-2.5">
-                  {Array.from(new Set(assets.map(a => a.subsection))).map(s => (
-                    <Badge key={s} variant="secondary" className="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest bg-background border border-border/60 hover:border-primary/40 transition-colors cursor-default">
+                  {Array.from(new Set(assets.map(a => a.subsection || 'Base Register'))).map((s, idx) => (
+                    <Badge key={`batch-context-${s || 'default'}-${idx}`} variant="secondary" className="px-4 py-1.5 rounded-xl text-[9px] font-black uppercase tracking-widest bg-background border border-border/60 hover:border-primary/40 transition-colors cursor-default">
                       {s === 'Base Register' ? 'Core Pulse' : s}
                     </Badge>
                   ))}
