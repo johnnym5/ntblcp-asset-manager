@@ -33,7 +33,10 @@ import {
   MoreVertical,
   ChevronDown,
   ExternalLink,
-  Code
+  Code,
+  Zap,
+  CheckCircle2,
+  XCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,6 +67,10 @@ export default function DatabaseExplorerPage() {
   const [editedData, setEditedData] = useState("");
   const [isSaving, setIsSaving] = useState(false);
   const [expandedPaths, setExpandedPaths] = useState<Set<string>>(new Set());
+  
+  // Parity State
+  const [parityData, setParityData] = useState<Record<StorageLayer, any> | null>(null);
+  const [isComparing, setIsComparing] = useState(false);
 
   useEffect(() => {
     loadRootNodes();
@@ -79,10 +86,21 @@ export default function DatabaseExplorerPage() {
     }
   };
 
+  const loadParity = async (path: string) => {
+    setIsComparing(true);
+    try {
+      const data = await VirtualDBService.compareNodeAcrossLayers(path);
+      setParityData(data);
+    } finally {
+      setIsComparing(false);
+    }
+  };
+
   const toggleExpand = async (node: DBNode) => {
     if (node.type !== 'COLLECTION') {
       setSelectedNode(node);
       setEditedData(JSON.stringify(node.data, null, 2));
+      loadParity(node.path);
       return;
     }
 
@@ -91,7 +109,7 @@ export default function DatabaseExplorerPage() {
 
     if (isExpanded) {
       newExpanded.delete(node.path);
-      // Logic to remove children from flat list could be added here
+      // Simplify list by removing children if needed
     } else {
       newExpanded.add(node.path);
       setLoading(true);
@@ -114,9 +132,23 @@ export default function DatabaseExplorerPage() {
       const data = JSON.parse(editedData);
       await VirtualDBService.updateNode(selectedNode.source, selectedNode.path, data);
       toast({ title: "Mutation Committed", description: `Updated ${selectedNode.displayName} pulse.` });
-      // Refresh logic
+      loadRootNodes();
     } catch (e) {
       toast({ variant: "destructive", title: "Syntax Error", description: "Invalid JSON schema." });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleReconcile = async (from: StorageLayer, to: StorageLayer) => {
+    if (!selectedNode) return;
+    setIsSaving(true);
+    try {
+      await VirtualDBService.syncNode(selectedNode.path, from, to);
+      toast({ title: "Parity Established", description: `Synchronized ${from} -> ${to}.` });
+      loadParity(selectedNode.path);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Sync Failure" });
     } finally {
       setIsSaving(false);
     }
@@ -189,7 +221,7 @@ export default function DatabaseExplorerPage() {
                 className="h-9 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest"
               >Technical</Button>
             </div>
-            <Button variant="outline" className="h-11 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2">
+            <Button variant="outline" onClick={loadRootNodes} className="h-11 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2">
               <RefreshCw className="h-3.5 w-3.5" /> Re-Sync View
             </Button>
           </div>
@@ -274,11 +306,11 @@ export default function DatabaseExplorerPage() {
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-4 rounded-2xl bg-background/50 border-2 border-dashed space-y-1">
                       <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Status</span>
-                      <p className="text-[10px] font-bold uppercase">Synced</p>
+                      <p className="text-[10px] font-bold uppercase">Active</p>
                     </div>
                     <div className="p-4 rounded-2xl bg-background/50 border-2 border-dashed space-y-1">
-                      <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Last Pulse</span>
-                      <p className="text-[10px] font-bold uppercase">2m ago</p>
+                      <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Node Level</span>
+                      <p className="text-[10px] font-bold uppercase">{selectedNode.type}</p>
                     </div>
                   </div>
                 </div>
@@ -291,11 +323,63 @@ export default function DatabaseExplorerPage() {
             </CardHeader>
             <ScrollArea className="flex-1 bg-background/30">
               <div className="p-6">
-                {/* Dynamic list view for collections would go here */}
-                <div className="flex flex-col items-center justify-center py-20 opacity-10">
-                  <Search className="h-12 w-12 mb-4" />
-                  <p className="text-xs font-black uppercase">Sub-records displayed here</p>
-                </div>
+                <Tabs defaultValue="overview">
+                  <TabsList className="bg-muted/50 p-1 rounded-xl mb-6">
+                    <TabsTrigger value="overview" className="text-[10px] font-black uppercase">Overview</TabsTrigger>
+                    <TabsTrigger value="parity" className="text-[10px] font-black uppercase">Parity Pulse</TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="overview">
+                    <div className="flex flex-col items-center justify-center py-20 opacity-10">
+                      <Search className="h-12 w-12 mb-4" />
+                      <p className="text-xs font-black uppercase">Sub-records displayed here</p>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="parity">
+                    {isComparing ? (
+                      <div className="py-20 flex flex-col items-center gap-4 opacity-20">
+                        <Loader2 className="h-8 w-8 animate-spin" />
+                        <span className="text-[10px] font-black uppercase">Auditing Layers...</span>
+                      </div>
+                    ) : parityData ? (
+                      <div className="space-y-6">
+                        {['FIRESTORE', 'RTDB', 'LOCAL'].map((layer) => {
+                          const data = parityData[layer as StorageLayer];
+                          return (
+                            <div key={layer} className="p-5 rounded-2xl border-2 border-border/40 bg-card/50 flex items-center justify-between">
+                              <div className="flex items-center gap-4">
+                                <div className={cn("p-2 rounded-xl bg-opacity-10", layer === 'FIRESTORE' ? "bg-blue-500 text-blue-500" : layer === 'RTDB' ? "bg-green-500 text-green-500" : "bg-amber-500 text-amber-500")}>
+                                  <Database className="h-4 w-4" />
+                                </div>
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] font-black uppercase">{layer} Snapshot</span>
+                                  <span className="text-[8px] font-bold opacity-40">{data ? 'RECORD DETECTED' : 'VOID'}</span>
+                                </div>
+                              </div>
+                              {data ? (
+                                <div className="flex items-center gap-2">
+                                  <CheckCircle2 className="h-4 w-4 text-green-500" />
+                                  <Button variant="outline" size="sm" onClick={() => setEditedData(JSON.stringify(data, null, 2))} className="h-8 text-[8px] font-black uppercase">View Snapshot</Button>
+                                </div>
+                              ) : (
+                                <XCircle className="h-4 w-4 text-destructive opacity-40" />
+                              )}
+                            </div>
+                          );
+                        })}
+                        
+                        <div className="p-6 rounded-3xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-4">
+                          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Reconciliation Triggers</h4>
+                          <div className="grid grid-cols-2 gap-2">
+                            <Button variant="outline" onClick={() => handleReconcile('LOCAL', 'FIRESTORE')} className="h-10 text-[8px] font-black uppercase gap-2"><Cloud className="h-3 w-3" /> Force Local -> Cloud</Button>
+                            <Button variant="outline" onClick={() => handleReconcile('FIRESTORE', 'LOCAL')} className="h-10 text-[8px] font-black uppercase gap-2"><HardDrive className="h-3 w-3" /> Force Cloud -> Local</Button>
+                          </div>
+                        </div>
+                      </div>
+                    ) : null}
+                  </TabsContent>
+                </Tabs>
               </div>
             </ScrollArea>
           </Card>
