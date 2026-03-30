@@ -1,15 +1,15 @@
 'use client';
 
 /**
- * @fileOverview AppStateContext - The Data Facade.
+ * @fileOverview AppStateContext - The Unified Data Facade.
  * Orchestrates the UI requests with the Offline Storage and Sync Engine.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { storage } from '@/offline/storage';
 import { processSyncQueue } from '@/offline/sync';
 import { FirestoreService } from '@/services/firebase/firestore';
-import type { Asset, AppSettings } from '@/types/domain';
+import type { Asset, AppSettings, Grant } from '@/types/domain';
 import { addNotification } from '@/hooks/use-notifications';
 
 interface AppStateContextType {
@@ -23,7 +23,8 @@ interface AppStateContextType {
   appSettings: AppSettings | null;
   settingsLoaded: boolean;
   refreshRegistry: () => Promise<void>;
-  globalStateFilters: string[];
+  activeGrantId: string | null;
+  setActiveGrantId: (id: string) => Promise<void>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -37,42 +38,70 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
 
+  const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
+
   const setIsOnline = (status: boolean) => {
     setIsOnlineStatus(status);
     addNotification({ 
-      title: status ? 'Cloud Sync Active' : 'Offline Mode Enabled',
-      description: status ? 'Re-establishing heartbeat with the central registry.' : 'Data is being stored in the local write-ahead queue.'
+      title: status ? 'Cloud Heartbeat Active' : 'Offline Registry Active',
+      description: status ? 'Online Assets View: re-establishing cloud parity.' : 'Locally Saved Assets View: modifications queued locally.'
     });
   };
 
   const refreshRegistry = useCallback(async () => {
     setIsSyncing(true);
     try {
+      // 1. Load Local State Pulse
       const localAssets = await storage.getAssets();
-      setAssets(localAssets);
-      
       const localSandbox = await storage.getSandbox();
+      const localSettings = await storage.getSettings();
+
+      if (localSettings) setAppSettings(localSettings);
+      
+      // Filter main registry by active project context
+      const filteredAssets = localSettings?.activeGrantId 
+        ? localAssets.filter(a => a.hierarchy.document.includes(localSettings.activeGrantId!)) // Use document provenance as a proxy
+        : localAssets;
+
+      setAssets(filteredAssets);
       setOfflineAssets(localSandbox);
 
-      const localSettings = await storage.getSettings();
-      if (localSettings) setAppSettings(localSettings);
-
+      // 2. Synchronize if Online
       if (isOnline) {
-        // Background sync check
         await processSyncQueue();
         const remoteSettings = await FirestoreService.getSettings();
         if (remoteSettings) {
           setAppSettings(remoteSettings);
           await storage.saveSettings(remoteSettings);
+          
+          // Fetch remote project data if grant is active
+          if (remoteSettings.activeGrantId) {
+            const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId);
+            if (remoteAssets.length > 0) {
+              await storage.saveAssets(remoteAssets);
+              setAssets(remoteAssets);
+            }
+          }
         }
       }
     } catch (e) {
-      console.error("Facade: Failed to sync registry", e);
+      console.error("Facade Error: Failed to reconcile registry pulse", e);
     } finally {
       setIsSyncing(false);
       setSettingsLoaded(true);
     }
   }, [isOnline]);
+
+  const setActiveGrantId = async (id: string) => {
+    if (!appSettings) return;
+    const nextSettings = { ...appSettings, activeGrantId: id };
+    setAppSettings(nextSettings);
+    await storage.saveSettings(nextSettings);
+    if (isOnline) {
+      FirestoreService.updateSettings({ activeGrantId: id });
+    }
+    await refreshRegistry();
+  };
 
   useEffect(() => {
     refreshRegistry();
@@ -90,7 +119,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       appSettings,
       settingsLoaded,
       refreshRegistry,
-      globalStateFilters: ['All']
+      activeGrantId,
+      setActiveGrantId
     }}>
       {children}
     </AppStateContext.Provider>
