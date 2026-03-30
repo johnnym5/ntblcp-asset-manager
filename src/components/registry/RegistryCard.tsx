@@ -1,6 +1,6 @@
 /**
  * @fileOverview RegistryCard - Source-Aware Professional Register Renderer.
- * Phase 23: Added photo evidence thumbnails and multi-select support.
+ * Phase 38: Added friendly sync-state indicators and responsive typography.
  */
 
 import React from 'react';
@@ -20,7 +20,9 @@ import {
   Package,
   Layers,
   Database,
-  Camera
+  Camera,
+  Cloud,
+  Smartphone
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -39,21 +41,17 @@ interface RegistryCardProps {
 export function RegistryCard({ record, onInspect, selected, onToggleSelect, densityMode = "expanded" }: RegistryCardProps) {
   const asset = record.rawRow as unknown as Asset;
 
-  // Primary Identification Pulse
-  const descriptionField = record.fields.find(f => {
-    const h = record.headers.find(header => header.id === f.headerId);
-    return h?.normalizedName === 'asset_description';
-  });
-
   // Arrangement Filtering
   const visibleFields = record.fields.filter(f => {
     const header = record.headers.find(h => h.id === f.headerId);
     if (!header || !header.visible) return false;
-    
-    // Core markers are always shown in the top strip
     if (['sn', 'asset_description', 'row_number'].includes(header.normalizedName)) return false;
-    
     return true;
+  });
+
+  const descriptionField = record.fields.find(f => {
+    const h = record.headers.find(header => header.id === f.headerId);
+    return h?.normalizedName === 'asset_description';
   });
 
   return (
@@ -66,7 +64,7 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
       onClick={() => onInspect(record.id)}
     >
       <CardContent className="p-0">
-        {/* Top Strip: Primary Identity Anchor (S/N and Row ID) */}
+        {/* Top Strip: Primary Identity Anchor & Sync State */}
         <div className="px-5 py-3 bg-muted/30 border-b flex items-center justify-between">
           <div className="flex items-center gap-3">
             {onToggleSelect && (
@@ -74,14 +72,14 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
                 <Checkbox 
                   checked={selected} 
                   onCheckedChange={() => onToggleSelect(record.id)}
-                  className="h-4 w-4 rounded border-2 border-primary/20 bg-background accent-primary"
+                  className="h-4 w-4 rounded border-2 border-primary/20 bg-background"
                 />
               </div>
             )}
             <div className="flex items-center gap-2">
-              <Box className="h-3 w-3 opacity-40" style={{ color: record.accentColor }} />
-              <span className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: record.accentColor }}>
-                S/N: {record.sn || '---'}
+              {asset.lastModifiedByState ? <Cloud className="h-3 w-3 text-primary opacity-40" /> : <Smartphone className="h-3 w-3 text-muted-foreground opacity-40" />}
+              <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60">
+                {asset.lastModifiedByState ? 'Synchronized' : 'Saved on Device'}
               </span>
             </div>
           </div>
@@ -92,38 +90,33 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
               </div>
             )}
             <Badge variant="secondary" className="h-5 px-2 text-[8px] font-mono font-bold uppercase tracking-widest bg-muted/50 border-none">
-              Record #{record.rowNumber}
+              PULSE #{record.rowNumber}
             </Badge>
-            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg opacity-40 group-hover:opacity-100 transition-opacity">
-              <MoreHorizontal className="h-4 w-4" />
-            </Button>
           </div>
         </div>
 
-        {/* Register Body: Stacked Label-Value Pairs */}
+        {/* Register Body */}
         <div className={cn(
           "p-5 space-y-4",
           densityMode === 'compact' ? "space-y-2" : "space-y-5"
         )}>
-          {/* Main Description */}
           <div className="space-y-1">
             <label className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-50 flex items-center gap-2">
-              <Tag className="h-2 w-2" /> Asset Description
+              <Tag className="h-2 w-2" /> Asset Identity
             </label>
             <p className={cn(
               "font-black uppercase tracking-tight text-foreground truncate leading-tight transition-colors group-hover:text-primary",
               densityMode === 'compact' ? "text-sm" : "text-base"
             )}>
-              {descriptionField?.displayValue || 'Untitled Registry Record'}
+              {descriptionField?.displayValue || 'Untitled Registry Pulse'}
             </p>
           </div>
 
-          {/* Dynamic Field Stack */}
           <div className={cn(
             "grid gap-y-4",
             densityMode === 'compact' ? "grid-cols-2 gap-x-4 gap-y-2" : "grid-cols-1"
           )}>
-            {visibleFields.map((field) => {
+            {visibleFields.slice(0, densityMode === 'compact' ? 4 : 6).map((field) => {
               const header = record.headers.find(h => h.id === field.headerId);
               if (!header) return null;
 
@@ -145,20 +138,20 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
           </div>
         </div>
 
-        {/* Bottom Strip: Source Fidelity & Subsection Chips */}
+        {/* Bottom Strip: Source Fidelity */}
         <div className="px-5 py-3 border-t border-dashed bg-muted/10 flex flex-wrap items-center gap-2">
           {record.sourceSheet && (
             <Badge 
               variant="outline" 
-              className="h-5 px-2 text-[8px] font-black tracking-widest rounded-lg"
+              className="h-5 px-2 text-[8px] font-black tracking-widest rounded-lg border-2"
               style={{ borderColor: `${record.accentColor}40`, backgroundColor: `${record.accentColor}10`, color: record.accentColor }}
             >
               <Database className="h-2 w-2 mr-1" /> {record.sourceSheet}
             </Badge>
           )}
-          {record.subsectionName && (
+          {record.sn && (
             <Badge variant="secondary" className="h-5 px-2 text-[8px] font-black tracking-widest rounded-lg bg-muted text-muted-foreground">
-              <Layers className="h-2 w-2 mr-1" /> {record.subsectionName}
+              SN: {record.sn}
             </Badge>
           )}
           <div className="ml-auto text-[7px] font-bold text-muted-foreground/30 uppercase tracking-[0.2em]">

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
- * Phase 35: Activated Quick Selection Pulse & Intelligent Logic Chips.
+ * Phase 38: Integrated Intelligent Discovery Pulse & Interactive Metrics.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -39,7 +39,9 @@ import {
   Sparkles,
   Info,
   CheckSquare,
-  Square
+  Square,
+  Activity,
+  MousePointer2
 } from 'lucide-react';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
@@ -50,6 +52,7 @@ import { SourceBrandingDrawer } from '@/components/registry/SourceBrandingDrawer
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { AssetForm } from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
+import { VerificationPulse } from '@/components/registry/VerificationPulse';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
@@ -184,6 +187,54 @@ export default function AssetRegistryPage() {
 
   const currentRegistry = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
 
+  // --- Metrics ---
+  const metrics = useMemo(() => {
+    const total = currentRegistry.length;
+    const verified = currentRegistry.filter(a => a.status === 'VERIFIED').length;
+    const exceptions = currentRegistry.filter(a => a.status === 'DISCREPANCY' || ['Stolen', 'Burnt'].includes(a.condition)).length;
+    const dataGaps = currentRegistry.filter(a => !a.serialNumber || !a.assetIdCode).length;
+    return { total, verified, exceptions, dataGaps };
+  }, [currentRegistry]);
+
+  // --- Intelligent Suggestions Pulse ---
+  const suggestions = useMemo(() => {
+    const list = [];
+    if (metrics.exceptions > 0) list.push({ label: `Audit ${metrics.exceptions} Discrepancies`, type: 'exceptions' });
+    if (metrics.dataGaps > 0) list.push({ label: `Fix ${metrics.dataGaps} Data Gaps`, type: 'gaps' });
+    if (metrics.total - metrics.verified > 0) list.push({ label: `Complete ${metrics.total - metrics.verified} Pending Reviews`, type: 'pending' });
+    return list.slice(0, 3);
+  }, [metrics]);
+
+  const applyMetricFilter = (type: 'verified' | 'exceptions' | 'gaps' | 'pending') => {
+    let targetHeaderId = '';
+    let targetValue = '';
+    
+    switch(type) {
+      case 'verified': 
+        targetHeaderId = headers.find(h => h.normalizedName === 'verification_status')?.id || '';
+        targetValue = 'VERIFIED';
+        break;
+      case 'exceptions':
+        targetHeaderId = headers.find(h => h.normalizedName === 'verification_status')?.id || '';
+        targetValue = 'DISCREPANCY';
+        break;
+      case 'pending':
+        targetHeaderId = headers.find(h => h.normalizedName === 'verification_status')?.id || '';
+        targetValue = 'UNVERIFIED';
+        break;
+      case 'gaps':
+        targetHeaderId = headers.find(h => h.normalizedName === 'serial_number')?.id || '';
+        setFilters([{ headerId: targetHeaderId, operator: 'exists', value: '' }]);
+        toast({ title: "Gaps Identified", description: "Showing records with missing technical markers." });
+        return;
+    }
+
+    if (targetHeaderId) {
+      setFilters([{ headerId: targetHeaderId, operator: 'equals', value: targetValue }]);
+      toast({ title: "Logic Pulse Applied", description: `Filtering by ${type} context.` });
+    }
+  };
+
   // --- Filtering & Sorting logic ---
   const processedRecords = useMemo(() => {
     let results = currentRegistry.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding));
@@ -210,7 +261,7 @@ export default function AssetRegistryPage() {
           case 'contains': return val.includes(filterVal);
           case 'startsWith': return val.startsWith(filterVal);
           case 'endsWith': return val.endsWith(filterVal);
-          case 'exists': return val !== '' && val !== '---';
+          case 'exists': return val === '' || val === '---' || val === 'n/a';
           default: return true;
         }
       });
@@ -303,16 +354,15 @@ export default function AssetRegistryPage() {
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter text-foreground uppercase leading-tight">{activeProjectName}</h2>
               <div className="flex items-center gap-3">
                 <Badge variant="outline" className="h-6 px-3 text-[9px] font-black tracking-widest rounded-full border-2 border-primary/20 bg-primary/5 text-primary">
-                  {processedRecords.length} PULSES
+                  {processedRecords.length} RECORDS
                 </Badge>
                 {dataSource === 'SANDBOX' && (
-                  <Badge className="h-6 px-3 text-[9px] font-black tracking-widest bg-orange-500 text-white rounded-full shadow-lg">SANDBOX MODE</Badge>
+                  <Badge className="h-6 px-3 text-[9px] font-black tracking-widest bg-orange-500 text-white rounded-full shadow-lg">SANDBOX STORE</Badge>
                 )}
               </div>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              {/* Saved Views Snapshot Pulse */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-card border-2 border-border/40 tactile-pulse relative">
@@ -342,7 +392,7 @@ export default function AssetRegistryPage() {
                   onClick={() => setDataSource('PRODUCTION')}
                   className="h-8 px-3 md:px-4 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest gap-2"
                 >
-                  <Database className="h-3.5 w-3.5 hidden xs:inline" /> Prod
+                  <Database className="h-3.5 w-3.5 hidden xs:inline" /> Registry
                 </Button>
                 <Button 
                   variant={dataSource === 'SANDBOX' ? 'secondary' : 'ghost'} 
@@ -379,10 +429,21 @@ export default function AssetRegistryPage() {
               </DropdownMenu>
               
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={() => setIsBrandingOpen(true)} className="h-10 w-10 rounded-xl border-2 border-primary/10 shadow-sm bg-card tactile-pulse"><Palette className="h-4 w-4 text-primary" /></Button>
-                <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-xl border-2 border-primary/10 shadow-sm bg-card tactile-pulse"><Settings2 className="h-4 w-4 text-primary" /></Button>
+                <Button variant="outline" size="icon" onClick={() => setIsBrandingOpen(true)} title="Branding Pulse" className="h-10 w-10 rounded-xl border-2 border-primary/10 shadow-sm bg-card tactile-pulse"><Palette className="h-4 w-4 text-primary" /></Button>
+                <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} title="Field Setup" className="h-10 w-10 rounded-xl border-2 border-primary/10 shadow-sm bg-card tactile-pulse"><Settings2 className="h-4 w-4 text-primary" /></Button>
               </div>
             </div>
+          </motion.div>
+
+          {/* Metrics Pulse Row */}
+          <motion.div layout className="px-1">
+            <VerificationPulse 
+              total={metrics.total}
+              verified={metrics.verified}
+              exceptions={metrics.exceptions}
+              dataGaps={metrics.dataGaps}
+              onAction={applyMetricFilter}
+            />
           </motion.div>
 
           {/* Action Toolbar */}
@@ -404,7 +465,7 @@ export default function AssetRegistryPage() {
                   className="flex-1 sm:flex-none h-12 md:h-14 px-4 md:px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-lg relative tactile-pulse"
                 >
                   <Filter className="h-4 w-4" /> 
-                  <span className="hidden xs:inline">Logic</span>
+                  <span className="hidden xs:inline">Logic Filters</span>
                   {filters.length > 0 && <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-white text-[10px] rounded-full flex items-center justify-center border-4 border-background">{filters.length}</span>}
                 </Button>
                 <Button 
@@ -412,22 +473,26 @@ export default function AssetRegistryPage() {
                   onClick={() => setIsSortOpen(true)}
                   className="flex-1 sm:flex-none h-12 md:h-14 px-4 md:px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-lg tactile-pulse"
                 >
-                  <ArrowUpDown className="h-4 w-4" /> <span className="hidden xs:inline">Sort</span>
+                  <ArrowUpDown className="h-4 w-4" /> <span className="hidden xs:inline">Sort Order</span>
                 </Button>
               </div>
             </div>
 
-            {/* Intelligent Filter Suggestions (Non-AI) */}
-            {(isBeginner || appSettings?.autoSuggestFilters) && filters.length === 0 && (
-              <div className="flex items-center gap-3 px-2 animate-in fade-in slide-in-from-left-2 duration-500">
-                <Sparkles className="h-3.5 w-3.5 text-primary" />
-                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Suggested Logic:</span>
-                <Badge variant="ghost" className="h-7 px-3 rounded-lg border-2 border-dashed font-bold text-[8px] uppercase cursor-pointer hover:bg-primary/5 transition-colors" onClick={() => setIsFilterOpen(true)}>
-                  Filter by Location
-                </Badge>
-                <Badge variant="ghost" className="h-7 px-3 rounded-lg border-2 border-dashed font-bold text-[8px] uppercase cursor-pointer hover:bg-primary/5 transition-colors" onClick={() => setIsFilterOpen(true)}>
-                  Show Discrepancies
-                </Badge>
+            {/* Intelligent Discovery Pulse Bar */}
+            {isBeginner && suggestions.length > 0 && (
+              <div className="flex items-center gap-3 px-2 animate-in fade-in slide-in-from-left-2 duration-500 overflow-x-auto custom-scrollbar pb-2">
+                <Sparkles className="h-3.5 w-3.5 text-primary shrink-0" />
+                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60 whitespace-nowrap">Recommended Actions:</span>
+                {suggestions.map((s, i) => (
+                  <Badge 
+                    key={`suggest-${i}`} 
+                    variant="ghost" 
+                    className="h-8 px-4 rounded-xl border-2 border-dashed border-primary/20 font-bold text-[9px] uppercase cursor-pointer hover:bg-primary/5 hover:border-primary/40 transition-all gap-2 whitespace-nowrap" 
+                    onClick={() => applyMetricFilter(s.type as any)}
+                  >
+                    <MousePointer2 className="h-3 w-3 opacity-40" /> {s.label}
+                  </Badge>
+                ))}
               </div>
             )}
 
@@ -477,15 +542,15 @@ export default function AssetRegistryPage() {
               <div className="h-[400px] flex flex-col items-center justify-center text-center p-10 opacity-20 border-4 border-dashed rounded-[3rem] space-y-6">
                 <Boxes className="h-24 w-24 mb-2" />
                 <div className="space-y-2">
-                  <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Registry Pulse Silent</h3>
-                  <p className="text-xs font-bold uppercase tracking-widest max-w-xs mx-auto leading-relaxed">No records matched your current query scope. Adjust logic filters or search tokens to refresh discovery.</p>
+                  <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Registry Silent</h3>
+                  <p className="text-xs font-bold uppercase tracking-widest max-w-xs mx-auto leading-relaxed">Adjust your logic filters or search terms to find records.</p>
                 </div>
                 <div className="flex gap-3 pt-4">
                   <Button variant="outline" onClick={() => { setFilters([]); setSearchTerm(""); }} className="h-12 px-8 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 gap-2">
-                    <FilterX className="h-4 w-4" /> Reset Filters
+                    <FilterX className="h-4 w-4" /> Clear Search
                   </Button>
                   <Button onClick={() => { setSelectedAssetForForm(undefined); setIsFormOpen(true); }} className="h-12 px-8 rounded-xl font-black uppercase text-[10px] tracking-widest bg-primary text-white shadow-lg gap-2">
-                    <Plus className="h-4 w-4" /> New Registration
+                    <Plus className="h-4 w-4" /> Add Record
                   </Button>
                 </div>
               </div>
@@ -506,8 +571,8 @@ export default function AssetRegistryPage() {
                 </div>
                 <div className="h-8 w-px bg-border/40 hidden xs:block" />
                 <div className="flex items-center gap-1 md:gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-primary hover:bg-primary/5"><Edit3 className="h-3.5 w-3.5" /> Bulk Pulse</Button>
-                  <Button variant="ghost" size="sm" onClick={() => setIsBatchDeleteDialogOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-destructive hover:bg-destructive/5"><Trash2 className="h-3.5 w-3.5" /> Purge</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-primary hover:bg-primary/5"><Edit3 className="h-3.5 w-3.5" /> Bulk Update</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsBatchDeleteDialogOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-destructive hover:bg-destructive/5"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
                   <Button variant="ghost" size="icon" onClick={() => setSelectedIds(new Set())} className="h-11 w-11 rounded-xl opacity-40 hover:opacity-100"><X className="h-4 w-4" /></Button>
                 </div>
               </div>
@@ -521,9 +586,9 @@ export default function AssetRegistryPage() {
                 <div className="h-6 w-px bg-border/40 hidden xs:block" />
                 <div className="flex items-center gap-2">
                   <Button className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 tactile-pulse text-white" onClick={() => { setSelectedAssetForForm(undefined); setIsFormOpen(true); }}>
-                    <Plus className="mr-2 h-4 w-4 hidden xs:inline" /> New Pulse
+                    <Plus className="mr-2 h-4 w-4 hidden xs:inline" /> New Asset
                   </Button>
-                  <Button variant="ghost" size="icon" onClick={handleExport} className="h-12 w-12 rounded-2xl opacity-60 hover:opacity-100 tactile-pulse" title="Export Pulse"><FileDown className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" onClick={handleExport} className="h-12 w-12 rounded-2xl opacity-60 hover:opacity-100 tactile-pulse" title="Export Registry"><FileDown className="h-5 w-5" /></Button>
                 </div>
               </>
             )}
@@ -538,17 +603,17 @@ export default function AssetRegistryPage() {
       <SourceBrandingDrawer isOpen={isBrandingOpen} onOpenChange={setIsBrandingOpen} />
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={handleEdit} onNext={() => { if (!selectedRecord) return; const idx = processedRecords.findIndex(r => r.id === selectedRecord.id); if (idx < processedRecords.length - 1) setSelectedRecord(processedRecords[idx + 1]); }} onPrevious={() => { if (!selectedRecord) return; const idx = processedRecords.findIndex(r => r.id === selectedRecord.id); if (idx > 0) setSelectedRecord(processedRecords[idx - 1]); }} />
       <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAssetForForm} headers={headers} isReadOnly={dataSource === 'PRODUCTION' && appSettings?.appMode === 'management'} onSave={async (a) => { await refreshRegistry(); setIsFormOpen(false); }} onQuickSave={async () => {}} />
-      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async (d) => { toast({ title: "Batch Pulse Applied" }); setSelectedIds(new Set()); await refreshRegistry(); }} />
+      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async (d) => { toast({ title: "Bulk Update Applied" }); setSelectedIds(new Set()); await refreshRegistry(); }} />
       
       <AlertDialog open={isBatchDeleteDialogOpen} onOpenChange={setIsBatchDeleteDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-primary/10 w-[95vw] max-w-lg">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Purge Selected Pulses?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium">This will permanently discard the selected records from the registry. This action is deterministic and irreversible.</AlertDialogDescription>
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Delete Selected Records?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium">This will permanently remove the selected assets from the registry. This action is irreversible.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4 gap-2">
-            <AlertDialogCancel className="rounded-xl font-bold">Cancel Action</AlertDialogCancel>
-            <AlertDialogAction onClick={handleBatchPurge} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black uppercase text-[10px] tracking-widest h-11 px-6">Confirm Purge</AlertDialogAction>
+            <AlertDialogCancel className="rounded-xl font-bold">Discard</AlertDialogCancel>
+            <AlertDialogAction onClick={handleBatchPurge} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black uppercase text-[10px] tracking-widest h-11 px-6">Confirm Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
