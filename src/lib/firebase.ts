@@ -1,6 +1,7 @@
 // Import the necessary functions from the Firebase SDKs.
 import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
+import { getAuth, type Auth } from "firebase/auth";
 import { getDatabase, type Database } from "firebase/database";
 
 // Your web app's Firebase configuration is now loaded from environment variables.
@@ -13,7 +14,6 @@ const firebaseConfig = {
   appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
   databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
 };
-
 
 // Check if all essential keys are present and not placeholders
 export const isConfigValid = !!(
@@ -28,6 +28,7 @@ export const isRtdbConfigValid = !!(
 
 let app: FirebaseApp | undefined;
 let db: Firestore | undefined;
+let auth: Auth | undefined;
 let rtdb: Database | undefined;
 
 // Initialize Firebase only on the client side and if config is valid
@@ -36,6 +37,7 @@ if (typeof window !== 'undefined') {
     try {
       app = !getApps().length ? initializeApp(firebaseConfig) : getApp();
       db = getFirestore(app);
+      auth = getAuth(app);
       
       if (firebaseConfig.databaseURL) {
         rtdb = getDatabase(app);
@@ -44,10 +46,8 @@ if (typeof window !== 'undefined') {
       console.error("Firebase initialization error:", e);
     }
   } else {
-    // This warning helps developers who haven't set up their .env file.
-    console.warn("Firebase configuration is missing or incomplete. Online features will be disabled. Please create and populate a .env file for local development as described in the README.");
+    console.warn("Firebase configuration is missing or incomplete. Online features will be disabled.");
   }
 }
 
-// Export the initialized services for use throughout the app.
-export { app, db, rtdb };
+export { app, db, auth, rtdb };
