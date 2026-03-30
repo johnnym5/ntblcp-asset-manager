@@ -10,13 +10,14 @@ import { useAppState } from '@/contexts/app-state-context';
 
 export default function Page() {
   const { userProfile, loading, profileSetupComplete } = useAuth();
-  const { setGlobalStateFilter } = useAppState();
+  const { setGlobalStateFilters } = useAppState();
 
   useEffect(() => {
     if (profileSetupComplete && userProfile) {
-      setGlobalStateFilter(userProfile.state || '');
+      // Set the global filters to include only the user's current session state
+      setGlobalStateFilters(userProfile.state ? [userProfile.state] : []);
     }
-  }, [profileSetupComplete, userProfile, setGlobalStateFilter]);
+  }, [profileSetupComplete, userProfile, setGlobalStateFilters]);
 
   if (loading) {
     return (
