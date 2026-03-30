@@ -44,6 +44,7 @@ export interface Asset {
   value: number;
   serialNumber: string;
   assetIdCode?: string;
+  photoDataUri?: string; // Visual evidence pulse
 
   // Metadata & Provenance
   hierarchy: SectionHierarchy;

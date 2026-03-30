@@ -1,5 +1,8 @@
-
 'use client';
+
+/**
+ * @fileOverview RegistryTable - Virtualized performance-grade registry browser.
+ */
 
 import React from 'react';
 import { 
@@ -12,7 +15,7 @@ import {
 } from '@/components/ui/table';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { MoreHorizontal, ShieldCheck, AlertCircle, Clock } from 'lucide-react';
+import { MoreHorizontal, ShieldCheck, Clock, AlertCircle, Camera } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
 
@@ -43,9 +46,12 @@ export function RegistryTable({ assets, onInspect }: RegistryTableProps) {
             >
               <TableCell className="py-4 px-6">
                 <div className="flex flex-col">
-                  <span className="text-sm font-black tracking-tight">{asset.description || asset.name}</span>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-black tracking-tight">{asset.description || asset.name}</span>
+                    {asset.photoDataUri && <Camera className="h-3 w-3 text-primary" />}
+                  </div>
                   <span className="text-[10px] font-mono text-muted-foreground uppercase mt-0.5 tracking-tighter">
-                    SN: {asset.serialNumber || 'UNSET'}
+                    SN: {asset.serialNumber || 'UNSET'} &bull; TAG: {asset.assetIdCode || 'N/A'}
                   </span>
                 </div>
               </TableCell>
@@ -69,7 +75,7 @@ export function RegistryTable({ assets, onInspect }: RegistryTableProps) {
                   "flex items-center gap-2 text-[10px] font-black uppercase tracking-widest",
                   asset.status === 'VERIFIED' ? "text-green-500" : asset.status === 'DISCREPANCY' ? "text-destructive" : "text-orange-500"
                 )}>
-                  {asset.status === 'VERIFIED' ? <ShieldCheck className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
+                  {asset.status === 'VERIFIED' ? <ShieldCheck className="h-3 w-3" /> : asset.status === 'DISCREPANCY' ? <AlertCircle className="h-3 w-3" /> : <Clock className="h-3 w-3" />}
                   {asset.status}
                 </div>
               </TableCell>

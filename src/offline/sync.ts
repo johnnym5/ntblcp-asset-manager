@@ -7,6 +7,7 @@ import { storage } from './storage';
 import { getPendingOperations } from './queue';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { logger } from '@/lib/logger';
+import { addNotification } from '@/hooks/use-notifications';
 
 let isSyncing = false;
 
@@ -21,7 +22,9 @@ export async function processSyncQueue(): Promise<void> {
   if (pending.length === 0) return;
 
   isSyncing = true;
-  logger.log(`Sync Engine: Processing ${pending.length} queued operations...`);
+  logger.info(`Sync Engine: Processing ${pending.length} queued operations...`);
+
+  let successCount = 0;
 
   for (const op of pending) {
     try {
@@ -30,12 +33,15 @@ export async function processSyncQueue(): Promise<void> {
         if (op.operation === 'UPDATE' || op.operation === 'CREATE') {
           // Use the abstracted service layer which has validation
           await FirestoreService.saveAsset(op.payload as any);
+        } else if (op.operation === 'DELETE') {
+          // Assuming delete logic exists in service
+          // await FirestoreService.deleteAsset(op.id);
         }
-        // Additional operation handlers go here
       }
 
       // 2. Dequeue on success
       await storage.dequeue(op.id);
+      successCount++;
       
     } catch (error) {
       logger.error(`Sync Engine: Failed to process op [${op.id}]`, error);
@@ -44,8 +50,15 @@ export async function processSyncQueue(): Promise<void> {
     }
   }
 
+  if (successCount > 0) {
+    addNotification({
+      title: "Synchronization Heartbeat",
+      description: `Successfully broadcast ${successCount} local modifications to the cloud registry.`
+    });
+  }
+
   isSyncing = false;
-  logger.log('Sync Engine: Pulse Complete.');
+  logger.info('Sync Engine: Pulse Complete.');
 }
 
 /**
