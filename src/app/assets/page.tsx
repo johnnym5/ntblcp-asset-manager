@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState, useEffect } from 'react';
+import React, { useMemo, useState } from 'react';
 import AppLayout from '@/components/app-layout';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -17,12 +17,9 @@ import {
   Settings2, 
   LayoutGrid, 
   List, 
-  Trash2, 
-  CheckCircle2, 
-  ChevronLeft, 
-  ChevronRight,
+  ArrowLeft,
   MoreVertical,
-  ArrowLeft
+  ArrowUpDown
 } from 'lucide-react';
 import { RegistryTable } from '@/modules/registry/components/RegistryTable';
 import { AssetForm } from '@/components/asset-form';
@@ -33,6 +30,12 @@ import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
 import { Badge } from '@/components/ui/badge';
+import { Separator } from '@/components/ui/separator';
+
+export type SortConfig = {
+  key: keyof Asset | 'sn';
+  direction: 'asc' | 'desc';
+};
 
 export default function AssetRegistryPage() {
   const { assets, searchTerm, setSearchTerm, refreshRegistry, settingsLoaded, activeGrantId, appSettings } = useAppState();
@@ -43,6 +46,9 @@ export default function AssetRegistryPage() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [selectedIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   
+  // Sort State
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'description', direction: 'asc' });
+
   // Modal States
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
@@ -65,10 +71,15 @@ export default function AssetRegistryPage() {
     const statuses = new Map<string, number>();
 
     assets.forEach(a => {
-      if (a.section) sections.set(a.section, (sections.get(a.section) || 0) + 1);
-      if (a.subsection) subsections.set(a.subsection, (subsections.get(a.subsection) || 0) + 1);
-      if (a.location) locations.set(a.location, (locations.get(a.location) || 0) + 1);
-      if (a.status) statuses.set(a.status, (statuses.get(a.status) || 0) + 1);
+      const s = a.section || 'General';
+      const ss = a.subsection || 'Base Register';
+      const l = a.location || 'Global';
+      const st = a.status || 'UNVERIFIED';
+
+      sections.set(s, (sections.get(s) || 0) + 1);
+      subsections.set(ss, (subsections.get(ss) || 0) + 1);
+      locations.set(l, (locations.get(l) || 0) + 1);
+      statuses.set(st, (statuses.get(st) || 0) + 1);
     });
 
     const toOption = (map: Map<string, number>): FilterOption[] => 
@@ -82,8 +93,9 @@ export default function AssetRegistryPage() {
     };
   }, [assets]);
 
-  const filteredAssets = useMemo(() => {
-    return assets.filter(a => {
+  const filteredAndSortedAssets = useMemo(() => {
+    // 1. Filtering
+    let results = assets.filter(a => {
       if (searchTerm) {
         const term = searchTerm.toLowerCase();
         const match = (a.description || '').toLowerCase().includes(term) ||
@@ -91,13 +103,39 @@ export default function AssetRegistryPage() {
                       (a.assetIdCode || '').toLowerCase().includes(term);
         if (!match) return false;
       }
-      if (filters.sections.length > 0 && !filters.sections.includes(a.section)) return false;
-      if (filters.subsections.length > 0 && !filters.subsections.includes(a.subsection)) return false;
-      if (filters.locations.length > 0 && !filters.locations.includes(a.location)) return false;
-      if (filters.statuses.length > 0 && !filters.statuses.includes(a.status)) return false;
+      if (filters.sections.length > 0 && !filters.sections.includes(a.section || 'General')) return false;
+      if (filters.subsections.length > 0 && !filters.subsections.includes(a.subsection || 'Base Register')) return false;
+      if (filters.locations.length > 0 && !filters.locations.includes(a.location || 'Global')) return false;
+      if (filters.statuses.length > 0 && !filters.statuses.includes(a.status || 'UNVERIFIED')) return false;
       return true;
     });
-  }, [assets, searchTerm, filters]);
+
+    // 2. Sorting
+    results.sort((a, b) => {
+      let aVal: any = a[sortConfig.key as keyof Asset] || '';
+      let bVal: any = b[sortConfig.key as keyof Asset] || '';
+
+      // Special handling for numeric-ish fields if needed
+      if (sortConfig.key === 'serialNumber' || sortConfig.key === 'assetIdCode') {
+        return sortConfig.direction === 'asc' 
+          ? String(aVal).localeCompare(String(bVal), undefined, { numeric: true })
+          : String(bVal).localeCompare(String(aVal), undefined, { numeric: true });
+      }
+
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
+    return results;
+  }, [assets, searchTerm, filters, sortConfig]);
+
+  const handleSort = (key: keyof Asset) => {
+    setSortConfig(current => ({
+      key,
+      direction: current.key === key && current.direction === 'asc' ? 'desc' : 'asc'
+    }));
+  };
 
   const handleInspect = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -119,7 +157,7 @@ export default function AssetRegistryPage() {
   };
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedAssetIds(new Set(filteredAssets.map(a => a.id)));
+    if (checked) setSelectedAssetIds(new Set(filteredAndSortedAssets.map(a => a.id)));
     else setSelectedAssetIds(new Set());
   };
 
@@ -160,7 +198,7 @@ export default function AssetRegistryPage() {
             <div className="flex items-center gap-3">
               <h2 className="text-2xl font-black tracking-tight uppercase">{activeProjectName}</h2>
               <Badge variant="outline" className="font-black text-[10px] h-6 border-primary/20 bg-primary/5 text-primary">
-                {filteredAssets.length} Records
+                {filteredAndSortedAssets.length} Records
               </Badge>
             </div>
             <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
@@ -196,15 +234,33 @@ export default function AssetRegistryPage() {
           </div>
         </div>
 
-        {/* Global Registry Search */}
-        <div className="relative group">
-          <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-40 group-focus-within:text-primary group-focus-within:opacity-100 transition-all" />
-          <Input 
-            placeholder="Search registry by ID, serial, or name..." 
-            className="pl-12 h-14 rounded-2xl bg-card border-2 border-transparent shadow-xl focus-visible:ring-primary/20 focus-visible:border-primary/20 text-base font-medium transition-all"
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-          />
+        {/* Global Registry Search & Filters */}
+        <div className="flex flex-col md:flex-row items-center gap-4">
+          <div className="relative flex-1 w-full group">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-40 group-focus-within:text-primary group-focus-within:opacity-100 transition-all" />
+            <Input 
+              placeholder="Search registry by ID, serial, or name..." 
+              className="pl-12 h-14 rounded-2xl bg-card border-none shadow-xl focus-visible:ring-primary/20 text-base font-medium transition-all"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => setIsFilterOpen(true)}
+            className={cn(
+              "h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-xl transition-all",
+              Object.values(filters).flat().length > 0 ? "text-primary ring-2 ring-primary/20" : "hover:bg-primary/5"
+            )}
+          >
+            <Filter className="h-4 w-4" />
+            Logic Filters
+            {Object.values(filters).flat().length > 0 && (
+              <Badge className="ml-1 bg-primary text-white h-5 min-w-5 p-0 flex items-center justify-center rounded-full text-[8px]">
+                {Object.values(filters).flat().length}
+              </Badge>
+            )}
+          </Button>
         </div>
 
         {/* Action Header (Selection Context) */}
@@ -227,13 +283,15 @@ export default function AssetRegistryPage() {
 
         {/* Registry Surface */}
         <div className="flex-1 bg-card/50 rounded-[2.5rem] border-2 border-dashed border-border/40 overflow-hidden">
-          {filteredAssets.length > 0 ? (
+          {filteredAndSortedAssets.length > 0 ? (
             <RegistryTable 
-              assets={filteredAssets} 
+              assets={filteredAndSortedAssets} 
               onInspect={handleInspect}
               selectedIds={selectedIds}
               onToggleSelection={handleToggleSelection}
               onSelectAll={handleSelectAll}
+              onSort={handleSort}
+              sortConfig={sortConfig}
             />
           ) : (
             <div className="h-full flex flex-col items-center justify-center text-center p-20 opacity-20">
@@ -255,18 +313,6 @@ export default function AssetRegistryPage() {
             <Plus className="h-4 w-4" /> New Registration
           </Button>
           <Separator orientation="vertical" className="h-10 opacity-50" />
-          <Button 
-            variant="outline" 
-            className="h-14 w-14 p-0 rounded-2xl bg-card border-border/40 hover:bg-primary/5 transition-all group"
-            onClick={() => setIsFilterOpen(true)}
-          >
-            <Filter className={cn("h-5 w-5", Object.values(filters).flat().length > 0 ? "text-primary" : "text-muted-foreground")} />
-            {Object.values(filters).flat().length > 0 && (
-              <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-white rounded-full text-[8px] flex items-center justify-center font-black">
-                {Object.values(filters).flat().length}
-              </span>
-            )}
-          </Button>
           <Button variant="outline" className="h-14 w-14 p-0 rounded-2xl bg-card border-border/40 hover:bg-primary/5 transition-all">
             <FileUp className="h-5 w-5 text-muted-foreground" />
           </Button>
@@ -298,15 +344,5 @@ export default function AssetRegistryPage() {
         onReset={() => setFilters({ sections: [], subsections: [], locations: [], statuses: [] })}
       />
     </AppLayout>
-  );
-}
-
-function Separator({ orientation = 'horizontal', className }: { orientation?: 'horizontal' | 'vertical', className?: string }) {
-  return (
-    <div className={cn(
-      "bg-border shrink-0",
-      orientation === 'horizontal' ? "h-[1px] w-full" : "h-full w-[1px]",
-      className
-    )} />
   );
 }

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryTable - Virtualized performance-grade registry browser.
- * Updated for Phase 2 with selection pulse and refined operational density.
+ * Updated for Phase 3 with advanced header sorting and high-density selection.
  */
 
 import React from 'react';
@@ -23,13 +23,12 @@ import {
   Clock, 
   AlertCircle, 
   Camera, 
-  Database, 
-  Globe,
   ArrowUpDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppState } from '@/contexts/app-state-context';
 import type { Asset } from '@/types/domain';
+import type { SortConfig } from '@/app/assets/page';
 
 interface RegistryTableProps {
   assets: Asset[];
@@ -37,14 +36,49 @@ interface RegistryTableProps {
   selectedIds: Set<string>;
   onToggleSelection: (id: string) => void;
   onSelectAll: (checked: boolean) => void;
+  onSort: (key: keyof Asset) => void;
+  sortConfig: SortConfig;
 }
+
+const SortHeader = ({ 
+  label, 
+  sortKey, 
+  currentSort, 
+  onSort 
+}: { 
+  label: string; 
+  sortKey: keyof Asset; 
+  currentSort: SortConfig; 
+  onSort: (key: keyof Asset) => void;
+}) => {
+  const isActive = currentSort.key === sortKey;
+  return (
+    <TableHead className="py-5 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground group select-none">
+      <button 
+        onClick={() => onSort(sortKey)}
+        className={cn(
+          "flex items-center gap-2 transition-colors uppercase",
+          isActive ? "text-primary" : "hover:text-primary"
+        )}
+      >
+        {label} 
+        <ArrowUpDown className={cn(
+          "h-3 w-3 transition-opacity",
+          isActive ? "opacity-100" : "opacity-0 group-hover:opacity-40"
+        )} />
+      </button>
+    </TableHead>
+  );
+};
 
 export function RegistryTable({ 
   assets, 
   onInspect, 
   selectedIds, 
   onToggleSelection, 
-  onSelectAll 
+  onSelectAll,
+  onSort,
+  sortConfig
 }: RegistryTableProps) {
   const { isOnline } = useAppState();
 
@@ -62,14 +96,10 @@ export function RegistryTable({
                 className="h-5 w-5 rounded-lg border-2 data-[state=checked]:bg-primary"
               />
             </TableHead>
-            <TableHead className="py-5 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-              <div className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors group">
-                Identification Pulse <ArrowUpDown className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-opacity" />
-              </div>
-            </TableHead>
-            <TableHead className="py-5 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Hierarchical Context</TableHead>
-            <TableHead className="py-5 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Regional Scope</TableHead>
-            <TableHead className="py-5 px-4 text-[10px] font-black uppercase tracking-widest text-muted-foreground">Assessment</TableHead>
+            <SortHeader label="Identification Pulse" sortKey="description" currentSort={sortConfig} onSort={onSort} />
+            <SortHeader label="Category" sortKey="category" currentSort={sortConfig} onSort={onSort} />
+            <SortHeader label="Regional Scope" sortKey="location" currentSort={sortConfig} onSort={onSort} />
+            <SortHeader label="Assessment" sortKey="status" currentSort={sortConfig} onSort={onSort} />
             <TableHead className="py-5 px-6 text-[10px] font-black uppercase tracking-widest text-muted-foreground text-right">Actions</TableHead>
           </TableRow>
         </TableHeader>
@@ -112,13 +142,13 @@ export function RegistryTable({
                     {asset.category}
                   </span>
                   <span className="text-[9px] text-muted-foreground font-bold truncate max-w-[180px] opacity-50 uppercase mt-0.5">
-                    {asset.section} › {asset.subsection}
+                    {asset.section || 'General'} › {asset.subsection || 'Base Register'}
                   </span>
                 </div>
               </TableCell>
               <TableCell className="py-5 px-4">
                 <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/20 bg-primary/5 text-primary rounded-lg h-6 px-3">
-                  {asset.location}
+                  {asset.location || 'Global'}
                 </Badge>
               </TableCell>
               <TableCell className="py-5 px-4">
@@ -127,7 +157,7 @@ export function RegistryTable({
                   asset.status === 'VERIFIED' ? "text-green-600" : asset.status === 'DISCREPANCY' ? "text-destructive" : "text-orange-600"
                 )}>
                   {asset.status === 'VERIFIED' ? <ShieldCheck className="h-3.5 w-3.5" /> : asset.status === 'DISCREPANCY' ? <AlertCircle className="h-3.5 w-3.5" /> : <Clock className="h-3.5 w-3.5" />}
-                  {asset.status}
+                  {asset.status || 'UNVERIFIED'}
                 </div>
               </TableCell>
               <TableCell className="py-5 px-6 text-right">
