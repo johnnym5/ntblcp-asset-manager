@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Global Environment Control Panel.
- * Orchestrates Multi-Registry Projects, User Identity, and Governance Pulse.
+ * Phase 20: Activated Dynamic Schema Evolution & Field Mapping.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -23,12 +23,13 @@ import {
   Loader2, 
   Sun, 
   Moon, 
-  Monitor,
   ShieldCheck,
   Zap,
   RefreshCw,
   ScanSearch,
-  PlaneTakeoff
+  PlaneTakeoff,
+  Columns,
+  Wrench
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -38,14 +39,15 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { UserManagement } from '@/components/admin/user-management';
+import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
 import { cn } from '@/lib/utils';
-import type { AppSettings, Grant } from '@/types/domain';
+import { HEADER_DEFINITIONS } from '@/lib/constants';
+import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
 
 export default function SettingsPage() {
   const { appSettings, refreshRegistry, settingsLoaded, isSyncing } = useAppState();
@@ -55,6 +57,11 @@ export default function SettingsPage() {
 
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  
+  // Schema Editor State
+  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
+  const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
+  const [activeGrantForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
 
   useEffect(() => {
     if (appSettings) {
@@ -77,7 +84,7 @@ export default function SettingsPage() {
       id: crypto.randomUUID(),
       name: 'New Asset Registry',
       enabledSheets: [],
-      sheetDefinitions: {},
+      sheetDefinitions: { ...HEADER_DEFINITIONS },
     };
     handleSettingChange('grants', [...draftSettings.grants, newGrant]);
   };
@@ -99,20 +106,56 @@ export default function SettingsPage() {
     setDraftSettings({ ...draftSettings, grants: filtered, activeGrantId: activeId });
   };
 
+  const handleConfigureSchema = (grantId: string, sheetName: string) => {
+    const grant = draftSettings?.grants.find(g => g.id === grantId);
+    if (!grant) return;
+    const def = grant.sheetDefinitions[sheetName];
+    if (def) {
+      setSelectedSheetDef(def);
+      setActiveGrantIdForSchema(grantId);
+      setIsColumnSheetOpen(true);
+    }
+  };
+
+  const handleSaveSchema = (originalName: string | null, newDef: SheetDefinition, applyToAll: boolean) => {
+    if (!draftSettings || !activeGrantForSchema) return;
+
+    const updatedGrants = draftSettings.grants.map(grant => {
+      if (grant.id === activeGrantForSchema) {
+        const newSheetDefs = { ...grant.sheetDefinitions };
+        if (applyToAll) {
+          // Propagate this field structure to all categories in the grant
+          Object.keys(newSheetDefs).forEach(key => {
+            newSheetDefs[key] = {
+              ...newDef,
+              name: key // Keep the individual category names
+            };
+          });
+        } else {
+          newSheetDefs[newDef.name] = newDef;
+          if (originalName && originalName !== newDef.name) {
+            delete newSheetDefs[originalName];
+          }
+        }
+        return { ...grant, sheetDefinitions: newSheetDefs };
+      }
+      return grant;
+    });
+
+    handleSettingChange('grants', updatedGrants);
+    toast({ title: "Schema Pulse Staged", description: "Save configuration to broadcast changes." });
+  };
+
   const handleCommitChanges = async () => {
     if (!draftSettings) return;
     setIsSaving(true);
     try {
-      // 1. Broadcast to Cloud
       await FirestoreService.updateSettings(draftSettings);
-      // 2. Commit to Local persistence
       await storage.saveSettings(draftSettings);
-      // 3. Trigger global state reconciliation
       await refreshRegistry();
-      
       toast({ title: "Configuration Broadcasted", description: "Global environment state has been updated." });
     } catch (e) {
-      toast({ variant: "destructive", title: "Broadcast Failure", description: "Failed to update global configuration." });
+      toast({ variant: "destructive", title: "Broadcast Failure" });
     } finally {
       setIsSaving(false);
     }
@@ -221,14 +264,27 @@ export default function SettingsPage() {
                           </Button>
                         </div>
                       </CardHeader>
-                      <CardContent className="px-6 pb-6 pt-0">
+                      <CardContent className="px-6 pb-6 pt-0 space-y-4">
                         <div className="flex flex-wrap gap-2">
                           <Badge variant="secondary" className="rounded-lg text-[9px] font-black uppercase tracking-tighter bg-background border">
-                            {Object.keys(grant.sheetDefinitions || {}).length} Registry Classes
+                            {Object.keys(grant.sheetDefinitions || {}).length} Asset Classes
                           </Badge>
-                          <Badge variant="outline" className="rounded-lg text-[9px] font-black uppercase tracking-tighter border-primary/20 text-primary">
-                            Target: {grant.name.split(' ')[0]}
-                          </Badge>
+                        </div>
+                        <Separator className="opacity-40 border-dashed" />
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                          {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
+                            <div key={sheetName} className="flex items-center justify-between p-3 rounded-xl bg-background/50 border border-border/40 hover:border-primary/20 transition-all group">
+                              <span className="text-[10px] font-black uppercase tracking-tight truncate max-w-[120px]">{sheetName}</span>
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                className="h-7 w-7 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
+                                onClick={() => handleConfigureSchema(grant.id, sheetName)}
+                              >
+                                <Columns className="h-3.5 w-3.5" />
+                              </Button>
+                            </div>
+                          ))}
                         </div>
                       </CardContent>
                     </Card>
@@ -243,7 +299,7 @@ export default function SettingsPage() {
                   </CardHeader>
                   <CardContent className="p-6 space-y-6">
                     <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
-                      Activating a project registry switches the entire system context (Inventory Pulse, Import Engine, and Reports) to that project's specific data scope.
+                      Schema Orchestration allows you to redefine table headers and field mappings per category. Changes are broadcast during the next config pulse.
                     </p>
                     <div className="p-5 bg-background rounded-2xl border-2 shadow-inner space-y-4">
                       <div className="flex items-center justify-between text-[10px] font-black uppercase">
@@ -386,7 +442,7 @@ export default function SettingsPage() {
 
               <Card className="rounded-[2.5rem] border-2 border-dashed border-border/40 shadow-none bg-muted/5 p-8 text-center flex flex-col items-center justify-center space-y-4">
                 <div className="p-6 bg-primary/10 rounded-full mb-2">
-                  <Monitor className="h-10 w-10 text-primary" />
+                  <Zap className="h-10 w-10 text-primary" />
                 </div>
                 <h4 className="text-sm font-black uppercase tracking-tight">System Integrity</h4>
                 <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
@@ -399,6 +455,16 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      {selectedSheetDef && (
+        <ColumnCustomizationSheet 
+          isOpen={isColumnSheetOpen}
+          onOpenChange={setIsColumnSheetOpen}
+          sheetDefinition={selectedSheetDef}
+          originalSheetName={selectedSheetDef.name}
+          onSave={handleSaveSchema}
+        />
+      )}
     </AppLayout>
   );
 }

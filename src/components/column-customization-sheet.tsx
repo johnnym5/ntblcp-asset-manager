@@ -1,5 +1,9 @@
-
 "use client";
+
+/**
+ * @fileOverview ColumnCustomizationSheet - Professional Schema Editor.
+ * Orchestrates reordering, mapping, and structural visibility.
+ */
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -13,14 +17,27 @@ import {
 } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from './ui/scroll-area';
-import { ArrowDown, ArrowUp, GripVertical, PlusCircle, Trash2, ArrowLeft, Type, DollarSign, Binary, CalendarDays } from 'lucide-react';
-import type { SheetDefinition, DisplayField, Asset } from '@/lib/types';
-import { Input } from './ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { 
+  ArrowDown, 
+  ArrowUp, 
+  PlusCircle, 
+  Trash2, 
+  ArrowLeft, 
+  Type, 
+  DollarSign, 
+  Binary, 
+  CalendarDays,
+  Columns,
+  Hash,
+  Eye,
+  LayoutGrid
+} from 'lucide-react';
+import { Input } from '@/components/ui/input';
 import { useToast } from '@/hooks/use-toast';
-import { Badge } from './ui/badge';
-import { Separator } from './ui/separator';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import type { SheetDefinition, DisplayField, Asset } from '@/types/domain';
 
 interface ColumnCustomizationSheetProps {
   isOpen: boolean;
@@ -29,13 +46,6 @@ interface ColumnCustomizationSheetProps {
   originalSheetName: string | null;
   onSave: (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => void;
 }
-
-const FormatIcon = () => (
-    <div className="flex flex-col items-center justify-center opacity-60">
-        <span className="text-[10px] font-black leading-none uppercase">abc</span>
-        <span className="text-[10px] font-black leading-none uppercase">123</span>
-    </div>
-);
 
 export function ColumnCustomizationSheet({
   isOpen,
@@ -56,22 +66,10 @@ export function ColumnCustomizationSheet({
   }, [isOpen, sheetDefinition]);
   
   const handleAddField = (type: string) => {
-    const customFieldKeys: (keyof Asset)[] = ['customField1', 'customField2', 'customField3', 'customField4', 'customField5'];
-    const usedCustomKeys = new Set(editedFields.map(f => f.key).filter(k => customFieldKeys.includes(k as keyof Asset)));
-    
-    const availableCustomField = customFieldKeys.find(k => !usedCustomKeys.has(k));
-
-    if (!availableCustomField) {
-        toast({
-            title: 'Registry Limit Reached',
-            description: 'You have reached the maximum of 5 custom fields for this category.',
-            variant: 'destructive',
-        });
-        return;
-    }
+    const customFieldKeys: (keyof Asset)[] = ['metadata']; 
     
     const newField: DisplayField = {
-        key: availableCustomField,
+        key: `custom_${Date.now()}` as any,
         label: `New ${type} Field`,
         table: true,
         quickView: true,
@@ -80,7 +78,7 @@ export function ColumnCustomizationSheet({
     };
 
     setEditedFields(current => [...current, newField]);
-    toast({ title: "Custom field added", description: "Rename the label to finalize." });
+    toast({ title: "Custom field added", description: "Rename the label to finalize schema mapping." });
   };
 
   const handleRemoveField = (index: number) => {
@@ -117,86 +115,121 @@ export function ColumnCustomizationSheet({
     onOpenChange(false);
   };
 
-  return (
-    <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="w-full sm:max-w-xl flex flex-col p-0 overflow-hidden bg-background">
-        {/* Header matching image structure */}
-        <div className="flex items-center justify-between p-6 border-b">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-full">
-                    <ArrowLeft className="h-6 w-6" />
-                </Button>
-                <div className="flex flex-col">
-                    <h2 className="text-xl font-black uppercase tracking-tight">Configure Layout</h2>
-                    <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{editedName}</span>
+  const FieldPulse = ({ field, index }: { field: DisplayField, index: number }) => (
+    <div className="group relative">
+        <div className="absolute -left-6 top-1/2 -translate-y-1/2 flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={() => handleMove(index, 'up')} disabled={index === 0} className="hover:text-primary disabled:opacity-20"><ArrowUp className="h-3 w-3" /></button>
+            <button onClick={() => handleMove(index, 'down')} disabled={index === editedFields.length - 1} className="hover:text-primary disabled:opacity-20"><ArrowDown className="h-3 w-3" /></button>
+        </div>
+        
+        <div className="bg-card border-2 border-border/40 rounded-3xl p-5 flex items-center justify-between shadow-sm transition-all hover:border-primary/20 group-hover:shadow-md">
+            <div className="flex-1 mr-4">
+                <Input 
+                    value={field.label}
+                    onChange={(e) => handleLabelChange(index, e.target.value)}
+                    className="border-none bg-transparent p-0 h-auto font-black text-sm uppercase tracking-tight focus-visible:ring-0 shadow-none text-foreground placeholder:opacity-20"
+                />
+                <div className="flex items-center gap-2 mt-1 opacity-40">
+                  <Hash className="h-2.5 w-2.5" />
+                  <span className="text-[8px] font-black uppercase tracking-widest">{field.key}</span>
                 </div>
             </div>
-            <Button variant="ghost" size="icon" className="text-destructive opacity-40 hover:opacity-100 transition-opacity">
-                <Trash2 className="h-6 w-6" />
-            </Button>
+            <div className="flex items-center gap-3">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => {
+                    const next = [...editedFields];
+                    next[index].table = !next[index].table;
+                    setEditedFields(next);
+                  }}
+                  className={cn("h-9 w-9 rounded-xl transition-colors", field.table ? "text-primary bg-primary/10" : "opacity-20")}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  onClick={() => {
+                    const next = [...editedFields];
+                    next[index].quickView = !next[index].quickView;
+                    setEditedFields(next);
+                  }}
+                  className={cn("h-9 w-9 rounded-xl transition-colors", field.quickView ? "text-primary bg-primary/10" : "opacity-20")}
+                >
+                  <Eye className="h-4 w-4" />
+                </Button>
+                {String(field.key).startsWith('custom') && (
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl text-destructive/40 hover:text-destructive hover:bg-destructive/10" onClick={() => handleRemoveField(index)}>
+                        <Trash2 className="h-4 w-4" />
+                    </Button>
+                )}
+            </div>
+        </div>
+    </div>
+  );
+
+  return (
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetContent className="w-full sm:max-w-xl flex flex-col p-0 overflow-hidden bg-background rounded-l-[2.5rem] border-primary/10 shadow-2xl">
+        <div className="p-8 pb-4 bg-muted/20 border-b">
+          <SheetHeader>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase">
+                <div className="p-2 bg-primary/10 rounded-xl">
+                  <Columns className="text-primary h-6 w-6" />
+                </div>
+                Layout Orchestrator
+              </SheetTitle>
+              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl">
+                <ArrowLeft className="h-5 w-5" />
+              </Button>
+            </div>
+            <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
+              Defining technical field mapping for category: <span className="text-primary">{editedName}</span>
+            </DialogDescription>
+          </SheetHeader>
         </div>
 
-        <div className="px-8 py-4 bg-muted/20 flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-            <span>Field label</span>
-            <span>Format</span>
+        <div className="px-8 py-4 bg-muted/10 border-b flex items-center justify-between text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">
+            <span>Mapping Logic / Label</span>
+            <div className="flex gap-8 mr-12">
+              <span>Table</span>
+              <span>Grid</span>
+            </div>
         </div>
 
-        <ScrollArea className="flex-1 px-6">
-            <div className="space-y-3 py-4">
+        <ScrollArea className="flex-1 px-8 bg-background">
+            <div className="space-y-3 py-6">
                 {editedFields.map((field, index) => (
-                    <div key={`${field.key}-${index}`} className="group relative">
-                        <div className="absolute -left-4 top-1/2 -translate-y-1/2 flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleMove(index, 'up')} disabled={index === 0} className="hover:text-primary"><ArrowUp className="h-3 w-3" /></button>
-                            <button onClick={() => handleMove(index, 'down')} disabled={index === editedFields.length - 1} className="hover:text-primary"><ArrowDown className="h-3 w-3" /></button>
-                        </div>
-                        
-                        <div className="bg-card border-2 border-border/40 rounded-3xl p-5 flex items-center justify-between shadow-sm transition-all hover:border-primary/20 hover:shadow-md">
-                            <div className="flex-1 mr-4">
-                                <Input 
-                                    value={field.label}
-                                    onChange={(e) => handleLabelChange(index, e.target.value)}
-                                    className="border-none bg-transparent p-0 h-auto font-black text-base focus-visible:ring-0 shadow-none text-foreground placeholder:opacity-20"
-                                />
-                            </div>
-                            <div className="flex items-center gap-4">
-                                <FormatIcon />
-                                {String(field.key).startsWith('customField') && (
-                                    <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive/40 hover:text-destructive" onClick={() => handleRemoveField(index)}>
-                                        <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
+                    <FieldPulse key={`${field.key}-${index}`} field={field} index={index} />
                 ))}
             </div>
         </ScrollArea>
 
-        {/* Bottom bar for "Add field" matching image */}
-        <div className="p-6 border-t bg-muted/10">
+        <div className="p-8 border-t bg-muted/10">
             <div className="flex flex-col items-center gap-4">
-                <div className="w-12 h-1 bg-muted-foreground/20 rounded-full" />
-                <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Add field</span>
-                <div className="flex items-center justify-center gap-8 w-full">
-                    <button onClick={() => handleAddField('Text')} className="flex flex-col items-center gap-1 group">
-                        <div className="p-2 rounded-xl group-hover:bg-primary/10 transition-colors"><Type className="h-6 w-6 text-foreground" /></div>
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Inject New Schema Field</span>
+                <div className="flex items-center justify-center gap-6 w-full">
+                    <button onClick={() => handleAddField('Text')} className="p-4 rounded-2xl bg-card border-2 hover:border-primary/20 hover:bg-primary/5 transition-all tactile-pulse shadow-sm">
+                        <Type className="h-6 w-6 text-primary" />
                     </button>
-                    <button onClick={() => handleAddField('Currency')} className="flex flex-col items-center gap-1 group">
-                        <div className="p-2 rounded-xl group-hover:bg-primary/10 transition-colors"><DollarSign className="h-6 w-6 text-foreground" /></div>
+                    <button onClick={() => handleAddField('Currency')} className="p-4 rounded-2xl bg-card border-2 hover:border-primary/20 hover:bg-primary/5 transition-all tactile-pulse shadow-sm">
+                        <DollarSign className="h-6 w-6 text-primary" />
                     </button>
-                    <button onClick={() => handleAddField('Number')} className="flex flex-col items-center gap-1 group">
-                        <div className="p-2 rounded-xl group-hover:bg-primary/10 transition-colors"><Binary className="h-6 w-6 text-foreground" /></div>
+                    <button onClick={() => handleAddField('Number')} className="p-4 rounded-2xl bg-card border-2 hover:border-primary/20 hover:bg-primary/5 transition-all tactile-pulse shadow-sm">
+                        <Binary className="h-6 w-6 text-primary" />
                     </button>
-                    <button onClick={() => handleAddField('Date')} className="flex flex-col items-center gap-1 group">
-                        <div className="p-2 rounded-xl group-hover:bg-primary/10 transition-colors"><CalendarDays className="h-6 w-6 text-foreground" /></div>
+                    <button onClick={() => handleAddField('Date')} className="p-4 rounded-2xl bg-card border-2 hover:border-primary/20 hover:bg-primary/5 transition-all tactile-pulse shadow-sm">
+                        <CalendarDays className="h-6 w-6 text-primary" />
                     </button>
                 </div>
             </div>
         </div>
 
-        <SheetFooter className="p-6 border-t bg-muted/20 flex flex-row items-center gap-2">
-            <Button variant="outline" className="flex-1 font-black uppercase text-[10px] tracking-widest h-12 rounded-2xl" onClick={() => handleSaveChanges(true)}>Update All</Button>
-            <Button className="flex-1 font-black uppercase text-[10px] tracking-widest h-12 rounded-2xl shadow-xl shadow-primary/20" onClick={() => handleSaveChanges(false)}>Commit Changes</Button>
+        <SheetFooter className="p-8 border-t bg-muted/20 flex flex-row items-center gap-3">
+            <Button variant="ghost" className="flex-1 font-black uppercase text-[10px] tracking-widest h-14 rounded-2xl" onClick={() => handleSaveChanges(true)}>Apply Global</Button>
+            <Button className="flex-1 font-black uppercase text-[10px] tracking-widest h-14 rounded-2xl shadow-xl shadow-primary/20 bg-primary text-primary-foreground" onClick={() => handleSaveChanges(false)}>Commit Schema</Button>
         </SheetFooter>
       </SheetContent>
     </Sheet>
