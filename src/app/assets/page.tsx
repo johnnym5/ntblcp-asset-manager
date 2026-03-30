@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - High-Performance Asset Browser.
- * Final Polish: Pagination and high-density operational workflows.
+ * Operational Overhaul: Aligned with "Glass Cockpit" UI/UX requirements.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -33,7 +33,8 @@ import {
   Trash2,
   ChevronRight,
   Database,
-  ChevronLeft
+  ChevronLeft,
+  X
 } from 'lucide-react';
 import { RegistryTable } from '@/modules/registry/components/RegistryTable';
 import { AssetForm } from '@/components/asset-form';
@@ -68,6 +69,7 @@ export default function AssetRegistryPage() {
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [selectedIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [currentPage, setCurrentPage] = useState(1);
+  const [showSearch, setShowSearch] = useState(false);
   
   // Sort State
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'description', direction: 'asc' });
@@ -376,118 +378,90 @@ export default function AssetRegistryPage() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col h-full gap-6 relative pb-32">
+      <div className="flex flex-col h-full gap-4 relative pb-32">
         {/* Hidden File Trigger */}
         <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
 
-        {/* Top Operational Bar */}
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2">
-          <div className="space-y-1">
-            <div className="flex items-center gap-3">
-              <h2 className="text-3xl font-black tracking-tighter uppercase">{activeProjectName}</h2>
-              <Badge className="font-black text-[10px] h-6 border-2 border-primary/20 bg-primary/5 text-primary rounded-full px-3">
-                {filteredAndSortedAssets.length} Records
-              </Badge>
-            </div>
-            <div className="flex items-center gap-2">
-              <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-[0.3em] opacity-60">
-                Primary Audit Workstation › Registry Context
-              </p>
-              <Badge variant="outline" className={cn(
-                "h-5 px-2 text-[8px] font-black uppercase tracking-tighter border-2 rounded-full shadow-sm",
-                isOnline ? "text-green-600 border-green-200 bg-green-50" : "text-orange-600 border-orange-200 bg-orange-50"
-              )}>
-                {isOnline ? "Online Registry" : "Locally Saved Assets"}
-              </Badge>
-            </div>
+        {/* Top Operational Header */}
+        <div className="flex items-center justify-between px-2 h-14 shrink-0">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-black tracking-tight uppercase truncate max-w-[200px] md:max-w-md">{activeProjectName}</h2>
+            <Badge variant="outline" className="h-6 px-2 text-[10px] font-black tracking-tighter border-primary/20 bg-primary/5 text-primary rounded-full">
+              {filteredAndSortedAssets.length} PULSES
+            </Badge>
           </div>
 
-          <div className="flex items-center gap-2">
-            <div className="flex bg-muted/50 p-1.5 rounded-2xl border border-border/40 mr-2 shadow-inner">
-              <Button 
-                variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
-                size="sm" 
-                onClick={() => setViewMode('list')}
-                className="h-9 w-9 p-0 rounded-xl transition-all"
-              >
-                <List className="h-4 w-4" />
-              </Button>
-              <Button 
-                variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
-                size="sm" 
-                onClick={() => setViewMode('grid')}
-                className="h-9 w-9 p-0 rounded-xl transition-all"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </Button>
-            </div>
-            <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl bg-card border-2 border-border/40 shadow-xl hover:bg-primary/5 transition-all">
-              <Settings2 className="h-5 w-5" />
-            </Button>
-            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl opacity-40 hover:opacity-100">
-              <MoreVertical className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-
-        {/* Global Registry Search & Filters */}
-        <div className="flex flex-col md:flex-row items-center gap-4">
-          <div className="relative flex-1 w-full group">
-            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-40 group-focus-within:text-primary group-focus-within:opacity-100 transition-all" />
-            <Input 
-              placeholder="Search registry by ID, serial, or name..." 
-              className="pl-14 h-16 rounded-[1.5rem] bg-card border-2 border-transparent shadow-2xl focus-visible:ring-primary/20 focus-visible:border-primary/20 text-base font-medium transition-all"
-              value={searchTerm}
-              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
-            />
-          </div>
-          <Button 
-            variant="outline" 
-            onClick={() => setIsFilterOpen(true)}
-            className={cn(
-              "h-16 px-10 rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.2em] gap-3 bg-card border-2 border-transparent shadow-2xl transition-all",
-              Object.values(filters).flat().length > 0 ? "text-primary border-primary/20 bg-primary/5" : "hover:bg-primary/5 hover:border-primary/10"
-            )}
-          >
-            <Filter className="h-4 w-4" />
-            Logic Filters
-            {Object.values(filters).flat().length > 0 && (
-              <Badge className="ml-2 bg-primary text-white h-6 min-w-6 p-0 flex items-center justify-center rounded-full text-[9px] font-black shadow-lg shadow-primary/20">
-                {Object.values(filters).flat().length}
-              </Badge>
-            )}
-          </Button>
-        </div>
-
-        {/* Action Header (Selection Context) */}
-        <AnimatePresence>
-          {selectedIds.size > 0 && (
-            <motion.div 
-              initial={{ opacity: 0, y: -20 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -20 }}
-              className="bg-primary text-primary-foreground p-5 rounded-[1.5rem] flex items-center justify-between shadow-2xl shadow-primary/30 z-20"
+          <div className="flex items-center gap-1.5 bg-muted/50 p-1 rounded-xl">
+            <Button 
+              variant={viewMode === 'list' ? 'secondary' : 'ghost'} 
+              size="sm" 
+              onClick={() => setViewMode('list')}
+              className="h-8 w-8 p-0 rounded-lg"
             >
-              <div className="flex items-center gap-5">
-                <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 rounded-xl" onClick={() => setSelectedAssetIds(new Set())}>
-                  <ArrowLeft className="h-5 w-5" />
+              <List className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant={viewMode === 'grid' ? 'secondary' : 'ghost'} 
+              size="sm" 
+              onClick={() => setViewMode('grid')}
+              className="h-8 w-8 p-0 rounded-lg"
+            >
+              <LayoutGrid className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+
+        {/* Dynamic Context Header (Search or Selection) */}
+        <div className="relative z-20 shrink-0">
+          <AnimatePresence mode="wait">
+            {selectedIds.size > 0 ? (
+              <motion.div 
+                key="selection-bar"
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                className="bg-primary text-primary-foreground p-3 rounded-2xl flex items-center justify-between shadow-xl"
+              >
+                <div className="flex items-center gap-3">
+                  <Button variant="ghost" size="icon" className="text-white hover:bg-white/10 h-8 w-8" onClick={() => setSelectedAssetIds(new Set())}>
+                    <X className="h-4 w-4" />
+                  </Button>
+                  <span className="font-black uppercase text-[10px] tracking-widest">{selectedIds.size} SELECTED</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" size="sm" onClick={handleBulkVerify} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10">VERIFY</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-white/10">MOVE</Button>
+                  <Button variant="ghost" size="sm" onClick={handleBulkDelete} className="h-8 px-3 rounded-lg font-black text-[9px] uppercase tracking-widest text-white hover:bg-red-500/20">PURGE</Button>
+                </div>
+              </motion.div>
+            ) : showSearch ? (
+              <motion.div 
+                key="search-bar"
+                initial={{ opacity: 0, scale: 0.98 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.98 }}
+                className="relative group"
+              >
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
+                <Input 
+                  autoFocus
+                  placeholder="Scan S/N, ID, or Description..." 
+                  className="pl-11 h-12 rounded-2xl bg-card border-2 border-transparent shadow-lg focus-visible:ring-primary/20 focus-visible:border-primary/20 text-sm font-medium"
+                  value={searchTerm}
+                  onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
+                />
+                <Button variant="ghost" size="icon" className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-lg" onClick={() => { setSearchTerm(''); setShowSearch(false); }}>
+                  <X className="h-4 w-4" />
                 </Button>
-                <span className="font-black uppercase text-xs tracking-[0.2em]">{selectedIds.size} Records Selected</span>
-              </div>
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="sm" onClick={handleBulkVerify} className="h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest text-white hover:bg-white/10">Mark Verified</Button>
-                <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest text-white hover:bg-white/10">Move / Edit</Button>
-                <Separator orientation="vertical" className="h-6 bg-white/20" />
-                <Button variant="ghost" size="sm" onClick={handleBulkDelete} className="h-10 px-4 rounded-xl font-black text-[10px] uppercase tracking-widest text-white hover:bg-red-500/20">Delete Pulse</Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+              </motion.div>
+            ) : null}
+          </AnimatePresence>
+        </div>
 
         {/* Registry Surface */}
         <motion.div 
           layout
-          className="flex-1 bg-card/50 rounded-[3rem] border-2 border-dashed border-border/40 overflow-hidden shadow-inner min-h-[400px]"
+          className="flex-1 bg-card/50 rounded-[2rem] border-2 border-dashed border-border/40 overflow-hidden shadow-inner min-h-[300px]"
         >
           <AnimatePresence mode="wait">
             {paginatedAssets.length > 0 ? (
@@ -515,39 +489,36 @@ export default function AssetRegistryPage() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   exit={{ opacity: 0 }}
-                  className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 h-full overflow-y-auto custom-scrollbar"
+                  className="p-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 h-full overflow-y-auto custom-scrollbar"
                 >
                   {paginatedAssets.map((asset) => (
                     <motion.div key={asset.id} layout>
                       <Card 
                         className={cn(
-                          "border-2 border-border/40 hover:border-primary/20 transition-all rounded-[2.5rem] overflow-hidden group cursor-pointer shadow-lg",
-                          selectedIds.has(asset.id) ? "bg-primary/5 border-primary/20 shadow-primary/5" : "bg-card hover:shadow-2xl"
+                          "border-2 border-border/40 hover:border-primary/20 transition-all rounded-3xl overflow-hidden group cursor-pointer shadow-md",
+                          selectedIds.has(asset.id) ? "bg-primary/5 border-primary/20 shadow-primary/5" : "bg-card hover:shadow-xl"
                         )}
                         onClick={() => handleInspect(asset)}
                       >
-                        <CardContent className="p-8 space-y-6">
+                        <CardContent className="p-5 space-y-4">
                           <div className="flex justify-between items-start">
-                            <div className="flex flex-col gap-2">
-                              <h3 className="font-black text-base uppercase tracking-tight line-clamp-2 leading-none">{asset.description || asset.name}</h3>
-                              <span className="text-[10px] font-mono text-muted-foreground uppercase opacity-60 tracking-widest">TAG: {asset.assetIdCode || 'UNSET'}</span>
+                            <div className="flex flex-col gap-1.5 min-w-0">
+                              <h3 className="font-black text-sm uppercase tracking-tight truncate leading-none">{asset.description || asset.name}</h3>
+                              <span className="text-[9px] font-mono text-muted-foreground uppercase opacity-60 tracking-widest truncate">TAG: {asset.assetIdCode || 'UNSET'}</span>
                             </div>
-                            <div className="flex items-center gap-2">
-                              <Badge variant="outline" className={cn(
-                                "text-[9px] font-black uppercase tracking-widest h-7 px-3 border-2 rounded-full shadow-sm",
-                                asset.status === 'VERIFIED' ? "text-green-600 border-green-500/20 bg-green-50" : "text-orange-600 border-orange-500/20 bg-orange-50"
-                              )}>
-                                {asset.status === 'VERIFIED' ? <ShieldCheck className="h-3 w-3 mr-2" /> : <Clock className="h-3 w-3 mr-2" />}
-                                {asset.status}
-                              </Badge>
-                            </div>
+                            <Badge variant="outline" className={cn(
+                              "text-[8px] font-black uppercase tracking-widest h-6 px-2 shrink-0 border-2 rounded-lg shadow-sm",
+                              asset.status === 'VERIFIED' ? "text-green-600 border-green-500/20 bg-green-50" : "text-orange-600 border-orange-500/20 bg-orange-50"
+                            )}>
+                              {asset.status}
+                            </Badge>
                           </div>
-                          <div className="pt-6 border-t-2 border-dashed space-y-3">
-                            <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                              <MapPin className="h-4 w-4 text-primary opacity-40" /> {asset.location}
+                          <div className="pt-4 border-t border-dashed space-y-2">
+                            <div className="flex items-center gap-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                              <MapPin className="h-3.5 w-3.5 text-primary opacity-40 shrink-0" /> <span className="truncate">{asset.location}</span>
                             </div>
-                            <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">
-                              <Tag className="h-4 w-4 text-primary opacity-40" /> {asset.category}
+                            <div className="flex items-center gap-2.5 text-[9px] font-black uppercase tracking-widest text-muted-foreground">
+                              <Tag className="h-3.5 w-3.5 text-primary opacity-40 shrink-0" /> <span className="truncate">{asset.category}</span>
                             </div>
                           </div>
                         </CardContent>
@@ -561,81 +532,69 @@ export default function AssetRegistryPage() {
                 key="empty-view"
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
-                className="h-full flex flex-col items-center justify-center text-center p-20 opacity-20"
+                className="h-full flex flex-col items-center justify-center text-center p-10 opacity-20"
               >
-                <div className="p-10 bg-muted rounded-[3rem] mb-8 shadow-inner">
-                  <Boxes className="h-24 w-24" />
+                <div className="p-8 bg-muted rounded-[2rem] mb-6 shadow-inner">
+                  <Boxes className="h-16 w-16" />
                 </div>
-                <div className="space-y-2">
-                  <h3 className="text-3xl font-black uppercase tracking-[0.3em]">Registry Silent</h3>
-                  <p className="text-sm font-medium max-w-xs mx-auto uppercase tracking-widest opacity-60">No records match the current operational pulse.</p>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-black uppercase tracking-widest">Registry Silent</h3>
+                  <p className="text-[10px] font-bold max-w-[200px] mx-auto uppercase tracking-widest opacity-60">Zero pulses discovered in current logic filter.</p>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </motion.div>
 
-        {/* Pagination & Export Pulse (Bottom Bar) */}
-        <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 bg-background/80 backdrop-blur-2xl p-4 rounded-[2.5rem] border-2 border-primary/10 shadow-[0_35px_60px_-15px_rgba(0,0,0,0.5)] border-t-primary/20 ring-1 ring-white/10">
-          <div className="flex items-center gap-2 pr-4 border-r border-border/40">
+        {/* Bottom Action Pulse Bar */}
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 flex items-center gap-2 bg-background/80 backdrop-blur-2xl p-2.5 rounded-[2rem] border-2 border-primary/10 shadow-2xl ring-1 ring-white/10 w-[95%] max-w-lg">
+          <div className="flex items-center gap-1 pr-2 border-r border-border/40">
             <Button 
               variant="ghost" 
               size="icon" 
               disabled={currentPage === 1}
               onClick={() => setCurrentPage(prev => prev - 1)}
-              className="h-12 w-12 rounded-2xl hover:bg-primary/10"
+              className="h-10 w-10 rounded-xl"
             >
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-4 w-4" />
             </Button>
-            <span className="text-[10px] font-black uppercase tracking-widest px-4">
-              {currentPage} / {totalPages || 1}
+            <span className="text-[9px] font-black uppercase tracking-tighter px-2 tabular-nums">
+              {currentPage}/{totalPages || 1}
             </span>
             <Button 
               variant="ghost" 
               size="icon" 
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage(prev => prev + 1)}
-              className="h-12 w-12 rounded-2xl hover:bg-primary/10"
+              className="h-10 w-10 rounded-xl"
             >
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-4 w-4" />
             </Button>
           </div>
 
-          <Button 
-            className="h-16 px-10 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.25em] gap-4 shadow-2xl shadow-primary/30 transition-all hover:-translate-y-1 active:scale-95"
-            onClick={handleCreateNew}
-          >
-            <Plus className="h-5 w-5" /> New Registration
-          </Button>
-          <Separator orientation="vertical" className="h-10 opacity-30" />
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="h-16 w-16 p-0 rounded-[1.5rem] bg-card border-2 border-border/40 hover:bg-primary/10 hover:border-primary/20 transition-all shadow-xl"
-                  onClick={() => fileInputRef.current?.click()}
-                >
-                  <FileUp className="h-6 w-6 text-muted-foreground" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="font-black uppercase text-[10px] tracking-widest">Ingest Pulse</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
-          <TooltipProvider>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  className="h-16 w-16 p-0 rounded-[1.5rem] bg-card border-2 border-border/40 hover:bg-primary/10 hover:border-primary/20 transition-all shadow-xl"
-                  onClick={handleExportRegistry}
-                >
-                  <FileDown className="h-6 w-6 text-muted-foreground" />
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent className="font-black uppercase text-[10px] tracking-widest">Export Ledger</TooltipContent>
-            </Tooltip>
-          </TooltipProvider>
+          <div className="flex flex-1 items-center justify-around gap-1">
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl" onClick={() => setShowSearch(true)}>
+              <Search className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl relative" onClick={() => setIsFilterOpen(true)}>
+              <Filter className="h-5 w-5" />
+              {Object.values(filters).flat().length > 0 && (
+                <span className="absolute top-2 right-2 h-2.5 w-2.5 bg-primary rounded-full shadow-lg border-2 border-white" />
+              )}
+            </Button>
+            <Button 
+              className="h-12 w-12 rounded-2xl font-black shadow-xl shadow-primary/20 transition-all active:scale-95 bg-primary"
+              onClick={handleCreateNew}
+            >
+              <Plus className="h-6 w-6" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl" onClick={() => fileInputRef.current?.click()}>
+              <FileUp className="h-5 w-5" />
+            </Button>
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-xl" onClick={handleExportRegistry}>
+              <FileDown className="h-5 w-5" />
+            </Button>
+          </div>
         </div>
       </div>
 
