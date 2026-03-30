@@ -53,17 +53,20 @@ export default function UserProfileSetup() {
   const handleLogin = () => {
     setError(null);
     if (!email) {
-      setError("Please enter an email address.");
+      setError("Please enter your email or login ID.");
       return;
     }
 
     const allUsers = [...appSettings.authorizedUsers, superAdmin];
+    const searchTerm = email.toLowerCase().trim();
+
     const user = allUsers.find(
-      u => u.email.toLowerCase() === email.toLowerCase().trim()
+      u => (u.email && u.email.toLowerCase() === searchTerm) || 
+           (u.loginName && u.loginName.toLowerCase() === searchTerm)
     );
 
     if (!user) {
-      setError("Invalid email or password.");
+      setError("Invalid credentials. Please contact an administrator.");
       return;
     }
 
@@ -72,7 +75,7 @@ export default function UserProfileSetup() {
       if (user.states.length === 1 && user.states[0] !== 'All') {
         setSelectedState(user.states[0]);
         handleConfirm(user, user.states[0]);
-      } else if (user.isAdmin) {
+      } else if (user.isAdmin || user.states.includes('All')) {
         setSelectedState('All');
         handleConfirm(user, 'All');
       }
@@ -89,12 +92,12 @@ export default function UserProfileSetup() {
       if (user.states.length === 1 && user.states[0] !== 'All') {
         setSelectedState(user.states[0]);
         handleConfirm(user, user.states[0]);
-      } else if (user.isAdmin) {
+      } else if (user.isAdmin || user.states.includes('All')) {
         setSelectedState('All');
         handleConfirm(user, 'All');
       }
     } else {
-      setError("Invalid email or password.");
+      setError("Invalid credentials.");
       setFoundUser(null);
     }
   };
@@ -110,43 +113,46 @@ export default function UserProfileSetup() {
     setIsSaving(false);
   };
   
-  const isMultiStateUser = foundUser && foundUser.states.length > 1 && !foundUser.isAdmin;
+  const isMultiStateUser = foundUser && foundUser.states.length > 1 && !foundUser.isAdmin && !foundUser.states.includes('All');
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="w-full max-w-sm">
             <AlertDialog open={true}>
-            <AlertDialogContent>
+            <AlertDialogContent className="rounded-3xl border-primary/10">
                 <AlertDialogHeader className="text-center items-center">
                     <div className="p-3 bg-primary/10 rounded-full mb-2">
                         <Boxes className="h-6 w-6 text-primary" />
                     </div>
-                    <AlertDialogTitle>NTBLCP Asset Manager</AlertDialogTitle>
-                    <AlertDialogDescription>
-                        Please sign in to continue.
+                    <AlertDialogTitle className="text-2xl font-black tracking-tight">Assetain Registry</AlertDialogTitle>
+                    <AlertDialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
+                        Secure Authentication Gateway
                     </AlertDialogDescription>
                 </AlertDialogHeader>
                 <div className="py-4 space-y-4">
                 {!foundUser || isMultiStateUser ? (
                     <>
                         <div className="space-y-2">
-                            <Label htmlFor="email">Email</Label>
+                            <Label htmlFor="email" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Identity (Email or ID)</Label>
                             <Input 
                             id="email" 
-                            type="email"
-                            placeholder="user@example.com"
+                            type="text"
+                            placeholder="username or email"
                             value={email} 
                             onChange={(e) => setEmail(e.target.value)}
+                            className="h-11 rounded-xl"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label htmlFor="password">Password</Label>
+                            <Label htmlFor="password" title="password" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Access Passphrase</Label>
                             <Input 
                             id="password" 
                             type="password"
+                            placeholder="••••••••"
                             value={password} 
                             onChange={(e) => setPassword(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                            className="h-11 rounded-xl"
                             />
                         </div>
                     </>
@@ -154,17 +160,17 @@ export default function UserProfileSetup() {
 
                 {isMultiStateUser && (
                     <>
-                     <Separator />
-                     <p className="text-sm text-center text-muted-foreground">Login successful. Please select your location for this session.</p>
+                     <Separator className="opacity-50" />
+                     <p className="text-[11px] text-center font-medium text-muted-foreground leading-relaxed">Identity verified. Please select your regional authorized scope for this session.</p>
                      <div className="space-y-2">
-                        <Label htmlFor="state">Assigned Location</Label>
+                        <Label htmlFor="state" className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Regional Scope</Label>
                         <Select onValueChange={setSelectedState} value={selectedState}>
-                            <SelectTrigger id="state">
+                            <SelectTrigger id="state" className="h-11 rounded-xl">
                             <SelectValue placeholder="Select a location..." />
                             </SelectTrigger>
-                            <SelectContent>
+                            <SelectContent className="rounded-xl">
                                 {foundUser.states.map((state) => (
-                                <SelectItem key={state} value={state}>
+                                <SelectItem key={state} value={state} className="rounded-lg">
                                     {state}
                                 </SelectItem>
                                 ))}
@@ -175,23 +181,21 @@ export default function UserProfileSetup() {
                 )}
 
                 {error && (
-                    <Alert variant="destructive">
+                    <Alert variant="destructive" className="rounded-2xl border-2 bg-destructive/5">
                         <AlertCircle className="h-4 w-4" />
-                        <AlertTitle>Login Error</AlertTitle>
-                        <AlertDescription>{error}</AlertDescription>
+                        <AlertTitle className="font-bold">Authentication Failed</AlertTitle>
+                        <AlertDescription className="text-xs">{error}</AlertDescription>
                     </Alert>
                 )}
                 </div>
-                <AlertDialogFooter>
+                <AlertDialogFooter className="mt-2">
                     {isMultiStateUser ? (
-                        <Button className="w-full" onClick={() => handleConfirm(foundUser!, selectedState)} disabled={isSaving || !selectedState}>
-                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Confirm and Continue
+                        <Button className="w-full h-12 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20" onClick={() => handleConfirm(foundUser!, selectedState)} disabled={isSaving || !selectedState}>
+                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Confirm Scope & Entry'}
                         </Button>
                     ) : (
-                        <Button className="w-full" onClick={handleLogin} disabled={isSaving}>
-                            {isSaving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                            Sign In
+                        <Button className="w-full h-12 rounded-2xl font-black uppercase tracking-widest text-xs shadow-xl shadow-primary/20" onClick={handleLogin} disabled={isSaving}>
+                            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Sign In to System'}
                         </Button>
                     )}
                 </AlertDialogFooter>

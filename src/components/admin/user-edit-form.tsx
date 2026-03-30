@@ -36,7 +36,7 @@ import { Switch } from '@/components/ui/switch';
 import type { AuthorizedUser } from '@/lib/types';
 import { NIGERIAN_STATES, NIGERIAN_ZONES, ZONAL_STORES } from '@/lib/constants';
 import { Popover, PopoverContent, PopoverTrigger } from '../ui/popover';
-import { ChevronsUpDown, Check, MapPin, ShieldCheck, User } from 'lucide-react';
+import { ChevronsUpDown, Check, MapPin, ShieldCheck, User, Mail } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Badge } from '../ui/badge';
 import { Checkbox } from '../ui/checkbox';
@@ -45,6 +45,7 @@ import { ScrollArea } from '../ui/scroll-area';
 const userFormSchema = z.object({
   displayName: z.string().min(2, 'Display name required.'),
   loginName: z.string().min(2, 'Login name required.').transform(v => v.toLowerCase().trim()),
+  email: z.string().email('Valid email address required.'),
   states: z.array(z.string()).min(1, 'Select at least one state.'),
   isAdmin: z.boolean(),
   isZonalAdmin: z.boolean().optional(),
@@ -72,7 +73,20 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
   const [isSaving, setIsSaving] = useState(false);
   const form = useForm<UserFormValues>({
     resolver: zodResolver(userFormSchema),
-    defaultValues: { displayName: '', loginName: '', states: [], isAdmin: false, isZonalAdmin: false, assignedZone: '', isGuest: false, password: '', confirmPassword: '', canAddAssets: true, canEditAssets: true },
+    defaultValues: { 
+        displayName: '', 
+        loginName: '', 
+        email: '',
+        states: [], 
+        isAdmin: false, 
+        isZonalAdmin: false, 
+        assignedZone: '', 
+        isGuest: false, 
+        password: '', 
+        confirmPassword: '', 
+        canAddAssets: true, 
+        canEditAssets: true 
+    },
   });
   
   const isAdmin = form.watch('isAdmin');
@@ -82,9 +96,27 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
   useEffect(() => {
     if (isOpen) {
       if (user) {
-        form.reset({ ...user, password: user.password || '', confirmPassword: user.password || '' });
+        form.reset({ 
+            ...user, 
+            email: user.email || '',
+            password: user.password || '', 
+            confirmPassword: user.password || '' 
+        });
       } else {
-        form.reset({ displayName: '', loginName: '', states: [], isAdmin: false, isZonalAdmin: false, assignedZone: '', isGuest: false, password: '', confirmPassword: '', canAddAssets: true, canEditAssets: true });
+        form.reset({ 
+            displayName: '', 
+            loginName: '', 
+            email: '',
+            states: [], 
+            isAdmin: false, 
+            isZonalAdmin: false, 
+            assignedZone: '', 
+            isGuest: false, 
+            password: '', 
+            confirmPassword: '', 
+            canAddAssets: true, 
+            canEditAssets: true 
+        });
       }
     }
   }, [isOpen, user, form]);
@@ -106,56 +138,88 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-lg rounded-3xl overflow-hidden p-0">
-        <DialogHeader className="p-6 bg-muted/20 border-b">
-          <DialogTitle className="flex items-center gap-2"><User className="h-5 w-5 text-primary"/> {user ? 'Edit Identity' : 'New System Identity'}</DialogTitle>
-          <DialogDescription>Define access roles and regional scopes.</DialogDescription>
+      <DialogContent className="sm:max-w-2xl rounded-3xl overflow-hidden p-0 border-primary/10 shadow-2xl">
+        <DialogHeader className="p-8 bg-muted/20 border-b">
+          <DialogTitle className="flex items-center gap-3 text-2xl font-black tracking-tight">
+            <User className="h-6 w-6 text-primary"/> {user ? 'Edit System Identity' : 'New Registry Identity'}
+          </DialogTitle>
+          <DialogDescription className="text-xs font-bold uppercase tracking-widest text-muted-foreground opacity-70">
+            Define administrative roles and regional authorized scopes.
+          </DialogDescription>
         </DialogHeader>
-        <ScrollArea className="max-h-[60vh]">
+        <ScrollArea className="max-h-[70vh]">
             <Form {...form}>
-            <form onSubmit={form.handleSubmit(handleSubmit)} className="p-6 space-y-6">
-                <div className="grid grid-cols-2 gap-4">
-                    <FormField control={form.control} name="displayName" render={({ field }) => (
-                        <FormItem><FormLabel>Full Name</FormLabel><FormControl><Input placeholder="John Doe" {...field} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                    <FormField control={form.control} name="loginName" render={({ field }) => (
-                        <FormItem><FormLabel>Login ID</FormLabel><FormControl><Input placeholder="jdoe" {...field} /></FormControl><FormMessage /></FormItem>
-                    )}/>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                    <FormField control={form.control} name="password" render={({ field }) => (
-                        <FormItem><FormLabel>Passphrase</FormLabel><FormControl><Input type="password" {...field} /></FormControl></FormItem>
-                    )}/>
-                    <FormField control={form.control} name="confirmPassword" render={({ field }) => (
-                        <FormItem><FormLabel>Confirm</FormLabel><FormControl><Input type="password" {...field} /></FormControl></FormItem>
+            <form onSubmit={form.handleSubmit(handleSubmit)} className="p-8 space-y-8">
+                <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Primary Identification</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <FormField control={form.control} name="displayName" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Full Name</FormLabel>
+                                <FormControl><Input placeholder="John Doe" {...field} className="rounded-xl"/></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}/>
+                        <FormField control={form.control} name="loginName" render={({ field }) => (
+                            <FormItem>
+                                <FormLabel>Login ID (Unique)</FormLabel>
+                                <FormControl><Input placeholder="jdoe" {...field} className="rounded-xl"/></FormControl>
+                                <FormMessage />
+                            </FormItem>
+                        )}/>
+                    </div>
+                    <FormField control={form.control} name="email" render={({ field }) => (
+                        <FormItem>
+                            <FormLabel className="flex items-center gap-2"><Mail className="h-3.5 w-3.5" /> Email Address</FormLabel>
+                            <FormControl><Input placeholder="j.doe@example.com" type="email" {...field} className="rounded-xl"/></FormControl>
+                            <FormMessage />
+                        </FormItem>
                     )}/>
                 </div>
 
                 <div className="space-y-4">
-                    <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Governance Level</Label>
-                    
-                    <FormField control={form.control} name="isAdmin" render={({ field }) => (
-                        <FormItem className="flex items-center justify-between p-3 rounded-2xl border bg-muted/5">
-                            <div className="space-y-0.5"><FormLabel className="font-bold">Super Administrator</FormLabel><FormDescription className="text-[10px]">Unrestricted global project access.</FormDescription></div>
-                            <FormControl><Switch checked={field.value} onCheckedChange={(v) => { field.onChange(v); if(v) form.setValue('isZonalAdmin', false); }}/></FormControl>
-                        </FormItem>
-                    )}/>
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Security & Passphrase</Label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <FormField control={form.control} name="password" render={({ field }) => (
+                            <FormItem><FormLabel>Access Passphrase</FormLabel><FormControl><Input type="password" {...field} className="rounded-xl"/></FormControl></FormItem>
+                        )}/>
+                        <FormField control={form.control} name="confirmPassword" render={({ field }) => (
+                            <FormItem><FormLabel>Confirm Passphrase</FormLabel><FormControl><Input type="password" {...field} className="rounded-xl"/></FormControl><FormMessage /></FormItem>
+                        )}/>
+                    </div>
+                </div>
 
-                    <FormField control={form.control} name="isZonalAdmin" render={({ field }) => (
-                        <FormItem className="flex items-center justify-between p-3 rounded-2xl border bg-muted/5">
-                            <div className="space-y-0.5"><FormLabel className="font-bold">Zonal Administrator</FormLabel><FormDescription className="text-[10px]">Manages all states in a Nigerian zone.</FormDescription></div>
-                            <FormControl><Switch checked={field.value} onCheckedChange={(v) => { field.onChange(v); if(v) form.setValue('isAdmin', false); }}/></FormControl>
-                        </FormItem>
-                    )}/>
+                <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-primary">Governance & Authorization</Label>
+                    <div className="grid grid-cols-1 gap-3">
+                        <FormField control={form.control} name="isAdmin" render={({ field }) => (
+                            <FormItem className="flex items-center justify-between p-4 rounded-2xl border bg-muted/5 transition-all hover:bg-muted/10">
+                                <div className="space-y-0.5">
+                                    <FormLabel className="font-black text-sm">Super Administrator</FormLabel>
+                                    <FormDescription className="text-[10px] font-bold uppercase opacity-60">Unrestricted global project access and user management.</FormDescription>
+                                </div>
+                                <FormControl><Switch checked={field.value} onCheckedChange={(v) => { field.onChange(v); if(v) form.setValue('isZonalAdmin', false); }}/></FormControl>
+                            </FormItem>
+                        )}/>
+
+                        <FormField control={form.control} name="isZonalAdmin" render={({ field }) => (
+                            <FormItem className="flex items-center justify-between p-4 rounded-2xl border bg-muted/5 transition-all hover:bg-muted/10">
+                                <div className="space-y-0.5">
+                                    <FormLabel className="font-black text-sm">Zonal Administrator</FormLabel>
+                                    <FormDescription className="text-[10px] font-bold uppercase opacity-60">Manages all states within a Nigerian geopolitical zone.</FormDescription>
+                                </div>
+                                <FormControl><Switch checked={field.value} onCheckedChange={(v) => { field.onChange(v); if(v) form.setValue('isAdmin', false); }}/></FormControl>
+                            </FormItem>
+                        )}/>
+                    </div>
 
                     {isZonalAdmin && (
                         <FormField control={form.control} name="assignedZone" render={({ field }) => (
-                            <FormItem>
+                            <FormItem className="animate-in fade-in slide-in-from-top-2 duration-300">
                                 <FormLabel>Assigned Geopolitical Zone</FormLabel>
                                 <Select onValueChange={field.onChange} value={field.value}>
-                                    <SelectTrigger><SelectValue placeholder="Select Zone..." /></SelectTrigger>
-                                    <SelectContent>{ZONAL_STORES.map(z => <SelectItem key={z} value={z}>{z}</SelectItem>)}</SelectContent>
+                                    <SelectTrigger className="rounded-xl h-11"><SelectValue placeholder="Select Zone..." /></SelectTrigger>
+                                    <SelectContent className="rounded-xl">{ZONAL_STORES.map(z => <SelectItem key={z} value={z} className="rounded-lg">{z}</SelectItem>)}</SelectContent>
                                 </Select>
                             </FormItem>
                         )}/>
@@ -164,42 +228,55 @@ export function UserEditForm({ isOpen, onOpenChange, user, onSave }: UserEditFor
 
                 {!isAdmin && !isZonalAdmin && (
                     <FormField control={form.control} name="states" render={({ field }) => (
-                        <FormItem className="flex flex-col">
-                            <FormLabel>Regional Authorized Scope</FormLabel>
+                        <FormItem className="flex flex-col animate-in fade-in slide-in-from-top-2 duration-300">
+                            <FormLabel className="text-[10px] font-black uppercase tracking-widest text-primary mb-2">Regional Authorized Scope</FormLabel>
                             <Popover>
                                 <PopoverTrigger asChild>
-                                    <Button variant="outline" className="w-full justify-between">
-                                        {field.value?.length > 0 ? `${field.value.length} States Selected` : "Select states..."}
+                                    <Button variant="outline" className="w-full h-11 justify-between rounded-xl border-2">
+                                        <div className="flex items-center gap-2">
+                                            <MapPin className="h-4 w-4 text-primary opacity-60" />
+                                            {field.value?.length > 0 ? <span className="font-black text-xs">{field.value.length} States Selected</span> : "Select Authorized States..."}
+                                        </div>
                                         <ChevronsUpDown className="h-4 w-4 opacity-50" />
                                     </Button>
                                 </PopoverTrigger>
-                                <PopoverContent className="w-[300px] p-0">
-                                    <ScrollArea className="h-64">
-                                        <div className="p-2 space-y-1">
+                                <PopoverContent className="w-[400px] p-0 rounded-2xl shadow-2xl border-primary/10 overflow-hidden" align="start">
+                                    <div className="p-4 bg-muted/30 border-b">
+                                        <h4 className="text-[10px] font-black uppercase tracking-widest">Select Regional Jurisdiction</h4>
+                                    </div>
+                                    <ScrollArea className="h-72">
+                                        <div className="p-3 grid grid-cols-2 gap-1">
                                             {NIGERIAN_STATES.map(s => (
-                                                <div key={s} className="flex items-center gap-2 p-2 hover:bg-muted rounded-lg cursor-pointer" onClick={() => {
+                                                <div key={s} className="flex items-center gap-3 p-2 hover:bg-primary/5 rounded-xl cursor-pointer transition-colors group" onClick={() => {
                                                     const cur = field.value || [];
                                                     field.onChange(cur.includes(s) ? cur.filter(x => x !== s) : [...cur, s]);
                                                 }}>
-                                                    <Checkbox checked={field.value?.includes(s)} />
-                                                    <span className="text-sm">{s}</span>
+                                                    <Checkbox checked={field.value?.includes(s)} className="rounded-md h-5 w-5"/>
+                                                    <span className="text-xs font-bold group-hover:text-primary transition-colors">{s}</span>
                                                 </div>
                                             ))}
                                         </div>
                                     </ScrollArea>
                                 </PopoverContent>
                             </Popover>
+                            <div className="flex flex-wrap gap-1.5 mt-3">
+                                {field.value?.map(s => (
+                                    <Badge key={s} variant="secondary" className="rounded-lg text-[9px] font-black uppercase tracking-tighter bg-primary/5 border-primary/10 text-primary">
+                                        {s}
+                                    </Badge>
+                                ))}
+                            </div>
                         </FormItem>
                     )}/>
                 )}
             </form>
             </Form>
         </ScrollArea>
-        <DialogFooter className="p-6 bg-muted/20 border-t gap-2">
-            <DialogClose asChild><Button variant="outline">Cancel</Button></DialogClose>
-            <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSaving} className="font-bold">
+        <DialogFooter className="p-8 bg-muted/20 border-t gap-3">
+            <DialogClose asChild><Button variant="ghost" className="font-bold px-6 rounded-xl">Discard Changes</Button></DialogClose>
+            <Button onClick={form.handleSubmit(handleSubmit)} disabled={isSaving} className="h-12 font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 px-8 rounded-xl">
                 {isSaving ? <Loader2 className="animate-spin h-4 w-4 mr-2"/> : <ShieldCheck className="h-4 w-4 mr-2"/>}
-                Save Identity
+                Commit Identity Changes
             </Button>
         </DialogFooter>
       </DialogContent>
