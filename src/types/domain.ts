@@ -22,7 +22,7 @@ export interface ImportMetadata {
 
 export interface Asset {
   id: string;
-  name: string;
+  name?: string;
   description: string;
   category: string;
   grantId: string; // Link to the specific project/grant

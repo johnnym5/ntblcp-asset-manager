@@ -19,6 +19,7 @@ export function normalizeRow(
     status: 'UNVERIFIED',
     condition: 'Unassessed',
     lastModified: new Date().toISOString(),
+    lastModifiedBy: context.lastModifiedBy || 'System Import',
   };
 
   headerRow.forEach((rawHeader, index) => {
@@ -34,6 +35,11 @@ export function normalizeRow(
       asset.metadata[normalizedHeader] = cellValue;
     }
   });
+
+  // Ensure name is at least populated from description for parity
+  if (!asset.name && asset.description) {
+    asset.name = asset.description;
+  }
 
   return asset;
 }

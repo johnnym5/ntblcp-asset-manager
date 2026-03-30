@@ -27,6 +27,7 @@ import { ReconciliationView } from '@/modules/import/components/ReconciliationVi
 import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
 import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { monitoring } from '@/lib/monitoring';
 import * as XLSX from 'xlsx';
 import type { Asset } from '@/types/domain';
@@ -34,6 +35,7 @@ import type { Asset } from '@/types/domain';
 export default function ImportPage() {
   const { toast } = useToast();
   const { refreshRegistry, activeGrantId } = useAppState();
+  const { userProfile } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [stagedAssets, setStagedAssets] = useState<Asset[]>([]);
   const [analysisProgress, setAnalysisProgress] = useState(0);
@@ -75,10 +77,12 @@ export default function ImportPage() {
         const data = XLSX.utils.sheet_to_json(sheet, { header: 1 });
         const assets = parseSheetToAssets(data as any[][], file.name, sheetName);
         
-        // Tag assets with the current project ID
+        // Tag assets with the current project ID and user audit info
         const taggedAssets = assets.map(a => ({
           ...a,
-          grantId: activeGrantId
+          grantId: activeGrantId,
+          lastModifiedBy: userProfile?.displayName || 'System Import',
+          name: a.name || a.description // Ensure name is present for validation
         }));
         
         allParsedAssets = [...allParsedAssets, ...taggedAssets];

@@ -7,8 +7,8 @@ import { z } from 'zod';
 
 export const AssetSchema = z.object({
   id: z.string().uuid(),
-  name: z.string().min(1, "Name is required"),
-  description: z.string().min(2, "Description must be valid"),
+  name: z.string().optional(),
+  description: z.string().min(1, "Description is required"),
   category: z.string().min(1, "Category is required"),
   grantId: z.string().min(1, "Grant ID is required"),
   
@@ -30,6 +30,7 @@ export const AssetSchema = z.object({
   value: z.number().nonnegative().default(0),
   serialNumber: z.string().default("N/A"),
   assetIdCode: z.string().optional(),
+  photoDataUri: z.string().optional(),
 
   // Nested Structured Data
   hierarchy: z.object({
