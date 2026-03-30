@@ -5,7 +5,7 @@
 
 import { storage } from './storage';
 import { getPendingOperations } from './queue';
-import { RegistryService } from '@/services/cloud/registry-service';
+import { FirestoreService } from '@/services/firebase/firestore';
 import { logger } from '@/lib/logger';
 
 let isSyncing = false;
@@ -15,7 +15,7 @@ let isSyncing = false;
  * Implements deterministic sequential processing to maintain state integrity.
  */
 export async function processSyncQueue(): Promise<void> {
-  if (isSyncing || !navigator.onLine) return;
+  if (isSyncing || typeof window === 'undefined' || !navigator.onLine) return;
   
   const pending = await getPendingOperations();
   if (pending.length === 0) return;
@@ -28,9 +28,10 @@ export async function processSyncQueue(): Promise<void> {
       // 1. Process by collection type
       if (op.collection === 'assets') {
         if (op.operation === 'UPDATE' || op.operation === 'CREATE') {
-          await RegistryService.updateAsset(op.payload);
+          // Use the abstracted service layer which has validation
+          await FirestoreService.saveAsset(op.payload as any);
         }
-        // Additional operation handlers (DELETE, etc) go here
+        // Additional operation handlers go here
       }
 
       // 2. Dequeue on success

@@ -36,11 +36,19 @@ const getDb = () => {
   if (!dbPromise) {
     dbPromise = openDB<AssetainSchema>(DB_NAME, DB_VERSION, {
       upgrade(db) {
-        db.createObjectStore('assets', { keyPath: 'id' });
-        db.createObjectStore('sandbox', { keyPath: 'id' });
-        db.createObjectStore('settings');
-        const queueStore = db.createObjectStore('queue', { keyPath: 'id' });
-        queueStore.createIndex('by-timestamp', 'timestamp');
+        if (!db.objectStoreNames.contains('assets')) {
+          db.createObjectStore('assets', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('sandbox')) {
+          db.createObjectStore('sandbox', { keyPath: 'id' });
+        }
+        if (!db.objectStoreNames.contains('settings')) {
+          db.createObjectStore('settings');
+        }
+        if (!db.objectStoreNames.contains('queue')) {
+          const queueStore = db.createObjectStore('queue', { keyPath: 'id' });
+          queueStore.createIndex('by-timestamp', 'timestamp');
+        }
       },
     });
   }
@@ -60,6 +68,10 @@ export const storage = {
     await Promise.all(assets.map(a => tx.store.put(a)));
     await tx.done;
   },
+  async clearAssets(): Promise<void> {
+    const db = await getDb();
+    if (db) await db.clear('assets');
+  },
 
   // Sandbox Store (Imports)
   async getSandbox(): Promise<Asset[]> {
@@ -76,6 +88,16 @@ export const storage = {
   async clearSandbox(): Promise<void> {
     const db = await getDb();
     if (db) await db.clear('sandbox');
+  },
+
+  // Settings Store
+  async getSettings(): Promise<AppSettings | null> {
+    const db = await getDb();
+    return db ? db.get('settings', 'app-settings') : null;
+  },
+  async saveSettings(settings: AppSettings): Promise<void> {
+    const db = await getDb();
+    if (db) await db.put('settings', settings, 'app-settings');
   },
 
   // Queue Store

@@ -1,6 +1,7 @@
 /**
  * @fileOverview Hardened Firestore Service.
  * Implements deterministic validation and strict RBAC context.
+ * This module is the sole gateway for cloud data persistence.
  */
 
 import { 
@@ -70,7 +71,7 @@ export const FirestoreService = {
   /**
    * Single record update with mandatory Zod validation.
    */
-  saveAsset(asset: Asset) {
+  async saveAsset(asset: Asset): Promise<void> {
     if (!db) return;
 
     // DETERMINISTIC VALIDATION: Block dirty data at the boundary
@@ -83,9 +84,12 @@ export const FirestoreService = {
     const assetRef = doc(db, 'assets', asset.id);
     const sanitized = sanitizeForFirestore(validation.data);
     
-    setDoc(assetRef, sanitized, { merge: true }).catch(err => {
+    try {
+      await setDoc(assetRef, sanitized, { merge: true });
+    } catch (err: any) {
       this.handlePermissionError(assetRef, 'update', err, sanitized);
-    });
+      throw err;
+    }
   },
 
   /**
