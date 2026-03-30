@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
- * Phase 16: High-density KPI grid with Integrity Scrubbing & Regional Benchmarking.
+ * Refined for Phase 25 with Unified Verification Pulse component.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -11,27 +12,15 @@ import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Progress } from '@/components/ui/progress';
 import { 
   TrendingUp, 
-  ShieldCheck, 
-  AlertCircle, 
-  Activity, 
   Loader2, 
   ArrowRight, 
   Database, 
   Globe,
-  Clock,
-  CheckCircle2,
-  Zap,
-  LayoutGrid,
-  ShieldAlert,
-  Fingerprint,
-  FileWarning,
   Map,
-  History,
-  PieChart,
-  ShieldHalf
+  ShieldHalf,
+  LayoutGrid
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -40,6 +29,7 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ArchiveService } from '@/lib/archive-service';
+import { VerificationPulse } from '@/components/registry/VerificationPulse';
 
 const container = {
   hidden: { opacity: 0 },
@@ -55,8 +45,8 @@ const item = {
 };
 
 export default function DashboardPage() {
-  const { assets, settingsLoaded, isSyncing, isOnline, appSettings, activeGrantId } = useAppState();
-  const { profileSetupComplete, loading: authLoading, userProfile } = useAuth();
+  const { assets, settingsLoaded, isOnline, appSettings, activeGrantId } = useAppState();
+  const { profileSetupComplete, loading: authLoading } = useAuth();
   
   const [integrityScore, setIntegrityScore] = useState(100);
   const [integrityConflicts, setIntegrityConflicts] = useState(0);
@@ -75,7 +65,6 @@ export default function DashboardPage() {
     
     const total = assets.length;
     const verified = assets.filter(a => a.status === 'VERIFIED').length;
-    const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
 
     // Data Quality Exceptions
     const missingSerials = assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A').length;
@@ -101,7 +90,15 @@ export default function DashboardPage() {
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
 
-    return { total, verified, coverage, missingSerials, missingTags, criticalHealth, benchmarking };
+    return { 
+      total, 
+      verified, 
+      missingSerials, 
+      missingTags, 
+      criticalHealth, 
+      benchmarking,
+      dataGaps: missingSerials + missingTags
+    };
   }, [assets, settingsLoaded]);
 
   if (authLoading || !settingsLoaded) {
@@ -127,7 +124,7 @@ export default function DashboardPage() {
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
           <div className="space-y-1">
-            <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase leading-none">Operational Pulse</h2>
+            <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase leading-none">Intelligence Hub</h2>
             <div className="flex items-center gap-3 mt-2">
               <Badge className="bg-primary/5 border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest px-4 h-7 rounded-full shadow-sm">
                 {activeProjectName}
@@ -148,63 +145,13 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        {/* Primary KPI Matrix */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <motion.div variants={item}>
-            <Card className="bg-primary border-none shadow-2xl shadow-primary/30 text-primary-foreground h-full relative overflow-hidden group">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] opacity-70">Project Coverage</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-6xl font-black tracking-tighter mb-4">{stats?.coverage || 0}%</div>
-                <Progress value={stats?.coverage || 0} className="h-1.5 bg-white/20" />
-                <TrendingUp className="absolute -right-4 -bottom-4 h-32 w-32 opacity-10 group-hover:rotate-12 transition-transform duration-700" />
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div variants={item}>
-            <Card className="border-2 border-border/40 shadow-xl bg-card/50 hover:border-primary/20 transition-all">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">
-                  <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> Verified Pulses
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-5xl font-black tracking-tighter text-foreground leading-none">{stats?.verified || 0}</div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mt-3 tracking-tighter opacity-60">Physical assessments confirmed</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div variants={item}>
-            <Card className="border-2 border-border/40 shadow-xl bg-card/50 hover:border-orange-500/20 transition-all">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">
-                  <Clock className="h-3.5 w-3.5 text-orange-500" /> Awaiting Pulse
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-5xl font-black tracking-tighter text-orange-500 leading-none">{(stats?.total || 0) - (stats?.verified || 0)}</div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mt-3 tracking-tighter opacity-60">Pending field assessment</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-
-          <motion.div variants={item}>
-            <Card className="border-2 border-border/40 shadow-xl bg-card/50 hover:border-red-500/20 transition-all">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">
-                  <ShieldAlert className="h-3.5 w-3.5 text-destructive" /> Critical Alerts
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="text-5xl font-black tracking-tighter text-destructive leading-none">{stats?.criticalHealth || 0}</div>
-                <p className="text-[10px] font-bold text-muted-foreground uppercase mt-3 tracking-tighter opacity-60">High-risk registry exceptions</p>
-              </CardContent>
-            </Card>
-          </motion.div>
-        </div>
+        {/* Primary Verification Pulse */}
+        <VerificationPulse 
+          total={stats?.total || 0}
+          verified={stats?.verified || 0}
+          exceptions={stats?.criticalHealth || 0}
+          dataGaps={stats?.dataGaps || 0}
+        />
 
         {/* Intelligence Breakdown Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -266,7 +213,7 @@ export default function DashboardPage() {
                 <CardContent className="p-8 space-y-8">
                   <div className="flex items-center justify-between border-b border-dashed pb-4">
                     <div className="flex items-center gap-4">
-                      <div className="p-2.5 bg-green-100 rounded-xl"><ShieldCheck className="h-5 w-5 text-green-600" /></div>
+                      <div className="p-2.5 bg-green-100 rounded-xl"><ShieldHalf className="h-5 w-5 text-green-600" /></div>
                       <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Pulse Score</span>
                     </div>
                     <span className={cn("text-[10px] font-black uppercase", integrityScore > 90 ? "text-green-600" : "text-orange-600")}>
@@ -275,7 +222,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center justify-between border-b border-dashed pb-4">
                     <div className="flex items-center gap-4">
-                      <div className="p-2.5 bg-orange-100 rounded-xl"><AlertCircle className="h-5 w-5 text-orange-600" /></div>
+                      <div className="p-2.5 bg-orange-100 rounded-xl"><ShieldHalf className="h-5 w-5 text-orange-600" /></div>
                       <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Conflicts</span>
                     </div>
                     <span className={cn("text-[10px] font-black uppercase", integrityConflicts > 0 ? "text-destructive" : "text-green-600")}>
@@ -284,7 +231,7 @@ export default function DashboardPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                      <div className="p-2.5 bg-primary/10 rounded-xl"><Fingerprint className="h-5 w-5 text-primary" /></div>
+                      <div className="p-2.5 bg-primary/10 rounded-xl"><LayoutGrid className="h-5 w-5 text-primary" /></div>
                       <span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Data Gaps</span>
                     </div>
                     <span className="text-[10px] font-black uppercase text-primary">{(stats?.missingSerials || 0) + (stats?.missingTags || 0)} Missing</span>
@@ -299,13 +246,13 @@ export default function DashboardPage() {
                   <LayoutGrid className="h-12 w-12 text-primary" />
                 </div>
                 <div className="space-y-3">
-                  <h4 className="text-lg font-black uppercase tracking-tight text-primary">Ingestion Workflow</h4>
+                  <h4 className="text-lg font-black uppercase tracking-tight text-primary">Verification Flow</h4>
                   <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase tracking-widest opacity-60 px-4">
-                    Merge hierarchical spreadsheet pulses into the global registry.
+                    Execute physical assessments across your authorized regional scope.
                   </p>
                 </div>
                 <Button className="w-full h-16 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 transition-all hover:-translate-y-1" asChild>
-                  <Link href="/import">Initialize Ingest</Link>
+                  <Link href="/verify">Execute Audit Pulse</Link>
                 </Button>
               </div>
             </motion.div>
