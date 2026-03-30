@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview TravelReportDialog - High-Fidelity Word Document Generator.
+ * Refined for Phase 12 with intelligent exception tables and smart drafting.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -19,9 +20,8 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
-import { NIGERIAN_STATE_CAPITALS, SPECIAL_LOCATIONS } from '@/lib/constants';
 import { ScrollArea } from './ui/scroll-area';
-import { PlaneTakeoff, Info, FileText, Check, Loader2 } from 'lucide-react';
+import { PlaneTakeoff, Info, FileText, Check, Loader2, FileWarning } from 'lucide-react';
 import { Badge } from './ui/badge';
 
 interface TravelReportDialogProps {
@@ -76,12 +76,17 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
     const verified = assets.filter(a => a.status === 'VERIFIED');
     const stolen = assets.filter(a => a.condition === 'Stolen').length;
     const bad = assets.filter(a => ['Bad condition', 'Unsalvageable', 'Burnt'].includes(a.condition || '')).length;
+    const missingSerial = assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A').length;
+    const missingTag = assets.filter(a => !a.assetIdCode).length;
+
     return {
         total: assets.length,
         verifiedCount: verified.length,
         unverifiedCount: assets.length - verified.length,
         stolen,
         bad,
+        missingSerial,
+        missingTag,
         percentage: assets.length > 0 ? Math.round((verified.length / assets.length) * 100) : 0
     };
   }, [assets]);
@@ -96,12 +101,13 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
       
       // Smart Suggestion Logic: Auto-draft observations based on registry data
       let obs = `Conducted physical audit of ${stats.total} registry records. Currently achieved ${stats.percentage}% verification coverage.`;
-      if (stats.stolen > 0) obs += `\n- ALERT: Detected ${stats.stolen} stolen items requiring immediate security reporting.`;
-      if (stats.bad > 0) obs += `\n- Detected ${stats.bad} assets in critical or unsalvageable condition.`;
+      if (stats.stolen > 0) obs += `\n- CRITICAL: Detected ${stats.stolen} stolen items requiring immediate security reporting.`;
+      if (stats.bad > 0) obs += `\n- CONDITION: Identified ${stats.bad} assets in critical or unsalvageable state.`;
+      if (stats.missingSerial > 0) obs += `\n- QUALITY: ${stats.missingSerial} records are missing Manufacturer Serial numbers.`;
       setObservations(obs);
 
       setChallenges("Internet connectivity in remote LGAs was intermittent.\nDifficulty accessing locked storage rooms in certain facilities.");
-      setRecommendations("Immediate replacement of obsolete IT equipment identified during assessment.\nStrengthen security protocols in LGAs with reported asset losses.");
+      setRecommendations("Immediate replacement of obsolete equipment identified.\nImprove security protocols in facility stores with reported losses.\nConduct data cleaning exercise to capture missing serial numbers.");
     }
   }, [isOpen, userProfile, stats, activeProject]);
 
@@ -126,19 +132,24 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
         // Exceptions table header
         const tableHeader = new TableRow({
             children: [
-                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ID CODE", bold: true })]})], ...cellStyles }),
+                new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "ID / TAG", bold: true })]})], ...cellStyles }),
                 new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "DESCRIPTION", bold: true })]})], ...cellStyles }),
                 new TableCell({ children: [new Paragraph({ children: [new TextRun({ text: "OBSERVATION", bold: true })]})], ...cellStyles }),
             ],
         });
 
         // Get assets with critical remarks or conditions
-        const exceptions = assets.filter(a => (a.metadata?.remarks && String(a.metadata.remarks).trim() !== '') || a.status === 'DISCREPANCY');
+        const exceptions = assets.filter(a => 
+          (a.metadata?.remarks && String(a.metadata.remarks).trim() !== '') || 
+          a.status === 'DISCREPANCY' || 
+          ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')
+        );
+
         const remarksRows = exceptions.map((asset) => new TableRow({
             children: [
-                new TableCell({ children: [new Paragraph(asset.assetIdCode || 'N/A')], ...cellStyles }),
-                new TableCell({ children: [new Paragraph(asset.description || asset.name)], ...cellStyles }),
-                new TableCell({ children: [new Paragraph(String(asset.metadata?.remarks || 'Integrity Discrepancy'))], ...cellStyles }),
+                new TableCell({ children: [new Paragraph(asset.assetIdCode || 'UNTAGGED')], ...cellStyles }),
+                new TableCell({ children: [new Paragraph(asset.description || asset.name || 'Untitled')], ...cellStyles }),
+                new TableCell({ children: [new Paragraph(String(asset.metadata?.remarks || asset.condition || 'Integrity Failure'))], ...cellStyles }),
             ],
         }));
 
@@ -155,50 +166,51 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
             },
             sections: [{
                 children: [
-                    new Paragraph({ text: "ASSETAIN REGISTRY PULSE", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
-                    new Paragraph({ text: "ASSET VERIFICATION TRAVEL REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
+                    new Paragraph({ text: "ASSETAIN REGISTRY INTELLIGENCE", heading: HeadingLevel.HEADING_1, alignment: AlignmentType.CENTER }),
+                    new Paragraph({ text: "OFFICIAL ASSET VERIFICATION REPORT", heading: HeadingLevel.HEADING_2, alignment: AlignmentType.CENTER }),
                     new Paragraph(" "),
-                    new Paragraph({ text: `DATE OF TRAVEL:\t\t${travelDate}` }),
-                    new Paragraph({ text: `LOCATION VISITED:\t\t${reportState}` }),
+                    new Paragraph({ text: `DATE OF REPORT:\t\t${travelDate}` }),
+                    new Paragraph({ text: `REGION VISITED:\t\t${reportState}` }),
                     new Paragraph({ text: `OFFICER IN CHARGE:\t${userProfile?.displayName}` }),
                     new Paragraph(" "),
-                    new Paragraph({ text: "VERIFICATION EXECUTIVE SUMMARY:", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "VERIFICATION EXECUTIVE SUMMARY", heading: HeadingLevel.HEADING_3 }),
                     new Paragraph({
                         children: [
                             new TextRun("Mandatory physical audit conducted for "),
                             new TextRun({ text: activeProject, bold: true }),
                             new TextRun(" in "),
                             new TextRun({ text: reportState, bold: true }),
-                            new TextRun(". Out of a register total of "),
+                            new TextRun(". Total registry scope: "),
                             new TextRun({ text: `${stats.total} assets`, bold: true }),
-                            new TextRun(", "),
-                            new TextRun({ text: `${stats.verifiedCount} were physically verified`, bold: true, color: "008000" }),
+                            new TextRun(". Results: "),
+                            new TextRun({ text: `${stats.verifiedCount} verified (${stats.percentage}%)`, bold: true, color: "008000" }),
                             new TextRun(" and "),
-                            new TextRun({ text: `${stats.unverifiedCount} remain in the unverified queue.`, bold: true, color: "FF0000" }),
+                            new TextRun({ text: `${stats.unverifiedCount} pending.`, bold: true, color: "FF0000" }),
                         ],
                     }),
                     new Paragraph(" "),
-                    new Paragraph({ text: "OBJECTIVES:", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "AUDIT OBJECTIVES", heading: HeadingLevel.HEADING_3 }),
                     ...createBulletedParagraphs(objectives),
                     new Paragraph(" "),
-                    new Paragraph({ text: "ACTIVITIES PERFORMED:", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "ACTIVITIES PERFORMED", heading: HeadingLevel.HEADING_3 }),
                     ...createBulletedParagraphs(activities),
                     new Paragraph(" "),
-                    new Paragraph({ text: "KEY OBSERVATIONS:", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "KEY FINDINGS & EXCEPTIONS", heading: HeadingLevel.HEADING_3 }),
                     ...createBulletedParagraphs(observations),
                     new Paragraph(" "),
-                    new Paragraph({ text: "CHALLENGES & BOTTLENECKS:", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "CHALLENGES ENCOUNTERED", heading: HeadingLevel.HEADING_3 }),
                     ...createBulletedParagraphs(challenges),
                     new Paragraph(" "),
-                    new Paragraph({ text: "MANAGEMENT RECOMMENDATIONS:", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "MANAGEMENT RECOMMENDATIONS", heading: HeadingLevel.HEADING_3 }),
                     ...createBulletedParagraphs(recommendations),
                     new Paragraph(" "),
-                    new Paragraph({ text: "ASSET REGISTRY EXCEPTIONS:", heading: HeadingLevel.HEADING_3 }),
+                    new Paragraph({ text: "ASSET EXCEPTION LOG", heading: HeadingLevel.HEADING_3 }),
                     remarksRows.length > 0 
                         ? new Table({ rows: [tableHeader, ...remarksRows], width: { size: 100, type: WidthType.PERCENTAGE } }) 
-                        : new Paragraph("Zero registry exceptions with remarks noted."),
+                        : new Paragraph("No critical registry exceptions noted in this period."),
                     new Paragraph(" "),
-                    new Paragraph({ text: `Authored by: ${userProfile?.displayName}` }),
+                    new Paragraph(" "),
+                    new Paragraph({ text: `Report Authored by: ${userProfile?.displayName}` }),
                     new Paragraph({ text: `Approved by: ${approvedBy || '____________________'}` }),
                 ],
             }],
@@ -228,7 +240,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                     </Badge>
                 </div>
                 <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-                    Automated generator for formal field verification findings.
+                    Automated report engine with Discrepancy Analysis.
                 </DialogDescription>
             </DialogHeader>
         </div>
@@ -254,22 +266,22 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
                     <ReportInput label="Field Activities" id="activities" value={activities} onChange={(e) => setActivities(e.target.value)} />
                 </div>
                 <div className="space-y-6">
-                    <div className="p-5 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-2">
-                        <h4 className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
-                            <FileText className="h-3.5 w-3.5" /> Live Registry Pulse
+                    <div className="p-5 rounded-2xl bg-red-500/5 border-2 border-dashed border-red-500/20 space-y-3">
+                        <h4 className="text-[10px] font-black uppercase tracking-widest text-red-600 flex items-center gap-2">
+                            <FileWarning className="h-3.5 w-3.5" /> Discovery Analysis
                         </h4>
-                        <div className="grid grid-cols-2 gap-4 pt-2">
+                        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
                             <div className="flex flex-col">
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase">Verified</span>
-                                <span className="text-xl font-black">{stats.verifiedCount} / {stats.total}</span>
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase">Exceptions</span>
+                                <span className="text-lg font-black text-red-600">{stats.stolen + stats.bad}</span>
                             </div>
                             <div className="flex flex-col text-right">
-                                <span className="text-[9px] font-bold text-muted-foreground uppercase">Exceptions</span>
-                                <span className="text-xl font-black text-destructive">{stats.stolen + stats.bad}</span>
+                                <span className="text-[8px] font-bold text-muted-foreground uppercase">Quality Gaps</span>
+                                <span className="text-lg font-black text-orange-600">{stats.missingSerial + stats.missingTag}</span>
                             </div>
                         </div>
                     </div>
-                    <ReportInput label="Key Findings & Observations" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
+                    <ReportInput label="Key Findings & Discrepancies" id="observations" value={observations} onChange={(e) => setObservations(e.target.value)} />
                     <ReportInput label="Field Bottlenecks" id="challenges" value={challenges} onChange={(e) => setChallenges(e.target.value)} />
                     <ReportInput label="Proposed Recommendations" id="recommendations" value={recommendations} onChange={(e) => setRecommendations(e.target.value)} />
                     <div className="space-y-1.5">
@@ -284,7 +296,7 @@ export function TravelReportDialog({ isOpen, onOpenChange }: TravelReportDialogP
           <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold rounded-xl px-8">Discard Draft</Button>
           <Button onClick={generateWordDocument} disabled={isGenerating || stats.total === 0} className="h-12 px-10 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 min-w-[240px]">
             {isGenerating ? <Loader2 className="animate-spin h-4 w-4 mr-2" /> : <Check className="h-4 w-4 mr-2" />}
-            Export Word Document (.docx)
+            Export Executive Report (.docx)
           </Button>
         </DialogFooter>
       </DialogContent>

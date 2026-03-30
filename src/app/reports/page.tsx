@@ -3,13 +3,14 @@
 /**
  * @fileOverview Audit Reports Workstation.
  * Orchestrates the generation of executive documentation and field finding pulses.
+ * Refined for Phase 12 with professional spacing and reporting protocols.
  */
 
 import React, { useState } from 'react';
 import AppLayout from '@/components/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { FileText, Download, Clock, CheckCircle2, Search, Zap } from 'lucide-react';
+import { FileText, Download, Clock, CheckCircle2, Search, Zap, ShieldAlert, FileWarning } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { TravelReportDialog } from '@/components/travel-report-dialog';
 import { Badge } from '@/components/ui/badge';
@@ -20,94 +21,104 @@ export default function ReportsPage() {
 
   return (
     <AppLayout>
-      <div className="max-w-5xl mx-auto space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
+      <div className="max-w-6xl mx-auto space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-20">
         <div className="space-y-2">
-          <h2 className="text-3xl font-black tracking-tight text-foreground uppercase">Audit Reports Workstation</h2>
+          <h2 className="text-3xl font-black tracking-tight text-foreground uppercase">Reporting Workstation</h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Automated Executive Summaries & Field Finding Pulses
+            Automated Executive Summaries & High-Fidelity Ledger Pulses
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="md:col-span-2 space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2 space-y-8">
             <Card className="border-2 border-primary/10 bg-card/50 rounded-[2.5rem] overflow-hidden shadow-2xl">
-              <CardHeader className="bg-primary/5 border-b border-primary/10 p-8">
+              <CardHeader className="bg-primary/5 border-b border-primary/10 p-10">
                 <div className="flex items-center justify-between">
-                  <CardTitle className="flex items-center gap-3 text-xl font-black tracking-tight uppercase">
-                    <FileText className="text-primary h-6 w-6" /> Executive Travel Report
+                  <CardTitle className="flex items-center gap-4 text-2xl font-black tracking-tight uppercase">
+                    <FileText className="text-primary h-8 w-8" /> Executive Travel Report
                   </CardTitle>
-                  <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[10px] h-7 px-3 rounded-full">
-                    Auto-Generator v3.0
+                  <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[10px] h-8 px-4 rounded-full">
+                    Auto-Generator v4.0
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="p-8 space-y-8">
+              <CardContent className="p-10 space-y-10">
                 <p className="text-sm font-medium text-muted-foreground leading-relaxed italic">
-                  The automated travel report compiler scans the active registry for field observations, verified totals, and critical exceptions. It generates a professional .docx document with built-in audit tables.
+                  The integrated reporting engine performs a deep-scan of the active registry to identify field findings, verification milestones, and data quality exceptions. It automatically compiles these into a formatted .docx document ready for management sign-off.
                 </p>
                 
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="p-6 rounded-3xl bg-muted/20 border-2 border-dashed space-y-2">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Active Scan Target</span>
-                    <p className="text-xs font-black text-primary uppercase">Global Project Registry</p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                  <div className="p-8 rounded-[2rem] bg-muted/20 border-2 border-dashed space-y-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Active Scan Scope</span>
+                    <p className="text-sm font-black text-primary uppercase">Current Project Registry</p>
                   </div>
-                  <div className="p-6 rounded-3xl bg-muted/20 border-2 border-dashed space-y-2">
-                    <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Records in Scope</span>
-                    <p className="text-xs font-black uppercase">{assets.length} Assets</p>
+                  <div className="p-8 rounded-[2rem] bg-muted/20 border-2 border-dashed space-y-3">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Records Analyzed</span>
+                    <p className="text-sm font-black uppercase">{assets.length} Pulses</p>
                   </div>
                 </div>
 
                 <Button 
                   onClick={() => setIsTravelReportOpen(true)}
-                  className="w-full h-16 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 transition-transform hover:scale-[1.02] active:scale-95"
+                  className="w-full h-20 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/20 transition-all hover:scale-[1.02] active:scale-95 bg-primary text-primary-foreground"
                 >
-                  <Zap className="mr-2 h-4 w-4 fill-current" /> Initialize Report Generator
+                  <Zap className="mr-3 h-5 w-5 fill-current" /> Initialize Intelligence Report
                 </Button>
               </CardContent>
             </Card>
 
-            <div className="p-8 rounded-[2.5rem] bg-muted/10 border-2 border-dashed border-border/40 space-y-4">
-              <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Reporting Protocol</h4>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                <div className="flex gap-3">
-                  <div className="h-5 w-5 rounded bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <CheckCircle2 className="h-3 w-3 text-primary" />
+            <div className="p-10 rounded-[3rem] bg-muted/10 border-2 border-dashed border-border/40 space-y-6">
+              <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-3">
+                <ShieldAlert className="h-4 w-4" /> Professional Protocol
+              </h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                <div className="flex gap-4">
+                  <div className="h-6 w-6 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-[10px] font-medium leading-relaxed italic opacity-70">Reports include automated "Exception Tables" for assets flagged with remarks.</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-black uppercase tracking-tight">Discrepancy Analysis</p>
+                    <p className="text-[10px] font-medium leading-relaxed italic opacity-70 text-muted-foreground">Reports include automated "Exception Logs" for high-risk assets.</p>
+                  </div>
                 </div>
-                <div className="flex gap-3">
-                  <div className="h-5 w-5 rounded bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                    <CheckCircle2 className="h-3 w-3 text-primary" />
+                <div className="flex gap-4">
+                  <div className="h-6 w-6 rounded-lg bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                    <CheckCircle2 className="h-4 w-4 text-primary" />
                   </div>
-                  <p className="text-[10px] font-medium leading-relaxed italic opacity-70">Fidelity metadata (S/N, Tag ID) is cross-referenced for 100% accuracy.</p>
+                  <div className="space-y-1">
+                    <p className="text-xs font-black uppercase tracking-tight">Audit Chain Integrity</p>
+                    <p className="text-[10px] font-medium leading-relaxed italic opacity-70 text-muted-foreground">S/N and Tag ID gaps are flagged to ensure 100% register fidelity.</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          <aside className="space-y-6">
-            <Card className="border-border/40 shadow-xl rounded-[2rem] overflow-hidden bg-card/50">
-              <CardHeader className="p-6 bg-muted/20 border-b">
-                <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Recent Pulse Exports</CardTitle>
+          <aside className="space-y-8">
+            <Card className="border-border/40 shadow-xl rounded-[2.5rem] overflow-hidden bg-card/50">
+              <CardHeader className="p-8 bg-muted/20 border-b">
+                <CardTitle className="text-[11px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-3">
+                  <Clock className="h-4 w-4" /> Export Ledger
+                </CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="flex flex-col items-center justify-center py-16 text-center opacity-30">
-                  <div className="p-4 bg-muted rounded-full mb-4">
-                    <Clock className="h-8 w-8" />
+                <div className="flex flex-col items-center justify-center py-20 text-center opacity-30">
+                  <div className="p-6 bg-muted rounded-full mb-6">
+                    <Download className="h-10 w-10" />
                   </div>
-                  <p className="text-[10px] font-bold uppercase tracking-widest">Zero Session Exports</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">No exports in current pulse</p>
                 </div>
               </CardContent>
             </Card>
 
-            <Card className="bg-green-500/5 border-2 border-dashed border-green-500/20 rounded-[2rem]">
-              <CardContent className="p-6 space-y-3">
-                <div className="flex items-center gap-2">
-                  <CheckCircle2 className="h-4 w-4 text-green-500" />
-                  <h4 className="text-[10px] font-black uppercase tracking-widest text-green-600">Data Integrity Pulse</h4>
+            <Card className="bg-orange-500/5 border-2 border-dashed border-orange-500/20 rounded-[2.5rem] group hover:bg-orange-500/10 transition-all">
+              <CardContent className="p-10 space-y-4 text-center">
+                <div className="p-4 bg-orange-100 rounded-full w-16 h-16 mx-auto mb-2 flex items-center justify-center shadow-inner group-hover:scale-110 transition-transform">
+                  <FileWarning className="h-8 w-8 text-orange-600" />
                 </div>
+                <h4 className="text-sm font-black uppercase tracking-tight text-orange-700">Data Quality Alert</h4>
                 <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase opacity-60">
-                  Documentation is generated from the local write-ahead log or the last verified cloud heartbeat.
+                  Reports generated while offline will reflect the last verified local heartbeat. Ensure cloud parity before final export.
                 </p>
               </CardContent>
             </Card>

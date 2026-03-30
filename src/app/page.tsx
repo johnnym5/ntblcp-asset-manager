@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardPage - The Inventory Intelligence Hub.
- * Final Polish: High-density KPI cards with motion-aware drill-downs.
+ * Final Polish: High-density KPI cards with Data Quality Pulse trackers.
  */
 
 import React, { useMemo } from 'react';
@@ -24,7 +24,10 @@ import {
   Clock,
   CheckCircle2,
   Zap,
-  LayoutGrid
+  LayoutGrid,
+  ShieldAlert,
+  Fingerprint,
+  FileWarning
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -53,14 +56,19 @@ export default function DashboardPage() {
   const { profileSetupComplete, loading: authLoading } = useAuth();
 
   const stats = useMemo(() => {
-    if (!settingsLoaded || !assets) return { total: 0, verified: 0, discrepancies: 0, coverage: 0 };
+    if (!settingsLoaded || !assets) return { total: 0, verified: 0, discrepancies: 0, coverage: 0, missingSerials: 0, missingTags: 0, criticalHealth: 0 };
     
     const total = assets.length;
     const verified = assets.filter(a => a.status === 'VERIFIED').length;
     const discrepancies = assets.filter(a => a.status === 'DISCREPANCY').length;
     const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
 
-    return { total, verified, discrepancies, coverage };
+    // Data Quality Exceptions
+    const missingSerials = assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A' || a.serialNumber === 'UNSET').length;
+    const missingTags = assets.filter(a => !a.assetIdCode || a.assetIdCode === 'UNSET').length;
+    const criticalHealth = assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')).length;
+
+    return { total, verified, discrepancies, coverage, missingSerials, missingTags, criticalHealth };
   }, [assets, settingsLoaded]);
 
   if (authLoading || !settingsLoaded) {
@@ -83,7 +91,7 @@ export default function DashboardPage() {
         variants={container}
         initial="hidden"
         animate="show"
-        className="space-y-8 pb-20"
+        className="space-y-10 pb-20 max-w-7xl mx-auto"
       >
         {/* Header Section */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
@@ -109,7 +117,7 @@ export default function DashboardPage() {
           </Button>
         </div>
 
-        {/* KPI Grid */}
+        {/* Primary KPI Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
           <motion.div variants={item}>
             <Link href="/assets" className="block h-full group">
@@ -169,6 +177,56 @@ export default function DashboardPage() {
               </CardContent>
             </Card>
           </motion.div>
+        </div>
+
+        {/* Data Quality Pulse section */}
+        <div className="space-y-6">
+          <div className="flex items-center gap-3 px-2">
+            <ShieldAlert className="h-5 w-5 text-primary" />
+            <h3 className="text-sm font-black uppercase tracking-[0.3em] text-foreground">Data Quality Matrix</h3>
+            <div className="h-px flex-1 bg-border/40" />
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <motion.div variants={item}>
+              <Card className="border-2 border-dashed border-border/60 bg-muted/5 rounded-[2rem] p-6 group hover:border-primary/40 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <Fingerprint className="h-6 w-6 text-primary/40 group-hover:text-primary transition-colors" />
+                  <Badge variant="secondary" className="text-[8px] font-black uppercase tracking-widest">Integrity Pulse</Badge>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-3xl font-black tracking-tighter text-foreground">{stats.missingSerials}</span>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Missing Mfr. Serials</p>
+                </div>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={item}>
+              <Card className="border-2 border-dashed border-border/60 bg-muted/5 rounded-[2rem] p-6 group hover:border-primary/40 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <Activity className="h-6 w-6 text-primary/40 group-hover:text-primary transition-colors" />
+                  <Badge variant="secondary" className="text-[8px] font-black uppercase tracking-widest">Tag Pulse</Badge>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-3xl font-black tracking-tighter text-foreground">{stats.missingTags}</span>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground opacity-60">Assets without Tag IDs</p>
+                </div>
+              </Card>
+            </motion.div>
+
+            <motion.div variants={item}>
+              <Card className="border-2 border-dashed border-border/60 bg-red-500/5 rounded-[2rem] p-6 group hover:border-red-500/40 transition-all">
+                <div className="flex items-center justify-between mb-4">
+                  <FileWarning className="h-6 w-6 text-red-500/40 group-hover:text-red-500 transition-colors" />
+                  <Badge className="bg-red-500 text-white text-[8px] font-black uppercase tracking-widest border-none shadow-sm">Critical Alert</Badge>
+                </div>
+                <div className="space-y-1">
+                  <span className="text-3xl font-black tracking-tighter text-red-600">{stats.criticalHealth}</span>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-red-600 opacity-60">Stolen / Burnt / Lost</p>
+                </div>
+              </Card>
+            </motion.div>
+          </div>
         </div>
 
         {/* Intelligence Breakdown */}
