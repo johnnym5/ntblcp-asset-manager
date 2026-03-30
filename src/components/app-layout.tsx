@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
+ * Grouped navigation reflecting an operational asset management hierarchy.
  */
 
 import React, { useState } from 'react';
@@ -25,7 +26,8 @@ import {
   CheckCircle2,
   ListTodo,
   Users,
-  Activity
+  Activity,
+  ArrowRightLeft
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -78,13 +80,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const NavGroup = ({ items, title }: { items: NavItem[], title?: string }) => (
     <div className="space-y-1">
-      {title && <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50 mt-6">{title}</p>}
+      {title && (
+        <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50 mt-6">
+          {title}
+        </p>
+      )}
       {items.map((item) => (
         <Link
           key={item.href}
           href={item.href}
           className={cn(
-            "flex items-center gap-3 px-4 py-3 text-sm font-bold uppercase tracking-widest rounded-xl transition-all",
+            "flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all",
             pathname === item.href 
               ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" 
               : "text-muted-foreground hover:bg-muted hover:text-foreground"
@@ -99,6 +105,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden">
+      {/* Desktop Sidebar */}
       <aside className="hidden lg:flex flex-col w-72 border-r bg-card/50 backdrop-blur-xl p-6">
         <div className="flex items-center gap-3 mb-10 px-2">
           <div className="p-2 bg-primary rounded-xl shadow-lg">
@@ -118,11 +125,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {isAdmin && (
             <div className="mt-6 space-y-1">
               <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50">Quick Actions</p>
-              <Button variant="ghost" onClick={() => setIsInboxOpen(true)} className="w-full justify-between px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12">
+              <Button 
+                variant="ghost" 
+                onClick={() => setIsInboxOpen(true)} 
+                className="w-full justify-between px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all"
+              >
                 <span className="flex items-center gap-3"><Inbox className="h-4 w-4" /> Approvals</span>
-                {pendingCount > 0 && <Badge className="bg-primary text-[8px] h-4 min-w-4 flex items-center justify-center p-0">{pendingCount}</Badge>}
+                {pendingCount > 0 && (
+                  <Badge className="bg-primary text-[8px] h-4 min-w-4 flex items-center justify-center p-0 rounded-full">
+                    {pendingCount}
+                  </Badge>
+                )}
               </Button>
-              <Button variant="ghost" onClick={() => setIsAdminDBOpen(true)} className="w-full justify-start gap-3 px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12">
+              <Button 
+                variant="ghost" 
+                onClick={() => setIsAdminDBOpen(true)} 
+                className="w-full justify-start gap-3 px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all"
+              >
                 <Monitor className="h-4 w-4" /> Infrastructure
               </Button>
             </div>
@@ -132,14 +151,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="mt-auto space-y-4 pt-6 border-t border-border/40">
           <div className="flex items-center gap-3 px-2">
             <Avatar className="h-10 w-10 border-2 border-primary/20">
-              <AvatarFallback className="font-black">{userProfile?.displayName?.[0] || 'U'}</AvatarFallback>
+              <AvatarFallback className="font-black bg-muted text-primary">
+                {userProfile?.displayName?.[0] || 'U'}
+              </AvatarFallback>
             </Avatar>
             <div className="flex flex-col min-w-0">
               <span className="text-sm font-black truncate">{userProfile?.displayName}</span>
-              <span className="text-[10px] font-bold text-muted-foreground uppercase truncate">{userProfile?.state || 'Global'}</span>
+              <span className="text-[10px] font-bold text-muted-foreground uppercase truncate">
+                {userProfile?.state || 'Global Scope'}
+              </span>
             </div>
           </div>
-          <Button variant="ghost" className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive font-black uppercase text-[10px] tracking-widest" onClick={() => logout()}>
+          <Button 
+            variant="ghost" 
+            className="w-full justify-start text-destructive hover:bg-destructive/10 hover:text-destructive font-black uppercase text-[10px] tracking-widest rounded-xl" 
+            onClick={() => logout()}
+          >
             <LogOut className="mr-2 h-4 w-4" /> Sign Out
           </Button>
         </div>
@@ -166,7 +193,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </SheetContent>
               </Sheet>
             </div>
-            <h1 className="text-sm font-black uppercase tracking-widest text-muted-foreground hidden sm:block">
+            <h1 className="text-xs font-black uppercase tracking-[0.2em] text-muted-foreground hidden sm:block">
               {pathname === '/' ? 'Inventory Pulse' : 
                pathname.split('/').pop()?.replace('-', ' ') || 'Workstation'}
             </h1>
@@ -175,7 +202,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <div className="flex items-center gap-3">
             <div className={cn(
               "flex items-center gap-2 px-4 py-1.5 rounded-full border-2 transition-all",
-              isOnline ? "border-green-500/20 bg-green-500/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive"
+              isOnline 
+                ? "border-green-500/20 bg-green-500/5 text-green-600" 
+                : "border-destructive/20 bg-destructive/5 text-destructive"
             )}>
               {isOnline ? <Cloud className="h-3.5 w-3.5" /> : <CloudOff className="h-3.5 w-3.5" />}
               <span className="text-[10px] font-black uppercase tracking-tighter">
@@ -184,14 +213,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-4 w-4 ml-1 hover:bg-transparent" 
+                className="h-4 w-4 ml-1 hover:bg-transparent p-0" 
                 onClick={() => setIsOnline(!isOnline)}
               >
-                <Activity className="h-3 w-3 opacity-40" />
+                <Activity className={cn("h-3 w-3 opacity-40", isSyncing && "animate-pulse text-primary opacity-100")} />
               </Button>
             </div>
             
-            <Button variant="ghost" size="icon" className="relative rounded-full">
+            <Button variant="ghost" size="icon" className="relative rounded-full hover:bg-muted">
               <Bell className="h-5 w-5" />
               <Badge className="absolute top-0 right-0 h-4 w-4 p-0 flex items-center justify-center bg-primary text-[8px] font-black">0</Badge>
             </Button>
