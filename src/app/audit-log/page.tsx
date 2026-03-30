@@ -7,7 +7,7 @@
 
 import React from 'react';
 import AppLayout from '@/components/app-layout';
-import { History, Search, Filter, Download, User, Clock, ShieldCheck, RotateCcw, AlertCircle, ArrowRight } from 'lucide-react';
+import { History, Search, Filter, Download, User, Clock, ShieldCheck, RotateCcw, AlertCircle, ArrowRight, Loader2 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
@@ -15,14 +15,46 @@ import { Card, CardContent } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { useToast } from '@/hooks/use-toast';
+import { enqueueMutation } from '@/offline/queue';
+import { storage } from '@/offline/storage';
+import type { Asset } from '@/types/domain';
 
 export default function AuditLogPage() {
-  const { assets } = useAppState();
+  const { assets, refreshRegistry } = useAppState();
+  const { toast } = useToast();
+  const [isProcessing, setIsProcessing] = React.useState(false);
   
   // Historical pulse is derived from assets with lastModified metadata
   const history = assets
     .filter(a => a.lastModified)
     .sort((a, b) => new Date(b.lastModified).getTime() - new Date(a.lastModified).getTime());
+
+  const handleRestore = async (asset: Asset) => {
+    if (!asset.previousState) return;
+    
+    setIsProcessing(true);
+    try {
+      const restoredAsset = {
+        ...asset.previousState,
+        id: asset.id, // Ensure same ID
+        previousState: { ...asset, previousState: undefined }, // Buffer current state for undo
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: 'Audit Restore'
+      } as Asset;
+
+      await enqueueMutation('UPDATE', 'assets', restoredAsset);
+      const current = await storage.getAssets();
+      await storage.saveAssets(current.map(a => a.id === asset.id ? restoredAsset : a));
+      await refreshRegistry();
+      
+      toast({ title: "Registry Restored", description: "Record reverted to previous verified pulse." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Restore Failed" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
   return (
     <AppLayout>
@@ -74,9 +106,16 @@ export default function AuditLogPage() {
                     </div>
                     <div className="flex items-center gap-3">
                       {asset.previousState && (
-                        <Badge variant="outline" className="h-8 px-3 rounded-xl font-black uppercase text-[8px] tracking-widest border-orange-200 bg-orange-50 text-orange-600 gap-1.5">
-                          <RotateCcw className="h-2.5 w-2.5" /> Revert Pulse Available
-                        </Badge>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => handleRestore(asset)}
+                          disabled={isProcessing}
+                          className="h-8 px-3 rounded-xl font-black uppercase text-[8px] tracking-widest border-orange-200 bg-orange-50 text-orange-600 gap-1.5 hover:bg-orange-100 transition-all"
+                        >
+                          {isProcessing ? <Loader2 className="h-2.5 w-2.5 animate-spin" /> : <RotateCcw className="h-2.5 w-2.5" />}
+                          Restore Pulse
+                        </Button>
                       )}
                       <div className="px-4 py-2 rounded-xl bg-muted/50 border border-border/40 text-[10px] font-black uppercase tracking-widest">
                         Registry Update

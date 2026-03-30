@@ -109,6 +109,10 @@ export const storage = {
     const db = await getDb();
     if (db) await db.put('queue', entry);
   },
+  async updateQueueEntry(entry: OfflineQueueEntry): Promise<void> {
+    const db = await getDb();
+    if (db) await db.put('queue', entry);
+  },
   async dequeue(id: string): Promise<void> {
     const db = await getDb();
     if (db) await db.delete('queue', id);

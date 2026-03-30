@@ -7,7 +7,21 @@
 
 import React, { useEffect, useState } from 'react';
 import AppLayout from '@/components/app-layout';
-import { ListTodo, RefreshCw, AlertTriangle, CheckCircle2, ShieldAlert, Database, Cloud, Clock, Tag } from 'lucide-react';
+import { 
+  ListTodo, 
+  RefreshCw, 
+  AlertTriangle, 
+  CheckCircle2, 
+  ShieldAlert, 
+  Database, 
+  Cloud, 
+  Clock, 
+  Tag,
+  Trash2,
+  RotateCcw,
+  Search,
+  Eye
+} from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAppState } from '@/contexts/app-state-context';
@@ -15,9 +29,12 @@ import { Badge } from '@/components/ui/badge';
 import { storage } from '@/offline/storage';
 import type { OfflineQueueEntry } from '@/types/domain';
 import { formatDistanceToNow } from 'date-fns';
+import { useToast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
 
 export default function SyncQueuePage() {
   const { isSyncing, refreshRegistry } = useAppState();
+  const { toast } = useToast();
   const [queue, setQueue] = useState<OfflineQueueEntry[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -32,6 +49,19 @@ export default function SyncQueuePage() {
     const interval = setInterval(loadQueue, 3000); // Poll for queue changes
     return () => clearInterval(interval);
   }, []);
+
+  const handleRetry = async (entry: OfflineQueueEntry) => {
+    const updated: OfflineQueueEntry = { ...entry, status: 'PENDING', error: undefined };
+    await storage.updateQueueEntry(updated);
+    toast({ title: "Pulse Reset", description: "Operation queued for immediate retry." });
+    loadQueue();
+  };
+
+  const handleDiscard = async (id: string) => {
+    await storage.dequeue(id);
+    toast({ title: "Pulse Discarded", description: "Local modification removed from queue." });
+    loadQueue();
+  };
 
   const pendingCount = queue.filter(q => q.status === 'PENDING').length;
   const failedCount = queue.filter(q => q.status === 'FAILED').length;
@@ -83,7 +113,7 @@ export default function SyncQueuePage() {
             </CardHeader>
             <CardContent>
               <div className="text-4xl font-black tracking-tighter text-primary">
-                {queue.length > 0 ? Math.round(((queue.length - pendingCount) / queue.length) * 100) : 100}%
+                {queue.length > 0 ? Math.round(((queue.length - pendingCount - failedCount) / queue.length) * 100) : 100}%
               </div>
               <p className="text-[10px] font-bold text-muted-foreground uppercase mt-1">Local to Cloud parity</p>
             </CardContent>
@@ -96,12 +126,18 @@ export default function SyncQueuePage() {
               <Clock className="h-4 w-4" /> Active Replay Log
             </h3>
             {queue.map((entry) => (
-              <Card key={entry.id} className="border-2 border-border/40 hover:border-primary/20 transition-all rounded-3xl overflow-hidden bg-card/50">
+              <Card key={entry.id} className={cn(
+                "border-2 transition-all rounded-3xl overflow-hidden bg-card/50",
+                entry.status === 'FAILED' ? "border-destructive/40 bg-destructive/5" : "border-border/40 hover:border-primary/20"
+              )}>
                 <CardContent className="p-6">
-                  <div className="flex items-center justify-between gap-6">
+                  <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
                     <div className="flex items-center gap-4">
-                      <div className="p-3 bg-primary/10 rounded-2xl">
-                        <Database className="h-5 w-5 text-primary" />
+                      <div className={cn(
+                        "p-3 rounded-2xl",
+                        entry.status === 'FAILED' ? "bg-destructive/10" : "bg-primary/10"
+                      )}>
+                        <Database className={cn("h-5 w-5", entry.status === 'FAILED' ? "text-destructive" : "text-primary")} />
                       </div>
                       <div className="space-y-1">
                         <h4 className="font-black text-sm uppercase tracking-tight">
@@ -113,11 +149,30 @@ export default function SyncQueuePage() {
                           </Badge>
                           <span>Queued {formatDistanceToNow(entry.timestamp, { addSuffix: true })}</span>
                         </div>
+                        {entry.error && (
+                          <p className="text-[10px] font-mono text-destructive mt-2 bg-destructive/10 p-2 rounded-lg">{entry.error}</p>
+                        )}
                       </div>
                     </div>
-                    <Badge className={entry.status === 'PENDING' ? "bg-orange-500" : entry.status === 'FAILED' ? "bg-destructive" : "bg-green-500"}>
-                      {entry.status}
-                    </Badge>
+                    <div className="flex items-center gap-3">
+                      <Badge className={cn(
+                        "px-3 py-1 font-black text-[10px] uppercase tracking-tighter rounded-full",
+                        entry.status === 'PENDING' ? "bg-orange-500" : entry.status === 'FAILED' ? "bg-destructive" : "bg-green-500"
+                      )}>
+                        {entry.status}
+                      </Badge>
+                      <Separator orientation="vertical" className="h-6" />
+                      <div className="flex items-center gap-1">
+                        {entry.status === 'FAILED' && (
+                          <Button variant="ghost" size="icon" onClick={() => handleRetry(entry)} className="h-9 w-9 rounded-xl hover:bg-primary/10 text-primary">
+                            <RotateCcw className="h-4 w-4" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" onClick={() => handleDiscard(entry.id)} className="h-9 w-9 rounded-xl hover:bg-destructive/10 text-destructive opacity-40 hover:opacity-100">
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 </CardContent>
               </Card>

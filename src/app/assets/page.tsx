@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - High-Performance Asset Browser.
- * Final Polish: Framer Motion transitions and improved drill-down scanability.
+ * Final Polish: Pagination and high-density operational workflows.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -32,7 +32,8 @@ import {
   CheckCircle2,
   Trash2,
   ChevronRight,
-  Database
+  Database,
+  ChevronLeft
 } from 'lucide-react';
 import { RegistryTable } from '@/modules/registry/components/RegistryTable';
 import { AssetForm } from '@/components/asset-form';
@@ -48,11 +49,14 @@ import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
 import { Card, CardContent } from '@/components/ui/card';
 import { ExcelService } from '@/services/excel-service';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 
 export type SortConfig = {
   key: keyof Asset | 'sn';
   direction: 'asc' | 'desc';
 };
+
+const ITEMS_PER_PAGE = 25;
 
 export default function AssetRegistryPage() {
   const { assets, searchTerm, setSearchTerm, refreshRegistry, settingsLoaded, activeGrantId, appSettings, isOnline } = useAppState();
@@ -63,6 +67,7 @@ export default function AssetRegistryPage() {
   // View States
   const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
   const [selectedIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
+  const [currentPage, setCurrentPage] = useState(1);
   
   // Sort State
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'description', direction: 'asc' });
@@ -148,6 +153,12 @@ export default function AssetRegistryPage() {
 
     return results;
   }, [assets, searchTerm, filters, sortConfig]);
+
+  // Pagination Logic
+  const totalPages = Math.ceil(filteredAndSortedAssets.length / ITEMS_PER_PAGE);
+  const paginatedAssets = useMemo(() => {
+    return filteredAndSortedAssets.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
+  }, [filteredAndSortedAssets, currentPage]);
 
   const handleSort = (key: keyof Asset) => {
     setSortConfig(current => ({
@@ -302,7 +313,6 @@ export default function AssetRegistryPage() {
     }
   };
 
-  // --- Import/Export Pulses ---
   const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !activeGrantId) return;
@@ -366,7 +376,7 @@ export default function AssetRegistryPage() {
 
   return (
     <AppLayout>
-      <div className="flex flex-col h-full gap-6 relative pb-24">
+      <div className="flex flex-col h-full gap-6 relative pb-32">
         {/* Hidden File Trigger */}
         <input type="file" ref={fileInputRef} onChange={handleImportFile} className="hidden" accept=".xlsx,.xls" />
 
@@ -428,7 +438,7 @@ export default function AssetRegistryPage() {
               placeholder="Search registry by ID, serial, or name..." 
               className="pl-14 h-16 rounded-[1.5rem] bg-card border-2 border-transparent shadow-2xl focus-visible:ring-primary/20 focus-visible:border-primary/20 text-base font-medium transition-all"
               value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
+              onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }}
             />
           </div>
           <Button 
@@ -477,10 +487,10 @@ export default function AssetRegistryPage() {
         {/* Registry Surface */}
         <motion.div 
           layout
-          className="flex-1 bg-card/50 rounded-[3rem] border-2 border-dashed border-border/40 overflow-hidden shadow-inner"
+          className="flex-1 bg-card/50 rounded-[3rem] border-2 border-dashed border-border/40 overflow-hidden shadow-inner min-h-[400px]"
         >
           <AnimatePresence mode="wait">
-            {filteredAndSortedAssets.length > 0 ? (
+            {paginatedAssets.length > 0 ? (
               viewMode === 'list' ? (
                 <motion.div 
                   key="list-view"
@@ -490,7 +500,7 @@ export default function AssetRegistryPage() {
                   className="h-full"
                 >
                   <RegistryTable 
-                    assets={filteredAndSortedAssets} 
+                    assets={paginatedAssets} 
                     onInspect={handleInspect}
                     selectedIds={selectedIds}
                     onToggleSelection={handleToggleSelection}
@@ -507,7 +517,7 @@ export default function AssetRegistryPage() {
                   exit={{ opacity: 0 }}
                   className="p-8 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8 h-full overflow-y-auto custom-scrollbar"
                 >
-                  {filteredAndSortedAssets.map((asset) => (
+                  {paginatedAssets.map((asset) => (
                     <motion.div key={asset.id} layout>
                       <Card 
                         className={cn(
@@ -565,8 +575,32 @@ export default function AssetRegistryPage() {
           </AnimatePresence>
         </motion.div>
 
-        {/* High-Impact Action Pulse (Bottom Bar) */}
+        {/* Pagination & Export Pulse (Bottom Bar) */}
         <div className="fixed bottom-10 left-1/2 -translate-x-1/2 z-40 flex items-center gap-4 bg-background/80 backdrop-blur-2xl p-4 rounded-[2.5rem] border-2 border-primary/10 shadow-[0_35px_60px_-15px_rgba(0,0,0,0.5)] border-t-primary/20 ring-1 ring-white/10">
+          <div className="flex items-center gap-2 pr-4 border-r border-border/40">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              disabled={currentPage === 1}
+              onClick={() => setCurrentPage(prev => prev - 1)}
+              className="h-12 w-12 rounded-2xl hover:bg-primary/10"
+            >
+              <ChevronLeft className="h-5 w-5" />
+            </Button>
+            <span className="text-[10px] font-black uppercase tracking-widest px-4">
+              {currentPage} / {totalPages || 1}
+            </span>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              disabled={currentPage === totalPages}
+              onClick={() => setCurrentPage(prev => prev + 1)}
+              className="h-12 w-12 rounded-2xl hover:bg-primary/10"
+            >
+              <ChevronRight className="h-5 w-5" />
+            </Button>
+          </div>
+
           <Button 
             className="h-16 px-10 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.25em] gap-4 shadow-2xl shadow-primary/30 transition-all hover:-translate-y-1 active:scale-95"
             onClick={handleCreateNew}
