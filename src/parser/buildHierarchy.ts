@@ -1,0 +1,79 @@
+/**
+ * @fileOverview Hierarchy Orchestrator.
+ * Maintains stateful context during spreadsheet traversal.
+ */
+
+import { classifyRow, type RowType } from './classifyRow';
+import { normalizeRow } from './normalize';
+import { detectSchema } from './detectSchema';
+import { HEADER_DEFINITIONS } from '@/lib/constants';
+import type { Asset, SectionHierarchy } from '@/types/domain';
+
+export function parseSheetToAssets(
+  sheetData: any[][], 
+  sourceFileName: string, 
+  sheetName: string
+): Asset[] {
+  const assets: Asset[] = [];
+  
+  let currentHierarchy: SectionHierarchy = {
+    document: sheetName,
+    section: 'General',
+    subsection: 'Base Register',
+    assetFamily: 'Uncategorized'
+  };
+
+  let activeHeaderRow: any[] | null = null;
+  let currentDefinitionName: string | null = null;
+
+  for (let i = 0; i < sheetData.length; i++) {
+    const row = sheetData[i];
+    if (!row) continue;
+
+    // Detect Schema change or initialization
+    const potentialSchema = detectSchema(row);
+    if (potentialSchema) {
+      currentDefinitionName = potentialSchema;
+      activeHeaderRow = row;
+      continue;
+    }
+
+    // Classify using current definition headers
+    const defHeaders = currentDefinitionName ? HEADER_DEFINITIONS[currentDefinitionName].headers : [];
+    const classification = classifyRow(row, defHeaders);
+
+    switch (classification.type) {
+      case 'MAJOR_SECTION':
+        currentHierarchy.section = classification.label!;
+        currentHierarchy.subsection = 'Base Register';
+        currentHierarchy.assetFamily = 'Uncategorized';
+        break;
+      
+      case 'TEMPORAL_SUBSECTION':
+        currentHierarchy.subsection = classification.label!;
+        break;
+
+      case 'QUANTITY_BATCH':
+        currentHierarchy.assetFamily = classification.label!;
+        break;
+
+      case 'DATA_ROW':
+        if (activeHeaderRow) {
+          const normalized = normalizeRow(row, activeHeaderRow, {
+            category: currentDefinitionName || 'Unclassified',
+            hierarchy: { ...currentHierarchy },
+            importMetadata: {
+              sourceFile: sourceFileName,
+              sheetName: sheetName,
+              rowNumber: i + 1,
+              importedAt: new Date().toISOString()
+            }
+          });
+          assets.push(normalized as Asset);
+        }
+        break;
+    }
+  }
+
+  return assets;
+}
