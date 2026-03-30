@@ -40,7 +40,6 @@ import { useAppState } from '@/contexts/app-state-context';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { DatabaseAdminDialog } from './admin/database-admin-dialog';
 import { InboxSheet } from './inbox-sheet';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { Separator } from './ui/separator';
@@ -67,6 +66,7 @@ const AUDIT_NAV: NavItem[] = [
 
 const ADMIN_NAV: NavItem[] = [
   { label: 'Users & Roles', href: '/users', icon: <Users className="h-4 w-4" /> },
+  { label: 'Infrastructure', href: '/infrastructure', icon: <Monitor className="h-4 w-4" /> },
   { label: 'Settings', href: '/settings', icon: <Settings className="h-4 w-4" /> },
 ];
 
@@ -76,7 +76,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isOnline, setIsOnline, isSyncing, assets } = useAppState();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isAdminDBOpen, setIsAdminDBOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
 
   const isAdmin = userProfile?.isAdmin;
@@ -149,13 +148,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     {pendingCount}
                   </Badge>
                 )}
-              </Button>
-              <Button 
-                variant="ghost" 
-                onClick={() => setIsAdminDBOpen(true)} 
-                className="w-full justify-start gap-3 px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all group"
-              >
-                <Monitor className="h-4 w-4 group-hover:scale-110 transition-transform" /> Infrastructure
               </Button>
             </div>
           )}
@@ -296,10 +288,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </div>
 
       {isAdmin && (
-        <>
-          <DatabaseAdminDialog isOpen={isAdminDBOpen} onOpenChange={setIsAdminDBOpen} />
-          <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
-        </>
+        <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
       )}
     </div>
   );

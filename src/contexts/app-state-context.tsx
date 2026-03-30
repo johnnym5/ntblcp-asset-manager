@@ -3,13 +3,14 @@
 /**
  * @fileOverview AppStateContext - The Unified Data Facade.
  * Orchestrates the UI requests with the Offline Storage and Sync Engine.
- * Final Hardening: Correct grantId association and project-aware filtering.
+ * Hardened: Implementing automated Shadow Fallback (RTDB fallback logic).
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { storage } from '@/offline/storage';
 import { processSyncQueue } from '@/offline/sync';
 import { FirestoreService } from '@/services/firebase/firestore';
+import { getAssets as getRtdbAssets, getSettings as getRtdbSettings } from '@/lib/database';
 import type { Asset, AppSettings, Grant } from '@/types/domain';
 import { addNotification } from '@/hooks/use-notifications';
 
@@ -54,34 +55,45 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     try {
       // 1. Load Local State Pulse
       const localAssets = await storage.getAssets();
-      const localSandbox = await storage.getSandbox();
       const localSettings = await storage.getSettings();
 
       if (localSettings) setAppSettings(localSettings);
       
       const currentGrantId = localSettings?.activeGrantId;
-
-      // Filter main registry by active project context using grantId
-      const filteredAssets = currentGrantId 
+      const initialFiltered = currentGrantId 
         ? localAssets.filter(a => a.grantId === currentGrantId)
         : localAssets;
 
-      setAssets(filteredAssets);
-      setOfflineAssets(localSandbox);
+      setAssets(initialFiltered);
 
-      // 2. Synchronize if Online
+      // 2. Synchronize if Online with Automated Shadow Fallback
       if (isOnline) {
         await processSyncQueue();
-        const remoteSettings = await FirestoreService.getSettings();
+        
+        let remoteSettings = null;
+        try {
+          // Attempt Primary Layer (Firestore)
+          remoteSettings = await FirestoreService.getSettings();
+        } catch (e) {
+          console.warn("Primary Layer Unreachable. Attempting Shadow Fallback (RTDB)...");
+          // Attempt Shadow Layer (Realtime Database)
+          remoteSettings = await getRtdbSettings();
+        }
+
         if (remoteSettings) {
           setAppSettings(remoteSettings);
           await storage.saveSettings(remoteSettings);
           
-          // Fetch remote project data if grant is active
           if (remoteSettings.activeGrantId) {
-            const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId);
+            let remoteAssets: Asset[] = [];
+            try {
+              remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId);
+            } catch (e) {
+              console.warn("Primary Assets Unavailable. Fetching from Shadow Mirror...");
+              remoteAssets = await getRtdbAssets(remoteSettings.activeGrantId);
+            }
+
             if (remoteAssets.length > 0) {
-              // Update local storage with remote assets for this project
               const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
               const combinedAssets = [...otherAssets, ...remoteAssets];
               await storage.saveAssets(combinedAssets);
@@ -106,7 +118,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (isOnline) {
       FirestoreService.updateSettings({ activeGrantId: id });
     }
-    // Refresh to update assets for the new project context
     await refreshRegistry();
   };
 
@@ -136,6 +147,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
 export const useAppState = () => {
   const context = useContext(AppStateContext);
-  if (!context) throw new Error('useAppState must be used within AppStateProvider');
+  if (context === undefined) throw new Error('useAppState must be used within AppStateProvider');
   return context;
 };
