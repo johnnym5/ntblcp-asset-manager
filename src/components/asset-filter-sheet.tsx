@@ -11,7 +11,7 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
-import { Check, Hash, Calendar as CalendarIcon, Layout } from 'lucide-react';
+import { Check, Hash, Calendar as CalendarIcon, Layout, Filter, X, ShieldAlert } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
@@ -19,6 +19,7 @@ import { Label } from './ui/label';
 import { RadioGroup, RadioGroupItem } from './ui/radio-group';
 import type { Asset } from '@/lib/types';
 import { useAppState } from '@/contexts/app-state-context';
+import { Badge } from './ui/badge';
 
 export interface OptionType {
   label: string;
@@ -51,20 +52,13 @@ interface AssetFilterDialogProps {
 }
 
 const fieldsToFilter: { label: string, value: keyof Asset }[] = [
-    { label: 'S/N', value: 'sn' },
     { label: 'Serial Number', value: 'serialNumber' },
     { label: 'Asset ID Code', value: 'assetIdCode' },
-    { label: 'Description', value: 'description' },
-    { label: 'Category', value: 'category' },
-    { label: 'Location', value: 'location' },
-    { label: 'LGA', value: 'lga' },
     { label: 'Assignee', value: 'assignee' },
     { label: 'Condition', value: 'condition' },
     { label: 'Manufacturer', value: 'manufacturer' },
     { label: 'Model Number', value: 'modelNumber' },
-    { label: 'Engine Number', value: 'engineNo' },
-    { label: 'Chasis Number', value: 'chasisNo' },
-    { label: 'Asset Class', value: 'assetClass' },
+    { label: 'Major Section', value: 'majorSection' },
 ];
 
 const FilterSection = ({ title, options, selected, onChange, icon }: {
@@ -83,13 +77,16 @@ const FilterSection = ({ title, options, selected, onChange, icon }: {
   };
 
   return (
-    <div className="space-y-2">
-      <Label className="font-semibold flex items-center gap-2">
-        {icon} {title}
-      </Label>
-      <div className="rounded-md border">
-        <ScrollArea className="h-[150px]">
-          <div className="p-1">
+    <div className="space-y-3">
+      <div className="flex items-center justify-between px-1">
+        <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
+            {icon} {title}
+        </Label>
+        {selected.length > 0 && <Badge className="bg-primary h-4 px-1.5 text-[8px] font-black uppercase">{selected.length}</Badge>}
+      </div>
+      <div className="rounded-2xl border-2 border-border/40 overflow-hidden bg-muted/5 transition-all focus-within:border-primary/20">
+        <ScrollArea className="h-[140px]">
+          <div className="p-2 space-y-0.5">
             {options.length > 0 ? (
               options.map((option) => {
                 const isSelected = selected.includes(option.value);
@@ -97,24 +94,27 @@ const FilterSection = ({ title, options, selected, onChange, icon }: {
                   <div
                     key={option.value}
                     onClick={() => handleSelect(option.value)}
-                    className="relative flex cursor-default select-none items-center rounded-sm px-2 py-1.5 text-sm outline-none hover:bg-accent"
+                    className={cn(
+                        "relative flex cursor-pointer select-none items-center rounded-xl px-3 py-2 text-xs font-bold transition-all",
+                        isSelected ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-muted-foreground"
+                    )}
                   >
                     <div className="flex w-full items-center justify-between">
-                      <div className="flex items-center">
+                      <div className="flex items-center gap-3">
                         <div
                           className={cn(
-                            'mr-2 flex h-4 w-4 items-center justify-center rounded-sm border border-primary',
+                            'flex h-4 w-4 items-center justify-center rounded-md border-2 transition-all',
                             isSelected
-                              ? 'bg-primary text-primary-foreground'
-                              : 'opacity-50 [&_svg]:invisible'
+                              ? 'bg-primary border-primary text-white'
+                              : 'border-muted-foreground/30'
                           )}
                         >
-                          <Check className={cn('h-4 w-4')} />
+                          <Check className={cn('h-3 w-3', isSelected ? 'opacity-100' : 'opacity-0')} />
                         </div>
-                        <span>{option.label}</span>
+                        <span className="truncate max-w-[180px]">{option.label}</span>
                       </div>
                       {option.count !== undefined && (
-                        <span className="ml-2 rounded-sm bg-muted/50 px-1.5 py-0.5 text-xs font-mono text-muted-foreground">
+                        <span className="text-[10px] font-mono opacity-40">
                           {option.count}
                         </span>
                       )}
@@ -123,9 +123,9 @@ const FilterSection = ({ title, options, selected, onChange, icon }: {
                 );
               })
             ) : (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                No options available.
-              </p>
+              <div className="py-10 text-center text-[10px] font-bold uppercase tracking-widest text-muted-foreground/40 italic">
+                No indexed entries.
+              </div>
             )}
           </div>
         </ScrollArea>
@@ -177,97 +177,119 @@ export function AssetFilterDialog({
     setSelectedStatuses([]);
     setSelectedConditions([]);
     setMissingFieldFilter('');
-    setDateFilter(null);
+    if (setDateFilter) setDateFilter(null);
   };
 
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + selectedConditions.length + (missingFieldFilter ? 1 : 0);
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="flex flex-col max-h-[90vh] sm:max-w-xl">
-        <DialogHeader>
-          <DialogTitle>Semantic Filter Engine</DialogTitle>
-          <DialogDescription>
-            Refine your view using hierarchical register metadata.
-          </DialogDescription>
-        </DialogHeader>
-        <div className="flex-1 space-y-6 overflow-y-auto pr-2 py-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FilterSection
-                title="Major Section"
-                options={hierarchicalOptions.sections}
-                selected={[]}
-                onChange={() => {}}
-                icon={<Layout className="h-4 w-4 text-primary" />}
-              />
-              <FilterSection
-                title="Addition Year"
-                options={hierarchicalOptions.years}
-                selected={[]}
-                onChange={() => {}}
-                icon={<CalendarIcon className="h-4 w-4 text-primary" />}
-              />
-          </div>
-          <Separator />
-          <FilterSection
-            title="Location"
-            options={locationOptions}
-            selected={selectedLocations}
-            onChange={setSelectedLocations}
-          />
-          <Separator />
-          <FilterSection
-            title="Assignee"
-            options={assigneeOptions}
-            selected={selectedAssignees}
-            onChange={setSelectedAssignees}
-          />
-          <Separator />
-          <FilterSection
-            title="Condition"
-            options={conditionOptions}
-            selected={selectedConditions}
-            onChange={setSelectedConditions}
-          />
-          {appSettings?.appMode === 'verification' && (
-            <>
-              <Separator />
-              <FilterSection
-                title="Status"
-                options={statusOptions}
-                selected={selectedStatuses}
-                onChange={setSelectedStatuses}
-              />
-            </>
-          )}
-          <Separator />
-           <div className="space-y-3">
-            <Label className="font-semibold flex items-center gap-2"><Hash className="h-4 w-4" /> Data Integrity Exceptions</Label>
-            <RadioGroup value={missingFieldFilter} onValueChange={(value) => { setMissingFieldFilter(value); setDateFilter?.(null);}}>
-              <ScrollArea className="h-[150px] rounded-md border p-2">
-                <div className="space-y-1">
-                 <div className="flex items-center space-x-2 p-1">
-                    <RadioGroupItem value="" id="missing-none" />
-                    <Label htmlFor="missing-none" className="font-normal cursor-pointer">None</Label>
-                  </div>
-                {fieldsToFilter.map((field) => (
-                  <div key={field.value} className="flex items-center space-x-2 p-1">
-                    <RadioGroupItem value={field.value} id={`missing-${field.value}`} />
-                    <Label htmlFor={`missing-${field.value}`} className="font-normal cursor-pointer">{field.label}</Label>
-                  </div>
-                ))}
-                </div>
-              </ScrollArea>
-            </RadioGroup>
-          </div>
+      <DialogContent className="max-w-2xl flex flex-col h-[90vh] p-0 border-primary/10 rounded-3xl overflow-hidden shadow-2xl bg-background/95 backdrop-blur-xl">
+        <div className="p-8 pb-4 bg-muted/20 border-b">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">
+                    <div className="p-2 bg-primary/10 rounded-xl">
+                        <Filter className="text-primary h-6 w-6" />
+                    </div>
+                    Semantic Filter Engine
+                </DialogTitle>
+                <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
+                    Precision query refinement across project hierarchical metadata.
+                </DialogDescription>
+            </DialogHeader>
         </div>
-        <DialogFooter className="mt-auto pt-4 border-t">
-           <Button variant="outline" onClick={handleClearAll} disabled={activeFilterCount === 0}>
-            Clear All Filters
-          </Button>
-          <DialogClose asChild>
-            <Button>Apply Logic</Button>
-          </DialogClose>
+
+        <ScrollArea className="flex-1 bg-background">
+            <div className="p-8 space-y-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FilterSection
+                        title="Document Section"
+                        options={hierarchicalOptions.sections}
+                        selected={[]}
+                        onChange={() => {}}
+                        icon={<Layout className="h-3.5 w-3.5" />}
+                    />
+                    <FilterSection
+                        title="Addition Period"
+                        options={hierarchicalOptions.years}
+                        selected={[]}
+                        onChange={() => {}}
+                        icon={<CalendarIcon className="h-3.5 w-3.5" />}
+                    />
+                </div>
+
+                <Separator className="opacity-50" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FilterSection
+                        title="Physical Jurisdiction"
+                        options={locationOptions}
+                        selected={selectedLocations}
+                        onChange={setSelectedLocations}
+                    />
+                    <FilterSection
+                        title="Officer / Assignee"
+                        options={assigneeOptions}
+                        selected={selectedAssignees}
+                        onChange={setSelectedAssignees}
+                    />
+                </div>
+
+                <Separator className="opacity-50" />
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <FilterSection
+                        title="Registry Status"
+                        options={statusOptions}
+                        selected={selectedStatuses}
+                        onChange={setSelectedStatuses}
+                    />
+                    <FilterSection
+                        title="Asset Health"
+                        options={conditionOptions}
+                        selected={selectedConditions}
+                        onChange={setSelectedConditions}
+                    />
+                </div>
+
+                <Separator className="opacity-50" />
+
+                <div className="space-y-4">
+                    <Label className="text-[10px] font-black uppercase tracking-widest text-primary flex items-center gap-2">
+                        <ShieldAlert className="h-3.5 w-3.5" /> Registry Integrity Exceptions
+                    </Label>
+                    <div className="p-5 rounded-2xl bg-muted/10 border-2 border-dashed border-border/60">
+                        <RadioGroup value={missingFieldFilter} onValueChange={(v) => { setMissingFieldFilter(v); if(setDateFilter) setDateFilter(null); }}>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                <div className="flex items-center space-x-3 p-3 rounded-xl hover:bg-primary/5 transition-colors cursor-pointer group" onClick={() => setMissingFieldFilter('')}>
+                                    <RadioGroupItem value="" id="missing-none" className="border-2" />
+                                    <Label htmlFor="missing-none" className="text-xs font-bold cursor-pointer group-hover:text-primary transition-colors">NO INTEGRITY FILTER</Label>
+                                </div>
+                                {fieldsToFilter.map((field) => (
+                                    <div key={field.value} className="flex items-center space-x-3 p-3 rounded-xl hover:bg-primary/5 transition-colors cursor-pointer group" onClick={() => setMissingFieldFilter(field.value)}>
+                                        <RadioGroupItem value={field.value} id={`missing-${field.value}`} className="border-2" />
+                                        <Label htmlFor={`missing-${field.value}`} className="text-xs font-bold cursor-pointer group-hover:text-primary transition-colors truncate">MISSING: {field.label.toUpperCase()}</Label>
+                                    </div>
+                                ))}
+                            </div>
+                        </RadioGroup>
+                    </div>
+                </div>
+            </div>
+        </ScrollArea>
+
+        <DialogFooter className="p-8 bg-muted/20 border-t sm:justify-between items-center gap-4">
+           <Button variant="ghost" onClick={handleClearAll} disabled={activeFilterCount === 0} className="font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-destructive/10 hover:text-destructive">
+                <X className="mr-2 h-3.5 w-3.5" /> Reset Engine
+           </Button>
+           <div className="flex items-center gap-3">
+                <DialogClose asChild>
+                    <Button variant="ghost" className="font-bold text-xs rounded-xl">Discard</Button>
+                </DialogClose>
+                <DialogClose asChild>
+                    <Button className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">Apply Logic Pulse</Button>
+                </DialogClose>
+           </div>
         </DialogFooter>
       </DialogContent>
     </Dialog>

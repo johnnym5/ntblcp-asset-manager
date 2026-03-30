@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -155,8 +154,8 @@ export function AssetForm({
   };
 
   const handleSaveColumnLayout = async (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => {
-    if (!isAdmin || !appSettings || !userProfile) return;
-    const newSheetDefinitions = { ...grant?.sheetDefinitions };
+    if (!isAdmin || !appSettings || !userProfile || !grant) return;
+    const newSheetDefinitions = { ...grant.sheetDefinitions };
     if (applyToAll) {
         Object.keys(newSheetDefinitions).forEach(sn => {
             newSheetDefinitions[sn] = { ...newSheetDefinitions[sn], displayFields: newDefinition.displayFields.map(f => ({ ...f })), headers: newDefinition.headers };
@@ -246,21 +245,21 @@ export function AssetForm({
   return (
     <>
       <Dialog open={isOpen} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-xl w-full flex flex-col h-[100vh] sm:h-[90vh] p-0 overflow-hidden rounded-none sm:rounded-3xl border-none">
-          {/* Custom Header matching image */}
+        <DialogContent className="max-w-xl w-full flex flex-col h-[100vh] sm:h-[90vh] p-0 overflow-hidden rounded-none sm:rounded-3xl border-none shadow-2xl bg-background">
+          {/* Custom Header matching mobile design */}
           <div className="flex items-center justify-between p-4 border-b bg-background sticky top-0 z-20">
               <div className="flex items-center gap-4">
                   <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-full">
                       <ArrowLeft className="h-6 w-6" />
                   </Button>
-                  <DialogTitle className="text-xl font-bold">{asset?.sn || 'New'}</DialogTitle>
+                  <DialogTitle className="text-xl font-black tracking-tight">{asset?.sn || 'NEW ENTRY'}</DialogTitle>
               </div>
               <div className="flex items-center gap-4">
                   {asset?.sourceRow && (
-                      <span className="text-[10px] font-bold text-muted-foreground uppercase">Row {asset.sourceRow}</span>
+                      <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-muted text-muted-foreground">Row {asset.sourceRow}</Badge>
                   )}
-                  <Button variant="ghost" size="icon" className="rounded-full"><Share2 className="h-5 w-5 opacity-60" /></Button>
-                  <Button variant="ghost" size="icon" className="rounded-full"><MoreVertical className="h-5 w-5 opacity-60" /></Button>
+                  <Button variant="ghost" size="icon" className="rounded-full opacity-40 hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all"><Share2 className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" className="rounded-full opacity-40 hover:opacity-100 hover:bg-primary/10 hover:text-primary transition-all"><MoreVertical className="h-5 w-5" /></Button>
               </div>
           </div>
 
@@ -268,9 +267,14 @@ export function AssetForm({
               <Form {...form}>
                 <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)}>
                     {!sheetDefinition ? (
-                        <div className="p-6">
-                            <span className="text-xs font-bold text-muted-foreground uppercase mb-2 block">Category</span>
-                            <div className="p-4 bg-muted/20 rounded-xl">Define a category to start.</div>
+                        <div className="p-8 text-center space-y-4">
+                            <div className="p-6 bg-muted/20 rounded-full w-20 h-20 mx-auto flex items-center justify-center">
+                                <FileJson className="h-10 w-10 text-muted-foreground/40" />
+                            </div>
+                            <div>
+                                <h3 className="text-lg font-black uppercase tracking-tight">Definition Required</h3>
+                                <p className="text-xs text-muted-foreground font-medium mt-1">Please configure a category schema before editing.</p>
+                            </div>
                         </div>
                     ) : (
                         <div className="flex flex-col">
@@ -280,23 +284,30 @@ export function AssetForm({
 
                     {asset && (
                         <div className="px-6 py-8 bg-muted/5 space-y-6">
-                            <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-2">Added Assets (By Period)</h4>
+                            <h4 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 mb-2">Registry Context & Traceability</h4>
                             <Accordion type="single" collapsible className="w-full">
                                 <AccordionItem value="traceability" className="border-none">
-                                    <AccordionTrigger className="hover:no-underline p-4 bg-background border rounded-2xl shadow-sm">
-                                        <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground">
-                                            <Info className="h-4 w-4 text-primary" /> Registry Context
+                                    <AccordionTrigger className="hover:no-underline p-5 bg-background border-2 rounded-2xl shadow-sm transition-all hover:border-primary/20 group">
+                                        <div className="flex items-center gap-3 text-[10px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-primary transition-colors">
+                                            <Info className="h-4 w-4 text-primary" /> Audit Metadata
                                         </div>
                                     </AccordionTrigger>
                                     <AccordionContent className="pt-4 space-y-4">
                                         <div className="grid grid-cols-2 gap-4">
-                                            <div className="p-3 bg-background border rounded-xl">
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1">Major Section</p>
-                                                <p className="text-xs font-bold">{asset.majorSection || 'Main Register'}</p>
+                                            <div className="p-4 bg-background border-2 rounded-2xl">
+                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1.5 opacity-60">Major Section</p>
+                                                <p className="text-xs font-black">{asset.majorSection || 'MAIN REGISTER'}</p>
                                             </div>
-                                            <div className="p-3 bg-background border rounded-xl">
-                                                <p className="text-[9px] font-bold text-muted-foreground uppercase mb-1">Subsection</p>
-                                                <p className="text-xs font-bold">{asset.subsectionName || 'Base'}</p>
+                                            <div className="p-4 bg-background border-2 rounded-2xl">
+                                                <p className="text-[9px] font-black text-muted-foreground uppercase tracking-widest mb-1.5 opacity-60">Addition Year</p>
+                                                <p className="text-xs font-black">{asset.yearBucket || 'BASE'}</p>
+                                            </div>
+                                        </div>
+                                        <div className="p-4 bg-muted/10 border-2 border-dashed rounded-2xl flex items-center gap-3">
+                                            <Clock className="h-4 w-4 text-muted-foreground/40" />
+                                            <div className="flex flex-col">
+                                                <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest opacity-60">Last Modification Pulse</span>
+                                                <span className="text-[10px] font-bold">{asset.lastModified ? formatDistanceToNow(new Date(asset.lastModified), { addSuffix: true }) : 'INITIAL REGISTRATION'} by {asset.lastModifiedBy || 'SYSTEM'}</span>
                                             </div>
                                         </div>
                                     </AccordionContent>
@@ -308,10 +319,10 @@ export function AssetForm({
               </Form>
           </ScrollArea>
           
-          <div className="grid grid-cols-2 border-t bg-background">
+          <div className="grid grid-cols-2 border-t bg-background shadow-2xl">
               <Button 
                 variant="ghost" 
-                className="h-14 font-black uppercase text-[11px] tracking-widest text-primary rounded-none border-r"
+                className="h-16 font-black uppercase text-[11px] tracking-[0.2em] text-primary rounded-none border-r hover:bg-primary/5 transition-all"
                 onClick={onPrevious}
                 disabled={!onPrevious}
               >
@@ -319,7 +330,7 @@ export function AssetForm({
               </Button>
               <Button 
                 variant="ghost" 
-                className="h-14 font-black uppercase text-[11px] tracking-widest text-primary rounded-none"
+                className="h-16 font-black uppercase text-[11px] tracking-[0.2em] text-primary rounded-none hover:bg-primary/5 transition-all"
                 onClick={onNext}
                 disabled={!onNext}
               >
@@ -328,11 +339,11 @@ export function AssetForm({
           </div>
 
           {!initialIsReadOnly && (
-              <div className="p-4 bg-muted/10 border-t flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                  <Button type="submit" form="asset-form" disabled={isSaving}>
+              <div className="p-6 bg-muted/10 border-t flex justify-end gap-3">
+                  <Button variant="ghost" onClick={() => onOpenChange(false)} className="font-bold px-6">Discard</Button>
+                  <Button type="submit" form="asset-form" disabled={isSaving} className="h-12 font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 px-8 rounded-xl">
                       {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Check className="h-4 w-4 mr-2" />}
-                      Save Profile
+                      Commit Record
                   </Button>
               </div>
           )}
