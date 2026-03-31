@@ -7,10 +7,18 @@ import { Toaster } from '@/components/ui/toaster';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 
+/**
+ * @fileOverview Root Layout - Deterministic System Shell.
+ * Phase 65: Hardened metadata with inline icon pulse to prevent favicon route errors.
+ */
+
 export const metadata: Metadata = {
   title: 'Assetain',
   description: 'Professional Asset Management & Verification Pulse. High-integrity offline-first registry.',
   manifest: '/manifest.json',
+  icons: {
+    icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>',
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
