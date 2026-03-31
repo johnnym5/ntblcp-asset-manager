@@ -18,14 +18,10 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   Printer, 
-  QrCode, 
   Tag, 
-  Settings2, 
-  Download, 
   X,
-  FileText,
   ShieldCheck,
-  CheckCircle2
+  Info
 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -41,7 +37,9 @@ export function TagPrintDialog({ isOpen, onOpenChange, records }: TagPrintDialog
   const [tagSize, setTagSize] = useState<'sm' | 'md' | 'lg'>('md');
 
   const handlePrintPulse = () => {
-    window.print();
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
   };
 
   return (
@@ -51,19 +49,19 @@ export function TagPrintDialog({ isOpen, onOpenChange, records }: TagPrintDialog
         <div className="p-8 pb-4 bg-muted/20 border-b print:hidden">
           <DialogHeader>
             <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase">
+              <div className="flex items-center gap-3">
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <Printer className="text-primary h-8 w-8" />
                 </div>
-                Tag Print Station
-              </SheetTitle>
+                <DialogTitle className="text-3xl font-black tracking-tight uppercase">Tag Print Station</DialogTitle>
+              </div>
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="sm" className="h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest gap-2" onClick={() => setTagSize('sm')}>Small</Button>
-                <Button variant="outline" size="sm" className={cn("h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest gap-2", tagSize === 'md' && "bg-primary text-white border-primary")} onClick={() => setTagSize('md')}>Standard</Button>
-                <Button variant="outline" size="sm" className="h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest gap-2" onClick={() => setTagSize('lg')}>Large</Button>
+                <Button variant="outline" size="sm" className={cn("h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2", tagSize === 'sm' && "bg-primary text-white border-primary")} onClick={() => setTagSize('sm')}>Small</Button>
+                <Button variant="outline" size="sm" className={cn("h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2", tagSize === 'md' && "bg-primary text-white border-primary")} onClick={() => setTagSize('md')}>Standard</Button>
+                <Button variant="outline" size="sm" className={cn("h-9 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-2", tagSize === 'lg' && "bg-primary text-white border-primary")} onClick={() => setTagSize('lg')}>Large</Button>
               </div>
             </div>
-            <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
+            <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70 mt-2">
               Generating {records.length} high-fidelity physical asset identity pulses.
             </DialogDescription>
           </DialogHeader>
