@@ -1,9 +1,10 @@
+
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity Detail Workstation.
- * Phase 43: Integrated Spatial Pulse & Geotag evidence.
+ * Phase 56: Integrated Professional PDF Profile Export.
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -24,11 +25,14 @@ import {
   ShieldCheck,
   X,
   Camera,
-  Navigation
+  Navigation,
+  FileDown,
+  Loader2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord, RegistryFieldValue } from '@/types/registry';
 import type { Asset } from '@/types/domain';
+import { PdfService } from '@/services/pdf-service';
 
 interface AssetDetailSheetProps {
   isOpen: boolean;
@@ -55,6 +59,8 @@ const DetailField = ({ label, value, icon: Icon, isFullWidth = false }: { label:
 );
 
 export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext, onPrevious }: AssetDetailSheetProps) {
+  const [isExporting, setIsExporting] = useState(false);
+
   if (!record) return null;
   const asset = record.rawRow as unknown as Asset;
 
@@ -64,6 +70,15 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
       return header?.normalizedName === normalizedName;
     });
     return field?.displayValue || '---';
+  };
+
+  const handlePdfExport = async () => {
+    setIsExporting(true);
+    try {
+      await PdfService.exportTechnicalProfile(asset);
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   return (
@@ -88,18 +103,20 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
               <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-8 w-8 rounded-lg"><ChevronLeft className="h-4 w-4" /></Button>
               <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-8 w-8 rounded-lg"><ChevronRight className="h-4 w-4" /></Button>
             </div>
+            <Button variant="ghost" size="icon" onClick={handlePdfExport} disabled={isExporting} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10">
+              {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileDown className="h-5 w-5" />}
+            </Button>
             <Button variant="ghost" size="icon" onClick={() => onEdit(record.id)} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10"><Edit3 className="h-5 w-5" /></Button>
-            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-40 hover:opacity-100"><Share2 className="h-5 w-5" /></Button>
           </div>
         </div>
 
         <ScrollArea className="flex-1 bg-background custom-scrollbar">
           <div className="pb-32">
             {/* Visual Evidence Pulse */}
-            {asset.photoDataUri && (
+            {(asset.photoUrl || asset.photoDataUri) && (
               <div className="px-8 pt-8">
                 <div className="relative group aspect-video bg-muted rounded-[2rem] overflow-hidden border-2 border-primary/10 shadow-lg">
-                  <img src={asset.photoDataUri} className="w-full h-full object-cover" alt="Asset Evidence" />
+                  <img src={asset.photoUrl || asset.photoDataUri} className="w-full h-full object-cover" alt="Asset Evidence" />
                   <Badge className="absolute bottom-4 left-4 bg-primary/90 backdrop-blur-md font-black uppercase text-[8px] tracking-[0.2em] px-3 h-6 rounded-lg">
                     <Camera className="h-3 w-3 mr-2" /> VERIFIED VISUAL PULSE
                   </Badge>

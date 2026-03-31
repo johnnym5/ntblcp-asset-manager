@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Reporting Workstation & Data Quality Suite.
- * Phase 49: Integrated Integrity Engine for Data Cleansing Pulses.
+ * Phase 56: Integrated Exception PDF Pulse for Management.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -26,7 +27,8 @@ import {
   Filter,
   RefreshCw,
   Wrench,
-  Trash2
+  Trash2,
+  FileWarning
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { TravelReportDialog } from '@/components/travel-report-dialog';
@@ -39,9 +41,12 @@ import { IntegrityEngine, type IntegrityIssue } from '@/lib/integrity-engine';
 import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
 import { useToast } from '@/hooks/use-toast';
+import { PdfService } from '@/services/pdf-service';
+import { useAuth } from '@/contexts/auth-context';
 
 export default function ReportsPage() {
   const { assets, refreshRegistry } = useAppState();
+  const { userProfile } = useAuth();
   const { toast } = useToast();
   
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
@@ -51,6 +56,7 @@ export default function ReportsPage() {
   const [issues, setIssues] = useState<IntegrityIssue[]>([]);
   const [isScanning, setIsScanning] = useState(false);
   const [isFixing, setIsFixing] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   useEffect(() => {
     if (activeTab === 'quality') {
@@ -90,11 +96,22 @@ export default function ReportsPage() {
     }
   };
 
+  const handleExceptionExport = async () => {
+    setIsExporting(true);
+    try {
+      await PdfService.exportExceptionReport(assets, userProfile?.state || 'Global Scope');
+      toast({ title: "Exception Pulse Exported", description: "Archival PDF generated successfully." });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const stats = useMemo(() => {
     const verified = assets.filter(a => a.status === 'VERIFIED').length;
+    const exceptions = assets.filter(a => a.status === 'DISCREPANCY' || ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition)).length;
     const total = assets.length;
     const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
-    return { total, verified, coverage };
+    return { total, verified, coverage, exceptions };
   }, [assets]);
 
   return (
@@ -115,9 +132,9 @@ export default function ReportsPage() {
         </div>
 
         <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-          <TabsList className="bg-muted/30 p-1 rounded-2xl h-12 border-2 border-border/40 ml-2">
-            <TabsTrigger value="reports" className="px-8 rounded-xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Executive Reports</TabsTrigger>
-            <TabsTrigger value="quality" className="px-8 rounded-xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
+          <TabsList className="bg-muted/30 p-1.5 rounded-2xl h-auto border-2 border-border/40 ml-2 w-fit">
+            <TabsTrigger value="reports" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Executive Reports</TabsTrigger>
+            <TabsTrigger value="quality" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">
               Data Cleansing
               {issues.length > 0 && <Badge className="ml-2 bg-destructive h-4 px-1.5 min-w-4 p-0">{issues.length}</Badge>}
             </TabsTrigger>
@@ -126,46 +143,33 @@ export default function ReportsPage() {
           <TabsContent value="reports" className="space-y-8 animate-in fade-in duration-500 outline-none m-0">
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-2">
               <div className="lg:col-span-8 space-y-8">
-                {/* Fidelity Audit Card */}
-                <Card className="border-2 border-border/40 shadow-2xl bg-card/50 rounded-[2.5rem] overflow-hidden">
-                  <CardHeader className="p-8 border-b bg-muted/20">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-1">
-                        <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-                          <ShieldCheck className="h-5 w-5 text-primary" /> Registry Fidelity
-                        </CardTitle>
-                        <p className="text-[10px] font-bold uppercase text-muted-foreground opacity-60">Pre-generation quality pulse</p>
-                      </div>
-                      <Badge variant="outline" className={cn(
-                        "font-black uppercase px-4 h-8 rounded-full border-2",
-                        issues.length > 0 ? "border-destructive text-destructive" : "border-green-500 text-green-600"
-                      )}>
-                        {issues.length > 0 ? `${issues.length} Gaps Detected` : 'Registry Healthy'}
-                      </Badge>
+                {/* Exception Quick Pulse */}
+                <Card className="border-2 border-destructive/20 shadow-2xl bg-destructive/[0.02] rounded-[2.5rem] overflow-hidden group">
+                  <CardHeader className="p-8 border-b border-destructive/10 bg-destructive/5 flex flex-row items-center justify-between">
+                    <div className="space-y-1">
+                      <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-destructive">
+                        <FileWarning className="h-5 w-5" /> High-Risk exceptions
+                      </CardTitle>
+                      <p className="text-[10px] font-bold uppercase text-destructive/60">Urgent field discrepancies compendium</p>
                     </div>
+                    <Badge variant="outline" className="font-black uppercase px-4 h-8 rounded-full border-destructive/20 text-destructive bg-destructive/5">
+                      {stats.exceptions} Critical Pulses
+                    </Badge>
                   </CardHeader>
-                  <CardContent className="p-8 space-y-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="p-5 rounded-2xl bg-background border-2 border-dashed border-border/40 flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Coverage</span>
-                          <span className="text-xs font-bold">{stats.coverage}% Verified</span>
-                        </div>
-                        <CheckCircle2 className="h-5 w-5 text-green-600" />
-                      </div>
-                      <div className="p-5 rounded-2xl bg-background border-2 border-dashed border-border/40 flex items-center justify-between">
-                        <div className="flex flex-col">
-                          <span className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Exceptions</span>
-                          <span className="text-xs font-bold">{issues.filter(i => i.severity === 'CRITICAL').length} Critical</span>
-                        </div>
-                        <Activity className="h-5 w-5 text-destructive" />
-                      </div>
-                    </div>
-                    {issues.length > 0 && (
-                      <Button variant="ghost" onClick={() => setActiveTab('quality')} className="w-full h-12 rounded-xl text-[10px] font-black uppercase tracking-widest text-primary bg-primary/5 hover:bg-primary/10 border-2 border-dashed border-primary/20">
-                        View Detailed Data Audit Pulse <ArrowRight className="ml-2 h-3.5 w-3.5" />
+                  <CardContent className="p-8">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                      <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed max-w-sm">
+                        Immediately extract a professional PDF compendium of all Stolen, Burnt, and Discrepant asset pulses for managerial review.
+                      </p>
+                      <Button 
+                        onClick={handleExceptionExport}
+                        disabled={isExporting || stats.exceptions === 0}
+                        className="h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-destructive/20 bg-destructive text-white gap-3 transition-transform hover:scale-105"
+                      >
+                        {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                        Export Exception PDF
                       </Button>
-                    )}
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -177,7 +181,7 @@ export default function ReportsPage() {
                         <FileText className="text-primary h-8 w-8" /> Executive Travel Report
                       </CardTitle>
                       <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[10px] h-8 px-4 rounded-full shadow-sm">
-                        Builder v5.1
+                        Builder v5.6
                       </Badge>
                     </div>
                   </CardHeader>
