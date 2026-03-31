@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview Unified Domain Models for Assetain.
  * Strictly typed, deterministic models for registry management and system configuration.
@@ -60,6 +59,10 @@ export interface Asset {
   // Media Persistence
   photoDataUri?: string; // Local visual evidence pulse (base64)
   photoUrl?: string;     // Remote storage pulse (Firebase Storage URL)
+  
+  // Forensic Verification Pulse
+  signatureDataUri?: string; // Local signature pulse (base64)
+  signatureUrl?: string;     // Remote storage pulse (Firebase Storage URL)
   
   geotag?: Geotag; // Spatial field protocol
 

@@ -1,10 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview Professional Technical PDF Service.
  * Orchestrates high-fidelity profile exports and archival exception reports.
- * Phase 56: Implemented Evidence Embedding & Multi-Table Exception Pulse.
+ * Phase 57: Implemented Forensic Signature Embedding.
  */
 
 import { jsPDF } from 'jspdf';
@@ -31,7 +30,7 @@ export const PdfService = {
     
     doc.setFontSize(10);
     doc.setFont('helvetica', 'normal');
-    doc.text('TECHNICAL ASSET PROFILE Dossier v5.6', 15, 30);
+    doc.text('TECHNICAL ASSET PROFILE Dossier v5.7', 15, 30);
     
     doc.setFontSize(8);
     doc.text(`EXTRACTED: ${new Date().toLocaleString()}`, 150, 15);
@@ -60,29 +59,49 @@ export const PdfService = {
         ['Condition State', asset.condition || 'UNASSESSED'],
         ['Verification Status', asset.status],
         ['Source Row', String(asset.importMetadata?.rowNumber || 'MANUAL')],
-        ['Last Pulse Auditor', asset.lastModifiedBy]
+        ['GPS Coordinates', asset.geotag ? `${asset.geotag.lat.toFixed(4)}, ${asset.geotag.lng.toFixed(4)}` : 'NOT ANCHORED']
       ],
       theme: 'grid',
       headStyles: { fillColor: primaryColor, textColor: 255, fontStyle: 'bold' },
       styles: { fontSize: 9, cellPadding: 4 }
     });
 
-    // 4. Visual Evidence Pulse
     const finalY = (doc as any).lastAutoTable.finalY || 150;
-    
+
+    // 4. Evidence Pulse: Visual & Forensic
+    let evidenceY = finalY + 15;
+
+    // A. Asset Photo
     if (asset.photoUrl || asset.photoDataUri) {
       doc.setFont('helvetica', 'bold');
-      doc.text('VERIFIED VISUAL EVIDENCE', 15, finalY + 15);
-      
+      doc.text('VERIFIED VISUAL EVIDENCE', 15, evidenceY);
       try {
         const imgUrl = asset.photoUrl || asset.photoDataUri;
         if (imgUrl) {
-          doc.addImage(imgUrl, 'JPEG', 15, finalY + 20, 80, 60);
-          doc.rect(15, finalY + 20, 80, 60, 'S'); // Outline
+          doc.addImage(imgUrl, 'JPEG', 15, evidenceY + 5, 80, 60);
+          doc.rect(15, evidenceY + 5, 80, 60, 'S');
         }
       } catch (e) {
         doc.setFont('helvetica', 'italic');
-        doc.text('[Media rendering unavailable in this pulse]', 15, finalY + 25);
+        doc.text('[Photo rendering failure]', 15, evidenceY + 10);
+      }
+    }
+
+    // B. Custodian Signature
+    if (asset.signatureUrl || asset.signatureDataUri) {
+      const sigX = 115;
+      doc.setFont('helvetica', 'bold');
+      doc.text('CUSTODIAN SIGNATURE', sigX, evidenceY);
+      try {
+        const sigUrl = asset.signatureUrl || asset.signatureDataUri;
+        if (sigUrl) {
+          doc.addImage(sigUrl, 'PNG', sigX, evidenceY + 5, 80, 25);
+          doc.line(sigX, evidenceY + 30, sigX + 80, evidenceY + 30); // Sign line
+          doc.setFontSize(7);
+          doc.text('Digital Signature Anchor', sigX, evidenceY + 35);
+        }
+      } catch (e) {
+        doc.text('[Signature pulse missing]', sigX, evidenceY + 10);
       }
     }
 

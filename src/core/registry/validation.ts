@@ -38,6 +38,12 @@ export const AssetSchema = z.object({
   serialNumber: z.string().default("N/A"),
   assetIdCode: z.string().optional(),
   photoDataUri: z.string().optional(),
+  photoUrl: z.string().optional(),
+  
+  // Forensic Fields
+  signatureDataUri: z.string().optional(),
+  signatureUrl: z.string().optional(),
+  
   geotag: GeotagSchema.optional(),
 
   // Nested Structured Data
@@ -60,6 +66,21 @@ export const AssetSchema = z.object({
   // System Metadata
   lastModified: z.string().datetime(),
   lastModifiedBy: z.string(),
+  lastModifiedByState: z.string().optional(),
+  
+  // Restoration Buffer
+  previousState: z.record(z.unknown()).nullable().optional(),
+  
+  // Governance
+  approvalStatus: z.enum(['PENDING', 'APPROVED', 'REJECTED']).optional(),
+  pendingChanges: z.record(z.unknown()).optional(),
+  changeSubmittedBy: z.object({
+    displayName: z.string(),
+    loginName: z.string(),
+    state: z.string()
+  }).optional(),
+  adminComment: z.string().optional(),
+  yearBucket: z.number().optional(),
 });
 
 export type ValidatedAsset = z.infer<typeof AssetSchema>;

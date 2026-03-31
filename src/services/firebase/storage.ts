@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Firebase Storage Service.
- * Manages professional persistence for asset visual evidence.
+ * Manages professional persistence for asset visual evidence and signatures.
  */
 
 import { ref, uploadString, getDownloadURL, deleteObject } from 'firebase/storage';
@@ -18,14 +17,9 @@ export const FirebaseStorageService = {
   async uploadAssetPhoto(grantId: string, assetId: string, base64Data: string): Promise<string> {
     if (!storage) throw new Error("Storage service unavailable.");
 
-    // Extract mime type and actual data
-    const formatMatch = base64Data.match(/^data:(image\/[a-z]+);base64,/);
-    if (!formatMatch) throw new Error("Invalid image format pulse.");
-
     const storageRef = ref(storage, `assets/${grantId}/${assetId}/evidence.jpg`);
     
     try {
-      // Use 'data_url' format for uploadString
       const snapshot = await uploadString(storageRef, base64Data, 'data_url');
       const downloadUrl = await getDownloadURL(snapshot.ref);
       logger.info(`Storage: Uploaded evidence for asset [${assetId}]`);
@@ -37,16 +31,39 @@ export const FirebaseStorageService = {
   },
 
   /**
-   * Removes an asset photo from storage.
+   * Uploads a base64 signature to storage.
+   * Path follows the structure: assets/{grantId}/{assetId}/signature.png
    */
-  async deleteAssetPhoto(grantId: string, assetId: string): Promise<void> {
-    if (!storage) return;
-    const storageRef = ref(storage, `assets/${grantId}/${assetId}/evidence.jpg`);
+  async uploadAssetSignature(grantId: string, assetId: string, base64Data: string): Promise<string> {
+    if (!storage) throw new Error("Storage service unavailable.");
+
+    const storageRef = ref(storage, `assets/${grantId}/${assetId}/signature.png`);
+    
     try {
-      await deleteObject(storageRef);
+      const snapshot = await uploadString(storageRef, base64Data, 'data_url');
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      logger.info(`Storage: Uploaded signature for asset [${assetId}]`);
+      return downloadUrl;
     } catch (e) {
-      // Ignore if file doesn't exist
-      logger.warn(`Storage: Could not delete photo for asset [${assetId}]`);
+      logger.error("Storage: Failed to upload signature pulse", e);
+      throw e;
+    }
+  },
+
+  /**
+   * Removes asset media from storage.
+   */
+  async deleteAssetMedia(grantId: string, assetId: string): Promise<void> {
+    if (!storage) return;
+    const photoRef = ref(storage, `assets/${grantId}/${assetId}/evidence.jpg`);
+    const signRef = ref(storage, `assets/${grantId}/${assetId}/signature.png`);
+    try {
+      await Promise.all([
+        deleteObject(photoRef).catch(() => {}),
+        deleteObject(signRef).catch(() => {})
+      ]);
+    } catch (e) {
+      logger.warn(`Storage: Cleanup failed for asset [${assetId}]`);
     }
   }
 };

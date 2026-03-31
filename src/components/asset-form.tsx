@@ -1,9 +1,8 @@
-
 "use client";
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 48: Integrated Record Reversion Pulse for Administrators.
+ * Phase 57: Integrated Forensic Signature Capture Pad.
  */
 
 import React, { useEffect, useState, useRef } from "react";
@@ -57,7 +56,10 @@ import {
   Navigation,
   Maximize,
   ScanLine,
-  RotateCcw
+  RotateCcw,
+  PenTool,
+  RotateCw,
+  Trash2
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -111,26 +113,28 @@ export function AssetForm({
   const { activeGrantId, isOnline, refreshRegistry } = useAppState();
   const { toast } = useToast();
   
+  // Media State
   const videoRef = useRef<HTMLVideoElement>(null);
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [capturedPhoto, setCapturedPhoto] = useState<string | null>(null);
+
+  // Signature State
+  const signatureCanvasRef = useRef<HTMLCanvasElement>(null);
+  const [capturedSignature, setCapturedSignature] = useState<string | null>(null);
+  const [isDrawing, setIsDrawing] = useState(false);
 
   const form = useForm<Asset>({
     resolver: zodResolver(AssetSchema),
     mode: 'onChange',
   });
 
-  const getLabel = (normalizedName: string, fallback: string) => {
-    const header = headers.find(h => h.normalizedName === normalizedName);
-    return header?.displayName || fallback;
-  };
-
   useEffect(() => {
     if (isOpen) {
       setActiveTab("details");
       if (asset) {
         form.reset(asset);
-        setCapturedPhoto(asset.photoDataUri || null);
+        setCapturedPhoto(asset.photoUrl || asset.photoDataUri || null);
+        setCapturedSignature(asset.signatureUrl || asset.signatureDataUri || null);
         if (isOnline) {
           loadHistory(asset.id);
         }
@@ -141,6 +145,10 @@ export function AssetForm({
           status: 'UNVERIFIED',
           condition: 'New',
           location: userProfile?.state || '',
+          description: '',
+          category: '',
+          custodian: 'Unassigned',
+          serialNumber: 'N/A',
           lastModified: new Date().toISOString(),
           lastModifiedBy: userProfile?.displayName || 'Unknown',
           hierarchy: { document: 'Manual Entry', section: 'General', subsection: 'Base Register', assetFamily: 'Uncategorized' },
@@ -148,10 +156,63 @@ export function AssetForm({
           metadata: {}
         } as Asset);
         setCapturedPhoto(null);
+        setCapturedSignature(null);
         setHistory([]);
       }
     }
   }, [isOpen, asset, form, userProfile, activeGrantId, isOnline]);
+
+  // --- Signature Pad Logic ---
+  const startDrawing = (e: React.MouseEvent | React.TouchEvent) => {
+    if (isReadOnly) return;
+    setIsDrawing(true);
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+    const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+
+    ctx.beginPath();
+    ctx.moveTo(x, y);
+    ctx.strokeStyle = '#2E3192'; // Brand Navy
+    ctx.lineWidth = 2;
+    ctx.lineCap = 'round';
+  };
+
+  const draw = (e: React.MouseEvent | React.TouchEvent) => {
+    if (!isDrawing) return;
+    const canvas = signatureCanvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const rect = canvas.getBoundingClientRect();
+    const x = ('touches' in e) ? e.touches[0].clientX - rect.left : e.clientX - rect.left;
+    const y = ('touches' in e) ? e.touches[0].clientY - rect.top : e.clientY - rect.top;
+
+    ctx.lineTo(x, y);
+    ctx.stroke();
+  };
+
+  const stopDrawing = () => {
+    setIsDrawing(false);
+    const canvas = signatureCanvasRef.current;
+    if (canvas) {
+      setCapturedSignature(canvas.toDataURL('image/png'));
+    }
+  };
+
+  const clearSignature = () => {
+    const canvas = signatureCanvasRef.current;
+    if (canvas) {
+      const ctx = canvas.getContext('2d');
+      if (ctx) ctx.clearRect(0, 0, canvas.width, canvas.height);
+      setCapturedSignature(null);
+    }
+  };
 
   const loadHistory = async (id: string) => {
     setLoadingHistory(true);
@@ -178,23 +239,6 @@ export function AssetForm({
     }
   };
 
-  const captureLocation = () => {
-    if (!navigator.geolocation) return;
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        const geotag: Geotag = {
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          accuracy: pos.coords.accuracy,
-          timestamp: new Date().toISOString()
-        };
-        form.setValue('geotag', geotag);
-      },
-      undefined,
-      { enableHighAccuracy: true }
-    );
-  };
-
   const startCamera = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
@@ -202,7 +246,6 @@ export function AssetForm({
       if (videoRef.current) {
         videoRef.current.srcObject = stream;
       }
-      captureLocation(); 
     } catch (error) {
       console.error('Error accessing camera:', error);
     }
@@ -236,7 +279,8 @@ export function AssetForm({
     try {
         await onSave({
             ...data,
-            photoDataUri: capturedPhoto || undefined,
+            photoDataUri: capturedPhoto?.startsWith('data:') ? capturedPhoto : undefined,
+            signatureDataUri: capturedSignature?.startsWith('data:') ? capturedSignature : undefined,
             lastModified: new Date().toISOString(),
             lastModifiedBy: userProfile?.displayName || 'Unknown'
         });
@@ -308,7 +352,7 @@ export function AssetForm({
 
                           <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/10">
                             <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
-                            <span className="text-[8px] font-black uppercase text-white tracking-widest">Live Document Scanner Active</span>
+                            <span className="text-[8px] font-black uppercase text-white tracking-widest">Document Scanner Active</span>
                           </div>
 
                           <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-6">
@@ -363,7 +407,7 @@ export function AssetForm({
                     </div>
 
                     <SectionHeader label="Field Assessment" icon={MapPin} />
-                    <div className="px-4 md:px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="px-4 md:px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-dashed">
                       <FormField control={form.control} name="location" render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Location Scope</FormLabel>
@@ -380,6 +424,53 @@ export function AssetForm({
                           </Select>
                         </FormItem>
                       )}/>
+                    </div>
+
+                    {/* Forensic Signature Section */}
+                    <SectionHeader label="Forensic Field Integrity" icon={PenTool} />
+                    <div className="px-4 md:px-6 py-8">
+                      <div className="space-y-4">
+                        <div className="flex items-center justify-between">
+                          <label className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40">Custodian Signature Pulse</label>
+                          {!isReadOnly && capturedSignature && (
+                            <Button variant="ghost" size="sm" onClick={clearSignature} className="h-8 px-3 rounded-lg text-[8px] font-black uppercase tracking-widest text-destructive hover:bg-destructive/10">
+                              <RotateCw className="h-3 w-3 mr-1.5" /> Reset Signature
+                            </Button>
+                          )}
+                        </div>
+
+                        {!isReadOnly ? (
+                          <div className="relative aspect-[3/1] bg-card border-2 border-dashed border-primary/20 rounded-3xl overflow-hidden shadow-inner cursor-crosshair">
+                            <canvas
+                              ref={signatureCanvasRef}
+                              width={600}
+                              height={200}
+                              className="w-full h-full touch-none"
+                              onMouseDown={startDrawing}
+                              onMouseMove={draw}
+                              onMouseUp={stopDrawing}
+                              onMouseLeave={stopDrawing}
+                              onTouchStart={startDrawing}
+                              onTouchMove={draw}
+                              onTouchEnd={stopDrawing}
+                            />
+                            {!capturedSignature && !isDrawing && (
+                              <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none opacity-20">
+                                <PenTool className="h-8 w-8 mb-2" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em]">Sign here to anchor assessment</span>
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <div className="aspect-[3/1] bg-muted/10 border-2 border-dashed border-border/40 rounded-3xl flex items-center justify-center overflow-hidden">
+                            {capturedSignature ? (
+                              <img src={capturedSignature} className="max-h-full mix-blend-multiply opacity-80" alt="Custodian Signature" />
+                            ) : (
+                              <div className="text-[10px] font-medium italic opacity-30">Zero signature pulse captured.</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </div>
                 </form>
               </Form>
@@ -429,7 +520,7 @@ export function AssetForm({
                             </span>
                           </div>
                           <div className="p-4 rounded-2xl bg-muted/30 border border-border/40 text-[10px] font-bold text-muted-foreground uppercase">
-                            <User className="h-3 w-3 inline mr-2" /> {entry.performedBy}
+                            <User className="h-3.5 w-3.5 inline mr-2 text-primary" /> {entry.performedBy}
                           </div>
                         </div>
                       </div>
@@ -446,7 +537,7 @@ export function AssetForm({
           </Tabs>
         </ScrollArea>
 
-        {/* Footer */}
+        {/* Footer Control */}
         {!isReadOnly && activeTab === 'details' && (
             <div className="p-4 md:p-6 bg-background/80 backdrop-blur-xl border-t flex flex-col sm:flex-row items-center gap-3 absolute bottom-0 left-0 right-0 z-40">
                 <Button variant="ghost" onClick={() => { stopCamera(); onOpenChange(false); }} className="w-full sm:flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl">DISCARD</Button>

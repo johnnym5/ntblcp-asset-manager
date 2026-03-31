@@ -1,7 +1,6 @@
-
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity Detail Workstation.
- * Phase 56: Integrated Professional PDF Profile Export.
+ * Phase 57: Integrated Forensic Verification Receipt (Signature & GPS).
  */
 
 import React, { useState } from 'react';
@@ -27,7 +26,8 @@ import {
   Camera,
   Navigation,
   FileDown,
-  Loader2
+  Loader2,
+  PenTool
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord, RegistryFieldValue } from '@/types/registry';
@@ -164,6 +164,28 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
               </>
             )}
 
+            {/* Forensic Receipt Pulse */}
+            <div className="px-8 py-4 bg-muted/20 border-y border-border/40 flex items-center gap-3">
+              <PenTool className="h-4 w-4 text-primary opacity-60" />
+              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Verification Receipt</h4>
+            </div>
+            <div className="p-8">
+              <div className="p-6 rounded-[2rem] bg-card border-2 border-dashed border-border/40 shadow-inner flex flex-col items-center justify-center text-center">
+                {asset.signatureUrl || asset.signatureDataUri ? (
+                  <div className="space-y-4 w-full">
+                    <img src={asset.signatureUrl || asset.signatureDataUri} className="max-h-24 mx-auto mix-blend-multiply opacity-80" alt="Custodian Signature" />
+                    <div className="h-px bg-border/40 w-1/2 mx-auto" />
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">Custodian Signature Anchor</p>
+                  </div>
+                ) : (
+                  <div className="py-6 opacity-20 space-y-2">
+                    <PenTool className="h-10 w-10 mx-auto" />
+                    <p className="text-[10px] font-black uppercase tracking-widest">No Signature Captured</p>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Regional Pulse */}
             <div className="px-8 py-4 bg-muted/20 border-y border-border/40 flex items-center gap-3">
               <MapPin className="h-4 w-4 text-primary opacity-60" />
@@ -174,17 +196,6 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
               <DetailField label="Assigned Auditor" value={getFieldValue('assignee_location')} icon={User} />
               <DetailField label="Field Condition" value={getFieldValue('condition')} icon={History} />
               <DetailField label="Verification Status" value={getFieldValue('verification_status')} icon={ShieldCheck} />
-            </div>
-
-            {/* Financial Pulse */}
-            <div className="px-8 py-4 bg-muted/20 border-y border-border/40 flex items-center gap-3">
-              <Calendar className="h-4 w-4 text-primary opacity-60" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Procurement History</h4>
-            </div>
-            <div className="p-8 grid grid-cols-2 gap-4">
-              <DetailField label="Date Procured" value={getFieldValue('date_purchased_received')} icon={Calendar} />
-              <DetailField label="Purchase Price (NGN)" value={getFieldValue('purchase_price_ngn')} icon={Database} />
-              <DetailField label="GRN Number" value={getFieldValue('goods_received_note_no')} isFullWidth />
             </div>
 
             {/* Source Provenance Pulse */}
@@ -202,7 +213,7 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
             {/* Remarks Pulse */}
             <div className="p-8 border-t border-dashed">
               <div className="space-y-3">
-                <label className="text-[9px] font-black uppercase tracking-[0.3em] opacity-40">Auditor Field Remarks</label>
+                <label className="text-[9px] font-black uppercase tracking-0.3em opacity-40">Auditor Field Remarks</label>
                 <div className="p-6 rounded-[2rem] bg-muted/10 border-2 border-dashed font-medium text-xs leading-relaxed italic">
                   {getFieldValue('remarks') || 'Zero supplementary pulses recorded for this entry.'}
                 </div>

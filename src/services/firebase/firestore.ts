@@ -1,8 +1,7 @@
-
 /**
  * @fileOverview Hardened Firestore Service.
  * Implements deterministic validation and strict RBAC context.
- * Phase 50: Integrated Storage Offloading for visual evidence.
+ * Phase 57: Integrated Signature Offloading for verification receipts.
  */
 
 import { 
@@ -76,31 +75,42 @@ export const FirestoreService = {
 
   /**
    * Single record update with mandatory Zod validation and Activity Logging.
-   * Offloads base64 images to Firebase Storage.
+   * Offloads base64 images and signatures to Firebase Storage.
    */
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
 
-    // 1. Storage Offloading Pulse
-    // If we have a base64 photo but no remote URL, offload it to Storage
+    // 1. Storage Offloading Pulse (Photos)
     let finalPhotoUrl = asset.photoUrl;
     if (asset.photoDataUri && !asset.photoUrl) {
       try {
         finalPhotoUrl = await FirebaseStorageService.uploadAssetPhoto(asset.grantId, asset.id, asset.photoDataUri);
       } catch (e) {
-        console.error("Firestore: Storage offload failed, proceeding with base64 fallback.");
+        console.error("Firestore: Photo storage offload failed.");
+      }
+    }
+
+    // 2. Storage Offloading Pulse (Signatures)
+    let finalSignatureUrl = asset.signatureUrl;
+    if (asset.signatureDataUri && !asset.signatureUrl) {
+      try {
+        finalSignatureUrl = await FirebaseStorageService.uploadAssetSignature(asset.grantId, asset.id, asset.signatureDataUri);
+      } catch (e) {
+        console.error("Firestore: Signature storage offload failed.");
       }
     }
 
     const assetToSave = {
       ...asset,
       photoUrl: finalPhotoUrl,
-      // We clear the heavy base64 data once it's offloaded to the cloud
-      photoDataUri: finalPhotoUrl ? undefined : asset.photoDataUri 
+      photoDataUri: finalPhotoUrl ? undefined : asset.photoDataUri,
+      signatureUrl: finalSignatureUrl,
+      signatureDataUri: finalSignatureUrl ? undefined : asset.signatureDataUri
     };
 
     const validation = AssetSchema.safeParse(assetToSave);
     if (!validation.success) {
+      console.error("Validation Error:", validation.error);
       monitoring.trackError(new Error("Validation Failure"), { 
         module: 'Firestore', 
         action: 'WRITE_VALIDATION', 
@@ -143,13 +153,10 @@ export const FirestoreService = {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
     try {
-      // Fetch to find grantId for storage deletion
       const snap = await getDoc(assetRef);
       if (snap.exists()) {
         const data = snap.data() as Asset;
-        if (data.photoUrl) {
-          await FirebaseStorageService.deleteAssetPhoto(data.grantId, assetId);
-        }
+        await FirebaseStorageService.deleteAssetMedia(data.grantId, assetId);
       }
       await deleteDoc(assetRef);
     } catch (err: any) {
