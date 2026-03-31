@@ -1,4 +1,8 @@
 {
     "IDX.aI.enableInlineCompletion": true,
-    "IDX.aI.enableCodebaseIndexing": true
+    "IDX.aI.enableCodebaseIndexing": true,
+    "editor.accessibilityPageSize": 5000,
+    "editor.smoothScrolling": true,
+    "diffEditor.maxFileSize": 0,
+    "diffEditor.maxComputationTime": 50000
 }

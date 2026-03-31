@@ -232,7 +232,7 @@ export default function ImportPage() {
           <div className="flex items-center justify-between relative min-w-[600px] px-4">
             <div className="absolute top-1/2 left-0 w-full h-0.5 bg-muted/30 -translate-y-1/2 -z-10" />
             <div 
-              className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 -z-10 transition-all duration-700 ease-[cubic-bezier(0.22,1,0.36,1)]" 
+              className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 -z-10 transition-all duration-700 ease-out" 
               style={{ width: `${(currentStepIndex / (STEPS.length - 1)) * 100}%` }}
             />
             {STEPS.map((step, idx) => {

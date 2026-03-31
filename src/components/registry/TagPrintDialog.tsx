@@ -117,7 +117,7 @@ export function TagPrintDialog({ isOpen, onOpenChange, records }: TagPrintDialog
                   <div className="grid grid-cols-2 gap-x-4 gap-y-2 pt-2 border-t border-dashed">
                     <div className="space-y-0.5">
                       <span className="text-[7px] font-black uppercase text-muted-foreground opacity-60">Tag ID</span>
-                      <p className="text-[9px] font-black text-primary truncate print:text-black">{record.sn || record.id.split('-')[0]}</p>
+                      <p className="text-[9px] font-black text-primary truncate print:text-black">{record.sn || String(record.id).split('-')[0]}</p>
                     </div>
                     <div className="space-y-0.5 text-right">
                       <span className="text-[7px] font-black uppercase text-muted-foreground opacity-60">Status</span>

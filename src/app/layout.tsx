@@ -1,4 +1,3 @@
-
 import type {Metadata, Viewport} from 'next';
 import './globals.css';
 import { ThemeProvider } from "@/components/theme-provider"
@@ -12,6 +11,10 @@ export const metadata: Metadata = {
   title: 'Assetain',
   description: 'Professional Asset Management & Verification Pulse. High-integrity offline-first registry.',
   manifest: '/manifest.json',
+  icons: {
+    icon: [], // Explicitly empty to prevent build-time favicon lookups
+    apple: [],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
