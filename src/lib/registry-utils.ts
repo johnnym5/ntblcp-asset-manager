@@ -136,7 +136,9 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
       case "section_name": rawValue = asset.section || ""; break;
       case "subsection_name": rawValue = asset.subsection || ""; break;
       default:
-        rawValue = (asset.metadata as any)[header.rawName] || (asset.metadata as any)[header.normalizedName] || "";
+        // Use optional chaining and default to empty object to prevent TypeError if metadata is missing
+        const metadata = asset.metadata || {};
+        rawValue = (metadata as any)[header.rawName] || (metadata as any)[header.normalizedName] || "";
     }
 
     return {
