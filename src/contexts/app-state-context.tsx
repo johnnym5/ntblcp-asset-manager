@@ -1,9 +1,8 @@
 'use client';
 
 /**
- * @fileOverview AppStateContext - The Unified Data Facade.
- * Orchestrates UI requests with Offline Storage, Sandbox, and Sync Engine.
- * Phase 14: Support for PRODUCTION vs SANDBOX context switching.
+ * @fileOverview AppStateContext - Unified Data & Connectivity Orchestrator.
+ * Phase 46: Implemented Auto-Switch UI logic for Online/Offline state.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
@@ -45,6 +44,19 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
+  // --- AUTO-SWITCH UI LOGIC ---
+  useEffect(() => {
+    // When offline, we formally present "Locally Saved Assets"
+    // When online, we present "Online Assets"
+    // Note: Both use the same PRODUCTION data source in an offline-first model,
+    // but the UI labels and behaviors adapt to the connection state.
+    const status = isOnline ? 'Online Assets View' : 'Locally Saved Assets View';
+    addNotification({ 
+      title: 'Connectivity Auto-Switch',
+      description: `Application is now in ${status}.`
+    });
+  }, [isOnline]);
+
   const setDataSource = (source: DataSource) => {
     setDataSourceStatus(source);
     addNotification({ 
@@ -55,16 +67,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const setIsOnline = (status: boolean) => {
     setIsOnlineStatus(status);
-    addNotification({ 
-      title: status ? 'Cloud Heartbeat Active' : 'Offline Registry Active',
-      description: status ? 'Establishing cloud parity.' : 'Modifications will be queued locally.'
-    });
   };
 
   const refreshRegistry = useCallback(async () => {
     setIsSyncing(true);
     try {
-      // 1. Load Local & Sandbox Persistence
       const localAssets = await storage.getAssets();
       const localSandbox = await storage.getSandbox();
       const localSettings = await storage.getSettings();
@@ -79,7 +86,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
       setAssets(initialFiltered);
 
-      // 2. Synchronize if Online with Automated Shadow Fallback
       if (isOnline) {
         await processSyncQueue();
         
@@ -87,7 +93,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         try {
           remoteSettings = await FirestoreService.getSettings();
         } catch (e) {
-          console.warn("Primary Layer Unreachable. Attempting Shadow Fallback...");
           remoteSettings = await getRtdbSettings();
         }
 
@@ -100,7 +105,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
             try {
               remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId);
             } catch (e) {
-              console.warn("Primary Assets Unavailable. Fetching from Shadow Mirror...");
               remoteAssets = await getRtdbAssets(remoteSettings.activeGrantId);
             }
 

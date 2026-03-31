@@ -1,9 +1,8 @@
-
 "use client";
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 45: Removed AI OCR scanning.
+ * Phase 46: Integrated Document Scanner visuals & Auto-Switch guides.
  */
 
 import React, { useEffect, useState, useRef } from "react";
@@ -54,7 +53,9 @@ import {
   GitPullRequest,
   Clock,
   ArrowRight,
-  Navigation
+  Navigation,
+  Maximize,
+  ScanLine
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -160,11 +161,7 @@ export function AssetForm({
   };
 
   const captureLocation = () => {
-    if (!navigator.geolocation) {
-      toast({ variant: "destructive", title: "GPS Unavailable", description: "Your browser does not support geolocation." });
-      return;
-    }
-
+    if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => {
         const geotag: Geotag = {
@@ -174,11 +171,8 @@ export function AssetForm({
           timestamp: new Date().toISOString()
         };
         form.setValue('geotag', geotag);
-        toast({ title: "Spatial Pulse Anchored", description: `Location captured within ${Math.round(pos.coords.accuracy)}m.` });
       },
-      (err) => {
-        toast({ variant: "destructive", title: "Location Pulse Failed", description: "Please enable GPS permissions for field audits." });
-      },
+      undefined,
       { enableHighAccuracy: true }
     );
   };
@@ -212,7 +206,8 @@ export function AssetForm({
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0);
-        const dataUri = canvas.toDataURL('image/jpeg', 0.7);
+        // Automatic Sizing Logic: Use JPEG quality compression for high-fidelity evidence
+        const dataUri = canvas.toDataURL('image/jpeg', 0.8);
         setCapturedPhoto(dataUri);
         stopCamera();
       }
@@ -240,30 +235,27 @@ export function AssetForm({
         <div className="flex flex-col shrink-0">
           <div className="flex items-center justify-between p-4 border-b bg-background/80 backdrop-blur-md z-30">
               <div className="flex items-center gap-3">
-                  <Button variant="ghost" size="icon" onClick={() => { stopCamera(); onOpenChange(false); }} className="rounded-xl h-10 w-10 tactile-pulse">
+                  <Button variant="ghost" size="icon" onClick={() => { stopCamera(); onOpenChange(false); }} className="rounded-xl h-10 w-10">
                       <ArrowLeft className="h-5 w-5" />
                   </Button>
                   <div className="flex flex-col">
                     <DialogTitle className="text-xs md:text-sm font-black tracking-tight uppercase leading-none truncate max-w-[120px] md:max-w-xs">
-                      {asset?.assetIdCode || 'NEW REGISTRATION'}
+                      {asset?.assetIdCode || 'NEW ASSET RECORD'}
                     </DialogTitle>
-                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-[0.2em] mt-1 opacity-60">REGISTRY PULSE</span>
+                    <span className="text-[8px] font-black uppercase text-muted-foreground tracking-[0.2em] mt-1 opacity-60">
+                      {isOnline ? 'Online Assets View' : 'Locally Saved Store'}
+                    </span>
                   </div>
               </div>
               
               <div className="flex items-center gap-1">
-                  <div className="flex items-center bg-muted/50 rounded-xl p-1 mr-1">
-                    <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-8 w-8 rounded-lg tactile-pulse"><ChevronLeft className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-8 w-8 rounded-lg tactile-pulse"><ChevronRight className="h-4 w-4" /></Button>
-                  </div>
                   {!isReadOnly && (
-                      <Button variant="ghost" size="icon" onClick={startCamera} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10 tactile-pulse"><Camera className="h-5 w-5" /></Button>
+                      <Button variant="ghost" size="icon" onClick={startCamera} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10"><Camera className="h-5 w-5" /></Button>
                   )}
-                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-40 hover:opacity-100 tactile-pulse"><Share2 className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-40 hover:opacity-100"><Share2 className="h-5 w-5" /></Button>
               </div>
           </div>
 
-          {/* Navigation Tabs */}
           <div className="px-4 py-2 border-b bg-muted/10">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid grid-cols-2 bg-background p-1 rounded-xl h-11">
@@ -283,13 +275,30 @@ export function AssetForm({
             <TabsContent value="details" className="m-0 h-full">
               <Form {...form}>
                 <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)} className="pb-32">
-                    {/* Evidence Viewport - Adaptive Aspect */}
+                    {/* Document Scanner Viewport (PRD Requirement) */}
                     {isCameraActive ? (
                       <div className="relative aspect-[4/3] bg-black overflow-hidden m-2 sm:m-4 rounded-[1.5rem] sm:rounded-[2rem] border-4 border-primary/20">
-                          <video ref={videoRef} className="w-full h-full object-cover" autoPlay muted playsInline />
+                          <video ref={videoRef} className="w-full h-full object-cover opacity-80" autoPlay muted playsInline />
+                          
+                          {/* Scanner UI Overlays */}
+                          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                            <div className="w-[80%] h-[70%] border-2 border-white/40 border-dashed rounded-xl relative">
+                              <ScanLine className="absolute top-0 left-0 w-full h-0.5 bg-primary/60 animate-[scan_2s_linear_infinite]" />
+                              <div className="absolute -top-2 -left-2 h-6 w-6 border-t-4 border-l-4 border-primary" />
+                              <div className="absolute -top-2 -right-2 h-6 w-6 border-t-4 border-r-4 border-primary" />
+                              <div className="absolute -bottom-2 -left-2 h-6 w-6 border-b-4 border-l-4 border-primary" />
+                              <div className="absolute -bottom-2 -right-2 h-6 w-6 border-b-4 border-r-4 border-primary" />
+                            </div>
+                          </div>
+
+                          <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md px-3 py-1.5 rounded-full flex items-center gap-2 border border-white/10">
+                            <div className="h-2 w-2 rounded-full bg-red-500 animate-pulse" />
+                            <span className="text-[8px] font-black uppercase text-white tracking-widest">Live Document Scanner Active</span>
+                          </div>
+
                           <div className="absolute bottom-6 left-0 right-0 flex justify-center gap-6">
-                              <Button variant="destructive" size="icon" className="h-14 w-14 rounded-2xl shadow-xl tactile-pulse" onClick={stopCamera}><X className="h-6 w-6" /></Button>
-                              <Button className="h-16 w-16 rounded-full bg-white text-black shadow-2xl border-[6px] border-black/10 tactile-pulse" onClick={capturePhoto}>
+                              <Button variant="destructive" size="icon" className="h-14 w-14 rounded-2xl shadow-xl" onClick={stopCamera}><X className="h-6 w-6" /></Button>
+                              <Button className="h-16 w-16 rounded-full bg-white text-black shadow-2xl border-[6px] border-black/10" onClick={capturePhoto}>
                                 <div className="h-10 w-10 border-4 border-black rounded-full" />
                               </Button>
                           </div>
@@ -308,32 +317,15 @@ export function AssetForm({
                     ) : (
                       <div className="m-2 sm:m-4 h-40 md:h-48 border-2 border-dashed border-primary/10 rounded-[1.5rem] sm:rounded-[2rem] flex flex-col items-center justify-center gap-4 bg-primary/5 hover:bg-primary/[0.08] transition-colors cursor-pointer group" onClick={startCamera}>
                         <div className="p-4 bg-primary/10 rounded-2xl group-hover:scale-110 transition-transform"><Camera className="h-8 w-8 text-primary" /></div>
-                        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Attach Proof Pulse</span>
+                        <span className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground">Open Document Scanner</span>
                       </div>
                     )}
 
-                    {/* Geotag Indicator */}
-                    {form.watch('geotag') && (
-                      <div className="px-4 md:px-6">
-                        <div className="p-4 rounded-2xl bg-green-500/5 border-2 border-dashed border-green-500/20 flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <div className="p-2 bg-green-100 rounded-xl"><Navigation className="h-4 w-4 text-green-600" /></div>
-                            <div className="flex flex-col">
-                              <span className="text-[10px] font-black uppercase text-green-700">Spatial Protocol Active</span>
-                              <span className="text-[8px] font-mono font-bold opacity-40">{form.watch('geotag.lat').toFixed(4)}, {form.watch('geotag.lng').toFixed(4)}</span>
-                            </div>
-                          </div>
-                          <Badge className="bg-green-500 font-black text-[8px] uppercase">Anchored</Badge>
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Form Grids - Adaptive Columns */}
-                    <SectionHeader label="Identification Pulse" icon={Tag} />
+                    <SectionHeader label="Record Identification" icon={Tag} />
                     <div className="px-4 md:px-6 py-6 space-y-6">
                       <FormField control={form.control} name="description" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('asset_description', 'Description')}</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Asset Description</FormLabel>
                           <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormItem>
                         </FormItem>
                       )}/>
@@ -341,45 +333,36 @@ export function AssetForm({
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                         <FormField control={form.control} name="assetIdCode" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('asset_id_code', 'Registry Tag')}</FormLabel>
+                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Tag ID Code</FormLabel>
                             <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                           </FormItem>
                         )}/>
 
                         <FormField control={form.control} name="serialNumber" render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('serial_number', 'Serial')}</FormLabel>
+                            <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Serial Number</FormLabel>
                             <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                           </FormItem>
                         )}/>
                       </div>
                     </div>
 
-                    <SectionHeader label="Location & Assessment" icon={MapPin} />
+                    <SectionHeader label="Field Assessment" icon={MapPin} />
                     <div className="px-4 md:px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField control={form.control} name="location" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('location', 'Location')}</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Location Scope</FormLabel>
                           <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                         </FormItem>
                       )}/>
 
                       <FormField control={form.control} name="condition" render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">{getLabel('condition', 'Condition')}</FormLabel>
+                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Asset Condition</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value} disabled={isReadOnly}>
                             <FormControl><SelectTrigger className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:ring-primary/20 font-bold text-xs shadow-inner"><SelectValue /></SelectTrigger></FormControl>
                             <SelectContent className="rounded-xl">{ASSET_CONDITIONS.map(c => <SelectItem key={c} value={c} className="text-xs font-bold">{c}</SelectItem>)}</SelectContent>
                           </Select>
-                        </FormItem>
-                      )}/>
-                    </div>
-
-                    <div className="p-4 md:px-6">
-                      <FormField control={form.control} name="metadata.remarks" render={({ field }) => (
-                        <FormItem>
-                          <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Field Remarks</FormLabel>
-                          <FormControl><Textarea {...(field as any)} readOnly={isReadOnly} className="min-h-[100px] rounded-2xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-medium text-sm shadow-inner p-4 resize-none" /></FormControl>
                         </FormItem>
                       )}/>
                     </div>
@@ -429,13 +412,13 @@ export function AssetForm({
           </Tabs>
         </ScrollArea>
 
-        {/* Footer - Fluid Stack */}
+        {/* Footer */}
         {!isReadOnly && activeTab === 'details' && (
             <div className="p-4 md:p-6 bg-background/80 backdrop-blur-xl border-t flex flex-col sm:flex-row items-center gap-3 absolute bottom-0 left-0 right-0 z-40">
                 <Button variant="ghost" onClick={() => { stopCamera(); onOpenChange(false); }} className="w-full sm:flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl">DISCARD</Button>
                 <Button type="submit" form="asset-form" disabled={isSaving} className="w-full sm:flex-1 h-14 font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-primary/30 rounded-2xl bg-primary text-primary-foreground">
                     {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ShieldCheck className="h-5 w-5 mr-2" />}
-                    COMMIT PULSE
+                    COMMIT RECORD
                 </Button>
             </div>
         )}

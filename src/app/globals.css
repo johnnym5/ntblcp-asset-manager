@@ -4,66 +4,36 @@
 
 @layer base {
   :root {
-    /* Material You - Gold Forward Mode - Refined for Softness */
-    --background: 45 30% 98%;
-    --foreground: 45 10% 10%;
+    /* Navy Blue (#2E3192) forwarded for Primary */
+    --background: 210 29% 96%;
+    --foreground: 224 71.4% 4.1%;
     
     --card: 0 0% 100%;
-    --card-foreground: 45 10% 10%;
+    --card-foreground: 224 71.4% 4.1%;
     
     --popover: 0 0% 100%;
-    --popover-foreground: 45 10% 10%;
+    --popover-foreground: 224 71.4% 4.1%;
     
-    --primary: 45 95% 40%;
-    --primary-foreground: 45 50% 10%;
+    --primary: 238 52% 38%; /* #2E3192 */
+    --primary-foreground: 210 40% 98%;
     
-    --secondary: 45 20% 92%;
-    --secondary-foreground: 45 90% 15%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
     
-    --muted: 45 15% 94%;
-    --muted-foreground: 45 5% 40%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
     
-    --accent: 180 100% 22%;
+    --accent: 180 100% 25%; /* Teal #008080 */
     --accent-foreground: 210 40% 98%;
     
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
     
-    --border: 45 15% 88%;
-    --input: 45 15% 88%;
-    --ring: 45 95% 40%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 238 52% 38%;
     
-    --radius: 1.5rem; /* Soft Organic Curves */
-  }
-  .dark {
-    /* Material You - Gold AMOLED Night Mode */
-    --background: 0 0% 0%; /* Pure Black */
-    --foreground: 45 10% 95%;
-    
-    --card: 45 10% 4%;
-    --card-foreground: 45 10% 95%;
-    
-    --popover: 45 10% 3%;
-    --popover-foreground: 45 10% 95%;
-    
-    --primary: 45 90% 60%;
-    --primary-foreground: 45 50% 5%;
-    
-    --secondary: 45 10% 10%;
-    --secondary-foreground: 45 10% 95%;
-    
-    --muted: 45 10% 8%;
-    --muted-foreground: 45 5% 60%;
-    
-    --accent: 180 80% 45%;
-    --accent-foreground: 45 10% 5%;
-    
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
-    
-    --border: 45 10% 12%;
-    --input: 45 10% 12%;
-    --ring: 45 90% 60%;
+    --radius: 1.5rem;
   }
 }
 
@@ -72,59 +42,18 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body antialiased selection:bg-primary/20;
+    @apply bg-[#F0F4F8] text-foreground font-body antialiased;
   }
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline font-black uppercase tracking-tight;
   }
 }
 
-@layer utilities {
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    @apply bg-transparent;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-colors;
-  }
-  
-  /* Fluid Spacing Pulses */
-  .adaptive-p { @apply p-4 md:p-6 lg:p-8 xl:p-10; }
-  .adaptive-px { @apply px-4 md:px-6 lg:px-8 xl:px-10; }
-  .adaptive-py { @apply py-4 md:py-6 lg:py-8 xl:py-10; }
-  .adaptive-gap { @apply gap-4 md:gap-6 lg:gap-8; }
+@keyframes scan {
+  0% { transform: translateY(0); }
+  100% { transform: translateY(100%); }
+}
 
-  /* Operational Surface Utilities */
-  .surface-1 { @apply bg-primary/[0.04]; }
-  .surface-2 { @apply bg-primary/[0.07]; }
-  .surface-3 { @apply bg-primary/[0.10]; }
-  .surface-4 { @apply bg-primary/[0.12]; }
-  .surface-5 { @apply bg-primary/[0.14]; }
-
-  .glass-card {
-    @apply bg-card/70 backdrop-blur-xl border border-white/10 shadow-2xl;
-  }
-
-  /* Tactile Feedback Pulse */
-  .tactile-pulse {
-    @apply active:scale-95 transition-transform duration-200;
-  }
-
-  /* Fluid Entrance Animation */
-  .animate-pulse-slow {
-    animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
-  }
-
-  .text-responsive-h1 {
-    font-size: clamp(1.875rem, 5vw, 3rem);
-    line-height: 1;
-  }
-  
-  .text-responsive-h2 {
-    font-size: clamp(1.5rem, 4vw, 2.25rem);
-    line-height: 1.1;
-  }
+.animate-scan {
+  animation: scan 2s linear infinite;
 }
