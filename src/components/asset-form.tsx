@@ -1,8 +1,9 @@
+
 "use client";
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 61: Optimized with next/image and AI-hint compliance.
+ * Phase 63: Strictly deterministic form without suggestion logic.
  */
 
 import React, { useEffect, useState, useRef } from "react";
@@ -371,7 +372,6 @@ export function AssetForm({
                             height={400}
                             className="w-full h-full object-cover" 
                             alt="Asset Evidence" 
-                            data-ai-hint="technical evidence"
                             unoptimized
                           />
                           <div className="absolute top-4 right-4 flex gap-2">
@@ -479,7 +479,6 @@ export function AssetForm({
                                 height={200}
                                 className="max-h-full mix-blend-multiply opacity-80" 
                                 alt="Custodian Signature" 
-                                data-ai-hint="custodian signature"
                                 unoptimized
                               />
                             ) : (

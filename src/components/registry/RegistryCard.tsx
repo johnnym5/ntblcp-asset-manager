@@ -1,6 +1,7 @@
+
 /**
  * @fileOverview RegistryCard - Source-Aware Professional Register Renderer.
- * Phase 61: Optimized with next/image and AI-hint compliance.
+ * Phase 63: Deterministic render with optimized Image and GIS pulse markers.
  */
 
 import React from 'react';
@@ -22,7 +23,8 @@ import {
   Smartphone,
   Truck,
   LayoutGrid,
-  PenTool
+  PenTool,
+  Navigation
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
@@ -54,8 +56,8 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
   });
 
   const getSemanticImage = () => {
-    if (asset.photoUrl) return { url: asset.photoUrl, hint: "asset photo" };
-    if (asset.photoDataUri) return { url: asset.photoDataUri, hint: "asset photo" };
+    if (asset.photoUrl) return { url: asset.photoUrl };
+    if (asset.photoDataUri) return { url: asset.photoDataUri };
     
     const cat = asset.category?.toLowerCase() || '';
     if (cat.includes('vehicle') || cat.includes('motorcycle')) return images.asset_categories.vehicles;
@@ -97,6 +99,11 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {asset.geotag && (
+              <Badge variant="outline" className="h-6 px-2 border-primary/20 bg-primary/5 text-primary">
+                <Navigation className="h-3 w-3" />
+              </Badge>
+            )}
             {(asset.signatureUrl || asset.signatureDataUri) && (
               <Badge variant="outline" className="h-6 px-2 border-green-500/20 bg-green-50 text-green-600">
                 <PenTool className="h-3 w-3" />
@@ -109,7 +116,6 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
                 height={400}
                 className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" 
                 alt="Asset Evidence" 
-                data-ai-hint={imagePulse.hint}
                 unoptimized
               />
             </div>

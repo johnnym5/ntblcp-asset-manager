@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Visual Evidence Gallery - High-Fidelity Asset Media Workspace.
- * Phase 61: Optimized with next/image and AI-hint compliance.
+ * Phase 63: Optimized deterministic gallery without AI hints.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -132,7 +133,6 @@ export default function GalleryPage() {
                       height={400}
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
                       alt={asset.description}
-                      data-ai-hint="technical evidence"
                       unoptimized
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity duration-500" />

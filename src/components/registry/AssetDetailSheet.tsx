@@ -1,6 +1,7 @@
+
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity Detail Workstation.
- * Phase 61: Optimized with next/image and AI-hint compliance.
+ * Phase 63: Deterministic render without AI metadata hints.
  */
 
 import React, { useState } from 'react';
@@ -123,7 +124,6 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                     height={400}
                     className="w-full h-full object-cover" 
                     alt="Asset Evidence" 
-                    data-ai-hint="asset photo"
                     unoptimized
                   />
                   <Badge className="absolute bottom-4 left-4 bg-primary/90 backdrop-blur-md font-black uppercase text-[8px] tracking-[0.2em] px-3 h-6 rounded-lg">
@@ -188,7 +188,6 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                       height={200}
                       className="max-h-24 mx-auto mix-blend-multiply opacity-80" 
                       alt="Custodian Signature" 
-                      data-ai-hint="custodian signature"
                       unoptimized
                     />
                     <div className="h-px bg-border/40 w-1/2 mx-auto" />

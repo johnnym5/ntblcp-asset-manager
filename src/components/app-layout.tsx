@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
- * Phase 62: Hardened PWA Connectivity & Identity Scanning.
+ * Phase 63: Hardened GIS Integration & Deterministic Shell.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -37,7 +37,9 @@ import {
   Search,
   Command,
   ShieldAlert,
-  QrCode
+  QrCode,
+  Map as MapIcon,
+  Navigation
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -68,8 +70,9 @@ interface NavItem {
 const PRIMARY_NAV: NavItem[] = [
   { label: 'Pulse', href: '/', icon: <LayoutDashboard className="h-4 w-4" />, shortcut: 'D' },
   { label: 'Registry', href: '/assets', icon: <Boxes className="h-4 w-4" />, shortcut: 'R' },
+  { label: 'Spatial', href: '/gis', icon: <MapIcon className="h-4 w-4" />, shortcut: 'G' },
   { label: 'Review', href: '/verify', icon: <CheckCircle2 className="h-4 w-4" />, shortcut: 'V' },
-  { label: 'Evidence', href: '/gallery', icon: <Camera className="h-4 w-4" />, shortcut: 'G' },
+  { label: 'Evidence', href: '/gallery', icon: <Camera className="h-4 w-4" />, shortcut: 'E' },
 ];
 
 const AUDIT_NAV: NavItem[] = [
@@ -102,7 +105,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === 'r') router.push('/assets');
       if (e.key === 'd') router.push('/');
-      if (e.key === 'g') router.push('/gallery');
+      if (e.key === 'g') router.push('/gis');
+      if (e.key === 'e') router.push('/gallery');
       if (e.key === 'u') router.push('/import');
       if (e.key === 'v') router.push('/verify');
       if (e.key === 'q') router.push('/sync-queue');
