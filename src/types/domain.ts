@@ -10,6 +10,24 @@ export type UXMode = 'beginner' | 'advanced';
 export type StorageLayer = 'FIRESTORE' | 'RTDB' | 'LOCAL';
 export type AuthorityNode = 'FIRESTORE' | 'RTDB';
 
+/**
+ * SPA Workstation View Enumeration.
+ * Defines the logical sections available in the unified app shell.
+ */
+export type WorkstationView = 
+  | 'DASHBOARD' 
+  | 'REGISTRY' 
+  | 'IMPORT' 
+  | 'VERIFY' 
+  | 'REPORTS' 
+  | 'ALERTS' 
+  | 'AUDIT_LOG' 
+  | 'SYNC_QUEUE' 
+  | 'USERS' 
+  | 'INFRASTRUCTURE' 
+  | 'DATABASE' 
+  | 'SETTINGS';
+
 export interface SectionHierarchy {
   document: string;
   section: string;

@@ -1,17 +1,18 @@
 'use client';
 
 /**
- * @fileOverview AppStateContext - Unified Data & Connectivity Orchestrator.
+ * @fileOverview AppStateContext - Unified Data & SPA Orchestrator.
  * Phase 67: Deep-Hydration Protocol for 100% Offline Autonomy.
- * Ensures the entire registry is held in memory for zero-latency transitions.
+ * SPA View State enables zero-latency transitions between workstations.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { storage } from '@/offline/storage';
 import { processSyncQueue } from '@/offline/sync';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { getAssets as getRtdbAssets, getSettings as getRtdbSettings } from '@/lib/database';
-import type { Asset, AppSettings, DataSource, AuthorityNode } from '@/types/domain';
+import type { Asset, AppSettings, DataSource, AuthorityNode, WorkstationView } from '@/types/domain';
 import { addNotification } from '@/hooks/use-notifications';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
 
@@ -51,16 +52,23 @@ interface AppStateContextType {
   isSyncing: boolean;
   appSettings: AppSettings | null;
   settingsLoaded: boolean;
-  isHydrated: boolean; // Indicates if the local memory pulse is complete
+  isHydrated: boolean;
   refreshRegistry: () => Promise<void>;
   activeGrantId: string | null;
   setActiveGrantId: (id: string) => Promise<void>;
   setReadAuthority: (node: AuthorityNode) => Promise<void>;
+  
+  // SPA View Management
+  activeView: WorkstationView;
+  setActiveView: (view: WorkstationView) => void;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
 export const AppStateProvider = ({ children }: { children: React.ReactNode }) => {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  
   const [assets, setAssets] = useState<Asset[]>([]);
   const [sandboxAssets, setSandboxAssets] = useState<Asset[]>([]);
   const [dataSource, setDataSourceStatus] = useState<DataSource>('PRODUCTION');
@@ -71,7 +79,31 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [isHydrated, setIsHydrated] = useState(false);
 
+  // Unified SPA Navigation State
+  const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
+
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
+
+  /**
+   * Updates the active view and synchronizes with URL for deep linking.
+   */
+  const setActiveView = useCallback((view: WorkstationView) => {
+    setActiveViewStatus(view);
+    const params = new URLSearchParams(searchParams?.toString() || '');
+    params.set('v', view.toLowerCase());
+    router.push(`/?${params.toString()}`, { scroll: false });
+  }, [router, searchParams]);
+
+  // Sync URL view param with internal state
+  useEffect(() => {
+    const v = searchParams?.get('v');
+    if (v) {
+      const matchedView = v.toUpperCase() as WorkstationView;
+      if (matchedView !== activeView) {
+        setActiveViewStatus(matchedView);
+      }
+    }
+  }, [searchParams, activeView]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -87,10 +119,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, []);
 
-  /**
-   * Performs a Deep-Hydration of the local React state from IndexedDB.
-   * This is the "Zero-Latency" trigger.
-   */
   const hydrateFromLocalStore = useCallback(async () => {
     try {
       const [localAssets, localSandbox, localSettings] = await Promise.all([
@@ -114,16 +142,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, []);
 
-  /**
-   * Synchronizes the local store with the Cloud Authority.
-   * Runs silently in the background after hydration.
-   */
   const refreshRegistry = useCallback(async () => {
     if (!isOnline) return;
     setIsSyncing(true);
     try {
       await processSyncQueue();
-      
       const authority = appSettings?.readAuthority || 'FIRESTORE';
       let remoteSettings = null;
 
@@ -154,8 +177,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
             const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
             const combinedAssets = [...otherAssets, ...remoteAssets];
             await storage.saveAssets(combinedAssets);
-            
-            // Update React state instantly
             setAssets(remoteAssets);
           }
         }
@@ -181,7 +202,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (isOnline) {
       FirestoreService.updateSettings({ activeGrantId: id });
     }
-    // Instant local refresh
     const localAssets = await storage.getAssets();
     setAssets(localAssets.filter(a => a.grantId === id));
     refreshRegistry();
@@ -199,7 +219,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     refreshRegistry();
   };
 
-  // INITIAL BOOTSTRAP: HYDRATE FIRST, SYNC SECOND
   useEffect(() => {
     const bootstrap = async () => {
       await hydrateFromLocalStore();
@@ -228,7 +247,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       refreshRegistry,
       activeGrantId,
       setActiveGrantId,
-      setReadAuthority
+      setReadAuthority,
+      activeView,
+      setActiveView
     }}>
       {children}
     </AppStateContext.Provider>

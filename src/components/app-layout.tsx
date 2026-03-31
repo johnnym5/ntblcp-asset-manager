@@ -1,13 +1,11 @@
 'use client';
 
 /**
- * @fileOverview AppLayout - Reorganized Logical Workstations.
- * Phase 69: Grouped functional units (Engineering, Audit, Governance) and disabled Spatial.
+ * @fileOverview AppLayout - SPA Shell Persistence.
+ * Phase 69: Grouped functional units and transitioned to state-driven navigation.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
-import Link from 'next/link';
-import { usePathname, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   LayoutDashboard, 
@@ -38,7 +36,8 @@ import {
   QrCode,
   LayoutGrid,
   FileSpreadsheet,
-  FolderKanban
+  FolderKanban,
+  ChevronDown
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -55,10 +54,11 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/comp
 import { ScrollArea } from './ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from './ui/separator';
+import type { WorkstationView } from '@/types/domain';
 
 interface NavItem {
   label: string;
-  href: string;
+  view: WorkstationView;
   icon: React.ReactNode;
   adminOnly?: boolean;
   superAdminOnly?: boolean;
@@ -66,34 +66,29 @@ interface NavItem {
   badgeCount?: number;
 }
 
-// Group 1: Registry Engineering (Import/Export/Registry)
 const ENGINEERING_NAV: NavItem[] = [
-  { label: 'Asset Registry', href: '/assets', icon: <Boxes className="h-4 w-4" />, shortcut: 'R' },
-  { label: 'Import Center', href: '/import', icon: <FileUp className="h-4 w-4" />, shortcut: 'U' },
+  { label: 'Asset Registry', view: 'REGISTRY', icon: <Boxes className="h-4 w-4" />, shortcut: 'R' },
+  { label: 'Import Center', view: 'IMPORT', icon: <FileUp className="h-4 w-4" />, shortcut: 'U' },
 ];
 
-// Group 2: Quality & Audit (Review, Sync, Reports, Ledger)
 const AUDIT_NAV: NavItem[] = [
-  { label: 'Verification Queue', href: '/verify', icon: <CheckCircle2 className="h-4 w-4" />, shortcut: 'V' },
-  { label: 'Sync Queue', href: '/sync-queue', icon: <ListTodo className="h-4 w-4" />, shortcut: 'Q' },
-  { label: 'Reporting Hub', href: '/reports', icon: <FileText className="h-4 w-4" /> },
-  { label: 'Activity Ledger', href: '/audit-log', icon: <History className="h-4 w-4" />, shortcut: 'L' },
+  { label: 'Verification Queue', view: 'VERIFY', icon: <CheckCircle2 className="h-4 w-4" />, shortcut: 'V' },
+  { label: 'Sync Queue', view: 'SYNC_QUEUE', icon: <ListTodo className="h-4 w-4" />, shortcut: 'Q' },
+  { label: 'Reporting Hub', view: 'REPORTS', icon: <FileText className="h-4 w-4" /> },
+  { label: 'Activity Ledger', view: 'AUDIT_LOG', icon: <History className="h-4 w-4" />, shortcut: 'L' },
 ];
 
-// Group 3: Governance & Systems (Identities, Infrastructure, Database, Settings)
 const GOVERNANCE_NAV: NavItem[] = [
-  { label: 'Identities', href: '/users', icon: <Users className="h-4 w-4" />, adminOnly: true },
-  { label: 'Infrastructure', href: '/infrastructure', icon: <Monitor className="h-4 w-4" />, adminOnly: true },
-  { label: 'Database Control', href: '/admin/database', icon: <Terminal className="h-4 w-4" />, superAdminOnly: true },
-  { label: 'System Settings', href: '/settings', icon: <Settings className="h-4 w-4" />, adminOnly: true, shortcut: ',' },
+  { label: 'Identities', view: 'USERS', icon: <Users className="h-4 w-4" />, adminOnly: true },
+  { label: 'Infrastructure', view: 'INFRASTRUCTURE', icon: <Monitor className="h-4 w-4" />, adminOnly: true },
+  { label: 'Database Control', view: 'DATABASE', icon: <Terminal className="h-4 w-4" />, superAdminOnly: true },
+  { label: 'System Settings', view: 'SETTINGS', icon: <Settings className="h-4 w-4" />, adminOnly: true, shortcut: ',' },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const pathname = usePathname();
-  const router = useRouter();
   const { userProfile, logout } = useAuth();
   const { toast } = useToast();
-  const { isOnline, isSyncing, assets, appSettings, refreshRegistry } = useAppState();
+  const { isOnline, isSyncing, assets, appSettings, refreshRegistry, activeView, setActiveView } = useAppState();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
@@ -103,20 +98,20 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-      if (e.key === 'r') router.push('/assets');
-      if (e.key === 'd') router.push('/');
-      if (e.key === 'u') router.push('/import');
-      if (e.key === 'v') router.push('/verify');
-      if (e.key === 'q') router.push('/sync-queue');
+      if (e.key === 'r') setActiveView('REGISTRY');
+      if (e.key === 'd') setActiveView('DASHBOARD');
+      if (e.key === 'u') setActiveView('IMPORT');
+      if (e.key === 'v') setActiveView('VERIFY');
+      if (e.key === 'q') setActiveView('SYNC_QUEUE');
       if (e.key === 's') refreshRegistry();
       if (e.key === '?' || e.key === 'h') setIsHelpOpen(true);
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [router, refreshRegistry]);
+  }, [setActiveView, refreshRegistry]);
 
   const isAdmin = userProfile?.isAdmin;
-  const isSuperAdmin = userProfile?.isSuperAdmin || userProfile?.isAdmin;
+  const isSuperAdmin = userProfile?.isAdmin;
   const pendingCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
   
   const alertCount = useMemo(() => {
@@ -144,36 +139,43 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </p>
         )}
         {visibleItems.map((item) => (
-          <Link key={item.href} href={item.href} onClick={() => setIsMobileMenuOpen(false)} className={cn("flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all relative overflow-hidden group", pathname === item.href ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground hover:bg-muted hover:text-foreground")}>
+          <button 
+            key={item.view} 
+            onClick={() => { setActiveView(item.view); setIsMobileMenuOpen(false); }} 
+            className={cn(
+              "w-full flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all relative overflow-hidden group", 
+              activeView === item.view ? "bg-primary text-primary-foreground shadow-lg shadow-primary/20" : "text-muted-foreground hover:bg-muted hover:text-foreground"
+            )}
+          >
             <div className="z-10 flex items-center gap-3 w-full">
               {item.icon}
-              <span className="flex-1">{item.label}</span>
+              <span className="flex-1 text-left">{item.label}</span>
               {item.badgeCount && item.badgeCount > 0 ? (
                 <Badge className={cn(
                   "h-5 min-w-5 flex items-center justify-center p-0 rounded-full font-black text-[8px]",
-                  pathname === item.href ? "bg-white text-primary" : "bg-primary text-white"
+                  activeView === item.view ? "bg-white text-primary" : "bg-primary text-white"
                 )}>
                   {item.badgeCount}
                 </Badge>
               ) : null}
               {isAdvanced && item.shortcut && <kbd className="text-[8px] font-mono opacity-20 group-hover:opacity-60 border px-1.5 py-0.5 rounded-md bg-muted/20">{item.shortcut}</kbd>}
             </div>
-            {pathname === item.href && <motion.div layoutId="nav-active" className="absolute inset-0 bg-primary z-0" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
-          </Link>
+            {activeView === item.view && <motion.div layoutId="nav-active" className="absolute inset-0 bg-primary z-0" transition={{ type: "spring", stiffness: 380, damping: 30 }} />}
+          </button>
         ))}
       </div>
     );
   };
 
   const handleQRSuccess = (assetId: string) => {
-    router.push(`/assets?id=${assetId}`);
+    setActiveView('REGISTRY');
     toast({ title: "QR Pulse Detected", description: "Navigating to record profile..." });
   };
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden font-body selection:bg-primary/10">
       <aside className="hidden lg:flex flex-col w-72 shrink-0 border-r bg-card/50 backdrop-blur-xl p-6">
-        <div className="flex items-center gap-3 mb-10 px-2">
+        <div className="flex items-center gap-3 mb-10 px-2 cursor-pointer" onClick={() => setActiveView('DASHBOARD')}>
           <div className="p-2.5 bg-primary rounded-2xl shadow-xl shadow-primary/20">
             <Zap className="h-6 w-6 text-primary-foreground fill-current" />
           </div>
@@ -184,26 +186,32 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
 
         <div className="flex-1 overflow-y-auto custom-scrollbar pr-2 -mr-2">
-          <Link 
-            href="/" 
+          <button 
+            onClick={() => setActiveView('DASHBOARD')} 
             className={cn(
-              "flex items-center gap-3 px-4 py-3 mb-2 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all group",
-              pathname === '/' ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
+              "w-full flex items-center gap-3 px-4 py-3 mb-2 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all group",
+              activeView === 'DASHBOARD' ? "bg-primary/10 text-primary" : "text-muted-foreground hover:bg-muted"
             )}
           >
             <LayoutDashboard className="h-4 w-4" />
             <span>Dashboard Hub</span>
-          </Link>
+          </button>
 
           <NavGroup items={ENGINEERING_NAV} title="Registry Engineering" />
           
           <div className="mt-6 space-y-1">
             <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-destructive">Tactical Alerts</p>
-            <Link href="/alerts" className={cn("flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all group", pathname === '/alerts' ? "bg-destructive text-white shadow-xl" : "text-muted-foreground hover:bg-destructive/5 hover:text-destructive")}>
+            <button 
+              onClick={() => setActiveView('ALERTS')} 
+              className={cn(
+                "w-full flex items-center gap-3 px-4 py-3 text-[11px] font-bold uppercase tracking-widest rounded-xl transition-all group", 
+                activeView === 'ALERTS' ? "bg-destructive text-white shadow-xl" : "text-muted-foreground hover:bg-destructive/5 hover:text-destructive"
+              )}
+            >
               <ShieldAlert className="h-4 w-4" />
-              <span className="flex-1">Risk Alerts</span>
-              {alertCount > 0 && <Badge className={cn("h-5 min-w-5 flex items-center justify-center p-0 rounded-full font-black text-[8px] animate-pulse", pathname === '/alerts' ? "bg-white text-destructive" : "bg-destructive text-white")}>{alertCount}</Badge>}
-            </Link>
+              <span className="flex-1 text-left">Risk Alerts</span>
+              {alertCount > 0 && <Badge className={cn("h-5 min-w-5 flex items-center justify-center p-0 rounded-full font-black text-[8px] animate-pulse", activeView === 'ALERTS' ? "bg-white text-destructive" : "bg-destructive text-white")}>{alertCount}</Badge>}
+            </button>
           </div>
 
           <NavGroup items={AUDIT_NAV} title="Audit & Traceability" />
@@ -264,10 +272,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </SheetHeader>
                   <ScrollArea className="flex-1 px-6 py-4">
                     <div className="pb-10">
-                      <Link href="/" onClick={() => setIsMobileMenuOpen(false)} className="flex items-center gap-3 px-4 py-3 mb-4 text-[11px] font-bold uppercase tracking-widest rounded-xl bg-muted">
+                      <button 
+                        onClick={() => { setActiveView('DASHBOARD'); setIsMobileMenuOpen(false); }} 
+                        className="w-full flex items-center gap-3 px-4 py-3 mb-4 text-[11px] font-bold uppercase tracking-widest rounded-xl bg-muted"
+                      >
                         <LayoutDashboard className="h-4 w-4" />
                         <span>Dashboard</span>
-                      </Link>
+                      </button>
                       <NavGroup items={ENGINEERING_NAV} title="Registry Engineering" />
                       <NavGroup items={AUDIT_NAV} title="Audit & Traceability" />
                       <NavGroup items={GOVERNANCE_NAV} title="Governance & Systems" />
@@ -279,7 +290,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="flex items-center gap-4">
               <h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">
                 <span className="opacity-40 hidden sm:inline">Context ›</span>
-                <span className="text-foreground">{pathname === '/' ? 'Pulse' : pathname.split('/').pop()?.replace('-', ' ')}</span>
+                <span className="text-foreground">{activeView.replace('_', ' ')}</span>
               </h1>
               
               <button 
@@ -336,21 +347,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <main className="flex-1 overflow-y-auto custom-scrollbar bg-muted/10 relative">
-          <AnimatePresence mode="wait">
-            <motion.div 
-              key={pathname} 
-              initial={{ opacity: 0, y: 10, scale: 0.99 }} 
-              animate={{ opacity: 1, y: 0, scale: 1 }} 
-              exit={{ opacity: 0, y: -10, scale: 0.99 }} 
-              transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }} 
-              className="p-4 md:p-8 lg:p-10"
-            >
-              <div className="max-w-[1600px] mx-auto h-full">
-                {children}
-              </div>
-            </motion.div>
-          </AnimatePresence>
+        <main className="flex-1 overflow-hidden bg-muted/10 relative">
+          <div className="h-full w-full overflow-y-auto custom-scrollbar p-4 md:p-8 lg:p-10">
+            <div className="max-w-[1600px] mx-auto h-full">
+              {children}
+            </div>
+          </div>
         </main>
       </div>
 
