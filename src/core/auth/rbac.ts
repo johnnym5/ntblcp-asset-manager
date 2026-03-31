@@ -1,9 +1,9 @@
 /**
  * @fileOverview RBAC (Role-Based Access Control) Engine.
- * Pure business logic for evaluating user permissions and regional scopes.
+ * Phase 49: Hardened Zonal Manager scope inheritance logic.
  */
 
-import type { AuthorizedUser, UserRole, Asset } from '@/types/domain';
+import type { AuthorizedUser, Asset } from '@/types/domain';
 import { NIGERIAN_ZONES } from '@/lib/constants';
 
 export type Action = 
@@ -13,16 +13,19 @@ export type Action =
   | 'EDIT_ASSET' 
   | 'DELETE_ASSET' 
   | 'VERIFY_ASSET'
-  | 'VIEW_REPORTS';
+  | 'VIEW_REPORTS'
+  | 'DATABASE_MISSION_CONTROL';
 
 /**
  * Checks if a user has the base permission for an action.
- * This is role-based and does not consider data-level scoping.
  */
 export function hasPermission(user: AuthorizedUser, action: Action): boolean {
   const role = user.role;
 
   switch (action) {
+    case 'DATABASE_MISSION_CONTROL':
+      return !!user.isSuperAdmin;
+
     case 'MANAGE_USERS':
     case 'EDIT_CONFIG':
     case 'DELETE_ASSET':
@@ -59,7 +62,7 @@ export function isWithinScope(user: AuthorizedUser, asset: Asset): boolean {
   // they have scope for all states within that zone.
   for (const assignedStateOrZone of user.states) {
     const zoneStates = NIGERIAN_ZONES[assignedStateOrZone as keyof typeof NIGERIAN_ZONES];
-    if (zoneStates && zoneStates.includes(assetLocation)) {
+    if (zoneStates && zoneStates.map(s => s.toLowerCase()).includes(assetLocation.toLowerCase())) {
       return true;
     }
   }
