@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Infrastructure Command Center - Enterprise Data Governance.
- * Phase 51: Implemented Live Sync Heartbeat visualizer & detailed log stats.
+ * Phase 55: Launched System Diagnostics & Redundancy Topology visualizer.
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import AppLayout from '@/components/app-layout';
 import { 
   Monitor, 
@@ -30,7 +30,10 @@ import {
   ShieldHalf,
   Bomb,
   LineChart,
-  Network
+  Network,
+  Cpu,
+  ChevronRight,
+  ArrowRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -43,6 +46,7 @@ import { cn } from '@/lib/utils';
 import { storage } from '@/offline/storage';
 import { ArchiveService } from '@/lib/archive-service';
 import { VirtualDBService } from '@/services/virtual-db-service';
+import { SystemDiagnostics, type DiagnosticResult } from '@/lib/diagnostics';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import Link from 'next/link';
 
@@ -52,7 +56,8 @@ export default function InfrastructurePage() {
   const { toast } = useToast();
   
   const [isProcessing, setIsProcessing] = useState(false);
-  const [isArchiving, setIsArchiving] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
+  const [diagnosticPulse, setDiagnosticPulse] = useState<DiagnosticResult[] | null>(null);
   const [integrityReport, setIntegrityReport] = useState<any>(null);
   const [discrepancyCount, setDiscrepancyCount] = useState(0);
   const [layerStats, setLayerStats] = useState({
@@ -61,7 +66,6 @@ export default function InfrastructurePage() {
     lastBackup: 'Never'
   });
 
-  // Mock data for the heartbeat chart
   const heartbeatData = useMemo(() => Array.from({ length: 20 }).map((_, i) => ({
     time: i,
     latency: 20 + Math.random() * 30
@@ -83,6 +87,17 @@ export default function InfrastructurePage() {
     loadStats();
   }, [assets]);
 
+  const handleSelfTest = async () => {
+    setIsTesting(true);
+    try {
+      const results = await SystemDiagnostics.runSelfTest();
+      setDiagnosticPulse(results);
+      toast({ title: "Self-Test Complete", description: "Diagnostics successfully audited all storage nodes." });
+    } finally {
+      setIsTesting(false);
+    }
+  };
+
   const handleManualSync = async () => {
     setIsProcessing(true);
     try {
@@ -92,21 +107,6 @@ export default function InfrastructurePage() {
       toast({ variant: "destructive", title: "Heartbeat Interrupted" });
     } finally {
       setIsProcessing(false);
-    }
-  };
-
-  const handleFullBackup = async () => {
-    setIsArchiving(true);
-    try {
-      const meta = await ArchiveService.generateFullSnapshot();
-      toast({ 
-        title: "System Pulse Archived", 
-        description: `Successfully captured ${meta.totalRecords} records.` 
-      });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Archival Failure" });
-    } finally {
-      setIsArchiving(false);
     }
   };
 
@@ -141,12 +141,12 @@ export default function InfrastructurePage() {
           <div className="flex items-center gap-3">
             <Button 
               variant="outline"
-              onClick={handleFullBackup}
-              disabled={isArchiving}
+              onClick={handleSelfTest}
+              disabled={isTesting}
               className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 hover:bg-primary/5 tactile-pulse shadow-sm"
             >
-              {isArchiving ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileJson className="h-4 w-4" />}
-              Full Snapshot
+              {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cpu className="h-4 w-4" />}
+              System Self-Test
             </Button>
             <Button 
               onClick={handleManualSync} 
@@ -159,82 +159,78 @@ export default function InfrastructurePage() {
           </div>
         </div>
 
-        {/* Triple-Layer Health Matrix */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
-          <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-xl bg-card/50 overflow-hidden group hover:border-primary/20 transition-all">
-            <CardHeader className="bg-primary/5 p-6 border-b border-dashed">
-              <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-                <HardDrive className="h-4 w-4" /> Layer 1: Persistence
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-8 space-y-6">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase text-muted-foreground opacity-60">IDB Status</span>
-                <Badge className="bg-green-500 text-white font-black uppercase text-[9px] tracking-widest px-3 h-6">Stable</Badge>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-bold uppercase opacity-40">
-                  <span>Local Registry</span>
-                  <span>{layerStats.localCount} Records</span>
+        {/* Topology Visualization */}
+        <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden mx-2">
+          <CardHeader className="bg-muted/20 p-8 border-b border-dashed">
+            <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
+              <Network className="h-4 w-4" /> System Topology & Node Heartbeat
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-10">
+            <div className="flex flex-col md:flex-row items-center justify-between gap-12 relative">
+              <div className="absolute top-1/2 left-0 w-full h-0.5 bg-gradient-to-r from-amber-500 via-green-500 to-blue-500 -translate-y-1/2 opacity-10 hidden md:block" />
+              
+              {/* Node 1: Local */}
+              <div className="flex flex-col items-center gap-4 z-10">
+                <div className="p-6 rounded-[2rem] bg-amber-500/10 border-2 border-amber-500/20 shadow-xl group hover:border-amber-500 transition-all">
+                  <HardDrive className="h-10 w-10 text-amber-600" />
                 </div>
-                <Progress value={100} className="h-1 bg-primary/10" />
+                <div className="text-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-amber-700">Local Cache</p>
+                  <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">IDB Persistent</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
 
-          <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-xl bg-card/50 overflow-hidden group hover:border-blue-500/20 transition-all">
-            <CardHeader className="bg-blue-500/5 p-6 border-b border-dashed">
-              <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-600 flex items-center gap-3">
-                <Server className="h-4 w-4" /> Layer 2: Shadow Mirror
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-8 space-y-6">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase text-muted-foreground opacity-60">RTDB Heartbeat</span>
-                <div className="flex items-center gap-2">
-                  <div className="h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
-                  <span className="text-[10px] font-black uppercase text-blue-600">Replicating</span>
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-bold uppercase opacity-40">
-                  <span>Mirror Latency</span>
-                  <span>42ms</span>
-                </div>
-                <Progress value={98} className="h-1 bg-blue-100" />
-              </div>
-            </CardContent>
-          </Card>
+              <div className="hidden md:block"><ArrowRight className="h-6 w-6 text-muted-foreground opacity-20" /></div>
 
-          <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-xl bg-card/50 overflow-hidden group hover:border-green-500/20 transition-all">
-            <CardHeader className="bg-green-500/5 p-6 border-b border-dashed">
-              <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-green-600 flex items-center gap-3">
-                <Cloud className="h-4 w-4" /> Layer 3: Cloud Registry
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-8 space-y-6">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase text-muted-foreground opacity-60">Firestore Pulse</span>
-                <span className={cn(
-                  "text-[10px] font-black uppercase tracking-widest",
-                  isOnline ? "text-green-600" : "text-destructive"
-                )}>
-                  {isOnline ? 'Active Pulse' : 'Disconnected'}
-                </span>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-bold uppercase opacity-40">
-                  <span>Commit Depth</span>
-                  <span>{layerStats.queueDepth} OPS</span>
+              {/* Node 2: Mirror */}
+              <div className="flex flex-col items-center gap-4 z-10">
+                <div className="p-6 rounded-[2rem] bg-green-500/10 border-2 border-green-500/20 shadow-xl group hover:border-green-500 transition-all">
+                  <Activity className="h-10 w-10 text-green-600" />
                 </div>
-                <Progress value={isOnline ? 100 : 0} className="h-1 bg-green-100" />
+                <div className="text-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-green-700">Shadow Mirror</p>
+                  <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">RTDB Replication</p>
+                </div>
               </div>
-            </CardContent>
-          </Card>
-        </div>
 
+              <div className="hidden md:block"><ArrowRight className="h-6 w-6 text-muted-foreground opacity-20" /></div>
+
+              {/* Node 3: Cloud */}
+              <div className="flex flex-col items-center gap-4 z-10">
+                <div className="p-6 rounded-[2rem] bg-blue-500/10 border-2 border-blue-500/20 shadow-xl group hover:border-blue-500 transition-all">
+                  <Cloud className="h-10 w-10 text-blue-600" />
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">Cloud Authority</p>
+                  <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">Firestore Cluster</p>
+                </div>
+              </div>
+            </div>
+
+            {diagnosticPulse && (
+              <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-bottom-2 duration-500">
+                {diagnosticPulse.map((res) => (
+                  <div key={res.node} className="p-4 rounded-2xl bg-muted/30 border border-border/40 flex items-center justify-between">
+                    <div className="space-y-0.5">
+                      <span className="text-[8px] font-black uppercase opacity-40">{res.node} Pulse</span>
+                      <p className="text-[10px] font-bold">{res.message}</p>
+                    </div>
+                    <Badge variant="outline" className={cn(
+                      "text-[8px] font-mono",
+                      res.status === 'STABLE' ? "text-green-600 border-green-200" : "text-destructive border-destructive/20"
+                    )}>
+                      {res.latency}MS
+                    </Badge>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Global Parity Monitor */}
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-2">
-          {/* Parity Ledger Card */}
           <div className="lg:col-span-8 space-y-8">
             <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
               <CardHeader className="p-8 bg-muted/20 border-b flex flex-row items-center justify-between">
@@ -261,8 +257,8 @@ export default function InfrastructurePage() {
                     <p className="text-2xl font-black text-primary">{integrityReport?.score || 0}%</p>
                   </div>
                   <div className="p-6 rounded-2xl border-2 border-dashed bg-background/40 space-y-2">
-                    <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Auth Tier</span>
-                    <p className="text-2xl font-black text-foreground">Super</p>
+                    <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Node Tier</span>
+                    <p className="text-2xl font-black text-foreground">Global</p>
                   </div>
                 </div>
                 <Button 
@@ -317,9 +313,9 @@ export default function InfrastructurePage() {
               <div className="p-6 bg-primary/10 rounded-full mb-2">
                 <Network className="h-10 w-10 text-primary" />
               </div>
-              <h4 className="text-sm font-black uppercase tracking-tight">Sync Topology</h4>
+              <h4 className="text-sm font-black uppercase tracking-tight">Sync Protocol</h4>
               <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic opacity-70">
-                Data flows in a strictly hierarchical pulse from Local (IDB) to the Shadow Mirror (RTDB) and finally to the Cloud Authority (Firestore).
+                Registry flow uses strictly deterministic reconciliation. Local edits are buffered in IndexedDB before replication to the Mirror and Cloud Authority.
               </p>
             </Card>
 
@@ -329,10 +325,10 @@ export default function InfrastructurePage() {
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-orange-600">Infrastructure Rule</h4>
               </div>
               <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase opacity-60">
-                Wiping storage layers is an immutable operational pulse. Resolution via Reconstruct triggers is mandatory after a purge.
+                Atomic wipes are immutable operational pulses. Resolution via Forensic Reconciliation is mandatory after a manual purge.
               </p>
               <Button variant="ghost" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 transition-all">
-                <Bomb className="h-4 w-4 mr-2" /> Wipe Primary Layer
+                <Bomb className="h-4 w-4 mr-2" /> Wipe Persistence Layer
               </Button>
             </div>
           </aside>

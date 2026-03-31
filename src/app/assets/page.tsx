@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
- * Phase 54: Integrated Professional Tag Printing Pulse.
+ * Phase 55: Integrated Registry Pulse Snapshot (Quick JSON Export).
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -44,7 +44,8 @@ import {
   CloudOff,
   FolderKanban,
   ArrowRightLeft,
-  Printer
+  Printer,
+  FileJson
 } from 'lucide-react';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
@@ -66,6 +67,7 @@ import { Badge } from '@/components/ui/badge';
 import { ExcelService } from '@/services/excel-service';
 import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
+import { saveAs } from 'file-saver';
 import { 
   AlertDialog, 
   AlertDialogAction, 
@@ -138,6 +140,19 @@ export default function AssetRegistryPage() {
   const saveHeaderPrefs = (updated: RegistryHeader[]) => {
     setHeaders(updated);
     localStorage.setItem('registry-header-prefs', JSON.stringify(updated));
+  };
+
+  const handleQuickExport = () => {
+    const activeProject = appSettings?.grants.find(g => g.id === activeGrantId)?.name || 'Registry';
+    const snapshot = {
+      project: activeProject,
+      timestamp: new Date().toISOString(),
+      source: dataSource,
+      records: assets
+    };
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    saveAs(blob, `Registry-Pulse-${activeProject.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`);
+    toast({ title: "Registry Pulse Exported", description: "Project snapshot saved to local storage." });
   };
 
   const handleReassignGrant = async (targetGrantId: string) => {
@@ -303,6 +318,15 @@ export default function AssetRegistryPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={handleQuickExport}
+                className="h-10 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 gap-2 bg-card hover:bg-muted"
+              >
+                <FileJson className="h-3.5 w-3.5" /> Snapshot Pulse
+              </Button>
+
               <div className="flex items-center bg-muted/50 p-1 rounded-2xl border-2 border-border/40 shadow-inner">
                 <Button 
                   variant={dataSource === 'PRODUCTION' ? 'secondary' : 'ghost'} 
