@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview GIS Spatial Hub - Geographic Registry Workstation.
- * Phase 63: Visualizes asset distribution and coordinate clusters.
+ * Phase 66: Enhanced with status-aware node color coding.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -22,7 +22,9 @@ import {
   Globe,
   Maximize2,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  AlertTriangle,
+  Clock
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -69,6 +71,22 @@ export default function GISHubPage() {
   const handleInspect = (id: string) => {
     setSelectedAssetId(id);
     setIsDetailOpen(true);
+  };
+
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'VERIFIED': return 'bg-primary'; // Gold
+      case 'DISCREPANCY': return 'bg-destructive'; // Red
+      default: return 'bg-white'; // Muted Pending
+    }
+  };
+
+  const getStatusShadow = (status: string) => {
+    switch (status) {
+      case 'VERIFIED': return 'shadow-[0_0_15px_rgba(212,175,55,0.8)]';
+      case 'DISCREPANCY': return 'shadow-[0_0_15px_rgba(220,38,38,0.8)]';
+      default: return 'shadow-[0_0_15px_rgba(255,255,255,0.4)]';
+    }
   };
 
   const selectedRecord = useMemo(() => {
@@ -138,12 +156,12 @@ export default function GISHubPage() {
 
               <div className="flex-1 relative flex items-center justify-center">
                 <AnimatePresence>
-                  {filteredAssets.slice(0, 50).map((asset, idx) => (
+                  {filteredAssets.slice(0, 100).map((asset, idx) => (
                     <motion.button
                       key={asset.id}
                       initial={{ scale: 0, opacity: 0 }}
                       animate={{ scale: 1, opacity: 1 }}
-                      transition={{ delay: idx * 0.05 }}
+                      transition={{ delay: idx * 0.02 }}
                       onClick={() => handleInspect(asset.id)}
                       className="absolute group"
                       style={{
@@ -153,10 +171,17 @@ export default function GISHubPage() {
                       }}
                     >
                       <div className="relative">
-                        <div className="h-3 w-3 bg-primary rounded-full shadow-[0_0_15px_rgba(46,49,146,0.8)] border-2 border-white group-hover:scale-150 transition-transform" />
-                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white text-black p-2 rounded-lg shadow-2xl whitespace-nowrap z-50">
-                          <p className="text-[10px] font-black uppercase">{asset.description}</p>
-                          <p className="text-[8px] font-bold text-muted-foreground uppercase">{asset.location}</p>
+                        <div className={cn(
+                          "h-3 w-3 rounded-full border-2 border-black transition-transform group-hover:scale-150 group-hover:z-50",
+                          getStatusColor(asset.status),
+                          getStatusShadow(asset.status)
+                        )} />
+                        <div className="absolute top-full left-1/2 -translate-x-1/2 mt-2 opacity-0 group-hover:opacity-100 transition-opacity bg-white text-black p-3 rounded-xl shadow-2xl whitespace-nowrap z-50 pointer-events-none">
+                          <p className="text-[10px] font-black uppercase leading-none mb-1">{asset.description}</p>
+                          <div className="flex items-center gap-2">
+                            <Badge variant="outline" className="h-4 px-1.5 text-[7px] font-black border-black/20">{asset.status}</Badge>
+                            <span className="text-[8px] font-bold text-muted-foreground uppercase">{asset.location}</span>
+                          </div>
                         </div>
                       </div>
                     </motion.button>
@@ -165,11 +190,12 @@ export default function GISHubPage() {
               </div>
 
               <div className="mt-auto flex items-center justify-between text-white/40">
-                <div className="flex items-center gap-6 text-[8px] font-black uppercase tracking-[0.3em]">
+                <div className="flex flex-wrap items-center gap-6 text-[8px] font-black uppercase tracking-[0.3em]">
                   <span className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-primary" /> Verified Hub</span>
-                  <span className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-orange-500" /> Pending Pulse</span>
+                  <span className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-white" /> Pending Pulse</span>
+                  <span className="flex items-center gap-2"><div className="h-1.5 w-1.5 rounded-full bg-destructive" /> Discrepancy</span>
                 </div>
-                <p className="text-[8px] font-mono uppercase tracking-widest">GRID PROTOCOL: DETERMINISTIC SPATIAL PROJECTION</p>
+                <p className="hidden sm:block text-[8px] font-mono uppercase tracking-widest">GRID PROTOCOL: STATUS-AWARE SPATIAL PROJECTION</p>
               </div>
             </div>
           </Card>
@@ -202,7 +228,10 @@ export default function GISHubPage() {
                     className="w-full text-left p-4 rounded-2xl border-2 border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all group flex items-center justify-between"
                   >
                     <div className="flex items-center gap-4 min-w-0">
-                      <div className="p-2.5 bg-muted rounded-xl group-hover:bg-primary group-hover:text-white transition-colors">
+                      <div className={cn(
+                        "p-2.5 rounded-xl transition-colors",
+                        asset.status === 'VERIFIED' ? "bg-primary text-black" : "bg-muted text-muted-foreground group-hover:bg-primary group-hover:text-black"
+                      )}>
                         <MapPin className="h-4 w-4" />
                       </div>
                       <div className="flex flex-col min-w-0">

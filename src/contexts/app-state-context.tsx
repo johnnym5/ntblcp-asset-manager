@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Unified Data & Connectivity Orchestrator.
- * Phase 65: Hardened Bootstrapping - Ensures the shell always resolves to a usable state.
+ * Phase 66: Hardened Bootstrapping & Operational Failure Protection.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
@@ -101,19 +101,19 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const refreshRegistry = useCallback(async () => {
     setIsSyncing(true);
     try {
-      // 1. Retrieve Local State
+      // 1. Retrieve Local State (Critical for Offline-First)
       const [localAssets, localSandbox, localSettings] = await Promise.all([
         storage.getAssets(),
         storage.getSandbox(),
         storage.getSettings()
       ]);
 
-      setSandboxAssets(localSandbox);
+      setSandboxAssets(localSandbox || []);
       
       const currentGrantId = localSettings?.activeGrantId || DEFAULT_SETTINGS.activeGrantId;
       const initialFiltered = currentGrantId 
-        ? localAssets.filter(a => a.grantId === currentGrantId)
-        : localAssets;
+        ? (localAssets || []).filter(a => a.grantId === currentGrantId)
+        : (localAssets || []);
 
       setAssets(initialFiltered);
 
@@ -151,7 +151,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
             }
 
             if (remoteAssets.length > 0) {
-              const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
+              const otherAssets = (localAssets || []).filter(a => a.grantId !== remoteSettings.activeGrantId);
               const combinedAssets = [...otherAssets, ...remoteAssets];
               await storage.saveAssets(combinedAssets);
               setAssets(remoteAssets);
@@ -192,7 +192,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     await refreshRegistry();
   };
 
-  // CRITICAL: Hardened Initialization sequence to prevent infinite loading
+  // CRITICAL: Hardened Initialization sequence - prioritizes local persistence
   useEffect(() => {
     const bootstrap = async () => {
       try {
@@ -208,7 +208,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         setAppSettings(DEFAULT_SETTINGS);
       } finally {
         setSettingsLoaded(true);
-        // Background reconciliation pulse
+        // Secondary pulse for background reconciliation
         refreshRegistry();
       }
     };

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Global Activity Ledger - Registry Traceability Workspace.
- * Phase 52: Implemented Ledger Pulse Export (JSON/CSV).
+ * Phase 66: Enhanced with Human-Readable Forensic Diffs.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -25,7 +25,10 @@ import {
   CheckCircle2,
   Trash2,
   Activity,
-  FileJson
+  FileJson,
+  Boxes,
+  Zap,
+  ArrowRightLeft
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -136,7 +139,7 @@ export default function AuditLogPage() {
               Activity Ledger
             </h2>
             <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-              Immutable Traceability & Global Registry Integrity Pulse
+              Immutable Traceability & Forensic Pulse Replay
             </p>
           </div>
           <Button 
@@ -211,16 +214,22 @@ export default function AuditLogPage() {
                         </div>
 
                         {entry.changes && Object.keys(entry.changes).length > 0 && (
-                          <div className="p-6 rounded-[1.5rem] bg-muted/20 border-2 border-dashed border-border/40 space-y-3">
-                            <p className="text-[9px] font-black uppercase text-primary/60 tracking-[0.3em]">Pulse Modifications:</p>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-2">
+                          <div className="p-6 rounded-[1.5rem] bg-muted/20 border-2 border-dashed border-border/40 space-y-4">
+                            <p className="text-[10px] font-black uppercase text-primary tracking-[0.3em] flex items-center gap-2">
+                              <Zap className="h-3 w-3 fill-current" /> Forensic Value Pulse:
+                            </p>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-3">
                               {Object.entries(entry.changes).map(([key, val]: [string, any]) => (
-                                <div key={key} className="flex items-center gap-3 text-[10px] font-bold">
-                                  <span className="text-muted-foreground uppercase opacity-40 shrink-0">{key.replace(/([A-Z])/g, ' $1')}:</span>
-                                  <div className="flex items-center gap-2 min-w-0">
-                                    <span className="line-through opacity-30 truncate max-w-[80px] italic">{String(val.old || 'EMPTY')}</span>
-                                    <ArrowRight className="h-2.5 w-2.5 text-primary shrink-0" />
-                                    <span className="text-primary font-black truncate">{String(val.new)}</span>
+                                <div key={key} className="flex flex-col gap-1.5">
+                                  <span className="text-[8px] font-black uppercase text-muted-foreground opacity-40">{key.replace(/([A-Z])/g, ' $1')}</span>
+                                  <div className="flex items-center gap-3 text-[10px] font-bold">
+                                    <div className="flex items-center gap-2 bg-red-500/5 border border-red-500/10 px-2 py-1 rounded-lg line-through text-destructive/60 truncate max-w-[120px] italic">
+                                      {String(val.old || 'EMPTY')}
+                                    </div>
+                                    <ArrowRightLeft className="h-3 w-3 text-muted-foreground shrink-0 opacity-20" />
+                                    <div className="flex items-center gap-2 bg-green-500/5 border border-green-500/10 px-2 py-1 rounded-lg text-green-600 font-black truncate max-w-[120px]">
+                                      {String(val.new)}
+                                    </div>
                                   </div>
                                 </div>
                               ))}

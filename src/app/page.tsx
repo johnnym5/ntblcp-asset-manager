@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
- * Phase 64: Integrated Holistic Fidelity Pulse & Quality Scoring.
+ * Phase 66: Integrated Global Discovery Engine & Forensic Pulse.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -30,9 +30,13 @@ import {
   Fingerprint,
   AlertTriangle,
   Navigation,
-  Target
+  Target,
+  Search,
+  Zap,
+  Boxes
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import Link from 'next/link';
 import UserProfileSetup from '@/components/user-profile-setup';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
@@ -68,6 +72,9 @@ export default function DashboardPage() {
   const [fidelityScore, setFidelityScore] = useState(100);
   const [syncDrift, setSyncDrift] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
+  
+  // Global Search State
+  const [globalSearch, setGlobalSearch] = useState("");
 
   useEffect(() => {
     if (assets.length > 0) {
@@ -101,6 +108,16 @@ export default function DashboardPage() {
       await refreshRegistry();
     }
   };
+
+  const globalSearchResults = useMemo(() => {
+    if (!globalSearch || globalSearch.length < 2) return [];
+    const term = globalSearch.toLowerCase();
+    return assets.filter(a => 
+      a.description.toLowerCase().includes(term) ||
+      a.serialNumber?.toLowerCase().includes(term) ||
+      a.assetIdCode?.toLowerCase().includes(term)
+    ).slice(0, 5);
+  }, [assets, globalSearch]);
 
   const stats = useMemo(() => {
     if (!settingsLoaded || !assets) return null;
@@ -218,6 +235,60 @@ export default function DashboardPage() {
             <Button className="h-12 px-8 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 group" asChild>
               <Link href="/assets">Explore Registry <ArrowRight className="ml-3 h-4 w-4 transition-transform group-hover:translate-x-2" /></Link>
             </Button>
+          </div>
+        </div>
+
+        {/* Global Search Pulse */}
+        <div className="px-1 relative z-50">
+          <div className="relative group max-w-2xl">
+            <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-primary animate-pulse" />
+            <Input 
+              placeholder="Global Discovery: Search across all asset categories..." 
+              value={globalSearch}
+              onChange={(e) => setGlobalSearch(e.target.value)}
+              className="h-16 pl-14 pr-10 rounded-2xl bg-card border-2 border-primary/10 shadow-2xl focus-visible:ring-primary/20 font-black text-sm transition-all"
+            />
+            <AnimatePresence>
+              {globalSearch.length >= 2 && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-full left-0 right-0 mt-3 bg-background border-2 border-primary/20 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden"
+                >
+                  <div className="p-4 bg-primary/5 border-b flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Discovery Pulse Results</span>
+                    <Badge className="bg-primary text-black font-black text-[8px]">{globalSearchResults.length} HITS</Badge>
+                  </div>
+                  <div className="divide-y divide-border/40 max-h-[400px] overflow-y-auto custom-scrollbar">
+                    {globalSearchResults.map(asset => (
+                      <Link 
+                        key={asset.id} 
+                        href={`/assets?id=${asset.id}`}
+                        className="flex items-center justify-between p-5 hover:bg-primary/5 transition-colors group"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="p-2.5 bg-muted rounded-xl group-hover:bg-primary/10 transition-colors">
+                            <Boxes className="h-4 w-4 text-primary" />
+                          </div>
+                          <div className="flex flex-col">
+                            <span className="text-sm font-black uppercase tracking-tight">{asset.description}</span>
+                            <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">ID: {asset.assetIdCode || 'UNSET'} • SN: {asset.serialNumber || 'N/A'}</span>
+                          </div>
+                        </div>
+                        <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+                      </Link>
+                    ))}
+                    {globalSearchResults.length === 0 && (
+                      <div className="p-10 text-center opacity-40">
+                        <Zap className="h-8 w-8 mx-auto mb-2" />
+                        <p className="text-[10px] font-black uppercase tracking-widest">No matching pulse discovered</p>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </div>
 

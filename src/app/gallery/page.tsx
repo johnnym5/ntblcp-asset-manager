@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Visual Evidence Gallery - High-Fidelity Asset Media Workspace.
- * Phase 63: Optimized deterministic gallery without AI hints.
+ * Phase 66: Integrated Forensic Signature Audit Tab.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -22,12 +21,16 @@ import {
   Calendar,
   Image as ImageIcon,
   Loader2,
-  X
+  X,
+  PenTool,
+  CheckCircle2,
+  Database
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { motion, AnimatePresence } from 'framer-motion';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { transformAssetToRecord } from '@/lib/registry-utils';
@@ -36,6 +39,7 @@ import type { Asset } from '@/types/domain';
 export default function GalleryPage() {
   const { assets, settingsLoaded } = useAppState();
   const [searchTerm, setSearchTerm] = useState("");
+  const [activeTab, setActiveTab] = useState("photos");
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
@@ -43,15 +47,20 @@ export default function GalleryPage() {
     return assets.filter(a => !!a.photoDataUri || !!a.photoUrl);
   }, [assets]);
 
-  const filteredMedia = useMemo(() => {
-    if (!searchTerm) return mediaAssets;
+  const forensicAssets = useMemo(() => {
+    return assets.filter(a => !!a.signatureDataUri || !!a.signatureUrl);
+  }, [assets]);
+
+  const filteredItems = useMemo(() => {
+    const list = activeTab === 'photos' ? mediaAssets : forensicAssets;
+    if (!searchTerm) return list;
     const term = searchTerm.toLowerCase();
-    return mediaAssets.filter(a => 
+    return list.filter(a => 
       a.description.toLowerCase().includes(term) || 
       a.location.toLowerCase().includes(term) ||
       a.assetIdCode?.toLowerCase().includes(term)
     );
-  }, [mediaAssets, searchTerm]);
+  }, [mediaAssets, forensicAssets, searchTerm, activeTab]);
 
   const handleInspect = (id: string) => {
     setSelectedAssetId(id);
@@ -85,12 +94,21 @@ export default function GalleryPage() {
               Evidence Gallery
             </h2>
             <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-              Visual Audit Aggregation & Technical Proof Pulse
+              Visual Audit Aggregation & Forensic Anchor Pulse
             </p>
           </div>
-          <Badge variant="outline" className="h-10 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary shadow-sm">
-            {filteredMedia.length} Visual Pulses Discovered
-          </Badge>
+          <div className="flex items-center gap-3">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-fit">
+              <TabsList className="bg-muted/50 p-1.5 rounded-2xl border-2 border-border/40 h-auto">
+                <TabsTrigger value="photos" className="px-6 py-2 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black">
+                  <ImageIcon className="h-3 w-3" /> Visual Evidence
+                </TabsTrigger>
+                <TabsTrigger value="signatures" className="px-6 py-2 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black">
+                  <PenTool className="h-3 w-3" /> Forensic Pulse
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
 
         {/* Toolbar */}
@@ -98,7 +116,7 @@ export default function GalleryPage() {
           <div className="relative flex-1 w-full group">
             <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-colors" />
             <Input 
-              placeholder="Search by ID, Description or Location..." 
+              placeholder={`Search ${activeTab === 'photos' ? 'visual evidence' : 'signature anchors'}...`} 
               className="pl-14 h-16 rounded-[1.5rem] bg-card border-none shadow-xl font-bold text-sm focus-visible:ring-primary/20 transition-all placeholder:opacity-30"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -110,68 +128,75 @@ export default function GalleryPage() {
         </div>
 
         {/* Masonry-style Grid */}
-        {filteredMedia.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 px-2">
-            <AnimatePresence mode="popLayout">
-              {filteredMedia.map((asset) => (
-                <motion.div
-                  key={asset.id}
-                  layout
-                  initial={{ opacity: 0, scale: 0.9 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.9 }}
-                  whileHover={{ y: -8 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 25 }}
-                >
-                  <Card 
-                    className="group relative aspect-[4/5] rounded-[2rem] overflow-hidden border-2 border-border/40 hover:border-primary/40 shadow-lg cursor-pointer bg-card transition-all"
-                    onClick={() => handleInspect(asset.id)}
+        <div className="px-2">
+          {filteredItems.length > 0 ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+              <AnimatePresence mode="popLayout">
+                {filteredItems.map((asset) => (
+                  <motion.div
+                    key={`${activeTab}-${asset.id}`}
+                    layout
+                    initial={{ opacity: 0, scale: 0.9 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.9 }}
+                    whileHover={{ y: -8 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 25 }}
                   >
-                    <Image 
-                      src={asset.photoUrl || asset.photoDataUri || ''} 
-                      width={600}
-                      height={400}
-                      className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-                      alt={asset.description}
-                      unoptimized
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity duration-500" />
-                    
-                    <div className="absolute top-4 left-4">
-                      <Badge className="bg-primary/90 backdrop-blur-md font-black uppercase text-[8px] tracking-widest border-none h-6">
-                        {asset.assetIdCode || 'PULSE'}
-                      </Badge>
-                    </div>
-
-                    <div className="absolute bottom-0 left-0 right-0 p-6 space-y-2 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
-                      <h4 className="text-white font-black uppercase text-sm leading-tight line-clamp-2">
-                        {asset.description}
-                      </h4>
-                      <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest text-white/60">
-                        <span className="flex items-center gap-1.5"><MapPin className="h-3 w-3" /> {asset.location}</span>
-                        <span className="flex items-center gap-1.5"><Calendar className="h-3 w-3" /> {new Date(asset.lastModified).toLocaleDateString()}</span>
+                    <Card 
+                      className="group relative aspect-[4/5] rounded-[2rem] overflow-hidden border-2 border-border/40 hover:border-primary/40 shadow-lg cursor-pointer bg-white transition-all"
+                      onClick={() => handleInspect(asset.id)}
+                    >
+                      <Image 
+                        src={activeTab === 'photos' ? (asset.photoUrl || asset.photoDataUri || '') : (asset.signatureUrl || asset.signatureDataUri || '')} 
+                        width={600}
+                        height={400}
+                        className={cn(
+                          "absolute inset-0 w-full h-full transition-transform duration-700 group-hover:scale-110",
+                          activeTab === 'photos' ? "object-cover" : "object-contain p-8 mix-blend-multiply opacity-80"
+                        )} 
+                        alt={asset.description}
+                        unoptimized
+                      />
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity duration-500" />
+                      
+                      <div className="absolute top-4 left-4">
+                        <Badge className="bg-primary/90 backdrop-blur-md font-black uppercase text-[8px] tracking-widest border-none h-6 text-black">
+                          {asset.assetIdCode || 'PULSE'}
+                        </Badge>
                       </div>
-                    </div>
 
-                    <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
-                      <div className="p-4 bg-white/10 backdrop-blur-xl rounded-full border border-white/20">
-                        <Maximize2 className="h-6 w-6 text-white" />
+                      <div className="absolute bottom-0 left-0 right-0 p-6 space-y-2 transform translate-y-2 group-hover:translate-y-0 transition-transform duration-500">
+                        <h4 className="text-white font-black uppercase text-sm leading-tight line-clamp-2">
+                          {asset.description}
+                        </h4>
+                        <div className="flex items-center gap-3 text-[9px] font-black uppercase tracking-widest text-white/60">
+                          <span className="flex items-center gap-1.5"><MapPin className="h-3 w-3" /> {asset.location}</span>
+                          <span className="flex items-center gap-1.5"><Calendar className="h-3 w-3" /> {new Date(asset.lastModified).toLocaleDateString()}</span>
+                        </div>
                       </div>
-                    </div>
-                  </Card>
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        ) : (
-          <div className="py-40 text-center opacity-20 flex flex-col items-center gap-8 px-2 border-4 border-dashed rounded-[4rem]">
-            <ImageIcon className="h-32 w-32" />
-            <div className="space-y-2">
-              <h3 className="text-2xl font-black uppercase tracking-widest">Evidence Silent</h3>
-              <p className="text-sm font-medium italic">No visual pulses detected in the current query scope.</p>
+
+                      <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                        <div className="p-4 bg-white/10 backdrop-blur-xl rounded-full border border-white/20">
+                          <Maximize2 className="h-6 w-6 text-white" />
+                        </div>
+                      </div>
+                    </Card>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
             </div>
-          </div>
-        )}
+          ) : (
+            <div className="py-40 text-center opacity-20 flex flex-col items-center gap-8 border-4 border-dashed rounded-[4rem]">
+              <div className="p-10 bg-muted rounded-full">
+                {activeTab === 'photos' ? <ImageIcon className="h-20 w-20" /> : <PenTool className="h-20 w-20" />}
+              </div>
+              <div className="space-y-2">
+                <h3 className="text-2xl font-black uppercase tracking-widest">{activeTab === 'photos' ? 'Evidence Silent' : 'Forensics Silent'}</h3>
+                <p className="text-sm font-medium italic">No pulse detected in the current query scope.</p>
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <AssetDetailSheet 
