@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Super Admin Database Mission Control.
- * Phase 47: Implemented real Infrastructure Purge logic and Audio Pulse visibility.
- * Hardened reconciliation and forensic diff views.
+ * Phase 51: Launched Conflict Resolution Wizard & Cross-Layer Copy/Move logic.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -36,7 +35,10 @@ import {
   Zap,
   Bomb,
   Hammer,
-  ShieldHalf
+  ShieldHalf,
+  ArrowRightLeft,
+  ArrowUpRight,
+  Split
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -83,16 +85,24 @@ export default function DatabaseExplorerPage() {
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
   const [layerToPurge, setLayerToPurge] = useState<StorageLayer | null>(null);
 
+  // Conflict Resolution State
+  const [isConflictView, setIsConflictView] = useState(false);
+
   useEffect(() => {
     loadRootNodes();
     runGlobalScan();
-  }, [activeLayer]);
+  }, [activeLayer, isConflictView]);
 
   const loadRootNodes = async () => {
     setLoading(true);
     try {
-      const root = await VirtualDBService.getLogicalGroups(activeLayer);
-      setNodes(root);
+      if (isConflictView) {
+        const assets = await VirtualDBService.getDocuments(activeLayer, 'assets');
+        setNodes(assets.filter(n => discrepancyIds.includes(n.rawKey)));
+      } else {
+        const root = await VirtualDBService.getLogicalGroups(activeLayer);
+        setNodes(root);
+      }
     } finally {
       setLoading(false);
     }
@@ -160,12 +170,30 @@ export default function DatabaseExplorerPage() {
     if (!selectedNode) return;
     setIsSaving(true);
     try {
-      await VirtualDBService.syncNode(selectedNode.path, from, to);
+      await VirtualDBService.copyNode(selectedNode.path, from, to);
       toast({ title: "Parity Established", description: `Synchronized ${from} -> ${to}.` });
       loadParity(selectedNode.path);
       runGlobalScan();
     } catch (e) {
       toast({ variant: "destructive", title: "Sync Failure" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleResolve = async (layer: StorageLayer) => {
+    if (!parityData || !selectedNode) return;
+    const authoritativeData = parityData[layer];
+    if (!authoritativeData) return;
+
+    setIsSaving(true);
+    try {
+      await VirtualDBService.resolveConflict(selectedNode.path, authoritativeData);
+      toast({ title: "Conflict Resolved", description: `Record parity established using ${layer} pulse.` });
+      runGlobalScan();
+      loadParity(selectedNode.path);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Resolution Failure" });
     } finally {
       setIsSaving(false);
     }
@@ -233,10 +261,10 @@ export default function DatabaseExplorerPage() {
             </div>
             <Button 
               variant="outline" 
-              onClick={() => { setLayerToPurge(activeLayer); setIsPurgeDialogOpen(true); }}
-              className="h-11 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2 text-destructive border-destructive/20 hover:bg-destructive/5"
+              onClick={() => { setIsConflictView(!isConflictView); setSelectedNode(null); }}
+              className={cn("h-11 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2 transition-all", isConflictView ? "bg-destructive text-white border-destructive" : "text-destructive border-destructive/20 hover:bg-destructive/5")}
             >
-              <Bomb className="h-3.5 w-3.5" /> Wipe Layer
+              <Split className="h-3.5 w-3.5" /> {isConflictView ? 'Exit Conflict Mode' : 'Resolve Conflicts'}
             </Button>
           </div>
         </div>
@@ -316,9 +344,10 @@ export default function DatabaseExplorerPage() {
             </CardHeader>
             <ScrollArea className="flex-1 bg-background/30">
               <div className="p-6">
-                <Tabs defaultValue="parity">
+                <Tabs defaultValue={isConflictView ? "wizard" : "parity"}>
                   <TabsList className="bg-muted/50 p-1 rounded-xl mb-6">
                     <TabsTrigger value="parity" className="text-[10px] font-black uppercase">Parity Pulse</TabsTrigger>
+                    {isConflictView && <TabsTrigger value="wizard" className="text-[10px] font-black uppercase">Resolution Wizard</TabsTrigger>}
                     <TabsTrigger value="forensics" className="text-[10px] font-black uppercase">Forensic Diff</TabsTrigger>
                   </TabsList>
                   
@@ -356,6 +385,39 @@ export default function DatabaseExplorerPage() {
                         </div>
                       </div>
                     ) : null}
+                  </TabsContent>
+
+                  <TabsContent value="wizard">
+                    {parityData && (
+                      <div className="space-y-6">
+                        <div className="p-6 rounded-3xl bg-destructive/5 border-2 border-dashed border-destructive/20 space-y-2">
+                          <div className="flex items-center gap-3">
+                            <Split className="h-5 w-5 text-destructive" />
+                            <h4 className="text-sm font-black uppercase">Resolution Wizard</h4>
+                          </div>
+                          <p className="text-[10px] font-medium text-muted-foreground italic">Pick an authoritative storage pulse to resolve the sync drift for this record.</p>
+                        </div>
+                        
+                        <div className="space-y-3">
+                          {['FIRESTORE', 'RTDB', 'LOCAL'].map((layer) => (
+                            <button
+                              key={`resolve-${layer}`}
+                              onClick={() => handleResolve(layer as StorageLayer)}
+                              disabled={!parityData[layer as StorageLayer]}
+                              className="w-full p-5 rounded-2xl border-2 border-border/40 hover:border-primary/40 bg-card flex items-center justify-between group transition-all"
+                            >
+                              <div className="flex items-center gap-4">
+                                <div className={cn("p-2 rounded-xl group-hover:bg-primary group-hover:text-white transition-colors", getSourceColor(layer as StorageLayer))}>
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </div>
+                                <span className="text-[10px] font-black uppercase">Enforce {layer} Pulse</span>
+                              </div>
+                              <ArrowUpRight className="h-4 w-4 opacity-20 group-hover:opacity-100 group-hover:translate-x-1" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </TabsContent>
 
                   <TabsContent value="forensics">
