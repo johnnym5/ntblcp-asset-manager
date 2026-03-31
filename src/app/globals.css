@@ -4,7 +4,7 @@
 
 @layer base {
   :root {
-    /* Assetain Gold Primary (#D4AF37) */
+    /* Assetain Metallic Gold (#D4AF37) */
     --background: 210 29% 96%;
     --foreground: 224 71.4% 4.1%;
     
@@ -37,23 +37,23 @@
   }
 
   .dark {
-    /* True Black amoled Background */
+    /* Absolute Amoled Black */
     --background: 0 0% 0%;
     --foreground: 210 40% 98%;
     
-    --card: 0 0% 5%;
+    --card: 0 0% 4%;
     --card-foreground: 210 40% 98%;
     
     --popover: 0 0% 3%;
     --popover-foreground: 210 40% 98%;
     
-    --primary: 45 64% 52%; /* Gold Accent */
+    --primary: 45 64% 52%; /* Metallic Gold Accent */
     --primary-foreground: 0 0% 0%;
     
     --secondary: 0 0% 10%;
     --secondary-foreground: 210 40% 98%;
     
-    --muted: 0 0% 10%;
+    --muted: 0 0% 8%;
     --muted-foreground: 215 20.2% 65.1%;
     
     --accent: 45 64% 52%;
@@ -62,8 +62,8 @@
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
     
-    --border: 0 0% 15%;
-    --input: 0 0% 15%;
+    --border: 0 0% 12%;
+    --input: 0 0% 12%;
     --ring: 45 64% 52%;
   }
 }
@@ -80,6 +80,7 @@
   }
 }
 
+/* Operational Pulse Animations */
 @keyframes scan {
   0% { transform: translateY(0); }
   100% { transform: translateY(100%); }
@@ -87,6 +88,24 @@
 
 .animate-scan {
   animation: scan 2s linear infinite;
+}
+
+.tactile-pulse {
+  @apply transition-transform active:scale-95;
+}
+
+/* Scrollbar Customization - Control Room Aesthetic */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  @apply bg-transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-colors;
 }
 
 @media print {

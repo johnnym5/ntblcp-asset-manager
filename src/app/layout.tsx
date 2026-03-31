@@ -9,7 +9,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 
 /**
  * @fileOverview Root Layout - Deterministic System Shell.
- * Phase 65: Hardened metadata with inline icon pulse to prevent favicon route errors.
+ * Phase 65: Hardened metadata and icon handling for absolute build stability.
  */
 
 export const metadata: Metadata = {
@@ -17,11 +17,12 @@ export const metadata: Metadata = {
   description: 'Professional Asset Management & Verification Pulse. High-integrity offline-first registry.',
   manifest: '/manifest.json',
   icons: {
-    icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📦</text></svg>',
+    icon: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2225%22 fill=%22%23D4AF37%22/><text y=%22.9em%22 x=%225%22 font-size=%2270%22 font-weight=%22bold%22 fill=%22black%22>A</text></svg>',
+    apple: 'data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2225%22 fill=%22%23D4AF37%22/><text y=%22.9em%22 x=%225%22 font-size=%2270%22 font-weight=%22bold%22 fill=%22black%22>A</text></svg>',
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: 'default',
+    statusBarStyle: 'black-translucent',
     title: 'Assetain',
   },
   formatDetection: {
@@ -30,7 +31,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: '#2E3192',
+  themeColor: '#D4AF37',
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
@@ -47,9 +48,9 @@ export default function RootLayout({
       <head>
         <link rel="preconnect" href="https://fonts.googleapis.com" />
         <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet" />
       </head>
-      <body className="font-body antialiased" suppressHydrationWarning>
+      <body className="font-body antialiased selection:bg-primary/20" suppressHydrationWarning>
         <ThemeProvider
           attribute="class"
           defaultTheme="system"

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Unified Data & Connectivity Orchestrator.
- * Phase 64: Hardened Bootstrapping to prevent infinite loading hangs.
+ * Phase 65: Hardened Bootstrapping - Ensures the shell always resolves to a usable state.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
@@ -71,15 +71,20 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
+  // Network Restoration Pulse
   useEffect(() => {
-    const status = isOnline ? 'Online Assets View' : 'Locally Saved Assets View';
-    if (settingsLoaded) {
-      addNotification({ 
-        title: 'Connectivity Heartbeat',
-        description: `Application is now in ${status}.`
-      });
+    if (typeof window !== 'undefined') {
+      const handleOnline = () => setIsOnlineStatus(true);
+      const handleOffline = () => setIsOnlineStatus(false);
+      window.addEventListener('online', handleOnline);
+      window.addEventListener('offline', handleOffline);
+      setIsOnlineStatus(navigator.onLine);
+      return () => {
+        window.removeEventListener('online', handleOnline);
+        window.removeEventListener('offline', handleOffline);
+      };
     }
-  }, [isOnline, settingsLoaded]);
+  }, []);
 
   const setDataSource = (source: DataSource) => {
     setDataSourceStatus(source);
@@ -97,18 +102,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     setIsSyncing(true);
     try {
       // 1. Retrieve Local State
-      const localAssets = await storage.getAssets();
-      const localSandbox = await storage.getSandbox();
-      const localSettings = await storage.getSettings();
-
-      // 2. Immediate local bootstrap to prevent loading hangs
-      if (localSettings) {
-        setAppSettings(localSettings);
-      } else if (!appSettings) {
-        // Fallback to default if absolutely nothing is found
-        setAppSettings(DEFAULT_SETTINGS);
-        await storage.saveSettings(DEFAULT_SETTINGS);
-      }
+      const [localAssets, localSandbox, localSettings] = await Promise.all([
+        storage.getAssets(),
+        storage.getSandbox(),
+        storage.getSettings()
+      ]);
 
       setSandboxAssets(localSandbox);
       
@@ -119,7 +117,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
       setAssets(initialFiltered);
 
-      // 3. Remote Reconciliation Pulse
+      // 2. Remote Reconciliation Pulse (Conditional)
       if (isOnline) {
         await processSyncQueue();
         
@@ -162,12 +160,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         }
       }
     } catch (e) {
-      console.error("Context: Registry reconciliation failed", e);
+      console.error("Context: Registry reconciliation failure", e);
     } finally {
       setIsSyncing(false);
-      setSettingsLoaded(true);
     }
-  }, [isOnline, appSettings]);
+  }, [isOnline]);
 
   const setActiveGrantId = async (id: string) => {
     if (!appSettings) return;
@@ -195,9 +192,28 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     await refreshRegistry();
   };
 
+  // CRITICAL: Hardened Initialization sequence to prevent infinite loading
   useEffect(() => {
-    refreshRegistry();
-  }, []); // Only run once on mount
+    const bootstrap = async () => {
+      try {
+        const localSettings = await storage.getSettings();
+        if (localSettings) {
+          setAppSettings(localSettings);
+        } else {
+          setAppSettings(DEFAULT_SETTINGS);
+          await storage.saveSettings(DEFAULT_SETTINGS);
+        }
+      } catch (e) {
+        console.error("Bootstrap: Local store error, using defaults", e);
+        setAppSettings(DEFAULT_SETTINGS);
+      } finally {
+        setSettingsLoaded(true);
+        // Background reconciliation pulse
+        refreshRegistry();
+      }
+    };
+    bootstrap();
+  }, [refreshRegistry]);
 
   return (
     <AppStateContext.Provider value={{
