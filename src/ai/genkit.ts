@@ -1,13 +1,6 @@
+
 /**
- * @fileOverview Genkit Framework Initialization.
- * Configures the primary AI engine for multimodal asset analysis.
+ * AI Engine De-integrated.
+ * Assetain now runs on a strictly deterministic human-audited pulse.
  */
-
-import { genkit } from 'genkit';
-import { googleAI } from '@genkit-ai/google-genai';
-
-export const ai = genkit({
-  plugins: [
-    googleAI()
-  ],
-});
+export const ai = null;

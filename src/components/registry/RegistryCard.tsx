@@ -1,7 +1,7 @@
 
 /**
  * @fileOverview RegistryCard - Source-Aware Professional Register Renderer.
- * Phase 50: Prioritizes Storage URL for remote evidence.
+ * Phase 60: Integrated Forensic Signature Indicator.
  */
 
 import React from 'react';
@@ -21,7 +21,8 @@ import {
   Cloud,
   Smartphone,
   Truck,
-  LayoutGrid
+  LayoutGrid,
+  PenTool
 } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
@@ -53,7 +54,6 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
   });
 
   const getSemanticImage = () => {
-    // Phase 50: Remote URL > Local base64 > Placeholder
     if (asset.photoUrl) return { url: asset.photoUrl, hint: "remote asset photo" };
     if (asset.photoDataUri) return { url: asset.photoDataUri, hint: "local asset photo" };
     
@@ -84,7 +84,7 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
               <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
                 <Checkbox 
                   checked={selected} 
-                  onCheckedChange={() => onToggleSelect(record.id)}
+                  onToggle={() => onToggleSelect(record.id)}
                   className="h-4 w-4 rounded border-2 border-primary/20 bg-background"
                 />
               </div>
@@ -96,13 +96,20 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
               </span>
             </div>
           </div>
-          <div className="h-6 w-6 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm shrink-0 bg-muted">
-            <img 
-              src={imagePulse.url} 
-              className="h-full w-full object-cover" 
-              alt="Asset Evidence" 
-              data-ai-hint={imagePulse.hint}
-            />
+          <div className="flex items-center gap-2">
+            {(asset.signatureUrl || asset.signatureDataUri) && (
+              <Badge variant="outline" className="h-6 px-2 border-green-500/20 bg-green-50 text-green-600">
+                <PenTool className="h-3 w-3" />
+              </Badge>
+            )}
+            <div className="h-6 w-6 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm shrink-0 bg-muted">
+              <img 
+                src={imagePulse.url} 
+                className="h-full w-full object-cover" 
+                alt="Asset Evidence" 
+                data-ai-hint={imagePulse.hint}
+              />
+            </div>
           </div>
         </div>
 

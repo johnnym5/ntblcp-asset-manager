@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
- * Phase 59: Integrated Alerts Cockpit with dynamic badge pulse.
+ * Phase 60: Integrated QR Identity Scanner & Mobile Action Pulse.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -35,7 +36,8 @@ import {
   Terminal,
   Search,
   Command,
-  ShieldAlert
+  ShieldAlert,
+  QrCode
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -47,6 +49,7 @@ import { Badge } from '@/components/ui/badge';
 import { InboxSheet } from './inbox-sheet';
 import { HelpCenter } from './HelpCenter';
 import { CommandPalette } from './CommandPalette';
+import { QRScannerDialog } from './registry/QRScannerDialog';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { ScrollArea } from './ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
@@ -87,11 +90,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const { userProfile, logout } = useAuth();
   const { toast } = useToast();
-  const { isOnline, setIsOnline, isSyncing, assets, appSettings, refreshRegistry } = useAppState();
+  const { isOnline, isSyncing, assets, appSettings, refreshRegistry } = useAppState();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -113,7 +117,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isSuperAdmin = userProfile?.isSuperAdmin || userProfile?.isAdmin;
   const pendingCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
   
-  // Tactical Alert Count
   const alertCount = useMemo(() => {
     return assets.filter(a => 
       ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '') ||
@@ -154,6 +157,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         ))}
       </div>
     );
+  };
+
+  const handleQRSuccess = (assetId: string) => {
+    router.push(`/assets?id=${assetId}`);
+    toast({ title: "QR Pulse Detected", description: "Navigating to record profile..." });
   };
 
   return (
@@ -222,7 +230,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
           
-          <div className="flex items-center gap-2 sm:gap-4"><TooltipProvider><Tooltip><TooltipTrigger asChild><div className={cn("flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-2xl border-2 transition-all cursor-help", isOnline ? "border-green-500/20 bg-green-50/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive")}><div className="flex items-center gap-1.5"><div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} /><span className="text-[10px] font-black uppercase tracking-tighter hidden xs:inline">{isOnline ? 'Active' : 'Offline'}</span></div><Separator orientation="vertical" className="h-4 opacity-20 hidden xs:block" /><div className="flex gap-1"><Database className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} /><Activity className={cn("h-3 w-3", isSyncing ? "text-primary animate-pulse" : "opacity-30")} /><Globe className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} /></div></div></TooltipTrigger><TooltipContent side="bottom" className="p-4 rounded-2xl border-2 shadow-2xl space-y-2 min-w-[200px]"><p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b pb-2">Parity Status</p><div className="space-y-1 text-[10px] font-bold"><div className="flex justify-between"><span className="opacity-60">Local Layer:</span><span className="text-green-600">Stable</span></div><div className="flex justify-between"><span className="opacity-60">Primary Cloud:</span><span className={cn(isOnline ? "text-green-600" : "text-destructive")}>{isOnline ? 'Active Pulse' : 'Offline'}</span></div></div></TooltipContent></Tooltip></TooltipProvider></div>
+          <div className="flex items-center gap-2 sm:gap-4">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={() => setIsQRScannerOpen(true)}
+              className="rounded-2xl border-2 border-primary/10 bg-primary/5 text-primary hover:bg-primary/10 lg:hidden"
+            >
+              <QrCode className="h-5 w-5" />
+            </Button>
+
+            <TooltipProvider><Tooltip><TooltipTrigger asChild><div className={cn("flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-2xl border-2 transition-all cursor-help", isOnline ? "border-green-500/20 bg-green-50/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive")}><div className="flex items-center gap-1.5"><div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} /><span className="text-[10px] font-black uppercase tracking-tighter hidden xs:inline">{isOnline ? 'Active' : 'Offline'}</span></div><Separator orientation="vertical" className="h-4 opacity-20 hidden xs:block" /><div className="flex gap-1"><Database className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} /><Activity className={cn("h-3 w-3", isSyncing ? "text-primary animate-pulse" : "opacity-30")} /><Globe className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} /></div></div></TooltipTrigger><TooltipContent side="bottom" className="p-4 rounded-2xl border-2 shadow-2xl space-y-2 min-w-[200px]"><p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b pb-2">Parity Status</p><div className="space-y-1 text-[10px] font-bold"><div className="flex justify-between"><span className="opacity-60">Local Layer:</span><span className="text-green-600">Stable</span></div><div className="flex justify-between"><span className="opacity-60">Primary Cloud:</span><span className={cn(isOnline ? "text-green-600" : "text-destructive")}>{isOnline ? 'Active Pulse' : 'Offline'}</span></div></div></TooltipContent></Tooltip></TooltipProvider></div>
         </header>
 
         <main className="flex-1 overflow-y-auto custom-scrollbar bg-muted/10 relative">
@@ -233,6 +251,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       {isAdmin && <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />}
       <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
       <CommandPalette />
+      <QRScannerDialog isOpen={isQRScannerOpen} onOpenChange={setIsQRScannerOpen} onScanSuccess={handleQRSuccess} />
     </div>
   );
 }
