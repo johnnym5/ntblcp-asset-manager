@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview SettingsWorkstation - Operational Control Center.
- * Phase 35: Enabled Automation Pulses & Logic Centers.
+ * Phase 53: Added Local Data Recovery & Sub-Table Schema Management.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import AppLayout from '@/components/app-layout';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -41,7 +41,10 @@ import {
   User,
   Info,
   Smartphone,
-  MousePointer2
+  MousePointer2,
+  Download,
+  AlertTriangle,
+  RotateCcw
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
@@ -57,6 +60,7 @@ import { UserManagement } from '@/components/admin/user-management';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
+import { ArchiveService } from '@/lib/archive-service';
 import { cn } from '@/lib/utils';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
 import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
@@ -70,7 +74,10 @@ export default function SettingsPage() {
 
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
   
+  const recoveryInputRef = useRef<HTMLInputElement>(null);
+
   // Schema Editor State
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
@@ -103,6 +110,27 @@ export default function SettingsPage() {
       toast({ variant: "destructive", title: "Broadcast Failure", description: "Could not establish cloud parity for settings." });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleExportBackup = async () => {
+    toast({ title: "Archiving Local State..." });
+    await ArchiveService.generateFullSnapshot();
+    toast({ title: "Device Pulse Exported", description: "Your local database has been archived to JSON." });
+  };
+
+  const handleImportRecovery = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsRestoring(true);
+    try {
+      await ArchiveService.importSnapshot(file);
+      toast({ title: "Recovery Pulse Complete", description: "System state has been reconstructed from the archive." });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Recovery Failure", description: "The archive pulse is corrupted or invalid." });
+    } finally {
+      setIsRestoring(false);
     }
   };
 
@@ -317,7 +345,7 @@ export default function SettingsPage() {
                       <Switch checked={draftSettings.autoSync} onCheckedChange={(v) => handleSettingChange('autoSync', v)} />
                     </SettingRow>
                     
-                    <SettingRow label="Predictive OCR" description="Automatically initialize the AI analysis pulse immediately after a photo is captured." icon={Zap}>
+                    <SettingRow label="Predictive Extraction" description="Identify technical markers from documents during the capture pulse." icon={Zap}>
                       <Switch checked={draftSettings.autoAnalyze} onCheckedChange={(v) => handleSettingChange('autoAnalyze', v)} />
                     </SettingRow>
 
@@ -362,19 +390,43 @@ export default function SettingsPage() {
           {/* Tab 5: System Pulse */}
           <TabsContent value="system" className="space-y-10 outline-none">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-              <div>
-                <SectionHeading title="Infrastructure Health" description="Triple-layer parity monitoring" icon={RefreshCw} />
-                <div className="space-y-4">
-                  <SettingRow label="Manual Reconciliation" description="Force a full state-refresh across Local, Shadow, and Cloud layers." icon={Activity}>
-                    <Button variant="outline" size="sm" onClick={refreshRegistry} disabled={isSyncing} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">
-                      {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
-                      Sync Now
+              <div className="space-y-10">
+                <div>
+                  <SectionHeading title="Infrastructure Health" description="Triple-layer parity monitoring" icon={RefreshCw} />
+                  <div className="space-y-4">
+                    <SettingRow label="Manual Reconciliation" description="Force a full state-refresh across Local, Shadow, and Cloud layers." icon={Activity}>
+                      <Button variant="outline" size="sm" onClick={refreshRegistry} disabled={isSyncing} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">
+                        {isSyncing ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <RefreshCw className="h-3 w-3 mr-2" />}
+                        Sync Now
+                      </Button>
+                    </SettingRow>
+                    
+                    <SettingRow label="Registry Snapshot" description="Export the entire active register as a deterministic JSON archive." icon={PlaneTakeoff}>
+                      <Button variant="outline" size="sm" onClick={handleExportBackup} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">Backup Pulse</Button>
+                    </SettingRow>
+                  </div>
+                </div>
+
+                <div>
+                  <SectionHeading title="Local Data Recovery" description="Deterministic state restoration" icon={RotateCcw} />
+                  <div className="p-8 rounded-[2.5rem] bg-primary/5 border-2 border-dashed border-primary/20 space-y-6">
+                    <div className="flex items-center gap-3">
+                      <Download className="h-5 w-5 text-primary" />
+                      <h4 className="text-sm font-black uppercase tracking-tight text-primary">Import Recovery Pulse</h4>
+                    </div>
+                    <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic opacity-70">
+                      If you have exported a "Device Pulse" backup, you can reconstruct your local environment by importing the JSON archive. This will overwrite all local IndexedDB stores.
+                    </p>
+                    <input type="file" ref={recoveryInputRef} onChange={handleImportRecovery} className="hidden" accept=".json" />
+                    <Button 
+                      onClick={() => recoveryInputRef.current?.click()}
+                      disabled={isRestoring}
+                      className="w-full h-14 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-primary/20"
+                    >
+                      {isRestoring ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <FileUp className="h-4 w-4 mr-2" />}
+                      Load Recovery Pulse
                     </Button>
-                  </SettingRow>
-                  
-                  <SettingRow label="Registry Snapshot" description="Export the entire active register as a deterministic JSON archive." icon={PlaneTakeoff}>
-                    <Button variant="outline" size="sm" className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">Backup Pulse</Button>
-                  </SettingRow>
+                  </div>
                 </div>
               </div>
 

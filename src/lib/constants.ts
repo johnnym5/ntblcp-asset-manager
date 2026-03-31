@@ -66,6 +66,13 @@ export const HEADER_ALIASES: { [key in keyof Partial<Asset>]: string[] } = {
   condition: ['CONDITION', 'COMMENTS'],
 };
 
+// Specialized sub-table signatures for complex sheets (e.g. IHVN)
+export const SUB_TABLE_SIGNATURES: Record<string, string[]> = {
+  'IHVN-General': [ "S/N", "STATE", "TAG NUMBERS", "DESCRIPTION", "CLASSIFICATION", "SERIAL NUMBERS" ],
+  'IHVN-Computers': [ "S/N", "CATEGORY", "TAG NUMBER", "DESCRIPTION", "SERIAL NUMBER", "MODEL NUMBER" ],
+  'IHVN-Vehicles': [ "S/N", "DESCRIPTION", "TAG NUMBER", "CHASIS NO", "ENGINE NO" ],
+};
+
 export const HEADER_DEFINITIONS: Record<string, SheetDefinition> = {
   'NTBLCP-TB-FAR': { 
     name: 'NTBLCP-TB-FAR', 
