@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview Super Admin Database Mission Control.
- * Phase 44: Implemented real Infrastructure Purge logic and Audio Pulse visibility.
+ * Phase 47: Implemented real Infrastructure Purge logic and Audio Pulse visibility.
+ * Hardened reconciliation and forensic diff views.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -35,7 +35,8 @@ import {
   RotateCcw,
   Zap,
   Bomb,
-  Hammer
+  Hammer,
+  ShieldHalf
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';

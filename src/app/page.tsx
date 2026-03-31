@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
- * Phase 45: Removed AI interpretation pulses.
+ * Phase 47: Integrated Infrastructure Health Pulse for Administrators.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -27,7 +26,9 @@ import {
   Activity,
   Camera,
   AlertTriangle,
-  BarChart3
+  BarChart3,
+  Monitor,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -39,6 +40,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { ArchiveService } from '@/lib/archive-service';
 import { VerificationPulse } from '@/components/registry/VerificationPulse';
 import { FirestoreService } from '@/services/firebase/firestore';
+import { VirtualDBService } from '@/services/virtual-db-service';
 import { storage } from '@/offline/storage';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell } from 'recharts';
 
@@ -57,9 +59,10 @@ const item = {
 
 export default function DashboardPage() {
   const { assets, settingsLoaded, isOnline, appSettings, activeGrantId, refreshRegistry } = useAppState();
-  const { profileSetupComplete, loading: authLoading } = useAuth();
+  const { userProfile, profileSetupComplete, loading: authLoading } = useAuth();
   
   const [integrityScore, setIntegrityScore] = useState(100);
+  const [syncDrift, setSyncDrift] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
@@ -68,7 +71,13 @@ export default function DashboardPage() {
         setIntegrityScore(report.score);
       });
     }
-  }, [assets]);
+    
+    if (userProfile?.isAdmin) {
+      VirtualDBService.getGlobalDiscrepancies().then(ids => {
+        setSyncDrift(ids.length);
+      });
+    }
+  }, [assets, userProfile]);
 
   useEffect(() => {
     if (settingsLoaded && appSettings && !appSettings.onboardingComplete) {
@@ -267,21 +276,52 @@ export default function DashboardPage() {
           </motion.div>
 
           <div className="space-y-8">
+            {userProfile?.isAdmin && (
+              <motion.div variants={item}>
+                <Card className="border-2 border-primary/20 bg-primary/5 shadow-2xl rounded-[2.5rem] overflow-hidden">
+                  <CardHeader className="p-8 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="p-2.5 bg-primary rounded-xl">
+                          <Monitor className="h-5 w-5 text-white" />
+                        </div>
+                        <CardTitle className="text-xl font-black uppercase tracking-tight text-primary">Infra Health</CardTitle>
+                      </div>
+                      <Badge className="bg-primary text-white font-black uppercase text-[9px]">Root Pulse</Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-8 pt-0 space-y-6">
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-white/50 border border-primary/10">
+                      <div className="space-y-0.5">
+                        <p className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Sync Drift</p>
+                        <p className={cn("text-lg font-black", syncDrift > 0 ? "text-destructive" : "text-green-600")}>
+                          {syncDrift} Discrepant
+                        </p>
+                      </div>
+                      {syncDrift > 0 && <AlertTriangle className="h-5 w-5 text-destructive animate-pulse" />}
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-white/50 border border-primary/10">
+                      <div className="space-y-0.5">
+                        <p className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Parity Score</p>
+                        <p className="text-lg font-black text-primary">{integrityScore}% Integrity</p>
+                      </div>
+                      <ShieldHalf className="h-5 w-5 text-primary opacity-40" />
+                    </div>
+
+                    <Button variant="ghost" asChild className="w-full h-12 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 bg-primary/5 hover:bg-primary/10">
+                      <Link href="/infrastructure"><RefreshCw className="h-3.5 w-3.5" /> Initialize Reconcile</Link>
+                    </Button>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            )}
+
             <motion.div variants={item} className="grid grid-cols-1 gap-4">
               <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground px-2">Common Operations</h4>
               <Link href="/import" className="group"><div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between"><div className="flex items-center gap-4"><div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors"><FileUp className="h-5 w-5 text-primary" /></div><div className="flex flex-col"><span className="text-sm font-black uppercase tracking-tight">Upload Center</span><span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Ingest Workbook</span></div></div><ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" /></div></Link>
               <Link href="/verify" className="group"><div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between"><div className="flex items-center gap-4"><div className="p-3 bg-green-500/10 rounded-xl group-hover:bg-green-500/20 transition-colors"><ClipboardCheck className="h-5 w-5 text-green-600" /></div><div className="flex flex-col"><span className="text-sm font-black uppercase tracking-tight">To Review</span><span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Audit Field findings</span></div></div><ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" /></div></Link>
               <Link href="/audit-log" className="group"><div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between"><div className="flex items-center gap-4"><div className="p-3 bg-blue-500/10 rounded-xl group-hover:bg-blue-500/20 transition-colors"><History className="h-5 w-5 text-blue-600" /></div><div className="flex flex-col"><span className="text-sm font-black uppercase tracking-tight">Registry Ledger</span><span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Traceability Heartbeat</span></div></div><ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" /></div></Link>
-            </motion.div>
-
-            <motion.div variants={item}>
-              <Card className="border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden rounded-[2.5rem]">
-                <CardHeader className="bg-primary/5 border-b p-8"><CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3"><ShieldHalf className="h-4 w-4 fill-current" /> Maintenance Integrity</CardTitle></CardHeader>
-                <CardContent className="p-8 space-y-8">
-                  <div className="flex items-center justify-between border-b border-dashed pb-4"><div className="flex items-center gap-4"><div className="p-2.5 bg-green-100 rounded-xl"><ShieldHalf className="h-5 w-5 text-green-600" /></div><span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Pulse Score</span></div><span className={cn("text-[10px] font-black uppercase", integrityScore > 90 ? "text-green-600" : "text-orange-600")}>{integrityScore}% Healthy</span></div>
-                  <div className="flex items-center justify-between"><div className="flex items-center gap-4"><div className="p-2.5 bg-primary/10 rounded-xl"><LayoutGrid className="h-5 w-5 text-primary" /></div><span className="text-xs font-black uppercase tracking-widest text-muted-foreground">Data Gaps</span></div><span className="text-[10px] font-black uppercase text-primary">{(stats?.missingSerials || 0) + (stats?.missingTags || 0)} Missing</span></div>
-                </CardContent>
-              </Card>
             </motion.div>
           </div>
         </div>

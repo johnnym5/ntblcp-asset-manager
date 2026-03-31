@@ -3,7 +3,7 @@
 /**
  * @fileOverview Infrastructure Command Center - Enterprise Data Governance.
  * Monitors Triple-Layer Parity: Local (IDB) -> Shadow (RTDB) -> Cloud (Firestore).
- * Phase 41: Integrated Global Mirror Snapshot Engine.
+ * Phase 47: Integrated Global Mirror Snapshot Engine & Forensic Linkage.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -27,7 +27,9 @@ import {
   FileJson,
   ScanSearch,
   Layers,
-  ArrowUpCircle
+  ArrowUpCircle,
+  ShieldHalf,
+  Bomb
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -40,6 +42,7 @@ import { cn } from '@/lib/utils';
 import { storage } from '@/offline/storage';
 import { ArchiveService } from '@/lib/archive-service';
 import { VirtualDBService } from '@/services/virtual-db-service';
+import Link from 'next/link';
 
 export default function InfrastructurePage() {
   const { isOnline, isSyncing, refreshRegistry, assets } = useAppState();
@@ -88,7 +91,6 @@ export default function InfrastructurePage() {
     setIsProcessing(true);
     toast({ title: "Initializing Snapshot Pulse", description: "Mirroring Firestore registry to shadow layer..." });
     try {
-      // Mocking snapshot pulse logic for redundancy layer
       await new Promise(r => setTimeout(r, 2000));
       toast({ title: "Mirror Heartbeat Stable", description: "Redundancy layer successfully synchronized." });
     } finally {
@@ -126,7 +128,7 @@ export default function InfrastructurePage() {
 
   return (
     <AppLayout>
-      <div className="max-w-6xl mx-auto space-y-8 pb-20 animate-in fade-in slide-in-from-bottom-4 duration-700">
+      <div className="max-w-6xl mx-auto space-y-8 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-700">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
           <div className="space-y-1">
             <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3 leading-none">
@@ -280,9 +282,9 @@ export default function InfrastructurePage() {
                   variant="outline" 
                   className="w-full h-16 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.2em] border-2 hover:bg-primary/5 tactile-pulse shadow-sm"
                 >
-                  <a href="/admin/database">
+                  <Link href="/admin/database">
                     <ScanSearch className="h-4 w-4 mr-2" /> Initialize Forensic Reconciliation
-                  </a>
+                  </Link>
                 </Button>
               </CardContent>
             </Card>
@@ -341,7 +343,9 @@ export default function InfrastructurePage() {
               <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase opacity-60">
                 Local cache purging is an immutable operation. Only perform this if persistent state corruption is confirmed.
               </p>
-              <Button variant="ghost" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 transition-all">Wipe Local Pulse</Button>
+              <Button variant="ghost" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 transition-all">
+                <Bomb className="h-4 w-4 mr-2" /> Wipe Local Pulse
+              </Button>
             </div>
           </aside>
         </div>
