@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview Intelligence Hub - The Operational Command Center.
- * Phase 66: Integrated Global Discovery Engine & Forensic Pulse.
+ * @fileOverview Intelligence Hub - Grouped Operational Commands.
+ * Phase 69: Aligned Common Operations with new functional groupings.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -33,7 +33,11 @@ import {
   Target,
   Search,
   Zap,
-  Boxes
+  Boxes,
+  ListTodo,
+  FileText,
+  Users,
+  Monitor
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -194,7 +198,7 @@ export default function DashboardPage() {
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="sm" className="h-10 px-4 rounded-xl border-2 border-primary/10 bg-card hover:bg-primary/5 gap-2 group shadow-sm transition-all">
-                      <FolderKanban className="h-4 w-4 text-primary" />
+                      <Folder_Kanban className="h-4 w-4 text-primary" />
                       <span className="text-[10px] font-black uppercase tracking-widest">Switch Project</span>
                       <ChevronDown className="h-3 w-3 opacity-40 group-data-[state=open]:rotate-180 transition-transform" />
                     </Button>
@@ -230,10 +234,10 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline" asChild className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2">
-              <Link href="/alerts"><ShieldAlert className="h-4 w-4 text-destructive" /> Tactical Alerts</Link>
+              <Link href="/alerts"><ShieldAlert className="h-4 w-4 text-destructive" /> Risk Alerts</Link>
             </Button>
             <Button className="h-12 px-8 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 group" asChild>
-              <Link href="/assets">Explore Registry <ArrowRight className="ml-3 h-4 w-4 transition-transform group-hover:translate-x-2" /></Link>
+              <Link href="/assets">Open Registry <ArrowRight className="ml-3 h-4 w-4 transition-transform group-hover:translate-x-2" /></Link>
             </Button>
           </div>
         </div>
@@ -317,12 +321,6 @@ export default function DashboardPage() {
                 <div className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
                     <AreaChart data={stats?.trendData}>
-                      <defs>
-                        <linearGradient id="coverageGradient" x1="0" y1="0" x2="0" y2="1">
-                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                        </linearGradient>
-                      </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.2} />
                       <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} dy={10} />
                       <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} unit="%" />
@@ -337,7 +335,7 @@ export default function DashboardPage() {
                         }
                         return null;
                       }} />
-                      <Area type="monotone" dataKey="coverage" stroke="hsl(var(--primary))" strokeWidth={4} fillOpacity={1} fill="url(#coverageGradient)" />
+                      <Area type="monotone" dataKey="coverage" stroke="hsl(var(--primary))" strokeWidth={4} fill="hsl(var(--primary))" fillOpacity={0.1} />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -402,15 +400,8 @@ export default function DashboardPage() {
                     </div>
                     <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40">
                       <div className="flex items-center gap-3">
-                        <Navigation className={cn("h-4 w-4", integrityIssues.some(i => i.type === 'COORDINATE_DRIFT') ? "text-orange-500" : "text-green-600")} />
-                        <span className="text-[10px] font-black uppercase opacity-60">Spatial Drift</span>
-                      </div>
-                      <span className="text-xs font-black text-foreground">{integrityIssues.filter(i => i.type === 'COORDINATE_DRIFT').length}</span>
-                    </div>
-                    <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40">
-                      <div className="flex items-center gap-3">
-                        <History className={cn("h-4 w-4", syncDrift ? "text-primary" : "text-green-600")} />
-                        <span className="text-[10px] font-black uppercase opacity-60">Registry Drift</span>
+                        <ListTodo className={cn("h-4 w-4", syncDrift ? "text-primary" : "text-green-600")} />
+                        <span className="text-[10px] font-black uppercase opacity-60">Sync Drift</span>
                       </div>
                       <span className={cn("text-xs font-black", syncDrift ? "text-primary" : "text-green-600")}>{syncDrift} Pulses</span>
                     </div>
@@ -426,10 +417,51 @@ export default function DashboardPage() {
             </motion.div>
 
             <motion.div variants={item} className="grid grid-cols-1 gap-4">
-              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground px-2">Common Operations</h4>
-              <Link href="/import" className="group"><div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between"><div className="flex items-center gap-4"><div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors"><FileUp className="h-5 w-5 text-primary" /></div><div className="flex flex-col"><span className="text-sm font-black uppercase tracking-tight">Upload Center</span><span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Ingest Workbook</span></div></div><ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" /></div></Link>
-              <Link href="/verify" className="group"><div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between"><div className="flex items-center gap-4"><div className="p-3 bg-green-500/10 rounded-xl group-hover:bg-green-500/20 transition-colors"><ClipboardCheck className="h-5 w-5 text-green-600" /></div><div className="flex flex-col"><span className="text-sm font-black uppercase tracking-tight">To Review</span><span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Audit Field findings</span></div></div><ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" /></div></Link>
-              <Link href="/audit-log" className="group"><div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between"><div className="flex items-center gap-4"><div className="p-3 bg-blue-500/10 rounded-xl group-hover:bg-blue-500/20 transition-colors"><History className="h-5 w-5 text-blue-600" /></div><div className="flex flex-col"><span className="text-sm font-black uppercase tracking-tight">Registry Ledger</span><span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Traceability Heartbeat</span></div></div><ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" /></div></Link>
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground px-2">Registry Engineering</h4>
+              <Link href="/import" className="group">
+                <div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors"><FileUp className="h-5 w-5 text-primary" /></div>
+                    <div className="flex flex-col"><span className="text-sm font-black uppercase tracking-tight">Upload Center</span><span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Ingest Workbook</span></div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
+                </div>
+              </Link>
+
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground px-2 mt-4">Audit & Quality</h4>
+              <Link href="/verify" className="group">
+                <div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-green-500/10 rounded-xl group-hover:bg-green-500/20 transition-colors"><CheckCircle2 className="h-5 w-5 text-green-600" /></div>
+                    <div className="flex flex-col"><span className="text-sm font-black uppercase tracking-tight">Review Queue</span><span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Field Assessments</span></div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
+                </div>
+              </Link>
+              <Link href="/audit-log" className="group">
+                <div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between">
+                  <div className="flex items-center gap-4">
+                    <div className="p-3 bg-blue-500/10 rounded-xl group-hover:bg-blue-500/20 transition-colors"><History className="h-5 w-5 text-blue-600" /></div>
+                    <div className="flex flex-col"><span className="text-sm font-black uppercase tracking-tight">Registry Ledger</span><span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Traceability Trail</span></div>
+                  </div>
+                  <ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
+                </div>
+              </Link>
+
+              {userProfile?.isAdmin && (
+                <>
+                  <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground px-2 mt-4">Governance</h4>
+                  <Link href="/infrastructure" className="group">
+                    <div className="p-6 rounded-[2rem] bg-card border-2 border-border/40 group-hover:border-primary/20 shadow-lg transition-all flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className="p-3 bg-orange-500/10 rounded-xl group-hover:bg-orange-500/20 transition-colors"><Monitor className="h-5 w-5 text-orange-600" /></div>
+                        <div className="flex flex-col"><span className="text-sm font-black uppercase tracking-tight">Systems</span><span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">Infrastructure Pulse</span></div>
+                      </div>
+                      <ArrowRight className="h-4 w-4 opacity-20 group-hover:translate-x-1 transition-all" />
+                    </div>
+                  </Link>
+                </>
+              )}
             </motion.div>
           </div>
         </div>
