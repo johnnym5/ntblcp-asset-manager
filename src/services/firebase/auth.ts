@@ -3,6 +3,7 @@
 /**
  * @fileOverview Abstraction layer for Firebase Authentication.
  * Handles session-level persistence and provides a clean interface for the AuthContext.
+ * singleton promise pattern prevents auth/too-many-requests during high-frequency boots.
  */
 
 import { 
@@ -14,7 +15,8 @@ import {
 import { auth } from '@/lib/firebase';
 import { logger } from '@/lib/logger';
 
-let isSigningIn = false;
+// singleton promise to handle concurrent ensureSession pulses
+let signInPromise: Promise<User | null> | null = null;
 
 export const FirebaseAuthService = {
   /**
@@ -22,19 +24,23 @@ export const FirebaseAuthService = {
    * Uses anonymous auth as a base for custom RBAC state.
    */
   async ensureSession(): Promise<User | null> {
-    if (!auth || isSigningIn) return auth?.currentUser || null;
-    try {
-      if (auth.currentUser) return auth.currentUser;
-      
-      isSigningIn = true;
-      const credential = await signInAnonymously(auth);
-      isSigningIn = false;
-      return credential.user;
-    } catch (e) {
-      isSigningIn = false;
-      logger.error("Firebase Auth: Failed to initialize session", e);
-      return null;
-    }
+    if (!auth) return null;
+    if (auth.currentUser) return auth.currentUser;
+    if (signInPromise) return signInPromise;
+
+    signInPromise = (async () => {
+      try {
+        const credential = await signInAnonymously(auth);
+        return credential.user;
+      } catch (e) {
+        logger.error("Firebase Auth: Failed to initialize session", e);
+        return null;
+      } finally {
+        signInPromise = null;
+      }
+    })();
+
+    return signInPromise;
   },
 
   /**
