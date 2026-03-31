@@ -156,7 +156,8 @@ export const FirestoreService = {
   async logErrorAudit(entry: ErrorLogEntry) {
     if (!db) return;
     try {
-      await setDoc(doc(db, 'error_logs', entry.id), entry);
+      const sanitized = sanitizeForFirestore(entry);
+      await setDoc(doc(db, 'error_logs', entry.id), sanitized);
     } catch (e) {
       console.error("CRITICAL: Failed to archive error log", e);
     }
@@ -189,10 +190,11 @@ export const FirestoreService = {
     if (!db) return;
     const logRef = collection(db, 'activity_log');
     try {
-      await addDoc(logRef, {
+      const data = {
         ...entry,
         timestamp: new Date().toISOString()
-      });
+      };
+      await addDoc(logRef, sanitizeForFirestore(data));
     } catch (e) {
       console.error("Failed to log activity pulse", e);
     }
