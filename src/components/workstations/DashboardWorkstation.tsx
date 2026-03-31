@@ -143,7 +143,7 @@ export function DashboardWorkstation() {
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-10 px-4 rounded-xl border-2 border-primary/10 bg-card hover:bg-primary/5 gap-2 group shadow-sm transition-all">
-                    <Folder_Kanban className="h-4 w-4 text-primary" />
+                    <FolderKanban className="h-4 w-4 text-primary" />
                     <span className="text-[10px] font-black uppercase tracking-widest">Switch Project</span>
                     <ChevronDown className="h-3 w-3 opacity-40 group-data-[state=open]:rotate-180 transition-transform" />
                   </Button>
@@ -205,7 +205,7 @@ export function DashboardWorkstation() {
                 className="absolute top-full left-0 right-0 mt-3 bg-background border-2 border-primary/20 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden"
               >
                 <div className="p-4 bg-primary/5 border-b flex items-center justify-between">
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Discovery Pulse Results</span>
+                  <span className="text-10px font-black uppercase tracking-0.3em text-primary">Discovery Pulse Results</span>
                   <Badge className="bg-primary text-black font-black text-[8px]">{globalSearchResults.length} HITS</Badge>
                 </div>
                 <div className="divide-y divide-border/40 max-h-[400px] overflow-y-auto custom-scrollbar">
@@ -311,7 +311,7 @@ export function DashboardWorkstation() {
               </Table>
             </CardContent>
           </Card>
-        </motion.div>
+        </div>
 
         <div className="space-y-8">
           <motion.div variants={item}>
