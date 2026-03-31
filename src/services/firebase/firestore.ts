@@ -1,7 +1,7 @@
 /**
  * @fileOverview Hardened Firestore Service.
- * Implements Deep-Hydration retrieval for 100% offline parity.
- * Note: Media offloading to Storage is currently disabled.
+ * Phase 71: Reinforced deep recursive sanitization for all log writes.
+ * Prevents illegal undefined values from interrupting background audit pulses.
  */
 
 import { 
@@ -89,7 +89,6 @@ export const FirestoreService = {
 
   /**
    * Single record update with mandatory Zod validation.
-   * Media (Photo/Signature) offloading is currently disabled.
    */
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
@@ -180,7 +179,8 @@ export const FirestoreService = {
     if (!db) return;
     const logRef = doc(db, 'error_logs', logId);
     try {
-      await updateDoc(logRef, { status, adminNotes: notes });
+      const updates = sanitizeForFirestore({ status, adminNotes: notes });
+      await updateDoc(logRef, updates);
     } catch (e) {
       console.error("Failed to update error status", e);
     }

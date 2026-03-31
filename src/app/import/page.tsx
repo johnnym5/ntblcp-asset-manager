@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Guided Import Wizard - Deterministic Hierarchical Ingestion.
- * Phase 40: Integrated Interactive Schema Mapper for Data Engineering.
+ * Phase 70: Added missing Badge import.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -51,7 +51,7 @@ const STEPS: { id: ImportStep; label: string; description: string; icon: any }[]
 
 export default function ImportPage() {
   const { toast } = useToast();
-  const { refreshRegistry, activeGrantId, appSettings } = useAppState();
+  const { refreshRegistry, activeGrantId } = useAppState();
   const { userProfile } = useAuth();
   
   const [currentStep, setCurrentStep] = useState<ImportStep>('INGEST');

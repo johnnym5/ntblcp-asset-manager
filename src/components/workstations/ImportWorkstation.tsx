@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview ImportWorkstation - SPA Ingestion Module.
+ * Phase 71: Verified imports and added missing Badge reference.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -32,7 +33,6 @@ import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
-import { monitoring } from '@/lib/monitoring';
 import * as XLSX from 'xlsx';
 import type { Asset } from '@/types/domain';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -202,7 +202,9 @@ export function ImportWorkstation() {
             <motion.div key="step-ingest" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
               <Card className="border-4 border-dashed border-border/40 bg-card/50 hover:border-primary/40 transition-all rounded-[3rem] p-12 flex flex-col items-center justify-center text-center h-[400px] cursor-pointer group" onClick={() => fileInputRef.current?.click()}>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx,.xls" />
-                <FileUp className="h-16 w-16 text-primary mb-8" />
+                <div className="p-10 bg-primary/10 rounded-full w-32 h-32 flex items-center justify-center mb-8 shadow-inner">
+                  <FileUp className="h-16 w-16 text-primary" />
+                </div>
                 <h3 className="text-3xl font-black uppercase">Upload Pulse</h3>
                 <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Select Registry Workbook</Button>
               </Card>
@@ -221,6 +223,15 @@ export function ImportWorkstation() {
 
           {currentStep === 'MAPPER' && (
             <motion.div key="step-mapper" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
+              <div className="flex items-center justify-between mb-8">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary rounded-xl shadow-lg"><Columns className="h-5 w-5 text-white" /></div>
+                  <h3 className="text-xl font-black uppercase tracking-tight text-foreground">Interactive Schema Mapper</h3>
+                </div>
+                <Badge variant="outline" className="h-8 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px]">
+                  {detectedHeaders.length} HEADERS DISCOVERED
+                </Badge>
+              </div>
               <SchemaMapper headers={detectedHeaders} onConfirm={handleConfirmMapping} isProcessing={isProcessing} />
             </motion.div>
           )}
@@ -228,7 +239,7 @@ export function ImportWorkstation() {
           {currentStep === 'RECONCILIATION' && (
             <motion.div key="step-recon" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-10">
               <ReconciliationView assets={stagedAssets} />
-              <Button onClick={() => setCurrentStep('COMMIT')} className="w-full h-20 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl">Proceed to Commit <ChevronRight className="h-5 w-5 ml-2" /></Button>
+              <Button onClick={() => setCurrentStep('COMMIT')} className="w-full h-20 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl bg-primary text-white gap-4">Proceed to Commit <ChevronRight className="h-5 w-5" /></Button>
             </motion.div>
           )}
 
@@ -237,7 +248,7 @@ export function ImportWorkstation() {
               <DatabaseZap className="h-32 w-28 text-muted-foreground opacity-20" />
               <div className="space-y-6">
                 <h3 className="text-3xl font-black uppercase">Commit Selection</h3>
-                <Button onClick={handleCommitToRegistry} disabled={isProcessing} className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-4">
+                <Button onClick={handleCommitToRegistry} disabled={isProcessing} className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-4 bg-primary text-white">
                   {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
                   Execute Merge Pulse
                 </Button>

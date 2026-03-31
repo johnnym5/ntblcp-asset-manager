@@ -2,12 +2,10 @@
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 63: Strictly deterministic form without suggestion logic.
- * Note: Evidence and Signature features are currently disabled.
+ * Phase 70: Media (Photo/Signature) fields disabled per user request.
  */
 
-import React, { useEffect, useState, useRef } from "react";
-import Image from "next/image";
+import React, { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -32,29 +30,17 @@ import {
 } from "@/components/ui/select";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { 
   Loader2, 
   ArrowLeft, 
   Share2, 
   ShieldCheck, 
-  X, 
-  ChevronLeft,
-  ChevronRight,
-  Database,
-  MapPin,
-  Tag,
-  Hash,
-  Activity,
-  User,
-  History,
+  Tag, 
+  MapPin, 
+  History, 
   Info,
-  DollarSign,
-  CalendarDays,
-  GitPullRequest,
   Clock,
-  ArrowRight,
-  Navigation,
+  User,
   RotateCcw
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
@@ -73,7 +59,7 @@ import { useToast } from "@/hooks/use-toast";
 
 interface AssetFormProps {
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
+  onOpenChange: (open: boolean) => void;
   asset?: Asset;
   headers?: RegistryHeader[];
   onSave: (assetToSave: Asset) => Promise<void>;
@@ -94,11 +80,8 @@ export default function AssetForm({
     isOpen, 
     onOpenChange, 
     asset,
-    headers = [],
     onSave, 
     isReadOnly,
-    onNext,
-    onPrevious
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const [activeTab, setActiveTab] = useState("details");
@@ -119,9 +102,7 @@ export default function AssetForm({
       setActiveTab("details");
       if (asset) {
         form.reset(asset);
-        if (isOnline) {
-          loadHistory(asset.id);
-        }
+        if (isOnline) loadHistory(asset.id);
       } else {
         form.reset({
           id: crypto.randomUUID(),
@@ -159,11 +140,9 @@ export default function AssetForm({
     setIsReverting(true);
     try {
       await FirestoreService.restoreAsset(asset.id, userProfile.displayName);
-      toast({ title: "Reversion Pulse Complete", description: "Record successfully rolled back." });
+      toast({ title: "Reversion Pulse Complete" });
       await refreshRegistry();
       onOpenChange(false);
-    } catch (e) {
-      toast({ variant: "destructive", title: "Reversion Failed" });
     } finally {
       setIsReverting(false);
     }
@@ -185,7 +164,6 @@ export default function AssetForm({
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl w-full flex flex-col h-full sm:h-[95vh] p-0 overflow-hidden sm:rounded-[2.5rem] border-none shadow-2xl bg-background">
-        {/* Header Bar */}
         <div className="flex flex-col shrink-0">
           <div className="flex items-center justify-between p-4 border-b bg-background/80 backdrop-blur-md z-30">
               <div className="flex items-center gap-3">
@@ -201,10 +179,7 @@ export default function AssetForm({
                     </span>
                   </div>
               </div>
-              
-              <div className="flex items-center gap-1">
-                  <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-40 hover:opacity-100"><Share2 className="h-5 w-5" /></Button>
-              </div>
+              <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl opacity-40 hover:opacity-100"><Share2 className="h-5 w-5" /></Button>
           </div>
 
           <div className="px-4 py-2 border-b bg-muted/10">
@@ -253,7 +228,7 @@ export default function AssetForm({
                     </div>
 
                     <SectionHeader label="Field Assessment" icon={MapPin} />
-                    <div className="px-4 md:px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-4 border-b border-dashed">
+                    <div className="px-4 md:px-6 py-6 grid grid-cols-1 md:grid-cols-2 gap-4">
                       <FormField control={form.control} name="location" render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Location Scope</FormLabel>
@@ -271,6 +246,13 @@ export default function AssetForm({
                         </FormItem>
                       )}/>
                     </div>
+
+                    <div className="p-8 border-t border-dashed opacity-40 grayscale pointer-events-none">
+                      <div className="p-6 rounded-[2rem] border-2 border-dashed border-border/40 text-center space-y-2">
+                        <ShieldCheck className="h-8 w-8 mx-auto text-muted-foreground" />
+                        <p className="text-[10px] font-black uppercase tracking-widest">Visual Evidence Pulses De-integrated</p>
+                      </div>
+                    </div>
                 </form>
               </Form>
             </TabsContent>
@@ -281,17 +263,10 @@ export default function AssetForm({
                   <div className="p-6 rounded-[2rem] bg-primary/5 border-2 border-dashed border-primary/20 flex items-center justify-between group hover:border-primary/40 transition-all">
                     <div className="space-y-1">
                       <h4 className="text-xs font-black uppercase tracking-tight">Restoration Pulse Available</h4>
-                      <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                        Roll back this record to its previous verified state.
-                      </p>
+                      <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Roll back this record to its previous verified state.</p>
                     </div>
-                    <Button 
-                      onClick={handleRevert} 
-                      disabled={isReverting}
-                      className="h-11 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 shadow-xl shadow-primary/10"
-                    >
-                      {isReverting ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
-                      Execute Revert
+                    <Button onClick={handleRevert} disabled={isReverting} className="h-11 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 shadow-xl shadow-primary/10">
+                      {isReverting ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />} Execute Revert
                     </Button>
                   </div>
                 )}
@@ -305,44 +280,32 @@ export default function AssetForm({
                   <div className="space-y-6 relative before:absolute before:left-[19px] before:top-2 before:bottom-2 before:w-0.5 before:bg-primary/10">
                     {history.map((entry, idx) => (
                       <div key={entry.id} className="relative pl-12">
-                        <div className={cn(
-                          "absolute left-0 top-0 h-10 w-10 rounded-xl flex items-center justify-center shadow-lg border-2 z-10",
-                          idx === 0 ? "bg-primary border-primary text-white" : "bg-card border-primary/20 text-primary"
-                        )}>
+                        <div className={cn("absolute left-0 top-0 h-10 w-10 rounded-xl flex items-center justify-center shadow-lg border-2 z-10", idx === 0 ? "bg-primary border-primary text-white" : "bg-card border-primary/20 text-primary")}>
                           <Clock className="h-5 w-5" />
                         </div>
                         <div className="space-y-2">
                           <div className="flex items-center justify-between">
                             <h4 className="font-black text-[10px] uppercase tracking-tight">{entry.operation}</h4>
-                            <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">
-                              {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
-                            </span>
+                            <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">{formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}</span>
                           </div>
-                          <div className="p-4 rounded-2xl bg-muted/30 border border-border/40 text-[10px] font-bold text-muted-foreground uppercase">
-                            <User className="h-3.5 w-3.5 inline mr-2 text-primary" /> {entry.performedBy}
-                          </div>
+                          <div className="p-4 rounded-2xl bg-muted/30 border border-border/40 text-[10px] font-bold text-muted-foreground uppercase"><User className="h-3.5 w-3.5 inline mr-2 text-primary" /> {entry.performedBy}</div>
                         </div>
                       </div>
                     ))}
                   </div>
                 ) : (
-                  <div className="flex flex-col items-center justify-center py-32 opacity-20 text-center">
-                    <History className="h-12 w-12 mb-4" />
-                    <h3 className="text-xl font-black uppercase tracking-widest">History Silent</h3>
-                  </div>
+                  <div className="flex flex-col items-center justify-center py-32 opacity-20 text-center"><History className="h-12 w-12 mb-4" /><h3 className="text-xl font-black uppercase tracking-widest">History Silent</h3></div>
                 )}
               </div>
             </TabsContent>
           </Tabs>
         </ScrollArea>
 
-        {/* Footer Control */}
         {!isReadOnly && activeTab === 'details' && (
             <div className="p-4 md:p-6 bg-background/80 backdrop-blur-xl border-t flex flex-col sm:flex-row items-center gap-3 absolute bottom-0 left-0 right-0 z-40">
-                <Button variant="ghost" onClick={() => { onOpenChange(false); }} className="w-full sm:flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl">DISCARD</Button>
+                <Button variant="ghost" onClick={() => onOpenChange(false)} className="w-full sm:flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl">DISCARD</Button>
                 <Button type="submit" form="asset-form" disabled={isSaving} className="w-full sm:flex-1 h-14 font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-primary/30 rounded-2xl bg-primary text-primary-foreground">
-                    {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ShieldCheck className="h-5 w-5 mr-2" />}
-                    COMMIT RECORD
+                    {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-2" /> : <ShieldCheck className="h-5 w-5 mr-2" />} COMMIT RECORD
                 </Button>
             </div>
         )}

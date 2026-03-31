@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - SPA Intelligence Hub.
+ * Phase 71: Resolved syntax error and FolderKanban icon reference.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -22,10 +23,7 @@ import {
   Fingerprint,
   Search,
   Zap,
-  Boxes,
-  ListTodo,
-  FileText,
-  Monitor
+  Boxes
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -81,7 +79,7 @@ export function DashboardWorkstation() {
   }, [assets, globalSearch]);
 
   const stats = useMemo(() => {
-    if (!assets) return null;
+    if (!assets || assets.length === 0) return null;
     
     const total = assets.length;
     const verified = assets.filter(a => a.status === 'VERIFIED').length;
@@ -205,7 +203,7 @@ export function DashboardWorkstation() {
                 className="absolute top-full left-0 right-0 mt-3 bg-background border-2 border-primary/20 rounded-[2rem] shadow-[0_20px_50px_rgba(0,0,0,0.3)] overflow-hidden"
               >
                 <div className="p-4 bg-primary/5 border-b flex items-center justify-between">
-                  <span className="text-10px font-black uppercase tracking-0.3em text-primary">Discovery Pulse Results</span>
+                  <span className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Discovery Pulse Results</span>
                   <Badge className="bg-primary text-black font-black text-[8px]">{globalSearchResults.length} HITS</Badge>
                 </div>
                 <div className="divide-y divide-border/40 max-h-[400px] overflow-y-auto custom-scrollbar">
@@ -251,14 +249,14 @@ export function DashboardWorkstation() {
                   </div>
                 </div>
                 <Badge className="bg-primary text-white font-black uppercase text-[10px] h-8 px-4 rounded-full">
-                  {stats?.verified} / {stats?.total} TARGETS
+                  {stats?.verified || 0} / {stats?.total || 0} TARGETS
                 </Badge>
               </div>
             </CardHeader>
             <CardContent className="p-10">
               <div className="h-[280px] w-full">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={stats?.trendData}>
+                  <AreaChart data={stats?.trendData || []}>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.2} />
                     <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} dy={10} />
                     <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} unit="%" />
@@ -334,7 +332,7 @@ export function DashboardWorkstation() {
                       <Fingerprint className={cn("h-4 w-4", stats?.missingSerials ? "text-orange-500" : "text-green-600")} />
                       <span className="text-[10px] font-black uppercase opacity-60">Serial Gaps</span>
                     </div>
-                    <span className={cn("text-xs font-black", stats?.missingSerials ? "text-orange-600" : "text-green-600")}>{stats?.missingSerials}</span>
+                    <span className={cn("text-xs font-black", stats?.missingSerials ? "text-orange-600" : "text-green-600")}>{stats?.missingSerials || 0}</span>
                   </div>
                   <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40">
                     <div className="flex items-center gap-3">
