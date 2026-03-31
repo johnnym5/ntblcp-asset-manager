@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Infrastructure Command Center - Enterprise Data Governance.
- * Phase 55: Launched System Diagnostics & Redundancy Topology visualizer.
+ * Phase 58: Launched HA Failover Engine & Authority Switch workstation.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -33,7 +33,10 @@ import {
   Network,
   Cpu,
   ChevronRight,
-  ArrowRight
+  ArrowRight,
+  ShieldAlert,
+  ArrowDownCircle,
+  ToggleRight
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -49,9 +52,10 @@ import { VirtualDBService } from '@/services/virtual-db-service';
 import { SystemDiagnostics, type DiagnosticResult } from '@/lib/diagnostics';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import Link from 'next/link';
+import type { AuthorityNode } from '@/types/domain';
 
 export default function InfrastructurePage() {
-  const { isOnline, isSyncing, refreshRegistry, assets } = useAppState();
+  const { isOnline, isSyncing, refreshRegistry, assets, appSettings, setReadAuthority } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   
@@ -110,6 +114,16 @@ export default function InfrastructurePage() {
     }
   };
 
+  const executeFailover = async (target: AuthorityNode) => {
+    setIsProcessing(true);
+    try {
+      await setReadAuthority(target);
+      toast({ title: "Authority Pulse Shifted", description: `Primary read source is now ${target}.` });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   if (!userProfile?.isAdmin) {
     return (
       <AppLayout>
@@ -122,6 +136,8 @@ export default function InfrastructurePage() {
       </AppLayout>
     );
   }
+
+  const activeAuthority = appSettings?.readAuthority || 'FIRESTORE';
 
   return (
     <AppLayout>
@@ -159,11 +175,87 @@ export default function InfrastructurePage() {
           </div>
         </div>
 
+        {/* Failover Protocol Workstation */}
+        <Card className="rounded-[2.5rem] border-2 border-primary/20 shadow-2xl bg-primary/[0.02] overflow-hidden mx-2">
+          <CardHeader className="p-8 bg-primary/5 border-b border-primary/10">
+            <div className="flex items-center justify-between">
+              <div className="space-y-1">
+                <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3 text-primary">
+                  <ShieldAlert className="h-5 w-5" /> Failover Protocol
+                </CardTitle>
+                <CardDescription className="text-xs font-medium">Deterministic shift of primary data authority.</CardDescription>
+              </div>
+              <Badge variant="outline" className="font-black px-4 h-8 rounded-full border-primary/20 text-primary bg-primary/10">
+                ACTIVE AUTHORITY: {activeAuthority}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="p-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <button 
+                onClick={() => executeFailover('FIRESTORE')}
+                disabled={isProcessing || activeAuthority === 'FIRESTORE'}
+                className={cn(
+                  "p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4 group",
+                  activeAuthority === 'FIRESTORE' 
+                    ? "bg-primary border-primary text-white shadow-xl" 
+                    : "bg-background border-border/40 hover:border-primary/40 hover:bg-primary/5"
+                )}
+              >
+                <div className={cn(
+                  "p-4 rounded-2xl transition-colors",
+                  activeAuthority === 'FIRESTORE' ? "bg-white/20" : "bg-primary/10 text-primary"
+                )}>
+                  <Cloud className="h-10 w-10" />
+                </div>
+                <div className="text-center">
+                  <h4 className="text-sm font-black uppercase tracking-widest">Restore Cloud Authority</h4>
+                  <p className={cn(
+                    "text-[10px] font-medium italic mt-1",
+                    activeAuthority === 'FIRESTORE' ? "text-white/60" : "text-muted-foreground"
+                  )}>
+                    Standard cluster operations (Firestore).
+                  </p>
+                </div>
+                {activeAuthority === 'FIRESTORE' && <CheckCircle2 className="h-5 w-5 mt-auto" />}
+              </button>
+
+              <button 
+                onClick={() => executeFailover('RTDB')}
+                disabled={isProcessing || activeAuthority === 'RTDB'}
+                className={cn(
+                  "p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4 group",
+                  activeAuthority === 'RTDB' 
+                    ? "bg-green-600 border-green-600 text-white shadow-xl" 
+                    : "bg-background border-border/40 hover:border-green-500/40 hover:bg-green-500/5"
+                )}
+              >
+                <div className={cn(
+                  "p-4 rounded-2xl transition-colors",
+                  activeAuthority === 'RTDB' ? "bg-white/20" : "bg-green-100 text-green-600"
+                )}>
+                  <Zap className="h-10 w-10" />
+                </div>
+                <div className="text-center">
+                  <h4 className="text-sm font-black uppercase tracking-widest">Force Mirror Standby</h4>
+                  <p className={cn(
+                    "text-[10px] font-medium italic mt-1",
+                    activeAuthority === 'RTDB' ? "text-white/60" : "text-muted-foreground"
+                  )}>
+                    Hot-standby replication failover (RTDB).
+                  </p>
+                </div>
+                {activeAuthority === 'RTDB' && <CheckCircle2 className="h-5 w-5 mt-auto" />}
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
         {/* Topology Visualization */}
         <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden mx-2">
           <CardHeader className="bg-muted/20 p-8 border-b border-dashed">
             <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-              <Network className="h-4 w-4" /> System Topology & Node Heartbeat
+              <Network className="h-4 w-4" /> Redundancy Topology & Pulse Direction
             </CardTitle>
           </CardHeader>
           <CardContent className="p-10">
@@ -181,30 +273,56 @@ export default function InfrastructurePage() {
                 </div>
               </div>
 
-              <div className="hidden md:block"><ArrowRight className="h-6 w-6 text-muted-foreground opacity-20" /></div>
-
-              {/* Node 2: Mirror */}
-              <div className="flex flex-col items-center gap-4 z-10">
-                <div className="p-6 rounded-[2rem] bg-green-500/10 border-2 border-green-500/20 shadow-xl group hover:border-green-500 transition-all">
-                  <Activity className="h-10 w-10 text-green-600" />
-                </div>
-                <div className="text-center">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-green-700">Shadow Mirror</p>
-                  <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">RTDB Replication</p>
+              <div className="hidden md:block">
+                <div className="flex flex-col items-center">
+                  <ArrowRight className="h-6 w-6 text-muted-foreground opacity-20" />
+                  <span className="text-[7px] font-black uppercase mt-1 opacity-20">Buffer</span>
                 </div>
               </div>
 
-              <div className="hidden md:block"><ArrowRight className="h-6 w-6 text-muted-foreground opacity-20" /></div>
+              {/* Node 2: Mirror */}
+              <div className="flex flex-col items-center gap-4 z-10 relative">
+                <div className={cn(
+                  "p-6 rounded-[2rem] border-2 shadow-xl group transition-all",
+                  activeAuthority === 'RTDB' ? "bg-green-500/20 border-green-500" : "bg-green-500/10 border-green-500/20"
+                )}>
+                  <Activity className={cn("h-10 w-10", activeAuthority === 'RTDB' ? "text-green-600 animate-pulse" : "text-green-600")} />
+                </div>
+                <div className="text-center">
+                  <p className="text-[10px] font-black uppercase tracking-widest text-green-700">Shadow Mirror</p>
+                  <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">RTDB Standby</p>
+                </div>
+                {activeAuthority === 'RTDB' && (
+                  <div className="absolute -top-4 -right-4">
+                    <Badge className="bg-green-600 text-[8px] font-black">PRIMARY PULSE</Badge>
+                  </div>
+                )}
+              </div>
+
+              <div className="hidden md:block">
+                <div className="flex flex-col items-center">
+                  <ArrowRightLeft className="h-6 w-6 text-muted-foreground opacity-20" />
+                  <span className="text-[7px] font-black uppercase mt-1 opacity-20">Replicate</span>
+                </div>
+              </div>
 
               {/* Node 3: Cloud */}
-              <div className="flex flex-col items-center gap-4 z-10">
-                <div className="p-6 rounded-[2rem] bg-blue-500/10 border-2 border-blue-500/20 shadow-xl group hover:border-blue-500 transition-all">
-                  <Cloud className="h-10 w-10 text-blue-600" />
+              <div className="flex flex-col items-center gap-4 z-10 relative">
+                <div className={cn(
+                  "p-6 rounded-[2rem] border-2 shadow-xl group transition-all",
+                  activeAuthority === 'FIRESTORE' ? "bg-blue-500/20 border-blue-500" : "bg-blue-500/10 border-blue-500/20"
+                )}>
+                  <Cloud className={cn("h-10 w-10", activeAuthority === 'FIRESTORE' ? "text-blue-600 animate-pulse" : "text-blue-600")} />
                 </div>
                 <div className="text-center">
                   <p className="text-[10px] font-black uppercase tracking-widest text-blue-700">Cloud Authority</p>
                   <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">Firestore Cluster</p>
                 </div>
+                {activeAuthority === 'FIRESTORE' && (
+                  <div className="absolute -top-4 -right-4">
+                    <Badge className="bg-blue-600 text-[8px] font-black">PRIMARY PULSE</Badge>
+                  </div>
+                )}
               </div>
             </div>
 
@@ -313,9 +431,9 @@ export default function InfrastructurePage() {
               <div className="p-6 bg-primary/10 rounded-full mb-2">
                 <Network className="h-10 w-10 text-primary" />
               </div>
-              <h4 className="text-sm font-black uppercase tracking-tight">Sync Protocol</h4>
+              <h4 className="text-sm font-black uppercase tracking-tight">Redundancy Protocol</h4>
               <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic opacity-70">
-                Registry flow uses strictly deterministic reconciliation. Local edits are buffered in IndexedDB before replication to the Mirror and Cloud Authority.
+                Registry flow uses a strictly synchronous "Dual-Commit" pulse. Every modification to the Cloud Authority is instantly mirrored to the Shadow Standby (RTDB).
               </p>
             </Card>
 
@@ -325,7 +443,7 @@ export default function InfrastructurePage() {
                 <h4 className="text-[10px] font-black uppercase tracking-widest text-orange-600">Infrastructure Rule</h4>
               </div>
               <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase opacity-60">
-                Atomic wipes are immutable operational pulses. Resolution via Forensic Reconciliation is mandatory after a manual purge.
+                Atomic wipes are immutable operational pulses. Failover to the Shadow Mirror should only be used during prolonged Cloud Authority latency.
               </p>
               <Button variant="ghost" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 transition-all">
                 <Bomb className="h-4 w-4 mr-2" /> Wipe Persistence Layer

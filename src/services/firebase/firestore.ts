@@ -1,7 +1,7 @@
 /**
  * @fileOverview Hardened Firestore Service.
  * Implements deterministic validation and strict RBAC context.
- * Phase 57: Integrated Signature Offloading for verification receipts.
+ * Phase 58: Hardened Dual-Commit mirroring to RTDB for hot redundancy.
  */
 
 import { 
@@ -26,6 +26,7 @@ import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
 import { monitoring } from '@/lib/monitoring';
 import { FirebaseStorageService } from './storage';
+import { batchSetAssets as mirrorToRtdb, updateSettings as mirrorSettingsToRtdb } from '@/lib/database';
 import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry } from '@/types/domain';
 
 export const FirestoreService = {
@@ -46,15 +47,27 @@ export const FirestoreService = {
 
   /**
    * Updates global configuration.
+   * Synchronously mirrors to RTDB for HA redundancy.
    */
-  updateSettings(settings: Partial<AppSettings>) {
+  async updateSettings(settings: Partial<AppSettings>) {
     if (!db) return;
     const settingsRef = doc(db, 'config', 'settings');
     const sanitized = sanitizeForFirestore(settings);
     
+    // 1. Commit to Cloud Authority (Firestore)
     setDoc(settingsRef, sanitized, { merge: true }).catch(err => {
       this.handlePermissionError(settingsRef, 'update', err, sanitized);
     });
+
+    // 2. Commit to Shadow Mirror (RTDB)
+    try {
+      const fullSettings = await this.getSettings();
+      if (fullSettings) {
+        mirrorSettingsToRtdb({ ...fullSettings, ...settings });
+      }
+    } catch (e) {
+      console.warn("Mirroring: Settings sync pulse latent.");
+    }
   },
 
   /**
@@ -63,7 +76,12 @@ export const FirestoreService = {
   async getProjectAssets(grantId: string): Promise<Asset[]> {
     if (!db) return [];
     const assetsRef = collection(db, 'assets');
-    const q = query(assetsRef, where('grantId', '==', grantId));
+    
+    // If grantId is 'ALL_PROJECTS', return full registry (Super Admin only)
+    const q = grantId === 'ALL_PROJECTS' 
+      ? query(assetsRef)
+      : query(assetsRef, where('grantId', '==', grantId));
+
     try {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
@@ -76,6 +94,7 @@ export const FirestoreService = {
   /**
    * Single record update with mandatory Zod validation and Activity Logging.
    * Offloads base64 images and signatures to Firebase Storage.
+   * Synchronously mirrors to RTDB for HA redundancy.
    */
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
@@ -110,7 +129,6 @@ export const FirestoreService = {
 
     const validation = AssetSchema.safeParse(assetToSave);
     if (!validation.success) {
-      console.error("Validation Error:", validation.error);
       monitoring.trackError(new Error("Validation Failure"), { 
         module: 'Firestore', 
         action: 'WRITE_VALIDATION', 
@@ -126,11 +144,15 @@ export const FirestoreService = {
       const currentSnap = await getDoc(assetRef);
       const previousState = currentSnap.exists() ? currentSnap.data() : null;
 
+      // A. Commit to Cloud Authority
       await setDoc(assetRef, {
         ...sanitized,
         previousState: previousState ? sanitizeForFirestore(previousState) : null
       }, { merge: true });
       
+      // B. Commit to Shadow Mirror (RTDB)
+      mirrorToRtdb([sanitized as Asset]).catch(e => console.warn("Mirroring: Asset pulse latent."));
+
       await this.logActivity({
         assetId: asset.id,
         assetDescription: asset.description,

@@ -8,6 +8,7 @@ export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
 export type DataSource = 'PRODUCTION' | 'SANDBOX';
 export type UXMode = 'beginner' | 'advanced';
 export type StorageLayer = 'FIRESTORE' | 'RTDB' | 'LOCAL';
+export type AuthorityNode = 'FIRESTORE' | 'RTDB';
 
 export interface SectionHierarchy {
   document: string;
@@ -96,6 +97,7 @@ export interface AppSettings {
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   activeDatabase: 'firestore' | 'rtdb';
+  readAuthority: AuthorityNode; // PRD: Failover authority
   activeGrantId: string | null;
   grants: Grant[];
   sourceBranding?: Record<string, string>; // Maps sheetName to HSL/Hex color
