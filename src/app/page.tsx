@@ -12,11 +12,21 @@ import Loading from './loading';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import UserProfileSetup from '@/components/user-profile-setup';
+import { Zap } from 'lucide-react';
 
 // Workstations
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
 import { RegistryWorkstation } from '@/components/workstations/RegistryWorkstation';
-// ... Other workstations will be migrated in subsequent pulses
+import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
+import { VerifyWorkstation } from '@/components/workstations/VerifyWorkstation';
+import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
+import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
+import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
+import { SyncQueueWorkstation } from '@/components/workstations/SyncQueueWorkstation';
+import { UsersWorkstation } from '@/components/workstations/UsersWorkstation';
+import { InfrastructureWorkstation } from '@/components/workstations/InfrastructureWorkstation';
+import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstation';
+import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
 
 export default function SPAOrchestrator() {
   const { activeView, settingsLoaded } = useAppState();
@@ -49,7 +59,16 @@ function renderWorkstation(view: string) {
   switch (view) {
     case 'DASHBOARD': return <DashboardWorkstation />;
     case 'REGISTRY': return <RegistryWorkstation />;
-    // Fallback while other workstations are being componentized
+    case 'IMPORT': return <ImportWorkstation />;
+    case 'VERIFY': return <VerifyWorkstation />;
+    case 'REPORTS': return <ReportsWorkstation />;
+    case 'ALERTS': return <AlertsWorkstation />;
+    case 'AUDIT_LOG': return <AuditLogWorkstation />;
+    case 'SYNC_QUEUE': return <SyncQueueWorkstation />;
+    case 'USERS': return <UsersWorkstation />;
+    case 'INFRASTRUCTURE': return <InfrastructureWorkstation />;
+    case 'DATABASE': return <DatabaseWorkstation />;
+    case 'SETTINGS': return <SettingsWorkstation />;
     default: return (
       <div className="flex flex-col items-center justify-center py-40 opacity-20 space-y-6">
         <div className="p-8 bg-primary/10 rounded-[3rem] shadow-inner">
@@ -63,5 +82,3 @@ function renderWorkstation(view: string) {
     );
   }
 }
-
-import { Zap } from 'lucide-react';
