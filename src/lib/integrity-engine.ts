@@ -1,14 +1,14 @@
-
 /**
  * @fileOverview Registry Integrity Engine.
- * Provides high-performance heuristics for identifying data quality gaps and duplicates.
+ * Provides high-performance heuristics for identifying data quality gaps and critical alerts.
+ * Phase 59: Hardened Tactical Alert detection for Stolen/Burnt items.
  */
 
 import type { Asset } from '@/types/domain';
 
 export interface IntegrityIssue {
   id: string;
-  type: 'DUPLICATE_SERIAL' | 'INCONSISTENT_LOCATION' | 'MISSING_HIERARCHY' | 'CASE_MISMATCH' | 'UNOPTIMIZED_MEDIA';
+  type: 'DUPLICATE_SERIAL' | 'INCONSISTENT_LOCATION' | 'MISSING_HIERARCHY' | 'CASE_MISMATCH' | 'UNOPTIMIZED_MEDIA' | 'TACTICAL_ALERT';
   severity: 'CRITICAL' | 'WARNING' | 'INFO';
   description: string;
   affectedIds: string[];
@@ -17,12 +17,25 @@ export interface IntegrityIssue {
 
 export const IntegrityEngine = {
   /**
-   * Scans a registry pulse for data quality violations.
+   * Scans a registry pulse for data quality violations and high-risk exceptions.
    */
   async runFullAudit(assets: Asset[]): Promise<IntegrityIssue[]> {
     const issues: IntegrityIssue[] = [];
     
-    // 1. Duplicate Serial Detection
+    // 1. Tactical Alerts (High-Risk Conditions)
+    const highRiskAssets = assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || ''));
+    if (highRiskAssets.length > 0) {
+      issues.push({
+        id: 'tactical-alerts',
+        type: 'TACTICAL_ALERT',
+        severity: 'CRITICAL',
+        description: `${highRiskAssets.length} assets are in a critical state (Stolen/Burnt/Unsalvageable).`,
+        affectedIds: highRiskAssets.map(a => a.id),
+        suggestedFix: "Navigate to the Alerts Cockpit to initiate recovery pulses."
+      });
+    }
+
+    // 2. Duplicate Serial Detection
     const serialMap = new Map<string, string[]>();
     assets.forEach(a => {
       const sn = (a.serialNumber || '').trim().toUpperCase();
@@ -46,7 +59,7 @@ export const IntegrityEngine = {
       }
     });
 
-    // 2. Inconsistent Location Casing
+    // 3. Inconsistent Location Casing
     const locationVariants = new Map<string, Set<string>>();
     assets.forEach(a => {
       if (a.location) {
@@ -70,7 +83,7 @@ export const IntegrityEngine = {
       }
     });
 
-    // 3. Hierarchy Gaps
+    // 4. Hierarchy Gaps
     const missingHierarchy = assets.filter(a => !a.section || a.section === 'General' || !a.subsection);
     if (missingHierarchy.length > 0) {
       issues.push({
@@ -80,19 +93,6 @@ export const IntegrityEngine = {
         description: `${missingHierarchy.length} records are missing detailed provenance hierarchy.`,
         affectedIds: missingHierarchy.map(a => a.id),
         suggestedFix: "Use Batch Update to assign Major Sections."
-      });
-    }
-
-    // 4. Unoptimized Media (Phase 50)
-    const heavyAssets = assets.filter(a => !!a.photoDataUri && !a.photoUrl);
-    if (heavyAssets.length > 0) {
-      issues.push({
-        id: 'heavy-media',
-        type: 'UNOPTIMIZED_MEDIA',
-        severity: 'INFO',
-        description: `${heavyAssets.length} records are using local base64 storage for media.`,
-        affectedIds: heavyAssets.map(a => a.id),
-        suggestedFix: "Execute a Sync Pulse to offload media to the cloud."
       });
     }
 

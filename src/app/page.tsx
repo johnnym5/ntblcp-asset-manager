@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
- * Phase 48: Integrated Multi-Grant Switcher & Registry Health Matrix.
+ * Phase 59: Integrated Coverage Trend Analysis & Tactictal Pulse.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -34,7 +33,9 @@ import {
   CheckCircle2,
   XCircle,
   Fingerprint,
-  ChevronDown
+  ChevronDown,
+  LineChart,
+  AreaChart as AreaChartIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -48,7 +49,7 @@ import { VerificationPulse } from '@/components/registry/VerificationPulse';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { VirtualDBService } from '@/services/virtual-db-service';
 import { storage } from '@/offline/storage';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell } from 'recharts';
+import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, AreaChart, Area, CartesianGrid } from 'recharts';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const container = {
@@ -131,6 +132,18 @@ export default function DashboardPage() {
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
 
+    // Trend Pulse: Last 30 Days
+    const trendData = Array.from({ length: 15 }).map((_, i) => {
+      const d = new Date();
+      d.setDate(d.getDate() - (14 - i));
+      const dayStr = d.toISOString().split('T')[0];
+      const verifiedUpToDay = assets.filter(a => a.status === 'VERIFIED' && a.lastModified <= dayStr + 'T23:59:59Z').length;
+      return {
+        date: d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
+        coverage: total > 0 ? Math.round((verifiedUpToDay / total) * 100) : 0
+      };
+    });
+
     const velocityData = Array.from({ length: 7 }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - i);
@@ -150,6 +163,7 @@ export default function DashboardPage() {
       criticalHealth, 
       benchmarking,
       velocityData,
+      trendData,
       dataGaps: missingSerials + missingTags
     };
   }, [assets, settingsLoaded]);
@@ -221,7 +235,7 @@ export default function DashboardPage() {
           </div>
           <div className="flex items-center gap-3">
             <Button variant="outline" asChild className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2">
-              <Link href="/gallery"><Camera className="h-4 w-4" /> Evidence Gallery</Link>
+              <Link href="/alerts"><ShieldAlert className="h-4 w-4 text-destructive" /> Tactical Alerts</Link>
             </Button>
             <Button className="h-12 px-8 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 group" asChild>
               <Link href="/assets">Explore Registry <ArrowRight className="ml-3 h-4 w-4 transition-transform group-hover:translate-x-2" /></Link>
@@ -234,53 +248,68 @@ export default function DashboardPage() {
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 px-1">
           <motion.div variants={item} className="lg:col-span-2 space-y-8">
             <Card className="border-2 border-primary/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
-              <CardHeader className="p-8 pb-4">
+              <CardHeader className="p-8 pb-4 border-b border-dashed">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
                     <div className="p-2.5 bg-primary/10 rounded-xl">
                       <TrendingUp className="h-5 w-5 text-primary" />
                     </div>
-                    <CardTitle className="text-xl font-black uppercase tracking-tight">Audit Velocity</CardTitle>
+                    <div>
+                      <CardTitle className="text-xl font-black uppercase tracking-tight">Coverage Trend</CardTitle>
+                      <CardDescription className="text-[10px] font-bold uppercase tracking-widest opacity-60">Verification Pulse Trajectory</CardDescription>
+                    </div>
                   </div>
-                  <Badge variant="outline" className="border-primary/20 text-primary font-black uppercase text-[10px] gap-2">
-                    <Activity className="h-3 w-3" /> 7-Day Pulse
+                  <Badge className="bg-primary text-white font-black uppercase text-[10px] h-8 px-4 rounded-full">
+                    {stats?.verified} / {stats?.total} TARGETS
                   </Badge>
                 </div>
               </CardHeader>
-              <CardContent className="p-8 pt-0 space-y-8">
-                <div className="h-[200px] w-full">
+              <CardContent className="p-10">
+                <div className="h-[280px] w-full">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={stats?.velocityData}>
+                    <AreaChart data={stats?.trendData}>
+                      <defs>
+                        <linearGradient id="coverageGradient" x1="0" y1="0" x2="0" y2="1">
+                          <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
+                          <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
+                        </linearGradient>
+                      </defs>
+                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.2} />
                       <XAxis 
-                        dataKey="name" 
+                        dataKey="date" 
                         axisLine={false} 
                         tickLine={false} 
-                        tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--primary))' }} 
+                        tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} 
                         dy={10}
                       />
+                      <YAxis 
+                        axisLine={false} 
+                        tickLine={false} 
+                        tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} 
+                        unit="%"
+                      />
                       <RechartsTooltip 
-                        cursor={{ fill: 'rgba(var(--primary), 0.05)' }}
                         content={({ active, payload }) => {
                           if (active && payload && payload.length) {
                             return (
-                              <div className="bg-background border-2 border-primary/20 p-3 rounded-xl shadow-xl">
-                                <p className="text-[10px] font-black uppercase text-primary mb-1">{payload[0].payload.name}</p>
-                                <p className="text-sm font-black">{payload[0].value} Audits</p>
+                              <div className="bg-background border-2 border-primary/20 p-4 rounded-2xl shadow-2xl">
+                                <p className="text-[10px] font-black uppercase text-primary mb-1">{payload[0].payload.date}</p>
+                                <p className="text-lg font-black">{payload[0].value}% Coverage</p>
                               </div>
                             );
                           }
                           return null;
                         }}
                       />
-                      <Bar dataKey="pulses" radius={[6, 6, 6, 6]}>
-                        {stats?.velocityData.map((entry, index) => (
-                          <Cell 
-                            key={`cell-${index}`} 
-                            fill={index === stats.velocityData.length - 1 ? 'hsl(var(--primary))' : 'rgba(var(--primary), 0.2)'} 
-                          />
-                        ))}
-                      </Bar>
-                    </BarChart>
+                      <Area 
+                        type="monotone" 
+                        dataKey="coverage" 
+                        stroke="hsl(var(--primary))" 
+                        strokeWidth={4}
+                        fillOpacity={1} 
+                        fill="url(#coverageGradient)" 
+                      />
+                    </AreaChart>
                   </ResponsiveContainer>
                 </div>
               </CardContent>
