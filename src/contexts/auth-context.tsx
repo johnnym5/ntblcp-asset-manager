@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AuthContext - Identity & Access Gateway.
- * Hardened to prevent race conditions during system initialization.
+ * Hardened to ensure loading state resolves even if remote settings are latent.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -53,8 +53,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { appSettings, settingsLoaded } = useAppState();
 
   useEffect(() => {
-    // CRITICAL: Block initialization until the system settings heartbeat is stable
-    if (!settingsLoaded || !appSettings) {
+    // CRITICAL: Block until the settings heartbeat is stable
+    if (!settingsLoaded) {
       return;
     }
 
@@ -63,7 +63,10 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       if (savedProfile) {
         const profile: LocalUserProfile = JSON.parse(savedProfile);
         
-        const allUsers = [...(appSettings.authorizedUsers || []), superAdmin];
+        // If appSettings is still null despite being loaded (edge case), 
+        // fallback to superAdmin check only
+        const authorizedUsersList = appSettings?.authorizedUsers || [];
+        const allUsers = [...authorizedUsersList, superAdmin];
         const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {

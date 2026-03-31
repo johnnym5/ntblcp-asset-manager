@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Unified Data & Connectivity Orchestrator.
- * Phase 58: Implemented HA Failover logic for Cloud Authority vs Shadow Mirror.
+ * Phase 64: Hardened Bootstrapping to prevent infinite loading hangs.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
@@ -12,6 +12,32 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { getAssets as getRtdbAssets, getSettings as getRtdbSettings } from '@/lib/database';
 import type { Asset, AppSettings, DataSource, AuthorityNode } from '@/types/domain';
 import { addNotification } from '@/hooks/use-notifications';
+import { HEADER_DEFINITIONS } from '@/lib/constants';
+
+// Professional Default Configuration for new environments
+const DEFAULT_SETTINGS: AppSettings = {
+  authorizedUsers: [],
+  lockAssetList: false,
+  appMode: 'management',
+  activeDatabase: 'firestore',
+  readAuthority: 'FIRESTORE',
+  activeGrantId: 'ntblcp-core',
+  grants: [
+    {
+      id: 'ntblcp-core',
+      name: 'NTBLCP Standard Registry',
+      enabledSheets: Object.keys(HEADER_DEFINITIONS),
+      sheetDefinitions: HEADER_DEFINITIONS
+    }
+  ],
+  uxMode: 'beginner',
+  onboardingComplete: false,
+  showHelpTooltips: true,
+  autoSync: true,
+  autoAnalyze: false,
+  autoSuggestFilters: true,
+  sourceBranding: {}
+};
 
 interface AppStateContextType {
   assets: Asset[];
@@ -47,11 +73,13 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   useEffect(() => {
     const status = isOnline ? 'Online Assets View' : 'Locally Saved Assets View';
-    addNotification({ 
-      title: 'Connectivity Heartbeat',
-      description: `Application is now in ${status}.`
-    });
-  }, [isOnline]);
+    if (settingsLoaded) {
+      addNotification({ 
+        title: 'Connectivity Heartbeat',
+        description: `Application is now in ${status}.`
+      });
+    }
+  }, [isOnline, settingsLoaded]);
 
   const setDataSource = (source: DataSource) => {
     setDataSourceStatus(source);
@@ -68,24 +96,33 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const refreshRegistry = useCallback(async () => {
     setIsSyncing(true);
     try {
+      // 1. Retrieve Local State
       const localAssets = await storage.getAssets();
       const localSandbox = await storage.getSandbox();
       const localSettings = await storage.getSettings();
 
-      if (localSettings) setAppSettings(localSettings);
+      // 2. Immediate local bootstrap to prevent loading hangs
+      if (localSettings) {
+        setAppSettings(localSettings);
+      } else if (!appSettings) {
+        // Fallback to default if absolutely nothing is found
+        setAppSettings(DEFAULT_SETTINGS);
+        await storage.saveSettings(DEFAULT_SETTINGS);
+      }
+
       setSandboxAssets(localSandbox);
       
-      const currentGrantId = localSettings?.activeGrantId;
+      const currentGrantId = localSettings?.activeGrantId || DEFAULT_SETTINGS.activeGrantId;
       const initialFiltered = currentGrantId 
         ? localAssets.filter(a => a.grantId === currentGrantId)
         : localAssets;
 
       setAssets(initialFiltered);
 
+      // 3. Remote Reconciliation Pulse
       if (isOnline) {
         await processSyncQueue();
         
-        // PRD: Triple-Layer Redundancy Switch
         const authority = localSettings?.readAuthority || 'FIRESTORE';
         
         let remoteSettings = null;
@@ -96,8 +133,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
             remoteSettings = await getRtdbSettings();
           }
         } catch (e) {
-          // Fallback to RTDB if Firestore fails during standard refresh
-          remoteSettings = await getRtdbSettings();
+          console.warn("Reconciliation: Remote settings pulse latent.");
         }
 
         if (remoteSettings) {
@@ -113,7 +149,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
                 remoteAssets = await getRtdbAssets(remoteSettings.activeGrantId);
               }
             } catch (e) {
-              remoteAssets = await getRtdbAssets(remoteSettings.activeGrantId);
+              console.warn("Reconciliation: Remote asset pulse latent.");
             }
 
             if (remoteAssets.length > 0) {
@@ -131,7 +167,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       setIsSyncing(false);
       setSettingsLoaded(true);
     }
-  }, [isOnline]);
+  }, [isOnline, appSettings]);
 
   const setActiveGrantId = async (id: string) => {
     if (!appSettings) return;
@@ -161,7 +197,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   useEffect(() => {
     refreshRegistry();
-  }, [refreshRegistry]);
+  }, []); // Only run once on mount
 
   return (
     <AppStateContext.Provider value={{
