@@ -2,7 +2,8 @@
 
 /**
  * @fileOverview AppStateContext - Unified Data & Connectivity Orchestrator.
- * Phase 66: Hardened Bootstrapping & Operational Failure Protection.
+ * Phase 67: Deep-Hydration Protocol for 100% Offline Autonomy.
+ * Ensures the entire registry is held in memory for zero-latency transitions.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
@@ -14,7 +15,6 @@ import type { Asset, AppSettings, DataSource, AuthorityNode } from '@/types/doma
 import { addNotification } from '@/hooks/use-notifications';
 import { HEADER_DEFINITIONS } from '@/lib/constants';
 
-// Professional Default Configuration for new environments
 const DEFAULT_SETTINGS: AppSettings = {
   authorizedUsers: [],
   lockAssetList: false,
@@ -51,6 +51,7 @@ interface AppStateContextType {
   isSyncing: boolean;
   appSettings: AppSettings | null;
   settingsLoaded: boolean;
+  isHydrated: boolean; // Indicates if the local memory pulse is complete
   refreshRegistry: () => Promise<void>;
   activeGrantId: string | null;
   setActiveGrantId: (id: string) => Promise<void>;
@@ -68,10 +69,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [isSyncing, setIsSyncing] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
+  const [isHydrated, setIsHydrated] = useState(false);
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
-  // Network Restoration Pulse
   useEffect(() => {
     if (typeof window !== 'undefined') {
       const handleOnline = () => setIsOnlineStatus(true);
@@ -86,28 +87,19 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, []);
 
-  const setDataSource = (source: DataSource) => {
-    setDataSourceStatus(source);
-    addNotification({ 
-      title: source === 'PRODUCTION' ? 'Production Registry Active' : 'Sandbox Store Active',
-      description: source === 'PRODUCTION' ? 'Working with synced registry data.' : 'Reviewing hierarchical imports in the sandbox.'
-    });
-  };
-
-  const setIsOnline = (status: boolean) => {
-    setIsOnlineStatus(status);
-  };
-
-  const refreshRegistry = useCallback(async () => {
-    setIsSyncing(true);
+  /**
+   * Performs a Deep-Hydration of the local React state from IndexedDB.
+   * This is the "Zero-Latency" trigger.
+   */
+  const hydrateFromLocalStore = useCallback(async () => {
     try {
-      // 1. Retrieve Local State (Critical for Offline-First)
       const [localAssets, localSandbox, localSettings] = await Promise.all([
         storage.getAssets(),
         storage.getSandbox(),
         storage.getSettings()
       ]);
 
+      if (localSettings) setAppSettings(localSettings);
       setSandboxAssets(localSandbox || []);
       
       const currentGrantId = localSettings?.activeGrantId || DEFAULT_SETTINGS.activeGrantId;
@@ -116,55 +108,70 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         : (localAssets || []);
 
       setAssets(initialFiltered);
+      setIsHydrated(true);
+    } catch (e) {
+      console.error("Hydration Pulse Failed", e);
+    }
+  }, []);
 
-      // 2. Remote Reconciliation Pulse (Conditional)
-      if (isOnline) {
-        await processSyncQueue();
+  /**
+   * Synchronizes the local store with the Cloud Authority.
+   * Runs silently in the background after hydration.
+   */
+  const refreshRegistry = useCallback(async () => {
+    if (!isOnline) return;
+    setIsSyncing(true);
+    try {
+      await processSyncQueue();
+      
+      const authority = appSettings?.readAuthority || 'FIRESTORE';
+      let remoteSettings = null;
+
+      try {
+        remoteSettings = authority === 'FIRESTORE' 
+          ? await FirestoreService.getSettings() 
+          : await getRtdbSettings();
+      } catch (e) {
+        console.warn("Reconciliation: Settings pulse latent.");
+      }
+
+      if (remoteSettings) {
+        setAppSettings(remoteSettings);
+        await storage.saveSettings(remoteSettings);
         
-        const authority = localSettings?.readAuthority || 'FIRESTORE';
-        
-        let remoteSettings = null;
-        try {
-          if (authority === 'FIRESTORE') {
-            remoteSettings = await FirestoreService.getSettings();
-          } else {
-            remoteSettings = await getRtdbSettings();
+        if (remoteSettings.activeGrantId) {
+          let remoteAssets: Asset[] = [];
+          try {
+            remoteAssets = authority === 'FIRESTORE'
+              ? await FirestoreService.getProjectAssets(remoteSettings.activeGrantId)
+              : await getRtdbAssets(remoteSettings.activeGrantId);
+          } catch (e) {
+            console.warn("Reconciliation: Asset pulse latent.");
           }
-        } catch (e) {
-          console.warn("Reconciliation: Remote settings pulse latent.");
-        }
 
-        if (remoteSettings) {
-          setAppSettings(remoteSettings);
-          await storage.saveSettings(remoteSettings);
-          
-          if (remoteSettings.activeGrantId) {
-            let remoteAssets: Asset[] = [];
-            try {
-              if (authority === 'FIRESTORE') {
-                remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId);
-              } else {
-                remoteAssets = await getRtdbAssets(remoteSettings.activeGrantId);
-              }
-            } catch (e) {
-              console.warn("Reconciliation: Remote asset pulse latent.");
-            }
-
-            if (remoteAssets.length > 0) {
-              const otherAssets = (localAssets || []).filter(a => a.grantId !== remoteSettings.activeGrantId);
-              const combinedAssets = [...otherAssets, ...remoteAssets];
-              await storage.saveAssets(combinedAssets);
-              setAssets(remoteAssets);
-            }
+          if (remoteAssets.length > 0) {
+            const localAssets = await storage.getAssets();
+            const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
+            const combinedAssets = [...otherAssets, ...remoteAssets];
+            await storage.saveAssets(combinedAssets);
+            
+            // Update React state instantly
+            setAssets(remoteAssets);
           }
         }
       }
-    } catch (e) {
-      console.error("Context: Registry reconciliation failure", e);
     } finally {
       setIsSyncing(false);
     }
-  }, [isOnline]);
+  }, [isOnline, appSettings]);
+
+  const setDataSource = (source: DataSource) => {
+    setDataSourceStatus(source);
+  };
+
+  const setIsOnline = (status: boolean) => {
+    setIsOnlineStatus(status);
+  };
 
   const setActiveGrantId = async (id: string) => {
     if (!appSettings) return;
@@ -174,7 +181,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (isOnline) {
       FirestoreService.updateSettings({ activeGrantId: id });
     }
-    await refreshRegistry();
+    // Instant local refresh
+    const localAssets = await storage.getAssets();
+    setAssets(localAssets.filter(a => a.grantId === id));
+    refreshRegistry();
   };
 
   const setReadAuthority = async (node: AuthorityNode) => {
@@ -185,35 +195,21 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (isOnline) {
       await FirestoreService.updateSettings({ readAuthority: node });
     }
-    addNotification({ 
-      title: 'HA Failover Executed', 
-      description: `System read authority shifted to ${node}.` 
-    });
-    await refreshRegistry();
+    addNotification({ title: 'Authority Shifted', description: `Read priority now: ${node}.` });
+    refreshRegistry();
   };
 
-  // CRITICAL: Hardened Initialization sequence - prioritizes local persistence
+  // INITIAL BOOTSTRAP: HYDRATE FIRST, SYNC SECOND
   useEffect(() => {
     const bootstrap = async () => {
-      try {
-        const localSettings = await storage.getSettings();
-        if (localSettings) {
-          setAppSettings(localSettings);
-        } else {
-          setAppSettings(DEFAULT_SETTINGS);
-          await storage.saveSettings(DEFAULT_SETTINGS);
-        }
-      } catch (e) {
-        console.error("Bootstrap: Local store error, using defaults", e);
-        setAppSettings(DEFAULT_SETTINGS);
-      } finally {
-        setSettingsLoaded(true);
-        // Secondary pulse for background reconciliation
+      await hydrateFromLocalStore();
+      setSettingsLoaded(true);
+      if (navigator.onLine) {
         refreshRegistry();
       }
     };
     bootstrap();
-  }, [refreshRegistry]);
+  }, [hydrateFromLocalStore, refreshRegistry]);
 
   return (
     <AppStateContext.Provider value={{
@@ -228,6 +224,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       isSyncing,
       appSettings,
       settingsLoaded,
+      isHydrated,
       refreshRegistry,
       activeGrantId,
       setActiveGrantId,

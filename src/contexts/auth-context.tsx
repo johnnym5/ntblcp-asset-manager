@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AuthContext - Identity & Access Gateway.
- * Hardened to ensure loading state resolves even if remote settings are latent.
+ * Hardened to prioritize deep hydration before releasing the UI.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -33,7 +33,6 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// System Bootstrap Identity
 const superAdmin: AuthorizedUser = {
   loginName: 'admin',
   displayName: 'Super Admin',
@@ -50,11 +49,12 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [profileSetupComplete, setProfileSetupComplete] = useState(false);
   const [authInitialized, setAuthInitialized] = useState(false);
   
-  const { appSettings, settingsLoaded } = useAppState();
+  const { appSettings, settingsLoaded, isHydrated } = useAppState();
 
   useEffect(() => {
-    // CRITICAL: Block until the settings heartbeat is stable
-    if (!settingsLoaded) {
+    // CRITICAL: Block until the local database hydration pulse is complete.
+    // This ensures no per-page loading screens after initial entry.
+    if (!settingsLoaded || !isHydrated) {
       return;
     }
 
@@ -62,9 +62,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       const savedProfile = localStorage.getItem('assetain-user-session');
       if (savedProfile) {
         const profile: LocalUserProfile = JSON.parse(savedProfile);
-        
-        // If appSettings is still null despite being loaded (edge case), 
-        // fallback to superAdmin check only
         const authorizedUsersList = appSettings?.authorizedUsers || [];
         const allUsers = [...authorizedUsersList, superAdmin];
         const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
@@ -90,7 +87,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setLoading(false);
       setAuthInitialized(true);
     }
-  }, [settingsLoaded, appSettings]);
+  }, [settingsLoaded, isHydrated, appSettings]);
 
   const login = async (user: AuthorizedUser, state: string) => {
     setLoading(true);
@@ -108,8 +105,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem('assetain-user-session', JSON.stringify(newProfile));
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
-    } catch(e) {
-      console.error("Auth: Failed to commit session to persistence", e);
     } finally {
       setLoading(false);
     }

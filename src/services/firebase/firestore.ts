@@ -1,7 +1,6 @@
 /**
  * @fileOverview Hardened Firestore Service.
- * Implements deterministic validation and strict RBAC context.
- * Phase 58: Hardened Dual-Commit mirroring to RTDB for hot redundancy.
+ * Implements Deep-Hydration retrieval for 100% offline parity.
  */
 
 import { 
@@ -47,37 +46,34 @@ export const FirestoreService = {
 
   /**
    * Updates global configuration.
-   * Synchronously mirrors to RTDB for HA redundancy.
    */
   async updateSettings(settings: Partial<AppSettings>) {
     if (!db) return;
     const settingsRef = doc(db, 'config', 'settings');
     const sanitized = sanitizeForFirestore(settings);
     
-    // 1. Commit to Cloud Authority (Firestore)
     setDoc(settingsRef, sanitized, { merge: true }).catch(err => {
       this.handlePermissionError(settingsRef, 'update', err, sanitized);
     });
 
-    // 2. Commit to Shadow Mirror (RTDB)
     try {
       const fullSettings = await this.getSettings();
       if (fullSettings) {
         mirrorSettingsToRtdb({ ...fullSettings, ...settings });
       }
     } catch (e) {
-      console.warn("Mirroring: Settings sync pulse latent.");
+      console.warn("Mirroring: Settings pulse latent.");
     }
   },
 
   /**
-   * Fetches assets for a specific project.
+   * DEEP HYDRATION FETCH:
+   * Fetches the entire relevant registry for the active project scope.
    */
   async getProjectAssets(grantId: string): Promise<Asset[]> {
     if (!db) return [];
     const assetsRef = collection(db, 'assets');
     
-    // If grantId is 'ALL_PROJECTS', return full registry (Super Admin only)
     const q = grantId === 'ALL_PROJECTS' 
       ? query(assetsRef)
       : query(assetsRef, where('grantId', '==', grantId));
@@ -92,14 +88,11 @@ export const FirestoreService = {
   },
 
   /**
-   * Single record update with mandatory Zod validation and Activity Logging.
-   * Offloads base64 images and signatures to Firebase Storage.
-   * Synchronously mirrors to RTDB for HA redundancy.
+   * Single record update with mandatory Zod validation.
    */
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
 
-    // 1. Storage Offloading Pulse (Photos)
     let finalPhotoUrl = asset.photoUrl;
     if (asset.photoDataUri && !asset.photoUrl) {
       try {
@@ -109,7 +102,6 @@ export const FirestoreService = {
       }
     }
 
-    // 2. Storage Offloading Pulse (Signatures)
     let finalSignatureUrl = asset.signatureUrl;
     if (asset.signatureDataUri && !asset.signatureUrl) {
       try {
@@ -144,13 +136,11 @@ export const FirestoreService = {
       const currentSnap = await getDoc(assetRef);
       const previousState = currentSnap.exists() ? currentSnap.data() : null;
 
-      // A. Commit to Cloud Authority
       await setDoc(assetRef, {
         ...sanitized,
         previousState: previousState ? sanitizeForFirestore(previousState) : null
       }, { merge: true });
       
-      // B. Commit to Shadow Mirror (RTDB)
       mirrorToRtdb([sanitized as Asset]).catch(e => console.warn("Mirroring: Asset pulse latent."));
 
       await this.logActivity({
@@ -168,9 +158,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Permanent deletion from the cloud registry.
-   */
   async deleteAsset(assetId: string): Promise<void> {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
@@ -187,9 +174,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Commits an Error Log to the Administrative Audit collection.
-   */
   async logErrorAudit(entry: ErrorLogEntry) {
     if (!db) return;
     try {
@@ -199,9 +183,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Fetches all error logs for administrative review.
-   */
   async getErrorLogs(): Promise<ErrorLogEntry[]> {
     if (!db) return [];
     const logsRef = collection(db, 'error_logs');
@@ -215,9 +196,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Updates an error log status (e.g., Resolved).
-   */
   async updateErrorStatus(logId: string, status: ErrorLogEntry['status'], notes?: string) {
     if (!db) return;
     const logRef = doc(db, 'error_logs', logId);
@@ -228,9 +206,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Formal Activity Logging pulse.
-   */
   async logActivity(entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>) {
     if (!db) return;
     const logRef = collection(db, 'activity_log');
@@ -244,9 +219,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Fetches activity history for a specific asset.
-   */
   async getAssetHistory(assetId: string): Promise<ActivityLogEntry[]> {
     if (!db) return [];
     const logRef = collection(db, 'activity_log');
@@ -265,9 +237,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Fetches global activity history.
-   */
   async getGlobalActivity(limitCount: number = 100): Promise<ActivityLogEntry[]> {
     if (!db) return [];
     const logRef = collection(db, 'activity_log');
@@ -281,9 +250,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Formal Adjudication Pulse.
-   */
   async adjudicateAssetPulse(assetId: string, action: 'APPROVE' | 'REJECT', adminComment?: string) {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
@@ -321,9 +287,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Reversion Pulse.
-   */
   async restoreAsset(assetId: string, performedBy: string): Promise<void> {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
