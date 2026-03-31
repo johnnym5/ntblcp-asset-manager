@@ -1,4 +1,3 @@
-
 # Assetain
 
 **Assetain** is a professional, enterprise-grade Asset Management and Verification platform designed for high-integrity operations in geographically dispersed and low-connectivity environments. Built with an "Offline-First" philosophy, it transforms complex physical asset registers into actionable intelligence through automated verification workflows, regional governance, and deep data engineering.
@@ -24,12 +23,12 @@ Assetain is engineered to be mission-critical, ensuring field officers and manag
 ### 📊 3. Executive Intelligence & Fidelity
 *   **Integrity Engine**: Heuristic scanner that proactively identifies duplicate serials, inconsistent location naming, and data quality gaps.
 *   **Coverage Trends**: Real-time trajectory charts tracking the velocity of field assessments across the project lifecycle.
-*   **Professional Documentation**: Automated generation of technical profiles (PDF), high-risk exception compendiums (PDF), and executive travel reports (DOCX).
+*   **Fidelity Scoring**: A global health index that monitors the completeness and precision of the entire registry pulse.
 
 ### 📁 4. Advanced Data Engineering
 *   **Hierarchical Workbook Scanner**: Proprietary ingestion engine that auto-detects complex sheet structures and preserves document sections/subsections.
+*   **Schema Mapper**: Interactive interface to align incoming legacy spreadsheet columns with the production registry contract.
 *   **Structure-Preserving Export**: Generates Excel reports that mirror the project's original column layouts and naming conventions.
-*   **Disaster Recovery Workspace**: One-click manual snapshots and state reconstruction tools for extreme offline scenarios.
 
 ---
 
@@ -53,21 +52,19 @@ Open the project in Android Studio:
 npm run mobile:open
 ```
 
-### 🔑 PWA Installation
-Assetain is a Progressive Web App. Visit the site in Chrome (Android) or Safari (iOS) and select **"Add to Home Screen"** to install it as a standalone high-speed pulse.
-
 ---
 
-## 🚀 Deployment Guide
+## 🚀 Troubleshooting & Version Control
 
-### 1. Environment Configuration
-Create a `.env.local` file with your production Firebase keys:
-*   `NEXT_PUBLIC_FIREBASE_API_KEY`
-*   `NEXT_PUBLIC_FIREBASE_PROJECT_ID`
-*   `NEXT_PUBLIC_FIREBASE_DATABASE_URL` (Required for Shadow Mirror)
+### Git "Fetch First" Error
+If you encounter a `! [rejected] main -> main (fetch first)` error during a push, it means the remote GitHub repository has updates you don't have yet.
+**Solution:**
+1. Run `git pull` to fetch and merge remote changes.
+2. Resolve any local conflicts if prompted.
+3. Run `git push` to broadcast your local work.
 
-### 2. Hosting
-Link your repository to **Vercel** or **Firebase App Hosting**. The `apphosting.yaml` is pre-configured for high-availability scaling.
+### System Heartbeat Issues
+If the cloud indicator is red, the system has entered **Offline Mode**. Work will continue to be saved to Local Persistence and will automatically sync once a Cloud Pulse is detected.
 
 ---
 © 2024 Assetain. Professional Asset Intelligence.

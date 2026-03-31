@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
- * Phase 59: Integrated Coverage Trend Analysis & Tactictal Pulse.
+ * Phase 64: Integrated Holistic Fidelity Pulse & Quality Scoring.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -19,24 +19,18 @@ import {
   Globe,
   Map,
   ShieldHalf,
-  LayoutGrid,
   FileUp,
   ClipboardCheck,
   History,
   Activity,
-  Camera,
-  AlertTriangle,
-  BarChart3,
-  Monitor,
-  RefreshCw,
-  FolderKanban,
   CheckCircle2,
-  XCircle,
-  Fingerprint,
+  FolderKanban,
   ChevronDown,
-  LineChart,
-  AreaChart as AreaChartIcon,
-  ShieldAlert
+  ShieldAlert,
+  Fingerprint,
+  AlertTriangle,
+  Navigation,
+  Target
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -45,12 +39,12 @@ import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArchiveService } from '@/lib/archive-service';
+import { IntegrityEngine, type IntegrityIssue } from '@/lib/integrity-engine';
 import { VerificationPulse } from '@/components/registry/VerificationPulse';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { VirtualDBService } from '@/services/virtual-db-service';
 import { storage } from '@/offline/storage';
-import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell, AreaChart, Area, CartesianGrid } from 'recharts';
+import { ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, AreaChart, Area, CartesianGrid } from 'recharts';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const container = {
@@ -70,14 +64,16 @@ export default function DashboardPage() {
   const { assets, settingsLoaded, isOnline, appSettings, activeGrantId, setActiveGrantId, refreshRegistry } = useAppState();
   const { userProfile, profileSetupComplete, loading: authLoading } = useAuth();
   
-  const [integrityReport, setIntegrityReport] = useState<any>(null);
+  const [integrityIssues, setIssues] = useState<IntegrityIssue[]>([]);
+  const [fidelityScore, setFidelityScore] = useState(100);
   const [syncDrift, setSyncDrift] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     if (assets.length > 0) {
-      ArchiveService.runIntegrityAudit(assets).then(report => {
-        setIntegrityReport(report);
+      IntegrityEngine.runFullAudit(assets).then(issues => {
+        setIssues(issues);
+        setFidelityScore(IntegrityEngine.calculateFidelityScore(assets, issues));
       });
     }
     
@@ -133,7 +129,6 @@ export default function DashboardPage() {
       .sort((a, b) => b.total - a.total)
       .slice(0, 6);
 
-    // Trend Pulse: Last 30 Days
     const trendData = Array.from({ length: 15 }).map((_, i) => {
       const d = new Date();
       d.setDate(d.getDate() - (14 - i));
@@ -145,17 +140,6 @@ export default function DashboardPage() {
       };
     });
 
-    const velocityData = Array.from({ length: 7 }).map((_, i) => {
-      const d = new Date();
-      d.setDate(d.getDate() - i);
-      const dayStr = d.toISOString().split('T')[0];
-      const count = assets.filter(a => a.lastModified.startsWith(dayStr)).length;
-      return { 
-        name: d.toLocaleDateString('en-US', { weekday: 'short' }), 
-        pulses: count 
-      };
-    }).reverse();
-
     return { 
       total, 
       verified, 
@@ -163,7 +147,6 @@ export default function DashboardPage() {
       missingTags, 
       criticalHealth, 
       benchmarking,
-      velocityData,
       trendData,
       dataGaps: missingSerials + missingTags
     };
@@ -185,7 +168,7 @@ export default function DashboardPage() {
   return (
     <AppLayout>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-10 pb-32 max-w-7xl mx-auto">
-        {/* Header: Project Switcher Cockpit */}
+        {/* Header Pulse */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
           <div className="space-y-1">
             <div className="flex items-center gap-4">
@@ -200,7 +183,6 @@ export default function DashboardPage() {
                     </Button>
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="start" className="w-64 rounded-2xl border-2 shadow-2xl p-2">
-                    <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-widest opacity-40 px-2 py-3">Active Registry Pulse</DropdownMenuLabel>
                     <DropdownMenuItem className="rounded-xl h-12 bg-primary/5 text-primary mb-1">
                       <div className="flex flex-col min-w-0">
                         <span className="font-black text-[11px] uppercase truncate">{activeGrant?.name}</span>
@@ -209,14 +191,9 @@ export default function DashboardPage() {
                       <CheckCircle2 className="h-4 w-4 ml-auto" />
                     </DropdownMenuItem>
                     <DropdownMenuSeparator className="my-2" />
-                    <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-widest opacity-40 px-2 py-3">Other Projects</DropdownMenuLabel>
                     {otherGrants.map(grant => (
-                      <DropdownMenuItem 
-                        key={grant.id} 
-                        onClick={() => setActiveGrantId(grant.id)}
-                        className="rounded-xl h-12 hover:bg-muted group cursor-pointer"
-                      >
-                        <span className="font-bold text-[11px] uppercase truncate group-hover:text-primary transition-colors">{grant.name}</span>
+                      <DropdownMenuItem key={grant.id} onClick={() => setActiveGrantId(grant.id)} className="rounded-xl h-12 hover:bg-muted group cursor-pointer">
+                        <span className="font-bold text-[11px] uppercase truncate">{grant.name}</span>
                         <ArrowRight className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-1" />
                       </DropdownMenuItem>
                     ))}
@@ -276,40 +253,20 @@ export default function DashboardPage() {
                         </linearGradient>
                       </defs>
                       <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" opacity={0.2} />
-                      <XAxis 
-                        dataKey="date" 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} 
-                        dy={10}
-                      />
-                      <YAxis 
-                        axisLine={false} 
-                        tickLine={false} 
-                        tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} 
-                        unit="%"
-                      />
-                      <RechartsTooltip 
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-background border-2 border-primary/20 p-4 rounded-2xl shadow-2xl">
-                                <p className="text-[10px] font-black uppercase text-primary mb-1">{payload[0].payload.date}</p>
-                                <p className="text-lg font-black">{payload[0].value}% Coverage</p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Area 
-                        type="monotone" 
-                        dataKey="coverage" 
-                        stroke="hsl(var(--primary))" 
-                        strokeWidth={4}
-                        fillOpacity={1} 
-                        fill="url(#coverageGradient)" 
-                      />
+                      <XAxis dataKey="date" axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} dy={10} />
+                      <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 9, fontWeight: 900, fill: 'hsl(var(--muted-foreground))' }} unit="%" />
+                      <RechartsTooltip content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          return (
+                            <div className="bg-background border-2 border-primary/20 p-4 rounded-2xl shadow-2xl">
+                              <p className="text-[10px] font-black uppercase text-primary mb-1">{payload[0].payload.date}</p>
+                              <p className="text-lg font-black">{payload[0].value}% Coverage</p>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }} />
+                      <Area type="monotone" dataKey="coverage" stroke="hsl(var(--primary))" strokeWidth={4} fillOpacity={1} fill="url(#coverageGradient)" />
                     </AreaChart>
                   </ResponsiveContainer>
                 </div>
@@ -350,7 +307,6 @@ export default function DashboardPage() {
           </motion.div>
 
           <div className="space-y-8">
-            {/* Registry Health Cockpit */}
             <motion.div variants={item}>
               <Card className="border-2 border-border/40 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
                 <CardHeader className="p-8 pb-4">
@@ -361,7 +317,7 @@ export default function DashboardPage() {
                       </div>
                       <CardTitle className="text-xl font-black uppercase tracking-tight">Registry Fidelity</CardTitle>
                     </div>
-                    <Badge className="bg-primary text-white font-black uppercase text-[9px]">{integrityReport?.score || 100}% HEALTH</Badge>
+                    <Badge className="bg-primary text-white font-black uppercase text-[9px]">{fidelityScore}% HEALTH</Badge>
                   </div>
                 </CardHeader>
                 <CardContent className="p-8 pt-0 space-y-4">
@@ -369,29 +325,29 @@ export default function DashboardPage() {
                     <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40">
                       <div className="flex items-center gap-3">
                         <Fingerprint className={cn("h-4 w-4", stats?.missingSerials ? "text-orange-500" : "text-green-600")} />
-                        <span className="text-[10px] font-black uppercase opacity-60">Missing Serials</span>
+                        <span className="text-[10px] font-black uppercase opacity-60">Serial Gaps</span>
                       </div>
                       <span className={cn("text-xs font-black", stats?.missingSerials ? "text-orange-600" : "text-green-600")}>{stats?.missingSerials}</span>
                     </div>
                     <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40">
                       <div className="flex items-center gap-3">
-                        <AlertTriangle className={cn("h-4 w-4", stats?.criticalHealth ? "text-destructive" : "text-green-600")} />
-                        <span className="text-[10px] font-black uppercase opacity-60">High-Risk Alerts</span>
+                        <Navigation className={cn("h-4 w-4", integrityIssues.some(i => i.type === 'COORDINATE_DRIFT') ? "text-orange-500" : "text-green-600")} />
+                        <span className="text-[10px] font-black uppercase opacity-60">Spatial Drift</span>
                       </div>
-                      <span className={cn("text-xs font-black", stats?.criticalHealth ? "text-destructive" : "text-green-600")}>{stats?.criticalHealth}</span>
+                      <span className="text-xs font-black text-foreground">{integrityIssues.filter(i => i.type === 'COORDINATE_DRIFT').length}</span>
                     </div>
                     <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40">
                       <div className="flex items-center gap-3">
                         <History className={cn("h-4 w-4", syncDrift ? "text-primary" : "text-green-600")} />
-                        <span className="text-[10px] font-black uppercase opacity-60">Infrastructure Drift</span>
+                        <span className="text-[10px] font-black uppercase opacity-60">Registry Drift</span>
                       </div>
-                      <span className={cn("text-xs font-black", syncDrift ? "text-primary" : "text-green-600")}>{syncDrift} Pulse(s)</span>
+                      <span className={cn("text-xs font-black", syncDrift ? "text-primary" : "text-green-600")}>{syncDrift} Pulses</span>
                     </div>
                   </div>
                   
                   <div className="pt-4">
                     <Button variant="ghost" asChild className="w-full h-12 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 bg-primary/5 hover:bg-primary/10">
-                      <Link href="/reports"><CheckCircle2 className="h-3.5 w-3.5" /> Initialize Fidelity Audit</Link>
+                      <Link href="/reports"><Target className="h-3.5 w-3.5" /> Initialize Fidelity Audit</Link>
                     </Button>
                   </div>
                 </CardContent>

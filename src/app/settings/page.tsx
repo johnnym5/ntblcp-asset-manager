@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Operational Control Center.
- * Phase 53: Added Local Data Recovery & Sub-Table Schema Management.
+ * Phase 64: Hardened Emergency Pulse Reset & Local State Reconstruction.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -23,37 +23,28 @@ import {
   Loader2, 
   Sun, 
   Moon, 
-  ShieldCheck,
   Zap,
   RefreshCw,
-  ScanSearch,
-  PlaneTakeoff,
-  Columns,
-  Wrench,
-  GraduationCap,
-  Cpu,
-  Lock,
-  Cloud,
-  History,
-  FileUp,
-  FileDown,
-  Activity,
-  User,
-  Info,
   Smartphone,
-  MousePointer2,
+  Info,
   Download,
-  AlertTriangle,
-  RotateCcw
+  RotateCcw,
+  ShieldCheck,
+  Lock,
+  Cpu,
+  GraduationCap,
+  Columns,
+  Activity,
+  Bomb,
+  FileUp
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
-import { Separator } from '@/components/ui/separator';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { UserManagement } from '@/components/admin/user-management';
@@ -62,12 +53,12 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
 import { ArchiveService } from '@/lib/archive-service';
 import { cn } from '@/lib/utils';
-import { HEADER_DEFINITIONS } from '@/lib/constants';
-import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
+import type { AppSettings, SheetDefinition, UXMode } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
 
 export default function SettingsPage() {
-  const { appSettings, refreshRegistry, settingsLoaded, isSyncing } = useAppState();
+  const { appSettings, refreshRegistry, settingsLoaded, isSyncing, isOnline } = useAppState();
   const { userProfile, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const { setTheme, theme } = useTheme();
@@ -75,6 +66,7 @@ export default function SettingsPage() {
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+  const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   
   const recoveryInputRef = useRef<HTMLInputElement>(null);
 
@@ -134,9 +126,17 @@ export default function SettingsPage() {
     }
   };
 
-  const resetOnboarding = () => {
-    handleSettingChange('onboardingComplete', false);
-    toast({ title: "Tour Pulse Reset", description: "The welcome guide will appear on your next dashboard visit." });
+  const handleSystemReset = async () => {
+    setIsSaving(true);
+    try {
+      await storage.clearAssets();
+      await storage.clearSandbox();
+      localStorage.removeItem('assetain-user-session');
+      toast({ title: "Registry Purged", description: "Local persistence layer has been reset." });
+      window.location.href = '/';
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (authLoading || !settingsLoaded || !draftSettings) {
@@ -209,9 +209,6 @@ export default function SettingsPage() {
             <TabsTrigger value="registry" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
               <Columns className="h-3.5 w-3.5" /> Registry
             </TabsTrigger>
-            <TabsTrigger value="workflows" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
-              <Cpu className="h-3.5 w-3.5" /> Workflows
-            </TabsTrigger>
             <TabsTrigger value="security" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
               <Lock className="h-3.5 w-3.5" /> Governance
             </TabsTrigger>
@@ -269,10 +266,6 @@ export default function SettingsPage() {
                     <SettingRow label="Help Tooltips" description="Show descriptive pulses when hovering over buttons." icon={Info}>
                       <Switch checked={draftSettings.showHelpTooltips} onCheckedChange={(v) => handleSettingChange('showHelpTooltips', v)} />
                     </SettingRow>
-
-                    <SettingRow label="Welcome Guide" description="Replay the onboarding walkthrough." icon={History}>
-                      <Button variant="outline" size="sm" onClick={resetOnboarding} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">Reset Tour</Button>
-                    </SettingRow>
                   </div>
                 </div>
               </div>
@@ -293,7 +286,7 @@ export default function SettingsPage() {
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <div className={cn("p-2 rounded-xl", draftSettings.activeGrantId === grant.id ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                              <FolderKanban className="h-5 w-5" />
+                              <Folder_Kanban className="h-5 w-5" />
                             </div>
                             <div>
                               <Input 
@@ -320,7 +313,7 @@ export default function SettingsPage() {
                                 onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
                                 className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
                               >
-                                <Wrench className="h-3.5 w-3.5" />
+                                <RefreshCw className="h-3.5 w-3.5" />
                               </Button>
                             </div>
                           ))}
@@ -328,33 +321,6 @@ export default function SettingsPage() {
                       </CardContent>
                     </Card>
                   ))}
-                </div>
-                <aside className="space-y-6">
-                  <Card className="rounded-[2.5rem] border-2 border-dashed border-border/40 bg-muted/5 shadow-none overflow-hidden">
-                    <CardHeader className="bg-primary/5 p-6 border-b border-dashed">
-                      <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Layout Protocol</CardTitle>
-                    </CardHeader>
-                    <CardContent className="p-8 text-[10px] font-medium text-muted-foreground leading-relaxed italic">
-                      Registry arrangement allows you to redefine table headers and field mappings per category.
-                    </CardContent>
-                  </Card>
-                </aside>
-              </div>
-            </div>
-          </TabsContent>
-
-          <TabsContent value="workflows" className="space-y-10 outline-none">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-2">
-              <div>
-                <SectionHeading title="Automation Center" description="Deterministic intelligence rules" icon={Cpu} />
-                <div className="space-y-4">
-                  <SettingRow label="Auto-Sync Pulse" description="Automatically broadcast modifications to the cloud." icon={Cloud}>
-                    <Switch checked={draftSettings.autoSync} onCheckedChange={(v) => handleSettingChange('autoSync', v)} />
-                  </SettingRow>
-                  
-                  <SettingRow label="Intelligent Logic" description="Auto-suggest filters and sorting sequences." icon={MousePointer2}>
-                    <Switch checked={draftSettings.autoSuggestFilters} onCheckedChange={(v) => handleSettingChange('autoSuggestFilters', v)} />
-                  </SettingRow>
                 </div>
               </div>
             </div>
@@ -388,7 +354,7 @@ export default function SettingsPage() {
                       </Button>
                     </SettingRow>
                     
-                    <SettingRow label="Registry Snapshot" description="Export entire register as JSON archive." icon={PlaneTakeoff}>
+                    <SettingRow label="Registry Snapshot" description="Export entire register as JSON archive." icon={Download}>
                       <Button variant="outline" size="sm" onClick={handleExportBackup} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] tracking-widest border-2">Backup Pulse</Button>
                     </SettingRow>
                   </div>
@@ -401,9 +367,6 @@ export default function SettingsPage() {
                       <Download className="h-5 w-5 text-primary" />
                       <h4 className="text-sm font-black uppercase tracking-tight text-primary">Import Recovery Pulse</h4>
                     </div>
-                    <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic opacity-70">
-                      If you have exported a "Device Pulse" backup, you can reconstruct your local environment.
-                    </p>
                     <input type="file" ref={recoveryInputRef} onChange={handleImportRecovery} className="hidden" accept=".json" />
                     <Button 
                       onClick={() => recoveryInputRef.current?.click()}
@@ -427,7 +390,7 @@ export default function SettingsPage() {
                   <p className="text-[10px] font-bold text-muted-foreground leading-relaxed uppercase opacity-60">
                     Purging local encrypted store is irreversible.
                   </p>
-                  <Button variant="ghost" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 transition-all">
+                  <Button variant="ghost" onClick={() => setIsResetDialogOpen(true)} className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 transition-all">
                     Reset Local Pulse
                   </Button>
                 </div>
@@ -436,6 +399,28 @@ export default function SettingsPage() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 shadow-2xl p-10">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
+              <Bomb className="h-8 w-8 text-destructive" />
+            </div>
+            <div className="space-y-2">
+              <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Local Pulse?</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm font-medium leading-relaxed italic">
+                This will permanently delete all asset records and cached configuration from this device. Your session will be terminated. Cloud data is not affected.
+              </AlertDialogDescription>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Reset</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSystemReset} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/20 bg-destructive text-white m-0">
+              Execute Purge
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {selectedSheetDef && (
         <ColumnCustomizationSheet 
