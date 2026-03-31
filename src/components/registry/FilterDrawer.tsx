@@ -8,7 +8,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Filter, Plus, Trash2, X, Database, Layers, LayoutGrid } from 'lucide-react';
 import type { RegistryHeader, HeaderFilter } from '@/types/registry';
@@ -256,7 +256,7 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
             onClick={() => setLocalFilters([])}
             className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-destructive/10 hover:text-destructive transition-all"
           >
-            Purge Engine
+            <X className="mr-2 h-3.5 w-3.5" /> Purge Engine
           </Button>
           <Button 
             onClick={applyFilters}
