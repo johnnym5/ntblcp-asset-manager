@@ -1,3 +1,4 @@
+
 'use client';
 
 /**
@@ -9,6 +10,8 @@ import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
+  DialogTitle,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -142,8 +145,8 @@ export function WelcomeExperience({ isOpen, onComplete }: WelcomeExperienceProps
                 <Zap className="h-6 w-6 text-white fill-current" />
               </div>
               <div className="flex flex-col">
-                <span className="text-xl font-black tracking-tighter uppercase leading-none">Assetain</span>
-                <span className="text-[9px] font-black uppercase text-primary tracking-[0.3em] mt-1">Tour Pulse {currentStep + 1} of {STEPS.length}</span>
+                <DialogTitle className="text-xl font-black tracking-tighter uppercase leading-none">Assetain</DialogTitle>
+                <DialogDescription className="text-[9px] font-black uppercase text-primary tracking-[0.3em] mt-1">Tour Pulse {currentStep + 1} of {STEPS.length}</DialogDescription>
               </div>
             </div>
             <div className="flex gap-1.5">

@@ -87,30 +87,32 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-2xl flex flex-col p-0 border-none rounded-l-[2.5rem] shadow-2xl bg-background overflow-hidden">
         {/* Navigation Strip */}
-        <div className="flex items-center justify-between p-4 border-b bg-background/80 backdrop-blur-md z-30">
-          <div className="flex items-center gap-3">
-            <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-10 w-10">
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <div className="flex flex-col">
-              <span className="text-sm font-black tracking-tight uppercase leading-none truncate max-w-[180px]">
-                {record.sn || record.id.split('-')[0]} Pulse
-              </span>
-              <span className="text-[8px] font-black uppercase text-muted-foreground tracking-[0.2em] mt-1 opacity-60">Record Analysis</span>
+        <SheetHeader className="p-0 space-y-0">
+          <div className="flex items-center justify-between p-4 border-b bg-background/80 backdrop-blur-md z-30">
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-10 w-10">
+                <ChevronLeft className="h-5 w-5" />
+              </Button>
+              <div className="flex flex-col">
+                <SheetTitle className="text-sm font-black tracking-tight uppercase leading-none truncate max-w-[180px]">
+                  {record.sn || record.id.split('-')[0]} Pulse
+                </SheetTitle>
+                <SheetDescription className="text-[8px] font-black uppercase text-muted-foreground tracking-[0.2em] mt-1 opacity-60">Record Analysis</SheetDescription>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <div className="flex items-center bg-muted/50 rounded-xl p-1">
+                <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-8 w-8 rounded-lg"><ChevronLeft className="h-4 w-4" /></Button>
+                <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-8 w-8 rounded-lg"><ChevronRight className="h-4 w-4" /></Button>
+              </div>
+              <Button variant="ghost" size="icon" onClick={handlePdfExport} disabled={isExporting} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10">
+                {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileDown className="h-5 w-5" />}
+              </Button>
+              <Button variant="ghost" size="icon" onClick={() => onEdit(record.id)} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10"><Edit3 className="h-5 w-5" /></Button>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <div className="flex items-center bg-muted/50 rounded-xl p-1">
-              <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-8 w-8 rounded-lg"><ChevronLeft className="h-4 w-4" /></Button>
-              <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-8 w-8 rounded-lg"><ChevronRight className="h-4 w-4" /></Button>
-            </div>
-            <Button variant="ghost" size="icon" onClick={handlePdfExport} disabled={isExporting} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10">
-              {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileDown className="h-5 w-5" />}
-            </Button>
-            <Button variant="ghost" size="icon" onClick={() => onEdit(record.id)} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10"><Edit3 className="h-5 w-5" /></Button>
-          </div>
-        </div>
+        </SheetHeader>
 
         <ScrollArea className="flex-1 bg-background custom-scrollbar">
           <div className="pb-32">

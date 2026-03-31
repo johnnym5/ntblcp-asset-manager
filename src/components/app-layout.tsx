@@ -45,7 +45,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
-import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { InboxSheet } from './inbox-sheet';
@@ -211,7 +211,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="lg:hidden">
               <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
                 <SheetTrigger asChild><Button variant="ghost" size="icon" className="rounded-xl tactile-pulse"><Menu className="h-6 w-6" /></Button></SheetTrigger>
-                <SheetContent side="left" className="w-[85vw] max-w-sm p-0 flex flex-col rounded-r-[2.5rem] border-none bg-background shadow-2xl"><div className="p-8 pb-4 flex items-center justify-between"><div className="flex items-center gap-3"><Zap className="h-6 w-6 text-primary fill-current" /><span className="text-xl font-black uppercase tracking-tighter">Assetain</span></div><Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="rounded-xl"><X className="h-5 w-5" /></Button></div><ScrollArea className="flex-1 px-6 py-4"><div className="pb-10"><NavGroup items={PRIMARY_NAV} /><NavGroup items={AUDIT_NAV} title="Reporting & Pulse" /><NavGroup items={ADMIN_NAV} title="Governance" /></div></ScrollArea></SheetContent>
+                <SheetContent side="left" className="w-[85vw] max-w-sm p-0 flex flex-col rounded-r-[2.5rem] border-none bg-background shadow-2xl">
+                  <SheetHeader className="p-8 pb-4">
+                    <SheetTitle className="flex items-center gap-3">
+                      <Zap className="h-6 w-6 text-primary fill-current" />
+                      <span className="text-xl font-black uppercase tracking-tighter">Assetain</span>
+                    </SheetTitle>
+                  </SheetHeader>
+                  <ScrollArea className="flex-1 px-6 py-4"><div className="pb-10"><NavGroup items={PRIMARY_NAV} /><NavGroup items={AUDIT_NAV} title="Reporting & Pulse" /><NavGroup items={ADMIN_NAV} title="Governance" /></div></ScrollArea></SheetContent>
               </Sheet>
             </div>
             <div className="flex items-center gap-4">
@@ -251,10 +258,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-2xl border-2 transition-all cursor-help shadow-sm", 
                     isOnline ? "border-green-500/20 bg-green-50/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive animate-pulse"
                   )}>
-                    <div className="flex items-center gap-1.5">
-                      <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} />
-                      <span className="text-[10px] font-black uppercase tracking-tighter hidden xs:inline">{isOnline ? 'Cloud' : 'Offline'}</span>
-                    </div>
+                    <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} />
+                    <span className="text-[10px] font-black uppercase tracking-tighter hidden xs:inline">{isOnline ? 'Cloud' : 'Offline'}</span>
                     <Separator orientation="vertical" className="h-4 opacity-20 hidden xs:block" />
                     <div className="flex gap-1">
                       <Database className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} />
