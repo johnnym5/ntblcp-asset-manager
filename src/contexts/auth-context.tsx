@@ -2,12 +2,13 @@
 
 /**
  * @fileOverview AuthContext - Identity & Access Gateway.
- * Hardened to prioritize deep hydration before releasing the UI.
+ * Phase 68: Establishing Firebase Auth session during login pulse for rule parity.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
+import { FirebaseAuthService } from '@/services/firebase/auth';
 import type { AuthorizedUser, UserRole } from '@/types/domain';
 
 export interface LocalUserProfile {
@@ -52,8 +53,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const { appSettings, settingsLoaded, isHydrated } = useAppState();
 
   useEffect(() => {
-    // CRITICAL: Block until the local database hydration pulse is complete.
-    // This ensures no per-page loading screens after initial entry.
     if (!settingsLoaded || !isHydrated) {
       return;
     }
@@ -69,6 +68,8 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         if (authorizedUser) {
           setUserProfile(profile);
           setProfileSetupComplete(true);
+          // Auto-resume Firebase session if profile exists
+          FirebaseAuthService.ensureSession();
         } else {
           localStorage.removeItem('assetain-user-session');
           setUserProfile(null);
@@ -91,20 +92,25 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const login = async (user: AuthorizedUser, state: string) => {
     setLoading(true);
-    const newProfile: LocalUserProfile = {
-      id: uuidv4(),
-      loginName: user.loginName,
-      displayName: user.displayName,
-      email: user.email,
-      state: state,
-      isAdmin: user.isAdmin || user.role === 'ADMIN',
-      role: user.role,
-    };
-    
     try {
+      // Establish Firebase Auth session for Security Rules parity
+      await FirebaseAuthService.ensureSession();
+
+      const newProfile: LocalUserProfile = {
+        id: uuidv4(),
+        loginName: user.loginName,
+        displayName: user.displayName,
+        email: user.email,
+        state: state,
+        isAdmin: user.isAdmin || user.role === 'ADMIN',
+        role: user.role,
+      };
+      
       localStorage.setItem('assetain-user-session', JSON.stringify(newProfile));
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
+    } catch (e) {
+      console.error("Auth: Login pulse failed", e);
     } finally {
       setLoading(false);
     }
@@ -115,6 +121,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem('assetain-user-session');
     setUserProfile(null);
     setProfileSetupComplete(false);
+    await FirebaseAuthService.terminateSession();
     window.location.href = '/';
   };
 

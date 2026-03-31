@@ -1,11 +1,10 @@
 rules_version = '2';
 
 /**
- * ASSETAIN PROTOTYPE SECURITY RULES v5.1
+ * ASSETAIN PROTOTYPE SECURITY RULES v6.8
  * 
- * Simplified for high-availability prototyping.
- * RBAC and Regional Scoping are enforced at the application layer 
- * via the core/auth/rbac engine to ensure zero-latency offline parity.
+ * Optimized for high-availability prototype reconciliation.
+ * Permissions are enforced at the application layer via RBAC engine.
  */
 
 service cloud.firestore {
@@ -20,9 +19,9 @@ service cloud.firestore {
     // --- COLLECTION RULES ---
 
     // 1. Global Configuration
-    // Allows authenticated sessions to read/write system settings.
-    match /config/settings {
-      allow read, write: if isAuthenticated();
+    // Allows public access for bootstrap pulses in the prototype environment.
+    match /config/{document=**} {
+      allow read, write: if true;
     }
 
     // 2. Asset Registry
