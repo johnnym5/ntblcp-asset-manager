@@ -2,10 +2,11 @@
 
 /**
  * @fileOverview Visual Evidence Gallery - High-Fidelity Asset Media Workspace.
- * Phase 39: Aggregated view of capturing technical evidence across the project.
+ * Phase 61: Optimized with next/image and AI-hint compliance.
  */
 
 import React, { useMemo, useState } from 'react';
+import Image from 'next/image';
 import AppLayout from '@/components/app-layout';
 import { useAppState } from '@/contexts/app-state-context';
 import { 
@@ -38,7 +39,7 @@ export default function GalleryPage() {
   const [isDetailOpen, setIsDetailOpen] = useState(false);
 
   const mediaAssets = useMemo(() => {
-    return assets.filter(a => !!a.photoDataUri);
+    return assets.filter(a => !!a.photoDataUri || !!a.photoUrl);
   }, [assets]);
 
   const filteredMedia = useMemo(() => {
@@ -125,11 +126,14 @@ export default function GalleryPage() {
                     className="group relative aspect-[4/5] rounded-[2rem] overflow-hidden border-2 border-border/40 hover:border-primary/40 shadow-lg cursor-pointer bg-card transition-all"
                     onClick={() => handleInspect(asset.id)}
                   >
-                    <img 
-                      src={asset.photoDataUri} 
+                    <Image 
+                      src={asset.photoUrl || asset.photoDataUri || ''} 
+                      width={600}
+                      height={400}
                       className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
                       alt={asset.description}
-                      data-ai-hint="asset technical evidence"
+                      data-ai-hint="technical evidence"
+                      unoptimized
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent opacity-60 group-hover:opacity-100 transition-opacity duration-500" />
                     

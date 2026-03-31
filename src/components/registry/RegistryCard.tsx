@@ -1,10 +1,10 @@
-
 /**
  * @fileOverview RegistryCard - Source-Aware Professional Register Renderer.
- * Phase 60: Integrated Forensic Signature Indicator.
+ * Phase 61: Optimized with next/image and AI-hint compliance.
  */
 
 import React from 'react';
+import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -54,8 +54,8 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
   });
 
   const getSemanticImage = () => {
-    if (asset.photoUrl) return { url: asset.photoUrl, hint: "remote asset photo" };
-    if (asset.photoDataUri) return { url: asset.photoDataUri, hint: "local asset photo" };
+    if (asset.photoUrl) return { url: asset.photoUrl, hint: "asset photo" };
+    if (asset.photoDataUri) return { url: asset.photoDataUri, hint: "asset photo" };
     
     const cat = asset.category?.toLowerCase() || '';
     if (cat.includes('vehicle') || cat.includes('motorcycle')) return images.asset_categories.vehicles;
@@ -102,12 +102,15 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
                 <PenTool className="h-3 w-3" />
               </Badge>
             )}
-            <div className="h-6 w-6 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm shrink-0 bg-muted">
-              <img 
+            <div className="h-6 w-6 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm shrink-0 bg-muted relative">
+              <Image 
                 src={imagePulse.url} 
-                className="h-full w-full object-cover" 
+                width={600}
+                height={400}
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" 
                 alt="Asset Evidence" 
                 data-ai-hint={imagePulse.hint}
+                unoptimized
               />
             </div>
           </div>

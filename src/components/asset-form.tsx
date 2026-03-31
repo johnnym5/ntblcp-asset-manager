@@ -2,10 +2,11 @@
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 57: Integrated Forensic Signature Capture Pad.
+ * Phase 61: Optimized with next/image and AI-hint compliance.
  */
 
 import React, { useEffect, useState, useRef } from "react";
+import Image from "next/image";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import {
@@ -364,7 +365,15 @@ export function AssetForm({
                       </div>
                     ) : capturedPhoto ? (
                       <div className="relative group aspect-video bg-muted m-2 sm:m-4 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden border-2 border-primary/10 shadow-lg">
-                          <img src={capturedPhoto} className="w-full h-full object-cover" alt="Asset Evidence" />
+                          <Image 
+                            src={capturedPhoto} 
+                            width={600}
+                            height={400}
+                            className="w-full h-full object-cover" 
+                            alt="Asset Evidence" 
+                            data-ai-hint="technical evidence"
+                            unoptimized
+                          />
                           <div className="absolute top-4 right-4 flex gap-2">
                             {!isReadOnly && (
                                 <Button variant="destructive" size="icon" className="h-10 w-10 rounded-xl shadow-2xl" onClick={() => setCapturedPhoto(null)}>
@@ -462,9 +471,17 @@ export function AssetForm({
                             )}
                           </div>
                         ) : (
-                          <div className="aspect-[3/1] bg-muted/10 border-2 border-dashed border-border/40 rounded-3xl flex items-center justify-center overflow-hidden">
+                          <div className="aspect-[3/1] bg-muted/10 border-2 border-dashed border-border/40 rounded-3xl flex items-center justify-center overflow-hidden relative">
                             {capturedSignature ? (
-                              <img src={capturedSignature} className="max-h-full mix-blend-multiply opacity-80" alt="Custodian Signature" />
+                              <Image 
+                                src={capturedSignature} 
+                                width={600}
+                                height={200}
+                                className="max-h-full mix-blend-multiply opacity-80" 
+                                alt="Custodian Signature" 
+                                data-ai-hint="custodian signature"
+                                unoptimized
+                              />
                             ) : (
                               <div className="text-[10px] font-medium italic opacity-30">Zero signature pulse captured.</div>
                             )}

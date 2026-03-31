@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
- * Phase 55: Integrated Registry Pulse Snapshot (Quick JSON Export).
+ * Phase 61: Integrated Structure-Preserving Excel Export Pulse.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -45,7 +45,8 @@ import {
   FolderKanban,
   ArrowRightLeft,
   Printer,
-  FileJson
+  FileJson,
+  FileSpreadsheet
 } from 'lucide-react';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
@@ -126,6 +127,7 @@ export default function AssetRegistryPage() {
   const [selectedRecord, setSelectedRecord] = useState<AssetRecord | undefined>();
   const [selectedAssetForForm, setSelectedAssetForForm] = useState<Asset | undefined>();
   const [isReassigning, setIsReassigning] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
 
   useEffect(() => {
     const savedHeaders = localStorage.getItem('registry-header-prefs');
@@ -153,6 +155,18 @@ export default function AssetRegistryPage() {
     const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
     saveAs(blob, `Registry-Pulse-${activeProject.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`);
     toast({ title: "Registry Pulse Exported", description: "Project snapshot saved to local storage." });
+  };
+
+  const handleExcelExport = async () => {
+    setIsExportingExcel(true);
+    try {
+      await ExcelService.exportRegistry(assets, headers);
+      toast({ title: "Excel Pulse Complete", description: "Registry data exported with template alignment." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Export Failed" });
+    } finally {
+      setIsExportingExcel(false);
+    }
   };
 
   const handleReassignGrant = async (targetGrantId: string) => {
@@ -318,14 +332,25 @@ export default function AssetRegistryPage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={handleQuickExport}
-                className="h-10 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest border-2 gap-2 bg-card hover:bg-muted"
-              >
-                <FileJson className="h-3.5 w-3.5" /> Snapshot Pulse
-              </Button>
+              <div className="flex items-center bg-muted/50 p-1 rounded-2xl border-2 border-border/40 shadow-inner">
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleExcelExport}
+                  disabled={isExportingExcel}
+                  className="h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2"
+                >
+                  {isExportingExcel ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />} Excel
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={handleQuickExport}
+                  className="h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2"
+                >
+                  <FileJson className="h-3.5 w-3.5" /> JSON
+                </Button>
+              </div>
 
               <div className="flex items-center bg-muted/50 p-1 rounded-2xl border-2 border-border/40 shadow-inner">
                 <Button 

@@ -1,9 +1,10 @@
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity Detail Workstation.
- * Phase 57: Integrated Forensic Verification Receipt (Signature & GPS).
+ * Phase 61: Optimized with next/image and AI-hint compliance.
  */
 
 import React, { useState } from 'react';
+import Image from 'next/image';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -116,7 +117,15 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
             {(asset.photoUrl || asset.photoDataUri) && (
               <div className="px-8 pt-8">
                 <div className="relative group aspect-video bg-muted rounded-[2rem] overflow-hidden border-2 border-primary/10 shadow-lg">
-                  <img src={asset.photoUrl || asset.photoDataUri} className="w-full h-full object-cover" alt="Asset Evidence" />
+                  <Image 
+                    src={asset.photoUrl || asset.photoDataUri || ''} 
+                    width={600}
+                    height={400}
+                    className="w-full h-full object-cover" 
+                    alt="Asset Evidence" 
+                    data-ai-hint="asset photo"
+                    unoptimized
+                  />
                   <Badge className="absolute bottom-4 left-4 bg-primary/90 backdrop-blur-md font-black uppercase text-[8px] tracking-[0.2em] px-3 h-6 rounded-lg">
                     <Camera className="h-3 w-3 mr-2" /> VERIFIED VISUAL PULSE
                   </Badge>
@@ -173,7 +182,15 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
               <div className="p-6 rounded-[2rem] bg-card border-2 border-dashed border-border/40 shadow-inner flex flex-col items-center justify-center text-center">
                 {asset.signatureUrl || asset.signatureDataUri ? (
                   <div className="space-y-4 w-full">
-                    <img src={asset.signatureUrl || asset.signatureDataUri} className="max-h-24 mx-auto mix-blend-multiply opacity-80" alt="Custodian Signature" />
+                    <Image 
+                      src={asset.signatureUrl || asset.signatureDataUri || ''} 
+                      width={600}
+                      height={200}
+                      className="max-h-24 mx-auto mix-blend-multiply opacity-80" 
+                      alt="Custodian Signature" 
+                      data-ai-hint="custodian signature"
+                      unoptimized
+                    />
                     <div className="h-px bg-border/40 w-1/2 mx-auto" />
                     <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">Custodian Signature Anchor</p>
                   </div>
