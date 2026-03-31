@@ -57,3 +57,35 @@
 .animate-scan {
   animation: scan 2s linear infinite;
 }
+
+@media print {
+  body {
+    background: white !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+  
+  .print\:hidden {
+    display: none !important;
+  }
+  
+  header, aside, footer, .operational-bar {
+    display: none !important;
+  }
+  
+  main {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: transparent !important;
+  }
+
+  .scroll-area-viewport {
+    overflow: visible !important;
+  }
+
+  /* Tag layout forcing for standard Avery formats */
+  .tag-container {
+    display: block !important;
+    page-break-after: always;
+  }
+}

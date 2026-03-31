@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
- * Phase 49: Integrated Cross-Project Batch Reassignment Pulse.
+ * Phase 54: Integrated Professional Tag Printing Pulse.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -43,7 +43,8 @@ import {
   Globe,
   CloudOff,
   FolderKanban,
-  ArrowRightLeft
+  ArrowRightLeft,
+  Printer
 } from 'lucide-react';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
@@ -55,6 +56,7 @@ import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { AssetForm } from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { VerificationPulse } from '@/components/registry/VerificationPulse';
+import { TagPrintDialog } from '@/components/registry/TagPrintDialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
@@ -74,14 +76,6 @@ import {
   AlertDialogHeader, 
   AlertDialogTitle 
 } from '@/components/ui/alert-dialog';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
 
 const ITEMS_PER_PAGE = 24;
 
@@ -111,7 +105,7 @@ export default function AssetRegistryPage() {
   // --- Selection State ---
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  // --- Drawers ---
+  // --- Drawers & Dialogs ---
   const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
@@ -121,6 +115,7 @@ export default function AssetRegistryPage() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
   const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
+  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
 
   // --- Logic State ---
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
@@ -255,6 +250,10 @@ export default function AssetRegistryPage() {
 
   const totalPages = Math.ceil(processedRecords.length / ITEMS_PER_PAGE);
 
+  const selectedRecordsForPrint = useMemo(() => {
+    return processedRecords.filter(r => selectedIds.has(r.id));
+  }, [processedRecords, selectedIds]);
+
   const handleInspect = (id: string) => {
     const record = processedRecords.find(r => r.id === id);
     setSelectedRecord(record);
@@ -277,8 +276,6 @@ export default function AssetRegistryPage() {
     }
   };
 
-  const registryTitle = isOnline ? "Online Assets Registry" : "Locally Saved Assets Store";
-
   if (authLoading || !settingsLoaded) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -296,7 +293,7 @@ export default function AssetRegistryPage() {
             <div className="space-y-1">
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter text-foreground uppercase leading-tight flex items-center gap-3">
                 {isOnline ? <Globe className="h-8 w-8 text-green-600 animate-pulse" /> : <CloudOff className="h-8 w-8 text-orange-600" />}
-                {registryTitle}
+                {isOnline ? "Online Assets Registry" : "Locally Saved Store"}
               </h2>
               <div className="flex items-center gap-3">
                 <Badge variant="outline" className="h-6 px-3 text-[9px] font-black tracking-widest rounded-full border-2 border-primary/20 bg-primary/5 text-primary">
@@ -403,8 +400,9 @@ export default function AssetRegistryPage() {
                 <div className="h-8 w-px bg-border/40 hidden xs:block" />
                 <div className="flex items-center gap-1 md:gap-2">
                   <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-primary hover:bg-primary/5"><Edit3 className="h-3.5 w-3.5" /> Batch Edit</Button>
+                  <Button variant="ghost" size="sm" onClick={() => setIsPrintDialogOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-blue-600 hover:bg-blue-50"><Printer className="h-3.5 w-3.5" /> Print Tags</Button>
                   {userProfile?.isAdmin && (
-                    <Button variant="ghost" size="sm" onClick={() => setIsReassignDialogOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-blue-600 hover:bg-blue-50"><FolderKanban className="h-3.5 w-3.5" /> Reassign</Button>
+                    <Button variant="ghost" size="sm" onClick={() => setIsReassignDialogOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-primary hover:bg-primary/5"><FolderKanban className="h-3.5 w-3.5" /> Reassign</Button>
                   )}
                   <Button variant="ghost" size="sm" onClick={() => setIsBatchDeleteDialogOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-destructive hover:bg-destructive/5"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
                 </div>
@@ -428,7 +426,7 @@ export default function AssetRegistryPage() {
         </div>
       </LayoutGroup>
 
-      {/* Drawers */}
+      {/* Drawers & Dialogs */}
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={saveHeaderPrefs} onReset={() => {}} />
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }} />
@@ -436,6 +434,7 @@ export default function AssetRegistryPage() {
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => {}} />
       <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAssetForForm} headers={headers} isReadOnly={false} onSave={async (a) => { await refreshRegistry(); setIsFormOpen(false); }} onQuickSave={async () => {}} />
       <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async (d) => { await refreshRegistry(); setSelectedIds(new Set()); }} />
+      <TagPrintDialog isOpen={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen} records={selectedRecordsForPrint} />
       
       <AlertDialog open={isReassignDialogOpen} onOpenChange={setIsReassignDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-primary/10">

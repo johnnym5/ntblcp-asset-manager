@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Universal Command Palette - High-Speed Operational Interface.
- * Enables ⌘K navigation and action triggers across the platform.
+ * Phase 54: Integrated Tag Printing Command Pulse.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -30,7 +30,8 @@ import {
   User,
   LogOut,
   Terminal,
-  ShieldCheck
+  ShieldCheck,
+  Printer
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -92,6 +93,10 @@ export function CommandPalette() {
           <CommandItem onSelect={() => runCommand(() => router.push('/import'))}>
             <FileUp className="mr-2 h-4 w-4" />
             <span>Upload New Registry</span>
+          </CommandItem>
+          <CommandItem onSelect={() => runCommand(() => router.push('/assets?action=print'))}>
+            <Printer className="mr-2 h-4 w-4" />
+            <span>Generate Asset Tags</span>
           </CommandItem>
         </CommandGroup>
 
