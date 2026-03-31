@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Global Activity Ledger - Registry Traceability Workspace.
- * Phase 31: Activated Restoration Pulses & Visual Ledger Diffs.
+ * Phase 52: Implemented Ledger Pulse Export (JSON/CSV).
  */
 
 import React, { useEffect, useState } from 'react';
@@ -24,7 +24,8 @@ import {
   Database,
   CheckCircle2,
   Trash2,
-  Activity
+  Activity,
+  FileJson
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -47,6 +48,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { saveAs } from 'file-saver';
 
 export default function AuditLogPage() {
   const { isOnline, refreshRegistry } = useAppState();
@@ -73,6 +75,17 @@ export default function AuditLogPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportLedger = () => {
+    const snapshot = {
+      version: '5.0.4',
+      exportedAt: new Date().toISOString(),
+      entries: log
+    };
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    saveAs(blob, `Assetain-Activity-Ledger-${new Date().toISOString().split('T')[0]}.json`);
+    toast({ title: "Ledger Pulse Exported", description: "JSON archive saved to local storage." });
   };
 
   const handleRestorePulse = async () => {
@@ -126,8 +139,13 @@ export default function AuditLogPage() {
               Immutable Traceability & Global Registry Integrity Pulse
             </p>
           </div>
-          <Button variant="outline" className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 bg-card shadow-sm border-2 border-primary/10 hover:border-primary/30 transition-all tactile-pulse">
-            <Download className="h-4 w-4 text-primary" /> Export Ledger Pulse
+          <Button 
+            variant="outline" 
+            onClick={handleExportLedger}
+            disabled={log.length === 0}
+            className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 bg-card shadow-sm border-2 border-primary/10 hover:border-primary/30 transition-all tactile-pulse"
+          >
+            <FileJson className="h-4 w-4 text-primary" /> Export Ledger Pulse
           </Button>
         </div>
 
@@ -222,21 +240,14 @@ export default function AuditLogPage() {
                       </Badge>
                       
                       {entry.operation === 'UPDATE' && (
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => setEntryToRestore(entry)}
-                                className="h-12 w-12 rounded-2xl bg-muted/50 hover:bg-primary/10 hover:text-primary transition-all tactile-pulse"
-                              >
-                                <RotateCcw className="h-5 w-5" />
-                              </Button>
-                            </TooltipTrigger>
-                            <TooltipContent>Revert Pulse</TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          onClick={() => setEntryToRestore(entry)}
+                          className="h-12 w-12 rounded-2xl bg-muted/50 hover:bg-primary/10 hover:text-primary transition-all tactile-pulse"
+                        >
+                          <RotateCcw className="h-5 w-5" />
+                        </Button>
                       )}
                     </div>
                   </div>

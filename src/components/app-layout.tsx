@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
- * Phase 39: Integrated Evidence Gallery Pulse.
+ * Phase 52: Integrated Command Palette & High-Speed Search hints.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -32,7 +32,9 @@ import {
   HelpCircle,
   X,
   Camera,
-  Terminal
+  Terminal,
+  Search,
+  Command
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -43,6 +45,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { InboxSheet } from './inbox-sheet';
 import { HelpCenter } from './HelpCenter';
+import { CommandPalette } from './CommandPalette';
 import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { ScrollArea } from './ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
@@ -145,7 +148,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 shrink-0 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-4 md:px-6 z-30">
-          <div className="flex items-center gap-4"><div className="lg:hidden"><Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}><SheetTrigger asChild><Button variant="ghost" size="icon" className="rounded-xl tactile-pulse"><Menu className="h-6 w-6" /></Button></SheetTrigger><SheetContent side="left" className="w-[85vw] max-w-sm p-0 flex flex-col rounded-r-[2.5rem] border-none bg-background shadow-2xl"><div className="p-8 pb-4 flex items-center justify-between"><div className="flex items-center gap-3"><Zap className="h-6 w-6 text-primary fill-current" /><span className="text-xl font-black uppercase tracking-tighter">Assetain</span></div><Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="rounded-xl"><X className="h-5 w-5" /></Button></div><ScrollArea className="flex-1 px-6 py-4"><div className="pb-10"><NavGroup items={PRIMARY_NAV} /><NavGroup items={AUDIT_NAV} title="Reporting & Pulse" /><NavGroup items={ADMIN_NAV} title="Governance" /></div></ScrollArea></SheetContent></Sheet></div><h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2"><span className="opacity-40 hidden sm:inline">Context ›</span><span className="text-foreground">{pathname === '/' ? 'Pulse' : pathname.split('/').pop()?.replace('-', ' ')}</span></h1></div>
+          <div className="flex items-center gap-4">
+            <div className="lg:hidden">
+              <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
+                <SheetTrigger asChild><Button variant="ghost" size="icon" className="rounded-xl tactile-pulse"><Menu className="h-6 w-6" /></Button></SheetTrigger>
+                <SheetContent side="left" className="w-[85vw] max-w-sm p-0 flex flex-col rounded-r-[2.5rem] border-none bg-background shadow-2xl"><div className="p-8 pb-4 flex items-center justify-between"><div className="flex items-center gap-3"><Zap className="h-6 w-6 text-primary fill-current" /><span className="text-xl font-black uppercase tracking-tighter">Assetain</span></div><Button variant="ghost" size="icon" onClick={() => setIsMobileMenuOpen(false)} className="rounded-xl"><X className="h-5 w-5" /></Button></div><ScrollArea className="flex-1 px-6 py-4"><div className="pb-10"><NavGroup items={PRIMARY_NAV} /><NavGroup items={AUDIT_NAV} title="Reporting & Pulse" /><NavGroup items={ADMIN_NAV} title="Governance" /></div></ScrollArea></SheetContent>
+              </Sheet>
+            </div>
+            <div className="flex items-center gap-4">
+              <h1 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-2">
+                <span className="opacity-40 hidden sm:inline">Context ›</span>
+                <span className="text-foreground">{pathname === '/' ? 'Pulse' : pathname.split('/').pop()?.replace('-', ' ')}</span>
+              </h1>
+              
+              {/* Universal Search Command Hint */}
+              <button 
+                onClick={() => document.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', metaKey: true, ctrlKey: true }))}
+                className="hidden md:flex items-center gap-2 px-3 h-9 rounded-xl bg-muted/50 border-2 border-transparent hover:border-primary/20 transition-all group"
+              >
+                <Search className="h-3.5 w-3.5 text-muted-foreground group-hover:text-primary transition-colors" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60">Search pulse</span>
+                <div className="flex items-center gap-1 opacity-40">
+                  <Command className="h-3 w-3" />
+                  <span className="text-[10px] font-mono">K</span>
+                </div>
+              </button>
+            </div>
+          </div>
+          
           <div className="flex items-center gap-2 sm:gap-4"><TooltipProvider><Tooltip><TooltipTrigger asChild><div className={cn("flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-2xl border-2 transition-all cursor-help", isOnline ? "border-green-500/20 bg-green-500/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive")}><div className="flex items-center gap-1.5"><div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} /><span className="text-[10px] font-black uppercase tracking-tighter hidden xs:inline">{isOnline ? 'Active' : 'Offline'}</span></div><Separator orientation="vertical" className="h-4 opacity-20 hidden xs:block" /><div className="flex gap-1"><Database className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} /><Activity className={cn("h-3 w-3", isSyncing ? "text-primary animate-pulse" : "opacity-30")} /><Globe className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} /></div></div></TooltipTrigger><TooltipContent side="bottom" className="p-4 rounded-2xl border-2 shadow-2xl space-y-2 min-w-[200px]"><p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b pb-2">Parity Status</p><div className="space-y-1 text-[10px] font-bold"><div className="flex justify-between"><span className="opacity-60">Local Layer:</span><span className="text-green-600">Stable</span></div><div className="flex justify-between"><span className="opacity-60">Primary Cloud:</span><span className={cn(isOnline ? "text-green-600" : "text-destructive")}>{isOnline ? 'Active Pulse' : 'Offline'}</span></div></div></TooltipContent></Tooltip></TooltipProvider></div>
         </header>
 
@@ -156,6 +186,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {isAdmin && <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />}
       <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
+      <CommandPalette />
     </div>
   );
 }

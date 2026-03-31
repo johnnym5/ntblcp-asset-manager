@@ -3,6 +3,7 @@
 /**
  * @fileOverview Administrative Error Audit Workspace.
  * Monitors system health and provides a layman-friendly resolution ledger.
+ * Phase 52: Implemented Health Pulse Export.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -22,7 +23,8 @@ import {
   ChevronRight,
   Info,
   XCircle,
-  Monitor
+  Monitor,
+  FileJson
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -41,6 +43,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from '@/components/ui/dialog';
+import { saveAs } from 'file-saver';
 
 export default function ErrorAuditPage() {
   const { userProfile } = useAuth();
@@ -61,6 +64,16 @@ export default function ErrorAuditPage() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleExportErrors = () => {
+    const snapshot = {
+      version: '5.0.4',
+      exportedAt: new Date().toISOString(),
+      incidents: logs
+    };
+    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+    saveAs(blob, `Assetain-Resilience-Audit-${new Date().toISOString().split('T')[0]}.json`);
   };
 
   const handleResolve = async (logId: string) => {
@@ -88,8 +101,9 @@ export default function ErrorAuditPage() {
   if (!userProfile?.isAdmin) {
     return (
       <AppLayout>
-        <div className="h-full flex items-center justify-center opacity-20">
+        <div className="h-full flex flex-col items-center justify-center opacity-20 space-y-4">
           <ShieldAlert className="h-20 w-20" />
+          <h2 className="text-xl font-black uppercase tracking-widest">Clearance Required</h2>
         </div>
       </AppLayout>
     );
@@ -112,6 +126,14 @@ export default function ErrorAuditPage() {
             </p>
           </div>
           <div className="flex items-center gap-3">
+            <Button 
+              variant="outline" 
+              onClick={handleExportErrors}
+              disabled={logs.length === 0}
+              className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 hover:bg-muted transition-all"
+            >
+              <FileJson className="h-4 w-4" /> Export Health Pulse
+            </Button>
             <Button variant="outline" onClick={loadLogs} className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 hover:bg-muted transition-all">
               <Activity className="h-4 w-4" /> Refresh Audit Pulse
             </Button>
