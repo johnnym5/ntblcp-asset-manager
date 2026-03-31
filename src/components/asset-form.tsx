@@ -1,8 +1,9 @@
+
 "use client";
 
 /**
  * @fileOverview AssetForm - Operational Detail Workstation.
- * Phase 46: Integrated Document Scanner visuals & Auto-Switch guides.
+ * Phase 48: Integrated Record Reversion Pulse for Administrators.
  */
 
 import React, { useEffect, useState, useRef } from "react";
@@ -55,7 +56,8 @@ import {
   ArrowRight,
   Navigation,
   Maximize,
-  ScanLine
+  ScanLine,
+  RotateCcw
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -104,8 +106,9 @@ export function AssetForm({
   const [activeTab, setActiveTab] = useState("details");
   const [history, setHistory] = useState<ActivityLogEntry[]>([]);
   const [loadingHistory, setLoadingHistory] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
   const { userProfile } = useAuth();
-  const { activeGrantId, isOnline } = useAppState();
+  const { activeGrantId, isOnline, refreshRegistry } = useAppState();
   const { toast } = useToast();
   
   const videoRef = useRef<HTMLVideoElement>(null);
@@ -160,6 +163,21 @@ export function AssetForm({
     }
   };
 
+  const handleRevert = async () => {
+    if (!asset || !userProfile?.isAdmin) return;
+    setIsReverting(true);
+    try {
+      await FirestoreService.restoreAsset(asset.id, userProfile.displayName);
+      toast({ title: "Reversion Pulse Complete", description: "Record successfully rolled back." });
+      await refreshRegistry();
+      onOpenChange(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Reversion Failed" });
+    } finally {
+      setIsReverting(false);
+    }
+  };
+
   const captureLocation = () => {
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
@@ -206,7 +224,6 @@ export function AssetForm({
       const ctx = canvas.getContext('2d');
       if (ctx) {
         ctx.drawImage(videoRef.current, 0, 0);
-        // Automatic Sizing Logic: Use JPEG quality compression for high-fidelity evidence
         const dataUri = canvas.toDataURL('image/jpeg', 0.8);
         setCapturedPhoto(dataUri);
         stopCamera();
@@ -275,12 +292,10 @@ export function AssetForm({
             <TabsContent value="details" className="m-0 h-full">
               <Form {...form}>
                 <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)} className="pb-32">
-                    {/* Document Scanner Viewport (PRD Requirement) */}
                     {isCameraActive ? (
                       <div className="relative aspect-[4/3] bg-black overflow-hidden m-2 sm:m-4 rounded-[1.5rem] sm:rounded-[2rem] border-4 border-primary/20">
                           <video ref={videoRef} className="w-full h-full object-cover opacity-80" autoPlay muted playsInline />
                           
-                          {/* Scanner UI Overlays */}
                           <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                             <div className="w-[80%] h-[70%] border-2 border-white/40 border-dashed rounded-xl relative">
                               <ScanLine className="absolute top-0 left-0 w-full h-0.5 bg-primary/60 animate-[scan_2s_linear_infinite]" />
@@ -326,7 +341,7 @@ export function AssetForm({
                       <FormField control={form.control} name="description" render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-[9px] font-black uppercase tracking-[0.2em] opacity-40">Asset Description</FormLabel>
-                          <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormItem>
+                          <FormControl><Input {...field} readOnly={isReadOnly} className="h-12 rounded-xl bg-muted/10 border-2 border-transparent focus:border-primary/20 font-black uppercase text-sm shadow-inner" /></FormControl>
                         </FormItem>
                       )}/>
                       
@@ -372,6 +387,25 @@ export function AssetForm({
 
             <TabsContent value="history" className="m-0 h-full">
               <div className="p-4 md:p-6 space-y-6">
+                {userProfile?.isAdmin && asset?.previousState && (
+                  <div className="p-6 rounded-[2rem] bg-primary/5 border-2 border-dashed border-primary/20 flex items-center justify-between group hover:border-primary/40 transition-all">
+                    <div className="space-y-1">
+                      <h4 className="text-xs font-black uppercase tracking-tight">Restoration Pulse Available</h4>
+                      <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
+                        Roll back this record to its previous verified state.
+                      </p>
+                    </div>
+                    <Button 
+                      onClick={handleRevert} 
+                      disabled={isReverting}
+                      className="h-11 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 shadow-xl shadow-primary/10"
+                    >
+                      {isReverting ? <Loader2 className="h-3 w-3 animate-spin" /> : <RotateCcw className="h-3 w-3" />}
+                      Execute Revert
+                    </Button>
+                  </div>
+                )}
+
                 {loadingHistory ? (
                   <div className="flex flex-col items-center justify-center py-20 gap-4 opacity-40">
                     <Loader2 className="h-10 w-10 animate-spin text-primary" />

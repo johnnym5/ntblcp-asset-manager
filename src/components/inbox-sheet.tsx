@@ -1,7 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Governance Inbox - Request & Approval Management.
+ * Phase 48: Integrated Batch Adjudication & Selection Logic.
  */
 
 import React, { useState } from 'react';
@@ -10,13 +12,14 @@ import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
-import { Inbox, User, Clock, GitPullRequest, Check, X, RefreshCw, Loader2, ArrowRight } from 'lucide-react';
+import { Inbox, User, Clock, GitPullRequest, Check, X, RefreshCw, Loader2, ArrowRight, CheckSquare, Square, ShieldCheck } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import type { Asset } from '@/types/domain';
 import { Badge } from '@/components/ui/badge';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { Checkbox } from '@/components/ui/checkbox';
 
 const ChangeDetail = ({ label, oldValue, newValue }: { label: string, oldValue?: any, newValue?: any }) => {
     if (oldValue === newValue || (oldValue === undefined && newValue === '')) return null;
@@ -35,26 +38,46 @@ const ChangeDetail = ({ label, oldValue, newValue }: { label: string, oldValue?:
 export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenChange: (open: boolean) => void }) {
   const { assets, isSyncing, refreshRegistry } = useAppState();
   const { toast } = useToast();
+  
   const [isProcessing, setIsProcessing] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   const pendingAssets = assets
     .filter(asset => asset.approvalStatus === 'PENDING')
     .sort((a, b) => new Date(b.lastModified!).getTime() - new Date(a.lastModified!).getTime());
 
-  const handleAction = async (assetId: string, action: 'APPROVE' | 'REJECT') => {
+  const handleAction = async (assetIds: string[], action: 'APPROVE' | 'REJECT') => {
       setIsProcessing(true);
       try {
-        await FirestoreService.adjudicateAssetPulse(assetId, action);
+        for (const id of assetIds) {
+          await FirestoreService.adjudicateAssetPulse(id, action);
+        }
         await refreshRegistry();
         toast({ 
-          title: action === 'APPROVE' ? "Pulse Applied" : "Request Discarded", 
-          description: `Registry successfully adjudicated.` 
+          title: action === 'APPROVE' ? "Batch Applied" : "Requests Discarded", 
+          description: `Successfully adjudicated ${assetIds.length} registry pulses.` 
         });
+        setSelectedIds(new Set());
       } catch (e) {
         toast({ variant: "destructive", title: "Adjudication Failure" });
       } finally {
         setIsProcessing(false);
       }
+  };
+
+  const toggleSelect = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const toggleAll = () => {
+    if (selectedIds.size === pendingAssets.length) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(pendingAssets.map(a => a.id)));
+    }
   };
 
   return (
@@ -69,97 +92,133 @@ export function InboxSheet({ isOpen, onOpenChange }: { isOpen: boolean, onOpenCh
                         </div>
                         Approval Queue
                     </SheetTitle>
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="h-9 font-black text-[10px] uppercase tracking-widest border-primary/20 text-primary hover:bg-primary/5 rounded-xl"
-                        onClick={refreshRegistry}
-                        disabled={isSyncing}
-                    >
-                        {isSyncing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}
-                        Sync Queue
-                    </Button>
+                    <div className="flex items-center gap-2">
+                      <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="h-9 font-black text-[10px] uppercase tracking-widest border-primary/20 text-primary hover:bg-primary/5 rounded-xl"
+                          onClick={refreshRegistry}
+                          disabled={isSyncing}
+                      >
+                          {isSyncing ? <Loader2 className="mr-2 h-3.5 w-3.5 animate-spin" /> : <RefreshCw className="mr-2 h-3.5 w-3.5" />}
+                          Sync Pulse
+                      </Button>
+                    </div>
                 </div>
                 <SheetDescription className="mt-2 font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
                     Registry modifications proposed by field auditors.
                 </SheetDescription>
             </SheetHeader>
         </div>
+
+        {pendingAssets.length > 0 && (
+          <div className="px-8 py-4 bg-muted/5 border-b flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Checkbox 
+                id="select-all-inbox" 
+                checked={selectedIds.size === pendingAssets.length && pendingAssets.length > 0} 
+                onCheckedChange={toggleAll}
+                className="h-5 w-5 rounded-lg border-2"
+              />
+              <label htmlFor="select-all-inbox" className="text-[10px] font-black uppercase tracking-widest opacity-60 cursor-pointer">
+                {selectedIds.size > 0 ? `${selectedIds.size} Pulses Selected` : `Select All Pending`}
+              </label>
+            </div>
+            {selectedIds.size > 0 && (
+              <div className="flex gap-2 animate-in fade-in slide-in-from-right-2">
+                <Button variant="ghost" size="sm" onClick={() => handleAction(Array.from(selectedIds), 'REJECT')} className="h-8 text-[9px] font-black uppercase text-destructive hover:bg-destructive/10">Discard Selection</Button>
+                <Button size="sm" onClick={() => handleAction(Array.from(selectedIds), 'APPROVE')} className="h-8 text-[9px] font-black uppercase bg-primary text-white shadow-lg shadow-primary/20">Approve Batch</Button>
+              </div>
+            )}
+          </div>
+        )}
         
         <ScrollArea className="flex-1 px-8 py-6 bg-background">
           {pendingAssets.length > 0 ? (
             <div className="space-y-8">
               {pendingAssets.map((asset) => (
-                <Card key={asset.id} className="border-2 border-border/50 shadow-none hover:border-primary/20 transition-all rounded-3xl overflow-hidden bg-card">
-                  <CardHeader className="bg-muted/10 p-6 pb-4 border-b">
-                    <div className="flex justify-between items-start gap-4">
-                        <div>
-                            <CardTitle className="text-lg font-black tracking-tight">{asset.description || asset.name}</CardTitle>
-                            <CardDescription className="flex items-center gap-2 mt-1.5">
-                                <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-primary/20 bg-primary/5 text-primary rounded-lg">{asset.category}</Badge>
-                                <span className="text-[10px] font-mono text-muted-foreground font-bold">SN: {asset.serialNumber || 'UNSET'}</span>
-                            </CardDescription>
-                        </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="p-6 space-y-6">
-                     <div className="grid grid-cols-2 gap-4">
-                        <div className="flex items-center gap-2 text-muted-foreground">
-                            <div className="p-1.5 bg-muted rounded-lg"><User className="h-3.5 w-3.5" /></div>
-                            <div className="flex flex-col">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Submitted By</span>
-                                <span className="text-xs font-bold">{asset.changeSubmittedBy?.displayName || 'Unknown'}</span>
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-2 text-muted-foreground justify-end text-right">
-                            <div className="flex flex-col">
-                                <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Wait Time</span>
-                                <span className="text-xs font-bold">{formatDistanceToNow(new Date(asset.lastModified!), { addSuffix: true })}</span>
-                            </div>
-                            <div className="p-1.5 bg-muted rounded-lg"><Clock className="h-3.5 w-3.5" /></div>
-                        </div>
-                     </div>
-
-                      <div className="space-y-3 rounded-2xl border-2 border-dashed p-5 bg-muted/5">
-                         <h4 className="font-black text-[10px] uppercase tracking-widest text-primary flex items-center gap-2 mb-1">
-                            <GitPullRequest className="h-3.5 w-3.5"/> Proposed Modification Pulse
-                         </h4>
-                         <div className="space-y-0.5">
-                            {asset.pendingChanges && Object.keys(asset.pendingChanges).length > 0 ? (
-                                Object.keys(asset.pendingChanges).map(key => (
-                                    <ChangeDetail 
-                                        key={key}
-                                        label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
-                                        oldValue={(asset as any)[key]}
-                                        newValue={(asset.pendingChanges as any)[key]}
-                                    />
-                                ))
-                            ) : (
-                                <div className="text-[10px] font-bold text-muted-foreground/60 uppercase p-4 text-center border-2 border-dashed rounded-xl">No structural field changes (Audit Status Only)</div>
-                            )}
-                         </div>
+                <div key={asset.id} className="relative group">
+                  <div className="absolute top-6 left-[-2rem] z-20 transition-opacity">
+                    <Checkbox 
+                      checked={selectedIds.has(asset.id)} 
+                      onCheckedChange={() => toggleSelect(asset.id)}
+                      className="h-5 w-5 rounded-lg border-2 shadow-sm bg-background"
+                    />
+                  </div>
+                  <Card className={cn(
+                    "border-2 border-border/50 shadow-none hover:border-primary/20 transition-all rounded-3xl overflow-hidden bg-card",
+                    selectedIds.has(asset.id) && "border-primary bg-primary/[0.02]"
+                  )}>
+                    <CardHeader className="bg-muted/10 p-6 pb-4 border-b">
+                      <div className="flex justify-between items-start gap-4">
+                          <div>
+                              <CardTitle className="text-lg font-black tracking-tight">{asset.description || asset.name}</CardTitle>
+                              <CardDescription className="flex items-center gap-2 mt-1.5">
+                                  <Badge variant="outline" className="text-[9px] font-black uppercase tracking-widest border-primary/20 bg-primary/5 text-primary rounded-lg">{asset.category}</Badge>
+                                  <span className="text-[10px] font-mono text-muted-foreground font-bold">SN: {asset.serialNumber || 'UNSET'}</span>
+                              </CardDescription>
+                          </div>
                       </div>
-                  </CardContent>
-                  <CardFooter className="bg-muted/10 gap-3 border-t p-6">
-                    <Button 
-                        variant="outline" 
-                        size="sm" 
-                        disabled={isProcessing}
-                        className="flex-1 h-12 text-[10px] font-black uppercase tracking-widest text-destructive border-destructive/20 hover:bg-destructive/10 rounded-2xl transition-all" 
-                        onClick={() => handleAction(asset.id, 'REJECT')}
-                    >
-                        <X className="mr-2 h-4 w-4" /> Reject Request
-                    </Button>
-                     <Button 
-                        size="sm" 
-                        disabled={isProcessing}
-                        className="flex-1 h-12 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 rounded-2xl transition-all" 
-                        onClick={() => handleAction(asset.id, 'APPROVE')}
-                    >
-                        <Check className="mr-2 h-4 w-4" /> Apply Changes
-                    </Button>
-                  </CardFooter>
-                </Card>
+                    </CardHeader>
+                    <CardContent className="p-6 space-y-6">
+                       <div className="grid grid-cols-2 gap-4">
+                          <div className="flex items-center gap-2 text-muted-foreground">
+                              <div className="p-1.5 bg-muted rounded-lg"><User className="h-3.5 w-3.5" /></div>
+                              <div className="flex flex-col">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Submitted By</span>
+                                  <span className="text-xs font-bold">{asset.changeSubmittedBy?.displayName || 'Unknown'}</span>
+                              </div>
+                          </div>
+                          <div className="flex items-center gap-2 text-muted-foreground justify-end text-right">
+                              <div className="flex flex-col">
+                                  <span className="text-[9px] font-black uppercase tracking-widest text-muted-foreground/60">Wait Time</span>
+                                  <span className="text-xs font-bold">{formatDistanceToNow(new Date(asset.lastModified!), { addSuffix: true })}</span>
+                              </div>
+                              <div className="p-1.5 bg-muted rounded-lg"><Clock className="h-3.5 w-3.5" /></div>
+                          </div>
+                       </div>
+
+                        <div className="space-y-3 rounded-2xl border-2 border-dashed p-5 bg-muted/5">
+                           <h4 className="font-black text-[10px] uppercase tracking-widest text-primary flex items-center gap-2 mb-1">
+                              <GitPullRequest className="h-3.5 w-3.5"/> Proposed Modification Pulse
+                           </h4>
+                           <div className="space-y-0.5">
+                              {asset.pendingChanges && Object.keys(asset.pendingChanges).length > 0 ? (
+                                  Object.keys(asset.pendingChanges).map(key => (
+                                      <ChangeDetail 
+                                          key={key}
+                                          label={key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
+                                          oldValue={(asset as any)[key]}
+                                          newValue={(asset.pendingChanges as any)[key]}
+                                      />
+                                  ))
+                              ) : (
+                                  <div className="text-[10px] font-bold text-muted-foreground/60 uppercase p-4 text-center border-2 border-dashed rounded-xl">No structural field changes (Audit Status Only)</div>
+                              )}
+                           </div>
+                        </div>
+                    </CardContent>
+                    <CardFooter className="bg-muted/10 gap-3 border-t p-6">
+                      <Button 
+                          variant="outline" 
+                          size="sm" 
+                          disabled={isProcessing}
+                          className="flex-1 h-12 text-[10px] font-black uppercase tracking-widest text-destructive border-destructive/20 hover:bg-destructive/10 rounded-2xl transition-all" 
+                          onClick={() => handleAction([asset.id], 'REJECT')}
+                      >
+                          <X className="mr-2 h-4 w-4" /> Reject Request
+                      </Button>
+                       <Button 
+                          size="sm" 
+                          disabled={isProcessing}
+                          className="flex-1 h-12 text-[10px] font-black uppercase tracking-widest shadow-xl shadow-primary/20 rounded-2xl transition-all" 
+                          onClick={() => handleAction([asset.id], 'APPROVE')}
+                      >
+                          <Check className="mr-2 h-4 w-4" /> Apply Changes
+                      </Button>
+                    </CardFooter>
+                  </Card>
+                </div>
               ))}
             </div>
           ) : (

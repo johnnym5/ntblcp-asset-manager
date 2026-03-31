@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview Intelligence Hub - The Operational Command Center.
- * Phase 47: Integrated Infrastructure Health Pulse for Administrators.
+ * Phase 48: Integrated Multi-Grant Switcher & Registry Health Matrix.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -10,7 +11,7 @@ import AppLayout from '@/components/app-layout';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { 
   TrendingUp, 
   Loader2, 
@@ -28,7 +29,12 @@ import {
   AlertTriangle,
   BarChart3,
   Monitor,
-  RefreshCw
+  RefreshCw,
+  FolderKanban,
+  CheckCircle2,
+  XCircle,
+  Fingerprint,
+  ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -43,6 +49,7 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { VirtualDBService } from '@/services/virtual-db-service';
 import { storage } from '@/offline/storage';
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip as RechartsTooltip, Cell } from 'recharts';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
 
 const container = {
   hidden: { opacity: 0 },
@@ -58,17 +65,17 @@ const item = {
 };
 
 export default function DashboardPage() {
-  const { assets, settingsLoaded, isOnline, appSettings, activeGrantId, refreshRegistry } = useAppState();
+  const { assets, settingsLoaded, isOnline, appSettings, activeGrantId, setActiveGrantId, refreshRegistry } = useAppState();
   const { userProfile, profileSetupComplete, loading: authLoading } = useAuth();
   
-  const [integrityScore, setIntegrityScore] = useState(100);
+  const [integrityReport, setIntegrityReport] = useState<any>(null);
   const [syncDrift, setSyncDrift] = useState(0);
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
     if (assets.length > 0) {
       ArchiveService.runIntegrityAudit(assets).then(report => {
-        setIntegrityScore(report.score);
+        setIntegrityReport(report);
       });
     }
     
@@ -157,17 +164,54 @@ export default function DashboardPage() {
 
   if (!profileSetupComplete) return <UserProfileSetup />;
 
-  const activeProjectName = appSettings?.grants.find(g => g.id === activeGrantId)?.name || 'Registry Hub';
+  const activeGrant = appSettings?.grants.find(g => g.id === activeGrantId);
+  const otherGrants = appSettings?.grants.filter(g => g.id !== activeGrantId) || [];
 
   return (
     <AppLayout>
       <motion.div variants={container} initial="hidden" animate="show" className="space-y-10 pb-32 max-w-7xl mx-auto">
+        {/* Header: Project Switcher Cockpit */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
           <div className="space-y-1">
-            <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase leading-none">Intelligence Hub</h2>
+            <div className="flex items-center gap-4">
+              <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase leading-none">Intelligence Hub</h2>
+              {appSettings && appSettings.grants.length > 1 && (
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="ghost" size="sm" className="h-10 px-4 rounded-xl border-2 border-primary/10 bg-card hover:bg-primary/5 gap-2 group shadow-sm transition-all">
+                      <FolderKanban className="h-4 w-4 text-primary" />
+                      <span className="text-[10px] font-black uppercase tracking-widest">Switch Project</span>
+                      <ChevronDown className="h-3 w-3 opacity-40 group-data-[state=open]:rotate-180 transition-transform" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-64 rounded-2xl border-2 shadow-2xl p-2">
+                    <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-widest opacity-40 px-2 py-3">Active Registry Pulse</DropdownMenuLabel>
+                    <DropdownMenuItem className="rounded-xl h-12 bg-primary/5 text-primary mb-1">
+                      <div className="flex flex-col min-w-0">
+                        <span className="font-black text-[11px] uppercase truncate">{activeGrant?.name}</span>
+                        <span className="text-[8px] font-bold uppercase opacity-60">Currently Active</span>
+                      </div>
+                      <CheckCircle2 className="h-4 w-4 ml-auto" />
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator className="my-2" />
+                    <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-widest opacity-40 px-2 py-3">Other Projects</DropdownMenuLabel>
+                    {otherGrants.map(grant => (
+                      <DropdownMenuItem 
+                        key={grant.id} 
+                        onClick={() => setActiveGrantId(grant.id)}
+                        className="rounded-xl h-12 hover:bg-muted group cursor-pointer"
+                      >
+                        <span className="font-bold text-[11px] uppercase truncate group-hover:text-primary transition-colors">{grant.name}</span>
+                        <ArrowRight className="h-3 w-3 ml-auto opacity-0 group-hover:opacity-100 transition-all group-hover:translate-x-1" />
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              )}
+            </div>
             <div className="flex items-center gap-3 mt-2">
               <Badge className="bg-primary/5 border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest px-4 h-7 rounded-full shadow-sm">
-                {activeProjectName}
+                {activeGrant?.name || 'Registry Hub'}
               </Badge>
               <Badge variant="outline" className={cn("font-black uppercase text-[10px] tracking-widest px-4 h-7 rounded-full border-2 shadow-sm transition-colors", isOnline ? "text-green-600 border-green-200 bg-green-50" : "text-orange-600 border-orange-200 bg-orange-50")}>
                 {isOnline ? <Globe className="mr-2 h-3 w-3 inline" /> : <Database className="mr-2 h-3 w-3 inline" />}
@@ -276,46 +320,53 @@ export default function DashboardPage() {
           </motion.div>
 
           <div className="space-y-8">
-            {userProfile?.isAdmin && (
-              <motion.div variants={item}>
-                <Card className="border-2 border-primary/20 bg-primary/5 shadow-2xl rounded-[2.5rem] overflow-hidden">
-                  <CardHeader className="p-8 pb-4">
-                    <div className="flex items-center justify-between">
+            {/* Registry Health Cockpit */}
+            <motion.div variants={item}>
+              <Card className="border-2 border-border/40 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
+                <CardHeader className="p-8 pb-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2.5 bg-primary rounded-xl">
+                        <ShieldHalf className="h-5 w-5 text-white" />
+                      </div>
+                      <CardTitle className="text-xl font-black uppercase tracking-tight">Registry Fidelity</CardTitle>
+                    </div>
+                    <Badge className="bg-primary text-white font-black uppercase text-[9px]">{integrityReport?.score || 100}% HEALTH</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-8 pt-0 space-y-4">
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40">
                       <div className="flex items-center gap-3">
-                        <div className="p-2.5 bg-primary rounded-xl">
-                          <Monitor className="h-5 w-5 text-white" />
-                        </div>
-                        <CardTitle className="text-xl font-black uppercase tracking-tight text-primary">Infra Health</CardTitle>
+                        <Fingerprint className={cn("h-4 w-4", stats?.missingSerials ? "text-orange-500" : "text-green-600")} />
+                        <span className="text-[10px] font-black uppercase opacity-60">Missing Serials</span>
                       </div>
-                      <Badge className="bg-primary text-white font-black uppercase text-[9px]">Root Pulse</Badge>
+                      <span className={cn("text-xs font-black", stats?.missingSerials ? "text-orange-600" : "text-green-600")}>{stats?.missingSerials}</span>
                     </div>
-                  </CardHeader>
-                  <CardContent className="p-8 pt-0 space-y-6">
-                    <div className="flex items-center justify-between p-4 rounded-2xl bg-white/50 border border-primary/10">
-                      <div className="space-y-0.5">
-                        <p className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Sync Drift</p>
-                        <p className={cn("text-lg font-black", syncDrift > 0 ? "text-destructive" : "text-green-600")}>
-                          {syncDrift} Discrepant
-                        </p>
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40">
+                      <div className="flex items-center gap-3">
+                        <AlertTriangle className={cn("h-4 w-4", stats?.criticalHealth ? "text-destructive" : "text-green-600")} />
+                        <span className="text-[10px] font-black uppercase opacity-60">High-Risk Alerts</span>
                       </div>
-                      {syncDrift > 0 && <AlertTriangle className="h-5 w-5 text-destructive animate-pulse" />}
+                      <span className={cn("text-xs font-black", stats?.criticalHealth ? "text-destructive" : "text-green-600")}>{stats?.criticalHealth}</span>
                     </div>
-                    
-                    <div className="flex items-center justify-between p-4 rounded-2xl bg-white/50 border border-primary/10">
-                      <div className="space-y-0.5">
-                        <p className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Parity Score</p>
-                        <p className="text-lg font-black text-primary">{integrityScore}% Integrity</p>
+                    <div className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40">
+                      <div className="flex items-center gap-3">
+                        <History className={cn("h-4 w-4", syncDrift ? "text-primary" : "text-green-600")} />
+                        <span className="text-[10px] font-black uppercase opacity-60">Infrastructure Drift</span>
                       </div>
-                      <ShieldHalf className="h-5 w-5 text-primary opacity-40" />
+                      <span className={cn("text-xs font-black", syncDrift ? "text-primary" : "text-green-600")}>{syncDrift} Pulse(s)</span>
                     </div>
-
+                  </div>
+                  
+                  <div className="pt-4">
                     <Button variant="ghost" asChild className="w-full h-12 rounded-xl text-[10px] font-black uppercase tracking-widest gap-2 bg-primary/5 hover:bg-primary/10">
-                      <Link href="/infrastructure"><RefreshCw className="h-3.5 w-3.5" /> Initialize Reconcile</Link>
+                      <Link href="/reports"><CheckCircle2 className="h-3.5 w-3.5" /> Initialize Fidelity Audit</Link>
                     </Button>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            )}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
 
             <motion.div variants={item} className="grid grid-cols-1 gap-4">
               <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground px-2">Common Operations</h4>
