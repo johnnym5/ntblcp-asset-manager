@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
- * Phase 60: Integrated QR Identity Scanner & Mobile Action Pulse.
+ * Phase 62: Hardened PWA Connectivity & Identity Scanning.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -235,12 +235,41 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               variant="outline" 
               size="icon" 
               onClick={() => setIsQRScannerOpen(true)}
-              className="rounded-2xl border-2 border-primary/10 bg-primary/5 text-primary hover:bg-primary/10 lg:hidden"
+              className="rounded-2xl border-2 border-primary/10 bg-primary/5 text-primary hover:bg-primary/10 lg:hidden shadow-sm"
             >
               <QrCode className="h-5 w-5" />
             </Button>
 
-            <TooltipProvider><Tooltip><TooltipTrigger asChild><div className={cn("flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-2xl border-2 transition-all cursor-help", isOnline ? "border-green-500/20 bg-green-50/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive")}><div className="flex items-center gap-1.5"><div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} /><span className="text-[10px] font-black uppercase tracking-tighter hidden xs:inline">{isOnline ? 'Active' : 'Offline'}</span></div><Separator orientation="vertical" className="h-4 opacity-20 hidden xs:block" /><div className="flex gap-1"><Database className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} /><Activity className={cn("h-3 w-3", isSyncing ? "text-primary animate-pulse" : "opacity-30")} /><Globe className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} /></div></div></TooltipTrigger><TooltipContent side="bottom" className="p-4 rounded-2xl border-2 shadow-2xl space-y-2 min-w-[200px]"><p className="text-[9px] font-black uppercase tracking-widest text-muted-foreground border-b pb-2">Parity Status</p><div className="space-y-1 text-[10px] font-bold"><div className="flex justify-between"><span className="opacity-60">Local Layer:</span><span className="text-green-600">Stable</span></div><div className="flex justify-between"><span className="opacity-60">Primary Cloud:</span><span className={cn(isOnline ? "text-green-600" : "text-destructive")}>{isOnline ? 'Active Pulse' : 'Offline'}</span></div></div></TooltipContent></Tooltip></TooltipProvider></div>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className={cn(
+                    "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-2xl border-2 transition-all cursor-help shadow-sm", 
+                    isOnline ? "border-green-500/20 bg-green-50/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive animate-pulse"
+                  )}>
+                    <div className="flex items-center gap-1.5">
+                      <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} />
+                      <span className="text-[10px] font-black uppercase tracking-tighter hidden xs:inline">{isOnline ? 'Cloud' : 'Offline'}</span>
+                    </div>
+                    <Separator orientation="vertical" className="h-4 opacity-20 hidden xs:block" />
+                    <div className="flex gap-1">
+                      <Database className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} />
+                      <Activity className={cn("h-3 w-3", isSyncing ? "text-primary animate-pulse" : "opacity-30")} />
+                      <Globe className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} />
+                    </div>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="p-4 rounded-[1.5rem] border-2 shadow-2xl space-y-2 min-w-[220px]">
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b pb-2">Redundancy Pulse</p>
+                  <div className="space-y-1.5 text-[10px] font-bold">
+                    <div className="flex justify-between items-center"><span className="opacity-60">Local Persistence:</span><span className="text-green-600">STABLE</span></div>
+                    <div className="flex justify-between items-center"><span className="opacity-60">Shadow Mirror:</span><span className={cn(isOnline ? "text-green-600" : "text-destructive")}>{isOnline ? 'ACTIVE' : 'LATENT'}</span></div>
+                    <div className="flex justify-between items-center"><span className="opacity-60">Cloud Authority:</span><span className={cn(isOnline ? "text-green-600" : "text-destructive")}>{isOnline ? 'REACHABLE' : 'ZERO PULSE'}</span></div>
+                  </div>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
         </header>
 
         <main className="flex-1 overflow-y-auto custom-scrollbar bg-muted/10 relative">

@@ -1,10 +1,11 @@
 
 {
-  "name": "Assetain Registry",
+  "name": "Assetain",
   "short_name": "Assetain",
-  "description": "High-Availability Asset Management & Verification Platform",
+  "description": "Professional Asset Management & Verification Pulse",
   "start_url": "/",
   "display": "standalone",
+  "orientation": "portrait",
   "background_color": "#F0F4F8",
   "theme_color": "#2E3192",
   "icons": [
@@ -17,7 +18,8 @@
     {
       "src": "https://picsum.photos/seed/assetain-icon/512/512",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
   ]
 }
