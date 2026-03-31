@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Guided Import Wizard - Deterministic Hierarchical Ingestion.
- * Phase 70: Added missing Badge import.
+ * Phase 73: Fixed ReferenceError by adding missing Badge import.
  */
 
 import React, { useState, useRef, useEffect } from 'react';

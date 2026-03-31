@@ -7,26 +7,43 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 /**
- * Ensures objects are safe for Firestore by converting Dates to Timestamps 
- * and removing forbidden client-side properties.
+ * Deep recursive utility to ensure objects are safe for Firestore.
+ * - Converts Dates to Timestamps.
+ * - Recursively removes undefined values from objects and arrays.
+ * - Filters out sensitive local-only keys (e.g., previousState).
  */
-export const sanitizeForFirestore = <T extends object>(obj: T): T => {
-    const sanitizedObj: { [key: string]: any } = {};
-    for (const key in obj) {
-        const value = (obj as any)[key];
-        // CRITICAL: Ensure audit buffer is NEVER pushed to the cloud
-        if (key === 'previousState') continue;
-        if (value !== undefined) {
-            if (value instanceof Date) {
-                sanitizedObj[key] = Timestamp.fromDate(value);
-            } else if (value && typeof value === 'object' && !Array.isArray(value) && !(value instanceof Timestamp)) {
-                sanitizedObj[key] = sanitizeForFirestore(value);
-            } else {
-                sanitizedObj[key] = value;
+export const sanitizeForFirestore = <T extends any>(obj: T): T => {
+    if (obj === null || obj === undefined) return obj as T;
+
+    // Handle Dates
+    if (obj instanceof Date) {
+        return Timestamp.fromDate(obj) as any;
+    }
+
+    // Handle Arrays Recursively
+    if (Array.isArray(obj)) {
+        return obj.map(item => sanitizeForFirestore(item)) as any;
+    }
+
+    // Handle Objects Recursively
+    if (typeof obj === 'object' && !(obj instanceof Timestamp)) {
+        const sanitizedObj: { [key: string]: any } = {};
+        for (const key in obj) {
+            if (Object.prototype.hasOwnProperty.call(obj, key)) {
+                // CRITICAL: Ensure audit buffer is NEVER pushed to the cloud
+                if (key === 'previousState') continue;
+
+                const value = (obj as any)[key];
+                if (value !== undefined) {
+                    sanitizedObj[key] = sanitizeForFirestore(value);
+                }
             }
         }
+        return sanitizedObj as T;
     }
-    return sanitizedObj as T;
+
+    // Return primitives as is
+    return obj;
 };
 
 /**

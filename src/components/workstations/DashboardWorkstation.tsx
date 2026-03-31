@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - SPA Intelligence Hub.
- * Phase 71: Resolved syntax error and FolderKanban icon reference.
+ * Phase 73: Hardened JSX structure and resolved icon naming typos.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -29,8 +29,21 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
 import { ResponsiveContainer, XAxis, YAxis, Tooltip as RechartsTooltip, AreaChart, Area, CartesianGrid } from 'recharts';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -39,7 +52,17 @@ import { VerificationPulse } from '@/components/registry/VerificationPulse';
 import { VirtualDBService } from '@/services/virtual-db-service';
 import { cn } from '@/lib/utils';
 
-const item = {
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: {
+    opacity: 1,
+    transition: {
+      staggerChildren: 0.1
+    }
+  }
+};
+
+const itemVariants = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0 }
 };
@@ -132,7 +155,13 @@ export function DashboardWorkstation() {
   const otherGrants = appSettings?.grants.filter(g => g.id !== activeGrantId) || [];
 
   return (
-    <div className="space-y-10">
+    <motion.div 
+      variants={containerVariants}
+      initial="hidden"
+      animate="show"
+      className="space-y-10"
+    >
+      {/* Header Context Bar */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
         <div className="space-y-1">
           <div className="flex items-center gap-4">
@@ -147,7 +176,7 @@ export function DashboardWorkstation() {
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="start" className="w-64 rounded-2xl border-2 shadow-2xl p-2">
-                  <DropdownMenuItem className="rounded-xl h-12 bg-primary/5 text-primary mb-1">
+                  <DropdownMenuItem className="rounded-xl h-12 bg-primary/5 text-primary mb-1 focus:bg-primary/10">
                     <div className="flex flex-col min-w-0">
                       <span className="font-black text-[11px] uppercase truncate">{activeGrant?.name}</span>
                       <span className="text-[8px] font-bold uppercase opacity-60">Currently Active</span>
@@ -185,6 +214,7 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
+      {/* Global Discovery Engine */}
       <div className="px-1 relative z-50">
         <div className="relative group max-w-2xl">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-primary animate-pulse" />
@@ -232,10 +262,20 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
-      <VerificationPulse total={stats?.total || 0} verified={stats?.verified || 0} exceptions={stats?.criticalHealth || 0} dataGaps={stats?.dataGaps || 0} className="px-1" />
+      {/* Primary Metrics Pulse */}
+      <div className="px-1">
+        <VerificationPulse 
+          total={stats?.total || 0} 
+          verified={stats?.verified || 0} 
+          exceptions={stats?.criticalHealth || 0} 
+          dataGaps={stats?.dataGaps || 0} 
+        />
+      </div>
 
+      {/* Analytical Surface */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 px-1">
-        <motion.div variants={item} className="lg:col-span-2 space-y-8">
+        <motion.div variants={itemVariants} className="lg:col-span-2 space-y-8">
+          {/* Coverage Trend Card */}
           <Card className="border-2 border-primary/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
             <CardHeader className="p-8 pb-4 border-b border-dashed">
               <div className="flex items-center justify-between">
@@ -278,9 +318,12 @@ export function DashboardWorkstation() {
             </CardContent>
           </Card>
 
+          {/* Regional Matrix Card */}
           <Card className="border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden rounded-[2.5rem]">
             <CardHeader className="bg-muted/30 border-b p-8 flex flex-row items-center justify-between">
-              <CardTitle className="text-2xl font-black tracking-tight uppercase flex items-center gap-3"><Map className="h-6 w-6 text-primary" /> Regional Matrix</CardTitle>
+              <CardTitle className="text-2xl font-black tracking-tight uppercase flex items-center gap-3">
+                <Map className="h-6 w-6 text-primary" /> Regional Matrix
+              </CardTitle>
               <Badge variant="outline" className="border-primary/20 text-primary font-black uppercase text-[10px]">Registry Coverage Pulse</Badge>
             </CardHeader>
             <CardContent className="p-0">
@@ -309,10 +352,11 @@ export function DashboardWorkstation() {
               </Table>
             </CardContent>
           </Card>
-        </div>
+        </motion.div>
 
+        {/* Sidebar Intelligence */}
         <div className="space-y-8">
-          <motion.div variants={item}>
+          <motion.div variants={itemVariants}>
             <Card className="border-2 border-border/40 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
               <CardHeader className="p-8 pb-4">
                 <div className="flex items-center justify-between">
@@ -352,7 +396,7 @@ export function DashboardWorkstation() {
             </Card>
           </motion.div>
 
-          <motion.div variants={item} className="grid grid-cols-1 gap-4">
+          <motion.div variants={itemVariants} className="grid grid-cols-1 gap-4">
             <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground px-2">Common Operations</h4>
             <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="h-20 justify-start p-6 rounded-[2rem] bg-card border-2 border-border/40 hover:border-primary/20 shadow-lg transition-all group">
               <div className="p-3 bg-primary/10 rounded-xl group-hover:bg-primary/20 transition-colors mr-4"><FileUp className="h-5 w-5 text-primary" /></div>
@@ -369,6 +413,6 @@ export function DashboardWorkstation() {
           </motion.div>
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }

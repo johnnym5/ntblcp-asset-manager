@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview ImportWorkstation - SPA Ingestion Module.
- * Phase 71: Verified imports and added missing Badge reference.
+ * Phase 72: Verified imports and added missing Badge reference.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -43,7 +43,7 @@ const STEPS: { id: ImportStep; label: string; description: string; icon: any }[]
   { id: 'INGEST', label: 'Ingest', description: 'Upload Workbook', icon: FileUp },
   { id: 'TRAVERSAL', label: 'Traversal', description: 'Scan Headers', icon: ScanSearch },
   { id: 'MAPPER', label: 'Mapper', description: 'Align Schema', icon: Columns },
-  { id: 'RECONCILIATION', label: 'Reconciliation', description: 'Review Sandbox', icon: Layers },
+  { id: 'RECONCILIATION', label: 'Review', description: 'Review Sandbox', icon: Layers },
   { id: 'COMMIT', label: 'Commit', description: 'Registry Merge', icon: DatabaseZap },
 ];
 
@@ -181,13 +181,19 @@ export function ImportWorkstation() {
         )}
       </div>
 
+      {/* Stepper Pulse */}
       <div className="px-2 overflow-x-auto pb-4 custom-scrollbar">
         <div className="flex items-center justify-between relative min-w-[600px] px-4">
           <div className="absolute top-1/2 left-0 w-full h-0.5 bg-muted/30 -translate-y-1/2 -z-10" />
           <div className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 -z-10 transition-all duration-700" style={{ width: `${(currentStepIndex / (STEPS.length - 1)) * 100}%` }} />
           {STEPS.map((step, idx) => (
             <div key={step.id} className="flex flex-col items-center gap-3">
-              <div className={cn("h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-500 border-2", idx === currentStepIndex ? "bg-primary border-primary text-primary-foreground shadow-xl shadow-primary/20 scale-110" : idx < currentStepIndex ? "bg-primary/10 border-primary text-primary" : "bg-card border-border text-muted-foreground opacity-40")}>
+              <div className={cn(
+                "h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-500 border-2", 
+                idx === currentStepIndex ? "bg-primary border-primary text-primary-foreground shadow-xl shadow-primary/20 scale-110" : 
+                idx < currentStepIndex ? "bg-primary/10 border-primary text-primary" : 
+                "bg-card border-border text-muted-foreground opacity-40"
+              )}>
                 {idx < currentStepIndex ? <CheckCircle2 className="h-5 w-5" /> : <step.icon className="h-5 w-5" />}
               </div>
               <span className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", idx === currentStepIndex ? "text-primary" : "text-muted-foreground")}>{step.label}</span>

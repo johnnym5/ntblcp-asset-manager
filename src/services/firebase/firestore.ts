@@ -1,6 +1,6 @@
 /**
  * @fileOverview Hardened Firestore Service.
- * Phase 71: Reinforced deep recursive sanitization for all log writes.
+ * Phase 73: Reinforced deep recursive sanitization for all log writes.
  * Prevents illegal undefined values from interrupting background audit pulses.
  */
 
@@ -132,22 +132,11 @@ export const FirestoreService = {
         operation,
         performedBy: asset.lastModifiedBy,
         userState: asset.lastModifiedByState || 'Unknown',
-        changes
+        changes: changes ? sanitizeForFirestore(changes) : undefined
       });
 
     } catch (err: any) {
       this.handlePermissionError(assetRef, 'update', err, sanitized);
-      throw err;
-    }
-  },
-
-  async deleteAsset(assetId: string): Promise<void> {
-    if (!db) return;
-    const assetRef = doc(db, 'assets', assetId);
-    try {
-      await deleteDoc(assetRef);
-    } catch (err: any) {
-      this.handlePermissionError(assetRef, 'delete', err);
       throw err;
     }
   },
