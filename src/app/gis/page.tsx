@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -34,6 +33,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { transformAssetToRecord } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
+import { Separator } from '@/components/ui/separator';
 import type { Asset } from '@/types/domain';
 
 export default function GISHubPage() {
@@ -52,8 +52,8 @@ export default function GISHubPage() {
     const term = searchTerm.toLowerCase();
     return spatialAssets.filter(a => 
       a.description.toLowerCase().includes(term) || 
-      a.assetIdCode?.toLowerCase().includes(term) ||
-      a.location.toLowerCase().includes(term)
+      a.location.toLowerCase().includes(term) ||
+      a.assetIdCode?.toLowerCase().includes(term)
     );
   }, [spatialAssets, searchTerm]);
 

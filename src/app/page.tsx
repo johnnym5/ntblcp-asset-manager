@@ -35,7 +35,8 @@ import {
   Fingerprint,
   ChevronDown,
   LineChart,
-  AreaChart as AreaChartIcon
+  AreaChart as AreaChartIcon,
+  ShieldAlert
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
