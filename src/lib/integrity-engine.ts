@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview Registry Integrity Engine.
  * Provides high-performance heuristics for identifying data quality gaps and duplicates.
@@ -7,7 +8,7 @@ import type { Asset } from '@/types/domain';
 
 export interface IntegrityIssue {
   id: string;
-  type: 'DUPLICATE_SERIAL' | 'INCONSISTENT_LOCATION' | 'MISSING_HIERARCHY' | 'CASE_MISMATCH';
+  type: 'DUPLICATE_SERIAL' | 'INCONSISTENT_LOCATION' | 'MISSING_HIERARCHY' | 'CASE_MISMATCH' | 'UNOPTIMIZED_MEDIA';
   severity: 'CRITICAL' | 'WARNING' | 'INFO';
   description: string;
   affectedIds: string[];
@@ -79,6 +80,19 @@ export const IntegrityEngine = {
         description: `${missingHierarchy.length} records are missing detailed provenance hierarchy.`,
         affectedIds: missingHierarchy.map(a => a.id),
         suggestedFix: "Use Batch Update to assign Major Sections."
+      });
+    }
+
+    // 4. Unoptimized Media (Phase 50)
+    const heavyAssets = assets.filter(a => !!a.photoDataUri && !a.photoUrl);
+    if (heavyAssets.length > 0) {
+      issues.push({
+        id: 'heavy-media',
+        type: 'UNOPTIMIZED_MEDIA',
+        severity: 'INFO',
+        description: `${heavyAssets.length} records are using local base64 storage for media.`,
+        affectedIds: heavyAssets.map(a => a.id),
+        suggestedFix: "Execute a Sync Pulse to offload media to the cloud."
       });
     }
 

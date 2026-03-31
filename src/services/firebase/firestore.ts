@@ -1,7 +1,8 @@
+
 /**
  * @fileOverview Hardened Firestore Service.
  * Implements deterministic validation and strict RBAC context.
- * This module is the sole gateway for cloud data persistence.
+ * Phase 50: Integrated Storage Offloading for visual evidence.
  */
 
 import { 
@@ -25,6 +26,7 @@ import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors
 import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
 import { monitoring } from '@/lib/monitoring';
+import { FirebaseStorageService } from './storage';
 import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry } from '@/types/domain';
 
 export const FirestoreService = {
@@ -74,11 +76,30 @@ export const FirestoreService = {
 
   /**
    * Single record update with mandatory Zod validation and Activity Logging.
+   * Offloads base64 images to Firebase Storage.
    */
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
 
-    const validation = AssetSchema.safeParse(asset);
+    // 1. Storage Offloading Pulse
+    // If we have a base64 photo but no remote URL, offload it to Storage
+    let finalPhotoUrl = asset.photoUrl;
+    if (asset.photoDataUri && !asset.photoUrl) {
+      try {
+        finalPhotoUrl = await FirebaseStorageService.uploadAssetPhoto(asset.grantId, asset.id, asset.photoDataUri);
+      } catch (e) {
+        console.error("Firestore: Storage offload failed, proceeding with base64 fallback.");
+      }
+    }
+
+    const assetToSave = {
+      ...asset,
+      photoUrl: finalPhotoUrl,
+      // We clear the heavy base64 data once it's offloaded to the cloud
+      photoDataUri: finalPhotoUrl ? undefined : asset.photoDataUri 
+    };
+
+    const validation = AssetSchema.safeParse(assetToSave);
     if (!validation.success) {
       monitoring.trackError(new Error("Validation Failure"), { 
         module: 'Firestore', 
@@ -122,6 +143,14 @@ export const FirestoreService = {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
     try {
+      // Fetch to find grantId for storage deletion
+      const snap = await getDoc(assetRef);
+      if (snap.exists()) {
+        const data = snap.data() as Asset;
+        if (data.photoUrl) {
+          await FirebaseStorageService.deleteAssetPhoto(data.grantId, assetId);
+        }
+      }
       await deleteDoc(assetRef);
     } catch (err: any) {
       this.handlePermissionError(assetRef, 'delete', err);

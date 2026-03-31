@@ -1,6 +1,8 @@
+
 /**
  * @fileOverview Hierarchy Orchestrator.
  * Maintains stateful context during spreadsheet traversal.
+ * Phase 50: Specialized parsing logic per sheet category.
  */
 
 import { classifyRow } from './classifyRow';
@@ -74,7 +76,12 @@ export function parseSheetToAssets(
               importedAt: new Date().toISOString()
             }
           } as any, customMapping);
-          assets.push(normalized as Asset);
+
+          // --- PRD: Sheet-Specific Parsing Logic Pulse ---
+          const sheetSpecificValidated = applySheetSpecificLogic(normalized as Asset, currentDefinitionName);
+          if (sheetSpecificValidated) {
+            assets.push(sheetSpecificValidated);
+          }
         }
         break;
       
@@ -85,4 +92,39 @@ export function parseSheetToAssets(
   }
 
   return assets;
+}
+
+/**
+ * Applies specialized validation and transformation logic based on the sheet category.
+ */
+function applySheetSpecificLogic(asset: Asset, category: string | null): Asset | null {
+  if (!category) return asset;
+
+  const normalizedCategory = category.toUpperCase();
+
+  // 1. VEHICLES: Validate Chasis/Engine number signatures
+  if (normalizedCategory === 'VEHICLES') {
+    const chasis = String(asset.metadata?.['Chasis no'] || '').trim();
+    if (chasis && chasis.length < 5) {
+      asset.metadata.warning = "Invalid Chasis Pulse detected.";
+    }
+  }
+
+  // 2. GENEXPERT: Ensure specific manufacturer pulse
+  if (normalizedCategory === 'GENEXPERT') {
+    if (!asset.description.toUpperCase().includes('CEPHEID')) {
+      asset.metadata.origin = "NON-STANDARD OEM";
+    }
+  }
+
+  // 3. MOTORCYCLES: Auto-classify based on description
+  if (normalizedCategory === 'MOTORCYCLES') {
+    if (asset.description.toUpperCase().includes('YAMAHA')) {
+      asset.assetFamily = 'Yamaha Batch';
+    } else if (asset.description.toUpperCase().includes('BAJAJ')) {
+      asset.assetFamily = 'Bajaj Batch';
+    }
+  }
+
+  return asset;
 }

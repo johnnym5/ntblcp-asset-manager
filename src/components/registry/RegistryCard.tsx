@@ -1,7 +1,7 @@
 
 /**
  * @fileOverview RegistryCard - Source-Aware Professional Register Renderer.
- * Phase 45: Removed AI Voice Pulse.
+ * Phase 50: Prioritizes Storage URL for remote evidence.
  */
 
 import React from 'react';
@@ -53,7 +53,10 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
   });
 
   const getSemanticImage = () => {
-    if (asset.photoDataUri) return { url: asset.photoDataUri, hint: "asset photo" };
+    // Phase 50: Remote URL > Local base64 > Placeholder
+    if (asset.photoUrl) return { url: asset.photoUrl, hint: "remote asset photo" };
+    if (asset.photoDataUri) return { url: asset.photoDataUri, hint: "local asset photo" };
+    
     const cat = asset.category?.toLowerCase() || '';
     if (cat.includes('vehicle') || cat.includes('motorcycle')) return images.asset_categories.vehicles;
     if (cat.includes('computer') || cat.includes('laptop') || cat.includes('it')) return images.asset_categories.it_equipment;
@@ -87,9 +90,9 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
               </div>
             )}
             <div className="flex items-center gap-2">
-              {asset.lastModifiedByState ? <Cloud className="h-3 w-3 text-primary opacity-40" /> : <Smartphone className="h-3 w-3 text-muted-foreground opacity-40" />}
+              {asset.photoUrl ? <Cloud className="h-3 w-3 text-green-600 animate-pulse" /> : asset.lastModifiedByState ? <Cloud className="h-3 w-3 text-primary opacity-40" /> : <Smartphone className="h-3 w-3 text-muted-foreground opacity-40" />}
               <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60">
-                {asset.lastModifiedByState ? 'Synchronized' : 'Saved on Device'}
+                {asset.photoUrl ? 'Media Cloud Pulse' : asset.lastModifiedByState ? 'Synchronized' : 'Saved on Device'}
               </span>
             </div>
           </div>

@@ -1,3 +1,4 @@
+
 /**
  * @fileOverview Unified Domain Models for Assetain.
  * Strictly typed, deterministic models for registry management and system configuration.
@@ -55,7 +56,11 @@ export interface Asset {
   value: number;
   serialNumber: string;
   assetIdCode?: string;
-  photoDataUri?: string; // Visual evidence pulse
+  
+  // Media Persistence
+  photoDataUri?: string; // Local visual evidence pulse (base64)
+  photoUrl?: string;     // Remote storage pulse (Firebase Storage URL)
+  
   geotag?: Geotag; // Spatial field protocol
 
   // Metadata & Provenance
