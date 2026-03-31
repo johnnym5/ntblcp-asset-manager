@@ -1,6 +1,7 @@
 /**
  * @fileOverview Hardened Firestore Service.
  * Implements Deep-Hydration retrieval for 100% offline parity.
+ * Note: Media offloading to Storage is currently disabled.
  */
 
 import { 
@@ -24,7 +25,6 @@ import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors
 import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
 import { monitoring } from '@/lib/monitoring';
-import { FirebaseStorageService } from './storage';
 import { batchSetAssets as mirrorToRtdb, updateSettings as mirrorSettingsToRtdb } from '@/lib/database';
 import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry } from '@/types/domain';
 
@@ -89,34 +89,18 @@ export const FirestoreService = {
 
   /**
    * Single record update with mandatory Zod validation.
+   * Media (Photo/Signature) offloading is currently disabled.
    */
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
 
-    let finalPhotoUrl = asset.photoUrl;
-    if (asset.photoDataUri && !asset.photoUrl) {
-      try {
-        finalPhotoUrl = await FirebaseStorageService.uploadAssetPhoto(asset.grantId, asset.id, asset.photoDataUri);
-      } catch (e) {
-        console.error("Firestore: Photo storage offload failed.");
-      }
-    }
-
-    let finalSignatureUrl = asset.signatureUrl;
-    if (asset.signatureDataUri && !asset.signatureUrl) {
-      try {
-        finalSignatureUrl = await FirebaseStorageService.uploadAssetSignature(asset.grantId, asset.id, asset.signatureDataUri);
-      } catch (e) {
-        console.error("Firestore: Signature storage offload failed.");
-      }
-    }
-
+    // Media Storage Offload Disabled
     const assetToSave = {
       ...asset,
-      photoUrl: finalPhotoUrl,
-      photoDataUri: finalPhotoUrl ? undefined : asset.photoDataUri,
-      signatureUrl: finalSignatureUrl,
-      signatureDataUri: finalSignatureUrl ? undefined : asset.signatureDataUri
+      photoUrl: undefined,
+      photoDataUri: undefined,
+      signatureUrl: undefined,
+      signatureDataUri: undefined
     };
 
     const validation = AssetSchema.safeParse(assetToSave);
@@ -162,11 +146,6 @@ export const FirestoreService = {
     if (!db) return;
     const assetRef = doc(db, 'assets', assetId);
     try {
-      const snap = await getDoc(assetRef);
-      if (snap.exists()) {
-        const data = snap.data() as Asset;
-        await FirebaseStorageService.deleteAssetMedia(data.grantId, assetId);
-      }
       await deleteDoc(assetRef);
     } catch (err: any) {
       this.handlePermissionError(assetRef, 'delete', err);

@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview AppLayout - The Main Navigation Shell with Governance Triggers.
  * Phase 63: Hardened GIS Integration & Deterministic Shell.
+ * Note: Evidence Gallery disabled as part of media feature removal.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -32,7 +32,6 @@ import {
   Globe,
   HelpCircle,
   X,
-  Camera,
   Terminal,
   Search,
   Command,
@@ -72,7 +71,6 @@ const PRIMARY_NAV: NavItem[] = [
   { label: 'Registry', href: '/assets', icon: <Boxes className="h-4 w-4" />, shortcut: 'R' },
   { label: 'Spatial', href: '/gis', icon: <MapIcon className="h-4 w-4" />, shortcut: 'G' },
   { label: 'Review', href: '/verify', icon: <CheckCircle2 className="h-4 w-4" />, shortcut: 'V' },
-  { label: 'Evidence', href: '/gallery', icon: <Camera className="h-4 w-4" />, shortcut: 'E' },
 ];
 
 const AUDIT_NAV: NavItem[] = [
@@ -106,7 +104,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (e.key === 'r') router.push('/assets');
       if (e.key === 'd') router.push('/');
       if (e.key === 'g') router.push('/gis');
-      if (e.key === 'e') router.push('/gallery');
       if (e.key === 'u') router.push('/import');
       if (e.key === 'v') router.push('/verify');
       if (e.key === 'q') router.push('/sync-queue');

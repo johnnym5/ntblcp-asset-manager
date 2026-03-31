@@ -14,18 +14,24 @@ import {
 import { auth } from '@/lib/firebase';
 import { logger } from '@/lib/logger';
 
+let isSigningIn = false;
+
 export const FirebaseAuthService = {
   /**
    * Initializes a system session. 
    * Uses anonymous auth as a base for custom RBAC state.
    */
   async ensureSession(): Promise<User | null> {
-    if (!auth) return null;
+    if (!auth || isSigningIn) return auth?.currentUser || null;
     try {
       if (auth.currentUser) return auth.currentUser;
+      
+      isSigningIn = true;
       const credential = await signInAnonymously(auth);
+      isSigningIn = false;
       return credential.user;
     } catch (e) {
+      isSigningIn = false;
       logger.error("Firebase Auth: Failed to initialize session", e);
       return null;
     }

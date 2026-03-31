@@ -9,6 +9,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import AppLayout from '@/components/app-layout';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { 
   FileUp, 
   ScanSearch, 
