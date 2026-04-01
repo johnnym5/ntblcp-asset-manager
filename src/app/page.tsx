@@ -3,6 +3,7 @@
 /**
  * @fileOverview SPA Orchestrator Hub.
  * Manages the unified workstation switching logic with high-fidelity transitions.
+ * Phase 78: Added GIS Spatial Hub to deterministic workstation router.
  */
 
 import React, { Suspense } from 'react';
@@ -27,6 +28,7 @@ import { UsersWorkstation } from '@/components/workstations/UsersWorkstation';
 import { InfrastructureWorkstation } from '@/components/workstations/InfrastructureWorkstation';
 import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
+import { GISWorkstation } from '@/components/workstations/GISWorkstation';
 
 export default function SPAOrchestrator() {
   const { activeView, settingsLoaded } = useAppState();
@@ -69,6 +71,7 @@ function renderWorkstation(view: string) {
     case 'INFRASTRUCTURE': return <InfrastructureWorkstation />;
     case 'DATABASE': return <DatabaseWorkstation />;
     case 'SETTINGS': return <SettingsWorkstation />;
+    case 'GIS': return <GISWorkstation />;
     default: return (
       <div className="flex flex-col items-center justify-center py-40 opacity-20 space-y-6">
         <div className="p-8 bg-primary/10 rounded-[3rem] shadow-inner">

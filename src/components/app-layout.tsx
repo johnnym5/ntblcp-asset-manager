@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview AppLayout - SPA Shell Persistence.
- * Phase 75: Integrated Audit & Traceability Dropdown and Notifications into Header.
+ * Phase 78: Integrated GIS Spatial Hub into Sidebar and refined Header command topology.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -19,7 +18,6 @@ import {
   LogOut,
   Menu,
   Monitor,
-  Inbox,
   History,
   CheckCircle2,
   ListTodo,
@@ -29,19 +27,16 @@ import {
   Database,
   Globe,
   HelpCircle,
-  X,
   Terminal,
   Search,
   Command,
   ShieldAlert,
   QrCode,
-  LayoutGrid,
-  FileSpreadsheet,
-  FolderKanban,
   ChevronDown,
   Download,
   Upload,
-  Bell
+  Bell,
+  Navigation
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -81,6 +76,7 @@ interface NavItem {
 const ENGINEERING_NAV: NavItem[] = [
   { label: 'Asset Registry', view: 'REGISTRY', icon: <Boxes className="h-4 w-4" />, shortcut: 'R' },
   { label: 'Import Center', view: 'IMPORT', icon: <FileUp className="h-4 w-4" />, shortcut: 'U' },
+  { label: 'GIS Spatial Hub', view: 'GIS', icon: <Navigation className="h-4 w-4" />, shortcut: 'G' },
 ];
 
 const AUDIT_NAV: NavItem[] = [
@@ -123,6 +119,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
       if (e.key === 'r') setActiveView('REGISTRY');
       if (e.key === 'd') setActiveView('DASHBOARD');
+      if (e.key === 'g') setActiveView('GIS');
       if (e.key === 'u') setActiveView('IMPORT');
       if (e.key === 'v') setActiveView('VERIFY');
       if (e.key === 'q') setActiveView('SYNC_QUEUE');
@@ -238,16 +235,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <NavGroup items={GOVERNANCE_NAV} title="Governance & Systems" />
-          
-          {isAdmin && (
-            <div className="mt-6 space-y-1">
-              <p className="px-4 mb-2 text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-50">Quick Actions</p>
-              <Button variant="ghost" onClick={() => setIsInboxOpen(true)} className="w-full justify-between px-4 font-black uppercase text-[10px] tracking-widest rounded-xl h-12 hover:bg-primary/5 hover:text-primary transition-all group">
-                <span className="flex items-center gap-3"><Inbox className="h-4 w-4 group-hover:scale-110 transition-transform" /> Approvals</span>
-                {pendingCount > 0 && <Badge className="bg-primary text-[8px] h-4 min-w-4 flex items-center justify-center p-0 rounded-full animate-pulse">{pendingCount}</Badge>}
-              </Button>
-            </div>
-          )}
         </div>
         
         <div className="mt-auto space-y-4 pt-6 border-t border-border/40">
@@ -329,7 +316,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">
-            {/* Audit & Traceability Header Shortcut */}
             <div className="hidden lg:flex items-center gap-2 border-l border-r px-4 border-border/40 mx-2">
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -403,7 +389,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </TooltipProvider>
             </div>
 
-            {/* Notifications Hub */}
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -421,7 +406,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent className="rounded-xl font-bold uppercase text-[9px] tracking-widest">Approvals & Activity Notifications</TooltipContent>
+                <TooltipContent className="rounded-xl font-bold uppercase text-[9px] tracking-widest">Approvals & Notifications</TooltipContent>
               </Tooltip>
             </TooltipProvider>
 
@@ -467,7 +452,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      {isAdmin && <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />}
+      <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
       <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
       <CommandPalette />
       <QRScannerDialog isOpen={isQRScannerOpen} onOpenChange={setIsQRScannerOpen} onScanSuccess={handleQRSuccess} />
