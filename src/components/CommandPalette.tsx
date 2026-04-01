@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Universal Command Palette.
- * Phase 131: Renamed naming scheme to be asset manager friendly.
+ * Phase 132: Fixed missing icon imports and reconciled nomenclature.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -40,7 +40,8 @@ import {
   Activity,
   ShieldX,
   Package,
-  ClipboardList
+  ClipboardList,
+  RefreshCw
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -85,7 +86,7 @@ export function CommandPalette() {
         <CommandGroup heading="Inventory Management">
           <CommandItem onSelect={() => runCommand(() => router.push('/assets'))}>
             <ClipboardList className="mr-2 h-4 w-4" />
-            <span>Asset Register</span>
+            <span>Asset Inventory</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push('/import'))}>
             <FileUp className="mr-2 h-4 w-4" />
@@ -93,7 +94,7 @@ export function CommandPalette() {
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => refreshRegistry())}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            <span>Reconcile Registry</span>
+            <span>Reconcile Asset Register</span>
           </CommandItem>
         </CommandGroup>
 
@@ -106,7 +107,7 @@ export function CommandPalette() {
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push('/sync-queue'))}>
             <ListTodo className="mr-2 h-4 w-4" />
-            <span>Sync Queue Status</span>
+            <span>Sync Status Log</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push('/reports'))}>
             <FileText className="mr-2 h-4 w-4" />

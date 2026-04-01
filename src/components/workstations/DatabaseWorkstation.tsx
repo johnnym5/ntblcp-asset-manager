@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DatabaseWorkstation - High-Fidelity Database Management.
- * Phase 131: Renamed naming scheme to be asset manager friendly.
+ * Phase 132: Updated nomenclature to match Asset Manager friendly scheme.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -75,7 +75,7 @@ export function DatabaseWorkstation() {
     setIsProcessing(true);
     try {
       await VirtualDBService.purgeGlobalRegistry();
-      toast({ title: "Inventory Reset", description: "Global registry wiped successfully." });
+      toast({ title: "Inventory Reset", description: "Global register wiped successfully." });
       await refreshRegistry();
       setNukeDialogOpen(false);
     } finally {
@@ -120,7 +120,7 @@ export function DatabaseWorkstation() {
                   <div className="flex gap-4">
                     <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
                     <div className="space-y-1">
-                      <p className="text-xs font-black uppercase text-foreground">Global Settings</p>
+                      <p className="text-xs font-black uppercase text-foreground">Governance Settings</p>
                       <p className="text-[9px] text-muted-foreground leading-relaxed">Loaded from Firestore Authority.</p>
                     </div>
                   </div>
@@ -134,7 +134,7 @@ export function DatabaseWorkstation() {
                   <div className="flex gap-4">
                     <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
                     <div className="space-y-1">
-                      <p className="text-xs font-black uppercase text-foreground">Environment Pulse</p>
+                      <p className="text-xs font-black uppercase text-foreground">Environment State</p>
                       <p className="text-[9px] text-muted-foreground leading-relaxed">Firebase API credentials validated.</p>
                     </div>
                   </div>
@@ -170,7 +170,7 @@ export function DatabaseWorkstation() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
         <Card className="bg-card/50 border-border/40 rounded-2xl p-8 space-y-6 shadow-2xl">
           <div className="space-y-1">
-            <h3 className="text-xl font-black uppercase text-foreground">Tiered Synchronization</h3>
+            <h3 className="text-xl font-black uppercase text-foreground">Register Synchronization</h3>
             <p className="text-[10px] text-muted-foreground font-medium italic">Manually reconcile data across storage layers.</p>
           </div>
           <div className="space-y-3">
@@ -178,7 +178,7 @@ export function DatabaseWorkstation() {
               <RefreshCw className="h-4 w-4 text-primary" /> Sync Local to Cloud Database
             </Button>
             <Button variant="outline" onClick={refreshRegistry} className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6">
-              <Download className="h-4 w-4 text-primary" /> Pull Cloud State to Cache
+              <Download className="h-4 w-4 text-primary" /> Pull Cloud State to Register
             </Button>
           </div>
         </Card>
@@ -193,7 +193,7 @@ export function DatabaseWorkstation() {
               <Upload className="h-4 w-4 text-primary" /> Restore from JSON Archive
             </Button>
             <Button variant="outline" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6">
-              <Download className="h-4 w-4 text-primary" /> Generate System Snapshot
+              <Download className="h-4 w-4 text-primary" /> Generate Inventory Snapshot
             </Button>
           </div>
         </Card>
@@ -236,7 +236,7 @@ export function DatabaseWorkstation() {
 
       {/* Navigation Footer */}
       <div className="fixed bottom-24 left-0 right-0 z-50 pointer-events-none">
-        <div className="max-w-6xl mx-auto px-4">
+        <div className="max-w-6xl auto px-4">
           <div className="bg-card/90 backdrop-blur-2xl border border-border/40 rounded-2xl h-16 flex items-center justify-between px-6 pointer-events-auto shadow-3xl">
             <div className="flex-1 flex items-center gap-4 px-10">
               <button className="text-muted-foreground/40 hover:text-foreground transition-all"><ChevronLeft className="h-4 w-4" /></button>
