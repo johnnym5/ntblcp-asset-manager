@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview ImportWorkstation - Advanced Ingestion Center.
- * Fixed: Aligned engine method call to parseWorkbook.
+ * Phase 128: Aligned engine method call to parseWorkbook.
  */
 
 import React, { useState, useRef } from 'react';
@@ -72,7 +72,7 @@ export function ImportWorkstation() {
       const engine = new ParserEngine(file.name, existingAssets);
       setProgress(60);
       
-      // Fixed: Standardized method call name
+      // Standardized method call name to match engine.ts
       const result = engine.parseWorkbook(sheetName, data);
       
       setStagedAssets(result.assets);

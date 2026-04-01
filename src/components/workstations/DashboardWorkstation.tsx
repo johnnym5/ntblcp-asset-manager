@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - The Unified Intelligence Center.
- * Phase 127: Removed hardcoded dark colors for perfect theme contrast.
+ * Phase 128: Fixed 'Illegal constructor' by renaming Map icon to MapIcon.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -15,7 +15,8 @@ import {
   Database,
   Search,
   ArrowUpDown,
-  Filter
+  Filter,
+  Map as MapIcon
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -93,6 +94,7 @@ export function DashboardWorkstation() {
 
   // Derived Filter Options with Counts
   const locationOptions = useMemo(() => {
+    // Native Map constructor - NO LONGER SHADOWED
     const counts = new Map<string, number>();
     assets.forEach(a => {
       const loc = a.location || 'Global';

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Inventory & Intelligence Center - High-Fidelity Unified Telemetry.
- * Phase 115: Merged Intelligence Pulse with Inventory Pulse into one command node.
+ * Phase 128: Renamed Map to MapIcon to resolve constructor conflict.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -13,7 +13,7 @@ import {
     ChevronsUpDown,
     ShieldCheck,
     TrendingUp,
-    Map,
+    Map as MapIcon,
     ChevronDown,
     Layers,
     ShieldAlert,
@@ -228,7 +228,7 @@ export function AssetSummaryDashboard() {
                         <Card className="lg:col-span-8 bg-muted/10 border-2 border-dashed border-border/40 rounded-[2.5rem] sm:rounded-[3rem] overflow-hidden shadow-none">
                             <CardHeader className="p-6 sm:p-8 bg-muted/20 border-b border-dashed flex flex-row items-center justify-between">
                                 <CardTitle className="text-[10px] sm:text-xs font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-3">
-                                    <Map className="h-4 w-4 text-primary" /> Regional Matrix
+                                    <MapIcon className="h-4 w-4 text-primary" /> Regional Matrix
                                 </CardTitle>
                                 <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/20 text-primary bg-primary/5 px-3 h-6 rounded-full">GLOBAL SCOPE</Badge>
                             </CardHeader>
