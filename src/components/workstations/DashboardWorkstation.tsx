@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - SPA Intelligence Hub.
- * Phase 78: Integrated Regional Analytics and visual performance matrices.
+ * Phase 85: Integrated Regional Analytics, Fidelity Index, and Temporal Pulse.
  */
 
 import React, { useMemo } from 'react';
@@ -10,17 +10,19 @@ import {
   ArrowRight, 
   Globe,
   Map,
-  FileUp,
   CheckCircle2,
   FolderKanban,
   ChevronDown,
   ShieldAlert,
-  Boxes,
   Activity,
   Target,
   History,
   Zap,
-  TrendingUp
+  TrendingUp,
+  PieChart,
+  ShieldCheck,
+  AlertCircle,
+  Fingerprint
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -46,7 +48,7 @@ export function DashboardWorkstation() {
     const total = assets.length;
     const verified = assets.filter(a => a.status === 'VERIFIED').length;
     const exceptions = assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')).length;
-    const dataGaps = assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A').length;
+    const dataGaps = assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A' || !a.assetIdCode).length;
     
     // Regional Aggregation
     const regionalData = assets.reduce((acc, a) => {
@@ -58,10 +60,46 @@ export function DashboardWorkstation() {
     }, {} as Record<string, { total: number, verified: number }>);
 
     const regionalSummary = Object.entries(regionalData)
-      .map(([name, s]) => ({ name, ...s, percent: Math.round((s.verified / s.total) * 100) }))
+      .map(([name, s]) => ({ 
+        name, 
+        ...s, 
+        percent: Math.round((s.verified / s.total) * 100) 
+      }))
       .sort((a, b) => b.total - a.total);
 
-    return { total, verified, exceptions, dataGaps, regionalSummary };
+    // Temporal Breakdown
+    const temporalData = assets.reduce((acc, a) => {
+      const year = a.yearBucket || 'Legacy';
+      acc[year] = (acc[year] || 0) + 1;
+      return acc;
+    }, {} as Record<string | number, number>);
+
+    const temporalSummary = Object.entries(temporalData)
+      .map(([year, count]) => ({ year, count, percent: Math.round((count / total) * 100) }))
+      .sort((a, b) => String(b.year).localeCompare(String(a.year)));
+
+    // Condition Health
+    const healthData = assets.reduce((acc, a) => {
+      const cond = a.condition || 'Unassessed';
+      acc[cond] = (acc[cond] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const healthSummary = Object.entries(healthData)
+      .map(([label, count]) => ({ label, count, percent: Math.round((count / total) * 100) }))
+      .sort((a, b) => b.count - a.count);
+
+    return { 
+      total, 
+      verified, 
+      exceptions, 
+      dataGaps, 
+      regionalSummary, 
+      temporalSummary, 
+      healthSummary,
+      coverage: total > 0 ? Math.round((verified / total) * 100) : 0,
+      fidelityScore: Math.max(0, 100 - (exceptions * 5) - (dataGaps * 0.1))
+    };
   }, [assets]);
 
   const activeGrant = appSettings?.grants.find(g => g.id === activeGrantId);
@@ -110,7 +148,7 @@ export function DashboardWorkstation() {
         </div>
         <div className="flex items-center gap-3">
           <Button variant="outline" onClick={() => setActiveView('ALERTS')} className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2 border-2 hover:bg-destructive/5 transition-all">
-            <ShieldAlert className="h-4 w-4 text-destructive" /> Alerts
+            <ShieldAlert className="h-4 w-4 text-destructive" /> Tactical Alerts
           </Button>
           <Button onClick={() => setActiveView('REGISTRY')} className="h-12 px-8 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-primary-foreground group">
             Open Registry <ArrowRight className="ml-3 h-4 w-4 group-hover:translate-x-1 transition-transform" />
@@ -118,7 +156,7 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
-      {/* Global Progress Pulse */}
+      {/* Primary Metrics Strip */}
       <div className="px-1">
         <VerificationPulse 
           total={stats?.total || 0} 
@@ -130,20 +168,20 @@ export function DashboardWorkstation() {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-1">
         {/* Regional Performance Matrix */}
-        <Card className="lg:col-span-8 rounded-[3rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
+        <Card className="lg:col-span-8 rounded-[3rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
           <CardHeader className="p-8 border-b bg-muted/20 flex flex-row items-center justify-between">
             <div className="space-y-1">
               <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-                <Map className="h-5 w-5 text-primary" /> Regional Pulse
+                <Map className="h-5 w-5 text-primary" /> Regional Coverage Matrix
               </CardTitle>
-              <p className="text-[10px] font-bold uppercase text-muted-foreground opacity-60">Verification coverage by location scope</p>
+              <p className="text-[10px] font-bold uppercase text-muted-foreground opacity-60">Verification performance aggregated by location scope</p>
             </div>
             <Badge variant="outline" className="font-black h-7 px-4 border-primary/20 text-primary bg-primary/5">
-              {stats?.regionalSummary.length || 0} REGIONS
+              {stats?.regionalSummary.length || 0} ACTIVE REGIONS
             </Badge>
           </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[400px]">
+          <CardContent className="p-0 flex-1">
+            <ScrollArea className="h-[450px]">
               <div className="divide-y-2 divide-dashed divide-border/20">
                 {stats?.regionalSummary.map((region, idx) => (
                   <div key={region.name} className="p-6 flex items-center justify-between group hover:bg-primary/[0.02] transition-colors">
@@ -183,56 +221,85 @@ export function DashboardWorkstation() {
           </CardContent>
         </Card>
 
-        {/* Tactical Quick Actions & Shortcuts */}
+        {/* Intelligence Sidebars */}
         <div className="lg:col-span-4 space-y-8">
-          <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden h-full flex flex-col">
-            <CardHeader className="p-8 border-b bg-muted/20">
+          {/* Fidelity Index Card */}
+          <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
+            <CardHeader className="p-8 border-b bg-primary/5">
               <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-                <Zap className="h-4 w-4" /> Quick Launch
+                <TrendingUp className="h-4 w-4" /> Fidelity Index
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-6 space-y-3 flex-1">
-              <LaunchButton icon={Boxes} title="Asset Registry" sub="Search & Edit" onClick={() => setActiveView('REGISTRY')} />
-              <LaunchButton icon={FileUp} title="Import Center" sub="Ingest Data" onClick={() => setActiveView('IMPORT')} />
-              <LaunchButton icon={CheckCircle2} title="Verify Assets" sub="Assessment Queue" onClick={() => setActiveView('VERIFY')} />
-              <LaunchButton icon={Navigation} title="GIS Spatial Hub" sub="Coordinate Grid" onClick={() => setActiveView('GIS')} />
-              <LaunchButton icon={TrendingUp} title="Reports Hub" sub="Generate Extracts" onClick={() => setActiveView('REPORTS')} />
-              <LaunchButton icon={Activity} title="Audit Ledger" sub="Traceability" onClick={() => setActiveView('AUDIT_LOG')} />
-            </CardContent>
-            <div className="p-8 mt-auto border-t bg-muted/5">
-              <div className="p-6 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-3">
-                <div className="flex items-center gap-2">
-                  <History className="h-4 w-4 text-primary opacity-60" />
-                  <h5 className="text-[10px] font-black uppercase text-primary">System Pulse</h5>
+            <CardContent className="p-8 space-y-6">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <span className="text-5xl font-black tracking-tighter text-foreground">
+                    {stats?.fidelityScore.toFixed(1)}%
+                  </span>
+                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Global Integrity Rating</p>
                 </div>
-                <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                  Registry version v5.0.4. Database state synchronized across {appSettings?.grants.length} projects.
-                </p>
+                <div className="p-4 bg-primary/10 rounded-[2rem] shadow-inner">
+                  <ShieldCheck className="h-10 w-10 text-primary" />
+                </div>
               </div>
-            </div>
+              <div className="space-y-2">
+                <div className="flex justify-between text-[10px] font-black uppercase">
+                  <span className="opacity-40">Data Precision</span>
+                  <span className="text-primary">High</span>
+                </div>
+                <Progress value={stats?.fidelityScore} className="h-1 bg-primary/10" />
+              </div>
+            </CardContent>
           </Card>
+
+          {/* Temporal Pulse Card */}
+          <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
+            <CardHeader className="p-8 border-b bg-muted/20">
+              <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-3">
+                <History className="h-4 w-4 text-primary" /> Temporal Pulse
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="p-8">
+              <ScrollArea className="h-[180px] pr-4">
+                <div className="space-y-5">
+                  {stats?.temporalSummary.map((item) => (
+                    <div key={item.year} className="space-y-1.5">
+                      <div className="flex justify-between items-center text-[10px] font-black uppercase">
+                        <span className="opacity-60">{item.year} Register</span>
+                        <span className="text-foreground">{item.count} Assets</span>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <Progress value={item.percent} className="h-1 flex-1" />
+                        <span className="text-[9px] font-mono opacity-40">{item.percent}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </ScrollArea>
+            </CardContent>
+          </Card>
+
+          {/* Tactical Shortcuts */}
+          <div className="grid grid-cols-2 gap-4">
+            <Button 
+              variant="outline" 
+              onClick={() => setActiveView('IMPORT')}
+              className="h-20 rounded-3xl border-2 flex flex-col gap-1 transition-all hover:border-primary/40 hover:bg-primary/5"
+            >
+              <Zap className="h-5 w-5 text-primary" />
+              <span className="text-[9px] font-black uppercase">Ingest</span>
+            </Button>
+            <Button 
+              variant="outline" 
+              onClick={() => setActiveView('GIS')}
+              className="h-20 rounded-3xl border-2 flex flex-col gap-1 transition-all hover:border-primary/40 hover:bg-primary/5"
+            >
+              <Globe className="h-5 w-5 text-primary" />
+              <span className="text-[9px] font-black uppercase">GIS Grid</span>
+            </Button>
+          </div>
         </div>
       </div>
     </div>
-  );
-}
-
-function LaunchButton({ icon: Icon, title, sub, onClick }: any) {
-  return (
-    <button 
-      onClick={onClick}
-      className="w-full p-4 rounded-2xl border-2 border-transparent hover:border-primary/20 hover:bg-primary/5 transition-all group flex items-center justify-between text-left"
-    >
-      <div className="flex items-center gap-4">
-        <div className="p-2.5 rounded-xl bg-muted group-hover:bg-primary group-hover:text-primary-foreground transition-all shadow-sm">
-          <Icon className="h-4 w-4" />
-        </div>
-        <div className="flex flex-col">
-          <span className="text-xs font-black uppercase tracking-tight">{title}</span>
-          <span className="text-[9px] font-bold text-muted-foreground uppercase opacity-60">{sub}</span>
-        </div>
-      </div>
-      <ArrowRight className="h-4 w-4 opacity-0 group-hover:opacity-40 transition-opacity" />
-    </button>
   );
 }

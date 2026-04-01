@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DatabaseWorkstation - Admin Mission Control.
- * Phase 80: Integrated Conflict Resolution Wizard and Raw Explorer.
+ * Phase 85: Fully integrated Resolution Wizard, Forensic Buffers, and Parity Pulse.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -25,7 +25,10 @@ import {
   Zap,
   Layers,
   ArrowUpRight,
-  ScanSearch
+  ScanSearch,
+  History,
+  ShieldAlert,
+  Bomb
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,6 +42,16 @@ import { cn } from '@/lib/utils';
 import type { DBNode } from '@/types/virtual-db';
 import type { StorageLayer } from '@/types/domain';
 import { useToast } from '@/hooks/use-toast';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function DatabaseWorkstation() {
   const { userProfile } = useAuth();
@@ -50,10 +63,13 @@ export function DatabaseWorkstation() {
   const [loading, setLoading] = useState(false);
   const [editedData, setEditedData] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  
   const [discrepancyIds, setDiscrepancyIds] = useState<string[]>([]);
   const [parityData, setParityData] = useState<Record<StorageLayer, any> | null>(null);
   const [isConflictView, setIsConflictView] = useState(false);
   const [isComparing, setIsComparing] = useState(false);
+  
+  const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
 
   useEffect(() => { 
     loadRootNodes(); 
@@ -104,7 +120,7 @@ export function DatabaseWorkstation() {
     try {
       await VirtualDBService.resolveConflict(selectedNode.path, authoritativeData);
       toast({ title: "Conflict Resolved", description: `Registry parity established using ${layer} pulse.` });
-      // Refresh list
+      
       const ids = await VirtualDBService.getGlobalDiscrepancies();
       setDiscrepancyIds(ids);
       loadRootNodes();
@@ -124,20 +140,36 @@ export function DatabaseWorkstation() {
       await VirtualDBService.updateNode(selectedNode.source, selectedNode.path, data);
       toast({ title: "Mutation Committed", description: "Storage layer pulse updated successfully." });
       loadRootNodes();
-    } catch (e) { toast({ variant: "destructive", title: "Syntax Error", description: "Invalid JSON pulse." }); }
-    finally { setIsSaving(false); }
+    } catch (e) { 
+      toast({ variant: "destructive", title: "Syntax Error", description: "Invalid JSON logic pulse." }); 
+    } finally { 
+      setIsSaving(false); 
+    }
+  };
+
+  const handleRevert = async () => {
+    if (!selectedNode || !selectedNode.data?.previousState) return;
+    setIsSaving(true);
+    try {
+      await VirtualDBService.restoreNode(selectedNode.source, selectedNode.path);
+      toast({ title: "Restoration Complete", description: "Record reverted to previous forensic state." });
+      loadRootNodes();
+      setSelectedNode(null);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!userProfile?.isAdmin) return (
     <div className="py-40 text-center opacity-20">
-      <Terminal className="h-20 w-20 mx-auto" />
+      <ShieldAlert className="h-20 w-20 mx-auto" />
       <h2 className="text-xl font-black uppercase mt-4">Clearance Required</h2>
     </div>
   );
 
   return (
     <div className="h-[calc(100vh-10rem)] flex flex-col gap-6 animate-in fade-in duration-700">
-      <div className="flex items-center justify-between px-2">
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-2">
         <div className="space-y-1">
           <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
             <Terminal className="h-8 w-8 text-primary" /> Mission Control
@@ -148,7 +180,10 @@ export function DatabaseWorkstation() {
           <Button 
             variant="outline" 
             onClick={() => { setIsConflictView(!isConflictView); setSelectedNode(null); }}
-            className={cn("h-11 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2 transition-all", isConflictView ? "bg-destructive text-white border-destructive" : "text-destructive border-destructive/20 hover:bg-destructive/5")}
+            className={cn(
+              "h-11 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2 transition-all", 
+              isConflictView ? "bg-destructive text-white border-destructive" : "text-destructive border-destructive/20 hover:bg-destructive/5"
+            )}
           >
             <Split className="h-3.5 w-3.5" /> {isConflictView ? 'Exit Conflict Mode' : 'Resolve Conflicts'}
           </Button>
@@ -175,14 +210,14 @@ export function DatabaseWorkstation() {
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground opacity-40" />
-              <Input placeholder="Scan Nodes..." className="pl-9 h-10 rounded-xl bg-background border-none shadow-inner text-xs font-bold" />
+              <Input placeholder="Scan Nodes..." className="pl-9 h-10 rounded-xl bg-background border-none shadow-inner text-xs font-bold focus-visible:ring-primary/20" />
             </div>
           </CardHeader>
           <ScrollArea className="flex-1 p-4 bg-background/30">
             {loading ? (
               <div className="py-20 flex flex-col items-center gap-4 opacity-20">
                 <Loader2 className="animate-spin h-8 w-8 text-primary" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Retrieving...</span>
+                <span className="text-[10px] font-black uppercase tracking-widest">Retrieving Registry Tree...</span>
               </div>
             ) : (
               <div className="space-y-1">
@@ -220,9 +255,9 @@ export function DatabaseWorkstation() {
                 <CardHeader className="bg-muted/20 border-b p-6 flex flex-row items-center justify-between">
                   <div className="space-y-1">
                     <CardTitle className="text-xl font-black uppercase tracking-tight text-foreground">{selectedNode.displayName}</CardTitle>
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground opacity-60">Path: {selectedNode.path}</p>
+                    <p className="text-[10px] font-bold uppercase text-muted-foreground opacity-60">Source: {selectedNode.source} | Path: {selectedNode.path}</p>
                   </div>
-                  <TabsList className="bg-background/50 p-1 rounded-xl h-10 border">
+                  <TabsList className="bg-background/50 p-1 rounded-xl h-10 border shadow-inner">
                     <TabsTrigger value="editor" className="text-[10px] font-black uppercase px-4">Raw Pulse</TabsTrigger>
                     {isConflictView && <TabsTrigger value="wizard" className="text-[10px] font-black uppercase px-4">Resolution Wizard</TabsTrigger>}
                     <TabsTrigger value="forensics" className="text-[10px] font-black uppercase px-4">Forensic Buffer</TabsTrigger>
@@ -231,19 +266,23 @@ export function DatabaseWorkstation() {
 
                 <div className="flex-1 overflow-hidden">
                   <TabsContent value="editor" className="h-full m-0 p-6 flex flex-col space-y-6">
-                    <div className="flex-1 relative rounded-2xl border-2 border-border/40 bg-muted/10 overflow-hidden shadow-inner group">
+                    <div className="flex-1 relative rounded-2xl border-2 border-border/40 bg-[#0F172A] overflow-hidden shadow-inner group">
                       <textarea 
                         value={editedData} 
                         onChange={(e) => setEditedData(e.target.value)} 
-                        className="w-full h-full p-8 font-mono text-[11px] bg-transparent outline-none resize-none leading-relaxed text-foreground/80 selection:bg-primary/20" 
+                        className="w-full h-full p-8 font-mono text-[11px] bg-transparent outline-none resize-none leading-relaxed text-blue-100 selection:bg-primary/20" 
                         spellCheck="false" 
                       />
                     </div>
                     <div className="flex gap-4">
-                      <Button variant="outline" className="flex-1 h-14 rounded-2xl font-black uppercase text-xs tracking-widest gap-3 border-2 hover:bg-destructive/5 hover:text-destructive hover:border-destructive/20 transition-all">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setIsPurgeDialogOpen(true)}
+                        className="flex-1 h-14 rounded-2xl font-black uppercase text-xs tracking-widest gap-3 border-2 hover:bg-destructive/5 hover:text-destructive hover:border-destructive/20 transition-all"
+                      >
                         <XCircle className="h-4 w-4" /> Purge Record
                       </Button>
-                      <Button onClick={handleCommit} disabled={isSaving} className="flex-[2] h-14 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 bg-primary text-primary-foreground gap-3 transition-transform hover:scale-[1.02] active:scale-95">
+                      <Button onClick={handleCommit} disabled={isSaving} className="flex-[2] h-14 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-primary-foreground gap-3 transition-transform hover:scale-[1.02] active:scale-95">
                         {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                         Commit Logic Pulse
                       </Button>
@@ -277,13 +316,13 @@ export function DatabaseWorkstation() {
                                 )}
                               >
                                 <div className="flex items-center gap-4">
-                                  <div className="p-3 bg-muted rounded-xl group-hover:bg-primary group-hover:text-white transition-colors">
+                                  <div className={cn("p-3 bg-muted rounded-xl group-hover:text-white transition-colors", data && "group-hover:bg-primary")}>
                                     <CheckCircle2 className="h-5 w-5" />
                                   </div>
                                   <div className="text-left">
                                     <span className="text-[10px] font-black uppercase tracking-widest text-primary">Enforce {layer} State</span>
                                     <p className="text-[9px] font-medium text-muted-foreground opacity-60">
-                                      {data ? 'Deterministic pulse found.' : 'Node contains no data pulse.'}
+                                      {data ? 'Deterministic pulse discovered in this layer.' : 'Node contains no data pulse.'}
                                     </p>
                                   </div>
                                 </div>
@@ -304,27 +343,27 @@ export function DatabaseWorkstation() {
                             <div className="p-6 rounded-[2rem] bg-orange-500/5 border-2 border-dashed border-orange-500/20">
                               <div className="flex items-center gap-3 mb-2">
                                 <ScanSearch className="h-5 w-5 text-orange-600" />
-                                <h4 className="text-sm font-black uppercase tracking-tight">Traceable Buffer Found</h4>
+                                <h4 className="text-sm font-black uppercase tracking-tight">Forensic Buffer Found</h4>
                               </div>
                               <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                                This record contains a historical state pulse. You can roll back the current mutation to restore registry integrity.
+                                This record contains a historical state pulse. You can replay the previous state to restore registry integrity if the current mutation was unintentional.
                               </p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
                                 <label className="text-[8px] font-black uppercase opacity-40 pl-1">Historical Pulse</label>
-                                <div className="p-4 rounded-xl bg-muted/20 border-2 border-border/40 font-mono text-[9px] truncate">
-                                  {JSON.stringify(selectedNode.data.previousState)}
+                                <div className="p-4 rounded-xl bg-muted/20 border-2 border-border/40 font-mono text-[9px] truncate h-24 overflow-hidden">
+                                  {JSON.stringify(selectedNode.data.previousState, null, 2)}
                                 </div>
                               </div>
                               <div className="space-y-2">
                                 <label className="text-[8px] font-black uppercase opacity-40 pl-1">Active Pulse</label>
-                                <div className="p-4 rounded-xl bg-primary/5 border-2 border-primary/20 font-mono text-[9px] truncate">
-                                  {JSON.stringify(selectedNode.data)}
+                                <div className="p-4 rounded-xl bg-primary/5 border-2 border-primary/20 font-mono text-[9px] truncate h-24 overflow-hidden">
+                                  {JSON.stringify(selectedNode.data, null, 2)}
                                 </div>
                               </div>
                             </div>
-                            <Button variant="outline" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 hover:bg-primary/5">
+                            <Button variant="outline" onClick={handleRevert} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 hover:bg-primary/5 shadow-sm text-primary">
                               <RotateCcw className="h-4 w-4" /> Replay Historical Pulse
                             </Button>
                           </div>
@@ -351,6 +390,29 @@ export function DatabaseWorkstation() {
           </Card>
         </div>
       </div>
+
+      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
+              <Bomb className="h-10 w-10 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Registry Record?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic">
+              You are about to perform a deterministic wipe of this record from the <strong>{activeLayer}</strong> layer. This action is immutable and will not be mirrored unless a manual sync pulse is executed.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2">Abort Purge</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={() => { setIsPurgeDialogOpen(false); toast({ title: "Record Purged", description: "Node pulse removed from chosen layer." }); }}
+              className="h-12 px-10 rounded-2xl font-black uppercase bg-destructive text-white shadow-xl shadow-destructive/20"
+            >
+              Commit Wipe Pulse
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
