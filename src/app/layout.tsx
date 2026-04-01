@@ -1,4 +1,5 @@
 import type {Metadata, Viewport} from 'next';
+import { Suspense } from 'react';
 import './globals.css';
 import { ThemeProvider } from "@/components/theme-provider"
 import { AuthProvider } from '@/contexts/auth-context';
@@ -6,10 +7,11 @@ import { AppStateProvider } from '@/contexts/app-state-context';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import Loading from './loading';
 
 /**
  * @fileOverview Root Layout - Deterministic System Shell.
- * Phase 65: Hardened metadata and icon handling for absolute build stability.
+ * Phase 128: Implemented Suspense boundary to prevent build-time CSR bailout.
  */
 
 export const metadata: Metadata = {
@@ -58,13 +60,15 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <ErrorBoundary isGlobal module="Assetain Global Shell">
-            <AppStateProvider>
-              <AuthProvider>
-                {children}
-                <Toaster />
-                <FirebaseErrorListener />
-              </AuthProvider>
-            </AppStateProvider>
+            <Suspense fallback={<Loading />}>
+              <AppStateProvider>
+                <AuthProvider>
+                  {children}
+                  <Toaster />
+                  <FirebaseErrorListener />
+                </AuthProvider>
+              </AppStateProvider>
+            </Suspense>
           </ErrorBoundary>
         </ThemeProvider>
       </body>
