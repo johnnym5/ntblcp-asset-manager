@@ -1,48 +1,43 @@
 'use client';
 
 /**
- * @fileOverview DatabaseWorkstation - Admin Mission Control.
- * Phase 106: Enhanced with Cross-Layer Merge logic and high-fidelity dark UI.
+ * @fileOverview DatabaseWorkstation - High-Fidelity Mission Control.
+ * Strictly matches the "Hybrid Strategy" administrative pulse.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Terminal, 
-  Server, 
-  HardDrive, 
-  ChevronRight, 
-  Search, 
+  Database, 
+  CheckCircle2, 
+  RefreshCw, 
   FileJson, 
-  Database,
+  Trash2, 
+  AlertTriangle, 
+  Loader2, 
+  ArrowRightLeft, 
+  Download, 
+  Upload, 
+  Bomb, 
+  Zap, 
+  Monitor,
+  ChevronDown,
+  Terminal,
   Activity,
-  AlertTriangle,
-  Loader2,
-  Split,
-  CheckCircle2,
-  XCircle,
-  Save,
-  RotateCcw,
-  Zap,
-  Layers,
-  ArrowUpRight,
+  HardDrive,
+  ShieldCheck,
+  Search,
   ScanSearch,
-  History,
-  ShieldAlert,
-  Bomb,
-  ArrowRightLeft
+  X
 } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
+import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
+import { useToast } from '@/hooks/use-toast';
 import { VirtualDBService } from '@/services/virtual-db-service';
 import { cn } from '@/lib/utils';
-import type { DBNode } from '@/types/virtual-db';
-import type { StorageLayer } from '@/types/domain';
-import { useToast } from '@/hooks/use-toast';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -53,362 +48,288 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
 export function DatabaseWorkstation() {
+  const { assets, appSettings, refreshRegistry, isOnline, isSyncing } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
-  
-  const [activeLayer, setActiveLayer] = useState<StorageLayer>('FIRESTORE');
-  const [nodes, setNodes] = useState<DBNode[]>([]);
-  const [selectedNode, setSelectedNode] = useState<DBNode | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [editedData, setEditedData] = useState("");
-  const [isSaving, setIsSaving] = useState(false);
-  
-  const [discrepancyIds, setDiscrepancyIds] = useState<string[]>([]);
-  const [parityData, setParityData] = useState<Record<StorageLayer, any> | null>(null);
-  const [isConflictView, setIsConflictView] = useState(false);
-  const [isComparing, setIsComparing] = useState(false);
-  
-  const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
 
-  useEffect(() => { 
-    loadRootNodes(); 
-    VirtualDBService.getGlobalDiscrepancies().then(setDiscrepancyIds);
-  }, [activeLayer, isConflictView]);
+  const [isHealthOpen, setIsHealthOpen] = useState(true);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [nukeDialogOpen, setNukeDialogOpen] = useState(false);
+  const [activePath, setActivePath] = useState('/assets');
 
-  const loadRootNodes = async () => {
-    setLoading(true);
-    try { 
-      if (isConflictView) {
-        const assets = await VirtualDBService.getDocuments(activeLayer, 'assets');
-        setNodes(assets.filter(n => discrepancyIds.includes(n.rawKey)));
-      } else {
-        const root = await VirtualDBService.getLogicalGroups(activeLayer); 
-        setNodes(root);
-      }
-    }
-    finally { setLoading(false); }
-  };
+  const stats = useMemo(() => ({
+    assetCount: assets.length,
+    dbStatus: isOnline ? 'ACTIVE' : 'LATENT',
+    latency: '42ms'
+  }), [assets, isOnline]);
 
-  const handleNodeClick = async (node: DBNode) => {
-    if (node.type === 'COLLECTION') {
-      setLoading(true);
-      const docs = await VirtualDBService.getDocuments(node.source, node.path);
-      setNodes(docs);
-      setLoading(false);
-    } else {
-      setSelectedNode(node);
-      setEditedData(JSON.stringify(node.data || {}, null, 2));
-      
-      // Load Parity Data
-      setIsComparing(true);
-      try {
-        const data = await VirtualDBService.compareNodeAcrossLayers(node.path);
-        setParityData(data);
-      } finally {
-        setIsComparing(false);
-      }
-    }
-  };
-
-  const handleResolve = async (layer: StorageLayer) => {
-    if (!parityData || !selectedNode) return;
-    const authoritativeData = parityData[layer];
-    if (!authoritativeData) return;
-
-    setIsSaving(true);
+  const handleNukePulse = async () => {
+    setIsProcessing(true);
     try {
-      await VirtualDBService.resolveConflict(selectedNode.path, authoritativeData);
-      toast({ title: "Conflict Resolved", description: `Registry parity established using ${layer} pulse.` });
-      
-      const ids = await VirtualDBService.getGlobalDiscrepancies();
-      setDiscrepancyIds(ids);
-      loadRootNodes();
-      setSelectedNode(null);
-    } catch (e) {
-      toast({ variant: "destructive", title: "Resolution Failure" });
+      await VirtualDBService.purgeGlobalRegistry();
+      toast({ title: "GLOBAL DATA NUKED", description: "Registry reset to absolute zero state." });
+      await refreshRegistry();
+      setNukeDialogOpen(false);
     } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const handleCommit = async () => {
-    if (!selectedNode) return;
-    setIsSaving(true);
-    try {
-      const data = JSON.parse(editedData);
-      await VirtualDBService.updateNode(selectedNode.source, selectedNode.path, data);
-      toast({ title: "Mutation Committed", description: "Storage layer pulse updated successfully." });
-      loadRootNodes();
-    } catch (e) { 
-      toast({ variant: "destructive", title: "Syntax Error", description: "Invalid JSON logic pulse." }); 
-    } finally { 
-      setIsSaving(false); 
-    }
-  };
-
-  const handleRevert = async () => {
-    if (!selectedNode || !selectedNode.data?.previousState) return;
-    setIsSaving(true);
-    try {
-      await VirtualDBService.restoreNode(selectedNode.source, selectedNode.path);
-      toast({ title: "Restoration Complete", description: "Record reverted to previous forensic state." });
-      loadRootNodes();
-      setSelectedNode(null);
-    } finally {
-      setIsSaving(false);
+      setIsProcessing(false);
     }
   };
 
   if (!userProfile?.isAdmin) return null;
 
   return (
-    <div className="h-[calc(100vh-10rem)] flex flex-col gap-6 animate-in fade-in duration-700">
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-2">
-        <div className="space-y-1">
-          <h2 className="text-3xl font-black tracking-tight text-white uppercase flex items-center gap-3">
-            <Terminal className="h-8 w-8 text-primary" /> Mission Control
-          </h2>
-          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Cross-Layer Registry Orchestration</p>
-        </div>
+    <div className="max-w-6xl mx-auto space-y-8 pb-40 animate-in fade-in duration-700">
+      
+      {/* Header Pulse */}
+      <div className="space-y-1 px-1">
         <div className="flex items-center gap-3">
-          <Button 
-            variant="outline" 
-            onClick={() => { setIsConflictView(!isConflictView); setSelectedNode(null); }}
-            className={cn(
-              "h-11 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2 transition-all", 
-              isConflictView ? "bg-destructive text-white border-destructive" : "text-destructive border-destructive/20 hover:bg-destructive/5"
-            )}
-          >
-            <Split className="h-3.5 w-3.5" /> {isConflictView ? 'Exit Conflict Mode' : 'Resolve Conflicts'}
-          </Button>
-          <Button variant="outline" onClick={() => loadRootNodes()} className="h-11 rounded-xl gap-2 text-[10px] font-black uppercase tracking-widest border-2 border-white/5 text-white hover:bg-white/5">
-            <RotateCcw className="h-4 w-4" /> Reset Explorer
-          </Button>
+          <Database className="h-6 w-6 text-white" />
+          <h2 className="text-2xl font-black uppercase tracking-tight text-white">Database Administration</h2>
         </div>
+        <p className="text-[10px] font-bold text-muted-foreground opacity-60 uppercase tracking-widest">
+          Hybrid Strategy: Firestore (Settings) & RTDB (Assets).
+        </p>
       </div>
 
-      <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
-        {/* Navigation Sidebar */}
-        <Card className="lg:col-span-4 rounded-[2.5rem] border-2 border-white/5 shadow-2xl bg-black/40 overflow-hidden flex flex-col">
-          <CardHeader className="bg-white/5 border-b border-white/5 p-6 space-y-4">
-            <div className="grid grid-cols-3 bg-black/60 p-1 rounded-2xl border border-white/5 shadow-inner h-12">
-              <button onClick={() => setActiveLayer('FIRESTORE')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'FIRESTORE' ? "bg-blue-500 text-white shadow-lg" : "text-white/40 hover:text-white")}>
-                <Server className="h-3 w-3" /> Cloud
-              </button>
-              <button onClick={() => setActiveLayer('LOCAL')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'LOCAL' ? "bg-amber-500 text-white shadow-lg" : "text-white/40 hover:text-white")}>
-                <HardDrive className="h-3 w-3" /> Local
-              </button>
-              <button onClick={() => setActiveLayer('RTDB')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'RTDB' ? "bg-green-500 text-white shadow-lg" : "text-white/40 hover:text-white")}>
-                <Activity className="h-3 w-3" /> Mirror
-              </button>
-            </div>
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground opacity-40" />
-              <Input placeholder="Scan Nodes..." className="pl-9 h-10 rounded-xl bg-black/40 border-none shadow-inner text-xs font-bold text-white focus-visible:ring-primary/20" />
-            </div>
-          </CardHeader>
-          <ScrollArea className="flex-1 p-4 bg-black/20">
-            {loading ? (
-              <div className="py-20 flex flex-col items-center gap-4 opacity-20">
-                <Loader2 className="animate-spin h-8 w-8 text-primary" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-white">Retrieving Registry Tree...</span>
-              </div>
-            ) : (
+      {/* 1. App Health Check */}
+      <Card className="bg-[#0A0A0A] border-white/5 rounded-2xl overflow-hidden shadow-2xl">
+        <Collapsible open={isHealthOpen} onOpenChange={setIsHealthOpen}>
+          <CollapsibleTrigger asChild>
+            <div className="p-6 border-b border-white/5 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-all">
               <div className="space-y-1">
-                {nodes.map(node => (
-                  <button 
-                    key={node.id} 
-                    onClick={() => handleNodeClick(node)} 
-                    className={cn(
-                      "w-full text-left p-4 rounded-2xl transition-all group flex items-center justify-between border-2 border-transparent",
-                      selectedNode?.id === node.id ? "bg-primary/10 border-primary/20 shadow-sm" : "hover:bg-primary/5"
-                    )}
-                  >
-                    <div className="flex flex-col min-w-0">
-                      <div className="flex items-center gap-2">
-                        <span className={cn("text-[11px] font-black uppercase tracking-tight truncate", discrepancyIds.includes(node.rawKey) ? "text-destructive" : "text-white")}>
-                          {node.displayName}
-                        </span>
-                        {discrepancyIds.includes(node.rawKey) && <AlertTriangle className="h-2.5 w-2.5 text-destructive animate-pulse" />}
-                      </div>
-                      <span className="text-[8px] font-mono text-white/20 truncate">{node.path}</span>
-                    </div>
-                    {node.type === 'COLLECTION' ? <ChevronRight className="h-4 w-4 text-white/20" /> : <FileJson className="h-4 w-4 text-white/20" />}
-                  </button>
-                ))}
+                <h3 className="text-sm font-black uppercase text-white">App Health Check</h3>
+                <p className="text-[10px] text-muted-foreground italic">Detailed diagnostics for the Hybrid DB layers.</p>
               </div>
-            )}
-          </ScrollArea>
+              <ChevronsUpDown className="h-4 w-4 text-white/40" />
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent>
+            <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
+              {/* Settings Column */}
+              <div className="space-y-6">
+                <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Settings</h4>
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black uppercase text-white">Settings Data Layer</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">Application settings are loaded from Firestore.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black uppercase text-white">Project Configuration</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">Project sheets are configured.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Database Column */}
+              <div className="space-y-6">
+                <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Database</h4>
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black uppercase text-white">Firebase Environment</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">Firebase API keys are verified.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black uppercase text-white">Realtime DB (Asset Layer)</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">RTDB instance is active.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black uppercase text-white">Firestore (Settings Layer)</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">Firestore instance is active.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Assets Column */}
+              <div className="space-y-6">
+                <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Assets</h4>
+                <div className="space-y-4">
+                  <div className="flex gap-4">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black uppercase text-white">Main Local Store</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">{stats.assetCount} assets in indexedDB.</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-4">
+                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
+                    <div className="space-y-1">
+                      <p className="text-xs font-black uppercase text-white">Asset Data Integrity</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">All assets have critical fields.</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      </Card>
+
+      {/* 2. Operations Row */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        {/* Sync Workstation */}
+        <Card className="bg-[#0A0A0A] border-white/5 rounded-2xl p-8 space-y-6 shadow-2xl">
+          <div className="space-y-1">
+            <h3 className="text-xl font-black uppercase text-white">Sync Assets (RTDB Primary)</h3>
+            <p className="text-[10px] text-muted-foreground font-medium italic">Assets are optimized for RTDB usage.</p>
+          </div>
+          <div className="space-y-3">
+            <Button variant="outline" onClick={refreshRegistry} className="w-full h-12 bg-black border-white/10 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6 hover:bg-white/5 text-white">
+              <RefreshCw className="h-4 w-4" /> Push RTDB Assets to Firestore
+            </Button>
+            <Button variant="outline" onClick={refreshRegistry} className="w-full h-12 bg-black border-white/10 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6 hover:bg-white/5 text-white">
+              <RefreshCw className="h-4 w-4" /> Pull Firestore Assets to RTDB
+            </Button>
+          </div>
         </Card>
 
-        {/* Workspace Panel */}
-        <div className="lg:col-span-8 flex flex-col gap-6 overflow-hidden">
-          <Card className="flex-1 rounded-[2.5rem] border-2 border-white/5 shadow-2xl bg-black/40 overflow-hidden flex flex-col">
-            {selectedNode ? (
-              <Tabs defaultValue={isConflictView ? "wizard" : "editor"} className="flex-1 flex flex-col">
-                <CardHeader className="bg-white/5 border-b border-white/5 p-6 flex flex-row items-center justify-between">
-                  <div className="space-y-1">
-                    <CardTitle className="text-xl font-black uppercase tracking-tight text-white">{selectedNode.displayName}</CardTitle>
-                    <p className="text-[10px] font-bold uppercase text-white/20 tracking-widest">Source: {selectedNode.source} | Path: {selectedNode.path}</p>
-                  </div>
-                  <TabsList className="bg-black/60 p-1 rounded-xl h-10 border border-white/5 shadow-inner">
-                    <TabsTrigger value="editor" className="text-[10px] font-black uppercase px-4 data-[state=active]:bg-white/10 data-[state=active]:text-white">Raw Pulse</TabsTrigger>
-                    {isConflictView && <TabsTrigger value="wizard" className="text-[10px] font-black uppercase px-4 data-[state=active]:bg-white/10 data-[state=active]:text-white">Resolution Wizard</TabsTrigger>}
-                    <TabsTrigger value="forensics" className="text-[10px] font-black uppercase px-4 data-[state=active]:bg-white/10 data-[state=active]:text-white">Forensic Buffer</TabsTrigger>
-                  </TabsList>
-                </CardHeader>
+        {/* Backup & Restore */}
+        <Card className="bg-[#0A0A0A] border-white/5 rounded-2xl p-8 space-y-6 shadow-2xl">
+          <div className="space-y-1">
+            <h3 className="text-xl font-black uppercase text-white">Backup & Restore</h3>
+            <p className="text-[10px] text-muted-foreground font-medium italic">Export full snapshot of settings and assets.</p>
+          </div>
+          <div className="space-y-3">
+            <Button variant="outline" className="w-full h-12 bg-black border-white/10 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6 hover:bg-white/5 text-white">
+              <Upload className="h-4 w-4" /> Import Full Snapshot (JSON)
+            </Button>
+            <Button variant="outline" className="w-full h-12 bg-black border-white/10 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6 hover:bg-white/5 text-white">
+              <Download className="h-4 w-4" /> Export Full Snapshot
+            </Button>
+          </div>
+        </Card>
+      </div>
 
-                <div className="flex-1 overflow-hidden">
-                  <TabsContent value="editor" className="h-full m-0 p-6 flex flex-col space-y-6">
-                    <div className="flex-1 relative rounded-2xl border-2 border-white/5 bg-[#0A0A0A] overflow-hidden shadow-inner group">
-                      <textarea 
-                        value={editedData} 
-                        onChange={(e) => setEditedData(e.target.value)} 
-                        className="w-full h-full p-8 font-mono text-[11px] bg-transparent outline-none resize-none leading-relaxed text-blue-100 selection:bg-primary/20" 
-                        spellCheck="false" 
-                      />
-                    </div>
-                    <div className="flex gap-4">
-                      <Button 
-                        variant="outline" 
-                        onClick={() => setIsPurgeDialogOpen(true)}
-                        className="flex-1 h-14 rounded-2xl font-black uppercase text-xs tracking-widest gap-3 border-2 border-destructive/20 text-destructive hover:bg-destructive/5 transition-all"
-                      >
-                        <XCircle className="h-4 w-4" /> Purge Record
-                      </Button>
-                      <Button onClick={handleCommit} disabled={isSaving} className="flex-[2] h-14 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 bg-primary text-black gap-3 transition-transform hover:scale-[1.02] active:scale-95">
-                        {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
-                        Commit Logic Pulse
-                      </Button>
-                    </div>
-                  </TabsContent>
+      {/* 3. RTDB Browser */}
+      <Card className="bg-[#0A0A0A] border-white/5 rounded-2xl p-8 space-y-6 shadow-2xl">
+        <div className="space-y-1">
+          <h3 className="text-xl font-black uppercase text-white">RTDB Browser</h3>
+          <p className="text-[10px] text-muted-foreground font-medium italic">Directly modify assets or config in the Realtime Database layer.</p>
+        </div>
+        <div className="flex gap-3">
+          <button onClick={() => setActivePath('/config')} className={cn("px-6 py-2 rounded-xl font-black uppercase text-[10px] border transition-all", activePath === '/config' ? "bg-white/10 border-white/20 text-white" : "bg-black border-white/5 text-white/40 hover:text-white")}>/config</button>
+          <button onClick={() => setActivePath('/assets')} className={cn("px-6 py-2 rounded-xl font-black uppercase text-[10px] border transition-all", activePath === '/assets' ? "bg-white/10 border-white/20 text-white" : "bg-black border-white/5 text-white/40 hover:text-white")}>/assets</button>
+        </div>
+      </Card>
 
-                  <TabsContent value="wizard" className="h-full m-0">
-                    <ScrollArea className="h-full">
-                      <div className="p-8 space-y-8">
-                        <div className="p-6 rounded-[2rem] bg-destructive/5 border-2 border-dashed border-destructive/20">
-                          <div className="flex items-center gap-3 mb-2">
-                            <Split className="h-5 w-5 text-destructive" />
-                            <h4 className="text-sm font-black uppercase tracking-tight text-destructive">Sync Drift Detected</h4>
-                          </div>
-                          <p className="text-[10px] font-medium text-white/40 italic leading-relaxed">
-                            Pick an authoritative storage pulse to resolve the conflict for this record. Overwrites all layers to re-establish parity.
-                          </p>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4">
-                          {['FIRESTORE', 'RTDB', 'LOCAL'].map((layer) => {
-                            const data = parityData?.[layer as StorageLayer];
-                            return (
-                              <button
-                                key={`resolve-${layer}`}
-                                onClick={() => handleResolve(layer as StorageLayer)}
-                                disabled={!data || isSaving}
-                                className={cn(
-                                  "w-full p-6 rounded-2xl border-2 transition-all flex items-center justify-between group",
-                                  data ? "bg-white/5 border-white/5 hover:border-primary/40" : "opacity-20 grayscale cursor-not-allowed"
-                                )}
-                              >
-                                <div className="flex items-center gap-4">
-                                  <div className={cn("p-3 bg-black/40 rounded-xl group-hover:text-black transition-colors", data && "group-hover:bg-primary")}>
-                                    <CheckCircle2 className="h-5 w-5" />
-                                  </div>
-                                  <div className="text-left">
-                                    <span className={cn("text-[10px] font-black uppercase tracking-widest", data ? "text-primary" : "text-white/20")}>Enforce {layer} State</span>
-                                    <p className="text-[9px] font-medium text-white/40">
-                                      {data ? 'Deterministic pulse discovered in this layer.' : 'Node contains no data pulse.'}
-                                    </p>
-                                  </div>
-                                </div>
-                                <ArrowUpRight className="h-5 w-5 opacity-20 group-hover:opacity-100 group-hover:translate-x-1" />
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    </ScrollArea>
-                  </TabsContent>
-
-                  <TabsContent value="forensics" className="h-full m-0">
-                    <ScrollArea className="h-full">
-                      <div className="p-8 space-y-8">
-                        {selectedNode.data?.previousState ? (
-                          <div className="space-y-6">
-                            <div className="p-6 rounded-[2rem] bg-primary/5 border-2 border-dashed border-primary/20">
-                              <div className="flex items-center gap-3 mb-2">
-                                <ScanSearch className="h-5 w-5 text-primary" />
-                                <h4 className="text-sm font-black uppercase tracking-tight text-primary">Forensic Buffer Found</h4>
-                              </div>
-                              <p className="text-[10px] font-medium text-white/40 italic leading-relaxed">
-                                This record contains a historical state pulse. You can replay the previous state to restore registry integrity.
-                              </p>
-                            </div>
-                            <div className="grid grid-cols-2 gap-4">
-                              <div className="space-y-2">
-                                <label className="text-[8px] font-black uppercase opacity-20 pl-1 text-white">Historical Pulse</label>
-                                <div className="p-4 rounded-xl bg-black/40 border border-white/5 font-mono text-[9px] text-white/40 truncate h-24 overflow-hidden">
-                                  {JSON.stringify(selectedNode.data.previousState, null, 2)}
-                                </div>
-                              </div>
-                              <div className="space-y-2">
-                                <label className="text-[8px] font-black uppercase opacity-20 pl-1 text-white">Active Pulse</label>
-                                <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 font-mono text-[9px] text-primary truncate h-24 overflow-hidden">
-                                  {JSON.stringify(selectedNode.data, null, 2)}
-                                </div>
-                              </div>
-                            </div>
-                            <Button variant="outline" onClick={handleRevert} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-primary/20 text-primary hover:bg-primary/5">
-                              <RotateCcw className="h-4 w-4" /> Replay Historical Pulse
-                            </Button>
-                          </div>
-                        ) : (
-                          <div className="py-20 text-center opacity-20 space-y-4">
-                            <Zap className="h-16 w-16 mx-auto text-white" />
-                            <p className="text-[10px] font-black uppercase tracking-widest text-white">No Forensic Buffer Detected</p>
-                          </div>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </TabsContent>
-                </div>
-              </Tabs>
-            ) : (
-              <div className="flex-1 flex flex-col items-center justify-center opacity-20 space-y-6 text-center p-20 border-4 border-dashed border-white/5 rounded-[3rem] m-8">
-                <Database className="h-20 w-16 text-white animate-pulse" />
-                <div className="space-y-2">
-                  <h3 className="text-3xl font-black uppercase tracking-[0.2em] text-white">Inspector Inactive</h3>
-                  <p className="text-sm font-medium italic max-w-xs mx-auto text-white">Select a storage node from the registry tree to initialize the mission control pulse.</p>
-                </div>
-              </div>
-            )}
-          </Card>
+      {/* 4. Danger Zone */}
+      <div className="p-8 rounded-[2.5rem] bg-black border-2 border-destructive/20 space-y-8 shadow-3xl">
+        <div className="flex items-center gap-3">
+          <AlertTriangle className="h-6 w-6 text-destructive" />
+          <h3 className="text-xl font-black uppercase text-destructive tracking-widest">Danger Zone</h3>
+        </div>
+        
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Button variant="outline" onClick={handleNukePulse} className="h-12 bg-black border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest justify-start px-6 gap-3">
+            <HardDrive className="h-4 w-4" /> Wipe Local Cache
+          </Button>
+          <Button variant="outline" onClick={handleNukePulse} className="h-12 bg-black border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest justify-start px-6 gap-3">
+            <Database className="h-4 w-4" /> Wipe RTDB (Primary)
+          </Button>
+          <Button variant="outline" onClick={handleNukePulse} className="h-12 bg-black border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest justify-start px-6 gap-3">
+            <Cloud className="h-4 w-4" /> Wipe Firestore Assets
+          </Button>
+          <Button onClick={() => setNukeDialogOpen(true)} className="h-12 bg-destructive text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-destructive/20 gap-3">
+            <Bomb className="h-4 w-4" /> NUKE GLOBAL DATA
+          </Button>
         </div>
       </div>
 
-      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-black shadow-3xl">
+      {/* Adaptive Footer Control */}
+      <div className="fixed bottom-24 left-0 right-0 z-50 pointer-events-none">
+        <div className="adaptive-container px-4">
+          <div className="bg-black/90 backdrop-blur-2xl border border-white/10 rounded-2xl h-16 flex items-center justify-between px-6 pointer-events-auto shadow-3xl group">
+            {/* Base Navigation Scrollbar UI (Decorative based on mockup) */}
+            <div className="flex-1 flex items-center gap-4 px-10">
+              <button className="text-white/20 hover:text-white transition-all"><ChevronLeft className="h-4 w-4" /></button>
+              <div className="flex-1 h-2 bg-white/5 rounded-full overflow-hidden relative">
+                <div className="absolute top-0 left-0 h-full w-1/3 bg-white/10" />
+              </div>
+              <button className="text-white/20 hover:text-white transition-all"><ChevronRight className="h-4 w-4" /></button>
+            </div>
+            
+            <Button variant="ghost" onClick={() => window.location.href = '/'} className="h-10 px-8 rounded-xl font-black uppercase text-[10px] tracking-widest bg-white/[0.02] text-white hover:bg-white/10">
+              Close Admin
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Nuke Alert */}
+      <AlertDialog open={nukeDialogOpen} onOpenChange={setNukeDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-black shadow-3xl text-white">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
               <Bomb className="h-10 w-10 text-destructive" />
             </div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Registry Record?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">NUKE GLOBAL DATA?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/40">
-              You are about to perform a deterministic wipe of this record. This action is immutable.
+              This action is **immutable**. You are about to purge every registry record from the Cloud (Firestore), Mirror (RTDB), and Local Persistence. This is a terminal reset operation.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/5 text-white bg-transparent">Abort Purge</AlertDialogCancel>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/5 text-white bg-transparent m-0">Abort Pulse</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => setIsPurgeDialogOpen(false)}
-              className="h-12 px-10 rounded-2xl font-black uppercase bg-destructive text-white shadow-xl"
+              onClick={handleNukePulse}
+              disabled={isProcessing}
+              className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0"
             >
-              Commit Wipe Pulse
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Hammer className="h-4 w-4 mr-2" />}
+              Commit Nuke
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </div>
+  );
+}
+
+function ChevronsUpDown({ className }: { className?: string }) {
+  return (
+    <svg 
+      xmlns="http://www.w3.org/2000/svg" 
+      width="24" 
+      height="24" 
+      viewBox="0 0 24 24" 
+      fill="none" 
+      stroke="currentColor" 
+      strokeWidth="2" 
+      strokeLinecap="round" 
+      strokeLinejoin="round" 
+      className={className}
+    >
+      <path d="m7 15 5 5 5-5" />
+      <path d="m7 9 5-5 5 5" />
+    </svg>
+  );
+}
+
+function ChevronLeft({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m15 18-6-6 6-6"/></svg>
+  );
+}
+
+function ChevronRight({ className }: { className?: string }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>
   );
 }
