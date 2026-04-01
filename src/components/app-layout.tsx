@@ -107,6 +107,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   };
 
+  const handleNotificationsOpenChange = (open: boolean) => {
+    setIsNotificationsOpen(open);
+    if (open && unreadCount > 0) {
+      markAllAsRead();
+    }
+  };
+
   const PortalGroup = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
     <div className="space-y-4">
       <div className="flex items-center gap-3 px-2">
@@ -410,7 +417,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             ) : (
               <div className="h-full flex flex-col items-center justify-center p-10 opacity-20 text-center gap-4">
                 <CheckCheck className="h-16 w-16" />
-                <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Notification status: Clear</p>
+                <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Notification status: Clear</p>
               </div>
             )}
           </ScrollArea>
