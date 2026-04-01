@@ -69,7 +69,7 @@ import { Progress } from "@/components/ui/progress";
 import { AssetForm } from "./asset-form";
 import type { Asset, SheetDefinition, DisplayField } from "@/lib/types";
 import { useToast } from "@/hooks/use-toast";
-import { parseExcelFile, exportToExcel, sanitizeForFirestore } from "@/lib/excel-parser";
+import { parseExcelFile, exportToExcel } from "@/lib/excel-parser";
 import { NIGERIAN_ZONES, NIGERIAN_STATES, ZONAL_STORES, SPECIAL_LOCATIONS, NIGERIAN_STATE_CAPITALS } from "@/lib/constants";
 import { useAppState, type SortConfig } from "@/contexts/app-state-context";
 import { useAuth } from "@/contexts/auth-context";
@@ -78,7 +78,7 @@ import { CategoryBatchEditForm, type CategoryBatchUpdateData } from "./category-
 import { PaginationControls } from "./pagination-controls";
 import { getAssets, batchSetAssets, deleteAsset, batchDeleteAssets, updateSettings } from "@/lib/firestore";
 import { getLocalAssets as getLocalAssetsFromDb, saveAssets, clearAssets as clearLocalAssets, getLockedOfflineAssets, saveLockedOfflineAssets, clearLockedOfflineAssets } from "@/lib/idb";
-import { cn, normalizeAssetLocation, getStatusClasses } from "@/lib/utils";
+import { cn, normalizeAssetLocation, getStatusClasses, sanitizeForFirestore } from "@/lib/utils";
 import { addNotification } from "@/hooks/use-notifications";
 import { ColumnCustomizationSheet } from "./column-customization-sheet";
 import { TravelReportDialog } from "./travel-report-dialog";
@@ -111,6 +111,7 @@ const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean 
 
 const LocationProgress: React.FC<{ locationName: string; allAssets: Asset[]; appMode: 'management' | 'verification' }> = ({ locationName, allAssets, appMode }) => {
     const locationAssets = useMemo(() => {
+        if (!allAssets) return [];
         if (locationName === 'All') {
             return allAssets;
         }
@@ -409,8 +410,8 @@ export default function AssetList() {
       setIsLoading(true);
       const localAssets = await getLocalAssetsFromDb();
       const localOfflineAssets = await getLockedOfflineAssets();
-      setAssets(localAssets);
-      setOfflineAssets(localOfflineAssets);
+      setAssets(localAssets || []);
+      setOfflineAssets(localOfflineAssets || []);
       setIsLoading(false);
     };
 
@@ -441,7 +442,7 @@ export default function AssetList() {
   }, [appSettings.appMode, setStatusOptions]);
 
   const allAssetsForFiltering = useMemo(() => {
-    const currentAssets = dataSource === 'cloud' ? assets : offlineAssets;
+    const currentAssets = (dataSource === 'cloud' ? assets : offlineAssets) || [];
     if (isAdmin && globalStateFilter && globalStateFilter !== 'All') {
         const zones: Record<string, string[]> = NIGERIAN_ZONES;
         const capitals: Record<string, string> = NIGERIAN_STATE_CAPITALS;
@@ -525,7 +526,7 @@ export default function AssetList() {
   };
 
   const displayedAssets = useMemo(() => {
-    let results = allAssetsForFiltering.filter(asset => enabledSheets.includes(asset.category));
+    let results = (allAssetsForFiltering || []).filter(asset => enabledSheets.includes(asset.category));
 
     const hasFilters = selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
     if (hasFilters) {
@@ -554,7 +555,7 @@ export default function AssetList() {
   }, [allAssetsForFiltering, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter, sortConfig, enabledSheets]);
 
   const assetsByCategory = useMemo(() => {
-    return displayedAssets.reduce((acc, asset) => {
+    return (displayedAssets || []).reduce((acc, asset) => {
         const category = asset.category || 'Uncategorized';
         if (!acc[category]) {
             acc[category] = [];
@@ -704,7 +705,7 @@ export default function AssetList() {
     const assetsToUpdateCount = selectedAssetIds.length;
     addNotification({ title: 'Batch Updating...', description: `Applying changes to ${assetsToUpdateCount} assets.` });
     
-    const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
+    const sourceAssets = (dataSource === 'cloud' ? assets : offlineAssets) || [];
     const assetsToUpdate = sourceAssets.filter(asset => selectedAssetIds.includes(asset.id));
     
     const updatedAssets = assetsToUpdate.map(asset => {
@@ -755,7 +756,7 @@ export default function AssetList() {
       return;
     }
 
-    const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
+    const sourceAssets = (dataSource === 'cloud' ? assets : offlineAssets) || [];
     const originalAsset = sourceAssets.find(a => a.id === assetToSave.id);
 
     const changes: Partial<Asset> = {};
@@ -834,7 +835,7 @@ export default function AssetList() {
   };
 
   const handleQuickSaveAsset = async (assetId: string, data: { remarks?: string; condition?: string; verifiedStatus?: 'Verified' | 'Unverified', verifiedDate?: string }) => {
-    const sourceAssets = dataSource === 'cloud' ? assets : offlineAssets;
+    const sourceAssets = (dataSource === 'cloud' ? assets : offlineAssets) || [];
     const asset = sourceAssets.find(a => a.id === assetId);
     if (!asset) return;
 
@@ -923,7 +924,7 @@ export default function AssetList() {
   
   const handleSelectAll = (checked: boolean, allFilteredAssets: Asset[]) => {
     if (checked) {
-      setSelectedAssetIds(allFilteredAssets.map(a => a.id));
+      setSelectedAssetIds((allFilteredAssets || []).map(a => a.id));
     } else {
       setSelectedAssetIds([]);
     }
@@ -1307,12 +1308,12 @@ export default function AssetList() {
 
   // DASHBOARD VIEW
   if (view === 'dashboard') {
-    const totalAssetsInScope = allAssetsForFiltering.length;
-    const currentlyDisplayedAssets = displayedAssets.length;
-    const verifiedStateAssets = displayedAssets.filter(asset => asset.verifiedStatus === 'Verified').length;
+    const totalAssetsInScope = (allAssetsForFiltering || []).length;
+    const currentlyDisplayedAssets = (displayedAssets || []).length;
+    const verifiedStateAssets = (displayedAssets || []).filter(asset => asset.verifiedStatus === 'Verified').length;
     const verificationPercentage = currentlyDisplayedAssets > 0 ? (verifiedStateAssets / currentlyDisplayedAssets) * 100 : 0;
     const isFiltered = searchTerm || selectedLocations.length > 0 || selectedAssignees.length > 0 || selectedStatuses.length > 0 || missingFieldFilter;
-    const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.length === Object.keys(assetsByCategory).length;
+    const areAllCategoriesSelected = Object.keys(assetsByCategory).length > 0 && selectedCategories.size === Object.keys(assetsByCategory).length;
     
     const contextualButtonText = dataSource === 'local_locked' ? 'Merge to Main List' : 'Upload Selection';
     const ContextualButtonIcon = dataSource === 'local_locked' ? ArrowRightLeft : CloudUpload;
@@ -1355,7 +1356,7 @@ export default function AssetList() {
                           onValueChange={(value) => setGlobalStateFilter(value)}
                       >
                       <SelectTrigger className="w-full md:w-[280px]">
-                        <SelectValue placeholder="Select a location to filter..." />
+                        <SelectValue placeholder="Select a location..." />
                       </SelectTrigger>
                         <SelectContent>
                             <ScrollArea className="h-[400px]">
@@ -1515,7 +1516,7 @@ export default function AssetList() {
   }
 
   // TABLE VIEW
-  const paginatedCategoryAssets = categoryFilteredAssets.slice(
+  const paginatedCategoryAssets = (categoryFilteredAssets || []).slice(
     (currentPage - 1) * itemsPerPage,
     currentPage * itemsPerPage
   );

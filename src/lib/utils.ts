@@ -1,12 +1,32 @@
 import { clsx, type ClassValue } from "clsx"
 import { twMerge } from "tailwind-merge"
 import { NIGERIAN_STATES, NIGERIAN_STATE_CAPITALS } from "./constants";
+import { Timestamp } from 'firebase/firestore';
 import React from "react";
 
 export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+export const sanitizeForFirestore = <T extends object>(obj: T): T => {
+    const sanitizedObj: { [key: string]: any } = {};
+    for (const key in obj) {
+        const value = (obj as any)[key];
+        if (key === 'previousState') {
+            continue; 
+        }
+        if (value !== undefined) {
+            if (value instanceof Date) {
+                sanitizedObj[key] = Timestamp.fromDate(value);
+            } else if (value instanceof Timestamp) {
+                sanitizedObj[key] = value;
+            } else {
+                sanitizedObj[key] = value;
+            }
+        }
+    }
+    return sanitizedObj as T;
+};
 
 export const normalizeAssetLocation = (location?: string): string => {
     if (!location) return '';
