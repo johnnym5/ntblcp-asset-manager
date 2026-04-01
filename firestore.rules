@@ -12,18 +12,8 @@ service cloud.firestore {
      *
      * Data Structure:
      * - User Profiles and Roles: Flat structure under /users and /app_roles_{role}.
-     * - Assets & Verifications: Hierarchically nested under /grants/{grantId}/assets/... to enforce 
-     *   path-based context.
-     * - Infrastructure: Workbooks and Audit Logs are top-level administrative collections.
-     *
-     * Key Security Decisions:
-     * - Authorization Independence: User roles are mirrored into specific collections (e.g., /app_roles_admins)
-     *   allowing the rules to use `exists()` checks which are faster and more reliable than `get()` on a user profile.
-     * - Structural Segregation: Administrative data (Workbooks) is separated from operational data (Assets).
-     * - Denormalization: Critical IDs (like creatorId or grantId) are enforced on document creation to 
-     *   ensure relational integrity without needing to crawl the document tree.
-     * - Audit Integrity: The /audit_logs collection is strictly read-only for clients. All writes must
-     *   originate from a secure server-side environment (Admin SDK).
+     * - Assets: Root-level collection for high-speed global synchronization and reporting.
+     * - Infrastructure: Config, Workbooks, and Audit Logs are top-level administrative collections.
      */
 
     // --- GLOBAL HELPER FUNCTIONS ---
@@ -38,12 +28,8 @@ service cloud.firestore {
 
     /**
      * Checks if a user has a specific role by looking for an entry in the dedicated role collection.
-     * This pattern follows the "Authorization Independence" principle.
      */
     function hasRole(role) {
-      // FIX: Paths within functions like 'exists()' must use path literal syntax with $(variable) interpolation
-      // for contextual variables like `database` and `request.auth.uid`, and for string arguments like `role`.
-      // The entire path expression must be enclosed in quotes to be treated as a string literal.
       return isSignedIn() && exists("/databases/$(database)/documents/app_roles_$(role)/$(request.auth.uid)");
     }
 
@@ -66,11 +52,7 @@ service cloud.firestore {
     // --- COLLECTION RULES ---
 
     /**
-     * @description Rules for user profiles. Users can manage their own profile; Admins can manage all.
-     * @path /users/{userId}
-     * @allow (get) Any authenticated user. (create) User matching the ID. (update) Owner or Admin.
-     * @deny (list) Requests to list all users without Admin privileges.
-     * @principle Ownership and Role-based management.
+     * @description Rules for user profiles.
      */
     match /users/{userId} {
       allow get: if isSignedIn();
@@ -81,124 +63,85 @@ service cloud.firestore {
     }
 
     /**
-     * @description Role indicator collections used for DBAC (Database Access Control).
-     * @path /app_roles_{role}/{userId}
-     * @allow (get) The user themselves or an Admin.
-     * @deny (write) Any client-side write operation. These are managed by SuperAdmins via Server/Cloud Functions.
-     * @principle Authorization Independence via dedicated role mapping.
+     * @description Role indicator collections used for DBAC.
      */
-    match /app_roles_super_admins/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
-      allow create, update, delete: if isSuperAdmin();
-    }
-    match /app_roles_admins/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
-      allow create, update, delete: if isSuperAdmin();
-    }
-    match /app_roles_managers/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
-      allow create, update, delete: if isSuperAdmin();
-    }
-    match /app_roles_verifiers/{userId} {
-      allow get: if isOwner(userId) || isAdmin();
-      allow list: if isAdmin();
-      allow create, update, delete: if isSuperAdmin();
+    match /app_roles_super_admins/{userId} { allow get: if isOwner(userId) || isAdmin(); allow list: if isAdmin(); allow write: if false; }
+    match /app_roles_admins/{userId} { allow get: if isOwner(userId) || isAdmin(); allow list: if isAdmin(); allow write: if false; }
+    match /app_roles_managers/{userId} { allow get: if isOwner(userId) || isAdmin(); allow list: if isAdmin(); allow write: if false; }
+    match /app_roles_verifiers/{userId} { allow get: if isOwner(userId) || isAdmin(); allow list: if isAdmin(); allow write: if false; }
+
+    /**
+     * @description Global application configuration pulse.
+     */
+    match /config/settings {
+      allow get: if isSignedIn();
+      allow create, update: if isAdmin();
+      allow delete: if isSuperAdmin();
     }
 
     /**
-     * @description Grants management. Managers can create and edit grants.
-     * @path /grants/{grantId}
-     * @allow (read) All authenticated staff. (write) Managers and above.
-     * @deny (write) Verifiers or Viewers.
-     * @principle Global role-based write access.
+     * @description Core asset records.
+     */
+    match /assets/{assetId} {
+      allow get, list: if isSignedIn();
+      allow create: if isManager();
+      allow update: if isVerifier() && (request.resource.data.grantId == resource.data.grantId);
+      allow delete: if isAdmin();
+    }
+
+    /**
+     * @description Grants management.
      */
     match /grants/{grantId} {
       allow get, list: if isSignedIn();
-      allow create: if isManager() && request.resource.data.createdByUserId == request.auth.uid;
+      allow create: if isManager();
       allow update: if isManager() && resource != null;
       allow delete: if isAdmin() && resource != null;
     }
 
     /**
-     * @description Core asset records nested under grants.
-     * @path /grants/{grantId}/assets/{assetId}
-     * @allow (read) All staff. (create/update) Managers.
-     * @deny (delete) Anyone below Admin.
-     * @principle Relational integrity via grantId context and Manager-level authority.
-     */
-    match /grants/{grantId}/assets/{assetId} {
-      allow get, list: if isSignedIn();
-      allow create: if isManager() && request.resource.data.grantId == grantId && request.resource.data.createdByUserId == request.auth.uid;
-      allow update: if isManager() && resource != null && request.resource.data.grantId == resource.data.grantId;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
-     * @description Verification events for physical assets.
-     * @path /grants/{grantId}/assets/{assetId}/verifications/{verificationId}
-     * @allow (read) All staff. (create/update) Verifiers and above.
-     * @deny (update) Changing the asset link after creation.
-     * @principle Verifier ownership and path-to-data consistency.
-     */
-    match /grants/{grantId}/assets/{assetId}/verifications/{verificationId} {
-      allow get, list: if isSignedIn();
-      allow create: if isVerifier() && request.resource.data.assetId == assetId && request.resource.data.verifiedByUserId == request.auth.uid;
-      allow update: if isVerifier() && resource != null && request.resource.data.assetId == resource.data.assetId;
-      allow delete: if isAdmin() && resource != null;
-    }
-
-    /**
      * @description Metadata for uploaded Excel sources.
-     * @path /workbooks/{workbookId}
-     * @allow (read) Managers+. (write) Admins+.
-     * @deny (write) Managers or Verifiers.
-     * @principle Administrative segregation of source data.
      */
     match /workbooks/{workbookId} {
       allow get, list: if isManager();
-      allow create: if isAdmin() && request.resource.data.uploadedByUserId == request.auth.uid;
+      allow create: if isAdmin();
       allow update: if isAdmin() && resource != null;
       allow delete: if isSuperAdmin() && resource != null;
 
-      /**
-       * @description Sheets within workbooks. Inherits workbook security.
-       * @path /workbooks/{workbookId}/sheets/{sheetId}
-       */
       match /sheets/{sheetId} {
         allow get, list: if isManager();
-        allow create: if isAdmin() && request.resource.data.workbookId == workbookId;
+        allow create: if isAdmin();
         allow update: if isAdmin() && resource != null;
         allow delete: if isSuperAdmin() && resource != null;
       }
     }
 
     /**
-     * @description Metadata for photos and documents. Context fields enable "Authorization Independence".
-     * @path /attachments/{attachmentId}
-     * @allow (read) All staff. (create) Any staff member. (delete) Owner or Admin.
-     * @deny (update) Mutating existing attachment metadata.
-     * @principle Verified uploader identity.
+     * @description Metadata for photos and documents.
      */
     match /attachments/{attachmentId} {
       allow get, list: if isSignedIn();
-      allow create: if isSignedIn() && request.resource.data.uploadedByUserId == request.auth.uid;
-      allow update: if false; // Attachments are generally immutable once uploaded
+      allow create: if isSignedIn();
+      allow update: if false; 
       allow delete: if (isOwner(resource.data.uploadedByUserId) || isAdmin()) && resource != null;
     }
 
     /**
-     * @description Immutable audit logs. No client-side writes permitted.
-     * @path /audit_logs/{logId}
-     * @allow (read) Admins and SuperAdmins.
-     * @deny (write) All client requests.
-     * @principle Write-once integrity via server-only enforcement.
+     * @description Immutable activity logs.
      */
     match /audit_logs/{logId} {
       allow get, list: if isAdmin();
-      allow create, update, delete: if false;
+      allow create: if isSignedIn();
+      allow update, delete: if false;
+    }
+
+    /**
+     * @description Resilience audit logs.
+     */
+    match /error_logs/{logId} {
+      allow get, list: if isAdmin();
+      allow create: if isSignedIn();
+      allow update, delete: if isAdmin();
     }
   }
 }
