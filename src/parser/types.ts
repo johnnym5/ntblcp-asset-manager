@@ -1,41 +1,34 @@
 /**
- * @fileOverview Parser System Types.
+ * @fileOverview Structural Parser System Types.
+ * Defines the models for group-aware, template-driven registry ingestion.
  */
 
-import type { Asset, SectionHierarchy } from '@/types/domain';
+import type { Asset } from '@/types/domain';
 
 export type RowClassification = 
   | 'EMPTY' 
-  | 'DOC_TITLE' 
-  | 'SECTION_TITLE' 
+  | 'GROUP_HEADER' 
   | 'SCHEMA_HEADER' 
   | 'DATA_ROW' 
   | 'UNKNOWN';
 
-export interface WorkbookProfile {
-  id: 'TB_PROFILE' | 'C19_PROFILE';
-  workbookMatchHints: string[];
-  sheetNameHints: string[];
-  titlePatterns: string[];
-  sectionPatterns: string[];
-  primaryHeaderSignature: string[];
-  secondaryHeaderSignatures: string[][];
-  headerAliases: Record<string, string>;
-  grantKey: string;
+export interface HeaderTemplate {
+  id: string;
+  rawHeaders: string[];
+  normalizedHeaders: string[];
+  columnCount: number;
+  signature: string; // Hash of header positions
 }
 
-export interface ParserState {
-  profile: WorkbookProfile | null;
+export interface GroupBlock {
+  workbookName: string;
   sheetName: string;
-  docTitle: string;
-  sectionPath: {
-    documentTitle: string;
-    majorSection: string;
-    subsection: string;
-    assetFamily: string;
-  };
-  activeHeader: string[] | null;
-  activeHeaderMap: Record<string, number> | null;
+  groupHeader: string;
+  startRow: number;
+  endRow?: number;
+  templateId: string;
+  rawHeaders: string[];
+  assets: ParsedAsset[];
 }
 
 export interface ValidationSummary {
@@ -48,6 +41,8 @@ export interface ValidationSummary {
 
 export interface ParsedAsset extends Asset {
   validation: ValidationSummary;
+  sourceGroup: string;
+  templateId: string;
 }
 
 export interface ImportRunSummary {
@@ -55,14 +50,18 @@ export interface ImportRunSummary {
   sheetName: string;
   profileId: string;
   totalRows: number;
-  titleRows: number;
-  sectionRows: number;
-  headerRows: number;
+  groupCount: number;
   dataRowsImported: number;
   rowsRejected: number;
-  rowsRequiringReview: number;
   duplicatesDetected: number;
-  warningsCount: number;
-  errorsCount: number;
+  templatesDiscovered: number;
   sectionBreakdown: Record<string, number>;
+}
+
+export interface ParserState {
+  activeGroup: string;
+  activeTemplateId: string;
+  activeHeaders: string[];
+  workbookName: string;
+  sheetName: string;
 }

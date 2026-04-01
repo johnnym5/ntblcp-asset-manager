@@ -80,12 +80,6 @@ export interface Asset {
   
   geotag?: Geotag;
 
-  // Depreciation Pulse (TB Specific)
-  depreciation?: {
-    ngn: Record<string, number>;
-    usd: Record<string, number>;
-  };
-
   // Metadata & Traceability
   hierarchy: SectionHierarchy;
   importMetadata: ImportMetadata;
@@ -99,6 +93,11 @@ export interface Asset {
   // Restoration Buffer
   previousState?: Partial<Asset> | null;
   
+  // Structural Parsing Provenance
+  sourceGroup?: string;
+  sourceColumnAGroup?: string;
+  templateId?: string;
+
   // Governance
   approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   pendingChanges?: Partial<Asset>;
