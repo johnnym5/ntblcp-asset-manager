@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -83,7 +82,6 @@ export function SettingsWorkstation() {
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
-  const [newProjectName, setNewProjectName] = useState("");
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [isNukeDialogOpen, setIsNukeDialogOpen] = useState(false);
