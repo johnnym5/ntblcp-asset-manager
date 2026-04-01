@@ -100,7 +100,6 @@ export function RegistryWorkstation() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
-  const [pulseView, setPulseView] = useState<'stats' | 'insights'>('stats');
 
   // Sorting Logic State
   const [sortKey, setSortKey] = useState<string>('sn');
@@ -266,25 +265,6 @@ export function RegistryWorkstation() {
           <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl" title="Logic Filters"><Filter className="h-5 w-5" /></Button>
         </div>
       </div>
-
-      {/* 2. Inventory Pulse Card */}
-      <Card className="bg-[#0A0A0A] border-none shadow-3xl rounded-[2.5rem] overflow-hidden group">
-        <CardContent className="p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-          <div className="flex items-center gap-6">
-            <div className="p-4 bg-primary/10 rounded-2xl group-hover:bg-primary/20 transition-colors shadow-inner">
-              <Activity className="h-8 w-8 text-primary" />
-            </div>
-            <div className="space-y-1">
-              <h3 className="text-2xl font-black uppercase text-white leading-none">Inventory Pulse</h3>
-              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground opacity-60">Registry Health Telemetry</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-4 bg-black/60 p-1 rounded-2xl border border-white/5 w-full sm:w-auto">
-            <button onClick={() => setPulseView('stats')} className={cn("flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all", pulseView === 'stats' ? "bg-white/10 text-white shadow-lg" : "text-muted-foreground hover:text-white")}>Stats</button>
-            <button onClick={() => setPulseView('insights')} className={cn("flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all", pulseView === 'insights' ? "bg-white/10 text-white shadow-lg" : "text-muted-foreground hover:text-white")}>Insights</button>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* 3. Header Section */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-6 py-2 px-1">
