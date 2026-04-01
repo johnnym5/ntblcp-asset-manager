@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - SPA Decentralized Registry.
+ * Phase 74: Hardened On-Device Save Protocol.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -74,6 +75,7 @@ export function RegistryWorkstation() {
     dataSource, 
     setDataSource, 
     refreshRegistry, 
+    manualDownload,
     activeGrantId, 
     appSettings,
     isOnline,
@@ -86,7 +88,6 @@ export function RegistryWorkstation() {
 
   const [headers, setHeaders] = useState<RegistryHeader[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
-  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
   // Logic State
@@ -99,13 +100,8 @@ export function RegistryWorkstation() {
   const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
-  const [isBrandingOpen, setIsBrandingOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isPrintDialogOpen, setIsPrintDialogOpen] = useState(false);
-  const [isReassignDialogOpen, setIsReassignDialogOpen] = useState(false);
-  const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
-  const [isReassigning, setIsReassigning] = useState(false);
 
   useEffect(() => {
     const savedHeaders = localStorage.getItem('registry-header-prefs');
@@ -281,7 +277,19 @@ export function RegistryWorkstation() {
       <AssetForm 
         isOpen={isFormOpen} 
         onOpenChange={setIsFormOpen} 
-        onSave={async (a) => { await refreshRegistry(); setIsFormOpen(false); }} 
+        asset={processedRecords.find(r => r.id === selectedRecord?.id)?.rawRow as unknown as Asset}
+        onSave={async (a) => { 
+          const isUpdate = assets.some(x => x.id === a.id);
+          await enqueueMutation(isUpdate ? 'UPDATE' : 'CREATE', 'assets', a);
+          
+          const local = await storage.getAssets();
+          const next = isUpdate ? local.map(x => x.id === a.id ? a : x) : [a, ...local];
+          await storage.saveAssets(next);
+          
+          await refreshRegistry();
+          setIsFormOpen(false); 
+          toast({ title: "Modification Staged", description: "Record pulse saved on device. Manual sync required." });
+        }} 
         isReadOnly={false} 
         onQuickSave={async () => {}} 
       />

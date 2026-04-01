@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - SPA Shell Persistence.
- * Phase 69: Grouped functional units and transitioned to state-driven navigation.
+ * Phase 74: Manual Sync Controls and Togglable Cloud Pulse.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -37,7 +37,9 @@ import {
   LayoutGrid,
   FileSpreadsheet,
   FolderKanban,
-  ChevronDown
+  ChevronDown,
+  Download,
+  Upload
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -88,7 +90,18 @@ const GOVERNANCE_NAV: NavItem[] = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { userProfile, logout } = useAuth();
   const { toast } = useToast();
-  const { isOnline, isSyncing, assets, appSettings, refreshRegistry, activeView, setActiveView } = useAppState();
+  const { 
+    isOnline, 
+    setIsOnline, 
+    isSyncing, 
+    assets, 
+    appSettings, 
+    refreshRegistry, 
+    manualDownload,
+    manualUpload,
+    activeView, 
+    setActiveView 
+  } = useAppState();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isInboxOpen, setIsInboxOpen] = useState(false);
@@ -317,13 +330,52 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               <QrCode className="h-5 w-5" />
             </Button>
 
+            <div className="hidden sm:flex items-center gap-2 mr-2">
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={manualDownload} 
+                      disabled={isSyncing || !isOnline}
+                      className="rounded-xl border-2 h-10 w-10 bg-card hover:bg-primary/5"
+                    >
+                      <Download className={cn("h-4 w-4 text-primary", isSyncing && "animate-spin")} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="rounded-xl font-bold uppercase text-[9px] tracking-widest">Manual Download (Cloud -> Device)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={manualUpload} 
+                      disabled={isSyncing || !isOnline}
+                      className="rounded-xl border-2 h-10 w-10 bg-card hover:bg-primary/5"
+                    >
+                      <Upload className={cn("h-4 w-4 text-primary", isSyncing && "animate-spin")} />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent className="rounded-xl font-bold uppercase text-[9px] tracking-widest">Manual Upload (Device -> Cloud)</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            </div>
+
             <TooltipProvider>
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <div className={cn(
-                    "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-2xl border-2 transition-all cursor-help shadow-sm", 
-                    isOnline ? "border-green-500/20 bg-green-50/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive animate-pulse"
-                  )}>
+                  <button 
+                    onClick={() => setIsOnline(!isOnline)}
+                    className={cn(
+                      "flex items-center gap-2 sm:gap-3 px-3 sm:px-4 py-2 rounded-2xl border-2 transition-all cursor-pointer shadow-sm", 
+                      isOnline ? "border-green-500/20 bg-green-50/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive animate-pulse"
+                    )}
+                  >
                     <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} />
                     <span className="text-[10px] font-black uppercase tracking-tighter hidden xs:inline">{isOnline ? 'Cloud' : 'Offline'}</span>
                     <Separator orientation="vertical" className="h-4 opacity-20 hidden xs:block" />
@@ -332,15 +384,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                       <Activity className={cn("h-3 w-3", isSyncing ? "text-primary animate-pulse" : "opacity-30")} />
                       <Globe className={cn("h-3 w-3", isOnline ? "text-green-600" : "text-destructive")} />
                     </div>
-                  </div>
+                  </button>
                 </TooltipTrigger>
                 <TooltipContent side="bottom" className="p-4 rounded-[1.5rem] border-2 shadow-2xl space-y-2 min-w-[220px]">
-                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b pb-2">Redundancy Pulse</p>
+                  <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground border-b pb-2">Cloud Pulse Protocol</p>
                   <div className="space-y-1.5 text-[10px] font-bold">
-                    <div className="flex justify-between items-center"><span className="opacity-60">Local Persistence:</span><span className="text-green-600">STABLE</span></div>
-                    <div className="flex justify-between items-center"><span className="opacity-60">Shadow Mirror:</span><span className={cn(isOnline ? "text-green-600" : "text-destructive")}>{isOnline ? 'ACTIVE' : 'LATENT'}</span></div>
-                    <div className="flex justify-between items-center"><span className="opacity-60">Cloud Authority:</span><span className={cn(isOnline ? "text-green-600" : "text-destructive")}>{isOnline ? 'REACHABLE' : 'ZERO PULSE'}</span></div>
+                    <div className="flex justify-between items-center"><span className="opacity-60">Status:</span><span className={cn(isOnline ? "text-green-600" : "text-destructive")}>{isOnline ? 'ONLINE AWARE' : 'MANUAL ISOLATION'}</span></div>
+                    <div className="flex justify-between items-center"><span className="opacity-60">Local Storage:</span><span className="text-green-600">PERSISTENT</span></div>
                   </div>
+                  <p className="pt-2 text-[8px] font-medium italic text-muted-foreground leading-tight">Tap to toggle cloud awareness. Fully manual on-device pulse enabled.</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>

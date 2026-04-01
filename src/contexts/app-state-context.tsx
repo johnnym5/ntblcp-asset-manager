@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview AppStateContext - Unified Data & SPA Orchestrator.
- * Phase 67: Deep-Hydration Protocol for 100% Offline Autonomy.
- * SPA View State enables zero-latency transitions between workstations.
+ * Phase 74: Fully Manual Synchronization Protocol.
+ * Decouples cloud pulses from automatic triggers to ensure "On-Device" autonomy.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
@@ -34,7 +34,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   uxMode: 'beginner',
   onboardingComplete: false,
   showHelpTooltips: true,
-  autoSync: true,
+  autoSync: false,
   autoAnalyze: false,
   autoSuggestFilters: true,
   sourceBranding: {}
@@ -54,6 +54,8 @@ interface AppStateContextType {
   settingsLoaded: boolean;
   isHydrated: boolean;
   refreshRegistry: () => Promise<void>;
+  manualDownload: () => Promise<void>;
+  manualUpload: () => Promise<void>;
   activeGrantId: string | null;
   setActiveGrantId: (id: string) => Promise<void>;
   setReadAuthority: (node: AuthorityNode) => Promise<void>;
@@ -143,48 +145,84 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   }, []);
 
   const refreshRegistry = useCallback(async () => {
-    if (!isOnline) return;
+    /**
+     * Phase 74: Fully Manual Reconciliation.
+     * This pulse now ONLY reconciles the Context State with the local IndexedDB.
+     * It no longer triggers background cloud sync.
+     */
+    try {
+      const [localAssets, localSettings] = await Promise.all([
+        storage.getAssets(),
+        storage.getSettings()
+      ]);
+
+      if (localSettings) setAppSettings(localSettings);
+      
+      const currentGrantId = localSettings?.activeGrantId || activeGrantId;
+      const filtered = currentGrantId 
+        ? (localAssets || []).filter(a => a.grantId === currentGrantId)
+        : (localAssets || []);
+
+      setAssets(filtered);
+    } catch (e) {
+      console.error("Local Reconciliation Failure", e);
+    }
+  }, [activeGrantId]);
+
+  const manualDownload = useCallback(async () => {
+    if (!isOnline) {
+      addNotification({ title: "Cloud Offline", description: "Enable Cloud Pulse to initiate download.", variant: "destructive" });
+      return;
+    }
     setIsSyncing(true);
     try {
-      await processSyncQueue();
       const authority = appSettings?.readAuthority || 'FIRESTORE';
-      let remoteSettings = null;
-
-      try {
-        remoteSettings = authority === 'FIRESTORE' 
-          ? await FirestoreService.getSettings() 
-          : await getRtdbSettings();
-      } catch (e) {
-        console.warn("Reconciliation: Settings pulse latent.");
-      }
+      
+      // 1. Fetch Settings
+      const remoteSettings = authority === 'FIRESTORE' 
+        ? await FirestoreService.getSettings() 
+        : await getRtdbSettings();
 
       if (remoteSettings) {
         setAppSettings(remoteSettings);
         await storage.saveSettings(remoteSettings);
         
+        // 2. Fetch Assets for Active Project
         if (remoteSettings.activeGrantId) {
-          let remoteAssets: Asset[] = [];
-          try {
-            remoteAssets = authority === 'FIRESTORE'
-              ? await FirestoreService.getProjectAssets(remoteSettings.activeGrantId)
-              : await getRtdbAssets(remoteSettings.activeGrantId);
-          } catch (e) {
-            console.warn("Reconciliation: Asset pulse latent.");
-          }
+          const remoteAssets = authority === 'FIRESTORE'
+            ? await FirestoreService.getProjectAssets(remoteSettings.activeGrantId)
+            : await getRtdbAssets(remoteSettings.activeGrantId);
 
           if (remoteAssets.length > 0) {
             const localAssets = await storage.getAssets();
             const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
             const combinedAssets = [...otherAssets, ...remoteAssets];
             await storage.saveAssets(combinedAssets);
-            setAssets(remoteAssets);
           }
         }
       }
+      await refreshRegistry();
+      addNotification({ title: "Download Complete", description: "Registry synchronized with cloud authority." });
+    } catch (e) {
+      addNotification({ title: "Download Interrupted", variant: "destructive" });
     } finally {
       setIsSyncing(false);
     }
-  }, [isOnline, appSettings]);
+  }, [isOnline, appSettings, refreshRegistry]);
+
+  const manualUpload = useCallback(async () => {
+    if (!isOnline) {
+      addNotification({ title: "Cloud Offline", description: "Enable Cloud Pulse to initiate upload.", variant: "destructive" });
+      return;
+    }
+    setIsSyncing(true);
+    try {
+      await processSyncQueue();
+      await refreshRegistry();
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [isOnline, refreshRegistry]);
 
   const setDataSource = (source: DataSource) => {
     setDataSourceStatus(source);
@@ -192,6 +230,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const setIsOnline = (status: boolean) => {
     setIsOnlineStatus(status);
+    addNotification({ 
+      title: status ? "Cloud Pulse Enabled" : "Cloud Pulse Inhibited", 
+      description: status ? "Application is now online-aware." : "Manual off-device triggers only." 
+    });
   };
 
   const setActiveGrantId = async (id: string) => {
@@ -202,9 +244,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     if (isOnline) {
       FirestoreService.updateSettings({ activeGrantId: id });
     }
-    const localAssets = await storage.getAssets();
-    setAssets(localAssets.filter(a => a.grantId === id));
-    refreshRegistry();
+    await refreshRegistry();
   };
 
   const setReadAuthority = async (node: AuthorityNode) => {
@@ -216,19 +256,17 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       await FirestoreService.updateSettings({ readAuthority: node });
     }
     addNotification({ title: 'Authority Shifted', description: `Read priority now: ${node}.` });
-    refreshRegistry();
+    await refreshRegistry();
   };
 
   useEffect(() => {
     const bootstrap = async () => {
       await hydrateFromLocalStore();
       setSettingsLoaded(true);
-      if (navigator.onLine) {
-        refreshRegistry();
-      }
+      // Phase 74: Automatic cloud reconciliation on boot disabled.
     };
     bootstrap();
-  }, [hydrateFromLocalStore, refreshRegistry]);
+  }, [hydrateFromLocalStore]);
 
   return (
     <AppStateContext.Provider value={{
@@ -245,6 +283,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       settingsLoaded,
       isHydrated,
       refreshRegistry,
+      manualDownload,
+      manualUpload,
       activeGrantId,
       setActiveGrantId,
       setReadAuthority,

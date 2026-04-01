@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview SyncQueueWorkstation - SPA Pending Operations Module.
+ * Phase 74: Manual Sync Orchestration.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -18,7 +19,9 @@ import {
   Activity,
   Zap,
   Box,
-  ArrowRight
+  ArrowRight,
+  Upload,
+  Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,7 +35,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export function SyncQueueWorkstation() {
-  const { isSyncing, refreshRegistry } = useAppState();
+  const { isSyncing, refreshRegistry, manualUpload, manualDownload, isOnline } = useAppState();
   const { toast } = useToast();
   const [queue, setQueue] = useState<OfflineQueueEntry[]>([]);
 
@@ -64,19 +67,24 @@ export function SyncQueueWorkstation() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-2">
           <h2 className="text-3xl font-black tracking-tight uppercase flex items-center gap-3">
-            <Activity className="h-8 w-8 text-primary" /> Pending Sync
+            <Activity className="h-8 w-8 text-primary" /> Sync Workstation
           </h2>
-          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Write-Ahead Ledger & Conflict Resolution Pulses</p>
+          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Manual Write-Ahead Ledger Management</p>
         </div>
-        <Button disabled={isSyncing} onClick={refreshRegistry} className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">
-          {isSyncing ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4 fill-current" />} Trigger Global Pulse
-        </Button>
+        <div className="flex items-center gap-3">
+          <Button variant="outline" disabled={isSyncing || !isOnline} onClick={manualDownload} className="h-12 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest border-2">
+            <Download className="h-4 w-4 mr-2" /> Pull Cloud State
+          </Button>
+          <Button disabled={isSyncing || !isOnline} onClick={manualUpload} className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">
+            {isSyncing ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />} Execute Sync Pulse
+          </Button>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
         <Card className="border-2 rounded-[2rem]"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Queue Depth</CardTitle></CardHeader><CardContent><div className="text-5xl font-black">{pendingCount}</div></CardContent></Card>
         <Card className="border-2 rounded-[2rem] border-destructive/20"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-destructive">Logic Conflicts</CardTitle></CardHeader><CardContent><div className="text-5xl font-black text-destructive">{failedCount}</div></CardContent></Card>
-        <Card className="border-2 rounded-[2rem] border-green-500/20"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600">Parity Health</CardTitle></CardHeader><CardContent><div className="text-5xl font-black text-green-600">100%</div></CardContent></Card>
+        <Card className="border-2 rounded-[2rem] border-green-500/20"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600">Sync Awareness</CardTitle></CardHeader><CardContent><div className={cn("text-5xl font-black", isOnline ? "text-green-600" : "text-muted-foreground")}>{isOnline ? 'ON' : 'OFF'}</div></CardContent></Card>
       </div>
 
       {queue.length > 0 ? (

@@ -1,6 +1,7 @@
 /**
  * @fileOverview Background Synchronization Engine.
  * Responsible for queue replay and conflict reconciliation.
+ * Phase 74: Auto-pulse de-integrated for fully manual user triggers.
  */
 
 import { storage } from './storage';
@@ -14,6 +15,7 @@ let isSyncing = false;
 /**
  * Replays the offline queue to the cloud services.
  * Implements deterministic sequential processing to maintain state integrity.
+ * This is now ONLY called by manual user triggers.
  */
 export async function processSyncQueue(): Promise<void> {
   if (isSyncing || typeof window === 'undefined' || !navigator.onLine) return;
@@ -60,8 +62,14 @@ export async function processSyncQueue(): Promise<void> {
 
   if (successCount > 0) {
     addNotification({
-      title: "Synchronization Heartbeat",
+      title: "Synchronization Complete",
       description: `Successfully broadcast ${successCount} local modifications to the cloud registry.`
+    });
+  } else {
+    addNotification({
+      title: "Sync Heartbeat latent",
+      description: "No local changes were successfully broadcast.",
+      variant: "destructive"
     });
   }
 
@@ -70,10 +78,6 @@ export async function processSyncQueue(): Promise<void> {
 }
 
 /**
- * Listen for network restoration to trigger sync.
+ * Phase 74: Window-level online auto-sync de-integrated.
+ * Auditors must explicitly execute the sync pulse via the workstation triggers.
  */
-if (typeof window !== 'undefined') {
-  window.addEventListener('online', () => {
-    processSyncQueue();
-  });
-}
