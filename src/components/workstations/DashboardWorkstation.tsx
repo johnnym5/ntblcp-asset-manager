@@ -116,11 +116,6 @@ export function DashboardWorkstation() {
             </Badge>
           </div>
         </div>
-        <div className="flex items-center gap-2">
-          <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2 border-2 hover:bg-primary/5 transition-all">
-            <Zap className="h-4 w-4 text-primary" /> Ingest Workbook
-          </Button>
-        </div>
       </div>
 
       {/* 2. Interactive Analytics Pulse */}
