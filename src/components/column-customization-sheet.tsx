@@ -66,8 +66,6 @@ export function ColumnCustomizationSheet({
   }, [isOpen, sheetDefinition]);
   
   const handleAddField = (type: string) => {
-    const customFieldKeys: (keyof Asset)[] = ['metadata']; 
-    
     const newField: DisplayField = {
         key: `custom_${Date.now()}` as any,
         label: `New ${type} Field`,
@@ -185,9 +183,9 @@ export function ColumnCustomizationSheet({
                 <ArrowLeft className="h-5 w-5" />
               </Button>
             </div>
-            <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
+            <SheetDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
               Defining technical field mapping for category: <span className="text-primary">{editedName}</span>
-            </DialogDescription>
+            </SheetDescription>
           </SheetHeader>
         </div>
 
