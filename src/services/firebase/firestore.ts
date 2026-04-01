@@ -1,8 +1,7 @@
+
 /**
  * @fileOverview Hardened Firestore Service.
- * Phase 105: Reinforced Manual Tiered Sync (Local -> Firestore -> RTDB).
- * Phase 106: Added state-scoped asset retrieval for regional isolation.
- * Phase 107: Using explicit FirestoreService references to avoid context loss.
+ * Phase 270: Enhanced getProjectAssets to support multi-state scoping for Zonal Admins.
  */
 
 import { 
@@ -30,9 +29,6 @@ import { batchSetAssets as mirrorToRtdb, updateSettings as mirrorSettingsToRtdb,
 import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
 
 export const FirestoreService = {
-  /**
-   * Fetches the global application configuration.
-   */
   async getSettings(): Promise<AppSettings | null> {
     if (!db) return null;
     const settingsRef = doc(db, 'config', 'settings');
@@ -45,9 +41,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Updates global configuration.
-   */
   async updateSettings(settings: Partial<AppSettings>) {
     if (!db) return;
     const settingsRef = doc(db, 'config', 'settings');
@@ -57,7 +50,6 @@ export const FirestoreService = {
       FirestoreService.handlePermissionError(settingsRef, 'update', err, sanitized);
     });
 
-    // Mirroring pulse is manual/synced via Infrastructure workstation, but we maintain a hot-standby path
     try {
       const fullSettings = await FirestoreService.getSettings();
       if (fullSettings) {
@@ -70,20 +62,22 @@ export const FirestoreService = {
 
   /**
    * Fetches assets for the active project scope.
-   * Supports regional state-locking for non-admin downloads.
+   * Phase 270: Upgraded to support array-based state filtering for Zonal Admins.
    */
-  async getProjectAssets(grantId: string, stateScope?: string): Promise<Asset[]> {
+  async getProjectAssets(grantId: string, stateScopes?: string[]): Promise<Asset[]> {
     if (!db) return [];
     const assetsRef = collection(db, 'assets');
     
     let q;
+    const hasStates = stateScopes && stateScopes.length > 0 && !stateScopes.includes('All');
+
     if (grantId === 'ALL_PROJECTS') {
-      q = stateScope 
-        ? query(assetsRef, where('location', '==', stateScope))
+      q = hasStates 
+        ? query(assetsRef, where('location', 'in', stateScopes))
         : query(assetsRef);
     } else {
-      q = stateScope
-        ? query(assetsRef, where('grantId', '==', grantId), where('location', '==', stateScope))
+      q = hasStates
+        ? query(assetsRef, where('grantId', '==', grantId), where('location', 'in', stateScopes))
         : query(assetsRef, where('grantId', '==', grantId));
     }
 
@@ -96,13 +90,9 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Tiered Mutation Pulse: Firestore Commit -> Shadow Mirror (RTDB) Broadcast.
-   */
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
 
-    // Filter out transient local fields before validation
     const assetToSave = { ...asset };
     delete (assetToSave as any).photoUrl;
     delete (assetToSave as any).photoDataUri;
@@ -124,16 +114,13 @@ export const FirestoreService = {
       const currentSnap = await getDoc(assetRef);
       const previousState = currentSnap.exists() ? currentSnap.data() : null;
 
-      // 1. Primary Authority Commit (Firestore)
       await setDoc(assetRef, {
         ...sanitized,
         previousState: previousState ? sanitizeForFirestore(previousState) : null
       }, { merge: true });
       
-      // 2. Tier 3: Mirror Pulse (RTDB Shadow)
       mirrorToRtdb([sanitized as Asset]).catch(e => console.warn("Mirroring: Shadow pulse latent."));
 
-      // 3. Activity Ledger Pulse
       await FirestoreService.logActivity({
         assetId: asset.id,
         assetDescription: asset.description,
@@ -149,9 +136,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Deletes a single asset from Firestore.
-   */
   async deleteAsset(id: string): Promise<void> {
     if (!db) return;
     const assetRef = doc(db, 'assets', id);
@@ -163,10 +147,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * High-speed global purge of all assets.
-   * Deterministic prepare for new data ingestion.
-   */
   async purgeAllAssets(): Promise<number> {
     if (!db) return 0;
     const assetsRef = collection(db, 'assets');
@@ -186,7 +166,6 @@ export const FirestoreService = {
     
     try {
       await batch.commit();
-      // Wipe Shadow Tier as well
       await clearRtdb();
     } catch (err: any) {
       FirestoreService.handlePermissionError(assetsRef.path, 'delete', err);
@@ -204,9 +183,6 @@ export const FirestoreService = {
     return total;
   },
 
-  /**
-   * Logs a technical incident to the resilience audit registry.
-   */
   async logErrorAudit(entry: ErrorLogEntry) {
     if (!db) return;
     const errorRef = doc(db, 'error_logs', entry.id);
@@ -214,7 +190,6 @@ export const FirestoreService = {
       await setDoc(errorRef, sanitizeForFirestore(entry));
     } catch (e: any) {
       FirestoreService.handlePermissionError(errorRef, 'create', e, entry);
-      console.error("Monitoring: Double-fault detected. Cloud logging failed.", e);
     }
   },
 
@@ -253,7 +228,6 @@ export const FirestoreService = {
       await addDoc(logRef, sanitized);
     } catch (e: any) {
       FirestoreService.handlePermissionError(logRef.path, 'create', e, entry);
-      console.error("Failed to log activity pulse", e);
     }
   },
 
@@ -301,10 +275,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Centralized helper to create and emit FirestorePermissionError.
-   * This is critical for Security Rules debugging and agentive fixing.
-   */
   handlePermissionError(
     refOrPath: string | DocumentReference, 
     operation: 'get' | 'list' | 'create' | 'update' | 'delete' | 'write', 
@@ -318,9 +288,7 @@ export const FirestoreService = {
         operation,
         requestResourceData: data,
       });
-      // Emit via central emitter for FirebaseErrorListener to catch and surface
       errorEmitter.emit('permission-error', permissionError);
-      // Also log to internal resilience monitor
       monitoring.trackError(permissionError, { action: operation, module: 'Firestore' }, 'CRITICAL');
     }
   }

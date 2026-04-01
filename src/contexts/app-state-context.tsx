@@ -1,9 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 170: Hardened manual sync triggers with deterministic feedback.
- * Phase 171: Implemented state-scoped downloads for regional isolation.
+ * Phase 270: Implemented multi-state scope downloads for Zonal Administrators.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react';
@@ -45,7 +45,6 @@ interface AppStateContextType {
   setActiveGrantId: (id: string) => Promise<void>;
   setReadAuthority: (node: AuthorityNode) => Promise<void>;
   
-  // Unified Registry State
   headers: RegistryHeader[];
   setHeaders: Dispatch<SetStateAction<RegistryHeader[]>>;
   sortKey: string;
@@ -53,7 +52,6 @@ interface AppStateContextType {
   sortDir: 'asc' | 'desc';
   setSortDir: Dispatch<SetStateAction<'asc' | 'desc'>>;
 
-  // Global Filter States
   globalStateFilter: string;
   setGlobalStateFilter: Dispatch<SetStateAction<string>>;
   selectedLocations: string[];
@@ -67,7 +65,6 @@ interface AppStateContextType {
   missingFieldFilter: string;
   setMissingFieldFilter: Dispatch<SetStateAction<string>>;
 
-  // Filter Options (Computed)
   locationOptions: OptionType[];
   assigneeOptions: OptionType[];
   conditionOptions: OptionType[];
@@ -91,12 +88,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
 
-  // Unified Registry State
   const [headers, setHeaders] = useState<RegistryHeader[]>([]);
   const [sortKey, setSortKey] = useState<string>('sn');
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
 
-  // Logic Engine States
   const [globalStateFilter, setGlobalStateFilter] = useState('All');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
@@ -106,7 +101,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
-  // --- Computed Options Pulse ---
   const locationOptions = useMemo(() => {
     const counts = new Map<string, number>();
     assets.forEach(a => {
@@ -145,7 +139,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   useEffect(() => { setIsHydrated(true); }, []);
 
-  // Initialize Headers
   useEffect(() => {
     if (!isHydrated) return;
     const savedHeaders = localStorage.getItem('registry-header-prefs');
@@ -202,13 +195,17 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       return;
     }
 
-    // RBAC: Identify the authorized regional scope for the current session
     const userSession = localStorage.getItem('assetain-user-session');
     const profile = userSession ? JSON.parse(userSession) : null;
-    const stateScope = (profile && !profile.isAdmin) ? profile.state : undefined;
+    
+    // Phase 270: Extract all authorized state scopes for the user (Zonal Admin support)
+    const stateScopes = (profile && !profile.isAdmin) ? profile.states : undefined;
 
     setIsSyncing(true);
-    toast({ title: "Reconciling Authority...", description: stateScope ? `Fetching latest records for ${stateScope}.` : "Fetching latest project scope from cloud." });
+    toast({ 
+      title: "Reconciling Authority...", 
+      description: stateScopes ? `Fetching records for authorized state scope.` : "Fetching latest project scope from cloud." 
+    });
     
     try {
       const remoteSettings = await FirestoreService.getSettings();
@@ -217,17 +214,25 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         await storage.saveSettings(remoteSettings);
         
         if (remoteSettings.activeGrantId) {
-          // Pulse: Fetch only state-specific assets if the user is not an admin
-          const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId, stateScope);
+          // Fetch only authorized records
+          const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId, stateScopes);
           const localAssets = await storage.getAssets();
           
-          // Merge logic: Keep assets from other projects/states, overwrite active scope
-          const otherAssets = stateScope
-            ? localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId || (a.location || '').toLowerCase() !== stateScope.toLowerCase())
-            : localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
+          // Selective merge logic: preserve other projects, overwrite active scope
+          let nextAssets;
+          if (stateScopes) {
+            const scopeSet = new Set(stateScopes.map(s => s.toLowerCase()));
+            const otherAssets = localAssets.filter(a => 
+              a.grantId !== remoteSettings.activeGrantId || 
+              !scopeSet.has((a.location || '').toLowerCase())
+            );
+            nextAssets = [...otherAssets, ...remoteAssets];
+          } else {
+            const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
+            nextAssets = [...otherAssets, ...remoteAssets];
+          }
             
-          await storage.saveAssets([...otherAssets, ...remoteAssets]);
-          
+          await storage.saveAssets(nextAssets);
           addNotification({ 
             title: "Download Complete", 
             description: `Successfully synchronized ${remoteAssets.length} records.` 

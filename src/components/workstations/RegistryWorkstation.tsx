@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview RegistryWorkstation - High-Fidelity Asset Inventory.
- * Phase 260: Achieved 100% screenshot parity for the category grouping cards.
+ * Phase 270: Resolved ReferenceErrors and enforced strict Zonal RBAC visibility.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -20,7 +21,8 @@ import {
   Trash2,
   Loader2,
   X,
-  FileSpreadsheet
+  FileSpreadsheet,
+  ShieldAlert
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -30,6 +32,7 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
+import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { TagPrintDialog } from '@/components/registry/TagPrintDialog';
 import { transformAssetToRecord } from '@/lib/registry-utils';
@@ -37,6 +40,9 @@ import { ExcelService } from '@/services/excel-service';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { isWithinScope } from '@/core/auth/rbac';
+import { enqueueMutation } from '@/offline/queue';
+import { storage } from '@/offline/storage';
 import type { Asset } from '@/types/domain';
 
 interface RegistryWorkstationProps {
@@ -62,24 +68,37 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
+  // --- UI State ---
   const [selectedCategory, setSelectedCategory] = useState<string | null>(viewAll ? 'ALL' : null);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
+  // --- Derived State ---
+  const selectedAsset = useMemo(() => 
+    assets.find(a => a.id === selectedAssetId), 
+    [assets, selectedAssetId]
+  );
+
   const filteredAssets = useMemo(() => {
     let results = assets;
-    if (!userProfile?.isAdmin && userProfile?.state) {
-      const userState = userProfile.state.toLowerCase().trim();
-      results = results.filter(a => (a.location || '').toLowerCase().trim() === userState);
+
+    // RBAC: Enforce regional authorized scope pulse
+    if (!userProfile?.isAdmin) {
+      results = results.filter(a => isWithinScope(userProfile as any, a));
     }
+
+    // Tab Filtering
     if (selectedCategory && selectedCategory !== 'ALL') {
       results = results.filter(a => a.category === selectedCategory);
     }
+
+    // Search Logic
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       results = results.filter(a => 
@@ -88,24 +107,35 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
         a.serialNumber.toLowerCase().includes(term)
       );
     }
+
+    // Secondary Filter State
     if (selectedLocations.length > 0) results = results.filter(a => selectedLocations.includes(a.location));
     if (selectedAssignees.length > 0) results = results.filter(a => selectedAssignees.includes(a.custodian));
     if (selectedStatuses.length > 0) results = results.filter(a => selectedStatuses.includes(a.status));
     if (selectedConditions.length > 0) results = results.filter(a => selectedConditions.includes(a.condition));
     if (missingFieldFilter) results = results.filter(a => !(a as any)[missingFieldFilter]);
     
+    // Sort Sequence
     results = [...results].sort((a, b) => {
       const valA = String((a as any)[sortKey] || '').toLowerCase();
       const valB = String((b as any)[sortKey] || '').toLowerCase();
       return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
     });
+
     return results;
   }, [assets, selectedCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, sortKey, sortDir, userProfile]);
 
+  const selectedRecordsForPrint = useMemo(() => {
+    return filteredAssets
+      .filter(a => selectedIds.has(a.id))
+      .map(a => transformAssetToRecord(a, headers));
+  }, [filteredAssets, selectedIds, headers]);
+
   const categoryStats = useMemo(() => {
-    const scopedAssets = !userProfile?.isAdmin && userProfile?.state
-      ? assets.filter(a => (a.location || '').toLowerCase().trim() === userProfile.state.toLowerCase().trim())
+    const scopedAssets = !userProfile?.isAdmin
+      ? assets.filter(a => isWithinScope(userProfile as any, a))
       : assets;
+
     const groups = scopedAssets.reduce((acc, a) => {
       const cat = a.category || 'General Register';
       if (!acc[cat]) acc[cat] = { total: 0, verified: 0 };
@@ -113,9 +143,11 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
       if (a.status === 'VERIFIED') acc[cat].verified++;
       return acc;
     }, {} as Record<string, { total: number, verified: number }>);
+
     return Object.entries(groups).map(([name, stats]) => ({ name, ...stats })).sort((a, b) => a.name.localeCompare(b.name));
   }, [assets, userProfile]);
 
+  // --- Handlers ---
   const handleToggleSelect = (id: string) => {
     const next = new Set(selectedIds);
     if (next.has(id)) next.delete(id);
@@ -146,8 +178,11 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   };
 
   const handleDeleteSelected = () => {
-    // Basic confirmation pulse
-    toast({ title: "Delete Pulse Inhibited", description: "Wipe operation requires Super Admin clearance." });
+    if (!userProfile?.isAdmin) {
+      toast({ variant: "destructive", title: "Action Inhibited", description: "Wipe operation requires administrative clearance." });
+      return;
+    }
+    toast({ title: "Delete Pulse Not Initialized", description: "This is a deterministic state operation." });
   };
 
   const isListView = selectedCategory || viewAll;
@@ -260,7 +295,10 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
                 <RegistryTable records={filteredAssets.map(a => transformAssetToRecord(a, headers))} onInspect={handleInspect} selectedIds={selectedIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} />
               )}
               {filteredAssets.length === 0 && (
-                <div className="py-40 text-center opacity-20 flex flex-col items-center gap-6"><Boxes className="h-16 w-16 md:h-20 md:w-20" /><p className="text-lg font-black uppercase tracking-widest">Registry Silent</p></div>
+                <div className="py-40 text-center opacity-20 flex flex-col items-center gap-6">
+                  <Boxes className="h-16 w-16 md:h-20 md:w-20" />
+                  <p className="text-lg font-black uppercase tracking-widest">Registry Silent</p>
+                </div>
               )}
             </motion.div>
           )}
@@ -300,10 +338,26 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
         isOpen={isDetailOpen} 
         onOpenChange={setIsDetailOpen} 
         record={filteredAssets.find(a => a.id === selectedAssetId) ? transformAssetToRecord(filteredAssets.find(a => a.id === selectedAssetId)!, headers) : undefined}
-        onEdit={() => {}}
+        onEdit={() => { setIsDetailOpen(false); setIsFormOpen(true); }}
       />
+
+      <AssetForm 
+        isOpen={isFormOpen} 
+        onOpenChange={setIsFormOpen} 
+        asset={selectedAsset} 
+        isReadOnly={false} 
+        onSave={async (a) => { 
+          await enqueueMutation('UPDATE', 'assets', a); 
+          const currentLocal = await storage.getAssets();
+          await storage.saveAssets(currentLocal.map(x => x.id === a.id ? a : x));
+          await refreshRegistry(); 
+          setIsFormOpen(false); 
+          toast({ title: "Modification Pulse Complete" });
+        }} 
+      />
+
       <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async () => { setSelectedIds(new Set()); await refreshRegistry(); }} />
-      <TagPrintDialog isOpen={isPrintOpen} onOpenChange={setIsPrintOpen} records={filteredAssets.filter(a => selectedIds.has(a.id)).map(a => transformAssetToRecord(a, headers))} />
+      <TagPrintDialog isOpen={isPrintOpen} onOpenChange={setIsPrintOpen} records={selectedRecordsForPrint} />
     </div>
   );
 }

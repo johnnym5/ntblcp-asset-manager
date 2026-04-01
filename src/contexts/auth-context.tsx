@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview AuthContext - Identity & Access Gateway.
- * Phase 68: Establishing Firebase Auth session during login pulse for rule parity.
+ * Phase 270: Expanded profile to include regional scope inheritance for Zonal Admins.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
@@ -19,6 +20,9 @@ export interface LocalUserProfile {
   state: string; 
   isAdmin: boolean;
   role: UserRole;
+  states: string[];
+  isZonalAdmin?: boolean;
+  assignedZone?: string;
   canAddAssets?: boolean;
   canEditAssets?: boolean;
 }
@@ -66,9 +70,17 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const authorizedUser = allUsers.find(u => u.loginName === profile.loginName);
         
         if (authorizedUser) {
-          setUserProfile(profile);
+          // Restore full scope info from the latest authorized user pulse
+          const mergedProfile: LocalUserProfile = {
+            ...profile,
+            states: authorizedUser.states,
+            isZonalAdmin: authorizedUser.isZonalAdmin,
+            assignedZone: authorizedUser.assignedZone,
+            role: authorizedUser.role,
+            isAdmin: authorizedUser.isAdmin || authorizedUser.role === 'ADMIN' || authorizedUser.role === 'SUPERADMIN'
+          };
+          setUserProfile(mergedProfile);
           setProfileSetupComplete(true);
-          // Auto-resume Firebase session if profile exists
           FirebaseAuthService.ensureSession();
         } else {
           localStorage.removeItem('assetain-user-session');
@@ -93,7 +105,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = async (user: AuthorizedUser, state: string) => {
     setLoading(true);
     try {
-      // Establish Firebase Auth session for Security Rules parity
       await FirebaseAuthService.ensureSession();
 
       const newProfile: LocalUserProfile = {
@@ -102,6 +113,9 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         displayName: user.displayName,
         email: user.email,
         state: state,
+        states: user.states,
+        isZonalAdmin: user.isZonalAdmin,
+        assignedZone: user.assignedZone,
         isAdmin: user.isAdmin || user.role === 'ADMIN' || user.role === 'SUPERADMIN',
         role: user.role,
       };
