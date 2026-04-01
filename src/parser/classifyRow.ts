@@ -1,7 +1,7 @@
 /**
  * @fileOverview Deterministic Structural Row Classifier.
  * Identifies the functional role of a row based on Column A behavior and row density.
- * Phase 185: Expanded SCHEMA_HEADER triggers and reduced DATA_ROW density threshold.
+ * Phase 195: Hardened for high-volume registers (14k+ rows).
  */
 
 import { RowClassification } from './types';
@@ -15,7 +15,7 @@ const KNOWN_GROUP_KEYWORDS = [
 
 const SCHEMA_ANCHORS = [
   'S/N', 'SN', 'S.N', 'SERIAL NO', 'SERIAL NUMBER', 
-  'STATE', 'LOCATION', 'DATE', 'ASSET', 'TAG'
+  'STATE', 'LOCATION', 'DATE', 'ASSET', 'TAG', 'MODEL', 'MAKE', 'REG', 'NAME'
 ];
 
 export function classifyRow(row: any[]): RowClassification {
@@ -27,25 +27,29 @@ export function classifyRow(row: any[]): RowClassification {
   const colA_Upper = colA.toUpperCase();
   
   // 1. SCHEMA_HEADER: Explicitly identifies the start of a data block
-  if (SCHEMA_ANCHORS.some(anchor => colA_Upper === anchor)) {
+  if (SCHEMA_ANCHORS.some(anchor => colA_Upper === anchor || colA_Upper.startsWith(anchor + ' '))) {
     return 'SCHEMA_HEADER';
+  }
+
+  // 2. DATA_ROW: If Col A is numeric, it is almost certainly an S/N data row in NTBLCP registers
+  const isNumericColA = colA !== '' && !isNaN(Number(colA.replace(/[^0-9.]/g, '')));
+  if (isNumericColA) {
+    return 'DATA_ROW';
   }
 
   const populatedCount = row.filter(c => c !== null && String(c).trim() !== '').length;
 
-  // 2. GROUP_HEADER: Structural section boundary in Column A
+  // 3. GROUP_HEADER: Structural section boundary in Column A
   // A group header is usually a standalone label in Col A that is NOT a number.
   const isKeywordMatch = KNOWN_GROUP_KEYWORDS.some(k => colA_Upper.includes(k));
   const isStandaloneColA = colA && populatedCount <= 2;
-  const isNotNumber = isNaN(Number(colA));
 
-  if (isStandaloneColA && isNotNumber && (isKeywordMatch || colA.length > 5)) {
-    // Basic length guard to avoid misclassifying very short text fragments
+  if (isStandaloneColA && (isKeywordMatch || colA.length > 5)) {
     return 'GROUP_HEADER';
   }
 
-  // 3. DATA_ROW: Any row with content that isn't a header or group boundary
-  if (populatedCount >= 1) {
+  // 4. DATA_ROW FALLBACK: If there is significant data density, treat as data
+  if (populatedCount >= 2) {
     return 'DATA_ROW';
   }
 
