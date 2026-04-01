@@ -20,6 +20,15 @@ export interface HeaderTemplate {
   signature: string; // Hash of header positions
 }
 
+export interface DiscoveredGroup {
+  groupName: string;
+  headerSet: string[];
+  headerSource: 'explicit' | 'inferred';
+  columnCount: number;
+  templateId: string;
+  startRow: number;
+}
+
 export interface ValidationSummary {
   warnings: string[];
   errors: string[];

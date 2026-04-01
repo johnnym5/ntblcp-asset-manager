@@ -9,7 +9,8 @@ import { normalizeHeaderName } from '@/lib/registry-utils';
 import type { 
   ParsedAsset, 
   ImportRunSummary, 
-  HeaderTemplate 
+  HeaderTemplate,
+  DiscoveredGroup
 } from './types';
 import type { Asset } from '@/types/domain';
 
@@ -26,12 +27,16 @@ export class ParserEngine {
   /**
    * Main Pulse: Two-Stage Discovery & Import
    */
-  public parseWorkbook(sheetName: string, data: any[][]): { assets: ParsedAsset[], summary: ImportRunSummary } {
+  public parseWorkbook(sheetName: string, data: any[][]): { 
+    assets: ParsedAsset[], 
+    summary: ImportRunSummary,
+    groups: DiscoveredGroup[]
+  } {
     // STAGE 1: Discovery Pulse - Learn the Structural Landscape
     this.discoverTemplates(data);
 
     // STAGE 2: Ingestion Pulse - Map Data to Learned Templates
-    const assets = this.executeIngestion(sheetName, data);
+    const { assets, groups } = this.executeIngestion(sheetName, data);
 
     const groupCounts: Record<string, number> = {};
     assets.forEach(a => {
@@ -51,7 +56,7 @@ export class ParserEngine {
       sectionBreakdown: groupCounts
     };
 
-    return { assets, summary };
+    return { assets, summary, groups };
   }
 
   /**
@@ -87,10 +92,12 @@ export class ParserEngine {
   /**
    * STAGE 2: Import every asset row under its detected group context.
    */
-  private executeIngestion(sheetName: string, data: any[][]): ParsedAsset[] {
+  private executeIngestion(sheetName: string, data: any[][]): { assets: ParsedAsset[], groups: DiscoveredGroup[] } {
     const assets: ParsedAsset[] = [];
+    const groups: Map<string, DiscoveredGroup> = new Map();
     let activeGroup: string = 'General Register';
     let activeTemplate: HeaderTemplate | null = null;
+    let headerSource: 'explicit' | 'inferred' = 'inferred';
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
@@ -99,7 +106,8 @@ export class ParserEngine {
       // Context Shift: New Group Header detected in Column A
       if (classification === 'GROUP_HEADER') {
         activeGroup = String(row[0]).trim();
-        activeTemplate = null; // Clear active template, must find/infer new one
+        activeTemplate = null; 
+        headerSource = 'inferred';
         continue;
       }
 
@@ -107,14 +115,38 @@ export class ParserEngine {
       if (classification === 'SCHEMA_HEADER') {
         const sig = row.map(c => String(c || '').trim()).filter(h => h.length > 0).join('|');
         activeTemplate = this.templates.get(sig) || null;
+        headerSource = 'explicit';
+        
+        // Track the structural node for visualization
+        if (activeTemplate) {
+          groups.set(activeGroup, {
+            groupName: activeGroup,
+            headerSet: activeTemplate.rawHeaders,
+            headerSource: 'explicit',
+            columnCount: activeTemplate.columnCount,
+            templateId: activeTemplate.id,
+            startRow: i + 1
+          });
+        }
         continue;
       }
 
       // Record Pulse: Data row detected
       if (classification === 'DATA_ROW') {
-        // Inference Rule: If no active anchor, match row shape to learned templates
         if (!activeTemplate) {
           activeTemplate = this.inferTemplateFromRow(row);
+          headerSource = 'inferred';
+          
+          if (activeTemplate && !groups.has(activeGroup)) {
+            groups.set(activeGroup, {
+              groupName: activeGroup,
+              headerSet: activeTemplate.rawHeaders,
+              headerSource: 'inferred',
+              columnCount: activeTemplate.columnCount,
+              templateId: activeTemplate.id,
+              startRow: i + 1
+            });
+          }
         }
 
         if (activeTemplate) {
@@ -124,16 +156,14 @@ export class ParserEngine {
       }
     }
 
-    return assets;
+    return { assets, groups: Array.from(groups.values()) };
   }
 
   private inferTemplateFromRow(row: any[]): HeaderTemplate | null {
     let bestMatch: HeaderTemplate | null = null;
     let maxOverlap = 0;
 
-    // Matching Rule: Match row density and populated positions to discovered templates
     this.templates.forEach(tpl => {
-      // Logic: If the row has enough columns to be part of this template
       if (tpl.columnCount >= row.length && tpl.columnCount > maxOverlap) {
         bestMatch = tpl;
         maxOverlap = tpl.columnCount;
@@ -146,7 +176,7 @@ export class ParserEngine {
   private mapRowToDomain(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
     const asset: any = {
       id: uuidv4(),
-      category: group, // Section becomes the primary category for this batch
+      category: group,
       description: '',
       grantId: 'SYSTEM_STAGED', 
       section: group,
@@ -180,31 +210,25 @@ export class ParserEngine {
       templateId: tpl.id
     };
 
-    // Deterministic Column Mapping Pulse
     tpl.normalizedHeaders.forEach((key, idx) => {
       const val = row[idx];
       if (val !== undefined && val !== null) {
         const strVal = String(val).trim();
-        // Domain Matching: Check if key maps to Asset domain fields
         if (this.isDomainField(key)) {
           asset[key] = strVal;
         } else {
-          // Sequestration: Safe isolation into metadata pulse
           asset.metadata[tpl.rawHeaders[idx] || `COL_${idx}`] = val;
         }
       }
     });
 
-    // Post-Processing & Quality Pulse
     if (asset.sn && !isNaN(Number(asset.sn))) asset.sn = Number(asset.sn);
     
-    // Duplicate Detection Pulse
     if (asset.serialNumber && this.existingSerials.has(asset.serialNumber)) {
       asset.validation.duplicateFlags.push('Duplicate Serial Detected');
       asset.validation.needsReview = true;
     }
 
-    // Integrity: Must have at least an ID or Description to join the registry
     if (asset.description || asset.assetIdCode || asset.serialNumber) {
       return asset as ParsedAsset;
     }
