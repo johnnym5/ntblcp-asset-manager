@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - Unified Single-Scope Hub.
- * Phase 225: Optimized for global header-based command hub integration.
+ * Phase 240: Removed registry from overview per high-fidelity request.
  */
 
 import React, { useState } from 'react';
@@ -81,7 +81,7 @@ export function DashboardWorkstation() {
         <Tabs value={activeTab} className="w-full">
           <TabsContent value="overview" className="m-0 space-y-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <AssetSummaryDashboard />
-            <RegistryWorkstation />
+            {/* Registry removed from Overview per request. It stays in Inventory tab only. */}
           </TabsContent>
 
           <TabsContent value="inventory" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
