@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview ImportWorkstation - Advanced Ingestion Center.
- * Phase 128: Aligned engine method call to parseWorkbook.
+ * @fileOverview ImportWorkstation - Asset Data Import Center.
+ * Phase 131: Renamed naming scheme to be asset manager friendly.
  */
 
 import React, { useState, useRef } from 'react';
@@ -72,7 +72,6 @@ export function ImportWorkstation() {
       const engine = new ParserEngine(file.name, existingAssets);
       setProgress(60);
       
-      // Standardized method call name to match engine.ts
       const result = engine.parseWorkbook(sheetName, data);
       
       setStagedAssets(result.assets);
@@ -85,8 +84,8 @@ export function ImportWorkstation() {
       }, 800);
 
     } catch (error) {
-      console.error("Ingestion error:", error);
-      toast({ variant: "destructive", title: "Ingestion Failure", description: "The workbook structure is not deterministic." });
+      console.error("Import error:", error);
+      toast({ variant: "destructive", title: "Import Failure", description: "The workbook structure could not be mapped correctly." });
       setCurrentStep('INGEST');
     }
   };
@@ -103,11 +102,11 @@ export function ImportWorkstation() {
       const current = await storage.getAssets();
       await storage.saveAssets([...validAssets, ...current]);
       
-      toast({ title: "Registry Merged", description: `${validAssets.length} records pushed to production pulse.` });
+      toast({ title: "Import Successful", description: `${validAssets.length} assets added to the register.` });
       await refreshRegistry();
       setCurrentStep('SUMMARY');
     } catch (e) {
-      toast({ variant: "destructive", title: "Merge Failure" });
+      toast({ variant: "destructive", title: "Registration Failure" });
     } finally {
       setIsProcessing(false);
     }
@@ -121,15 +120,15 @@ export function ImportWorkstation() {
             <div className="p-3 bg-primary/10 rounded-2xl">
               <DatabaseZap className="h-8 w-8 text-primary" />
             </div>
-            Ingestion Center
+            Data Import Center
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Multi-Profile Registry Engineering & Extraction Pulse
+            Hierarchical Data Ingestion & Registry Engineering
           </p>
         </div>
         {currentStep !== 'INGEST' && (
           <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-12 px-6 rounded-xl font-black uppercase text-[9px] border-2">
-            <Trash2 className="mr-2 h-3.5 w-3.5" /> Discard Run
+            <Trash2 className="mr-2 h-3.5 w-3.5" /> Discard Import
           </Button>
         )}
       </div>
@@ -144,13 +143,13 @@ export function ImportWorkstation() {
                   <FileSpreadsheet className="h-16 w-16 text-primary" />
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-3xl font-black uppercase">Ingest Workbook</h3>
+                  <h3 className="text-3xl font-black uppercase">Import Registry Workbook</h3>
                   <p className="text-sm font-medium text-muted-foreground max-w-sm mx-auto italic opacity-70">
-                    The deterministic analyzer supports TB.xlsx and C19 ASSETS.xlsx profiles with full section context preservation.
+                    Supports TB and C19 registry profiles with automatic section detection.
                   </p>
                 </div>
                 <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 mt-10">
-                  Select Data Pulse
+                  Select Excel File
                 </Button>
               </Card>
             </motion.div>
@@ -162,9 +161,9 @@ export function ImportWorkstation() {
                 <ScanSearch className="h-20 w-20 text-primary" />
               </div>
               <div className="space-y-4 max-w-sm w-full">
-                <h3 className="text-2xl font-black uppercase tracking-widest">Executing Extraction</h3>
+                <h3 className="text-2xl font-black uppercase tracking-widest">Processing Data</h3>
                 <Progress value={progress} className="h-2 rounded-full" />
-                <p className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Building Section Hierarchy...</p>
+                <p className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Mapping Record Hierarchy...</p>
               </div>
             </div>
           )}
@@ -173,11 +172,11 @@ export function ImportWorkstation() {
             <motion.div key="preview" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="p-6 rounded-3xl bg-card border-2 border-border/40 shadow-sm">
-                  <span className="text-[9px] font-black uppercase opacity-40">Profile Pulse</span>
+                  <span className="text-[9px] font-black uppercase opacity-40">Profile Matched</span>
                   <p className="text-sm font-black text-primary uppercase">{runSummary?.profileId}</p>
                 </div>
                 <div className="p-6 rounded-3xl bg-card border-2 border-border/40 shadow-sm">
-                  <span className="text-[9px] font-black uppercase opacity-40">Data Records</span>
+                  <span className="text-[9px] font-black uppercase opacity-40">Total Records</span>
                   <p className="text-sm font-black">{runSummary?.dataRowsImported}</p>
                 </div>
                 <div className={cn("p-6 rounded-3xl bg-card border-2 shadow-sm", (runSummary?.duplicatesDetected || 0) > 0 ? "border-destructive/20 bg-destructive/5" : "border-border/40")}>
@@ -185,7 +184,7 @@ export function ImportWorkstation() {
                   <p className={cn("text-sm font-black", (runSummary?.duplicatesDetected || 0) > 0 ? "text-destructive" : "text-foreground")}>{runSummary?.duplicatesDetected}</p>
                 </div>
                 <div className="p-6 rounded-3xl bg-card border-2 border-border/40 shadow-sm">
-                  <span className="text-[9px] font-black uppercase opacity-40">Rejected</span>
+                  <span className="text-[9px] font-black uppercase opacity-40">Rejected Rows</span>
                   <p className="text-sm font-black text-destructive">{runSummary?.rowsRejected}</p>
                 </div>
               </div>
@@ -193,11 +192,11 @@ export function ImportWorkstation() {
               <Card className="rounded-[2.5rem] border-2 border-border/40 overflow-hidden bg-card/50">
                 <CardHeader className="p-8 bg-muted/20 border-b flex flex-row items-center justify-between">
                   <div className="space-y-1">
-                    <CardTitle className="text-xl font-black uppercase tracking-tight">Sandbox Reconciliation</CardTitle>
-                    <CardDescription className="text-[10px] font-bold uppercase">Source: {runSummary?.sheetName}</CardDescription>
+                    <CardTitle className="text-xl font-black uppercase tracking-tight">Import Reconciliation</CardTitle>
+                    <CardDescription className="text-[10px] font-bold uppercase">Source Sheet: {runSummary?.sheetName}</CardDescription>
                   </div>
                   <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary font-black px-4 h-8 rounded-full">
-                    {stagedAssets.length} PULSES DISCOVERED
+                    {stagedAssets.length} RECORDS FOUND
                   </Badge>
                 </CardHeader>
                 <CardContent className="p-0">
@@ -219,12 +218,12 @@ export function ImportWorkstation() {
                               <div className="flex flex-wrap items-center gap-3 text-[9px] font-bold text-muted-foreground uppercase opacity-60">
                                 <span className="flex items-center gap-1"><Layers className="h-2.5 w-2.5" /> {asset.section}</span>
                                 <span className="flex items-center gap-1">•</span>
-                                <span className="font-mono">SN: {asset.serialNumber}</span>
+                                <span className="font-mono">S/N: {asset.serialNumber}</span>
                               </div>
                             </div>
                           </div>
                           <div className="shrink-0 flex items-center gap-3">
-                            <Badge variant="outline" className="text-[8px] font-black border-border">ROW {asset.importMetadata.rowNumber}</Badge>
+                            <Badge variant="outline" className="text-[8px] font-black border-border">SOURCE ROW {asset.importMetadata.rowNumber}</Badge>
                           </div>
                         </div>
                       ))}
@@ -237,9 +236,9 @@ export function ImportWorkstation() {
                 <div className="flex items-start gap-4 max-w-lg">
                   <div className="p-3 bg-card border border-border/40 rounded-2xl shadow-sm"><Info className="h-6 w-6 text-primary" /></div>
                   <div className="space-y-1">
-                    <h5 className="text-xs font-black uppercase tracking-tight">Final Verification Protocol</h5>
+                    <h5 className="text-xs font-black uppercase tracking-tight">Review Protocol</h5>
                     <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                      Rejected rows (Red) will not be imported. Review rows (Orange) contain warnings or duplicate serials but can still be merged into the registry pulse.
+                      Please validate the mapped records. Assets marked in red will be excluded from the final import to preserve registry integrity.
                     </p>
                   </div>
                 </div>
@@ -248,8 +247,8 @@ export function ImportWorkstation() {
                   disabled={isProcessing}
                   className="h-16 px-12 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-4 transition-transform hover:scale-105 active:scale-95 min-w-[240px]"
                 >
-                  {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <DatabaseZap className="h-5 w-5" />}
-                  Execute Merge Pulse
+                  {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CheckCircle2 className="h-5 w-5" />}
+                  Finalize Import
                 </Button>
               </div>
             </motion.div>
@@ -261,13 +260,13 @@ export function ImportWorkstation() {
                 <CheckCircle2 className="h-24 w-20" />
               </div>
               <div className="space-y-4 max-w-lg">
-                <h3 className="text-3xl font-black uppercase">Ingestion Complete</h3>
+                <h3 className="text-3xl font-black uppercase">Import Complete</h3>
                 <p className="text-sm font-medium text-muted-foreground italic leading-relaxed">
-                  Registry pulse successfully reconciled. {runSummary?.dataRowsImported} records have been merged and enqueued for cloud synchronization.
+                  The data has been successfully mapped and added to the inventory. {runSummary?.dataRowsImported} assets are now live in the registry.
                 </p>
               </div>
               <Button onClick={() => setCurrentStep('INGEST')} variant="outline" className="h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest border-2">
-                Return to Center
+                New Import Run
               </Button>
             </div>
           )}

@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * @fileOverview AlertsWorkstation - SPA Exception Cockpit.
+ * @fileOverview AlertsWorkstation - Critical Exceptions Dashboard.
+ * Phase 131: Renamed naming scheme to be asset manager friendly.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -63,22 +64,22 @@ export function AlertsWorkstation() {
         <div className="space-y-2">
           <h2 className="text-4xl font-black tracking-tighter uppercase flex items-center gap-4 leading-none">
             <div className="p-3 bg-destructive/10 rounded-2xl"><ShieldAlert className="h-8 w-8 text-destructive animate-pulse" /></div>
-            Tactical Alerts
+            Critical Alerts
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">High-Risk Exception Management</p>
         </div>
         <Button variant="outline" className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-destructive/20 text-destructive hover:bg-destructive/5">
-          <Megaphone className="h-4 w-4" /> Escalate All Alerts
+          <Megaphone className="h-4 w-4" /> Escalate All Issues
         </Button>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
         <Card className="rounded-[2.5rem] border-2 border-destructive/20 bg-destructive/[0.02]">
-          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-destructive flex items-center gap-2"><XCircle className="h-3.5 w-3.5" /> Stolen Pulses</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-destructive flex items-center gap-2"><XCircle className="h-3.5 w-3.5" /> Stolen Assets</CardTitle></CardHeader>
           <CardContent><div className="text-5xl font-black text-destructive">{stats.stolen}</div></CardContent>
         </Card>
         <Card className="rounded-[2.5rem] border-2 border-orange-500/20 bg-orange-500/[0.02]">
-          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-orange-600 flex items-center gap-2"><Bomb className="h-3.5 w-3.5" /> Damaged / Burnt</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-orange-600 flex items-center gap-2"><Bomb className="h-3.5 w-3.5" /> Major Damage</CardTitle></CardHeader>
           <CardContent><div className="text-5xl font-black text-orange-600">{stats.damaged}</div></CardContent>
         </Card>
         <Card className="rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.02]">
@@ -89,7 +90,7 @@ export function AlertsWorkstation() {
 
       <div className="relative group px-2">
         <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40" />
-        <Input placeholder="Search critical exceptions..." className="h-16 pl-14 rounded-[1.5rem] bg-card border-none shadow-xl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <Input placeholder="Search critical issues..." className="h-16 pl-14 rounded-[1.5rem] bg-card border-none shadow-xl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
       <div className="px-2">

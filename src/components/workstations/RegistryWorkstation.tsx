@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Overhauled to match requested High-Fidelity Design.
- * Phase 128: Finalized syntax and resolved state collision anomalies.
+ * Phase 131: Renamed naming scheme to be asset manager friendly.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -19,7 +19,9 @@ import {
   CheckCircle2,
   ArrowRightLeft,
   FileSpreadsheet,
-  X
+  X,
+  Package,
+  ClipboardList
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -87,7 +89,7 @@ export function RegistryWorkstation() {
         : sourceAssets;
       
       await ExcelService.exportRegistry(targetAssets, headers);
-      toast({ title: "Excel Pulse Complete" });
+      toast({ title: "Excel Export Complete" });
     } finally {
       setIsExportingExcel(false);
     }
@@ -96,7 +98,7 @@ export function RegistryWorkstation() {
   const categoryStats = useMemo(() => {
     const source = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
     const groups = source.reduce((acc, a) => {
-      const cat = a.category || 'General Registry';
+      const cat = a.category || 'General Register';
       if (!acc[cat]) acc[cat] = { total: 0, verified: 0 };
       acc[cat].total++;
       if (a.status === 'VERIFIED') acc[cat].verified++;
@@ -173,14 +175,14 @@ export function RegistryWorkstation() {
   return (
     <div className="space-y-6 animate-in fade-in duration-700">
       
-      {/* Registry Title Context */}
+      {/* Asset Inventory Title */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-6 py-2 px-1">
         <div className="flex items-center gap-4">
-          <div className="p-3 bg-primary/10 rounded-xl"><LayoutGrid className="h-6 w-6 text-primary" /></div>
-          <h2 className="text-2xl sm:text-3xl font-black uppercase text-foreground tracking-tighter truncate max-w-[200px] sm:max-w-none">{selectedCategory || 'Registry Pulse'}</h2>
+          <div className="p-3 bg-primary/10 rounded-xl"><ClipboardList className="h-6 w-6 text-primary" /></div>
+          <h2 className="text-2xl sm:text-3xl font-black uppercase text-foreground tracking-tighter truncate max-w-[200px] sm:max-w-none">{selectedCategory || 'Asset Inventory'}</h2>
         </div>
         <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto justify-between sm:justify-end">
-          <Badge variant="outline" className="h-8 px-4 font-black uppercase text-[10px] border-border text-muted-foreground">{processedRecords.length} RECORDS IN VIEW</Badge>
+          <Badge variant="outline" className="h-8 px-4 font-black uppercase text-[10px] border-border text-muted-foreground">{processedRecords.length} ASSETS MATCHED</Badge>
           <button onClick={handleSelectAll} className="flex items-center gap-3 group px-4 py-2 hover:bg-muted/50 rounded-xl transition-all">
             <span className="text-[11px] font-black uppercase tracking-widest text-muted-foreground group-hover:text-foreground">SELECT ALL</span>
             <div className={cn("h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all", isAnySelected ? "bg-primary border-primary text-primary-foreground" : "border-border")}><CheckCircle2 className="h-4 w-4" /></div>
@@ -188,7 +190,7 @@ export function RegistryWorkstation() {
         </div>
       </div>
 
-      {/* Adaptive Grid Surface */}
+      {/* Adaptive Inventory Grid */}
       <AnimatePresence mode="wait">
         {!selectedCategory ? (
           <motion.div key="category-grid" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
@@ -210,7 +212,7 @@ export function RegistryWorkstation() {
           </motion.div>
         ) : (
           <motion.div key="record-grid" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
-            <Button variant="ghost" onClick={() => setSelectedCategory(null)} className="h-12 px-6 rounded-xl border-2 border-border/40 text-foreground font-black uppercase text-[10px] tracking-widest"><ArrowLeft className="mr-3 h-4 w-4" /> Back to pulse</Button>
+            <Button variant="ghost" onClick={() => setSelectedCategory(null)} className="h-12 px-6 rounded-xl border-2 border-border/40 text-foreground font-black uppercase text-[10px] tracking-widest"><ArrowLeft className="mr-3 h-4 w-4" /> Back to Register</Button>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
               {paginatedRecords.map(record => (
                 <RegistryCard key={record.id} record={record} onInspect={() => { setSelectedRecord(record); setIsDetailOpen(true); }} selected={selectedIds.has(record.id)} onToggleSelect={(id) => { const next = new Set(selectedIds); if (next.has(id)) next.delete(id); else next.add(id); setSelectedIds(next); }} />
@@ -220,18 +222,17 @@ export function RegistryWorkstation() {
         )}
       </AnimatePresence>
 
-      {/* Gold Action Bar */}
+      {/* Global Action Bar */}
       <AnimatePresence>
         {isAnySelected && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-24 sm:bottom-28 left-1/2 -translate-x-1/2 z-50 w-[95vw] lg:w-auto">
             <div className="bg-primary shadow-3xl shadow-primary/30 rounded-[2rem] h-16 sm:h-20 flex items-center px-6 sm:px-10 gap-6 sm:gap-10 overflow-hidden">
-              <span className="text-xs sm:text-sm font-black uppercase text-primary-foreground shrink-0">{selectedCategory ? selectedIds.size : selectedCategories.size} Pulses</span>
+              <span className="text-xs sm:text-sm font-black uppercase text-primary-foreground shrink-0">{selectedCategory ? selectedIds.size : selectedCategories.size} Selected</span>
               <Separator orientation="vertical" className="h-8 bg-black/10 hidden md:block" />
               <div className="flex-1 flex items-center gap-6 sm:gap-10 py-2">
-                <button className="flex items-center gap-2 text-primary-foreground font-black uppercase text-[10px] tracking-widest shrink-0"><ArrowRightLeft className="h-4 w-4" /> Merge</button>
-                <button onClick={() => setIsBatchEditOpen(true)} className="flex items-center gap-2 text-primary-foreground font-black uppercase text-[10px] tracking-widest shrink-0"><Edit3 className="h-4 w-4" /> Edit</button>
-                <button onClick={handleExcelExport} className="flex items-center gap-2 text-primary-foreground font-black uppercase text-[10px] tracking-widest shrink-0"><FileSpreadsheet className="h-4 w-4" /> Excel</button>
-                <button className="flex items-center gap-2 text-primary-foreground font-black uppercase text-[10px] tracking-widest shrink-0"><Trash2 className="h-4 w-4" /> Wipe</button>
+                <button onClick={() => setIsBatchEditOpen(true)} className="flex items-center gap-2 text-primary-foreground font-black uppercase text-[10px] tracking-widest shrink-0"><Edit3 className="h-4 w-4" /> Bulk Edit</button>
+                <button onClick={handleExcelExport} className="flex items-center gap-2 text-primary-foreground font-black uppercase text-[10px] tracking-widest shrink-0"><FileSpreadsheet className="h-4 w-4" /> Export Excel</button>
+                <button className="flex items-center gap-2 text-primary-foreground font-black uppercase text-[10px] tracking-widest shrink-0"><Trash2 className="h-4 w-4" /> Delete Records</button>
               </div>
               <Button variant="ghost" size="icon" onClick={() => { setSelectedIds(new Set()); setSelectedCategories(new Set()); }} className="h-10 w-10 text-primary-foreground shrink-0"><X className="h-5 w-5" /></Button>
             </div>

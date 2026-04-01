@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * @fileOverview ReportsWorkstation - SPA Document & Quality Module.
+ * @fileOverview ReportsWorkstation - Inventory Reports Module.
+ * Phase 131: Renamed naming scheme to be asset manager friendly.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -73,7 +74,7 @@ export function ReportsWorkstation() {
         await storage.saveAssets(currentLocal.map(a => a.id === asset.id ? updated : a));
       }
       await refreshRegistry();
-      toast({ title: "Cleansing Pulse Applied" });
+      toast({ title: "Data Cleaned Successfuly" });
     } finally {
       setIsFixing(false);
     }
@@ -96,40 +97,40 @@ export function ReportsWorkstation() {
       <div className="space-y-2 px-2">
         <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase flex items-center gap-4 leading-none">
           <div className="p-3 bg-primary/10 rounded-2xl"><FileText className="h-8 w-8 text-primary" /></div>
-          Reporting Hub
+          Inventory Reports
         </h2>
-        <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Executive Documentation & Data Integrity Workstation</p>
+        <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Executive Documentation & Data Quality Tools</p>
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
         <TabsList className="bg-muted/30 p-1.5 rounded-2xl h-auto border-2 border-border/40 ml-2">
           <TabsTrigger value="reports" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest">Executive Reports</TabsTrigger>
           <TabsTrigger value="quality" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest">
-            Data Cleansing {issues.length > 0 && <Badge className="ml-2 bg-destructive">{issues.length}</Badge>}
+            Data Quality {issues.length > 0 && <Badge className="ml-2 bg-destructive">{issues.length}</Badge>}
           </TabsTrigger>
         </TabsList>
 
         <TabsContent value="reports" className="space-y-8 px-2">
           <Card className="border-2 border-destructive/20 bg-destructive/[0.02] rounded-[2.5rem] overflow-hidden">
             <CardHeader className="p-8 border-b bg-destructive/5 flex flex-row items-center justify-between">
-              <CardTitle className="text-xl font-black uppercase text-destructive flex items-center gap-3"><FileWarning className="h-5 w-5" /> High-Risk exceptions</CardTitle>
-              <Badge variant="outline" className="border-destructive/20 text-destructive">{stats.exceptions} Critical Pulses</Badge>
+              <CardTitle className="text-xl font-black uppercase text-destructive flex items-center gap-3"><FileWarning className="h-5 w-5" /> High-Risk Exceptions</CardTitle>
+              <Badge variant="outline" className="border-destructive/20 text-destructive">{stats.exceptions} Critical Issues</Badge>
             </CardHeader>
             <CardContent className="p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-              <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed max-w-sm">Extract a PDF compendium of all Stolen, Burnt, and Discrepant asset pulses.</p>
+              <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed max-w-sm">Generate a PDF report of all Stolen, Burnt, and Discrepant assets.</p>
               <Button onClick={handleExceptionExport} disabled={isExporting || stats.exceptions === 0} className="h-14 px-10 rounded-2xl bg-destructive text-white shadow-xl shadow-destructive/20 gap-3">
-                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export Exception PDF
+                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export PDF
               </Button>
             </CardContent>
           </Card>
 
           <Card className="border-2 border-primary/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
             <CardHeader className="p-10 border-b bg-primary/5">
-              <CardTitle className="flex items-center gap-4 text-2xl font-black uppercase"><FileText className="text-primary h-8 w-8" /> Executive Travel Report</CardTitle>
+              <CardTitle className="flex items-center gap-4 text-2xl font-black uppercase"><FileText className="text-primary h-8 w-8" /> Asset Verification Report</CardTitle>
             </CardHeader>
             <CardContent className="p-10">
               <Button onClick={() => setIsTravelReportOpen(true)} disabled={stats.total === 0} className="w-full h-20 rounded-[1.5rem] font-black uppercase shadow-2xl shadow-primary/20 bg-primary text-primary-foreground gap-4">
-                <Zap className="h-5 w-5 fill-current" /> Initialize Report Builder <ArrowRight className="h-5 w-5" />
+                <Zap className="h-5 w-5 fill-current" /> Build Custom Report <ArrowRight className="h-5 w-5" />
               </Button>
             </CardContent>
           </Card>
@@ -138,8 +139,8 @@ export function ReportsWorkstation() {
         <TabsContent value="quality" className="px-2">
           <Card className="border-2 border-border/40 shadow-2xl bg-card/50 rounded-[2.5rem] overflow-hidden">
             <CardHeader className="p-8 border-b bg-muted/20 flex flex-row items-center justify-between">
-              <CardTitle className="text-xl font-black uppercase flex items-center gap-3"><Wrench className="h-5 w-5 text-primary" /> Registry Cleansing Suite</CardTitle>
-              <Button variant="outline" size="sm" onClick={runAuditPulse} disabled={isScanning} className="h-9 px-4 rounded-xl font-black text-[9px] uppercase"><RefreshCw className="h-3 w-3 mr-2" /> Rescan</Button>
+              <CardTitle className="text-xl font-black uppercase flex items-center gap-3"><Wrench className="h-5 w-5 text-primary" /> Integrity Analysis</CardTitle>
+              <Button variant="outline" size="sm" onClick={runAuditPulse} disabled={isScanning} className="h-9 px-4 rounded-xl font-black text-[9px] uppercase"><RefreshCw className="h-3 w-3 mr-2" /> Scan Now</Button>
             </CardHeader>
             <ScrollArea className="h-[500px]">
               {isScanning ? <div className="h-full flex items-center justify-center opacity-40"><Loader2 className="h-12 w-12 animate-spin" /></div> : 
@@ -154,9 +155,9 @@ export function ReportsWorkstation() {
                         <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">{issue.suggestedFix}</p>
                       </div>
                     </div>
-                    {issue.type === 'CASE_MISMATCH' && <Button onClick={() => handleFixCasing(issue)} disabled={isFixing} className="h-11 px-6 rounded-xl font-black uppercase text-[9px]">Standardize Pulse</Button>}
+                    {issue.type === 'CASE_MISMATCH' && <Button onClick={() => handleFixCasing(issue)} disabled={isFixing} className="h-11 px-6 rounded-xl font-black uppercase text-[9px]">Apply Fix</Button>}
                   </div>
-                )) : <div className="py-24 text-center opacity-20"><CheckCircle2 className="h-20 w-20 mx-auto mb-4" /><h4 className="text-2xl font-black uppercase">Registry Perfect</h4></div>}
+                )) : <div className="py-24 text-center opacity-20"><CheckCircle2 className="h-20 w-20 mx-auto mb-4" /><h4 className="text-2xl font-black uppercase">Data Quality: Perfect</h4></div>}
             </ScrollArea>
           </Card>
         </TabsContent>

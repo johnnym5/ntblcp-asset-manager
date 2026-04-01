@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * @fileOverview VerifyWorkstation - SPA Field Assessment Module.
+ * @fileOverview VerifyWorkstation - Field Audit Module.
+ * Phase 131: Renamed naming scheme to be asset manager friendly.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -63,7 +64,7 @@ export function VerifyWorkstation() {
     const current = await storage.getAssets();
     await storage.saveAssets(current.map(a => a.id === asset.id ? updated : a));
     await refreshRegistry();
-    toast({ title: "Status Pulse Applied" });
+    toast({ title: "Audit Status Updated", description: `Asset marked as ${newStatus}.` });
   };
 
   return (
@@ -71,20 +72,20 @@ export function VerifyWorkstation() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-2">
           <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
-            <ClipboardCheck className="h-8 w-8 text-primary" /> Verification Queue
+            <ClipboardCheck className="h-8 w-8 text-primary" /> Field Audit Queue
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Mandatory Field Assessments & Operability Pulses
+            Mandatory Physical Verification Tasks
           </p>
         </div>
         <Badge variant="outline" className="h-10 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary">
-          <Zap className="h-3.5 w-3.5 mr-2 fill-current" /> {unverified.length} Pulses Pending
+          <Zap className="h-3.5 w-3.5 mr-2 fill-current" /> {unverified.length} Tasks Pending Audit
         </Badge>
       </div>
 
       <div className="relative group px-2">
         <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40" />
-        <Input placeholder="Scan Tag ID or Search Queue Pulse..." className="pl-12 h-14 rounded-2xl bg-card border-none shadow-xl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <Input placeholder="Search Audit Queue..." className="pl-12 h-14 rounded-2xl bg-card border-none shadow-xl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
       <div className="px-2">
@@ -95,16 +96,16 @@ export function VerifyWorkstation() {
                 <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} layout className="relative group">
                   <RegistryCard record={transformAssetToRecord(asset, headers)} onInspect={() => { setSelectedAsset(asset); setIsFormOpen(true); }} densityMode="compact" />
                   <div className="absolute top-14 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all z-20">
-                    <Button size="icon" className="h-10 w-10 rounded-xl bg-green-500 text-white shadow-xl" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'VERIFIED'); }}><CheckCircle2 className="h-5 w-5" /></Button>
-                    <Button size="icon" className="h-10 w-10 rounded-xl bg-destructive text-white shadow-xl" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'DISCREPANCY'); }}><XCircle className="h-5 w-5" /></Button>
+                    <Button size="icon" className="h-10 w-10 rounded-xl bg-green-500 text-white shadow-xl" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'VERIFIED'); }} title="Verify Asset"><CheckCircle2 className="h-5 w-5" /></Button>
+                    <Button size="icon" className="h-10 w-10 rounded-xl bg-destructive text-white shadow-xl" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'DISCREPANCY'); }} title="Report Discrepancy"><XCircle className="h-5 w-5" /></Button>
                   </div>
                 </motion.div>
               ))}
             </motion.div>
           ) : (
             <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[3rem]">
-              <Database className="h-32 w-28 mx-auto mb-4" />
-              <h3 className="text-3xl font-black uppercase tracking-[0.2em]">Queue Pulse Clear</h3>
+              <CheckCircle2 className="h-32 w-32 mx-auto mb-4 text-green-600" />
+              <h3 className="text-3xl font-black uppercase tracking-[0.2em]">Audit Queue Clear</h3>
             </div>
           )}
         </AnimatePresence>

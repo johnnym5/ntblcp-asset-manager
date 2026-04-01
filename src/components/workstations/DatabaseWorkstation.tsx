@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview DatabaseWorkstation - High-Fidelity Mission Control.
- * Phase 127: Removed hardcoded dark colors for perfect theme contrast.
+ * @fileOverview DatabaseWorkstation - High-Fidelity Database Management.
+ * Phase 131: Renamed naming scheme to be asset manager friendly.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -31,7 +31,8 @@ import {
   ChevronsUpDown,
   ChevronLeft,
   ChevronRight,
-  Hammer
+  Hammer,
+  Server
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -66,7 +67,7 @@ export function DatabaseWorkstation() {
 
   const stats = useMemo(() => ({
     assetCount: assets.length,
-    dbStatus: isOnline ? 'ACTIVE' : 'LATENT',
+    dbStatus: isOnline ? 'ONLINE' : 'OFFLINE',
     latency: '42ms'
   }), [assets, isOnline]);
 
@@ -74,7 +75,7 @@ export function DatabaseWorkstation() {
     setIsProcessing(true);
     try {
       await VirtualDBService.purgeGlobalRegistry();
-      toast({ title: "GLOBAL DATA NUKED", description: "Registry reset to absolute zero state." });
+      toast({ title: "Inventory Reset", description: "Global registry wiped successfully." });
       await refreshRegistry();
       setNukeDialogOpen(false);
     } finally {
@@ -87,25 +88,25 @@ export function DatabaseWorkstation() {
   return (
     <div className="max-w-6xl mx-auto space-y-8 pb-40 animate-in fade-in duration-700">
       
-      {/* Header Pulse */}
+      {/* Header */}
       <div className="space-y-1 px-1">
         <div className="flex items-center gap-3">
-          <Database className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-black uppercase tracking-tight text-foreground">Database Administration</h2>
+          <Terminal className="h-6 w-6 text-primary" />
+          <h2 className="text-2xl font-black uppercase tracking-tight text-foreground">Database Manager</h2>
         </div>
         <p className="text-[10px] font-bold text-muted-foreground opacity-60 uppercase tracking-widest">
-          Hybrid Strategy: Firestore (Settings) & RTDB (Assets).
+          Primary Storage: Firestore & Hybrid Shadow: RTDB
         </p>
       </div>
 
-      {/* 1. App Health Check */}
+      {/* 1. System Health Audit */}
       <Card className="bg-card/50 border-border/40 rounded-2xl overflow-hidden shadow-2xl">
         <Collapsible open={isHealthOpen} onOpenChange={setIsHealthOpen}>
           <CollapsibleTrigger asChild>
             <div className="p-6 border-b border-border/40 flex items-center justify-between cursor-pointer hover:bg-muted/30 transition-all">
               <div className="space-y-1">
-                <h3 className="text-sm font-black uppercase text-foreground">App Health Check</h3>
-                <p className="text-[10px] text-muted-foreground italic">Detailed diagnostics for the Hybrid DB layers.</p>
+                <h3 className="text-sm font-black uppercase text-foreground">System Integrity Audit</h3>
+                <p className="text-[10px] text-muted-foreground italic">Real-time status of tiered storage layers.</p>
               </div>
               <ChevronsUpDown className="h-4 w-4 text-muted-foreground opacity-40" />
             </div>
@@ -114,20 +115,13 @@ export function DatabaseWorkstation() {
             <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-8">
               {/* Settings Column */}
               <div className="space-y-6">
-                <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Settings</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Configuration</h4>
                 <div className="space-y-4">
                   <div className="flex gap-4">
                     <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
                     <div className="space-y-1">
-                      <p className="text-xs font-black uppercase text-foreground">Settings Data Layer</p>
-                      <p className="text-[9px] text-muted-foreground leading-relaxed">Application settings are loaded from Firestore.</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-                    <div className="space-y-1">
-                      <p className="text-xs font-black uppercase text-foreground">Project Configuration</p>
-                      <p className="text-[9px] text-muted-foreground leading-relaxed">Project sheets are configured.</p>
+                      <p className="text-xs font-black uppercase text-foreground">Global Settings</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">Loaded from Firestore Authority.</p>
                     </div>
                   </div>
                 </div>
@@ -135,27 +129,20 @@ export function DatabaseWorkstation() {
 
               {/* Database Column */}
               <div className="space-y-6">
-                <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Database</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Database Engine</h4>
                 <div className="space-y-4">
                   <div className="flex gap-4">
                     <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
                     <div className="space-y-1">
-                      <p className="text-xs font-black uppercase text-foreground">Firebase Environment</p>
-                      <p className="text-[9px] text-muted-foreground leading-relaxed">Firebase API keys are verified.</p>
+                      <p className="text-xs font-black uppercase text-foreground">Environment Pulse</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">Firebase API credentials validated.</p>
                     </div>
                   </div>
                   <div className="flex gap-4">
                     <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
                     <div className="space-y-1">
-                      <p className="text-xs font-black uppercase text-foreground">Realtime DB (Asset Layer)</p>
-                      <p className="text-[9px] text-muted-foreground leading-relaxed">RTDB instance is active.</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-                    <div className="space-y-1">
-                      <p className="text-xs font-black uppercase text-foreground">Firestore (Settings Layer)</p>
-                      <p className="text-[9px] text-muted-foreground leading-relaxed">Firestore instance is active.</p>
+                      <p className="text-xs font-black uppercase text-foreground">RTDB Standby</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">Realtime mirror layer is active.</p>
                     </div>
                   </div>
                 </div>
@@ -163,20 +150,13 @@ export function DatabaseWorkstation() {
 
               {/* Assets Column */}
               <div className="space-y-6">
-                <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Assets</h4>
+                <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-40">Asset Records</h4>
                 <div className="space-y-4">
                   <div className="flex gap-4">
                     <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
                     <div className="space-y-1">
-                      <p className="text-xs font-black uppercase text-foreground">Main Local Store</p>
-                      <p className="text-[9px] text-muted-foreground leading-relaxed">{stats.assetCount} assets in indexedDB.</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-4">
-                    <CheckCircle2 className="h-5 w-5 text-green-500 shrink-0" />
-                    <div className="space-y-1">
-                      <p className="text-xs font-black uppercase text-foreground">Asset Data Integrity</p>
-                      <p className="text-[9px] text-muted-foreground leading-relaxed">All assets have critical fields.</p>
+                      <p className="text-xs font-black uppercase text-foreground">Local Persistent Cache</p>
+                      <p className="text-[9px] text-muted-foreground leading-relaxed">{stats.assetCount} assets currently indexed locally.</p>
                     </div>
                   </div>
                 </div>
@@ -186,46 +166,44 @@ export function DatabaseWorkstation() {
         </Collapsible>
       </Card>
 
-      {/* 2. Operations Row */}
+      {/* 2. Database Controls */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-        {/* Sync Workstation */}
         <Card className="bg-card/50 border-border/40 rounded-2xl p-8 space-y-6 shadow-2xl">
           <div className="space-y-1">
-            <h3 className="text-xl font-black uppercase text-foreground">Sync Assets (RTDB Primary)</h3>
-            <p className="text-[10px] text-muted-foreground font-medium italic">Assets are optimized for RTDB usage.</p>
+            <h3 className="text-xl font-black uppercase text-foreground">Tiered Synchronization</h3>
+            <p className="text-[10px] text-muted-foreground font-medium italic">Manually reconcile data across storage layers.</p>
           </div>
           <div className="space-y-3">
             <Button variant="outline" onClick={refreshRegistry} className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6">
-              <RefreshCw className="h-4 w-4 text-primary" /> Push RTDB Assets to Firestore
+              <RefreshCw className="h-4 w-4 text-primary" /> Sync Local to Cloud Database
             </Button>
             <Button variant="outline" onClick={refreshRegistry} className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6">
-              <RefreshCw className="h-4 w-4 text-primary" /> Pull Firestore Assets to RTDB
+              <Download className="h-4 w-4 text-primary" /> Pull Cloud State to Cache
             </Button>
           </div>
         </Card>
 
-        {/* Backup & Restore */}
         <Card className="bg-card/50 border-border/40 rounded-2xl p-8 space-y-6 shadow-2xl">
           <div className="space-y-1">
-            <h3 className="text-xl font-black uppercase text-foreground">Backup & Restore</h3>
-            <p className="text-[10px] text-muted-foreground font-medium italic">Export full snapshot of settings and assets.</p>
+            <h3 className="text-xl font-black uppercase text-foreground">Archive Manager</h3>
+            <p className="text-[10px] text-muted-foreground font-medium italic">Full system state backup and recovery.</p>
           </div>
           <div className="space-y-3">
             <Button variant="outline" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6">
-              <Upload className="h-4 w-4 text-primary" /> Import Full Snapshot (JSON)
+              <Upload className="h-4 w-4 text-primary" /> Restore from JSON Archive
             </Button>
             <Button variant="outline" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6">
-              <Download className="h-4 w-4 text-primary" /> Export Full Snapshot
+              <Download className="h-4 w-4 text-primary" /> Generate System Snapshot
             </Button>
           </div>
         </Card>
       </div>
 
-      {/* 3. RTDB Browser */}
+      {/* 3. Raw Data Browser */}
       <Card className="bg-card/50 border-border/40 rounded-2xl p-8 space-y-6 shadow-2xl">
         <div className="space-y-1">
-          <h3 className="text-xl font-black uppercase text-foreground">RTDB Browser</h3>
-          <p className="text-[10px] text-muted-foreground font-medium italic">Directly modify assets or config in the Realtime Database layer.</p>
+          <h3 className="text-xl font-black uppercase text-foreground">Raw Storage Browser</h3>
+          <p className="text-[10px] text-muted-foreground font-medium italic">Direct read access to low-level database paths.</p>
         </div>
         <div className="flex gap-3">
           <button onClick={() => setActivePath('/config')} className={cn("px-6 py-2 rounded-xl font-black uppercase text-[10px] border transition-all", activePath === '/config' ? "bg-primary text-primary-foreground border-primary" : "bg-muted border-border/40 text-muted-foreground hover:text-foreground")}>/config</button>
@@ -237,30 +215,29 @@ export function DatabaseWorkstation() {
       <div className="p-8 rounded-[2.5rem] bg-destructive/5 border-2 border-destructive/20 space-y-8 shadow-xl">
         <div className="flex items-center gap-3">
           <AlertTriangle className="h-6 w-6 text-destructive" />
-          <h3 className="text-xl font-black uppercase text-destructive tracking-widest">Danger Zone</h3>
+          <h3 className="text-xl font-black uppercase text-destructive tracking-widest">Maintenance Operations</h3>
         </div>
         
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <Button variant="outline" onClick={handleNukePulse} className="h-12 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest justify-start px-6 gap-3">
-            <HardDrive className="h-4 w-4" /> Wipe Local Cache
+            <HardDrive className="h-4 w-4" /> Clear Local Cache
           </Button>
           <Button variant="outline" onClick={handleNukePulse} className="h-12 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest justify-start px-6 gap-3">
-            <Database className="h-4 w-4" /> Wipe RTDB (Primary)
+            <Server className="h-4 w-4" /> Wipe Standby Mirror (RTDB)
           </Button>
           <Button variant="outline" onClick={handleNukePulse} className="h-12 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest justify-start px-6 gap-3">
-            <Cloud className="h-4 w-4" /> Wipe Firestore Assets
+            <Cloud className="h-4 w-4" /> Wipe Primary Assets (Firestore)
           </Button>
           <Button onClick={() => setNukeDialogOpen(true)} className="h-12 bg-destructive text-destructive-foreground rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-destructive/20 gap-3">
-            <Bomb className="h-4 w-4" /> NUKE GLOBAL DATA
+            <Bomb className="h-4 w-4" /> RESET GLOBAL REGISTER
           </Button>
         </div>
       </div>
 
-      {/* Adaptive Footer Control */}
+      {/* Navigation Footer */}
       <div className="fixed bottom-24 left-0 right-0 z-50 pointer-events-none">
-        <div className="adaptive-container px-4">
-          <div className="bg-card/90 backdrop-blur-2xl border border-border/40 rounded-2xl h-16 flex items-center justify-between px-6 pointer-events-auto shadow-3xl group">
-            {/* Base Navigation Scrollbar UI (Decorative based on mockup) */}
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="bg-card/90 backdrop-blur-2xl border border-border/40 rounded-2xl h-16 flex items-center justify-between px-6 pointer-events-auto shadow-3xl">
             <div className="flex-1 flex items-center gap-4 px-10">
               <button className="text-muted-foreground/40 hover:text-foreground transition-all"><ChevronLeft className="h-4 w-4" /></button>
               <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden relative">
@@ -270,33 +247,33 @@ export function DatabaseWorkstation() {
             </div>
             
             <Button variant="ghost" onClick={() => window.location.href = '/'} className="h-10 px-8 rounded-xl font-black uppercase text-[10px] tracking-widest bg-muted/50 hover:bg-muted text-foreground">
-              Close Admin
+              Exit Admin
             </Button>
           </div>
         </div>
       </div>
 
-      {/* Nuke Alert */}
+      {/* Confirmation Dialogs */}
       <AlertDialog open={nukeDialogOpen} onOpenChange={setNukeDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-background shadow-3xl">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
               <Bomb className="h-10 w-10 text-destructive" />
             </div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">NUKE GLOBAL DATA?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Wipe Global Register?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
-              This action is **immutable**. You are about to purge every registry record from the Cloud (Firestore), Mirror (RTDB), and this device (IndexedDB). This is a terminal reset operation.
+              This action is **irreversible**. You are about to purge all inventory records from the Cloud, Mirror, and Local Storage. This is a factory reset operation.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Pulse</AlertDialogCancel>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleNukePulse}
               disabled={isProcessing}
               className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-destructive-foreground m-0"
             >
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Hammer className="h-4 w-4 mr-2" />}
-              Commit Nuke
+              Confirm Reset
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

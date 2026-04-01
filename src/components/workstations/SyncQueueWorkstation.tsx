@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview SyncQueueWorkstation - SPA Pending Operations Module.
- * Phase 130: Enhanced with direct manual sync triggers for users.
+ * @fileOverview SyncQueueWorkstation - Cloud Sync Status Module.
+ * Phase 131: Renamed naming scheme to be asset manager friendly.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -52,13 +52,13 @@ export function SyncQueueWorkstation() {
 
   const handleRetry = async (entry: OfflineQueueEntry) => {
     await storage.updateQueueEntry({ ...entry, status: 'PENDING', error: undefined });
-    toast({ title: "Pulse Reset" });
+    toast({ title: "Sync Retry Initiated" });
     loadQueue();
   };
 
   const handleDiscard = async (id: string) => {
     await storage.dequeue(id);
-    toast({ title: "Pulse Discarded" });
+    toast({ title: "Local Change Discarded" });
     loadQueue();
   };
 
@@ -73,9 +73,9 @@ export function SyncQueueWorkstation() {
             <div className="p-3 bg-primary/10 rounded-2xl">
               <Activity className="h-8 w-8 text-primary" />
             </div>
-            Sync Workstation
+            Cloud Sync Status
           </h2>
-          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Manual Write-Ahead Ledger Management</p>
+          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Cloud Reconciliation & Connection Logs</p>
         </div>
         <div className="flex items-center gap-3">
           <Button 
@@ -84,30 +84,30 @@ export function SyncQueueWorkstation() {
             onClick={manualDownload} 
             className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest border-2 hover:bg-primary/5"
           >
-            <Download className="h-4 w-4 mr-3" /> Pull Cloud State
+            <Download className="h-4 w-4 mr-3" /> Fetch Cloud Updates
           </Button>
           <Button 
             disabled={isSyncing || !isOnline} 
             onClick={manualUpload} 
             className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 bg-primary text-black transition-transform hover:scale-105 active:scale-95"
           >
-            {isSyncing ? <RefreshCw className="h-5 w-5 animate-spin mr-3" /> : <Upload className="h-5 w-5 mr-3" />} Execute Sync Pulse
+            {isSyncing ? <RefreshCw className="h-5 w-5 animate-spin mr-3" /> : <Upload className="h-5 w-5 mr-3" />} Push Local Changes
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
         <Card className="border-2 rounded-[2.5rem] bg-card/50 shadow-xl p-2">
-          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Queue Depth</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Queue Size</CardTitle></CardHeader>
           <CardContent><div className="text-5xl font-black tracking-tighter">{pendingCount}</div></CardContent>
         </Card>
         <Card className="border-2 rounded-[2.5rem] bg-card/50 border-destructive/20 shadow-xl p-2">
-          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-destructive">Logic Conflicts</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-destructive">Sync Failures</CardTitle></CardHeader>
           <CardContent><div className="text-5xl font-black tracking-tighter text-destructive">{failedCount}</div></CardContent>
         </Card>
         <Card className="border-2 rounded-[2.5rem] bg-card/50 border-green-500/20 shadow-xl p-2">
-          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-green-600">Sync Awareness</CardTitle></CardHeader>
-          <CardContent><div className={cn("text-5xl font-black tracking-tighter", isOnline ? "text-green-600" : "text-muted-foreground")}>{isOnline ? 'ON' : 'OFF'}</div></CardContent>
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-green-600">Connection Status</CardTitle></CardHeader>
+          <CardContent><div className={cn("text-5xl font-black tracking-tighter", isOnline ? "text-green-600" : "text-muted-foreground")}>{isOnline ? 'ONLINE' : 'OFFLINE'}</div></CardContent>
         </Card>
       </div>
 
@@ -124,20 +124,20 @@ export function SyncQueueWorkstation() {
                       </div>
                       <div className="space-y-2 min-w-0 flex-1">
                         <h4 className="font-black text-lg uppercase tracking-tight text-foreground truncate leading-none">
-                          {(entry.payload as any).description || 'Mutation Pulse'}
+                          {(entry.payload as any).description || 'Record Registration'}
                         </h4>
                         <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
                           <Badge variant="outline" className="h-6 px-3 text-[9px] font-black border-primary/20 text-primary uppercase">{entry.operation}</Badge>
                           <span className="flex items-center gap-2"><Clock className="h-3.5 w-3.5" /> {formatDistanceToNow(entry.timestamp, { addSuffix: true })}</span>
-                          <span className="flex items-center gap-2"><Tag className="h-3.5 w-3.5" /> UUID: {entry.id.split('-')[0]}</span>
+                          <span className="flex items-center gap-2"><Tag className="h-3.5 w-3.5" /> ID: {entry.id.split('-')[0]}</span>
                         </div>
                         {entry.status === 'FAILED' && (
                           <div className="mt-4 p-5 rounded-2xl bg-destructive/10 border-2 border-dashed border-destructive/20 space-y-1">
                             <p className="text-[10px] font-black uppercase text-destructive tracking-widest flex items-center gap-2">
-                              <AlertTriangle className="h-3.5 w-3.5" /> Registry Conflict Detected
+                              <AlertTriangle className="h-3.5 w-3.5" /> Connection Interruption
                             </p>
                             <p className="text-xs font-medium text-foreground italic leading-relaxed">
-                              {entry.error || 'The system could not broadcast this modification to the cloud authority.'}
+                              {entry.error || 'The system could not broadcast this update to the central register.'}
                             </p>
                           </div>
                         )}
@@ -170,11 +170,11 @@ export function SyncQueueWorkstation() {
       ) : (
         <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[4rem] bg-card/30 flex flex-col items-center gap-8 mx-2">
           <div className="p-10 bg-muted rounded-full">
-            <Database className="h-32 w-28 text-muted-foreground" />
+            <CheckCircle2 className="h-32 w-28 text-green-600" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-3xl font-black uppercase tracking-[0.2em]">Registry Synchronized</h3>
-            <p className="text-sm font-medium text-muted-foreground italic">No pending local modifications in the write-ahead ledger.</p>
+            <h3 className="text-3xl font-black uppercase tracking-[0.2em]">All Changes Synced</h3>
+            <p className="text-sm font-medium text-muted-foreground italic">Your local register is in absolute parity with the cloud database.</p>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - Unified Command Shell.
- * Phase 130: Integrated manual sync triggers and refined portal access.
+ * Phase 131: Renamed naming scheme to be asset manager friendly.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -43,7 +43,9 @@ import {
   Power,
   RefreshCw,
   Upload,
-  Download
+  Download,
+  ClipboardCheck,
+  ShieldX
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -146,11 +148,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <div className="flex items-center gap-4">
           <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveView('DASHBOARD')}>
             <div className="p-2 bg-primary rounded-xl shadow-lg">
-              <Zap className="h-5 w-5 text-primary-foreground fill-current" />
+              <Package className="h-5 w-5 text-primary-foreground" />
             </div>
             <div className="flex flex-col">
               <span className="text-sm font-black tracking-tighter uppercase leading-none">Assetain</span>
-              <span className="text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-0.5">Intelligence Hub</span>
+              <span className="text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-0.5">Asset Management System</span>
             </div>
           </div>
         </div>
@@ -164,7 +166,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={manualDownload} 
               disabled={isSyncing || !isOnline}
               className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
-              title="Pull Cloud Pulse"
+              title="Download from Cloud"
             >
               <Download className="h-4 w-4" />
             </Button>
@@ -174,7 +176,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={manualUpload} 
               disabled={isSyncing || !isOnline}
               className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
-              title="Push Local Pulse"
+              title="Upload to Cloud"
             >
               <Upload className="h-4 w-4" />
             </Button>
@@ -188,7 +190,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
           >
             <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} />
-            <span className="text-[9px] font-black uppercase tracking-tighter">{isOnline ? 'CLOUD ACTIVE' : 'OFFLINE PULSE'}</span>
+            <span className="text-[9px] font-black uppercase tracking-tighter">{isOnline ? 'CLOUD ACTIVE' : 'OFFLINE MODE'}</span>
           </button>
 
           <Button 
@@ -205,7 +207,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             )}
           </Button>
 
-          {/* Management Terminal Trigger */}
+          {/* Management Portal Trigger */}
           <div 
             onClick={() => setIsPortalOpen(true)}
             className="flex items-center gap-3 cursor-pointer group hover:bg-muted/50 p-1.5 rounded-2xl transition-all border-2 border-transparent hover:border-primary/20 bg-card/50 shadow-sm ml-2 relative"
@@ -250,28 +252,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               )}
             >
               <LayoutGrid className="h-5 w-5" />
-              <span className="text-[10px] font-black uppercase tracking-widest">Intelligence Center</span>
+              <span className="text-[10px] font-black uppercase tracking-widest">System Dashboard</span>
             </button>
             <Separator orientation="vertical" className="h-8 mx-4 opacity-20 hidden sm:block" />
             <div className="hidden md:flex items-center gap-2">
               <Badge variant="outline" className={cn("h-8 px-4 rounded-xl border-2 transition-all", isSyncing ? "border-primary/40 animate-pulse" : "border-border/40 opacity-40")}>
                 <Activity className="h-3 w-3 mr-2" />
-                <span className="text-[8px] font-black uppercase tracking-widest">{isSyncing ? 'SYNC_ACTIVE' : 'SYSTEM_IDLE'}</span>
+                <span className="text-[8px] font-black uppercase tracking-widest">{isSyncing ? 'SYNCING...' : 'SYSTEM IDLE'}</span>
               </Badge>
             </div>
           </div>
 
           <div className="hidden sm:flex items-center gap-4">
             <button onClick={() => setIsHelpOpen(true)} className="flex items-center gap-2 text-[10px] font-black uppercase text-muted-foreground hover:text-primary transition-colors">
-              <HelpCircle className="h-4 w-4" /> Documentation
+              <HelpCircle className="h-4 w-4" /> Help Center
             </button>
             <Separator orientation="vertical" className="h-4 opacity-20" />
-            <p className="text-[9px] font-mono text-muted-foreground opacity-40">VER 5.0.4</p>
+            <p className="text-[9px] font-mono text-muted-foreground opacity-40">SYSTEM v5.0.4</p>
           </div>
         </div>
       </aside>
 
-      {/* Management Portal */}
+      {/* Administration Portal */}
       <Sheet open={isPortalOpen} onOpenChange={setIsPortalOpen}>
         <SheetContent side="bottom" className="h-[90vh] bg-background border-none rounded-t-[3rem] p-0 flex flex-col overflow-hidden shadow-3xl">
           <div className="p-10 pb-6 border-b flex items-center justify-between bg-muted/20">
@@ -280,8 +282,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <Terminal className="h-8 w-8 text-primary-foreground" />
               </div>
               <div className="space-y-1">
-                <SheetTitle className="text-3xl font-black uppercase tracking-tight text-foreground leading-none">Management Terminal</SheetTitle>
-                <SheetDescription className="text-[10px] font-black uppercase text-primary tracking-[0.3em] opacity-60">Professional Operational Orchestration Pulse</SheetDescription>
+                <SheetTitle className="text-3xl font-black uppercase tracking-tight text-foreground leading-none">System Administration</SheetTitle>
+                <SheetDescription className="text-[10px] font-black uppercase text-primary tracking-[0.3em] opacity-60">Inventory Control & Governance Panel</SheetDescription>
               </div>
             </div>
             <Button variant="ghost" size="icon" onClick={() => setIsPortalOpen(false)} className="h-14 w-14 rounded-2xl bg-muted/50 hover:bg-muted text-foreground">
@@ -304,51 +306,51 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <Badge className="bg-primary text-primary-foreground font-black uppercase text-[10px]">{userProfile?.role}</Badge>
                         <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{userProfile?.email}</span>
                       </div>
-                      <p className="text-[10px] font-black uppercase text-primary/60 mt-2">Active Scope: {userProfile?.state || 'Global'}</p>
+                      <p className="text-[10px] font-black uppercase text-primary/60 mt-2">Current Scope: {userProfile?.state || 'Global'}</p>
                     </div>
                   </div>
                   <div className="flex gap-3">
                     <Button onClick={() => logout()} className="h-14 px-10 rounded-2xl bg-destructive text-destructive-foreground font-black uppercase text-[10px] tracking-widest gap-3 shadow-xl shadow-destructive/20 transition-transform hover:scale-105 active:scale-95">
-                      <Power className="h-4 w-4" /> Terminate Session
+                      <Power className="h-4 w-4" /> End Session
                     </Button>
                   </div>
                 </div>
               </div>
 
               <div className="lg:col-span-4 space-y-10">
-                <PortalGroup title="Registry Audit" icon={Activity}>
-                  <PortalItem label="Verify Queue" view="VERIFY" icon={CheckCircle2} description="Field Assessment pulses" />
-                  <PortalItem label="Sync Ledger" view="SYNC_QUEUE" icon={ListTodo} description="Pending modifications" />
-                  <PortalItem label="Reporting" view="REPORTS" icon={FileText} description="Executive documentation" />
-                  <PortalItem label="Activity" view="AUDIT_LOG" icon={History} description="Forensic traceability" />
-                  <PortalItem label="Exceptions" view="ALERTS" icon={ShieldAlert} description="Critical risk alerts" badge={alertCount} />
+                <PortalGroup title="Asset Auditing" icon={Activity}>
+                  <PortalItem label="Field Audit" view="VERIFY" icon={CheckCircle2} description="Field verification tasks" />
+                  <PortalItem label="Sync Log" view="SYNC_QUEUE" icon={ListTodo} description="Pending cloud updates" />
+                  <PortalItem label="Reports" view="REPORTS" icon={FileText} description="Generate inventory reports" />
+                  <PortalItem label="Audit Trail" view="AUDIT_LOG" icon={History} description="Historical record tracking" />
+                  <PortalItem label="Alerts" view="ALERTS" icon={ShieldAlert} description="Critical exceptions detected" badge={alertCount} />
                 </PortalGroup>
               </div>
 
               <div className="lg:col-span-4 space-y-10">
-                <PortalGroup title="Control & Identity" icon={Wrench}>
-                  <PortalItem label="Environment" view="SETTINGS" icon={Settings} description="UI/UX & System Pulse" />
-                  <PortalItem label="Identity" view="SETTINGS" icon={Users} description="User Governance & Scopes" />
-                  <PortalItem label="Resilience" view="ERROR_AUDIT" icon={ShieldCheck} description="System fault ledger" />
+                <PortalGroup title="System Control" icon={Wrench}>
+                  <PortalItem label="Settings" view="SETTINGS" icon={Settings} description="Global configuration" />
+                  <PortalItem label="Users" view="SETTINGS" icon={Users} description="User roles and scopes" />
+                  <PortalItem label="System Health" view="ERROR_AUDIT" icon={ShieldCheck} description="Error monitoring and logs" />
                 </PortalGroup>
               </div>
 
               <div className="lg:col-span-4 space-y-10">
                 {isSuperAdmin ? (
-                  <PortalGroup title="Infrastructure Hub" icon={Database}>
-                    <PortalItem label="Hybrid Database" view="DATABASE" icon={Terminal} description="Mission control orchestration" />
+                  <PortalGroup title="Infrastructure" icon={Database}>
+                    <PortalItem label="Database Manager" view="DATABASE" icon={Terminal} description="Direct database orchestration" />
                     <div className="p-8 rounded-[2rem] bg-primary/5 border-2 border-dashed border-primary/20 space-y-4">
                       <div className="flex items-center gap-3">
-                        <ShieldAlert className="h-5 w-5 text-primary" />
-                        <h5 className="text-[10px] font-black uppercase text-primary">Authority Guard</h5>
+                        <ShieldX className="h-5 w-5 text-primary" />
+                        <h5 className="text-[10px] font-black uppercase text-primary">Authority Control</h5>
                       </div>
-                      <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Infrastructure controls are restricted to the master system identity.</p>
+                      <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Advanced database operations are restricted to system administrators.</p>
                     </div>
                   </PortalGroup>
                 ) : (
                   <div className="h-full flex flex-col items-center justify-center p-10 opacity-20 text-center border-4 border-dashed border-border/40 rounded-[3rem]">
                     <Lock className="h-16 w-16 mb-4" />
-                    <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed text-muted-foreground">Infrastructure Clearance Required</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed text-muted-foreground">Admin Access Required</p>
                   </div>
                 )}
               </div>
@@ -358,7 +360,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       </Sheet>
 
       {/* Notification Sheet */}
-      <Sheet open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+      <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
         <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none shadow-3xl bg-background rounded-l-[2rem]">
           <div className="p-8 border-b bg-muted/20">
             <SheetHeader>
@@ -367,7 +369,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <div className="p-2 bg-primary/10 rounded-xl">
                     <Bell className="text-primary h-6 w-6" />
                   </div>
-                  <SheetTitle className="text-2xl font-black uppercase tracking-tight">System Pulse</SheetTitle>
+                  <SheetTitle className="text-2xl font-black uppercase tracking-tight">System Notifications</SheetTitle>
                 </div>
                 {notifications.length > 0 && (
                   <Button variant="ghost" size="sm" onClick={() => clearAll()} className="h-8 text-[9px] font-black uppercase text-muted-foreground hover:text-destructive">
@@ -375,7 +377,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </Button>
                 )}
               </div>
-              <SheetDescription className="text-[10px] font-black uppercase tracking-widest mt-1 opacity-60">Registry modifications and connectivity alerts.</SheetDescription>
+              <SheetDescription className="text-[10px] font-black uppercase tracking-widest mt-1 opacity-60">System alerts and record update status.</SheetDescription>
             </SheetHeader>
           </div>
 
@@ -408,7 +410,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             ) : (
               <div className="h-full flex flex-col items-center justify-center p-10 opacity-20 text-center gap-4">
                 <CheckCheck className="h-16 w-16" />
-                <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Pulse Status: Clear</p>
+                <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Notification status: Clear</p>
               </div>
             )}
           </ScrollArea>

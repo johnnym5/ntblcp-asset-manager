@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview SettingsWorkstation - Master Operational Control Center.
- * Phase 125: Reorganized into a unified tiered architecture (Environment, Registry, Governance, System).
+ * @fileOverview SettingsWorkstation - Master Settings Manager.
+ * Phase 131: Renamed naming scheme to be asset manager friendly.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -42,7 +42,9 @@ import {
   Download,
   ShieldCheck,
   RefreshCw,
-  LayoutGrid
+  LayoutGrid,
+  FileCode,
+  SlidersHorizontal
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -120,7 +122,7 @@ export function SettingsWorkstation() {
       await FirestoreService.updateSettings(draftSettings);
       await storage.saveSettings(draftSettings);
       await refreshRegistry();
-      toast({ title: "Environment Reconciled", description: "Global configuration pulse broadcasted successfully." });
+      toast({ title: "Configuration Updated", description: "Global settings have been saved successfully." });
     } finally {
       setIsSaving(false);
     }
@@ -134,7 +136,7 @@ export function SettingsWorkstation() {
     try {
       const discovered = await discoverTemplatesFromWorkbook(file);
       const activeGrantId = draftSettings.activeGrantId;
-      if (!activeGrantId) throw new Error("Select an active project scope first.");
+      if (!activeGrantId) throw new Error("Please select an active project scope first.");
 
       const updatedGrants = draftSettings.grants.map(g => {
         if (g.id === activeGrantId) {
@@ -150,7 +152,7 @@ export function SettingsWorkstation() {
       });
 
       handleSettingChange('grants', updatedGrants);
-      toast({ title: "Schema Discovered", description: `Captured ${discovered.length} hierarchical categories.` });
+      toast({ title: "Template Discovered", description: `Found ${discovered.length} record categories.` });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Discovery Failure", description: err.message });
     } finally {
@@ -164,7 +166,7 @@ export function SettingsWorkstation() {
     try {
       await storage.clearAssets();
       await refreshRegistry();
-      toast({ title: "Registry Purged", description: "Local data and state resets complete." });
+      toast({ title: "Cache Cleared", description: "Local asset data has been reset." });
       setIsNukeDialogOpen(false);
     } finally {
       setIsSaving(false);
@@ -212,17 +214,17 @@ export function SettingsWorkstation() {
   return (
     <div className="max-w-6xl mx-auto space-y-10 pb-40 animate-in fade-in duration-700">
       
-      {/* 1. Command Header */}
+      {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
         <div className="space-y-1">
           <h2 className="text-3xl sm:text-4xl font-black tracking-tighter text-foreground uppercase flex items-center gap-4 leading-none">
             <div className="p-3 bg-primary/10 rounded-2xl">
-              <Settings className="h-8 w-8 text-primary" />
+              <SlidersHorizontal className="h-8 w-8 text-primary" />
             </div>
-            Control Center
+            Settings Manager
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Global Environment Orchestration & Schema Pulse
+            System Configuration & Inventory Control
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -232,7 +234,7 @@ export function SettingsWorkstation() {
             className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 bg-primary text-primary-foreground flex items-center gap-3 transition-transform hover:scale-105 active:scale-95"
           >
             {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-            Commit Pulse
+            Save Configuration
           </Button>
         </div>
       </div>
@@ -241,28 +243,28 @@ export function SettingsWorkstation() {
         <div className="bg-muted/20 p-1.5 rounded-[2rem] border-2 border-border/40 overflow-hidden shadow-sm">
           <TabsList className="bg-transparent border-none p-0 h-auto gap-1.5 flex items-center w-full">
             <TabsTrigger value="environment" className="flex-1 px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
-              <GraduationCap className="h-3.5 w-3.5" /> Environment
+              <GraduationCap className="h-3.5 w-3.5" /> General
             </TabsTrigger>
             <TabsTrigger value="registry" className="flex-1 px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
-              <Columns className="h-3.5 w-3.5" /> Registry
+              <Columns className="h-3.5 w-3.5" /> Inventory
             </TabsTrigger>
             <TabsTrigger value="security" className="flex-1 px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
-              <Users className="h-3.5 w-3.5" /> Governance
+              <Users className="h-3.5 w-3.5" /> Users
             </TabsTrigger>
             <TabsTrigger value="system" className="flex-1 px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
-              <RefreshCw className="h-3.5 w-3.5" /> System
+              <RefreshCw className="h-3.5 w-3.5" /> Maintenance
             </TabsTrigger>
           </TabsList>
         </div>
 
-        {/* --- 1. ENVIRONMENT TAB --- */}
+        {/* --- 1. GENERAL TAB --- */}
         <TabsContent value="environment" className="space-y-10 outline-none m-0 animate-in fade-in slide-in-from-bottom-2">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 px-1">
             <div className="space-y-10">
               <div>
-                <SectionHeading title="Visual Identity" description="Theming & Surface language" icon={Palette} />
+                <SectionHeading title="System Appearance" description="Theme and visual identity" icon={Palette} />
                 <div className="space-y-4">
-                  <SettingRow label="System Theme" description="Choose between high-contrast light mode or dark amoled auditor view with gold accents." icon={Sun}>
+                  <SettingRow label="Color Theme" description="Choose between high-contrast Light mode or Dark amoled view." icon={Sun}>
                     <div className="flex gap-2 p-1 bg-muted/50 rounded-xl border-2">
                       <Button 
                         variant={theme === 'light' ? 'secondary' : 'ghost'} 
@@ -288,21 +290,21 @@ export function SettingsWorkstation() {
 
             <div className="space-y-10">
               <div>
-                <SectionHeading title="User Experience" description="Interface logic & guidance rules" icon={GraduationCap} />
+                <SectionHeading title="User Interface" description="Control complexity and help levels" icon={GraduationCap} />
                 <div className="space-y-4">
-                  <SettingRow label="Operational Mode" description="Switch between beginner-friendly guidance and high-speed expert pulses." icon={Smartphone}>
+                  <SettingRow label="Interface Mode" description="Switch between beginner-friendly guidance and expert view." icon={Smartphone}>
                     <Select value={draftSettings.uxMode} onValueChange={(v) => handleSettingChange('uxMode', v as UXMode)}>
                       <SelectTrigger className="w-40 h-11 rounded-xl font-black uppercase text-[10px] tracking-widest border-2">
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent className="rounded-xl">
                         <SelectItem value="beginner" className="text-[10px] font-black uppercase">Beginner Mode</SelectItem>
-                        <SelectItem value="advanced" className="text-[10px] font-black uppercase">Advanced Pulse</SelectItem>
+                        <SelectItem value="advanced" className="text-[10px] font-black uppercase">Advanced View</SelectItem>
                       </SelectContent>
                     </Select>
                   </SettingRow>
                   
-                  <SettingRow label="Help Tooltips" description="Show descriptive pulses when hovering over terminal buttons." icon={Info}>
+                  <SettingRow label="Contextual Help" description="Show tooltips and descriptions for interface elements." icon={Info}>
                     <Switch checked={draftSettings.showHelpTooltips} onCheckedChange={(v) => handleSettingChange('showHelpTooltips', v)} />
                   </SettingRow>
                 </div>
@@ -311,11 +313,11 @@ export function SettingsWorkstation() {
           </div>
         </TabsContent>
 
-        {/* --- 2. REGISTRY TAB --- */}
+        {/* --- 2. INVENTORY TAB --- */}
         <TabsContent value="registry" className="space-y-10 outline-none m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
           <div className="space-y-10">
             <div>
-              <SectionHeading title="Project Orchestration" description="Manage hierarchical data scopes" icon={LayoutGrid} />
+              <SectionHeading title="Project Management" description="Manage active projects and data schemas" icon={LayoutGrid} />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {draftSettings.grants.map((grant) => {
                   const isActive = draftSettings.activeGrantId === grant.id;
@@ -336,19 +338,19 @@ export function SettingsWorkstation() {
                                 onChange={(e) => handleSettingChange('grants', draftSettings.grants.map(g => g.id === grant.id ? { ...g, name: e.target.value } : g))}
                                 className="border-none bg-transparent font-black text-xl uppercase tracking-tighter p-0 h-auto focus-visible:ring-0 shadow-none"
                               />
-                              <p className="text-[9px] font-mono text-muted-foreground uppercase mt-1 opacity-40">ID: {grant.id.split('-')[0]}</p>
+                              <p className="text-[9px] font-mono text-muted-foreground uppercase mt-1 opacity-40">PROJECT_ID: {grant.id.split('-')[0]}</p>
                             </div>
                           </div>
                           {isActive ? (
-                            <Badge className="bg-primary text-primary-foreground font-black uppercase text-[8px] h-6 px-3 rounded-full">ACTIVE</Badge>
+                            <Badge className="bg-primary text-primary-foreground font-black uppercase text-[8px] h-6 px-3 rounded-full">SELECTED</Badge>
                           ) : (
-                            <Button variant="ghost" size="sm" onClick={() => handleSettingChange('activeGrantId', grant.id)} className="h-8 px-4 rounded-xl text-[9px] font-black uppercase border-2 border-border/40 hover:bg-primary/5">Set Active</Button>
+                            <Button variant="ghost" size="sm" onClick={() => handleSettingChange('activeGrantId', grant.id)} className="h-8 px-4 rounded-xl text-[9px] font-black uppercase border-2 border-border/40 hover:bg-primary/5">Activate</Button>
                           )}
                         </div>
                       </CardHeader>
                       <CardContent className="p-8 pt-4 space-y-6">
                         <div className="space-y-3">
-                          <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60 pl-1">Registry Classes</h5>
+                          <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60 pl-1">Record Categories</h5>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                             {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
                               <div key={sheetName} className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40 group hover:border-primary/20 transition-all">
@@ -358,6 +360,7 @@ export function SettingsWorkstation() {
                                   size="icon" 
                                   onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
                                   className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10 transition-all"
+                                  title="Configure Headers"
                                 >
                                   <Wrench className="h-3.5 w-3.5" />
                                 </Button>
@@ -369,11 +372,11 @@ export function SettingsWorkstation() {
                           <div className="grid grid-cols-2 gap-3 pt-2">
                             <input type="file" ref={templateInputRef} onChange={handleTemplateDiscovery} className="hidden" accept=".xlsx,.xls" />
                             <Button variant="outline" onClick={() => templateInputRef.current?.click()} disabled={isDiscovering} className="h-12 rounded-2xl border-white/10 text-foreground font-black uppercase text-[9px] tracking-widest gap-2 bg-muted/10">
-                              {isDiscovering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <ScanSearch className="h-3.5 w-3.5" />}
-                              Discover Template
+                              {isDiscovering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileCode className="h-3.5 w-3.5" />}
+                              Sync Schema
                             </Button>
                             <Button variant="outline" className="h-12 rounded-2xl border-white/10 text-foreground font-black uppercase text-[9px] tracking-widest gap-2 bg-muted/10">
-                              <PlusCircle className="h-3.5 w-3.5" /> Add Class
+                              <PlusCircle className="h-3.5 w-3.5" /> New Category
                             </Button>
                           </div>
                         )}
@@ -386,10 +389,10 @@ export function SettingsWorkstation() {
           </div>
         </TabsContent>
 
-        {/* --- 3. GOVERNANCE TAB --- */}
+        {/* --- 3. USERS TAB --- */}
         <TabsContent value="security" className="space-y-10 outline-none m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
           <div>
-            <SectionHeading title="Identity Governance" description="Manage auditors & regional authorized scopes" icon={Users} />
+            <SectionHeading title="User Management" description="Manage authorized auditors and access levels" icon={Users} />
             <Card className="rounded-[3rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
               <CardContent className="p-10">
                 <UserManagement 
@@ -402,29 +405,29 @@ export function SettingsWorkstation() {
           </div>
         </TabsContent>
 
-        {/* --- 4. SYSTEM TAB --- */}
+        {/* --- 4. MAINTENANCE TAB --- */}
         <TabsContent value="system" className="space-y-10 outline-none m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-10">
             <div className="space-y-10">
               <div>
-                <SectionHeading title="Infrastructure Pulse" description="Data state & sync orchestration" icon={Activity} />
+                <SectionHeading title="System Health" description="Database reconciliation and backups" icon={Activity} />
                 <div className="space-y-4">
-                  <SettingRow label="Manual Reconciliation" description="Force a full cross-layer state refresh for the active scope." icon={RefreshCw}>
+                  <SettingRow label="Cloud Refresh" description="Manually synchronize local data with the cloud database." icon={RefreshCw}>
                     <Button variant="outline" size="sm" onClick={refreshRegistry} className="h-10 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest border-2 gap-2">
-                      <RefreshCw className="h-3.5 w-3.5" /> Sync Pulse
+                      <RefreshCw className="h-3.5 w-3.5" /> Reconcile
                     </Button>
                   </SettingRow>
                   
-                  <SettingRow label="Registry Snapshot" description="Export entire register as an archival JSON pulse." icon={Download}>
-                    <Button variant="outline" size="sm" className="h-10 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest border-2">Backup Pulse</Button>
+                  <SettingRow label="Inventory Backup" description="Export the entire inventory as a JSON data file." icon={Download}>
+                    <Button variant="outline" size="sm" className="h-10 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest border-2">Export Backup</Button>
                   </SettingRow>
                 </div>
               </div>
 
               <div>
-                <SectionHeading title="Local Guard" description="Environment security & safety" icon={Lock} />
+                <SectionHeading title="Data Security" description="System access and locks" icon={Lock} />
                 <div className="space-y-4">
-                  <SettingRow label="Global Master Lock" description="Prevent field auditors from initiating direct registry modifications." icon={ShieldCheck}>
+                  <SettingRow label="Global Data Lock" description="Prevent non-admin users from creating or deleting records." icon={ShieldCheck}>
                     <Switch checked={draftSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
                   </SettingRow>
                 </div>
@@ -433,19 +436,19 @@ export function SettingsWorkstation() {
 
             <div className="space-y-10">
               <div>
-                <SectionHeading title="Danger Zone" description="Irreversible state modifications" icon={Bomb} />
+                <SectionHeading title="Advanced Actions" description="Caution: Irreversible data operations" icon={Bomb} />
                 <div className="p-8 rounded-[3rem] bg-destructive/[0.02] border-2 border-dashed border-destructive/20 space-y-6">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-destructive/10 rounded-2xl">
                       <Trash2 className="h-6 w-6 text-destructive" />
                     </div>
                     <div className="space-y-0.5">
-                      <h4 className="text-sm font-black uppercase tracking-tight text-destructive">Wipe Registry Pulse</h4>
-                      <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Deterministic removal of local records and staged pulses.</p>
+                      <h4 className="text-sm font-black uppercase tracking-tight text-destructive">Wipe Local Storage</h4>
+                      <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Deletes all locally cached records and import data from this device.</p>
                     </div>
                   </div>
                   <Button variant="ghost" onClick={() => setIsNukeDialogOpen(true)} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] text-destructive border-2 border-transparent hover:border-destructive/20 hover:bg-destructive/10 transition-all">
-                    Reset Local Pulse
+                    Reset Local Register
                   </Button>
                 </div>
               </div>
@@ -454,19 +457,19 @@ export function SettingsWorkstation() {
         </TabsContent>
       </Tabs>
 
-      {/* --- MODALS & DIALOGS --- */}
+      {/* Confirmation Dialogs */}
       
       <AlertDialog open={isNukeDialogOpen} onOpenChange={setIsNukeDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Bomb className="h-10 w-10 text-destructive" /></div>
-            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Wipe Registry Pulse?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Clear Local Data?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium italic text-muted-foreground leading-relaxed">
-              This will permanently delete all local asset records, staged sandboxes, and pending sync pulses from this device. Cloud data remains safe.
+              This will permanently delete all local asset records and pending updates from this device. Records already synced to the cloud will remain safe.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Pulse</AlertDialogCancel>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleNukeRegistry} className="h-12 px-10 rounded-2xl bg-destructive text-white font-black uppercase text-[10px] m-0 shadow-xl shadow-destructive/20">Execute Wipe</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

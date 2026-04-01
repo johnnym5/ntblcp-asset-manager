@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview DashboardWorkstation - The Unified Intelligence Center.
- * Phase 130: Fixed Illegal Constructor error by renaming Map to MapIcon and using object-based counting.
+ * @fileOverview DashboardWorkstation - The Unified Inventory Overview.
+ * Phase 131: Renamed naming scheme to be asset manager friendly.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -16,7 +16,8 @@ import {
   Search,
   ArrowUpDown,
   Filter,
-  Map as MapIcon
+  Map as MapIcon,
+  Package
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -135,13 +136,13 @@ export function DashboardWorkstation() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-4">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tighter uppercase leading-none text-foreground">Intelligence Center</h2>
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tighter uppercase leading-none text-foreground">Inventory Dashboard</h2>
             {appSettings?.grants && appSettings.grants.length > 1 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-10 px-4 rounded-xl border-2 border-primary/10 bg-card gap-2 hover:bg-primary/5 transition-all group">
                     <FolderKanban className="h-4 w-4 text-primary" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">Switch Project</span>
+                    <span className="text-[10px] font-black uppercase tracking-widest">Select Project</span>
                     <ChevronDown className="h-3 w-3 opacity-40 group-data-[state=open]:rotate-180 transition-transform" />
                   </Button>
                 </DropdownMenuTrigger>
@@ -162,11 +163,11 @@ export function DashboardWorkstation() {
           </div>
           <div className="flex flex-wrap items-center gap-3 mt-2">
             <Badge className="bg-primary/5 border-2 border-primary/20 text-primary font-black uppercase text-[9px] tracking-widest px-4 h-7 rounded-full shadow-sm">
-              {activeGrant?.name || 'Active Registry Pulse'}
+              {activeGrant?.name || 'Active Project Scope'}
             </Badge>
             <Badge variant="outline" className={cn("font-black uppercase text-[9px] tracking-widest px-4 h-7 rounded-full border-2", isOnline ? "text-green-600 border-green-200" : "text-orange-600 border-orange-200")}>
               {isOnline ? <Globe className="mr-2 h-3 w-3 inline" /> : <Database className="mr-2 h-3 w-3 inline" />}
-              {isOnline ? 'CLOUD AUTHORITY' : 'LOCAL DEVICE PULSE'}
+              {isOnline ? 'CLOUD CONNECTED' : 'LOCAL OFFLINE DATA'}
             </Badge>
           </div>
         </div>
@@ -177,14 +178,14 @@ export function DashboardWorkstation() {
         <div className="relative group">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
           <Input 
-            placeholder="Search Registry Hub..." 
+            placeholder="Search Inventory..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="h-14 sm:h-16 pl-14 pr-32 sm:pr-40 rounded-2xl bg-card border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 text-foreground"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-muted-foreground hover:text-primary rounded-xl" title="Sort Sequence"><ArrowUpDown className="h-5 w-5" /></Button>
-            <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-muted-foreground hover:text-primary rounded-xl relative" title="Logic Filters">
+            <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-muted-foreground hover:text-primary rounded-xl" title="Sort Inventory"><ArrowUpDown className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-muted-foreground hover:text-primary rounded-xl relative" title="Inventory Filters">
               <Filter className="h-5 w-5" />
               {(selectedStatuses.length + selectedConditions.length) > 0 && (
                 <div className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full animate-pulse shadow-lg" />
@@ -194,15 +195,15 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
-      {/* 3. Interactive Analytics Pulse */}
+      {/* 3. Interactive Analytics */}
       <AssetSummaryDashboard />
 
-      {/* 4. Global Registry Workspace */}
+      {/* 4. Global Inventory Register */}
       <div className="p-1 sm:p-2 rounded-[2.5rem] bg-muted/10 border-2 border-dashed border-border/40 min-h-[600px]">
         <RegistryWorkstation />
       </div>
 
-      {/* 5. Temporal Intelligence Pulse */}
+      {/* 5. Temporal Audit Summary */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-12">
           <Card className="rounded-[3rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
@@ -210,11 +211,11 @@ export function DashboardWorkstation() {
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-                    <HistoryIcon className="h-4 w-4" /> Temporal Pulse Breakdown
+                    <HistoryIcon className="h-4 w-4" /> Acquisition Year Breakdown
                   </CardTitle>
-                  <p className="text-[9px] font-medium text-muted-foreground italic">Distribution of assets by acquisition year / batch.</p>
+                  <p className="text-[9px] font-medium text-muted-foreground italic">Asset distribution by procurement period.</p>
                 </div>
-                <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary font-black uppercase h-7 px-4 rounded-full">Fidelity Level: High</Badge>
+                <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary font-black uppercase h-7 px-4 rounded-full">Data Status: Validated</Badge>
               </div>
             </CardHeader>
             <CardContent className="p-8">
@@ -222,12 +223,12 @@ export function DashboardWorkstation() {
                 {stats?.temporalSummary.slice(0, 4).map((item) => (
                   <div key={item.year} className="space-y-4 p-6 rounded-[2rem] bg-background/50 border-2 border-border/40 shadow-inner group hover:border-primary/20 transition-all">
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black uppercase text-muted-foreground">{item.year} REGISTER</span>
+                      <span className="text-[10px] font-black uppercase text-muted-foreground">{item.year} Register</span>
                       <span className="text-[10px] font-mono text-primary font-bold">{item.percent}%</span>
                     </div>
                     <div className="space-y-1">
                       <p className="text-3xl font-black text-foreground">{item.count}</p>
-                      <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Total Records</p>
+                      <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Assets Counted</p>
                     </div>
                     <Progress value={item.percent} className="h-1" />
                   </div>
@@ -238,7 +239,7 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
-      {/* Drawer Triggers */}
+      {/* Logic Panels */}
       <AssetFilterSheet 
         isOpen={isFilterOpen} 
         onOpenChange={setIsFilterOpen} 
