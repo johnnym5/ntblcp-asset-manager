@@ -27,7 +27,11 @@ import {
   ShieldCheck,
   Search,
   ScanSearch,
-  X
+  X,
+  ChevronsUpDown,
+  ChevronLeft,
+  ChevronRight,
+  Hammer
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -55,7 +59,7 @@ export function DatabaseWorkstation() {
   const { userProfile } = useAuth();
   const { toast } = useToast();
 
-  const [isHealthOpen, setIsHealthOpen] = useState(true);
+  const [isHealthOpen, setIsHealthOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [nukeDialogOpen, setNukeDialogOpen] = useState(false);
   const [activePath, setActivePath] = useState('/assets');
@@ -281,7 +285,7 @@ export function DatabaseWorkstation() {
             </div>
             <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">NUKE GLOBAL DATA?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/40">
-              This action is **immutable**. You are about to purge every registry record from the Cloud (Firestore), Mirror (RTDB), and Local Persistence. This is a terminal reset operation.
+              This action is **immutable**. You are about to purge every registry record from the Cloud (Firestore), Mirror (RTDB), and this device (IndexedDB). This is a terminal reset operation.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
@@ -299,37 +303,5 @@ export function DatabaseWorkstation() {
       </AlertDialog>
 
     </div>
-  );
-}
-
-function ChevronsUpDown({ className }: { className?: string }) {
-  return (
-    <svg 
-      xmlns="http://www.w3.org/2000/svg" 
-      width="24" 
-      height="24" 
-      viewBox="0 0 24 24" 
-      fill="none" 
-      stroke="currentColor" 
-      strokeWidth="2" 
-      strokeLinecap="round" 
-      strokeLinejoin="round" 
-      className={className}
-    >
-      <path d="m7 15 5 5 5-5" />
-      <path d="m7 9 5-5 5 5" />
-    </svg>
-  );
-}
-
-function ChevronLeft({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m15 18-6-6 6-6"/></svg>
-  );
-}
-
-function ChevronRight({ className }: { className?: string }) {
-  return (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className}><path d="m9 18 6-6-6-6"/></svg>
   );
 }

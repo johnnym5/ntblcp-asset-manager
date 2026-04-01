@@ -86,7 +86,7 @@ export function AssetSummaryDashboard() {
         setSelectedConditions
     } = useAppState();
     
-    const [isOpen, setIsOpen] = useState(true);
+    const [isOpen, setIsOpen] = useState(false);
     const [pulseView, setPulseView] = useState<'stats' | 'insights'>('stats');
     
     const summary = useMemo(() => {
