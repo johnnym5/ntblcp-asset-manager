@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Inventory & Intelligence Center - High-Fidelity Unified Telemetry.
- * Phase 128: Renamed Map to MapIcon to resolve constructor conflict.
+ * Phase 130: Fixed Illegal Constructor error by renaming Map to MapIcon and using object-based counting.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -94,27 +94,28 @@ export function AssetSummaryDashboard() {
         const total = source.length;
         const verified = source.filter(a => a.status === 'VERIFIED').length;
         
-        const stateStats = source.reduce((acc, a) => {
+        // Use plain objects for counting to avoid shadowing the global Map constructor
+        const stateStats: Record<string, { total: number, verified: number }> = {};
+        source.forEach(a => {
             const loc = a.location || 'Global';
-            if (!acc[loc]) acc[loc] = { total: 0, verified: 0 };
-            acc[loc].total++;
-            if (a.status === 'VERIFIED') acc[loc].verified++;
-            return acc;
-        }, {} as Record<string, { total: number, verified: number }>);
+            if (!stateStats[loc]) stateStats[loc] = { total: 0, verified: 0 };
+            stateStats[loc].total++;
+            if (a.status === 'VERIFIED') stateStats[loc].verified++;
+        });
 
-        const conditionStats = source.reduce((acc, a) => {
+        const conditionStats: Record<string, number> = {};
+        source.forEach(a => {
             const cond = a.condition || 'Unassessed';
-            acc[cond] = (acc[cond] || 0) + 1;
-            return acc;
-        }, {} as Record<string, number>);
+            conditionStats[cond] = (conditionStats[cond] || 0) + 1;
+        });
 
-        const yearBuckets = source.reduce((acc, a) => {
+        const yearBuckets: Record<string | number, { total: number, verified: number }> = {};
+        source.forEach(a => {
             const year = a.yearBucket || 'Legacy';
-            if (!acc[year]) acc[year] = { total: 0, verified: 0 };
-            acc[year].total++;
-            if (a.status === 'VERIFIED') acc[year].verified++;
-            return acc;
-        }, {} as Record<string | number, { total: number, verified: number }>);
+            if (!yearBuckets[year]) yearBuckets[year] = { total: 0, verified: 0 };
+            yearBuckets[year].total++;
+            if (a.status === 'VERIFIED') yearBuckets[year].verified++;
+        });
 
         const criticalConditions = ['Stolen', 'Burnt', 'Unsalvageable', 'Writeoff'];
         const unusable = source.filter(a => a.condition && criticalConditions.includes(a.condition));

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SyncQueueWorkstation - SPA Pending Operations Module.
- * Phase 74: Manual Sync Orchestration.
+ * Phase 130: Enhanced with direct manual sync triggers for users.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -39,7 +39,10 @@ export function SyncQueueWorkstation() {
   const { toast } = useToast();
   const [queue, setQueue] = useState<OfflineQueueEntry[]>([]);
 
-  const loadQueue = async () => { const items = await storage.getQueue(); setQueue(items); };
+  const loadQueue = async () => { 
+    const items = await storage.getQueue(); 
+    setQueue(items); 
+  };
 
   useEffect(() => {
     loadQueue();
@@ -63,28 +66,49 @@ export function SyncQueueWorkstation() {
   const failedCount = queue.filter(q => q.status === 'FAILED').length;
 
   return (
-    <div className="space-y-8 pb-32 max-w-5xl mx-auto">
+    <div className="space-y-10 pb-32 max-w-5xl mx-auto animate-in fade-in duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-2">
           <h2 className="text-3xl font-black tracking-tight uppercase flex items-center gap-3">
-            <Activity className="h-8 w-8 text-primary" /> Sync Workstation
+            <div className="p-3 bg-primary/10 rounded-2xl">
+              <Activity className="h-8 w-8 text-primary" />
+            </div>
+            Sync Workstation
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Manual Write-Ahead Ledger Management</p>
         </div>
         <div className="flex items-center gap-3">
-          <Button variant="outline" disabled={isSyncing || !isOnline} onClick={manualDownload} className="h-12 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest border-2">
-            <Download className="h-4 w-4 mr-2" /> Pull Cloud State
+          <Button 
+            variant="outline" 
+            disabled={isSyncing || !isOnline} 
+            onClick={manualDownload} 
+            className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest border-2 hover:bg-primary/5"
+          >
+            <Download className="h-4 w-4 mr-3" /> Pull Cloud State
           </Button>
-          <Button disabled={isSyncing || !isOnline} onClick={manualUpload} className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">
-            {isSyncing ? <RefreshCw className="h-4 w-4 animate-spin mr-2" /> : <Upload className="h-4 w-4 mr-2" />} Execute Sync Pulse
+          <Button 
+            disabled={isSyncing || !isOnline} 
+            onClick={manualUpload} 
+            className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 bg-primary text-black transition-transform hover:scale-105 active:scale-95"
+          >
+            {isSyncing ? <RefreshCw className="h-5 w-5 animate-spin mr-3" /> : <Upload className="h-5 w-5 mr-3" />} Execute Sync Pulse
           </Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
-        <Card className="border-2 rounded-[2rem]"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-muted-foreground">Queue Depth</CardTitle></CardHeader><CardContent><div className="text-5xl font-black">{pendingCount}</div></CardContent></Card>
-        <Card className="border-2 rounded-[2rem] border-destructive/20"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-destructive">Logic Conflicts</CardTitle></CardHeader><CardContent><div className="text-5xl font-black text-destructive">{failedCount}</div></CardContent></Card>
-        <Card className="border-2 rounded-[2rem] border-green-500/20"><CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase text-green-600">Sync Awareness</CardTitle></CardHeader><CardContent><div className={cn("text-5xl font-black", isOnline ? "text-green-600" : "text-muted-foreground")}>{isOnline ? 'ON' : 'OFF'}</div></CardContent></Card>
+        <Card className="border-2 rounded-[2.5rem] bg-card/50 shadow-xl p-2">
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Queue Depth</CardTitle></CardHeader>
+          <CardContent><div className="text-5xl font-black tracking-tighter">{pendingCount}</div></CardContent>
+        </Card>
+        <Card className="border-2 rounded-[2.5rem] bg-card/50 border-destructive/20 shadow-xl p-2">
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-destructive">Logic Conflicts</CardTitle></CardHeader>
+          <CardContent><div className="text-5xl font-black tracking-tighter text-destructive">{failedCount}</div></CardContent>
+        </Card>
+        <Card className="border-2 rounded-[2.5rem] bg-card/50 border-green-500/20 shadow-xl p-2">
+          <CardHeader className="pb-2"><CardTitle className="text-[10px] font-black uppercase tracking-widest text-green-600">Sync Awareness</CardTitle></CardHeader>
+          <CardContent><div className={cn("text-5xl font-black tracking-tighter", isOnline ? "text-green-600" : "text-muted-foreground")}>{isOnline ? 'ON' : 'OFF'}</div></CardContent>
+        </Card>
       </div>
 
       {queue.length > 0 ? (
@@ -92,26 +116,49 @@ export function SyncQueueWorkstation() {
           <AnimatePresence mode="popLayout">
             {queue.map((entry) => (
               <motion.div key={entry.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} layout>
-                <Card className={cn("border-2 transition-all rounded-[2rem] overflow-hidden bg-card/50", entry.status === 'FAILED' ? "border-destructive/40 bg-destructive/5" : "border-border/40 hover:border-primary/20")}>
-                  <CardContent className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6">
-                    <div className="flex items-start gap-5">
-                      <div className={cn("p-4 rounded-2xl shadow-inner", entry.status === 'FAILED' ? "bg-destructive/10" : "bg-primary/10")}>
-                        <Database className={cn("h-6 w-6", entry.status === 'FAILED' ? "text-destructive" : "text-primary")} />
+                <Card className={cn("border-2 transition-all rounded-[2rem] overflow-hidden bg-card/50 shadow-lg", entry.status === 'FAILED' ? "border-destructive/40 bg-destructive/5" : "border-border/40 hover:border-primary/20")}>
+                  <CardContent className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-8">
+                    <div className="flex items-start gap-6">
+                      <div className={cn("p-5 rounded-2xl shadow-inner shrink-0", entry.status === 'FAILED' ? "bg-destructive/10 text-destructive" : "bg-primary/10 text-primary")}>
+                        <Database className="h-8 w-8" />
                       </div>
-                      <div className="space-y-1.5 min-w-0">
-                        <h4 className="font-black text-base uppercase truncate leading-none">{(entry.payload as any).description || 'Mutation Pulse'}</h4>
-                        <div className="flex flex-wrap items-center gap-3 text-[10px] font-bold text-muted-foreground uppercase opacity-60">
-                          <Badge variant="outline" className="h-5 text-[8px] font-black">{entry.operation}</Badge>
-                          <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {formatDistanceToNow(entry.timestamp, { addSuffix: true })}</span>
+                      <div className="space-y-2 min-w-0 flex-1">
+                        <h4 className="font-black text-lg uppercase tracking-tight text-foreground truncate leading-none">
+                          {(entry.payload as any).description || 'Mutation Pulse'}
+                        </h4>
+                        <div className="flex flex-wrap items-center gap-4 text-[10px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
+                          <Badge variant="outline" className="h-6 px-3 text-[9px] font-black border-primary/20 text-primary uppercase">{entry.operation}</Badge>
+                          <span className="flex items-center gap-2"><Clock className="h-3.5 w-3.5" /> {formatDistanceToNow(entry.timestamp, { addSuffix: true })}</span>
+                          <span className="flex items-center gap-2"><Tag className="h-3.5 w-3.5" /> UUID: {entry.id.split('-')[0]}</span>
                         </div>
-                        {entry.status === 'FAILED' && <p className="mt-3 text-xs font-medium text-destructive italic">Sync Interruption Pulse: {entry.error || 'Identity Rejected'}</p>}
+                        {entry.status === 'FAILED' && (
+                          <div className="mt-4 p-5 rounded-2xl bg-destructive/10 border-2 border-dashed border-destructive/20 space-y-1">
+                            <p className="text-[10px] font-black uppercase text-destructive tracking-widest flex items-center gap-2">
+                              <AlertTriangle className="h-3.5 w-3.5" /> Registry Conflict Detected
+                            </p>
+                            <p className="text-xs font-medium text-foreground italic leading-relaxed">
+                              {entry.error || 'The system could not broadcast this modification to the cloud authority.'}
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <Badge className={cn("px-4 py-1.5 font-black text-[10px] uppercase", entry.status === 'PENDING' ? "bg-orange-500" : "bg-destructive")}>{entry.status}</Badge>
-                      <div className="flex items-center gap-2">
-                        {entry.status === 'FAILED' && <Button variant="outline" size="icon" onClick={() => handleRetry(entry)} className="h-11 w-11 rounded-xl border-2 text-primary"><RotateCcw className="h-5 w-5" /></Button>}
-                        <Button variant="ghost" size="icon" onClick={() => handleDiscard(entry.id)} className="h-11 w-11 rounded-xl text-destructive/40 hover:text-destructive"><Trash2 className="h-5 w-5" /></Button>
+                    <div className="flex items-center gap-4 shrink-0">
+                      <Badge className={cn(
+                        "px-6 py-2 font-black text-[10px] uppercase tracking-widest rounded-full shadow-lg", 
+                        entry.status === 'PENDING' ? "bg-orange-500 text-white" : "bg-destructive text-white"
+                      )}>
+                        {entry.status}
+                      </Badge>
+                      <div className="flex items-center gap-2 ml-2">
+                        {entry.status === 'FAILED' && (
+                          <Button variant="outline" size="icon" onClick={() => handleRetry(entry)} className="h-12 w-12 rounded-xl border-2 text-primary hover:bg-primary/5 transition-all">
+                            <RotateCcw className="h-5 w-5" />
+                          </Button>
+                        )}
+                        <Button variant="ghost" size="icon" onClick={() => handleDiscard(entry.id)} className="h-12 w-12 rounded-xl text-destructive/40 hover:text-destructive hover:bg-destructive/10 transition-all">
+                          <Trash2 className="h-5 w-5" />
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
@@ -121,9 +168,14 @@ export function SyncQueueWorkstation() {
           </AnimatePresence>
         </div>
       ) : (
-        <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[3rem]">
-          <Database className="h-32 w-28 mx-auto mb-8" />
-          <h3 className="text-3xl font-black uppercase tracking-[0.2em]">Registry Synchronized</h3>
+        <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[4rem] bg-card/30 flex flex-col items-center gap-8 mx-2">
+          <div className="p-10 bg-muted rounded-full">
+            <Database className="h-32 w-28 text-muted-foreground" />
+          </div>
+          <div className="space-y-2">
+            <h3 className="text-3xl font-black uppercase tracking-[0.2em]">Registry Synchronized</h3>
+            <p className="text-sm font-medium text-muted-foreground italic">No pending local modifications in the write-ahead ledger.</p>
+          </div>
         </div>
       )}
     </div>

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 126: Unified Registry State (Headers, Sorting) for Global Search.
+ * Phase 130: Integrated Manual Sync Triggers & Unified Header State.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react';
@@ -146,7 +146,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   }, []);
 
   const manualDownload = useCallback(async () => {
-    if (!isOnline) return;
+    if (!isOnline) {
+      addNotification({ title: "Offline Pulse", description: "Internet connection required for cloud pull.", variant: "destructive" });
+      return;
+    }
     setIsSyncing(true);
     try {
       const remoteSettings = await FirestoreService.getSettings();
@@ -168,7 +171,10 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   }, [isOnline, refreshRegistry]);
 
   const manualUpload = useCallback(async () => {
-    if (!isOnline) return;
+    if (!isOnline) {
+      addNotification({ title: "Offline Pulse", description: "Internet connection required for cloud push.", variant: "destructive" });
+      return;
+    }
     setIsSyncing(true);
     try {
       await processSyncQueue();

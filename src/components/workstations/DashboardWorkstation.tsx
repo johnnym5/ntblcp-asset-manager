@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - The Unified Intelligence Center.
- * Phase 129: Replaced native Map constructor with object-based counting to eliminate shadowing anomalies.
+ * Phase 130: Fixed Illegal Constructor error by renaming Map to MapIcon and using object-based counting.
  */
 
 import React, { useMemo, useState } from 'react';

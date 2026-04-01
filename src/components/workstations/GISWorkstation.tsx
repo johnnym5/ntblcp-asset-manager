@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview GIS Spatial Hub Workstation.
- * High-fidelity coordinate grid and geographic registry pulse monitor.
+ * Phase 130: Renamed Map to MapIcon to resolve constructor conflict.
  */
 
 import React, { useMemo, useState } from 'react';

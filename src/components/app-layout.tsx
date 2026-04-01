@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - Unified Command Shell.
- * Phase 127: Unified semantic colors for perfect light/dark parity.
+ * Phase 130: Integrated manual sync triggers and refined portal access.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -40,7 +40,10 @@ import {
   Wrench,
   Command,
   User,
-  Power
+  Power,
+  RefreshCw,
+  Upload,
+  Download
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -68,7 +71,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     isSyncing, 
     assets, 
     activeView, 
-    setActiveView 
+    setActiveView,
+    manualDownload,
+    manualUpload
   } = useAppState();
   
   const [isHelpOpen, setIsHelpOpen] = useState(false);
@@ -151,6 +156,30 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
         
         <div className="flex items-center gap-3">
+          {/* Manual Sync Triggers in Header */}
+          <div className="hidden lg:flex items-center bg-muted/30 p-1 rounded-xl border border-border/40 gap-1 mr-2">
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={manualDownload} 
+              disabled={isSyncing || !isOnline}
+              className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
+              title="Pull Cloud Pulse"
+            >
+              <Download className="h-4 w-4" />
+            </Button>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={manualUpload} 
+              disabled={isSyncing || !isOnline}
+              className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
+              title="Push Local Pulse"
+            >
+              <Upload className="h-4 w-4" />
+            </Button>
+          </div>
+
           <button 
             onClick={() => setIsOnline(!isOnline)}
             className={cn(
@@ -220,7 +249,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 activeView === 'DASHBOARD' ? "bg-primary text-primary-foreground shadow-xl" : "text-muted-foreground hover:bg-muted"
               )}
             >
-              <LayoutDashboard className="h-5 w-5" />
+              <LayoutGrid className="h-5 w-5" />
               <span className="text-[10px] font-black uppercase tracking-widest">Intelligence Center</span>
             </button>
             <Separator orientation="vertical" className="h-8 mx-4 opacity-20 hidden sm:block" />
@@ -267,7 +296,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 <div className="p-8 rounded-[2rem] bg-card border-2 border-border/40 flex flex-col md:flex-row items-center justify-between gap-8">
                   <div className="flex items-center gap-6">
                     <Avatar className="h-20 w-20 border-4 border-primary/20">
-                      <AvatarFallback className="bg-muted text-primary text-2xl font-black">{userProfile?.displayName?.[0]}</AvatarFallback>
+                      <AvatarFallback className="bg-muted text-primary text-2xl font-black">{userProfile?.displayName?.[0] || 'U'}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-1">
                       <h3 className="text-2xl font-black uppercase tracking-tight text-foreground">{userProfile?.displayName}</h3>
