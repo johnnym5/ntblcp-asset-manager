@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Settings Manager.
- * Phase 160: Activated all project and sheet orchestration pulses.
+ * Phase 162: Resolved Discovery Failure error and optimized button typography.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -60,7 +60,7 @@ import { UserManagement } from '@/components/admin/user-management';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
-import { discoverTemplatesFromWorkbook } from '@/lib/excel-parser';
+import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { cn } from '@/lib/utils';
 import type { AppSettings, SheetDefinition, Grant, UXMode } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -84,7 +84,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function SettingsWorkstation() {
-  const { appSettings, refreshRegistry, settingsLoaded, isOnline, setActiveGrantId, setActiveView } = useAppState();
+  const { appSettings, setAppSettings, refreshRegistry, isOnline, setActiveGrantId, setActiveView } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const { setTheme, theme } = useTheme();
@@ -114,7 +114,7 @@ export function SettingsWorkstation() {
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     if (!draftSettings) return;
-    setDraftSettings({ ...draftSettings, [key]: value });
+    setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
   };
 
   const handleCommitChanges = async () => {
@@ -184,7 +184,7 @@ export function SettingsWorkstation() {
 
     setIsDiscovering(true);
     try {
-      const discovered = await discoverTemplatesFromWorkbook(file);
+      const discovered = await parseExcelForTemplate(file);
       const activeId = draftSettings.activeGrantId;
       if (!activeId) throw new Error("Select an active project scope first.");
 
@@ -201,7 +201,7 @@ export function SettingsWorkstation() {
         return g;
       });
 
-      handleSettingChange('grants', updatedGrants);
+      handleSettingChange('sheetDefinitions', updatedGrants);
       toast({ title: "Schema Synchronized", description: `Discovered ${discovered.length} record categories.` });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Discovery Failure", description: err.message });
@@ -367,9 +367,9 @@ export function SettingsWorkstation() {
         <TabsContent value="registry" className="space-y-10 outline-none m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
           <div className="space-y-10">
             <div>
-              <div className="flex items-center justify-between mb-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
                 <h3 className="text-lg font-black uppercase text-foreground tracking-tight leading-none px-1">Manage Projects</h3>
-                <div className="flex gap-3">
+                <div className="flex gap-3 flex-1 sm:flex-none">
                   <Input 
                     placeholder="New project name..." 
                     value={newProjectName}
@@ -379,14 +379,14 @@ export function SettingsWorkstation() {
                   <Button 
                     onClick={handleAddProject}
                     disabled={!newProjectName.trim()}
-                    className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
+                    className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95 shrink-0"
                   >
                     <PlusCircle className="h-4 w-4" /> Add Project
                   </Button>
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 {draftSettings.grants.map((grant) => {
                   const isActive = draftSettings.activeGrantId === grant.id;
                   return (
@@ -395,7 +395,7 @@ export function SettingsWorkstation() {
                       isActive ? "border-primary/40 ring-4 ring-primary/5" : "border-border/40"
                     )}>
                       <CardHeader className="p-8 pb-4">
-                        <div className="flex items-center justify-between">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                           <div className="flex items-center gap-4">
                             <ChevronsUpDown className="h-4 w-4 text-white/20 shrink-0" />
                             <div className="flex items-center gap-3">
@@ -447,16 +447,16 @@ export function SettingsWorkstation() {
 
                         {isActive && (
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                            <Button variant="outline" className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] sm:text-[10px] tracking-wider px-2 gap-2 hover:bg-white/5 text-white/60 transition-all active:scale-95">
                               <PlusCircle className="h-4 w-4" /> Add Manually
                             </Button>
                             <input type="file" ref={templateInputRef} onChange={handleTemplateDiscovery} className="hidden" accept=".xlsx,.xls" />
-                            <Button variant="outline" onClick={() => templateInputRef.current?.click()} disabled={isDiscovering} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                            <Button variant="outline" onClick={() => templateInputRef.current?.click()} disabled={isDiscovering} className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] sm:text-[10px] tracking-wider px-2 gap-2 hover:bg-white/5 text-white/60 transition-all active:scale-95">
                               {isDiscovering ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
                               Import Template
                             </Button>
-                            <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
-                              <ScanSearch className="h-4 w-4" /> Scan & Import Data
+                            <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] sm:text-[10px] tracking-wider px-2 gap-2 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                              <ScanSearch className="h-4 w-4" /> Scan & Import
                             </Button>
                           </div>
                         )}
