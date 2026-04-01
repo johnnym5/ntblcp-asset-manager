@@ -1,21 +1,22 @@
+
 "use client";
 
+/**
+ * @fileOverview Import Orchestrator - High-Fidelity Design.
+ */
+
 import React, { useState, useRef, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { addNotification } from '@/hooks/use-notifications';
-import { Loader2, FileUp, FileCheck2, AlertTriangle, ScanSearch, ChevronsUpDown, Check, X, Layers } from 'lucide-react';
+import { Loader2, FileUp, FileCheck2, ScanSearch, Check, X, Layers } from 'lucide-react';
 import { scanExcelFile, parseExcelFile, type ScannedSheetInfo } from '@/lib/excel-parser';
-import { getLockedOfflineAssets, saveLockedOfflineAssets } from '@/lib/idb';
+import { storage } from '@/offline/storage';
 import { Label } from './ui/label';
 import { ScrollArea } from './ui/scroll-area';
-import { Checkbox } from './ui/checkbox';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Separator } from './ui/separator';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Badge } from './ui/badge';
 import { cn } from '@/lib/utils';
 
@@ -25,7 +26,7 @@ interface ImportScannerDialogProps {
 }
 
 export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialogProps) {
-  const { appSettings, setOfflineAssets, setDataSource } = useAppState();
+  const { appSettings, activeGrantId, setDataSource, refreshRegistry } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   
@@ -39,8 +40,14 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // Extract definitions from active project pulse
+  const activeGrant = React.useMemo(() => 
+    appSettings?.grants.find(g => g.id === activeGrantId), 
+    [appSettings, activeGrantId]
+  );
+
   useEffect(() => {
-    if (file) {
+    if (file && activeGrant) {
       const performScan = async () => {
         setIsScanning(true);
         setScanResults([]);
@@ -48,24 +55,22 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
         setSelectedSheets([]);
         
         try {
-          const { scannedSheets, errors } = await scanExcelFile(file, appSettings);
+          const { scannedSheets, errors } = await scanExcelFile(file, activeGrant.sheetDefinitions);
           
-          if (errors.length > 0) {
-            setScanErrors(errors);
-          }
+          if (errors.length > 0) setScanErrors(errors);
           if (scannedSheets.length > 0) {
             setScanResults(scannedSheets);
             setSelectedSheets(scannedSheets.map(s => s.sheetName));
           }
         } catch (e: any) {
-          toast({ variant: "destructive", title: "Scan Failed", description: e.message });
+          toast({ variant: "destructive", title: "Scan Failed" });
         } finally {
           setIsScanning(false);
         }
       };
       performScan();
     }
-  }, [file, appSettings, toast]);
+  }, [file, activeGrant, toast]);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -76,55 +81,44 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
   };
 
   const handleImport = async () => {
-    if (!file || selectedSheets.length === 0) return;
+    if (!file || selectedSheets.length === 0 || !activeGrant) return;
 
     setIsImporting(true);
     addNotification({ title: 'Importing Pulse...', description: `Processing ${selectedSheets.length} sheet(s).` });
 
-    const baseAssets = await getLockedOfflineAssets();
-    const sheetsToImport = scanResults.filter(r => selectedSheets.includes(r.sheetName));
+    try {
+      const existingAssets = await storage.getAssets();
+      const sheetsToImport = scanResults.filter(r => selectedSheets.includes(r.sheetName));
 
-    const { assets: newAssets, updatedAssets, skipped, errors } = await parseExcelFile(file, appSettings, baseAssets, sheetsToImport);
+      const { assets: newAssets, errors } = await parseExcelFile(
+        file, 
+        activeGrant.sheetDefinitions, 
+        existingAssets, 
+        sheetsToImport
+      );
 
-    errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
+      errors.forEach(error => addNotification({ title: "Import Error", description: error, variant: "destructive" }));
 
-    const allChanges = [...newAssets, ...updatedAssets].map(asset => ({
-      ...asset,
-      lastModified: new Date().toISOString(),
-      lastModifiedBy: userProfile?.displayName,
-      lastModifiedByState: userProfile?.state,
-      syncStatus: undefined
-    }));
+      const allChanges = newAssets.map(asset => ({
+        ...asset,
+        grantId: activeGrant.id,
+        lastModified: new Date().toISOString(),
+        lastModifiedBy: userProfile?.displayName || 'System Import',
+      }));
 
-    if (allChanges.length > 0) {
-      const assetMap = new Map(baseAssets.map(a => [a.id, a]));
-      allChanges.forEach(a => assetMap.set(a.id, a));
-      const combinedAssets = Array.from(assetMap.values());
-      
-      await saveLockedOfflineAssets(combinedAssets);
-      setOfflineAssets(combinedAssets);
-      addNotification({ title: 'Imported to Locked Offline Store', description: `${allChanges.length} records staged for review.` });
-      setDataSource('local_locked');
+      if (allChanges.length > 0) {
+        await storage.saveToSandbox(allChanges);
+        addNotification({ title: 'Sandbox Populated', description: `${allChanges.length} records staged for review.` });
+        setDataSource('SANDBOX');
+        await refreshRegistry();
+      }
+
+      onOpenChange(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Import Failure" });
+    } finally {
+      setIsImporting(false);
     }
-
-    setIsImporting(false);
-    onOpenChange(false);
-  };
-
-  const resetState = () => {
-    setFile(null);
-    setFileName('');
-    setIsScanning(false);
-    setIsImporting(false);
-    setScanResults([]);
-    setScanErrors([]);
-    setSelectedSheets([]);
-    if (fileInputRef.current) fileInputRef.current.value = '';
-  };
-  
-  const handleOpenChange = (open: boolean) => {
-    if (!open) resetState();
-    onOpenChange(open);
   };
 
   const handleSelectAll = (checked: boolean) => {
@@ -134,7 +128,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
   const allSelected = scanResults.length > 0 && selectedSheets.length === scanResults.length;
 
   return (
-    <Dialog open={isOpen} onOpenChange={handleOpenChange}>
+    <Dialog open={isOpen} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl bg-black border-white/5 p-0 overflow-hidden rounded-[2.5rem] shadow-3xl text-white">
         <div className="p-10 pb-6 border-b border-white/5 space-y-4">
           <DialogHeader>
@@ -211,7 +205,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                                 </div>
                                 <div className="space-y-0.5">
                                   <h5 className="text-sm font-black uppercase tracking-tight text-white">{result.sheetName}</h5>
-                                  <p className="text-[10px] font-bold text-white/40 uppercase">Assets: {result.rowCount}</p>
+                                  <p className="text-[10px] font-bold text-white/40 uppercase">Found {result.rowCount} potential asset rows</p>
                                 </div>
                               </div>
                               <Badge variant="outline" className="h-6 px-3 border-primary/20 bg-primary/5 text-primary text-[8px] font-black uppercase">{result.definitionName}</Badge>
