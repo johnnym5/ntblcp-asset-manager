@@ -3,25 +3,23 @@
 /**
  * @fileOverview RegionalScopeDrawer - High-Fidelity Location Management.
  * Recreated to match the exact visual pulse from the user's screenshot.
- * Phase 135: Refined layout with zonal checkboxes and circular counts.
+ * Phase 145: Hardened zonal logic and circular count badges.
  */
 
 import React, { useState, useMemo } from 'react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
+import { Sheet, SheetContent } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { 
   RefreshCw, 
   ArrowUpDown, 
   Layers, 
   Check, 
-  Search,
-  X,
   Database,
-  ChevronDown
+  ChevronDown,
+  X
 } from 'lucide-react';
-import { NIGERIAN_ZONES, NIGERIAN_STATES } from '@/lib/constants';
+import { NIGERIAN_ZONES } from '@/lib/constants';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
 
@@ -34,7 +32,6 @@ export function RegionalScopeDrawer({ isOpen, onOpenChange }: RegionalScopeDrawe
   const { assets, selectedLocations, setSelectedLocations } = useAppState();
   const [sortMode, setSortMode] = useState<'A-Z' | 'VOLUME' | 'ZONES'>('ZONES');
 
-  // Calculate counts per state
   const stateCounts = useMemo(() => {
     const counts: Record<string, number> = {};
     assets.forEach(a => {
@@ -59,10 +56,7 @@ export function RegionalScopeDrawer({ isOpen, onOpenChange }: RegionalScopeDrawe
     setSelectedLocations(Array.from(next));
   };
 
-  const resetAll = () => {
-    setSelectedLocations([]);
-  };
-
+  const resetAll = () => setSelectedLocations([]);
   const isAllSelected = selectedLocations.length === 0;
 
   return (
@@ -77,7 +71,6 @@ export function RegionalScopeDrawer({ isOpen, onOpenChange }: RegionalScopeDrawe
             </Button>
           </div>
 
-          {/* Toolbar segments */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-6">
               <button 
@@ -105,7 +98,6 @@ export function RegionalScopeDrawer({ isOpen, onOpenChange }: RegionalScopeDrawe
 
         <ScrollArea className="flex-1 bg-black">
           <div className="p-6 space-y-10 pb-32">
-            {/* Overall Project Scope */}
             <button 
               onClick={resetAll}
               className={cn(
@@ -127,7 +119,6 @@ export function RegionalScopeDrawer({ isOpen, onOpenChange }: RegionalScopeDrawe
               </div>
             </button>
 
-            {/* Zonal Lists organized as per screenshot */}
             {Object.entries(NIGERIAN_ZONES).map(([zone, states]) => {
               const zoneStatesIn = states.filter(s => selectedLocations.includes(s));
               const isZoneAllIn = zoneStatesIn.length === states.length;

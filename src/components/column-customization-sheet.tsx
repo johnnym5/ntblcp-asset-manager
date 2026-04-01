@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview ColumnCustomizationSheet - High-Fidelity Schema Editor.
- * Phase 130: Overhauled UI to match provided image with reordering, label editing, and view toggles.
+ * Phase 140: Synchronized with professional arrangement mockup.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -24,14 +24,10 @@ import {
   ArrowUp, 
   GripVertical, 
   PlusCircle, 
-  Trash2, 
-  ArrowLeft,
-  Columns,
   Hash,
   X
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
-import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { SheetDefinition, DisplayField } from '@/types/domain';
 
@@ -52,7 +48,6 @@ export function ColumnCustomizationSheet({
 }: ColumnCustomizationSheetProps) {
   const [editedName, setEditedName] = useState('');
   const [editedFields, setEditedFields] = useState<DisplayField[]>([]);
-  const { toast } = useToast();
 
   useEffect(() => {
     if (isOpen && sheetDefinition) {
@@ -80,7 +75,6 @@ export function ColumnCustomizationSheet({
   const handleMove = (index: number, direction: 'up' | 'down') => {
     const targetIndex = direction === 'up' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= editedFields.length) return;
-
     setEditedFields(current => {
       const next = [...current];
       [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
@@ -99,105 +93,69 @@ export function ColumnCustomizationSheet({
     onOpenChange(false);
   };
 
-  const handleAddNewField = () => {
-    const newField: DisplayField = {
-      key: `custom_${Date.now()}`,
-      label: 'New Field Label...',
-      table: true,
-      quickView: true,
-      inChecklist: false
-    };
-    setEditedFields([...editedFields, newField]);
-  };
-
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-2xl flex flex-col p-0 overflow-hidden bg-background rounded-l-[2.5rem] border-primary/10 shadow-2xl">
-        <div className="p-10 pb-6 bg-muted/20 border-b">
+      <SheetContent side="right" className="w-full sm:max-w-2xl flex flex-col p-0 overflow-hidden bg-black text-white rounded-l-[2.5rem] border-white/5 shadow-2xl">
+        <div className="p-10 pb-6 bg-white/5 border-b border-white/5">
           <SheetHeader>
             <div className="flex items-center justify-between">
-              <SheetTitle className="text-3xl font-black uppercase tracking-tight text-foreground leading-none">Customize Sheet Layout</SheetTitle>
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-12 w-12 bg-muted/20 hover:bg-muted text-foreground">
+              <SheetTitle className="text-3xl font-black uppercase tracking-tight text-white leading-none">Customize Sheet Layout</SheetTitle>
+              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-12 w-12 bg-white/5 hover:bg-white/10 text-white">
                 <X className="h-6 w-6" />
               </Button>
             </div>
-            <SheetDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70 mt-2 leading-relaxed max-w-sm">
-              Reorder fields, edit labels, and control visibility on desktop vs. mobile. Renaming a sheet is disabled to prevent data loss.
-            </SheetDescription>
+            <SheetDescription className="font-bold uppercase text-[10px] tracking-widest text-white/40 mt-2">TECHNICAL ORCHESTRATION & FIELD VISIBILITY</SheetDescription>
           </SheetHeader>
         </div>
 
-        <div className="px-10 py-6 border-b bg-card">
-          <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground opacity-60">Sheet Name</Label>
-          <Input value={editedName} readOnly className="h-14 mt-2 bg-muted/30 border-2 rounded-xl font-black uppercase text-sm cursor-not-allowed opacity-60" />
+        <div className="px-10 py-6 border-b border-white/5 bg-black">
+          <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Sheet Name</Label>
+          <Input value={editedName} readOnly className="h-14 mt-2 bg-white/5 border-2 border-white/10 rounded-xl font-black uppercase text-sm cursor-not-allowed opacity-60 text-white" />
         </div>
 
-        <div className="flex items-center px-10 py-4 bg-muted/30 border-b text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground shadow-sm">
+        <div className="flex items-center px-10 py-4 bg-white/5 border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
           <div className="flex-1">Field Label (Header Name)</div>
           <div className="w-20 text-center">In Table</div>
           <div className="w-24 text-center">Quick View</div>
         </div>
 
-        <ScrollArea className="flex-1 px-10 bg-background">
-          <div className="divide-y divide-border/40 pb-20">
+        <ScrollArea className="flex-1 px-10 bg-black">
+          <div className="divide-y divide-white/5 pb-20">
             {editedFields.map((field, idx) => (
-              <div key={`${field.key}-${idx}`} className="flex items-center py-6 group transition-all hover:bg-primary/[0.02]">
-                {/* Reorder Stack */}
+              <div key={`${field.key}-${idx}`} className="flex items-center py-6 group transition-all hover:bg-white/[0.02]">
                 <div className="flex flex-col items-center gap-1.5 mr-6 shrink-0">
-                  <button onClick={() => handleMove(idx, 'up')} disabled={idx === 0} className="text-muted-foreground/40 hover:text-primary disabled:opacity-5 transition-colors">
+                  <button onClick={() => handleMove(idx, 'up')} disabled={idx === 0} className="text-white/20 hover:text-primary disabled:opacity-5 transition-colors">
                     <ArrowUp className="h-4 w-4" />
                   </button>
-                  <div className="p-2 bg-muted/50 rounded-lg group-hover:bg-primary/10 group-hover:text-primary transition-all shadow-sm">
+                  <div className="p-2 bg-white/5 rounded-lg group-hover:bg-primary/10 group-hover:text-primary transition-all shadow-sm">
                     <GripVertical className="h-5 w-5 opacity-40" />
                   </div>
-                  <button onClick={() => handleMove(idx, 'down')} disabled={idx === editedFields.length - 1} className="text-muted-foreground/40 hover:text-primary disabled:opacity-5 transition-colors">
+                  <button onClick={() => handleMove(idx, 'down')} disabled={idx === editedFields.length - 1} className="text-white/20 hover:text-primary disabled:opacity-5 transition-colors">
                     <ArrowDown className="h-4 w-4" />
                   </button>
                 </div>
 
                 <div className="flex-1 pr-6">
-                  <Input 
-                    value={field.label} 
-                    onChange={(e) => handleLabelChange(idx, e.target.value)}
-                    className="h-12 rounded-xl border-2 border-transparent bg-transparent hover:border-primary/20 focus:border-primary/20 font-black uppercase text-sm tracking-tight focus-visible:ring-0 shadow-none transition-all px-0 hover:px-4 focus:px-4" 
-                  />
+                  <Input value={field.label} onChange={(e) => handleLabelChange(idx, e.target.value)} className="h-12 rounded-xl border-2 border-transparent bg-transparent hover:border-white/10 focus:border-primary/40 font-black uppercase text-sm tracking-tight text-white transition-all px-0 hover:px-4 focus:px-4" />
                   <div className="flex items-center gap-1.5 mt-1 opacity-20 group-hover:opacity-40 transition-opacity pl-0 group-hover:pl-4">
-                    <Hash className="h-2.5 w-2.5" />
-                    <span className="text-[8px] font-mono font-bold uppercase">{field.key}</span>
+                    <Hash className="h-2.5 w-2.5" /><span className="text-[8px] font-mono font-bold uppercase">{field.key}</span>
                   </div>
                 </div>
 
-                <div className="w-20 flex justify-center">
-                  <Switch checked={field.table} onCheckedChange={() => handleToggle(idx, 'table')} className="data-[state=checked]:bg-primary" />
-                </div>
-
-                <div className="w-24 flex justify-center">
-                  <Switch checked={field.quickView} onCheckedChange={() => handleToggle(idx, 'quickView')} className="data-[state=checked]:bg-primary" />
-                </div>
+                <div className="w-20 flex justify-center"><Switch checked={field.table} onCheckedChange={() => handleToggle(idx, 'table')} className="data-[state=checked]:bg-primary" /></div>
+                <div className="w-24 flex justify-center"><Switch checked={field.quickView} onCheckedChange={() => handleToggle(idx, 'quickView')} className="data-[state=checked]:bg-primary" /></div>
               </div>
             ))}
           </div>
         </ScrollArea>
 
-        <div className="p-10 bg-card border-t shadow-2xl relative z-30">
-          <div className="space-y-4">
-            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Add Custom Field</h4>
-            <div className="flex gap-3">
-              <Input placeholder="Enter new header label..." className="h-14 rounded-xl border-2 font-bold text-sm" />
-              <Button onClick={handleAddNewField} className="h-14 px-8 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 bg-primary text-black">
-                <PlusCircle className="h-4 w-4" /> Add
-              </Button>
-            </div>
-          </div>
-        </div>
-
-        <SheetFooter className="p-10 pt-0 bg-card flex flex-row items-center gap-4">
+        <SheetFooter className="p-10 bg-black border-t border-white/5 flex flex-row items-center gap-4">
           <SheetClose asChild>
-            <Button variant="ghost" className="flex-1 h-16 font-black uppercase text-xs tracking-widest rounded-[1.5rem] bg-muted/20 hover:bg-muted text-foreground">Cancel</Button>
+            <Button variant="ghost" className="flex-1 h-16 font-black uppercase text-xs tracking-widest rounded-[1.5rem] bg-white/5 hover:bg-white/10 text-white">Cancel</Button>
           </SheetClose>
           <div className="flex-[3] flex gap-4">
-            <Button variant="outline" onClick={() => handleSaveChanges(true)} className="flex-1 h-16 font-black uppercase text-[10px] tracking-[0.2em] rounded-[1.5rem] border-2 hover:bg-primary/5">Apply Layout to All Sheets</Button>
-            <Button onClick={() => handleSaveChanges(false)} className="flex-1 h-16 rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/30 bg-primary text-black hover:bg-primary/90 transition-transform active:scale-95">Apply to This Sheet</Button>
+            <Button variant="outline" onClick={() => handleSaveChanges(true)} className="flex-1 h-16 font-black uppercase text-[10px] tracking-[0.2em] rounded-[1.5rem] border-2 border-white/10 text-white hover:bg-white/5">Apply to All Sheets</Button>
+            <Button onClick={() => handleSaveChanges(false)} className="flex-1 h-16 rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/30 bg-primary text-black hover:bg-primary/90">Apply to This Sheet</Button>
           </div>
         </SheetFooter>
       </SheetContent>
