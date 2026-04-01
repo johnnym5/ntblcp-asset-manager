@@ -2,7 +2,8 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Control Center.
- * Phase 89: Enhanced with Global Registry Purge & Ingestion Preparation.
+ * Phase 90: Integrated Database Mission Control & Resilience Audit into unified tabs.
+ * Fixed: Added missing ArrowRightLeft import.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -41,7 +42,16 @@ import {
   Monitor,
   ShieldAlert,
   ArrowRight,
-  Hammer
+  Hammer,
+  ArrowRightLeft,
+  Terminal,
+  Split,
+  Search,
+  FileJson,
+  XCircle,
+  ScanSearch,
+  ChevronRight,
+  ArrowUpRight
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -59,9 +69,28 @@ import { ArchiveService } from '@/lib/archive-service';
 import { SystemDiagnostics, type DiagnosticResult } from '@/lib/diagnostics';
 import { VirtualDBService } from '@/services/virtual-db-service';
 import { cn } from '@/lib/utils';
-import type { AppSettings, UXMode, AuthorityNode, AuthorizedUser } from '@/types/domain';
+import { formatDistanceToNow } from 'date-fns';
+import { saveAs } from 'file-saver';
+import type { AppSettings, UXMode, AuthorityNode, AuthorizedUser, StorageLayer, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
+import type { DBNode } from '@/types/virtual-db';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '@/components/ui/alert-dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 export function SettingsWorkstation() {
   const { appSettings, refreshRegistry, settingsLoaded, isSyncing, isOnline, setReadAuthority } = useAppState();
@@ -76,6 +105,23 @@ export function SettingsWorkstation() {
   const [isGlobalPurgeDialogOpen, setIsGlobalPurgeDialogOpen] = useState(false);
   const [diagnosticPulse, setDiagnosticPulse] = useState<DiagnosticResult[] | null>(null);
   
+  // --- Database Logic State ---
+  const [dbActiveLayer, setDbActiveLayer] = useState<StorageLayer>('FIRESTORE');
+  const [dbNodes, setDbNodes] = useState<DBNode[]>([]);
+  const [selectedDbNode, setSelectedDbNode] = useState<DBNode | null>(null);
+  const [dbLoading, setDbLoading] = useState(false);
+  const [dbEditedData, setDbEditedData] = useState("");
+  const [discrepancyIds, setDiscrepancyIds] = useState<string[]>([]);
+  const [parityData, setParityData] = useState<Record<StorageLayer, any> | null>(null);
+  const [isConflictView, setIsConflictView] = useState(false);
+  const [isComparing, setIsComparing] = useState(false);
+
+  // --- Resilience Audit Logic State ---
+  const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
+  const [loadingLogs, setLoadingLogs] = useState(false);
+  const [selectedErrorLog, setSelectedErrorLog] = useState<ErrorLogEntry | null>(null);
+  const [errorSearchTerm, setErrorSearchTerm] = useState("");
+
   const recoveryInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -83,6 +129,40 @@ export function SettingsWorkstation() {
       setDraftSettings(JSON.parse(JSON.stringify(appSettings)));
     }
   }, [appSettings]);
+
+  // Initial Load for Admin Tabs
+  useEffect(() => {
+    if (userProfile?.isAdmin) {
+      loadDbRoot();
+      loadErrorLogs();
+      VirtualDBService.getGlobalDiscrepancies().then(setDiscrepancyIds);
+    }
+  }, [userProfile, dbActiveLayer, isConflictView]);
+
+  const loadDbRoot = async () => {
+    setDbLoading(true);
+    try {
+      if (isConflictView) {
+        const assets = await VirtualDBService.getDocuments(dbActiveLayer, 'assets');
+        setDbNodes(assets.filter(n => discrepancyIds.includes(n.rawKey)));
+      } else {
+        const root = await VirtualDBService.getLogicalGroups(dbActiveLayer);
+        setDbNodes(root);
+      }
+    } finally {
+      setDbLoading(false);
+    }
+  };
+
+  const loadErrorLogs = async () => {
+    setLoadingLogs(true);
+    try {
+      const data = await FirestoreService.getErrorLogs();
+      setErrorLogs(data);
+    } finally {
+      setLoadingLogs(false);
+    }
+  };
 
   const hasChanges = useMemo(() => {
     return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
@@ -100,7 +180,7 @@ export function SettingsWorkstation() {
       await FirestoreService.updateSettings(draftSettings);
       await storage.saveSettings(draftSettings);
       await refreshRegistry();
-      toast({ title: "Configuration Synchronized", description: "Global environment pulse broadcasted successfully." });
+      toast({ title: "Configuration Synchronized" });
     } catch (e) {
       toast({ variant: "destructive", title: "Broadcast Failure" });
     } finally {
@@ -132,13 +212,32 @@ export function SettingsWorkstation() {
     setIsSaving(true);
     try {
       await VirtualDBService.purgeGlobalRegistry();
-      toast({ title: "Global Purge Complete", description: "Registry reset to prepare for new ingestion pulse." });
+      toast({ title: "Global Purge Complete" });
       await refreshRegistry();
       setIsGlobalPurgeDialogOpen(false);
     } catch (e) {
       toast({ variant: "destructive", title: "Purge Interrupted" });
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleDbNodeClick = async (node: DBNode) => {
+    if (node.type === 'COLLECTION') {
+      setDbLoading(true);
+      const docs = await VirtualDBService.getDocuments(node.source, node.path);
+      setDbNodes(docs);
+      setDbLoading(false);
+    } else {
+      setSelectedDbNode(node);
+      setDbEditedData(JSON.stringify(node.data || {}, null, 2));
+      setIsComparing(true);
+      try {
+        const data = await VirtualDBService.compareNodeAcrossLayers(node.path);
+        setParityData(data);
+      } finally {
+        setIsComparing(false);
+      }
     }
   };
 
@@ -194,6 +293,12 @@ export function SettingsWorkstation() {
           <TabsTrigger value="infrastructure" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
             <Monitor className="h-3.5 w-3.5" /> Infrastructure
           </TabsTrigger>
+          <TabsTrigger value="database" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+            <Terminal className="h-3.5 w-3.5" /> Mission Control
+          </TabsTrigger>
+          <TabsTrigger value="resilience" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+            <ShieldAlert className="h-3.5 w-3.5" /> Resilience Audit
+          </TabsTrigger>
           <TabsTrigger value="system" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
             <Cpu className="h-3.5 w-3.5" /> System Pulse
           </TabsTrigger>
@@ -224,7 +329,7 @@ export function SettingsWorkstation() {
                     <Label className="text-sm font-black uppercase tracking-tight">Operational Mode</Label>
                     <p className="text-[10px] font-medium text-muted-foreground">Expert mode enables high-speed keyboard shortcuts.</p>
                   </div>
-                  <Select value={draftSettings.uxMode} onValueChange={(v) => handleSettingChange('uxMode', v)}>
+                  <Select value={draftSettings.uxMode} onValueChange={(v) => handleSettingChange('uxMode', v as UXMode)}>
                     <SelectTrigger className="w-32 h-10 rounded-xl font-black text-[10px] uppercase"><SelectValue /></SelectTrigger>
                     <SelectContent className="rounded-xl"><SelectItem value="beginner">Beginner</SelectItem><SelectItem value="advanced">Advanced</SelectItem></SelectContent>
                   </Select>
@@ -241,7 +346,7 @@ export function SettingsWorkstation() {
           </div>
         </TabsContent>
 
-        {/* --- Identities & Governance Tab --- */}
+        {/* --- Governance Tab --- */}
         <TabsContent value="governance" className="space-y-10 outline-none px-2">
           <SectionHeading title="Identity Governance" description="Authorized auditors & regional jurisdictions" icon={UserCog} />
           <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
@@ -261,7 +366,7 @@ export function SettingsWorkstation() {
                 <Label className="text-sm font-black uppercase tracking-tight">Global Master Lock</Label>
               </div>
               <p className="text-[10px] font-medium text-muted-foreground italic max-w-md leading-relaxed">
-                When active, only Super Administrators can create or modify asset records in the cloud authority. Prevents accidental field data corruption.
+                When active, only Super Administrators can create or modify asset records in the cloud authority.
               </p>
             </div>
             <Switch checked={draftSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
@@ -270,41 +375,29 @@ export function SettingsWorkstation() {
 
         {/* --- Infrastructure Tab --- */}
         <TabsContent value="infrastructure" className="space-y-10 outline-none px-2">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <SectionHeading title="Infrastructure" description="High-Availability Redundancy Monitor" icon={Monitor} />
-            <Button variant="outline" onClick={handleSelfTest} className="h-10 rounded-xl font-black text-[9px] uppercase tracking-widest gap-2 border-2">
-              <RefreshCw className="h-3 w-3" /> Audit Storage Pulse
-            </Button>
-          </div>
-
+          <SectionHeading title="Infrastructure" description="High-Availability Redundancy Monitor" icon={Monitor} />
+          
           <Card className="rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.02] overflow-hidden">
-            <CardHeader className="p-8 bg-primary/5 border-b border-primary/10">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <CardTitle className="text-xl font-black uppercase flex items-center gap-3 text-primary"><ShieldAlert className="h-5 w-5" /> Failover Protocol</CardTitle>
-                  <CardDescription className="text-xs font-medium">Deterministic shift of primary registry authority node.</CardDescription>
-                </div>
-                <Badge className="bg-primary/20 text-primary border-primary/20 font-black h-7 px-4 rounded-full">ACTIVE: {appSettings.readAuthority}</Badge>
-              </div>
+            <CardHeader className="p-8 border-b border-primary/10 flex flex-row items-center justify-between">
+              <CardTitle className="text-xl font-black uppercase flex items-center gap-3 text-primary"><ShieldAlert className="h-5 w-5" /> Failover Protocol</CardTitle>
+              <Badge className="bg-primary/20 text-primary border-primary/20 font-black h-7 px-4 rounded-full">ACTIVE: {appSettings.readAuthority}</Badge>
             </CardHeader>
             <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
               <button 
                 onClick={() => executeFailover('FIRESTORE')} 
-                disabled={draftSettings.readAuthority === 'FIRESTORE' || isSaving}
-                className={cn("p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4 group", draftSettings.readAuthority === 'FIRESTORE' ? "bg-primary text-white border-primary shadow-xl" : "bg-card border-border/40 hover:border-primary/40")}
+                disabled={draftSettings.readAuthority === 'FIRESTORE'}
+                className={cn("p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4", draftSettings.readAuthority === 'FIRESTORE' ? "bg-primary text-white border-primary shadow-xl" : "bg-card border-border/40 hover:border-primary/40")}
               >
-                <div className={cn("p-4 rounded-2xl", draftSettings.readAuthority === 'FIRESTORE' ? "bg-white/20" : "bg-primary/10 text-primary")}><Cloud className="h-10 w-10" /></div>
-                <h4 className="text-sm font-black uppercase">Cloud Authority</h4>
-                {draftSettings.readAuthority === 'FIRESTORE' && <CheckCircle2 className="h-5 w-5" />}
+                <Cloud className="h-10 w-10" />
+                <h4 className="text-sm font-black uppercase">Restore Cloud Authority</h4>
               </button>
               <button 
                 onClick={() => executeFailover('RTDB')} 
-                disabled={draftSettings.readAuthority === 'RTDB' || isSaving}
-                className={cn("p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4 group", draftSettings.readAuthority === 'RTDB' ? "bg-green-600 text-white border-green-600 shadow-xl" : "bg-card border-border/40 hover:border-green-500/40")}
+                disabled={draftSettings.readAuthority === 'RTDB'}
+                className={cn("p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4", draftSettings.readAuthority === 'RTDB' ? "bg-green-600 text-white border-green-600 shadow-xl" : "bg-card border-border/40 hover:border-green-500/40")}
               >
-                <div className={cn("p-4 rounded-2xl", draftSettings.readAuthority === 'RTDB' ? "bg-white/20" : "bg-green-100 text-green-600")}><Zap className="h-10 w-10" /></div>
-                <h4 className="text-sm font-black uppercase">Shadow Mirror</h4>
-                {draftSettings.readAuthority === 'RTDB' && <CheckCircle2 className="h-5 w-5" />}
+                <Zap className="h-10 w-10" />
+                <h4 className="text-sm font-black uppercase">Force Mirror Standby</h4>
               </button>
             </CardContent>
           </Card>
@@ -316,7 +409,7 @@ export function SettingsWorkstation() {
                 <div className="p-6 rounded-[2rem] bg-amber-500/10 border-2 border-amber-500/20 shadow-xl"><HardDrive className="h-10 w-10 text-amber-600" /></div>
                 <p className="text-[10px] font-black uppercase">Local Cache</p>
               </div>
-              <ArrowRight className="h-6 w-6 text-muted-foreground opacity-20 hidden md:block" />
+              <ArrowRightLeft className="h-6 w-6 text-muted-foreground opacity-20 hidden md:block" />
               <div className="flex flex-col items-center gap-3 z-10">
                 <div className={cn("p-6 rounded-[2rem] border-2 shadow-xl", draftSettings.readAuthority === 'RTDB' ? "border-green-500 bg-green-500/10" : "bg-muted/5 border-border/40")}><Activity className="h-10 w-10 text-green-600" /></div>
                 <p className="text-[10px] font-black uppercase">Mirror Pulse</p>
@@ -328,6 +421,92 @@ export function SettingsWorkstation() {
               </div>
             </div>
           </Card>
+        </TabsContent>
+
+        {/* --- Database Mission Control Tab --- */}
+        <TabsContent value="database" className="space-y-6 outline-none px-2 h-[600px] flex flex-col">
+          <SectionHeading title="Mission Control" description="Deterministic Cross-Layer Node Orchestration" icon={Terminal} />
+          <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
+            <Card className="lg:col-span-4 rounded-[2rem] border-2 border-border/40 bg-card/50 overflow-hidden flex flex-col">
+              <CardHeader className="bg-muted/20 border-b p-4 space-y-4">
+                <div className="grid grid-cols-3 bg-background/50 p-1 rounded-xl border shadow-inner h-10">
+                  <button onClick={() => setDbActiveLayer('FIRESTORE')} className={cn("rounded-lg flex items-center justify-center gap-2 text-[8px] font-black uppercase", dbActiveLayer === 'FIRESTORE' ? "bg-blue-500 text-white shadow-lg" : "text-muted-foreground")}>Cloud</button>
+                  <button onClick={() => setDbActiveLayer('LOCAL')} className={cn("rounded-lg flex items-center justify-center gap-2 text-[8px] font-black uppercase", dbActiveLayer === 'LOCAL' ? "bg-amber-500 text-white shadow-lg" : "text-muted-foreground")}>Local</button>
+                  <button onClick={() => setDbActiveLayer('RTDB')} className={cn("rounded-lg flex items-center justify-center gap-2 text-[8px] font-black uppercase", dbActiveLayer === 'RTDB' ? "bg-green-500 text-white shadow-lg" : "text-muted-foreground")}>Mirror</button>
+                </div>
+              </CardHeader>
+              <ScrollArea className="flex-1 p-2 bg-background/30">
+                {dbLoading ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-primary" /></div> : (
+                  <div className="space-y-1">
+                    {dbNodes.map(node => (
+                      <button key={node.id} onClick={() => handleDbNodeClick(node)} className={cn("w-full text-left p-3 rounded-xl transition-all flex items-center justify-between border-2 border-transparent", selectedDbNode?.id === node.id ? "bg-primary/10 border-primary/20" : "hover:bg-primary/5")}>
+                        <div className="flex flex-col min-w-0">
+                          <span className={cn("text-[10px] font-black uppercase truncate", discrepancyIds.includes(node.rawKey) && "text-destructive")}>{node.displayName}</span>
+                          <span className="text-[7px] font-mono text-muted-foreground opacity-40 truncate">{node.path}</span>
+                        </div>
+                        {node.type === 'COLLECTION' ? <ChevronRight className="h-3 w-3 opacity-20" /> : <FileJson className="h-3 w-3 opacity-40" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </Card>
+            <Card className="lg:col-span-8 rounded-[2rem] border-2 border-border/40 bg-card/50 overflow-hidden flex flex-col">
+              {selectedDbNode ? (
+                <div className="flex flex-col h-full">
+                  <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
+                    <span className="text-[10px] font-black uppercase">{selectedDbNode.displayName} Pulse</span>
+                    <Badge variant="outline" className="text-[8px] h-5">{selectedDbNode.source}</Badge>
+                  </div>
+                  <div className="flex-1 p-4 bg-[#0F172A] relative">
+                    <textarea value={dbEditedData} onChange={(e) => setDbEditedData(e.target.value)} className="w-full h-full bg-transparent text-blue-100 font-mono text-[10px] outline-none resize-none leading-relaxed" spellCheck="false" />
+                  </div>
+                  <div className="p-4 border-t bg-muted/20 flex justify-end gap-3">
+                    <Button variant="outline" size="sm" onClick={() => setSelectedDbNode(null)} className="h-9 px-4 rounded-xl font-black text-[9px] uppercase">Discard</Button>
+                    <Button size="sm" className="h-9 px-6 rounded-xl font-black text-[9px] uppercase bg-primary text-white">Commit Node</Button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex-1 flex flex-col items-center justify-center opacity-20 space-y-4">
+                  <Terminal className="h-12 w-12" />
+                  <p className="text-[10px] font-black uppercase">Awaiting Node Selection</p>
+                </div>
+              )}
+            </Card>
+          </div>
+        </TabsContent>
+
+        {/* --- Resilience Audit Tab --- */}
+        <TabsContent value="resilience" className="space-y-6 outline-none px-2">
+          <SectionHeading title="Resilience Audit" description="System Health Monitoring & Layman Error Pulse" icon={ShieldAlert} />
+          <div className="space-y-4">
+            {loadingLogs ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div> : 
+              errorLogs.length > 0 ? errorLogs.map(log => (
+                <Card key={log.id} className="rounded-[1.5rem] border-2 border-border/40 hover:border-primary/20 transition-all cursor-pointer bg-card/50" onClick={() => setSelectedErrorLog(log)}>
+                  <CardContent className="p-6 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className={cn("p-3 rounded-xl shadow-inner", log.severity === 'CRITICAL' ? "bg-red-100 text-red-600" : "bg-primary/10 text-primary")}>
+                        {log.severity === 'CRITICAL' ? <XCircle className="h-5 w-5" /> : <AlertCircle className="h-5 w-5" />}
+                      </div>
+                      <div>
+                        <h4 className="font-black text-sm uppercase tracking-tight">{log.error.laymanExplanation}</h4>
+                        <div className="flex items-center gap-3 text-[9px] font-bold text-muted-foreground uppercase mt-1 opacity-60">
+                          <span className="flex items-center gap-1"><Monitor className="h-2.5 w-2.5" /> {log.context.module}</span>
+                          <span className="flex items-center gap-1"><Clock className="h-2.5 w-2.5" /> {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Badge variant="outline" className={cn("h-7 px-4 rounded-full font-black uppercase text-[9px]", log.status === 'RESOLVED' ? "text-green-600 border-green-200" : "text-primary border-primary/20")}>{log.status}</Badge>
+                  </CardContent>
+                </Card>
+              )) : (
+                <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[3rem]">
+                  <CheckCircle2 className="h-16 w-16 mx-auto mb-4" />
+                  <h3 className="text-xl font-black uppercase tracking-widest">Resilience Pulse: Stable</h3>
+                </div>
+              )
+            }
+          </div>
         </TabsContent>
 
         {/* --- System Tab --- */}
@@ -351,41 +530,20 @@ export function SettingsWorkstation() {
               <SectionHeading title="Danger Zone" description="Immutable state operations" icon={Bomb} />
               <div className="space-y-4">
                 <Card className="rounded-[2.5rem] border-2 border-destructive/20 bg-destructive/[0.02] p-8 space-y-6 shadow-xl relative overflow-hidden">
-                  <div className="absolute top-0 right-0 p-4 opacity-10">
-                    <ShieldAlert className="h-20 w-20 text-destructive" />
-                  </div>
+                  <div className="absolute top-0 right-0 p-4 opacity-10"><ShieldAlert className="h-20 w-20 text-destructive" /></div>
                   <div className="space-y-2 relative z-10">
-                    <div className="flex items-center gap-3 text-destructive">
-                      <Trash2 className="h-5 w-5" />
-                      <h4 className="text-sm font-black uppercase">Local Reset Pulse</h4>
-                    </div>
-                    <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
-                      Purging the local store will clear all records and settings from **this device**. Cloud data is not affected.
-                    </p>
+                    <div className="flex items-center gap-3 text-destructive"><Trash2 className="h-5 w-5" /><h4 className="text-sm font-black uppercase">Local Reset Pulse</h4></div>
+                    <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">Purging local storage is irreversible.</p>
                   </div>
-                  <Button variant="ghost" onClick={() => setIsResetDialogOpen(true)} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 relative z-10 transition-all">
-                    Execute Local Reset
-                  </Button>
+                  <Button variant="ghost" onClick={() => setIsResetDialogOpen(true)} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 relative z-10">Execute Local Reset</Button>
                 </Card>
 
                 <Card className="rounded-[2.5rem] border-2 border-destructive/40 bg-destructive/[0.05] p-8 space-y-6 shadow-2xl relative overflow-hidden group">
-                  <div className="absolute -top-4 -right-4 h-24 w-24 bg-destructive opacity-5 group-hover:opacity-10 transition-opacity rounded-full" />
                   <div className="space-y-2 relative z-10">
-                    <div className="flex items-center gap-3 text-destructive">
-                      <Bomb className="h-6 w-6" />
-                      <h4 className="text-sm font-black uppercase tracking-tight">Global Registry Reset</h4>
-                    </div>
-                    <p className="text-[10px] font-bold text-destructive/80 uppercase tracking-widest">CRITICAL: Deterministic preparation for new ingestion.</p>
-                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                      This will wipe **every record** from Cloud, Mirror, and Local persistence layers. Use this only when preparing the system for a fresh data import from zero.
-                    </p>
+                    <div className="flex items-center gap-3 text-destructive"><Bomb className="h-6 w-6" /><h4 className="text-sm font-black uppercase tracking-tight">Global Registry Reset</h4></div>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">This will wipe **every record** from Cloud, Mirror, and Local persistence layers.</p>
                   </div>
-                  <Button 
-                    onClick={() => setIsGlobalPurgeDialogOpen(true)}
-                    className="w-full h-16 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/20 bg-destructive text-white hover:bg-destructive/90 transition-transform active:scale-95"
-                  >
-                    Initialize Global Purge
-                  </Button>
+                  <Button onClick={() => setIsGlobalPurgeDialogOpen(true)} className="w-full h-16 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/20 bg-destructive text-white hover:bg-destructive/90 transition-transform active:scale-95">Initialize Global Purge</Button>
                 </Card>
               </div>
             </div>
@@ -398,9 +556,7 @@ export function SettingsWorkstation() {
           <AlertDialogHeader className="space-y-4">
             <Trash2 className="h-12 w-12 text-destructive" />
             <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Local Pulse?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic">
-              This is an immutable operation. All local registry data and session pulses will be removed from this workstation.
-            </AlertDialogDescription>
+            <AlertDialogDescription className="text-sm font-medium italic">This is an immutable operation. All local registry data and session pulses will be removed from this workstation.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
             <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Reset</AlertDialogCancel>
@@ -410,38 +566,48 @@ export function SettingsWorkstation() {
       </AlertDialog>
 
       <AlertDialog open={isGlobalPurgeDialogOpen} onOpenChange={setIsGlobalPurgeDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-destructive/40 p-10 shadow-[0_35px_60px_-15px_rgba(220,38,38,0.3)] bg-background">
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/40 p-10 shadow-2xl bg-background">
           <AlertDialogHeader className="space-y-4">
-            <div className="p-4 bg-destructive/10 rounded-[2rem] w-fit">
-              <Bomb className="h-12 w-12 text-destructive animate-pulse" />
-            </div>
+            <div className="p-4 bg-destructive/10 rounded-[2rem] w-fit"><Bomb className="h-12 w-12 text-destructive animate-pulse" /></div>
             <div className="space-y-2">
               <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Destroy Global Registry?</AlertDialogTitle>
-              <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
-                You are about to perform a synchronized wipe across the entire system. This includes:
-                <ul className="mt-4 space-y-2 list-disc pl-5 font-bold uppercase text-[9px] tracking-widest text-destructive">
-                  <li>ALL Cloud Registry Records (Firestore)</li>
-                  <li>ALL Shadow Mirror Records (RTDB)</li>
-                  <li>ALL Local Device Data (IndexedDB)</li>
-                  <li>ALL Sync Queue Pulses</li>
-                </ul>
-                This action is **deterministic and irreversible**. Recovery is impossible without a prior JSON backup.
-              </AlertDialogDescription>
+              <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">You are about to perform a synchronized wipe across the entire system. This action is **deterministic and irreversible**.</AlertDialogDescription>
             </div>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-10 gap-3">
             <AlertDialogCancel className="h-14 px-8 rounded-2xl font-bold border-2 m-0">Abort Pulse</AlertDialogCancel>
-            <AlertDialogAction 
-              onClick={handleGlobalPurge}
-              disabled={isSaving}
-              className="h-14 px-12 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-destructive/40 bg-destructive text-white m-0"
-            >
-              {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />}
-              Commit Global Reset
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleGlobalPurge} disabled={isSaving} className="h-14 px-12 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/40 bg-destructive text-white m-0">{isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />}Commit Global Reset</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Error Detail Dialog */}
+      <Dialog open={!!selectedErrorLog} onOpenChange={() => setSelectedErrorLog(null)}>
+        <DialogContent className="max-w-3xl rounded-[2.5rem] border-primary/10 shadow-2xl p-0 overflow-hidden">
+          <div className="p-8 bg-muted/30 border-b">
+            <DialogHeader>
+              <div className="flex items-center justify-between">
+                <DialogTitle className="text-2xl font-black uppercase tracking-tight">Incident Analysis</DialogTitle>
+                <Badge variant="outline" className="border-destructive/20 text-destructive font-black uppercase px-4 h-8 rounded-full">{selectedErrorLog?.severity}</Badge>
+              </div>
+            </DialogHeader>
+          </div>
+          <ScrollArea className="max-h-[60vh] p-8 space-y-8">
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Layman Pulse</h4>
+              <p className="text-base font-black uppercase leading-relaxed">{selectedErrorLog?.error.laymanExplanation}</p>
+            </div>
+            <div className="space-y-4">
+              <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">Technical Message</h4>
+              <pre className="p-4 rounded-xl bg-muted/20 border text-[10px] font-mono overflow-auto">{selectedErrorLog?.error.technicalMessage}</pre>
+            </div>
+          </ScrollArea>
+          <div className="p-8 border-t bg-muted/30 flex justify-end gap-4">
+            <Button variant="ghost" onClick={() => setSelectedErrorLog(null)} className="font-bold rounded-xl px-10">Close</Button>
+            <Button onClick={() => selectedErrorLog && FirestoreService.updateErrorStatus(selectedErrorLog.id, 'RESOLVED')} className="h-14 px-12 rounded-2xl font-black uppercase text-xs shadow-xl shadow-primary/20 bg-primary text-primary-foreground">Mark as Resolved</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
