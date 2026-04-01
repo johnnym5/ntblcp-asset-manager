@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Settings Manager.
- * Phase 162: Resolved Discovery Failure error and optimized button typography.
+ * Phase 163: Resolved ReferenceError by importing settingsLoaded and hardened button layouts.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -84,7 +84,16 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function SettingsWorkstation() {
-  const { appSettings, setAppSettings, refreshRegistry, isOnline, setActiveGrantId, setActiveView } = useAppState();
+  const { 
+    appSettings, 
+    setAppSettings, 
+    refreshRegistry, 
+    isOnline, 
+    setActiveGrantId, 
+    setActiveView,
+    settingsLoaded 
+  } = useAppState();
+  
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const { setTheme, theme } = useTheme();
@@ -447,15 +456,15 @@ export function SettingsWorkstation() {
 
                         {isActive && (
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <Button variant="outline" className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] sm:text-[10px] tracking-wider px-2 gap-2 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                            <Button variant="outline" className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] sm:text-[9px] tracking-tight px-1 gap-1.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
                               <PlusCircle className="h-4 w-4" /> Add Manually
                             </Button>
                             <input type="file" ref={templateInputRef} onChange={handleTemplateDiscovery} className="hidden" accept=".xlsx,.xls" />
-                            <Button variant="outline" onClick={() => templateInputRef.current?.click()} disabled={isDiscovering} className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] sm:text-[10px] tracking-wider px-2 gap-2 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                            <Button variant="outline" onClick={() => templateInputRef.current?.click()} disabled={isDiscovering} className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] sm:text-[9px] tracking-tight px-1 gap-1.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
                               {isDiscovering ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
                               Import Template
                             </Button>
-                            <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] sm:text-[10px] tracking-wider px-2 gap-2 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                            <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-12 sm:h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] sm:text-[9px] tracking-tight px-1 gap-1.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
                               <ScanSearch className="h-4 w-4" /> Scan & Import
                             </Button>
                           </div>
