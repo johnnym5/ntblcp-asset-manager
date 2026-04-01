@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Global Command Hub.
- * Phase 245: Integrated structural Ingestion workstation and improved tab logic.
+ * Phase 250: Mobile-Optimized Layout & Responsive Command Pulses.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -21,7 +21,9 @@ import {
   Filter,
   ArrowUpDown,
   Settings as SettingsIcon,
-  DatabaseZap
+  DatabaseZap,
+  Menu,
+  X
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +47,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
@@ -86,11 +89,13 @@ export default function SPAHub() {
   } = useAppState();
   
   const { unreadCount } = useNotifications();
+  const isMobile = useIsMobile();
   
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
+  const [showMobileSearch, setShowMobileSearch] = useState(false);
 
   useEffect(() => {
     if (profileSetupComplete && !appSettings?.onboardingComplete) {
@@ -129,24 +134,24 @@ export default function SPAHub() {
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       
       <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
-        <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/80 backdrop-blur-3xl z-40 gap-8">
-          <div className="flex items-center gap-6 shrink-0">
+        <header className="h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-8 bg-black/80 backdrop-blur-3xl z-40 gap-4 md:gap-8">
+          <div className="flex items-center gap-3 md:gap-6 shrink-0">
             {activeView !== 'DASHBOARD' ? (
               <button 
                 onClick={() => setActiveView('DASHBOARD')} 
-                className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-primary group tactile-pulse"
+                className="flex items-center gap-2 p-2.5 md:p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-primary group tactile-pulse"
               >
                 <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Back to Dashboard</span>
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Dashboard</span>
               </button>
             ) : (
-              <div className="flex items-center gap-4">
-                <div className="p-2.5 bg-primary/10 rounded-xl">
+              <div className="flex items-center gap-2 md:gap-4">
+                <div className="p-2 md:p-2.5 bg-primary/10 rounded-xl">
                   <Boxes className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex flex-col">
-                  <h1 className="text-xl font-black uppercase text-white tracking-tighter leading-none">NTBLCP</h1>
-                  <span className="text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Asset Intelligence</span>
+                  <h1 className="text-lg md:text-xl font-black uppercase text-white tracking-tighter leading-none">NTBLCP</h1>
+                  <span className="text-[7px] md:text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Intelligence</span>
                 </div>
               </div>
             )}
@@ -156,7 +161,7 @@ export default function SPAHub() {
           <div className="flex-1 max-w-2xl relative group hidden md:block">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />
             <Input 
-              placeholder="Global Search: Descriptions, Tag IDs, or Serials..." 
+              placeholder="Global Search..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="h-12 pl-11 pr-24 rounded-xl bg-white/[0.03] border-white/5 text-sm font-medium focus-visible:ring-primary/20 text-white placeholder:text-white/20 shadow-inner"
@@ -187,12 +192,19 @@ export default function SPAHub() {
             </div>
           </div>
 
-          <div className="flex items-center gap-4 shrink-0">
-            <div className="flex items-center gap-2 mr-2">
+          <div className="flex items-center gap-2 md:gap-4 shrink-0">
+            {/* Mobile Search Trigger */}
+            <button 
+              className="md:hidden p-2.5 bg-white/5 rounded-xl text-white/40 tactile-pulse"
+              onClick={() => setShowMobileSearch(!showMobileSearch)}
+            >
+              <Search className="h-4 w-4" />
+            </button>
+
+            <div className="hidden sm:flex items-center gap-2 mr-2">
               <button 
                 onClick={manualDownload} 
                 disabled={isSyncing}
-                title="Fetch Cloud Updates"
                 className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
               >
                 <CloudDownload className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
@@ -200,15 +212,14 @@ export default function SPAHub() {
               <button 
                 onClick={manualUpload} 
                 disabled={isSyncing}
-                title="Push Local Changes"
                 className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
               >
                 <CloudUpload className={cn("h-4 w-4", isSyncing && "animate-spin")} />
               </button>
             </div>
             
-            <div className="flex items-center gap-3 pr-4 border-r border-white/5">
-              <div className={cn("h-2.5 w-2.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
+            <div className="flex items-center gap-2 md:gap-3 pr-2 md:pr-4 md:border-r border-white/5">
+              <div className={cn("h-2 w-2 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
               <button 
                 onClick={() => setIsNotificationsOpen(true)}
                 className="relative p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
@@ -224,9 +235,9 @@ export default function SPAHub() {
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <button className="flex items-center gap-3 group cursor-pointer pl-2">
+                <button className="flex items-center gap-3 group cursor-pointer pl-1">
                   <div className={cn(
-                    "h-10 w-10 rounded-full border transition-all flex items-center justify-center font-black text-xs shadow-xl",
+                    "h-9 w-9 md:h-10 md:w-10 rounded-full border transition-all flex items-center justify-center font-black text-[10px] md:text-xs shadow-xl",
                     activeView === 'SETTINGS' 
                       ? "bg-primary text-black border-primary" 
                       : "bg-primary/10 border-primary/20 text-primary group-hover:bg-primary group-hover:text-black"
@@ -239,7 +250,7 @@ export default function SPAHub() {
                 <DropdownMenuLabel className="font-normal p-4">
                   <div className="flex flex-col space-y-1">
                     <p className="text-sm font-black uppercase tracking-tight">{userProfile?.displayName}</p>
-                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{userProfile?.role}</p>
+                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{userProfile?.role}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
@@ -247,6 +258,18 @@ export default function SPAHub() {
                   <SettingsIcon className="mr-2 h-4 w-4" />
                   <span className="text-[11px] font-black uppercase">System Settings</span>
                 </DropdownMenuItem>
+                {isMobile && (
+                  <>
+                    <DropdownMenuItem onClick={manualDownload} className="p-3 focus:bg-white/10 rounded-xl cursor-pointer m-1">
+                      <CloudDownload className="mr-2 h-4 w-4" />
+                      <span className="text-[11px] font-black uppercase">Fetch Cloud</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={manualUpload} className="p-3 focus:bg-white/10 rounded-xl cursor-pointer m-1">
+                      <CloudUpload className="mr-2 h-4 w-4" />
+                      <span className="text-[11px] font-black uppercase">Push Local</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={logout} className="p-3 focus:bg-red-600 focus:text-white rounded-xl cursor-pointer m-1 text-red-500">
                   <LogOut className="mr-2 h-4 w-4" />
@@ -257,8 +280,33 @@ export default function SPAHub() {
           </div>
         </header>
 
+        {/* Mobile Search Overlay */}
+        {showMobileSearch && (
+          <div className="md:hidden bg-black/90 backdrop-blur-2xl border-b border-white/5 p-4 animate-in slide-in-from-top duration-300 z-30">
+            <div className="relative">
+              <Input 
+                autoFocus
+                placeholder="Global Search..." 
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="h-12 bg-white/[0.03] border-white/10 rounded-xl text-white pr-10"
+              />
+              <button 
+                onClick={() => setShowMobileSearch(false)}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="flex gap-2 mt-3">
+              <Button variant="outline" size="sm" onClick={() => { setIsSortOpen(true); setShowMobileSearch(false); }} className="flex-1 h-10 rounded-xl text-[9px] font-black uppercase"><ArrowUpDown className="h-3.5 w-3.5 mr-2" /> Sort</Button>
+              <Button variant="outline" size="sm" onClick={() => { setIsFilterOpen(true); setShowMobileSearch(false); }} className="flex-1 h-10 rounded-xl text-[9px] font-black uppercase"><Filter className="h-3.5 w-3.5 mr-2" /> Filter</Button>
+            </div>
+          </div>
+        )}
+
         <ScrollArea className="flex-1">
-          <div className="p-6 lg:p-10 min-h-full">
+          <div className="p-4 md:p-10 min-h-full">
             <ErrorBoundary module={activeView}>
               <Suspense fallback={
                 <div className="h-[60vh] flex flex-col items-center justify-center gap-6 opacity-40">
