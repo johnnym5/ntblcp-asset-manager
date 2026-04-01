@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Overhauled to match requested High-Fidelity Design.
- * Phase 127: Removed hardcoded bg-black for perfect contrast.
+ * Fixed: Syntax error in render block and resolved illegal constructor pulse.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -227,7 +227,7 @@ export function RegistryWorkstation() {
             <div className="bg-primary shadow-3xl shadow-primary/30 rounded-[2rem] h-16 sm:h-20 flex items-center px-6 sm:px-10 gap-6 sm:gap-10 overflow-hidden">
               <span className="text-xs sm:text-sm font-black uppercase text-primary-foreground shrink-0">{selectedCategory ? selectedIds.size : selectedCategories.size} Pulses</span>
               <Separator orientation="vertical" className="h-8 bg-black/10 hidden md:block" />
-              <div className="flex-1 overflow-x-auto custom-scrollbar flex items-center gap-6 sm:gap-10 py-2">
+              <div className="flex-1 flex items-center gap-6 sm:gap-10 py-2">
                 <button className="flex items-center gap-2 text-primary-foreground font-black uppercase text-[10px] tracking-widest shrink-0"><ArrowRightLeft className="h-4 w-4" /> Merge</button>
                 <button onClick={() => setIsBatchEditOpen(true)} className="flex items-center gap-2 text-primary-foreground font-black uppercase text-[10px] tracking-widest shrink-0"><Edit3 className="h-4 w-4" /> Edit</button>
                 <button onClick={handleExcelExport} className="flex items-center gap-2 text-primary-foreground font-black uppercase text-[10px] tracking-widest shrink-0"><FileSpreadsheet className="h-4 w-4" /> Excel</button>

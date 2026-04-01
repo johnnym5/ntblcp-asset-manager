@@ -2,9 +2,10 @@
 
 /**
  * @fileOverview ImportWorkstation - Advanced Ingestion Center.
+ * Fixed: Aligned engine method call to parseWorkbook.
  */
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,8 +21,6 @@ import {
   ChevronLeft,
   Activity,
   Layers,
-  Columns,
-  Search,
   FileSpreadsheet,
   AlertTriangle,
   Info
@@ -35,7 +34,6 @@ import { enqueueMutation } from '@/offline/queue';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import * as XLSX from 'xlsx';
-import type { Asset } from '@/types/domain';
 import type { ParsedAsset, ImportRunSummary } from '@/parser/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -68,14 +66,14 @@ export function ImportWorkstation() {
       const workbook = XLSX.read(buffer, { type: 'array', cellFormula: true, cellStyles: true });
       setProgress(40);
 
-      // We process the first compatible sheet for now
       const sheetName = workbook.SheetNames[0];
       const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 }) as any[][];
       
       const engine = new ParserEngine(file.name, existingAssets);
       setProgress(60);
       
-      const result = engine.parseSheet(sheetName, data);
+      // Fixed: Standardized method call name
+      const result = engine.parseWorkbook(sheetName, data);
       
       setStagedAssets(result.assets);
       setSummary(result.summary);
@@ -173,7 +171,6 @@ export function ImportWorkstation() {
 
           {currentStep === 'PREVIEW' && (
             <motion.div key="preview" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
-              {/* Summary Stats Bar */}
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="p-6 rounded-3xl bg-card border-2 border-border/40 shadow-sm">
                   <span className="text-[9px] font-black uppercase opacity-40">Profile Pulse</span>
@@ -193,7 +190,6 @@ export function ImportWorkstation() {
                 </div>
               </div>
 
-              {/* Preview List */}
               <Card className="rounded-[2.5rem] border-2 border-border/40 overflow-hidden bg-card/50">
                 <CardHeader className="p-8 bg-muted/20 border-b flex flex-row items-center justify-between">
                   <div className="space-y-1">
@@ -225,13 +221,6 @@ export function ImportWorkstation() {
                                 <span className="flex items-center gap-1">•</span>
                                 <span className="font-mono">SN: {asset.serialNumber}</span>
                               </div>
-                              {asset.validation.duplicateFlags.length > 0 && (
-                                <div className="mt-2 flex gap-2">
-                                  {asset.validation.duplicateFlags.map(f => (
-                                    <Badge key={f} className="bg-destructive text-white text-[7px] font-black uppercase h-4 px-1.5">{f}</Badge>
-                                  ))}
-                                </div>
-                              )}
                             </div>
                           </div>
                           <div className="shrink-0 flex items-center gap-3">
@@ -246,7 +235,7 @@ export function ImportWorkstation() {
 
               <div className="p-10 rounded-[3rem] bg-primary/5 border-2 border-dashed border-primary/20 flex flex-col md:flex-row items-center justify-between gap-8">
                 <div className="flex items-start gap-4 max-w-lg">
-                  <div className="p-3 bg-white rounded-2xl shadow-sm"><Info className="h-6 w-6 text-primary" /></div>
+                  <div className="p-3 bg-card border border-border/40 rounded-2xl shadow-sm"><Info className="h-6 w-6 text-primary" /></div>
                   <div className="space-y-1">
                     <h5 className="text-xs font-black uppercase tracking-tight">Final Verification Protocol</h5>
                     <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
