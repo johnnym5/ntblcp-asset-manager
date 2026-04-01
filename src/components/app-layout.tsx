@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - Unified Command Shell.
- * Phase 116: Management Terminal relocated to Top-Right Header.
+ * Phase 118: Fixed Notification interaction and unified theme pulses.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -55,7 +55,7 @@ import { QRScannerDialog } from './registry/QRScannerDialog';
 import { ScrollArea } from './ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from './ui/separator';
-import { useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
+import { useNotifications, clearAll, markAllAsRead, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
 import type { WorkstationView } from '@/types/domain';
 
@@ -91,6 +91,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const handlePortalNavigate = (view: WorkstationView) => {
     setActiveView(view);
     setIsPortalOpen(false);
+  };
+
+  const handleOpenNotifications = () => {
+    setIsNotificationsOpen(true);
+    if (unreadCount > 0) {
+      markAllAsRead();
+    }
   };
 
   const PortalGroup = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
@@ -155,12 +162,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <span className="text-[9px] font-black uppercase tracking-tighter">{isOnline ? 'CLOUD ACTIVE' : 'OFFLINE PULSE'}</span>
           </button>
 
-          <Button variant="ghost" size="icon" onClick={() => setIsNotificationsOpen(true)} className="relative h-10 w-10 rounded-xl bg-muted/30">
-            <Bell className="h-5 w-5" />
-            {unreadCount > 0 && <Badge className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center p-0 rounded-full bg-primary text-white text-[8px] font-black border-2 border-background">{unreadCount}</Badge>}
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={handleOpenNotifications} 
+            className="relative h-10 w-10 rounded-xl bg-muted/30 hover:bg-primary/10 group transition-all"
+          >
+            <Bell className="h-5 w-5 group-hover:text-primary transition-colors" />
+            {unreadCount > 0 && (
+              <Badge className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center p-0 rounded-full bg-primary text-white text-[8px] font-black border-2 border-background animate-in zoom-in duration-300">
+                {unreadCount}
+              </Badge>
+            )}
           </Button>
 
-          {/* Management Terminal Trigger (RELOCATED FROM BOTTOM) */}
+          {/* Management Terminal Trigger */}
           <div 
             onClick={() => setIsPortalOpen(true)}
             className="flex items-center gap-3 cursor-pointer group hover:bg-muted/50 p-1.5 rounded-2xl transition-all border-2 border-transparent hover:border-primary/20 bg-card/50 shadow-sm ml-2 relative"
@@ -176,7 +192,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             {alertCount > 0 && (
-              <Badge className="absolute -top-1 -left-1 bg-destructive text-white text-[7px] font-black h-4 min-w-4 p-0 flex items-center justify-center rounded-full border-2 border-background shadow-lg">
+              <Badge className="absolute -top-1 -left-1 bg-destructive text-white text-[7px] font-black h-4 min-w-4 p-0 flex items-center justify-center rounded-full border-2 border-background shadow-lg animate-pulse">
                 {alertCount}
               </Badge>
             )}
@@ -186,21 +202,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Main Workspace Area */}
       <main className="flex-1 overflow-hidden bg-muted/10 relative">
-        <ScrollArea className="h-full w-full custom-scrollbar">
-          <div className="adaptive-container py-8 sm:py-10">
+        <ScrollArea className="h-full w-full">
+          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-8 sm:py-10">
             {children}
           </div>
         </ScrollArea>
       </main>
 
-      {/* Simplified Bottom Dock */}
+      {/* Bottom Dock */}
       <aside className="h-20 shrink-0 border-t bg-card/80 backdrop-blur-2xl flex items-center px-4 md:px-10 z-40">
         <div className="max-w-[1600px] mx-auto w-full flex items-center justify-between">
           <div className="flex items-center gap-2">
             <button 
               onClick={() => setActiveView('DASHBOARD')} 
               className={cn(
-                "flex items-center gap-3 px-6 h-12 rounded-2xl transition-all group shrink-0",
+                "flex items-center gap-3 px-6 h-12 rounded-2xl transition-all group shrink-0 tactile-pulse",
                 activeView === 'DASHBOARD' ? "bg-primary text-black shadow-xl" : "text-muted-foreground hover:bg-muted"
               )}
             >
@@ -226,9 +242,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Grouped Management Portal Pop-up */}
+      {/* Management Portal */}
       <Sheet open={isPortalOpen} onOpenChange={setIsPortalOpen}>
-        <SheetContent side="bottom" className="h-[90vh] bg-black border-none rounded-t-[3rem] p-0 flex flex-col overflow-hidden text-white shadow-[0_-25px_50px_-12px_rgba(0,0,0,0.5)]">
+        <SheetContent side="bottom" className="h-[90vh] bg-black border-none rounded-t-[3rem] p-0 flex flex-col overflow-hidden text-white shadow-3xl">
           <div className="p-10 pb-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
             <div className="flex items-center gap-6">
               <div className="p-4 bg-primary rounded-[1.5rem] shadow-2xl">
@@ -247,7 +263,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <ScrollArea className="flex-1 custom-scrollbar">
             <div className="p-10 grid grid-cols-1 lg:grid-cols-12 gap-16">
               
-              {/* Identity & Session Control */}
               <div className="lg:col-span-12">
                 <div className="p-8 rounded-[2rem] bg-white/5 border-2 border-white/5 flex flex-col md:flex-row items-center justify-between gap-8">
                   <div className="flex items-center gap-6">
@@ -274,85 +289,34 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </div>
               </div>
 
-              {/* Audit Module */}
               <div className="lg:col-span-4 space-y-10">
                 <PortalGroup title="Registry Audit" icon={Activity}>
-                  <PortalItem 
-                    label="Verify Queue" 
-                    view="VERIFY" 
-                    icon={CheckCircle2} 
-                    description="Field Assessment pulses" 
-                  />
-                  <PortalItem 
-                    label="Sync Ledger" 
-                    view="SYNC_QUEUE" 
-                    icon={ListTodo} 
-                    description="Pending modifications" 
-                  />
-                  <PortalItem 
-                    label="Reporting" 
-                    view="REPORTS" 
-                    icon={FileText} 
-                    description="Executive documentation" 
-                  />
-                  <PortalItem 
-                    label="Activity" 
-                    view="AUDIT_LOG" 
-                    icon={History} 
-                    description="Forensic traceability" 
-                  />
-                  <PortalItem 
-                    label="Exceptions" 
-                    view="ALERTS" 
-                    icon={ShieldAlert} 
-                    description="Critical risk alerts" 
-                    badge={alertCount}
-                  />
+                  <PortalItem label="Verify Queue" view="VERIFY" icon={CheckCircle2} description="Field Assessment pulses" />
+                  <PortalItem label="Sync Ledger" view="SYNC_QUEUE" icon={ListTodo} description="Pending modifications" />
+                  <PortalItem label="Reporting" view="REPORTS" icon={FileText} description="Executive documentation" />
+                  <PortalItem label="Activity" view="AUDIT_LOG" icon={History} description="Forensic traceability" />
+                  <PortalItem label="Exceptions" view="ALERTS" icon={ShieldAlert} description="Critical risk alerts" badge={alertCount} />
                 </PortalGroup>
               </div>
 
-              {/* Settings Module */}
               <div className="lg:col-span-4 space-y-10">
                 <PortalGroup title="Control & Identity" icon={Wrench}>
-                  <PortalItem 
-                    label="Environment" 
-                    view="SETTINGS" 
-                    icon={Settings} 
-                    description="UI/UX & System Pulse" 
-                  />
-                  <PortalItem 
-                    label="Identity" 
-                    view="SETTINGS" 
-                    icon={Users} 
-                    description="User Governance & Scopes" 
-                  />
-                  <PortalItem 
-                    label="Resilience" 
-                    view="ERROR_AUDIT" 
-                    icon={ShieldCheck} 
-                    description="System fault ledger" 
-                  />
+                  <PortalItem label="Environment" view="SETTINGS" icon={Settings} description="UI/UX & System Pulse" />
+                  <PortalItem label="Identity" view="SETTINGS" icon={Users} description="User Governance & Scopes" />
+                  <PortalItem label="Resilience" view="ERROR_AUDIT" icon={ShieldCheck} description="System fault ledger" />
                 </PortalGroup>
               </div>
 
-              {/* Infrastructure Module */}
               <div className="lg:col-span-4 space-y-10">
                 {isSuperAdmin ? (
                   <PortalGroup title="Infrastructure Hub" icon={Database}>
-                    <PortalItem 
-                      label="Hybrid Database" 
-                      view="DATABASE" 
-                      icon={Terminal} 
-                      description="Mission control orchestration" 
-                    />
+                    <PortalItem label="Hybrid Database" view="DATABASE" icon={Terminal} description="Mission control orchestration" />
                     <div className="p-8 rounded-[2rem] bg-primary/5 border-2 border-dashed border-primary/20 space-y-4">
                       <div className="flex items-center gap-3">
                         <ShieldAlert className="h-5 w-5 text-primary" />
                         <h5 className="text-[10px] font-black uppercase text-primary">Authority Guard</h5>
                       </div>
-                      <p className="text-[10px] font-medium text-white/40 italic leading-relaxed">
-                        Infrastructure controls are restricted to the master system identity. Deterministic nuke and sync pulses are broadcast globally.
-                      </p>
+                      <p className="text-[10px] font-medium text-white/40 italic leading-relaxed">Infrastructure controls are restricted to the master system identity.</p>
                     </div>
                   </PortalGroup>
                 ) : (
@@ -362,17 +326,66 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   </div>
                 )}
               </div>
-
             </div>
           </ScrollArea>
+        </SheetContent>
+      </Sheet>
 
-          <div className="p-10 border-t border-white/5 bg-white/[0.01] flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <Badge className="bg-primary text-black font-black uppercase text-[8px] h-6 px-3">VER V5.0.4</Badge>
-              <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20">System Heartbeat: 100% STABLE</p>
-            </div>
-            <p className="text-[9px] font-mono uppercase text-white/10">TERMINAL_ID: {userProfile?.id.split('-')[0]}</p>
+      {/* Notification Sheet */}
+      <Sheet open={isNotificationsOpen} onOpenChange={setIsNotificationsOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none shadow-3xl bg-background rounded-l-[2rem]">
+          <div className="p-8 border-b bg-muted/20">
+            <SheetHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-xl">
+                    <Bell className="text-primary h-6 w-6" />
+                  </div>
+                  <SheetTitle className="text-2xl font-black uppercase tracking-tight">System Pulse</SheetTitle>
+                </div>
+                {notifications.length > 0 && (
+                  <Button variant="ghost" size="sm" onClick={() => clearAll()} className="h-8 text-[9px] font-black uppercase text-muted-foreground hover:text-destructive">
+                    Clear All
+                  </Button>
+                )}
+              </div>
+              <SheetDescription className="text-[10px] font-black uppercase tracking-widest mt-1 opacity-60">Registry modifications and connectivity alerts.</SheetDescription>
+            </SheetHeader>
           </div>
+
+          <ScrollArea className="flex-1 custom-scrollbar">
+            {notifications.length > 0 ? (
+              <div className="divide-y border-b">
+                {notifications.map((n) => (
+                  <div key={n.id} className={cn("p-6 relative group hover:bg-primary/[0.02] transition-colors", !n.read && "bg-primary/[0.01]")}>
+                    <div className="flex gap-4">
+                      <div className={cn("h-2 w-2 rounded-full mt-1.5 shrink-0", n.read ? "bg-muted" : "bg-primary animate-pulse")} />
+                      <div className="space-y-1 flex-1">
+                        <p className="text-sm font-black uppercase tracking-tight leading-none">{n.title}</p>
+                        <p className="text-xs font-medium text-muted-foreground leading-relaxed italic">{n.description}</p>
+                        <p className="text-[9px] font-bold uppercase opacity-40 pt-2 flex items-center gap-2">
+                          <Clock className="h-2.5 w-2.5" /> {formatDistanceToNow(n.date, { addSuffix: true })}
+                        </p>
+                      </div>
+                      <Button 
+                        variant="ghost" 
+                        size="icon" 
+                        onClick={() => removeNotification(n.id)} 
+                        className="h-8 w-8 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="h-full flex flex-col items-center justify-center p-10 opacity-20 text-center gap-4">
+                <CheckCheck className="h-16 w-16" />
+                <p className="text-sm font-black uppercase tracking-widest">Pulse Status: Clear</p>
+              </div>
+            )}
+          </ScrollArea>
         </SheetContent>
       </Sheet>
 
