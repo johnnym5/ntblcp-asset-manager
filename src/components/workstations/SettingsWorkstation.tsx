@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Control Center.
- * Phase 88: Consolidated all governance, identities, and infrastructure into a unified workstation.
+ * Phase 89: Enhanced with Global Registry Purge & Ingestion Preparation.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -40,7 +40,8 @@ import {
   HardDrive,
   Monitor,
   ShieldAlert,
-  ArrowRight
+  ArrowRight,
+  Hammer
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -56,6 +57,7 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
 import { ArchiveService } from '@/lib/archive-service';
 import { SystemDiagnostics, type DiagnosticResult } from '@/lib/diagnostics';
+import { VirtualDBService } from '@/services/virtual-db-service';
 import { cn } from '@/lib/utils';
 import type { AppSettings, UXMode, AuthorityNode, AuthorizedUser } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -71,6 +73,7 @@ export function SettingsWorkstation() {
   const [isSaving, setIsSaving] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
+  const [isGlobalPurgeDialogOpen, setIsGlobalPurgeDialogOpen] = useState(false);
   const [diagnosticPulse, setDiagnosticPulse] = useState<DiagnosticResult[] | null>(null);
   
   const recoveryInputRef = useRef<HTMLInputElement>(null);
@@ -120,6 +123,20 @@ export function SettingsWorkstation() {
     try {
       await setReadAuthority(target);
       toast({ title: "Authority Shifted", description: `Primary read source is now ${target}.` });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleGlobalPurge = async () => {
+    setIsSaving(true);
+    try {
+      await VirtualDBService.purgeGlobalRegistry();
+      toast({ title: "Global Purge Complete", description: "Registry reset to prepare for new ingestion pulse." });
+      await refreshRegistry();
+      setIsGlobalPurgeDialogOpen(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Purge Interrupted" });
     } finally {
       setIsSaving(false);
     }
@@ -263,7 +280,10 @@ export function SettingsWorkstation() {
           <Card className="rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.02] overflow-hidden">
             <CardHeader className="p-8 bg-primary/5 border-b border-primary/10">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-xl font-black uppercase flex items-center gap-3 text-primary"><ShieldAlert className="h-5 w-5" /> Failover Protocol</CardTitle>
+                <div className="space-y-1">
+                  <CardTitle className="text-xl font-black uppercase flex items-center gap-3 text-primary"><ShieldAlert className="h-5 w-5" /> Failover Protocol</CardTitle>
+                  <CardDescription className="text-xs font-medium">Deterministic shift of primary registry authority node.</CardDescription>
+                </div>
                 <Badge className="bg-primary/20 text-primary border-primary/20 font-black h-7 px-4 rounded-full">ACTIVE: {appSettings.readAuthority}</Badge>
               </div>
             </CardHeader>
@@ -315,7 +335,7 @@ export function SettingsWorkstation() {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-8">
               <SectionHeading title="Data Resilience" description="Backup exports & recovery pulses" icon={RotateCcw} />
-              <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 p-8 space-y-6">
+              <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 p-8 space-y-6 shadow-xl">
                 <div className="p-6 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-4">
                   <div className="flex items-center gap-3"><FileUp className="h-5 w-5 text-primary" /><h4 className="text-sm font-black uppercase">Load Recovery Pulse</h4></div>
                   <input type="file" ref={recoveryInputRef} className="hidden" accept=".json" onChange={(e) => { if(e.target.files?.[0]) ArchiveService.importSnapshot(e.target.files[0]); }} />
@@ -329,35 +349,96 @@ export function SettingsWorkstation() {
 
             <div className="space-y-8">
               <SectionHeading title="Danger Zone" description="Immutable state operations" icon={Bomb} />
-              <Card className="rounded-[2.5rem] border-2 border-destructive/20 bg-destructive/[0.02] p-8 space-y-6">
-                <div className="space-y-2">
-                  <div className="flex items-center gap-3 text-destructive">
-                    <Trash2 className="h-5 w-5" />
-                    <h4 className="text-sm font-black uppercase">Wipe Local Persistence</h4>
+              <div className="space-y-4">
+                <Card className="rounded-[2.5rem] border-2 border-destructive/20 bg-destructive/[0.02] p-8 space-y-6 shadow-xl relative overflow-hidden">
+                  <div className="absolute top-0 right-0 p-4 opacity-10">
+                    <ShieldAlert className="h-20 w-20 text-destructive" />
                   </div>
-                  <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
-                    Purging the local store will clear all asset records, sync logs, and cached configuration from this device. Cloud data is not affected.
-                  </p>
-                </div>
-                <Button variant="ghost" onClick={() => setIsResetDialogOpen(true)} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20">
-                  Execute Reset Pulse
-                </Button>
-              </Card>
+                  <div className="space-y-2 relative z-10">
+                    <div className="flex items-center gap-3 text-destructive">
+                      <Trash2 className="h-5 w-5" />
+                      <h4 className="text-sm font-black uppercase">Local Reset Pulse</h4>
+                    </div>
+                    <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">
+                      Purging the local store will clear all records and settings from **this device**. Cloud data is not affected.
+                    </p>
+                  </div>
+                  <Button variant="ghost" onClick={() => setIsResetDialogOpen(true)} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 relative z-10 transition-all">
+                    Execute Local Reset
+                  </Button>
+                </Card>
+
+                <Card className="rounded-[2.5rem] border-2 border-destructive/40 bg-destructive/[0.05] p-8 space-y-6 shadow-2xl relative overflow-hidden group">
+                  <div className="absolute -top-4 -right-4 h-24 w-24 bg-destructive opacity-5 group-hover:opacity-10 transition-opacity rounded-full" />
+                  <div className="space-y-2 relative z-10">
+                    <div className="flex items-center gap-3 text-destructive">
+                      <Bomb className="h-6 w-6" />
+                      <h4 className="text-sm font-black uppercase tracking-tight">Global Registry Reset</h4>
+                    </div>
+                    <p className="text-[10px] font-bold text-destructive/80 uppercase tracking-widest">CRITICAL: Deterministic preparation for new ingestion.</p>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
+                      This will wipe **every record** from Cloud, Mirror, and Local persistence layers. Use this only when preparing the system for a fresh data import from zero.
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={() => setIsGlobalPurgeDialogOpen(true)}
+                    className="w-full h-16 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/20 bg-destructive text-white hover:bg-destructive/90 transition-transform active:scale-95"
+                  >
+                    Initialize Global Purge
+                  </Button>
+                </Card>
+              </div>
             </div>
           </div>
         </TabsContent>
       </Tabs>
 
       <AlertDialog open={isResetDialogOpen} onOpenChange={setIsResetDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10">
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
-            <Bomb className="h-12 w-12 text-destructive" />
-            <AlertDialogTitle className="text-2xl font-black uppercase">Wipe Local Pulse?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic">This is an immutable operation. All local registry data will be removed from this workstation.</AlertDialogDescription>
+            <Trash2 className="h-12 w-12 text-destructive" />
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Local Pulse?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic">
+              This is an immutable operation. All local registry data and session pulses will be removed from this workstation.
+            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2">Abort</AlertDialogCancel>
-            <AlertDialogAction onClick={() => { storage.clearAssets(); window.location.href = '/'; }} className="h-12 px-10 rounded-2xl font-black uppercase bg-destructive text-white shadow-xl shadow-destructive/20">Execute Purge</AlertDialogAction>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Reset</AlertDialogCancel>
+            <AlertDialogAction onClick={() => { storage.clearAssets(); window.location.href = '/'; }} className="h-12 px-10 rounded-2xl font-black uppercase bg-destructive text-white m-0">Execute Purge</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={isGlobalPurgeDialogOpen} onOpenChange={setIsGlobalPurgeDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/40 p-10 shadow-[0_35px_60px_-15px_rgba(220,38,38,0.3)] bg-background">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-[2rem] w-fit">
+              <Bomb className="h-12 w-12 text-destructive animate-pulse" />
+            </div>
+            <div className="space-y-2">
+              <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Destroy Global Registry?</AlertDialogTitle>
+              <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
+                You are about to perform a synchronized wipe across the entire system. This includes:
+                <ul className="mt-4 space-y-2 list-disc pl-5 font-bold uppercase text-[9px] tracking-widest text-destructive">
+                  <li>ALL Cloud Registry Records (Firestore)</li>
+                  <li>ALL Shadow Mirror Records (RTDB)</li>
+                  <li>ALL Local Device Data (IndexedDB)</li>
+                  <li>ALL Sync Queue Pulses</li>
+                </ul>
+                This action is **deterministic and irreversible**. Recovery is impossible without a prior JSON backup.
+              </AlertDialogDescription>
+            </div>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-10 gap-3">
+            <AlertDialogCancel className="h-14 px-8 rounded-2xl font-bold border-2 m-0">Abort Pulse</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleGlobalPurge}
+              disabled={isSaving}
+              className="h-14 px-12 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-destructive/40 bg-destructive text-white m-0"
+            >
+              {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />}
+              Commit Global Reset
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
