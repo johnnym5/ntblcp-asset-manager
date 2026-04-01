@@ -1,41 +1,52 @@
+
 import * as XLSX from 'xlsx';
 import type { Asset, AppSettings, SheetDefinition, DisplayField } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES, IHVN_SUB_SHEET_DEFINITIONS } from './constants';
-import { AssetSchema } from './core/registry/validation';
-import { sanitizeForFirestore } from './lib/utils';
+import { Timestamp } from 'firebase/firestore';
 
 /**
  * Normalizes a header string by trimming and converting to uppercase.
  */
-const normalizeHeader = (header: unknown): string => {
+const normalizeHeader = (header: any): string => {
     if (header === null || header === undefined) return '';
     return String(header).trim().toUpperCase().replace(/\s+/g, ' ');
 };
 
 /**
- * Patterns for hierarchical classification
+ * Detects if a row is likely a Section/Group header.
+ * Typically has 1 non-empty cell that is a string and not a simple number or S/N.
  */
-const TEMPORAL_PATTERN = /\b(20\d{2})\b.*\b(additional|additions|procured|newly|added)\b/i;
-const QUANTITY_PATTERN = /\d+\s*(pieces|pcs|units)/i;
-const TRANSFER_PATTERN = /\b(transferred|transfer|dfb_| LSMOH|IHVN|FHI360)\b.*\bassets\b/i;
-const DOC_HEADER_KEYWORDS = ['CONTROL PROGRAMME', 'PROJECT', 'REPORTING FORM', 'FOCAL PERSONS', 'NTBLCP', 'GENERAL'];
-const MAJOR_SECTION_KEYWORDS = ['EQUIPMENT', 'COMPUTERS', 'INHERITED', 'ASSETS', 'GENERAL', 'ELECTRONICS', 'FURNITURE'];
-const ASSET_FAMILY_KEYWORDS = ['CHAIRS', 'TABLES', 'CABINETS', 'SHELVES', 'LAPTOPS', 'PRINTERS', 'SCANNERS', 'AC', 'UPS', 'GENERATORS', 'VEHICLES', 'MACHINES', 'MONITORS'];
+const isSectionRow = (row: any[]): string | null => {
+    if (!row || !Array.isArray(row)) return null;
+    const populated = row.filter(c => c !== null && String(c).trim() !== '');
+    if (populated.length === 1 && typeof populated[0] === 'string') {
+        const text = populated[0].trim();
+        const upper = text.toUpperCase();
+        
+        // Exclude document headers and schema headers
+        const isDocHeader = upper.includes('NATIONAL TUBERCULOSIS') || upper.includes('GLOBAL FUND');
+        const isSN = upper === 'S/N' || upper === 'SN';
+        const isNumeric = !isNaN(Number(text));
 
-type RowType = 'document_header' | 'major_section' | 'temporal_subsection' | 'quantity_subsection' | 'transfer_section' | 'asset_family' | 'schema_header' | 'asset_row' | 'empty';
+        if (!isDocHeader && !isSN && !isNumeric && text.length > 3) {
+            return text;
+        }
+    }
+    return null;
+};
 
 const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[], startRow: number = 0): number => {
     const normalizedDefinitiveHeaders = definitiveHeaders.map(normalizeHeader);
     
-    for (let i = startRow; i < Math.min(sheetData.length, startRow + 50); i++) {
+    for (let i = startRow; i < Math.min(sheetData.length, startRow + 25); i++) {
         const row = sheetData[i];
         if (!Array.isArray(row) || row.length === 0) continue;
 
         const normalizedRow = row.map(normalizeHeader);
         const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
         
-        if (matchCount / (definitiveHeaders.length || 1) >= 0.6) {
+        if (matchCount / (normalizedDefinitiveHeaders.length || 1) >= 0.7) {
             return i;
         }
     }
@@ -53,48 +64,115 @@ for (const key in HEADER_ALIASES) {
     }
 }
 
-const parseRows = (headerRow: any[], jsonData: any[][], category: string): { assets: Partial<Asset>[], rowsParsed: number } => {
-    const assets: Partial<Asset>[] = [];
+export const sanitizeForFirestore = <T extends object>(obj: T): T => {
+    const sanitizedObj: { [key: string]: any } = {};
+    for (const key in obj) {
+        const value = (obj as any)[key];
+        if (key === 'previousState') {
+            continue; 
+        }
+        if (value !== undefined) {
+            if (value instanceof Date) {
+                sanitizedObj[key] = Timestamp.fromDate(value);
+            } else {
+                sanitizedObj[key] = value;
+            }
+        }
+    }
+    return sanitizedObj as T;
+};
+
+const parseRows = (headerRow: any[], jsonData: any[][], category: string): { assets: Asset[], rowsParsed: number } => {
+    const assets: Asset[] = [];
     let rowsParsed = 0;
+    let currentSection = 'General';
 
     for (const row of jsonData) {
         rowsParsed++;
-        if (!row || row.every(cell => !cell || String(cell).trim() === '')) break;
 
-        const assetObject: Partial<Asset> = { category, status: 'UNVERIFIED', condition: 'New' };
+        // Detect Section Change mid-sheet (e.g. "PMU OFFICE EQUIPMENT")
+        const newSection = isSectionRow(row);
+        if (newSection) {
+            currentSection = newSection;
+            continue;
+        }
+
+        const firstCell = row[0] ? String(row[0]).trim().toLowerCase() : '';
+        const isEndOfTable = category === 'NTBLCP-TB-FAR' && (firstCell.startsWith('total') || firstCell.startsWith('grand total'));
+
+        if (row.every(cell => cell === null || String(cell).trim() === '') || (row[0] && normalizeHeader(row[0]) === 'S/N' && assets.length > 0) || isEndOfTable) {
+             rowsParsed--;
+            break;
+        }
+
+        const assetObject: Partial<Asset> = { 
+            category,
+            section: currentSection 
+        };
         let hasData = false;
         
         headerRow.forEach((rawHeader, colIndex) => {
-            if (!rawHeader) return;
+            if (rawHeader === null || rawHeader === undefined) return;
+
             const normalizedHeader = normalizeHeader(rawHeader);
-            const fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
+            let fieldName = COLUMN_TO_ASSET_FIELD_MAP.get(normalizedHeader);
+            
+            if(category.startsWith('IHVN')) {
+                if(normalizedHeader === 'LOCATION') fieldName = 'location';
+                if(normalizedHeader === 'STATE') fieldName = undefined;
+                if(normalizedHeader === 'LOCATION/USER') fieldName = 'assignee';
+            }
             
             if (fieldName) {
                 const cell = row[colIndex];
-                const finalValue = (cell !== null && cell !== undefined) ? String(cell).trim() : null;
+                const finalValue = (cell && cell.w) ? String(cell.w).trim() : (cell !== null && cell !== undefined ? String(cell).trim() : null);
+
                 if (finalValue) {
-                    (assetObject as any)[fieldName] = finalValue;
-                    hasData = true;
+                   (assetObject as any)[fieldName] = finalValue;
+                   hasData = true;
                 }
             }
         });
         
-        if (hasData) assets.push(assetObject);
+        if (hasData && (assetObject.description || assetObject.assetIdCode || assetObject.serialNumber)) {
+           const newAsset: Asset = { 
+                id: uuidv4(), 
+                ...assetObject, 
+                verifiedStatus: 'Unverified',
+                lastModified: new Date().toISOString(),
+            } as Asset;
+            assets.push(newAsset);
+        }
     }
     return { assets, rowsParsed };
 }
+
+const haveAssetDetailsChanged = (a: Partial<Asset>, b: Partial<Asset>): boolean => {
+    const keys = Object.keys(b) as (keyof Asset)[];
+    for (const key of keys) {
+        if (['id', 'syncStatus', 'lastModified', 'lastModifiedBy', 'lastModifiedByState'].includes(key)) {
+            continue;
+        }
+        const valA = String(a[key] ?? '').trim();
+        const valB = String(b[key] ?? '').trim();
+        if (valA !== valB) return true;
+    }
+    return false;
+};
 
 export interface ScannedSheetInfo {
   sheetName: string;
   definitionName: string;
   rowCount: number;
   headers: string[];
+  sectionsDetected: string[];
 }
 
 export async function scanExcelFile(
   fileOrBuffer: File | ArrayBuffer,
-  sheetDefinitions: Record<string, SheetDefinition>,
+  appSettings: AppSettings,
 ): Promise<{ scannedSheets: ScannedSheetInfo[], errors: string[] }> {
+    const { sheetDefinitions } = appSettings;
     const scannedSheets: ScannedSheetInfo[] = [];
     const errors: string[] = [];
 
@@ -106,33 +184,45 @@ export async function scanExcelFile(
             const sheet = workbook.Sheets[sheetName];
             const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
             
-            let bestMatch: any = null;
-
             for (const defName in sheetDefinitions) {
                 const definition = sheetDefinitions[defName];
-                const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers || []);
+                const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers);
 
                 if (headerRowIndex !== -1) {
-                    const rowCount = sheetData.slice(headerRowIndex + 1).length;
-                    const headers = (sheetData[headerRowIndex] || []).filter(h => h).map(String);
+                    const dataRows = sheetData.slice(headerRowIndex + 1);
+                    const sections: string[] = [];
+                    let rowCount = 0;
+
+                    dataRows.forEach(row => {
+                        const sec = isSectionRow(row);
+                        if (sec) {
+                            sections.push(sec);
+                        } else if (Array.isArray(row) && row.some(cell => cell !== null && String(cell).trim() !== '')) {
+                            rowCount++;
+                        }
+                    });
+
+                    const headers = sheetData[headerRowIndex].filter(h => h !== null).map(String);
                     
-                    if (!bestMatch || (headers.length > (bestMatch.headers?.length || 0))) {
-                        bestMatch = { definitionName: defName, rowCount, headers };
-                    }
+                    scannedSheets.push({
+                        sheetName: sheetName,
+                        definitionName: defName,
+                        rowCount: rowCount,
+                        headers: headers,
+                        sectionsDetected: sections
+                    });
+                    
+                    break; 
                 }
             }
-
-            if (bestMatch) {
-                scannedSheets.push({
-                    sheetName,
-                    definitionName: bestMatch.definitionName,
-                    rowCount: bestMatch.rowCount,
-                    headers: bestMatch.headers,
-                });
-            }
         }
+        if (scannedSheets.length === 0) {
+            errors.push("No matching asset sheets were found in this workbook based on the current settings.");
+        }
+
     } catch (e) {
-        errors.push(e instanceof Error ? e.message : "Scanning failed.");
+        console.error("Error scanning Excel file:", e);
+        errors.push(e instanceof Error ? e.message : "An unknown error occurred during scanning.");
     }
 
     return { scannedSheets, errors };
@@ -140,91 +230,229 @@ export async function scanExcelFile(
 
 export async function parseExcelFile(
     fileOrBuffer: File | ArrayBuffer, 
-    sheetDefinitions: Record<string, SheetDefinition>,
-    enabledSheets: string[],
+    appSettings: AppSettings, 
     existingAssets: Asset[],
     sheetsToImport?: ScannedSheetInfo[]
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
+    const { sheetDefinitions, enabledSheets } = appSettings;
+    
     const result: { assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] } = {
         assets: [],
         updatedAssets: [],
         skipped: 0,
         errors: [],
     };
+    let parsedAssets: Asset[] = [];
 
     try {
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
-        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true });
+        const workbook = XLSX.read(buffer, { type: 'array', cellDates: true, cellText: false });
 
-        const processList = sheetsToImport || [];
+        const processList: ScannedSheetInfo[] = sheetsToImport 
+            ? sheetsToImport 
+            : enabledSheets.map(defName => {
+                const actualSheetName = workbook.SheetNames.find(s => normalizeHeader(s).includes(normalizeHeader(defName)));
+                return actualSheetName ? { sheetName: actualSheetName, definitionName: defName, rowCount: 0, headers: [], sectionsDetected: [] } : null;
+            }).filter(Boolean) as ScannedSheetInfo[];
 
         for (const { sheetName, definitionName } of processList) {
-            const sheet = workbook.Sheets[sheetName];
             const definition = sheetDefinitions[definitionName];
-            if (!sheet || !definition) continue;
+            if (!definition) {
+                result.errors.push(`No definition found for sheet: "${definitionName}".`);
+                continue;
+            }
 
-            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-            const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers || []);
+            if (definitionName === 'IHVN-GF N-THRIP') {
+                 const sheet = workbook.Sheets[sheetName];
+                 const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, defval: null });
+                 let currentPos = 0;
+                 for (const subSheetName in IHVN_SUB_SHEET_DEFINITIONS) {
+                    const headers = IHVN_SUB_SHEET_DEFINITIONS[subSheetName];
+                    const headerRowIndex = findHeaderRowIndex(sheetData, headers, currentPos);
+                    if (headerRowIndex !== -1) {
+                        const headerRow = sheetData[headerRowIndex];
+                        const { assets: parsedGroupAssets, rowsParsed } = parseRows(headerRow, sheetData.slice(headerRowIndex + 1), 'IHVN-GF N-THRIP');
+                        parsedAssets.push(...parsedGroupAssets);
+                        currentPos = headerRowIndex + rowsParsed + 1;
+                    }
+                }
+                continue;
+            }
 
-            if (headerRowIndex !== -1) {
-                const { assets: parsed } = parseRows(sheetData[headerRowIndex], sheetData.slice(headerRowIndex + 1), definitionName);
-                
-                parsed.forEach(p => {
-                    const asset = {
-                        ...p,
-                        id: uuidv4(),
-                        lastModified: new Date().toISOString(),
-                        lastModifiedBy: 'System Ingestion',
-                        hierarchy: { document: sheetName, section: 'General', subsection: 'Base Register', assetFamily: 'Uncategorized' },
-                        importMetadata: { sourceFile: 'Workbook', sheetName, rowNumber: 0, importedAt: new Date().toISOString() },
-                        metadata: {}
-                    } as Asset;
+            const sheet = workbook.Sheets[sheetName];
+            if (!sheet) {
+                result.errors.push(`Could not find sheet named "${sheetName}" in the workbook.`);
+                continue;
+            }
+            const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, defval: null });
+            const headerRowIndex = findHeaderRowIndex(sheetData, definition.headers);
 
-                    const isDup = existingAssets.some(a => a.serialNumber === asset.serialNumber && a.serialNumber !== 'N/A');
-                    if (isDup) result.skipped++;
-                    else result.assets.push(asset);
-                });
+            if (headerRowIndex === -1) {
+                result.errors.push(`Could not find a valid header row in sheet: "${sheetName}".`);
+                continue;
+            }
+            
+            const headerRow = sheetData[headerRowIndex];
+            const jsonData = sheetData.slice(headerRowIndex + 1);
+            const { assets: parsedSheetAssets } = parseRows(headerRow, jsonData, definitionName);
+            parsedAssets.push(...parsedSheetAssets);
+        }
+        
+        const existingAssetMap = new Map(existingAssets.map(a => [`${a.sn || ''}-${a.assetIdCode || ''}-${a.description || ''}`.toLowerCase(), a.id]));
+
+        for (const parsedAsset of parsedAssets) {
+            const assetKey = `${parsedAsset.sn || ''}-${parsedAsset.assetIdCode || ''}-${parsedAsset.description || ''}`.toLowerCase();
+            if (existingAssetMap.has(assetKey)) {
+                const existingId = existingAssetMap.get(assetKey)!;
+                const existingAsset = existingAssets.find(a => a.id === existingId)!;
+                if (haveAssetDetailsChanged(existingAsset, parsedAsset)) {
+                     result.updatedAssets.push({ ...existingAsset, ...parsedAsset });
+                } else {
+                     result.skipped++;
+                }
+            } else {
+                 if (!appSettings.lockAssetList) {
+                    result.assets.push(parsedAsset);
+                 } else {
+                    result.skipped++;
+                 }
             }
         }
+        
+        if (result.assets.length === 0 && result.updatedAssets.length === 0 && result.errors.length === 0) {
+             result.errors.push(`No data to import. Check sheet names and headers.`);
+        }
+
     } catch (e) {
-        result.errors.push(e instanceof Error ? e.message : "Parsing failed.");
+        console.error("Error parsing Excel file:", e);
+        result.errors.push(e instanceof Error ? e.message : "An unknown error occurred during parsing.");
     }
     
     return result;
 }
 
+export function exportToExcel(assets: Asset[], sheetDefinitions: Record<string, SheetDefinition>, fileName: string): void {
+    const workbook = XLSX.utils.book_new();
+
+    const assetsByCategory = assets.reduce((acc, asset) => {
+        const category = asset.category || 'Uncategorized';
+        if (!acc[category]) {
+            acc[category] = [];
+        }
+        acc[category].push(asset);
+        return acc;
+    }, {} as Record<string, Asset[]>);
+    
+    for (const category in assetsByCategory) {
+        const definition = sheetDefinitions[category];
+        if (!definition) continue;
+
+        const headerArray = definition?.headers?.length > 0 ? [...definition.headers] : [];
+        if (headerArray.length === 0) continue; 
+        
+        if (!headerArray.includes("Section")) headerArray.push("Section");
+        if (!headerArray.includes("Verified Status")) headerArray.push("Verified Status");
+        if (!headerArray.includes("Last Modified Date")) headerArray.push("Last Modified Date");
+        
+        const sheetData = assetsByCategory[category].map(asset => {
+            const row: { [key: string]: any } = {};
+            headerArray.forEach(header => {
+                const normalizedHeader = normalizeHeader(header);
+                
+                let assetKey: keyof Asset | undefined;
+                for (const key in HEADER_ALIASES) {
+                    if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES].map(a => normalizeHeader(a)).includes(normalizedHeader)) {
+                        assetKey = key as keyof Asset;
+                        break;
+                    }
+                }
+                
+                if (assetKey) {
+                   row[header] = asset[assetKey] ?? '';
+                } else {
+                   if (normalizedHeader === 'SECTION') row[header] = asset.section || 'General';
+                   else if (normalizedHeader === 'VERIFIED STATUS') row[header] = asset.verifiedStatus || 'Unverified';
+                   else if (normalizedHeader === 'LAST MODIFIED DATE') row[header] = asset.lastModified ? new Date(asset.lastModified).toLocaleString() : '';
+                   else row[header] = '';
+                }
+            });
+            return row;
+        });
+        
+        const worksheet = XLSX.utils.json_to_sheet(sheetData, { header: headerArray });
+        const safeSheetName = category.replace(/[\\/?*[\]]/g, '-').substring(0, 31);
+        XLSX.utils.book_append_sheet(workbook, worksheet, safeSheetName);
+    }
+
+    if (workbook.SheetNames.length > 0) {
+        XLSX.writeFile(workbook, fileName);
+    }
+}
+
 export async function parseExcelForTemplate(file: File): Promise<SheetDefinition[]> {
   const templates: SheetDefinition[] = [];
-  try {
-    const buffer = await file.arrayBuffer();
-    const workbook = XLSX.read(buffer, { type: 'array' });
+  const buffer = await file.arrayBuffer();
+  const workbook = XLSX.read(buffer, { type: 'array' });
 
-    for (const sheetName of workbook.SheetNames) {
-      const sheet = workbook.Sheets[sheetName];
-      const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
-      
-      for (let i = 0; i < Math.min(sheetData.length, 20); i++) {
-          const row = sheetData[i];
-          if (!Array.isArray(row)) continue;
-          
-          const headerRow = row.map(h => String(h || '').trim()).filter(h => h.length > 1);
-          if (headerRow.length > 5) {
-              templates.push({
-                  name: sheetName,
-                  headers: headerRow,
-                  displayFields: headerRow.map(h => ({
-                      key: 'metadata' as any,
-                      label: h,
-                      table: true,
-                      quickView: true
-                  }))
-              });
-              break;
-          }
-      }
+  const allPossibleHeaders = new Set<string>();
+  Object.values(HEADER_ALIASES).flat().forEach(h => allPossibleHeaders.add(normalizeHeader(h)));
+
+  for (const sheetName of workbook.SheetNames) {
+    const sheet = workbook.Sheets[sheetName];
+    const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null });
+    
+    for (let i = 0; i < Math.min(sheetData.length, 10); i++) {
+        const row = sheetData[i];
+        if (!Array.isArray(row)) continue;
+        const normalizedRow = row.map(normalizeHeader);
+        const matchCount = normalizedRow.filter(h => allPossibleHeaders.has(h)).length;
+
+        if (matchCount > 5) {
+            const headerRow = row.map(h => String(h || '').trim()).filter(h => h);
+            const displayFields: DisplayField[] = [];
+
+            for (const header of headerRow) {
+                const normalizedHeader = normalizeHeader(header);
+                let fieldKey: keyof Asset | undefined;
+
+                for (const key in HEADER_ALIASES) {
+                    if (HEADER_ALIASES[key as keyof typeof HEADER_ALIASES].map(a => normalizeHeader(a)).includes(normalizedHeader)) {
+                        fieldKey = key as keyof Asset;
+                        break;
+                    }
+                }
+
+                if (fieldKey) {
+                    const showInTable = ['sn', 'description', 'assetIdCode', 'location', 'assignee', 'verifiedStatus'].includes(fieldKey);
+                    displayFields.push({
+                        key: fieldKey,
+                        label: header,
+                        table: showInTable,
+                        quickView: showInTable,
+                    });
+                }
+            }
+
+            // Always add Section if not matched
+            if (!displayFields.some(f => f.key === 'section')) {
+                displayFields.push({ key: 'section', label: 'Section Group', table: true, quickView: true });
+            }
+
+            if (displayFields.length > 0) {
+                 templates.push({
+                    name: sheetName,
+                    headers: headerRow,
+                    displayFields: displayFields,
+                });
+            }
+            break; 
+        }
     }
-  } catch (e) {
-    console.error("Template parse failed", e);
   }
+
+  if (templates.length === 0) {
+    throw new Error("Could not find any valid header rows in the provided Excel file.");
+  }
+
   return templates;
 }
