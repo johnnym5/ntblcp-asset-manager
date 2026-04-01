@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Single Page Application Hub.
- * Phase 175: Merged Core views into a unified Dashboard workstation.
+ * Phase 180: Consolidated Administration workstations into a unified Settings hub.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -43,9 +43,6 @@ import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation
 import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
 import { SyncQueueWorkstation } from '@/components/workstations/SyncQueueWorkstation';
-import { UsersWorkstation } from '@/components/workstations/UsersWorkstation';
-import { InfrastructureWorkstation } from '@/components/workstations/InfrastructureWorkstation';
-import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
 import { RegionalScopeDrawer } from '@/components/registry/RegionalScopeDrawer';
 import { NotificationsSheet } from '@/components/NotificationsSheet';
@@ -83,7 +80,7 @@ export default function SPAHub() {
     return <UserProfileSetup />;
   }
 
-  // Phase 175: Unified 'Core' group
+  // Phase 180: Unified Administration
   const navItems: { id: WorkstationView; label: string; icon: any; adminOnly?: boolean; group: string }[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, group: 'Core' },
     
@@ -94,10 +91,7 @@ export default function SPAHub() {
     { id: 'AUDIT_LOG', label: 'Audit Trail', icon: History, group: 'Systems' },
     { id: 'SYNC_QUEUE', label: 'Cloud Sync Status', icon: Activity, group: 'Systems' },
     
-    { id: 'USERS', label: 'User Management', icon: Package, adminOnly: true, group: 'System Administration' },
-    { id: 'INFRASTRUCTURE', label: 'System Infrastructure', icon: Monitor, adminOnly: true, group: 'System Administration' },
-    { id: 'DATABASE', label: 'Database Management', icon: Database, adminOnly: true, group: 'System Administration' },
-    { id: 'SETTINGS', label: 'System Settings', icon: Settings, group: 'System Administration' },
+    { id: 'SETTINGS', label: 'Settings', icon: Settings, group: 'System Administration' },
   ];
 
   const renderWorkstation = () => {
@@ -108,9 +102,6 @@ export default function SPAHub() {
       case 'ALERTS': return <AlertsWorkstation />;
       case 'AUDIT_LOG': return <AuditLogWorkstation />;
       case 'SYNC_QUEUE': return <SyncQueueWorkstation />;
-      case 'USERS': return <UsersWorkstation />;
-      case 'INFRASTRUCTURE': return <InfrastructureWorkstation />;
-      case 'DATABASE': return <DatabaseWorkstation />;
       case 'SETTINGS': return <SettingsWorkstation />;
       default: return <DashboardWorkstation />;
     }
