@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview AppLayout - SPA Shell Persistence.
- * Phase 98: Updated Activity Center to match high-fidelity design.
+ * Phase 99: Removed standalone Import Center from sidebar per consolidation request.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -80,7 +79,6 @@ interface NavItem {
 
 const ENGINEERING_NAV: NavItem[] = [
   { label: 'Asset Registry', view: 'REGISTRY', icon: <Boxes className="h-4 w-4" />, shortcut: 'R' },
-  { label: 'Import Center', view: 'IMPORT', icon: <FileUp className="h-4 w-4" />, shortcut: 'U' },
   { label: 'GIS Spatial Hub', view: 'GIS', icon: <Navigation className="h-4 w-4" />, shortcut: 'G' },
 ];
 
@@ -126,7 +124,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       if (e.key === 'r') setActiveView('REGISTRY');
       if (e.key === 'd') setActiveView('DASHBOARD');
       if (e.key === 'g') setActiveView('GIS');
-      if (e.key === 'u') setActiveView('IMPORT');
       if (e.key === 'v') setActiveView('VERIFY');
       if (e.key === 'q') setActiveView('SYNC_QUEUE');
       if (e.key === 's') refreshRegistry();

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - High-Fidelity Master Control Center.
- * Phase 95: Overhauled General tab to match requested UI design with Security & Reporting.
+ * Phase 100: Fully integrated redesign with high-fidelity Import Scanner pulse.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -35,7 +35,8 @@ import {
   PlaneTakeoff,
   KeyRound,
   Globe,
-  X
+  X,
+  FileSpreadsheet
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -55,6 +56,7 @@ import type { AppSettings, SheetDefinition, Grant, ErrorLogEntry } from '@/types
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { TravelReportDialog } from '@/components/travel-report-dialog';
+import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
 import { 
   Select, 
   SelectContent, 
@@ -73,6 +75,7 @@ export function SettingsWorkstation() {
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
+  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   
   // Tab State
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
@@ -187,7 +190,7 @@ export function SettingsWorkstation() {
           </TabsList>
         </div>
 
-        {/* Tab: General (Overhauled to match Image Design) */}
+        {/* Tab: General */}
         <TabsContent value="general" className="space-y-10 outline-none px-2 m-0">
           {/* Appearance Section */}
           <div className="space-y-4">
@@ -373,7 +376,7 @@ export function SettingsWorkstation() {
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                             <Button variant="outline" className="h-11 rounded-xl bg-transparent border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5"><PlusCircle className="h-3.5 w-3.5" /> Add Manually</Button>
                             <Button variant="outline" className="h-11 rounded-xl bg-transparent border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5"><FileUp className="h-3.5 w-3.5" /> Import Template</Button>
-                            <Button variant="outline" className="h-11 rounded-xl bg-transparent border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5"><ScanSearch className="h-3.5 w-3.5" /> Scan & Import Data</Button>
+                            <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-11 rounded-xl bg-transparent border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5"><ScanSearch className="h-3.5 w-3.5" /> Scan & Import Data</Button>
                           </div>
                         </div>
                       </div>
@@ -431,7 +434,7 @@ export function SettingsWorkstation() {
         </TabsContent>
       </Tabs>
 
-      {/* Main Footer (Matches Design Image) */}
+      {/* Main Footer */}
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-black/80 backdrop-blur-xl border-t border-white/5 z-50 flex items-center justify-between max-w-4xl mx-auto rounded-t-3xl">
         <Button 
           variant="outline" 
@@ -452,6 +455,7 @@ export function SettingsWorkstation() {
 
       {/* Dialogs & Overlays */}
       <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
+      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
 
       {selectedSheetDef && (
         <ColumnCustomizationSheet 
