@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - Unified Command Shell.
- * Phase 115: Profile to Top-Right & Grouped Management Portal implementation.
+ * Phase 116: Management Terminal relocated to Top-Right Header.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -38,7 +38,9 @@ import {
   ShieldCheck,
   Package,
   Wrench,
-  Command
+  Command,
+  User,
+  Power
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -53,14 +55,6 @@ import { QRScannerDialog } from './registry/QRScannerDialog';
 import { ScrollArea } from './ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from './ui/separator';
-import { 
-  DropdownMenu, 
-  DropdownMenuContent, 
-  DropdownMenuItem, 
-  DropdownMenuLabel, 
-  DropdownMenuSeparator, 
-  DropdownMenuTrigger 
-} from '@/components/ui/dropdown-menu';
 import { useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
 import type { WorkstationView } from '@/types/domain';
@@ -166,42 +160,27 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             {unreadCount > 0 && <Badge className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center p-0 rounded-full bg-primary text-white text-[8px] font-black border-2 border-background">{unreadCount}</Badge>}
           </Button>
 
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <div className="flex items-center gap-3 cursor-pointer group hover:bg-muted/50 p-1.5 rounded-2xl transition-all border-2 border-transparent hover:border-primary/20 bg-card/50 shadow-sm ml-2">
-                <Avatar className="h-9 w-9 border-2 border-primary/20 shadow-md">
-                  <AvatarFallback className="font-black bg-muted text-primary text-[10px] uppercase">{userProfile?.displayName?.[0] || 'U'}</AvatarFallback>
-                </Avatar>
-                <div className="hidden sm:flex flex-col min-w-0 pr-2">
-                  <span className="text-[10px] font-black truncate uppercase leading-none text-foreground">{userProfile?.displayName}</span>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <div className="h-1 w-1 rounded-full bg-primary" />
-                    <span className="text-[8px] font-bold text-muted-foreground uppercase truncate tracking-tighter">{userProfile?.role}</span>
-                  </div>
-                </div>
+          {/* Management Terminal Trigger (RELOCATED FROM BOTTOM) */}
+          <div 
+            onClick={() => setIsPortalOpen(true)}
+            className="flex items-center gap-3 cursor-pointer group hover:bg-muted/50 p-1.5 rounded-2xl transition-all border-2 border-transparent hover:border-primary/20 bg-card/50 shadow-sm ml-2 relative"
+          >
+            <Avatar className="h-9 w-9 border-2 border-primary/20 shadow-md">
+              <AvatarFallback className="font-black bg-muted text-primary text-[10px] uppercase">{userProfile?.displayName?.[0] || 'U'}</AvatarFallback>
+            </Avatar>
+            <div className="hidden sm:flex flex-col min-w-0 pr-2">
+              <span className="text-[10px] font-black truncate uppercase leading-none text-foreground">{userProfile?.displayName}</span>
+              <div className="flex items-center gap-1.5 mt-1">
+                <div className="h-1 w-1 rounded-full bg-primary" />
+                <span className="text-[8px] font-bold text-muted-foreground uppercase truncate tracking-tighter">{userProfile?.role}</span>
               </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 rounded-[1.5rem] border-2 shadow-2xl p-2 mt-2">
-              <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-[0.3em] px-3 pb-3 opacity-40">Administrative Pulse</DropdownMenuLabel>
-              <div className="px-3 py-3 rounded-xl bg-muted/20 mb-2">
-                <p className="text-[10px] font-black text-foreground uppercase truncate">{userProfile?.email}</p>
-                <p className="text-[8px] font-bold text-muted-foreground uppercase mt-1">Scope: {userProfile?.state || 'Global'}</p>
-              </div>
-              <DropdownMenuItem onClick={() => setIsHelpOpen(true)} className="rounded-xl h-11 flex items-center gap-3 cursor-pointer mb-1">
-                <HelpCircle className="h-4 w-4" />
-                <span className="font-bold text-[10px] uppercase">Documentation Hub</span>
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setIsQRScannerOpen(true)} className="rounded-xl h-11 flex items-center gap-3 cursor-pointer mb-1">
-                <QrCode className="h-4 w-4" />
-                <span className="font-bold text-[10px] uppercase">Identity Scanner</span>
-              </DropdownMenuItem>
-              <DropdownMenuSeparator className="my-2" />
-              <DropdownMenuItem onClick={() => logout()} className="rounded-xl h-11 flex items-center gap-3 cursor-pointer text-destructive hover:bg-destructive/5 transition-colors">
-                <LogOut className="mr-2 h-4 w-4" />
-                <span className="font-bold text-[10px] uppercase">Terminate Session</span>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+            </div>
+            {alertCount > 0 && (
+              <Badge className="absolute -top-1 -left-1 bg-destructive text-white text-[7px] font-black h-4 min-w-4 p-0 flex items-center justify-center rounded-full border-2 border-background shadow-lg">
+                {alertCount}
+              </Badge>
+            )}
+          </div>
         </div>
       </header>
 
@@ -237,15 +216,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setIsPortalOpen(true)}
-              className="flex items-center gap-3 px-8 h-14 rounded-[1.5rem] bg-black text-white font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl hover:bg-primary hover:text-black transition-all group"
-            >
-              <LayoutGrid className="h-5 w-5 text-primary group-hover:text-black" />
-              Management Terminal
-              {alertCount > 0 && <Badge className="bg-destructive text-white text-[8px] h-5 min-w-5 p-0 flex items-center justify-center rounded-full ml-2 shadow-lg">{alertCount}</Badge>}
+          <div className="hidden sm:flex items-center gap-4">
+            <button onClick={() => setIsHelpOpen(true)} className="flex items-center gap-2 text-[10px] font-black uppercase text-muted-foreground hover:text-primary transition-colors">
+              <HelpCircle className="h-4 w-4" /> Documentation
             </button>
+            <Separator orientation="vertical" className="h-4 opacity-20" />
+            <p className="text-[9px] font-mono text-muted-foreground opacity-40">VER 5.0.4</p>
           </div>
         </div>
       </aside>
@@ -271,6 +247,33 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <ScrollArea className="flex-1 custom-scrollbar">
             <div className="p-10 grid grid-cols-1 lg:grid-cols-12 gap-16">
               
+              {/* Identity & Session Control */}
+              <div className="lg:col-span-12">
+                <div className="p-8 rounded-[2rem] bg-white/5 border-2 border-white/5 flex flex-col md:flex-row items-center justify-between gap-8">
+                  <div className="flex items-center gap-6">
+                    <Avatar className="h-20 w-20 border-4 border-primary/20">
+                      <AvatarFallback className="bg-muted text-primary text-2xl font-black">{userProfile?.displayName?.[0]}</AvatarFallback>
+                    </Avatar>
+                    <div className="space-y-1">
+                      <h3 className="text-2xl font-black uppercase tracking-tight">{userProfile?.displayName}</h3>
+                      <div className="flex items-center gap-3">
+                        <Badge className="bg-primary text-black font-black uppercase text-[10px]">{userProfile?.role}</Badge>
+                        <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{userProfile?.email}</span>
+                      </div>
+                      <p className="text-[10px] font-black uppercase text-primary/60 mt-2">Active Scope: {userProfile?.state || 'Global'}</p>
+                    </div>
+                  </div>
+                  <div className="flex gap-3">
+                    <Button variant="outline" onClick={() => setIsQRScannerOpen(true)} className="h-14 px-8 rounded-2xl border-white/10 bg-white/5 font-black uppercase text-[10px] tracking-widest gap-3">
+                      <QrCode className="h-4 w-4" /> Identity Scan
+                    </Button>
+                    <Button onClick={() => logout()} className="h-14 px-10 rounded-2xl bg-destructive text-white font-black uppercase text-[10px] tracking-widest gap-3 shadow-xl shadow-destructive/20 transition-transform hover:scale-105 active:scale-95">
+                      <Power className="h-4 w-4" /> Terminate Session
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
               {/* Audit Module */}
               <div className="lg:col-span-4 space-y-10">
                 <PortalGroup title="Registry Audit" icon={Activity}>
