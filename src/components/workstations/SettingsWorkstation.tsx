@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview SettingsWorkstation - High-Fidelity Master Control Center.
- * Overhauled to match requested UI design with unified Projects & Sheets management.
+ * Phase 95: Overhauled General tab to match requested UI design with Security & Reporting.
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
@@ -19,28 +19,23 @@ import {
   Sun, 
   Moon, 
   Zap,
-  RefreshCw,
   History,
   Lock,
   PlusCircle,
   FileUp,
   ScanSearch,
-  ChevronDown,
-  ChevronUp,
   Wrench,
   Users,
   Search,
-  MoreHorizontal,
-  X,
   Loader2,
   Database,
   ArrowRightLeft,
-  AlertCircle,
   ShieldAlert,
-  ChevronRight,
   Monitor,
-  XCircle,
-  FileJson
+  PlaneTakeoff,
+  KeyRound,
+  Globe,
+  X
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -54,15 +49,22 @@ import { UserManagement } from '@/components/admin/user-management';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
-import { ArchiveService } from '@/lib/archive-service';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
-import type { AppSettings, UXMode, SheetDefinition, Grant, ErrorLogEntry } from '@/types/domain';
+import type { AppSettings, SheetDefinition, Grant, ErrorLogEntry } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { TravelReportDialog } from '@/components/travel-report-dialog';
+import { 
+  Select, 
+  SelectContent, 
+  SelectItem, 
+  SelectTrigger, 
+  SelectValue 
+} from '@/components/ui/select';
 
 export function SettingsWorkstation() {
-  const { appSettings, refreshRegistry, settingsLoaded, isOnline, setActiveGrantId } = useAppState();
+  const { appSettings, refreshRegistry, settingsLoaded, isOnline } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const { setTheme, theme } = useTheme();
@@ -70,8 +72,9 @@ export function SettingsWorkstation() {
   const [draftSettings, setDraftSettings] = useState<AppSettings | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState("");
+  const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
   
-  // History tab state
+  // Tab State
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
@@ -121,7 +124,7 @@ export function SettingsWorkstation() {
     };
     handleSettingChange('grants', [...draftSettings.grants, newGrant]);
     setNewProjectName("");
-    toast({ title: "Project Staged", description: `Added "${newGrant.name}" to the draft registry.` });
+    toast({ title: "Project Staged" });
   };
 
   const handleDeleteProject = (id: string) => {
@@ -150,7 +153,7 @@ export function SettingsWorkstation() {
 
   if (!settingsLoaded || !draftSettings) {
     return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
+      <div className="flex h-screen w-full items-center justify-center">
         <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
@@ -160,67 +163,166 @@ export function SettingsWorkstation() {
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-700 pb-32">
       {/* Header Pulse */}
       <div className="space-y-1 px-2">
-        <h2 className="text-2xl font-black tracking-tight text-foreground uppercase">Settings</h2>
-        <p className="text-xs font-bold text-muted-foreground opacity-70">
+        <h2 className="text-2xl font-black tracking-tight text-white uppercase">Settings</h2>
+        <p className="text-[10px] font-bold text-muted-foreground opacity-70 uppercase tracking-widest">
           Manage application settings and preferences. Admin changes apply to all users.
         </p>
       </div>
 
-      <Tabs defaultValue="projects" className="space-y-8">
-        <div className="bg-muted/30 p-1 rounded-2xl border-2 border-border/40 inline-flex">
+      <Tabs defaultValue="general" className="space-y-8">
+        <div className="bg-muted/20 p-1 rounded-2xl border-2 border-border/40 inline-flex">
           <TabsList className="bg-transparent border-none p-0 h-auto gap-1">
-            <TabsTrigger value="general" className="px-6 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
+            <TabsTrigger value="general" className="px-8 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
               <Settings className="h-3.5 w-3.5" /> General
             </TabsTrigger>
-            <TabsTrigger value="projects" className="px-6 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
+            <TabsTrigger value="projects" className="px-8 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
               <Wrench className="h-3.5 w-3.5" /> Projects & Sheets
             </TabsTrigger>
-            <TabsTrigger value="users" className="px-6 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
+            <TabsTrigger value="users" className="px-8 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
               <Users className="h-3.5 w-3.5" /> Users
             </TabsTrigger>
-            <TabsTrigger value="history" className="px-6 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
+            <TabsTrigger value="history" className="px-8 py-2 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white">
               <History className="h-3.5 w-3.5" /> History
             </TabsTrigger>
           </TabsList>
         </div>
 
-        {/* Tab: General */}
-        <TabsContent value="general" className="space-y-6 outline-none px-2">
-          <Card className="rounded-[2rem] border-2 border-border/40 bg-card/50 p-8 space-y-8">
-            <div className="space-y-4">
-              <div className="flex items-center gap-3">
-                <Palette className="h-5 w-5 text-primary" />
-                <Label className="text-sm font-black uppercase">Visual Identity</Label>
+        {/* Tab: General (Overhauled to match Image Design) */}
+        <TabsContent value="general" className="space-y-10 outline-none px-2 m-0">
+          {/* Appearance Section */}
+          <div className="space-y-4">
+            <h3 className="text-base font-black uppercase tracking-tight text-white">Appearance</h3>
+            <Card className="rounded-[1.5rem] border-2 border-border/40 bg-card/50 p-6">
+              <div className="flex flex-col gap-4">
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Globe className="h-4 w-4" />
+                  <Label className="text-[10px] font-black uppercase tracking-widest">Theme</Label>
+                </div>
+                <div className="flex gap-3 bg-black/40 p-1.5 rounded-xl border border-white/5">
+                  <Button 
+                    variant={theme === 'light' ? 'secondary' : 'ghost'} 
+                    onClick={() => setTheme('light')} 
+                    className="flex-1 h-10 rounded-lg font-black uppercase text-[10px] gap-2"
+                  >
+                    <Sun className="h-3.5 w-3.5" /> Light
+                  </Button>
+                  <Button 
+                    variant={theme === 'dark' ? 'secondary' : 'ghost'} 
+                    onClick={() => setTheme('dark')} 
+                    className="flex-1 h-10 rounded-lg font-black uppercase text-[10px] gap-2"
+                  >
+                    <Moon className="h-3.5 w-3.5" /> Dark
+                  </Button>
+                  <Button 
+                    variant={theme === 'system' ? 'secondary' : 'ghost'} 
+                    onClick={() => setTheme('system')} 
+                    className="flex-1 h-10 rounded-lg font-black uppercase text-[10px] gap-2"
+                  >
+                    <Monitor className="h-3.5 w-3.5" /> System
+                  </Button>
+                </div>
               </div>
-              <div className="flex gap-3">
-                <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="h-12 flex-1 rounded-xl font-black uppercase text-[10px] gap-2 border-2"><Sun className="h-4 w-4" /> Light</Button>
-                <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="h-12 flex-1 rounded-xl font-black uppercase text-[10px] gap-2 border-2"><Moon className="h-4 w-4" /> Dark</Button>
-              </div>
-            </div>
-            
-            <div className="flex items-center justify-between pt-4 border-t border-dashed">
+            </Card>
+          </div>
+
+          {/* Reporting Section */}
+          <div className="space-y-4">
+            <h3 className="text-base font-black uppercase tracking-tight text-white">Reporting</h3>
+            <Card className="rounded-[1.5rem] border-2 border-border/40 bg-card/50 p-6 space-y-4">
               <div className="space-y-1">
-                <Label className="text-sm font-black uppercase">Global Master Lock</Label>
-                <p className="text-[10px] font-medium text-muted-foreground italic">Prevent unauthorized cloud mutations.</p>
+                <h4 className="text-sm font-black uppercase text-white">Travel Report Generator</h4>
+                <p className="text-[10px] font-medium text-muted-foreground italic">Compile field verification findings into a professional Word document.</p>
               </div>
-              <Switch checked={draftSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
+              <Button 
+                variant="outline" 
+                onClick={() => setIsTravelReportOpen(true)}
+                className="w-full h-12 rounded-xl bg-black border-white/10 hover:bg-white/5 text-white font-black uppercase text-[10px] tracking-widest gap-2 shadow-inner"
+              >
+                <PlaneTakeoff className="h-4 w-4 text-primary" /> Create Travel Report
+              </Button>
+            </Card>
+          </div>
+
+          {/* Security Section */}
+          <div className="space-y-4">
+            <h3 className="text-base font-black uppercase tracking-tight text-white">Security</h3>
+            <Card className="rounded-[1.5rem] border-2 border-border/40 bg-card/50 p-8 space-y-6">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <KeyRound className="h-4 w-4" />
+                <h4 className="text-sm font-black uppercase tracking-widest">Change Your Password</h4>
+              </div>
+              
+              <div className="space-y-5">
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Current Password</Label>
+                  <Input type="password" placeholder="•••••" className="h-12 rounded-xl bg-black/40 border-border/40 font-bold focus-visible:ring-primary/20" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">New Password</Label>
+                  <Input type="password" className="h-12 rounded-xl bg-black/40 border-border/40 font-bold focus-visible:ring-primary/20" />
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Confirm New Password</Label>
+                  <Input type="password" className="h-12 rounded-xl bg-black/40 border-border/40 font-bold focus-visible:ring-primary/20" />
+                </div>
+                <div className="pt-2 space-y-4">
+                  <Button className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-transform hover:scale-[1.02]">
+                    Stage Password Change
+                  </Button>
+                  <p className="text-[9px] text-muted-foreground italic opacity-60 leading-relaxed">
+                    Your password change will be saved when you click "Save Changes" at the bottom of the panel.
+                  </p>
+                </div>
+              </div>
+            </Card>
+          </div>
+
+          {/* Global Admin Settings Section */}
+          <div className="space-y-4">
+            <h3 className="text-base font-black uppercase tracking-tight text-white">Global Admin Settings</h3>
+            <div className="space-y-6 px-2">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black uppercase text-white">Application Mode</h4>
+                  <p className="text-[10px] text-muted-foreground italic">Verification: Users can update status/remarks.</p>
+                </div>
+                <Select value={draftSettings.appMode} onValueChange={(v) => handleSettingChange('appMode', v as any)}>
+                  <SelectTrigger className="w-40 h-11 rounded-xl bg-black text-white font-black uppercase text-[10px] border-white/10 shadow-sm">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl">
+                    <SelectItem value="management" className="text-[10px] font-black uppercase">Management</SelectItem>
+                    <SelectItem value="verification" className="text-[10px] font-black uppercase">Verification</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              
+              <Separator className="bg-white/5" />
+
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <h4 className="text-sm font-black uppercase text-white">Lock Asset List</h4>
+                  <p className="text-[10px] text-muted-foreground italic">Prevent adding/deleting from main list.</p>
+                </div>
+                <Switch checked={draftSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
+              </div>
             </div>
-          </Card>
+          </div>
         </TabsContent>
 
         {/* Tab: Projects & Sheets */}
-        <TabsContent value="projects" className="space-y-6 outline-none px-2">
+        <TabsContent value="projects" className="space-y-6 outline-none px-2 m-0">
           <div className="space-y-4">
-            <h3 className="text-lg font-black uppercase tracking-tight">Manage Projects (Grants)</h3>
+            <h3 className="text-lg font-black uppercase tracking-tight text-white">Manage Projects (Grants)</h3>
             
             <div className="flex gap-2">
               <Input 
                 placeholder="New project name..." 
                 value={newProjectName}
                 onChange={(e) => setNewProjectName(e.target.value)}
-                className="h-12 rounded-xl bg-card border-2 border-border/40 focus-visible:ring-primary/20 font-bold"
+                className="h-12 rounded-xl bg-card border-2 border-border/40 text-white font-bold"
               />
-              <Button onClick={handleAddProject} className="h-12 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg shadow-primary/20">
+              <Button onClick={handleAddProject} className="h-12 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg">
                 <PlusCircle className="h-4 w-4" /> Add Project
               </Button>
             </div>
@@ -231,7 +333,7 @@ export function SettingsWorkstation() {
                 return (
                   <Card key={grant.id} className={cn(
                     "rounded-2xl border-2 transition-all duration-300 bg-black text-white",
-                    isActive ? "border-primary shadow-xl" : "border-border/40"
+                    isActive ? "border-primary shadow-xl shadow-primary/5" : "border-border/40"
                   )}>
                     <div className="p-5 flex items-center justify-between">
                       <div className="flex items-center gap-4">
@@ -243,7 +345,7 @@ export function SettingsWorkstation() {
                         {!isActive && (
                           <Button variant="ghost" size="sm" onClick={() => handleSettingChange('activeGrantId', grant.id)} className="h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-black text-[9px] uppercase px-4 border border-white/10">Set Active</Button>
                         )}
-                        <Button variant="ghost" size="sm" className="h-8 font-black text-[10px] uppercase text-white hover:text-primary transition-colors">Rename</Button>
+                        <Button variant="ghost" size="sm" className="h-8 font-black text-[10px] uppercase text-white hover:text-primary">Rename</Button>
                         <Button variant="ghost" size="sm" onClick={() => handleDeleteProject(grant.id)} className="h-8 font-black text-[10px] uppercase text-red-500 hover:text-red-400">Delete</Button>
                       </div>
                     </div>
@@ -257,7 +359,7 @@ export function SettingsWorkstation() {
                             {Object.keys(grant.sheetDefinitions || {}).length > 0 ? (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-4">
                                 {Object.keys(grant.sheetDefinitions).map(s => (
-                                  <div key={s} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10">
+                                  <div key={s} className="flex items-center justify-between p-3 bg-white/5 rounded-xl border border-white/10 group hover:border-primary/40 transition-colors">
                                     <span className="text-[10px] font-black uppercase">{s}</span>
                                     <Button variant="ghost" size="icon" onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[s]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }} className="h-7 w-7 text-primary hover:bg-primary/10"><Wrench className="h-3.5 w-3.5" /></Button>
                                   </div>
@@ -284,7 +386,7 @@ export function SettingsWorkstation() {
         </TabsContent>
 
         {/* Tab: Users */}
-        <TabsContent value="users" className="outline-none px-2">
+        <TabsContent value="users" className="outline-none px-2 m-0">
           <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 overflow-hidden shadow-2xl">
             <CardContent className="p-8">
               <UserManagement 
@@ -297,7 +399,7 @@ export function SettingsWorkstation() {
         </TabsContent>
 
         {/* Tab: History */}
-        <TabsContent value="history" className="space-y-6 outline-none px-2">
+        <TabsContent value="history" className="space-y-6 outline-none px-2 m-0">
           {loadingLogs ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div> : 
             errorLogs.length > 0 ? (
               <div className="space-y-4">
@@ -308,30 +410,34 @@ export function SettingsWorkstation() {
                         {log.severity === 'CRITICAL' ? <ShieldAlert className="h-5 w-5" /> : <Activity className="h-5 w-5" />}
                       </div>
                       <div>
-                        <h4 className="font-black text-sm uppercase">{log.error.laymanExplanation}</h4>
+                        <h4 className="font-black text-sm uppercase text-white">{log.error.laymanExplanation}</h4>
                         <div className="flex items-center gap-3 text-[9px] font-bold text-muted-foreground uppercase mt-1 opacity-60">
                           <span className="flex items-center gap-1"><Monitor className="h-2.5 w-2.5" /> {log.context.module}</span>
                           <span className="flex items-center gap-1"><History className="h-2.5 w-2.5" /> {formatDistanceToNow(new Date(log.timestamp), { addSuffix: true })}</span>
                         </div>
                       </div>
                     </div>
-                    <Badge variant="outline" className="font-black text-[9px] uppercase border-primary/20">{log.status}</Badge>
+                    <Badge variant="outline" className="font-black text-[9px] uppercase border-primary/20 text-primary">{log.status}</Badge>
                   </Card>
                 ))}
               </div>
             ) : (
               <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[3rem]">
                 <History className="h-16 w-16 mx-auto mb-4" />
-                <h3 className="text-xl font-black uppercase tracking-widest">History Silent</h3>
+                <h3 className="text-xl font-black uppercase tracking-widest text-white">History Silent</h3>
               </div>
             )
           }
         </TabsContent>
       </Tabs>
 
-      {/* Footer Pulse */}
-      <div className="pt-10 border-t-2 border-border/40 flex items-center justify-between px-2">
-        <Button variant="ghost" onClick={() => window.location.reload()} className="h-12 px-10 rounded-xl bg-black text-white font-black uppercase text-[10px] tracking-widest hover:bg-black/80">
+      {/* Main Footer (Matches Design Image) */}
+      <div className="fixed bottom-0 left-0 right-0 p-6 bg-black/80 backdrop-blur-xl border-t border-white/5 z-50 flex items-center justify-between max-w-4xl mx-auto rounded-t-3xl">
+        <Button 
+          variant="outline" 
+          onClick={() => window.location.reload()} 
+          className="h-12 px-10 rounded-xl bg-black text-white font-black uppercase text-[10px] tracking-widest border-white/10 hover:bg-white/5 transition-all"
+        >
           Cancel
         </Button>
         <Button 
@@ -343,6 +449,9 @@ export function SettingsWorkstation() {
           Save Changes
         </Button>
       </div>
+
+      {/* Dialogs & Overlays */}
+      <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
 
       {selectedSheetDef && (
         <ColumnCustomizationSheet 
