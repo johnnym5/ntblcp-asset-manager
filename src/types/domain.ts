@@ -80,6 +80,12 @@ export interface Asset {
   
   geotag?: Geotag;
 
+  // Depreciation Pulse (TB Specific)
+  depreciation?: {
+    ngn: Record<string, number>;
+    usd: Record<string, number>;
+  };
+
   // Metadata & Traceability
   hierarchy: SectionHierarchy;
   importMetadata: ImportMetadata;
@@ -131,7 +137,8 @@ export interface AuthorizedUser {
   password?: string;
   states: string[];
   role: UserRole;
-  isAdmin: boolean; 
+  isAdmin: boolean;
+  isSuperAdmin?: boolean; 
 }
 
 export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE';
@@ -167,7 +174,23 @@ export interface ErrorLogEntry {
   severity: ErrorSeverity;
   status: ErrorLogStatus;
   user: { id: string; name: string; role: string; };
-  context: { page: string; module: string; action: string; isOnline: boolean; };
-  error: { type: string; technicalMessage: string; laymanExplanation: string; stack?: string; };
-  recovery: { attempted: boolean; action?: string; result?: string; };
+  context: { 
+    page: string; 
+    module: string; 
+    action: string; 
+    isOnline: boolean;
+    browser: string;
+  };
+  error: { 
+    type: string; 
+    message: string;
+    technicalMessage: string; 
+    laymanExplanation: string; 
+    stack?: string; 
+  };
+  recovery: { 
+    attempted: boolean; 
+    action?: string; 
+    result?: string; 
+  };
 }

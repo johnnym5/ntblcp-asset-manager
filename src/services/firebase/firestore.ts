@@ -1,6 +1,6 @@
 /**
  * @fileOverview Hardened Firestore Service.
- * Phase 80: Aligned Activity logging with /audit_logs blueprint and reinforced deep sanitization.
+ * Phase 82: Enhanced with Error Audit logging and Forensic previousState buffering.
  */
 
 import { 
@@ -91,13 +91,10 @@ export const FirestoreService = {
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
 
-    const assetToSave = {
-      ...asset,
-      photoUrl: undefined,
-      photoDataUri: undefined,
-      signatureUrl: undefined,
-      signatureDataUri: undefined
-    };
+    // Filter out transient local fields before validation
+    const assetToSave = { ...asset };
+    delete (assetToSave as any).photoUrl;
+    delete (assetToSave as any).photoDataUri;
 
     const validation = AssetSchema.safeParse(assetToSave);
     if (!validation.success) {
@@ -116,6 +113,7 @@ export const FirestoreService = {
       const currentSnap = await getDoc(assetRef);
       const previousState = currentSnap.exists() ? currentSnap.data() : null;
 
+      // Commit with forensic buffer
       await setDoc(assetRef, {
         ...sanitized,
         previousState: previousState ? sanitizeForFirestore(previousState) : null
@@ -123,7 +121,6 @@ export const FirestoreService = {
       
       mirrorToRtdb([sanitized as Asset]).catch(e => console.warn("Mirroring: Asset pulse latent."));
 
-      // Align with /audit_logs blueprint
       await this.logActivity({
         assetId: asset.id,
         assetDescription: asset.description,
@@ -139,9 +136,39 @@ export const FirestoreService = {
     }
   },
 
+  /**
+   * Logs a technical incident to the resilience audit registry.
+   */
+  async logErrorAudit(entry: ErrorLogEntry) {
+    if (!db) return;
+    const errorRef = doc(db, 'error_logs', entry.id);
+    try {
+      await setDoc(errorRef, sanitizeForFirestore(entry));
+    } catch (e) {
+      console.error("Monitoring: Double-fault detected. Cloud logging failed.", e);
+    }
+  },
+
+  async getErrorLogs(): Promise<ErrorLogEntry[]> {
+    if (!db) return [];
+    const errorRef = collection(db, 'error_logs');
+    const q = query(errorRef, orderBy('timestamp', 'desc'), limit(100));
+    try {
+      const snap = await getDocs(q);
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as ErrorLogEntry));
+    } catch (e) {
+      return [];
+    }
+  },
+
+  async updateErrorStatus(id: string, status: ErrorLogStatus, adminComment?: string) {
+    if (!db) return;
+    const errorRef = doc(db, 'error_logs', id);
+    await updateDoc(errorRef, { status, adminComment });
+  },
+
   async logActivity(entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>) {
     if (!db) return;
-    // Uses /audit_logs path from backend.json
     const logRef = collection(db, 'audit_logs');
     try {
       const data = {
@@ -163,7 +190,6 @@ export const FirestoreService = {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as ActivityLogEntry));
     } catch (e) {
-      console.error("Failed to fetch global activity pulse", e);
       return [];
     }
   },
@@ -199,7 +225,7 @@ export const FirestoreService = {
   },
 
   handlePermissionError(refOrPath: string | DocumentReference, operation: SecurityRuleContext['operation'], error: any, data?: any) {
-    if (error?.code === 'permission-denied') {
+    if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
       const path = typeof refOrPath === 'string' ? refOrPath : refOrPath.path;
       const permissionError = new FirestorePermissionError({
         path,
