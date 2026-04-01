@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview InfrastructureWorkstation - SPA Command Center.
- * Phase 86: Enriched with Global Purge & Registry Preparation Pulses.
+ * @fileOverview InfrastructureWorkstation - System Infrastructure Module.
+ * Phase 165: Renamed to System Infrastructure.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -66,7 +66,6 @@ export function InfrastructureWorkstation() {
   
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
 
-  // Simulated live heartbeat data
   const heartbeatData = useMemo(() => Array.from({ length: 20 }).map((_, i) => ({
     time: i,
     latency: 20 + Math.random() * 30
@@ -99,7 +98,7 @@ export function InfrastructureWorkstation() {
     setIsProcessing(true);
     try {
       await VirtualDBService.purgeGlobalRegistry();
-      toast({ title: "Global Purge Complete", description: "Registry reset to prepare for new ingestion pulse." });
+      toast({ title: "Global Purge Complete", description: "Register reset to prepare for new data import." });
       await refreshRegistry();
       setIsPurgeDialogOpen(false);
     } catch (e) {
@@ -125,10 +124,10 @@ export function InfrastructureWorkstation() {
             <div className="p-3 bg-primary/10 rounded-2xl">
               <Monitor className="h-8 w-8 text-primary" />
             </div>
-            Infrastructure Command
+            System Infrastructure
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            High-Availability Redundancy & Global Parity Pulse
+            High-Availability Redundancy & Asset Register Parity
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -147,7 +146,7 @@ export function InfrastructureWorkstation() {
             className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 bg-primary text-primary-foreground group"
           >
             {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <RefreshCw className={cn("h-4 w-4 mr-3", isSyncing && "animate-spin")} />} 
-            Reconcile Layers
+            Reconcile Storage
           </Button>
         </div>
       </div>
@@ -261,9 +260,9 @@ export function InfrastructureWorkstation() {
         <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
           <CardHeader className="p-8 border-b bg-muted/20">
             <CardTitle className="text-xl font-black uppercase flex items-center gap-3">
-              <RotateCcw className="h-5 w-5 text-primary" /> Registry Preparation
+              <RotateCcw className="h-5 w-5 text-primary" /> Register Preparation
             </CardTitle>
-            <CardDescription className="text-xs font-medium">Reset the workstation to prepare for new data ingestion.</CardDescription>
+            <CardDescription className="text-xs font-medium">Reset the workstation to prepare for new data import.</CardDescription>
           </CardHeader>
           <CardContent className="p-8 space-y-6">
             <div className="p-6 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-2">
@@ -292,7 +291,7 @@ export function InfrastructureWorkstation() {
             <div className="p-6 rounded-2xl border-2 border-dashed bg-background/40 space-y-2 group hover:border-primary/20 transition-all">
               <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Cross-Layer Drift</span>
               <p className={cn("text-3xl font-black tabular-nums", discrepancyCount > 0 ? "text-destructive" : "text-green-600")}>
-                {discrepancyCount} Pulses
+                {discrepancyCount} Records
               </p>
             </div>
             <Button 
@@ -306,7 +305,6 @@ export function InfrastructureWorkstation() {
         </Card>
       </div>
 
-      {/* Global Purge Dialog */}
       <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
@@ -315,11 +313,11 @@ export function InfrastructureWorkstation() {
             </div>
             <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe All Databases?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
-              This action is **immutable**. You are about to purge every registry record from the Cloud (Firestore), Mirror (RTDB), and this device (IndexedDB). This is required to prepare for a fresh import of new assets.
+              This action is **immutable**. You are about to purge every record from the Cloud (Firestore), Mirror (RTDB), and this device (IndexedDB). This is required to prepare for a fresh import.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Pulse</AlertDialogCancel>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Action</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleGlobalPurge}
               disabled={isProcessing}

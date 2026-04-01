@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview DatabaseWorkstation - High-Fidelity Database Management.
- * Phase 132: Updated nomenclature to match Asset Manager friendly scheme.
+ * @fileOverview DatabaseWorkstation - Database Management.
+ * Phase 165: Renamed to Database Management.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -76,7 +76,7 @@ export function DatabaseWorkstation() {
     setIsProcessing(true);
     try {
       await VirtualDBService.purgeGlobalRegistry();
-      toast({ title: "Inventory Reset", description: "Global register wiped successfully." });
+      toast({ title: "Register Reset", description: "Global register wiped successfully." });
       await refreshRegistry();
       setNukeDialogOpen(false);
     } finally {
@@ -93,7 +93,7 @@ export function DatabaseWorkstation() {
       <div className="space-y-1 px-1">
         <div className="flex items-center gap-3">
           <Terminal className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-black uppercase tracking-tight text-foreground">Database Manager</h2>
+          <h2 className="text-2xl font-black uppercase tracking-tight text-foreground">Database Management</h2>
         </div>
         <p className="text-[10px] font-bold text-muted-foreground opacity-60 uppercase tracking-widest">
           Primary Storage: Firestore & Hybrid Shadow: RTDB
@@ -106,7 +106,7 @@ export function DatabaseWorkstation() {
           <CollapsibleTrigger asChild>
             <div className="p-6 border-b border-border/40 flex items-center justify-between cursor-pointer hover:bg-muted/30 transition-all">
               <div className="space-y-1">
-                <h3 className="text-sm font-black uppercase text-foreground">System Integrity Audit</h3>
+                <h3 className="text-sm font-black uppercase text-foreground">Storage Health Audit</h3>
                 <p className="text-[10px] text-muted-foreground italic">Real-time status of tiered storage layers.</p>
               </div>
               <ChevronsUpDown className="h-4 w-4 text-muted-foreground opacity-40" />
@@ -179,7 +179,7 @@ export function DatabaseWorkstation() {
               <RefreshCw className="h-4 w-4 text-primary" /> Sync Local to Cloud Database
             </Button>
             <Button variant="outline" onClick={refreshRegistry} className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6">
-              <Download className="h-4 w-4 text-primary" /> Pull Cloud State to Register
+              <Download className="h-4 w-4 text-primary" /> Pull Cloud State to Asset Register
             </Button>
           </div>
         </Card>
@@ -194,7 +194,7 @@ export function DatabaseWorkstation() {
               <Upload className="h-4 w-4 text-primary" /> Restore from JSON Archive
             </Button>
             <Button variant="outline" className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-3 justify-start px-6">
-              <Download className="h-4 w-4 text-primary" /> Generate Inventory Snapshot
+              <Download className="h-4 w-4 text-primary" /> Generate Asset Register Snapshot
             </Button>
           </div>
         </Card>
@@ -227,7 +227,7 @@ export function DatabaseWorkstation() {
             <Server className="h-4 w-4" /> Wipe Standby Mirror (RTDB)
           </Button>
           <Button variant="outline" onClick={handleNukePulse} className="h-12 border-destructive/20 text-destructive hover:bg-destructive/10 rounded-xl font-black uppercase text-[10px] tracking-widest justify-start px-6 gap-3">
-            <Cloud className="h-4 w-4" /> Wipe Primary Assets (Firestore)
+            <Cloud className="h-4 w-4" /> Wipe Primary Register (Firestore)
           </Button>
           <Button onClick={() => setNukeDialogOpen(true)} className="h-12 bg-destructive text-destructive-foreground rounded-xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-destructive/20 gap-3">
             <Bomb className="h-4 w-4" /> RESET GLOBAL REGISTER
@@ -235,7 +235,6 @@ export function DatabaseWorkstation() {
         </div>
       </div>
 
-      {/* Navigation Footer */}
       <div className="fixed bottom-24 left-0 right-0 z-50 pointer-events-none">
         <div className="max-w-6xl auto px-4">
           <div className="bg-card/90 backdrop-blur-2xl border border-border/40 rounded-2xl h-16 flex items-center justify-between px-6 pointer-events-auto shadow-3xl">
@@ -254,7 +253,6 @@ export function DatabaseWorkstation() {
         </div>
       </div>
 
-      {/* Confirmation Dialogs */}
       <AlertDialog open={nukeDialogOpen} onOpenChange={setNukeDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-background shadow-3xl">
           <AlertDialogHeader className="space-y-4">
@@ -263,7 +261,7 @@ export function DatabaseWorkstation() {
             </div>
             <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Wipe Global Register?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
-              This action is **irreversible**. You are about to purge all inventory records from the Cloud, Mirror, and Local Storage. This is a factory reset operation.
+              This action is **irreversible**. You are about to purge all Asset Register records from the Cloud, Mirror, and Local Storage. This is a factory reset operation.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">

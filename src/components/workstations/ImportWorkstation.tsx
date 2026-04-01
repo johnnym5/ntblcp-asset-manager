@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview ImportWorkstation - Asset Data Import Center.
- * Phase 131: Renamed naming scheme to be asset manager friendly.
+ * @fileOverview ImportWorkstation - Data Import Center.
+ * Phase 165: Renamed to Data Import Center.
  */
 
 import React, { useState, useRef } from 'react';
@@ -123,7 +123,7 @@ export function ImportWorkstation() {
             Data Import Center
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Hierarchical Data Ingestion & Registry Engineering
+            Hierarchical Data Ingestion & Asset Register Engineering
           </p>
         </div>
         {currentStep !== 'INGEST' && (
@@ -143,9 +143,9 @@ export function ImportWorkstation() {
                   <FileSpreadsheet className="h-16 w-16 text-primary" />
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-3xl font-black uppercase">Import Registry Workbook</h3>
+                  <h3 className="text-3xl font-black uppercase">Import Asset Register Workbook</h3>
                   <p className="text-sm font-medium text-muted-foreground max-w-sm mx-auto italic opacity-70">
-                    Supports TB and C19 registry profiles with automatic section detection.
+                    Supports TB and C19 register profiles with automatic section detection.
                   </p>
                 </div>
                 <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 mt-10">
@@ -163,7 +163,7 @@ export function ImportWorkstation() {
               <div className="space-y-4 max-w-sm w-full">
                 <h3 className="text-2xl font-black uppercase tracking-widest">Processing Data</h3>
                 <Progress value={progress} className="h-2 rounded-full" />
-                <p className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Mapping Record Hierarchy...</p>
+                <p className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Mapping Asset Hierarchy...</p>
               </div>
             </div>
           )}
@@ -234,11 +234,11 @@ export function ImportWorkstation() {
 
               <div className="p-10 rounded-[3rem] bg-primary/5 border-2 border-dashed border-primary/20 flex flex-col md:flex-row items-center justify-between gap-8">
                 <div className="flex items-start gap-4 max-w-lg">
-                  <div className="p-3 bg-card border border-border/40 rounded-2xl shadow-sm"><Info className="h-6 w-6 text-primary" /></div>
+                  <div className="p-3 bg-blue-500/10 rounded-2xl shrink-0"><Info className="h-6 w-6 text-blue-600" /></div>
                   <div className="space-y-1">
                     <h5 className="text-xs font-black uppercase tracking-tight">Review Protocol</h5>
                     <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                      Please validate the mapped records. Assets marked in red will be excluded from the final import to preserve registry integrity.
+                      Please validate the mapped records. Assets marked in red will be excluded from the final import to preserve Asset Register integrity.
                     </p>
                   </div>
                 </div>
@@ -262,7 +262,7 @@ export function ImportWorkstation() {
               <div className="space-y-4 max-w-lg">
                 <h3 className="text-3xl font-black uppercase">Import Complete</h3>
                 <p className="text-sm font-medium text-muted-foreground italic leading-relaxed">
-                  The data has been successfully mapped and added to the inventory. {runSummary?.dataRowsImported} assets are now live in the registry.
+                  The data has been successfully mapped and added to the register. {runSummary?.dataRowsImported} assets are now live in the Asset Register.
                 </p>
               </div>
               <Button onClick={() => setCurrentStep('INGEST')} variant="outline" className="h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest border-2">

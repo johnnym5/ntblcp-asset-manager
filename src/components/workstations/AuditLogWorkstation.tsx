@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * @fileOverview AuditLogWorkstation - SPA Activity Ledger.
- * Phase 93: Stabilized syntax and added forensic diff visualization.
+ * @fileOverview AuditLogWorkstation - SPA Audit Trail.
+ * Phase 165: Renamed to Audit Trail.
  */
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { 
   History as HistoryIcon, 
   Search, 
@@ -108,10 +108,10 @@ export function AuditLogWorkstation() {
             <div className="p-3 bg-primary/10 rounded-2xl">
               <HistoryIcon className="h-8 w-8 text-primary" />
             </div>
-            Activity Ledger
+            Audit Trail
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Immutable Traceability & Forensic Pulse Replay
+            Immutable Traceability & Forensic Register Replay
           </p>
         </div>
         <Button 
@@ -122,7 +122,7 @@ export function AuditLogWorkstation() {
           }} 
           className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 shadow-sm border-2 border-primary/10 hover:border-primary/30 transition-all"
         >
-          <FileJson className="h-4 w-4 text-primary" /> Export Ledger Pulse
+          <FileJson className="h-4 w-4 text-primary" /> Export Audit Log
         </Button>
       </div>
 
@@ -140,7 +140,7 @@ export function AuditLogWorkstation() {
         {loading ? (
           <div className="py-40 flex flex-col items-center gap-4 opacity-20">
             <Loader2 className="h-14 w-14 animate-spin text-primary" />
-            <p className="text-[10px] font-black uppercase tracking-widest">Replaying Activity Pulse...</p>
+            <p className="text-[10px] font-black uppercase tracking-widest">Replaying Audit Trail...</p>
           </div>
         ) : filteredLog.length > 0 ? (
           filteredLog.map((entry, idx) => (
@@ -163,7 +163,7 @@ export function AuditLogWorkstation() {
                     <div className="space-y-4 min-w-0 flex-1">
                       <div className="space-y-1">
                         <h4 className="font-black text-lg uppercase tracking-tight text-foreground truncate leading-none">
-                          {entry.assetDescription || 'Registry Mutation Pulse'}
+                          {entry.assetDescription || 'Register Mutation'}
                         </h4>
                         <div className="flex flex-wrap items-center gap-4 text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
                           <span className="flex items-center gap-2 px-2.5 py-1 bg-muted/50 rounded-lg border border-border/40">
@@ -229,9 +229,9 @@ export function AuditLogWorkstation() {
               <Database className="h-28 w-24 text-muted-foreground" />
             </div>
             <div className="space-y-3">
-              <h3 className="text-3xl font-black uppercase tracking-[0.3em]">Ledger Pulse Silent</h3>
+              <h3 className="text-3xl font-black uppercase tracking-[0.3em]">Audit Trail Clear</h3>
               <p className="text-sm font-medium italic max-w-xs mx-auto leading-relaxed">
-                No registry modifications detected in the current query scope.
+                No register modifications detected in the current query scope.
               </p>
             </div>
           </div>
@@ -244,9 +244,9 @@ export function AuditLogWorkstation() {
             <div className="p-4 bg-primary/10 rounded-2xl w-fit">
               <RotateCcw className="h-12 w-12 text-primary" />
             </div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight">Initialize Reversion Pulse?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight">Initialize Reversion?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic">
-              This will overwrite the current state for <strong>{entryToRestore?.assetDescription}</strong> with the data from before this mutation pulse. This action is deterministic and will be broadcast to the cloud authority.
+              This will overwrite the current state for <strong>{entryToRestore?.assetDescription}</strong> with the data from before this mutation. This action is deterministic and will be broadcast to the cloud authority.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">

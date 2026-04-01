@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SyncQueueWorkstation - Cloud Sync Status Module.
- * Phase 131: Renamed naming scheme to be asset manager friendly.
+ * Phase 165: Renamed to Cloud Sync Status.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -137,7 +137,7 @@ export function SyncQueueWorkstation() {
                               <AlertTriangle className="h-3.5 w-3.5" /> Connection Interruption
                             </p>
                             <p className="text-xs font-medium text-foreground italic leading-relaxed">
-                              {entry.error || 'The system could not broadcast this update to the central register.'}
+                              {entry.error || 'The system could not broadcast this update to the Asset Register.'}
                             </p>
                           </div>
                         )}
@@ -173,8 +173,8 @@ export function SyncQueueWorkstation() {
             <CheckCircle2 className="h-32 w-28 text-green-600" />
           </div>
           <div className="space-y-2">
-            <h3 className="text-3xl font-black uppercase tracking-[0.2em]">All Changes Synced</h3>
-            <p className="text-sm font-medium text-muted-foreground italic">Your local register is in absolute parity with the cloud database.</p>
+            <h3 className="text-3xl font-black uppercase tracking-[0.2em]">Asset Register Synced</h3>
+            <p className="text-sm font-medium text-muted-foreground italic">Your local records are in absolute parity with the cloud database.</p>
           </div>
         </div>
       )}

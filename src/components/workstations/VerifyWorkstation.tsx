@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview VerifyWorkstation - Field Audit Module.
- * Phase 131: Renamed naming scheme to be asset manager friendly.
+ * @fileOverview VerifyWorkstation - Field Audit Queue.
+ * Phase 165: Renamed to Field Audit Queue.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -75,7 +75,7 @@ export function VerifyWorkstation() {
             <ClipboardCheck className="h-8 w-8 text-primary" /> Field Audit Queue
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Mandatory Physical Verification Tasks
+            Mandatory Field Assessments & Audit Tasks
           </p>
         </div>
         <Badge variant="outline" className="h-10 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary">

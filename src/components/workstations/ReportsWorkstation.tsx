@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview ReportsWorkstation - Inventory Reports Module.
- * Phase 131: Renamed naming scheme to be asset manager friendly.
+ * Phase 165: Renamed to Inventory Reports.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -126,7 +126,7 @@ export function ReportsWorkstation() {
 
           <Card className="border-2 border-primary/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
             <CardHeader className="p-10 border-b bg-primary/5">
-              <CardTitle className="flex items-center gap-4 text-2xl font-black uppercase"><FileText className="text-primary h-8 w-8" /> Asset Verification Report</CardTitle>
+              <CardTitle className="flex items-center gap-4 text-2xl font-black uppercase"><FileText className="text-primary h-8 w-8" /> Asset Register Report</CardTitle>
             </CardHeader>
             <CardContent className="p-10">
               <Button onClick={() => setIsTravelReportOpen(true)} disabled={stats.total === 0} className="w-full h-20 rounded-[1.5rem] font-black uppercase shadow-2xl shadow-primary/20 bg-primary text-primary-foreground gap-4">

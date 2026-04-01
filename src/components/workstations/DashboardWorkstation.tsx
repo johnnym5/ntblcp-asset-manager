@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - The Unified Inventory Overview.
- * Phase 142: Achieved perfect parity with search and pulse telemetry screenshots.
+ * Phase 165: Renamed to Inventory Dashboard.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -39,7 +39,7 @@ export function DashboardWorkstation() {
   return (
     <div className="space-y-8 animate-in fade-in duration-700 max-w-[1600px] mx-auto">
       
-      {/* 1. Global Search - Matching exactly */}
+      {/* 1. Global Search */}
       <div className="px-1">
         <div className="relative group">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />

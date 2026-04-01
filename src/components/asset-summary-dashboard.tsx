@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Inventory Pulse - Wide High-Fidelity Telemetry Bar.
- * Phase 142: Achieved 100% Screenshot Parity.
+ * Phase 165: Hardened naming scheme sub-labels.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -29,7 +29,7 @@ export function AssetSummaryDashboard() {
                 <div className="space-y-0.5">
                     <h3 className="text-base font-black tracking-tight text-white uppercase leading-none">Inventory Pulse</h3>
                     <p className="text-[10px] font-medium text-white/40 uppercase tracking-widest leading-none">
-                        Real-time status of global assets
+                        Real-time status of the Asset Register
                     </p>
                 </div>
             </div>
@@ -52,7 +52,7 @@ export function AssetSummaryDashboard() {
                             activeTab === 'insights' ? "bg-white/10 text-white shadow-lg" : "text-white/20 hover:text-white"
                         )}
                     >
-                        Asset Insights
+                        Registry Insights
                     </button>
                 </div>
                 <div className="flex items-center gap-2 ml-2">

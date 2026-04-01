@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview RegistryWorkstation - Category Grid Module.
- * Phase 142: Achieved 100% Screenshot Parity for Category Cards.
+ * @fileOverview RegistryWorkstation - Asset Inventory Grid.
+ * Phase 165: Renamed to Asset Inventory.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -61,7 +61,7 @@ export function RegistryWorkstation() {
           <div className="p-2.5 bg-primary/10 rounded-xl shadow-inner">
             <LayoutGrid className="h-5 w-5 text-primary" />
           </div>
-          <h2 className="text-xl font-black uppercase text-white tracking-tight">Categories & Inventories</h2>
+          <h2 className="text-xl font-black uppercase text-white tracking-tight">Asset Inventory</h2>
         </div>
 
         <div className="flex items-center gap-6">
@@ -87,7 +87,6 @@ export function RegistryWorkstation() {
         </div>
       </div>
 
-      {/* Category Grid - Matching exact Screenshot aesthetics */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
         {categoryStats.map(cat => (
           <Card key={cat.name} className="bg-[#050505] border-2 border-white/5 rounded-[2rem] hover:border-primary/40 transition-all group cursor-pointer shadow-xl overflow-hidden relative">

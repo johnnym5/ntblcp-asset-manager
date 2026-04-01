@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview ErrorAuditWorkstation - System Health Monitor.
- * Phase 131: Renamed naming scheme to be asset manager friendly.
+ * @fileOverview ErrorAuditWorkstation - System Health Log.
+ * Phase 165: Renamed to System Health Log.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -111,7 +111,7 @@ export function ErrorAuditWorkstation() {
             System Health Log
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Administrative Monitoring & Error Diagnosis
+            Administrative Monitoring & Register Integrity Pulse
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -139,7 +139,7 @@ export function ErrorAuditWorkstation() {
           </CardHeader>
           <CardContent>
             <div className="text-5xl font-black tracking-tighter text-white">{stats.total}</div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase mt-2 opacity-60">Reported issues in registry</p>
+            <p className="text-[9px] font-bold text-muted-foreground uppercase mt-2 opacity-60">Reported issues in Asset Register</p>
           </CardContent>
         </Card>
 
@@ -250,7 +250,7 @@ export function ErrorAuditWorkstation() {
             <div className="space-y-3">
               <h3 className="text-3xl font-black uppercase tracking-[0.3em] text-white">All Systems Operational</h3>
               <p className="text-sm font-medium italic max-w-xs mx-auto leading-relaxed text-muted-foreground">
-                No system anomalies detected in the current audit window.
+                No register anomalies detected in the current audit window.
               </p>
             </div>
           </div>
@@ -315,7 +315,7 @@ export function ErrorAuditWorkstation() {
           <div className="p-8 bg-white/5 border-t border-white/5 flex items-center justify-between gap-4">
             <Button variant="ghost" onClick={() => setSelectedLog(null)} className="font-bold rounded-xl px-10 text-white/40 hover:text-white">Dismiss</Button>
             <Button 
-              onClick={() => selectedLog && handleResolve(selectedLog.id)}
+              onClick={() => selectedLog && handleResolve(logId)}
               disabled={selectedLog?.status === 'RESOLVED'}
               className="h-14 px-12 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 bg-primary text-black gap-3"
             >

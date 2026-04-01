@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Universal Command Palette.
- * Phase 132: Fixed missing icon imports and reconciled nomenclature.
+ * Phase 165: Applied professional Asset Manager friendly naming.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -19,7 +19,6 @@ import {
 import { 
   Boxes, 
   LayoutDashboard, 
-  Camera, 
   FileUp, 
   History, 
   Settings, 
@@ -107,7 +106,7 @@ export function CommandPalette() {
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push('/sync-queue'))}>
             <ListTodo className="mr-2 h-4 w-4" />
-            <span>Sync Status Log</span>
+            <span>Cloud Sync Status</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push('/reports'))}>
             <FileText className="mr-2 h-4 w-4" />
@@ -115,7 +114,7 @@ export function CommandPalette() {
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push('/audit-log'))}>
             <History className="mr-2 h-4 w-4" />
-            <span>Audit Trail Log</span>
+            <span>Audit Trail</span>
           </CommandItem>
         </CommandGroup>
 
@@ -133,7 +132,7 @@ export function CommandPalette() {
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => router.push('/admin/database'))}>
                 <Terminal className="mr-2 h-4 w-4" />
-                <span>Database Manager</span>
+                <span>Database Management</span>
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => router.push('/settings'))}>
                 <Settings className="mr-2 h-4 w-4" />

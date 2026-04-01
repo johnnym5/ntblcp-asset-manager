@@ -1,7 +1,8 @@
 'use client';
 
 /**
- * @fileOverview UsersWorkstation - SPA Identity Governance Module.
+ * @fileOverview UsersWorkstation - User Management Module.
+ * Phase 165: Renamed to User Management.
  */
 
 import React from 'react';
@@ -27,7 +28,7 @@ export function UsersWorkstation() {
       await FirestoreService.updateSettings(updatedSettings);
       await storage.saveSettings(updatedSettings);
       await refreshRegistry();
-      toast({ title: "Identity Ledger Updated" });
+      toast({ title: "User Directory Updated" });
     } catch (e) { toast({ variant: "destructive", title: "Update Failed" }); }
   };
 
@@ -37,9 +38,9 @@ export function UsersWorkstation() {
     <div className="space-y-8 pb-20 max-w-6xl mx-auto">
       <div className="space-y-2">
         <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
-          <Users className="h-8 w-8 text-primary" /> Identity Governance
+          <Users className="h-8 w-8 text-primary" /> User Management
         </h2>
-        <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Manage system auditors, regional scopes, and cryptographic access levels.</p>
+        <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Manage system auditors, regional scopes, and access levels.</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">

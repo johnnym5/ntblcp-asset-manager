@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Single Page Application Hub.
- * Rebuilt to achieve 100% parity with high-fidelity AMOLED design.
+ * Phase 165: Implemented Asset-Manager Friendly naming scheme.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -28,7 +28,6 @@ import {
   Monitor,
   CloudDownload,
   CloudUpload,
-  Cloud,
   Bell,
   Search
 } from 'lucide-react';
@@ -84,7 +83,7 @@ export default function SPAHub() {
   const navItems: { id: WorkstationView; label: string; icon: any; adminOnly?: boolean; group: string }[] = [
     { id: 'DASHBOARD', label: 'Inventory Dashboard', icon: LayoutDashboard, group: 'Core' },
     { id: 'REGISTRY', label: 'Asset Inventory', icon: Boxes, group: 'Core' },
-    { id: 'VERIFY', label: 'Field Audit', icon: ShieldCheck, group: 'Core' },
+    { id: 'VERIFY', label: 'Field Audit Queue', icon: ShieldCheck, group: 'Core' },
     { id: 'GIS', label: 'Spatial Hub', icon: Map, group: 'Core' },
     
     { id: 'IMPORT', label: 'Data Import Center', icon: FileUp, group: 'Tools' },
@@ -92,12 +91,12 @@ export default function SPAHub() {
     { id: 'ALERTS', label: 'Critical Exceptions', icon: AlertTriangle, group: 'Tools' },
     
     { id: 'AUDIT_LOG', label: 'Audit Trail', icon: History, group: 'Systems' },
-    { id: 'SYNC_QUEUE', label: 'Sync Status Log', icon: Activity, group: 'Systems' },
+    { id: 'SYNC_QUEUE', label: 'Cloud Sync Status', icon: Activity, group: 'Systems' },
     
-    { id: 'USERS', label: 'User Management', icon: Package, adminOnly: true, group: 'Admin' },
-    { id: 'INFRASTRUCTURE', label: 'System Infrastructure', icon: Monitor, adminOnly: true, group: 'Admin' },
-    { id: 'DATABASE', label: 'Database Manager', icon: Database, adminOnly: true, group: 'Admin' },
-    { id: 'SETTINGS', label: 'System Settings', icon: Settings, group: 'Admin' },
+    { id: 'USERS', label: 'User Management', icon: Package, adminOnly: true, group: 'System Administration' },
+    { id: 'INFRASTRUCTURE', label: 'System Infrastructure', icon: Monitor, adminOnly: true, group: 'System Administration' },
+    { id: 'DATABASE', label: 'Database Management', icon: Database, adminOnly: true, group: 'System Administration' },
+    { id: 'SETTINGS', label: 'System Settings', icon: Settings, group: 'System Administration' },
   ];
 
   const renderWorkstation = () => {
@@ -142,7 +141,6 @@ export default function SPAHub() {
       <CommandPalette />
       <WelcomeExperience isOpen={showWelcome} onComplete={() => setShowWelcome(false)} />
       
-      {/* 1. Global Navigation Pulse (Sidebar) */}
       <aside className={cn(
         "bg-[#050505] border-r border-white/5 flex flex-col transition-all duration-700 ease-out z-50 fixed inset-y-0 left-0 lg:relative lg:translate-x-0",
         isSidebarOpen ? "w-[280px] translate-x-0" : "w-[280px] -translate-x-full"
@@ -153,13 +151,13 @@ export default function SPAHub() {
           </div>
           <div className="flex flex-col">
             <h1 className="text-xl font-black tracking-tighter text-white uppercase leading-none">NTBLCP</h1>
-            <span className="text-[8px] font-black uppercase text-primary tracking-[0.3em] mt-1.5 opacity-60">Inventory Hub</span>
+            <span className="text-[8px] font-black uppercase text-primary tracking-[0.3em] mt-1.5 opacity-60">Asset Register</span>
           </div>
         </div>
 
         <ScrollArea className="flex-1 px-4 py-8">
           <div className="space-y-10 pb-20">
-            {['Core', 'Tools', 'Systems', 'Admin'].map(group => {
+            {['Core', 'Tools', 'Systems', 'System Administration'].map(group => {
               const items = navItems.filter(i => i.group === group && (!i.adminOnly || userProfile?.isAdmin));
               if (items.length === 0) return null;
               return (
@@ -185,9 +183,7 @@ export default function SPAHub() {
         </div>
       </aside>
 
-      {/* 2. Primary Workstation Hub */}
       <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
-        {/* Header - Matching Screenshot exactly */}
         <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/80 backdrop-blur-3xl z-40">
           <div className="flex items-center gap-6">
             <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors text-white/60 hover:text-white">
@@ -225,7 +221,6 @@ export default function SPAHub() {
           </div>
         </header>
 
-        {/* Dynamic Canvas Surface */}
         <ScrollArea className="flex-1">
           <div className="p-6 lg:p-10 min-h-full">
             <ErrorBoundary module={activeView}>
