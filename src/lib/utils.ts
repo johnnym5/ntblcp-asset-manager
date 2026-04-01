@@ -8,25 +8,40 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
-export const sanitizeForFirestore = <T extends object>(obj: T): T => {
+/**
+ * Recursively removes undefined fields and converts Date objects to Firestore Timestamps.
+ * Essential for nested objects like 'recovery' in error logs or 'metadata' in assets.
+ */
+export function sanitizeForFirestore<T>(obj: T): T {
+  if (obj === null || obj === undefined) return null as any;
+  
+  // Handle Firestore native types and Dates
+  if (obj instanceof Date) return Timestamp.fromDate(obj) as any;
+  if (obj instanceof Timestamp) return obj as any;
+  
+  // Handle Arrays
+  if (Array.isArray(obj)) {
+    return obj.map(v => sanitizeForFirestore(v)) as any;
+  }
+  
+  // Handle Objects
+  if (typeof obj === 'object') {
     const sanitizedObj: { [key: string]: any } = {};
     for (const key in obj) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        if (key === 'previousState') continue; // Skip undo buffer for Firestore
+        
         const value = (obj as any)[key];
-        if (key === 'previousState') {
-            continue; 
-        }
         if (value !== undefined) {
-            if (value instanceof Date) {
-                sanitizedObj[key] = Timestamp.fromDate(value);
-            } else if (value instanceof Timestamp) {
-                sanitizedObj[key] = value;
-            } else {
-                sanitizedObj[key] = value;
-            }
+          sanitizedObj[key] = sanitizeForFirestore(value);
         }
+      }
     }
     return sanitizedObj as T;
-};
+  }
+
+  return obj;
+}
 
 export const normalizeAssetLocation = (location?: string): string => {
     if (!location) return '';

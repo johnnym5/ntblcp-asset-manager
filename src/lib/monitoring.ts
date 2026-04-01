@@ -7,7 +7,7 @@
 
 import { v4 as uuidv4 } from 'uuid';
 import { FirestoreService } from '@/services/firebase/firestore';
-import type { ErrorLogEntry, ErrorSeverity, ErrorLogStatus } from '@/types/domain';
+import type { ErrorLogEntry, ErrorSeverity } from '@/types/domain';
 
 export interface TraceContext {
   component?: string;
@@ -16,6 +16,9 @@ export interface TraceContext {
   userId?: string;
   userName?: string;
   userRole?: string;
+  recoveryAttempted?: boolean;
+  recoveryAction?: string;
+  recoveryResult?: string;
   [key: string]: any;
 }
 
@@ -68,12 +71,12 @@ class MonitoringService {
         message: technicalMessage,
         technicalMessage,
         laymanExplanation,
-        stack: error?.stack
+        stack: error?.stack || null
       },
       recovery: {
         attempted: !!context.recoveryAttempted,
-        action: context.recoveryAction,
-        result: context.recoveryResult
+        action: context.recoveryAction || null,
+        result: context.recoveryResult || null
       }
     };
 
