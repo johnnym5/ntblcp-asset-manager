@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview Root Shell - Unified Single-Page Operational Hub.
- * Phase 210: Excised sidebar and redundant modules. Implemented Universal Back Button.
+ * @fileOverview Root Shell - Unified Global Command Hub.
+ * Phase 225: Activated Global Search, Filter, and Sort triggers in the header.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -13,33 +13,72 @@ import {
   Boxes, 
   Loader2, 
   LogOut, 
-  ChevronRight, 
   CloudDownload, 
   CloudUpload, 
   Bell, 
   ArrowLeft,
-  RefreshCw
+  Search,
+  Filter,
+  ArrowUpDown,
+  Settings as SettingsIcon
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
-import { RegionalScopeDrawer } from '@/components/registry/RegionalScopeDrawer';
 import { NotificationsCenter } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useNotifications } from '@/hooks/use-notifications';
+import { FilterDrawer } from '@/components/registry/FilterDrawer';
+import { SortDrawer } from '@/components/registry/SortDrawer';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
-  const { activeView, setActiveView, appSettings, isOnline, isSyncing, manualDownload, manualUpload } = useAppState();
+  const { 
+    activeView, 
+    setActiveView, 
+    appSettings, 
+    isOnline, 
+    isSyncing, 
+    manualDownload, 
+    manualUpload,
+    searchTerm,
+    setSearchTerm,
+    headers,
+    selectedLocations,
+    selectedAssignees,
+    selectedStatuses,
+    selectedConditions,
+    missingFieldFilter,
+    setSelectedLocations,
+    setSelectedAssignees,
+    setSelectedStatuses,
+    setSelectedConditions,
+    setMissingFieldFilter,
+    sortKey,
+    setSortKey,
+    sortDir,
+    setSortDir
+  } = useAppState();
+  
   const { unreadCount } = useNotifications();
   
-  const [isScopeOpen, setIsScopeOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false);
 
   useEffect(() => {
     if (profileSetupComplete && !appSettings?.onboardingComplete) {
@@ -67,15 +106,26 @@ export default function SPAHub() {
     }
   };
 
+  const activeFilters = [
+    ...selectedLocations.map(v => ({ headerId: headers.find(h => h.normalizedName === 'location')?.id || '', operator: 'equals' as const, value: v })),
+    ...selectedAssignees.map(v => ({ headerId: headers.find(h => h.normalizedName === 'assignee_location')?.id || '', operator: 'equals' as const, value: v })),
+    ...selectedStatuses.map(v => ({ headerId: headers.find(h => h.normalizedName === 'status')?.id || '', operator: 'equals' as const, value: v })),
+    ...selectedConditions.map(v => ({ headerId: headers.find(h => h.normalizedName === 'condition')?.id || '', operator: 'equals' as const, value: v }))
+  ];
+
+  if (missingFieldFilter) {
+    activeFilters.push({ headerId: headers.find(h => h.normalizedName === missingFieldFilter)?.id || '', operator: 'exists' as const, value: '' });
+  }
+
   return (
-    <div className="flex h-screen bg-black overflow-hidden font-sans selection:bg-primary/30">
+    <div className="flex h-screen bg-black overflow-hidden font-sans selection:bg-primary/30 text-white">
       <CommandPalette />
       <WelcomeExperience isOpen={showWelcome} onComplete={() => setShowWelcome(false)} />
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       
       <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
-        <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/80 backdrop-blur-3xl z-40">
-          <div className="flex items-center gap-6">
+        <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/80 backdrop-blur-3xl z-40 gap-8">
+          <div className="flex items-center gap-6 shrink-0">
             {activeView !== 'DASHBOARD' ? (
               <button 
                 onClick={() => setActiveView('DASHBOARD')} 
@@ -97,8 +147,43 @@ export default function SPAHub() {
             )}
           </div>
 
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2 mr-4">
+          {/* Global Command Hub Pulse */}
+          <div className="flex-1 max-w-2xl relative group hidden md:block">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />
+            <Input 
+              placeholder="Global Search: Descriptions, Tag IDs, or Serials..." 
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="h-12 pl-11 pr-24 rounded-xl bg-white/[0.03] border-white/5 text-sm font-medium focus-visible:ring-primary/20 text-white placeholder:text-white/20 shadow-inner"
+            />
+            <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsSortOpen(true)}
+                className="h-9 w-9 rounded-lg text-white/20 hover:text-primary hover:bg-primary/10 transition-all"
+              >
+                <ArrowUpDown className="h-4 w-4" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setIsFilterOpen(true)}
+                className={cn(
+                  "h-9 w-9 rounded-lg text-white/20 hover:text-primary hover:bg-primary/10 transition-all",
+                  activeFilters.length > 0 && "text-primary bg-primary/5"
+                )}
+              >
+                <Filter className="h-4 w-4" />
+                {activeFilters.length > 0 && (
+                  <div className="absolute top-1 right-1 h-2 w-2 bg-primary rounded-full" />
+                )}
+              </Button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-4 shrink-0">
+            <div className="flex items-center gap-2 mr-2">
               <button 
                 onClick={manualDownload} 
                 disabled={isSyncing}
@@ -183,17 +268,48 @@ export default function SPAHub() {
         </ScrollArea>
       </main>
 
-      <RegionalScopeDrawer isOpen={isScopeOpen} onOpenChange={setIsScopeOpen} />
+      <FilterDrawer 
+        isOpen={isFilterOpen} 
+        onOpenChange={setIsFilterOpen} 
+        headers={headers} 
+        activeFilters={activeFilters as any} 
+        onUpdateFilters={(fs) => {
+          // Flatten filters back to state arrays
+          const locations: string[] = [];
+          const assignees: string[] = [];
+          const statuses: string[] = [];
+          const conditions: string[] = [];
+          let missing: string = '';
+
+          fs.forEach(f => {
+            const h = headers.find(header => header.id === f.headerId);
+            if (!h) return;
+            if (f.operator === 'exists') missing = h.normalizedName;
+            else if (h.normalizedName === 'location') locations.push(String(f.value));
+            else if (h.normalizedName === 'assignee_location') assignees.push(String(f.value));
+            else if (h.normalizedName === 'status') statuses.push(String(f.value));
+            else if (h.normalizedName === 'condition') conditions.push(String(f.value));
+          });
+
+          setSelectedLocations(locations);
+          setSelectedAssignees(assignees);
+          setSelectedStatuses(statuses);
+          setSelectedConditions(conditions);
+          setMissingFieldFilter(missing);
+        }} 
+      />
+
+      <SortDrawer 
+        isOpen={isSortOpen} 
+        onOpenChange={setIsSortOpen} 
+        headers={headers} 
+        sortBy={sortKey} 
+        sortDirection={sortDir} 
+        onUpdateSort={(key, dir) => {
+          setSortKey(key);
+          setSortDir(dir);
+        }} 
+      />
     </div>
   );
 }
-
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Settings as SettingsIcon } from 'lucide-react';

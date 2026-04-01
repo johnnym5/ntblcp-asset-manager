@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - Unified Single-Scope Hub.
- * Phase 210: Focused on Core Inventory, Audit, Reports, and System Pulses.
+ * Phase 225: Optimized for global header-based command hub integration.
  */
 
 import React, { useState } from 'react';
@@ -10,16 +10,11 @@ import {
   LayoutDashboard,
   Boxes,
   ShieldCheck,
-  Search,
-  ArrowUpDown,
-  Filter,
-  RefreshCw,
   Activity,
   FileText,
   History
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Input } from '@/components/ui/input';
 import { useAppState } from '@/contexts/app-state-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
 import { RegistryWorkstation } from './RegistryWorkstation';
@@ -28,14 +23,11 @@ import { ReportsWorkstation } from './ReportsWorkstation';
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { SyncQueueWorkstation } from './SyncQueueWorkstation';
 import { cn } from '@/lib/utils';
-import { motion } from 'framer-motion';
 
 type DashboardTab = 'overview' | 'inventory' | 'audit' | 'reports' | 'trail' | 'sync';
 
 export function DashboardWorkstation() {
   const { 
-    searchTerm, 
-    setSearchTerm,
     isOnline,
     isSyncing,
     refreshRegistry
@@ -46,42 +38,38 @@ export function DashboardWorkstation() {
   return (
     <div className="space-y-8 animate-in fade-in duration-700 max-w-[1600px] mx-auto pb-32">
       
-      {/* 1. Global Command Bar */}
+      {/* 1. Header Navigation Tabs */}
       <div className="flex flex-col lg:flex-row items-center justify-between gap-6 px-1">
-        <div className="relative group flex-1 w-full lg:max-w-xl">
-          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />
-          <Input 
-            placeholder="Global search: Descriptions, Tag IDs, or Serials..." 
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="h-14 pl-12 pr-24 rounded-2xl bg-white/[0.03] border-white/5 text-sm font-medium focus-visible:ring-primary/20 text-white placeholder:text-white/20 shadow-2xl"
-          />
-          <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-3">
-            <button className="p-2 hover:bg-white/5 rounded-lg text-white/20 hover:text-white transition-all"><ArrowUpDown className="h-4 w-4" /></button>
-            <button className="p-2 hover:bg-white/5 rounded-lg text-white/20 hover:text-white transition-all"><Filter className="h-4 w-4" /></button>
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-primary/10 rounded-2xl shadow-inner">
+            <LayoutDashboard className="h-6 w-6 text-primary" />
+          </div>
+          <div>
+            <h2 className="text-2xl font-black uppercase text-white tracking-tight leading-none">Operational Command</h2>
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">Unified Registry Orchestration</p>
           </div>
         </div>
 
-        <div className="flex items-center gap-3 bg-muted/20 p-1.5 rounded-[1.5rem] border border-white/5 shadow-inner overflow-x-auto no-scrollbar">
+        <div className="flex items-center gap-3 bg-white/[0.02] p-1.5 rounded-[1.5rem] border border-white/5 shadow-2xl overflow-x-auto no-scrollbar backdrop-blur-xl">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="w-full">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center">
               <TabsTrigger value="overview" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                <LayoutDashboard className="h-3.5 w-3.5" /> Overview
+                Overview
               </TabsTrigger>
               <TabsTrigger value="inventory" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                <Boxes className="h-3.5 w-3.5" /> Inventory
+                Inventory
               </TabsTrigger>
               <TabsTrigger value="audit" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                <ShieldCheck className="h-3.5 w-3.5" /> Audit Queue
+                Audit Queue
               </TabsTrigger>
               <TabsTrigger value="reports" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                <FileText className="h-3.5 w-3.5" /> Reports
+                Reports
               </TabsTrigger>
               <TabsTrigger value="trail" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                <History className="h-3.5 w-3.5" /> Trail
+                Trail
               </TabsTrigger>
               <TabsTrigger value="sync" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                <Activity className="h-3.5 w-3.5" /> Sync
+                Sync
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -97,7 +85,7 @@ export function DashboardWorkstation() {
           </TabsContent>
 
           <TabsContent value="inventory" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <RegistryWorkstation />
+            <RegistryWorkstation viewAll />
           </TabsContent>
 
           <TabsContent value="audit" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
@@ -128,10 +116,6 @@ export function DashboardWorkstation() {
           <span className="text-[10px] font-black uppercase tracking-widest">
             {isOnline ? 'Registry Online' : 'Offline Mode'}
           </span>
-          <div className="w-px h-4 bg-current/20 mx-1" />
-          <button onClick={refreshRegistry} disabled={isSyncing} className="hover:scale-110 active:scale-95 transition-transform">
-            <RefreshCw className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-          </button>
         </div>
       </div>
 
