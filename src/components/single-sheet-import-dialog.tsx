@@ -1,8 +1,8 @@
-
 "use client";
 
 /**
  * @fileOverview Import Orchestrator - High-Fidelity Design.
+ * Phase 115: Resolved ReferenceError by adding missing Card imports.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -19,6 +19,7 @@ import { Label } from './ui/label';
 import { ScrollArea } from './ui/scroll-area';
 import { Badge } from './ui/badge';
 import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 
 interface ImportScannerDialogProps {
   isOpen: boolean;
