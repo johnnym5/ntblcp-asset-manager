@@ -132,3 +132,5 @@ Apr 01, 2026 10:58:15 AM com.google.cloud.datastore.emulator.firestore.websocket
 INFO: Connected to new websocket client
 Apr 01, 2026 11:15:07 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
 INFO: Detected non-HTTP/2 connection.
+Apr 01, 2026 11:15:09 AM io.gapi.emulators.netty.HttpVersionRoutingHandler channelRead
+INFO: Detected HTTP/2 connection.

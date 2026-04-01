@@ -1,9 +1,8 @@
 /**
  * @fileOverview Unified Domain Models for Assetain.
- * Strictly typed, deterministic models for registry management and system configuration.
  */
 
-export type UserRole = 'ADMIN' | 'MANAGER' | 'VIEWER';
+export type UserRole = 'ADMIN' | 'MANAGER' | 'VERIFIER' | 'VIEWER' | 'SUPERADMIN';
 export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
 export type DataSource = 'PRODUCTION' | 'SANDBOX';
 export type UXMode = 'beginner' | 'advanced';
@@ -22,7 +21,8 @@ export type WorkstationView =
   | 'USERS' 
   | 'INFRASTRUCTURE' 
   | 'DATABASE' 
-  | 'SETTINGS';
+  | 'SETTINGS'
+  | 'GIS';
 
 export interface SectionHierarchy {
   document: string;
@@ -61,7 +61,6 @@ export interface Asset {
   location: string;
   custodian: string;
   lga?: string;
-  assignee?: string;
   
   // State & Assessment
   status: VerificationStatus;
@@ -70,7 +69,6 @@ export interface Asset {
   // Financial & Technical
   purchaseDate?: string;
   value: number; // NGN
-  valueUsd?: number;
   serialNumber: string;
   assetIdCode?: string;
   manufacturer?: string;
@@ -78,36 +76,23 @@ export interface Asset {
   chassisNo?: string;
   engineNo?: string;
   supplier?: string;
-  usefulLife?: string;
   remarks?: string;
-  grant?: string;
-  pvJvNo?: string;
-  imei?: string;
-
-  // TB Depreciation Pulse
-  depreciation?: {
-    ngn: Record<string, number>;
-    usd: Record<string, number>;
-    accumulatedNgn?: number;
-    netBookValueNgn?: number;
-    accumulatedUsd?: number;
-    netBookValueUsd?: number;
-  };
-  addedAssetsContext?: string;
+  
+  geotag?: Geotag;
 
   // Metadata & Traceability
   hierarchy: SectionHierarchy;
   importMetadata: ImportMetadata;
   metadata: Record<string, unknown>;
-  rawRow?: any[];
-  rawHeader?: string[];
-  formulas?: Record<string, string>;
   
   // System Fields
   lastModified: string;
   lastModifiedBy: string;
   lastModifiedByState?: string;
 
+  // Restoration Buffer
+  previousState?: Partial<Asset> | null;
+  
   // Governance
   approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   pendingChanges?: Partial<Asset>;
@@ -116,8 +101,6 @@ export interface Asset {
     loginName: string;
     state: string;
   };
-
-  previousState?: Partial<Asset>;
   yearBucket?: number;
 }
 
@@ -125,17 +108,13 @@ export interface AppSettings {
   authorizedUsers: AuthorizedUser[];
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
-  activeDatabase: 'firestore' | 'rtdb';
   readAuthority: AuthorityNode;
   activeGrantId: string | null;
   grants: Grant[];
-  sourceBranding?: Record<string, string>;
   uxMode: UXMode;
   onboardingComplete: boolean;
   showHelpTooltips: boolean;
-  autoSync: boolean;
-  autoAnalyze: boolean;
-  autoSuggestFilters: boolean;
+  sourceBranding: Record<string, string>;
 }
 
 export interface Grant {
@@ -153,8 +132,6 @@ export interface AuthorizedUser {
   states: string[];
   role: UserRole;
   isAdmin: boolean; 
-  isSuperAdmin?: boolean;
-  isGuest?: boolean;
 }
 
 export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE';
@@ -179,40 +156,18 @@ export interface ActivityLogEntry {
   performedBy: string;
   userState: string;
   changes?: Record<string, { old: any; new: any }>;
-  metadata?: Record<string, any>;
 }
 
 export type ErrorSeverity = 'CRITICAL' | 'WARNING' | 'INFO';
-export type ErrorLogStatus = 'PENDING' | 'RESOLVED' | 'IGNORED' | 'ESCALATED';
+export type ErrorLogStatus = 'PENDING' | 'RESOLVED' | 'IGNORED';
 
 export interface ErrorLogEntry {
   id: string;
   timestamp: string;
   severity: ErrorSeverity;
   status: ErrorLogStatus;
-  user: {
-    id: string;
-    name: string;
-    role: string;
-  };
-  context: {
-    page: string;
-    module: string;
-    action: string;
-    browser: string;
-    isOnline: boolean;
-  };
-  error: {
-    type: string;
-    message: string;
-    technicalMessage: string;
-    laymanExplanation: string;
-    stack?: string;
-  };
-  recovery: {
-    attempted: boolean;
-    action?: string;
-    result?: string;
-  };
-  adminNotes?: string;
+  user: { id: string; name: string; role: string; };
+  context: { page: string; module: string; action: string; isOnline: boolean; };
+  error: { type: string; technicalMessage: string; laymanExplanation: string; stack?: string; };
+  recovery: { attempted: boolean; action?: string; result?: string; };
 }
