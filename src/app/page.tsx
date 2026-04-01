@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Single Page Application Hub.
- * Phase 170: Activated sync triggers and high-fidelity notifications center.
+ * Phase 175: Merged Core views into a unified Dashboard workstation.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -30,16 +30,15 @@ import {
   CloudUpload,
   Bell,
   Search,
-  RefreshCw
+  RefreshCw,
+  LayoutGrid
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
-import { RegistryWorkstation } from '@/components/workstations/RegistryWorkstation';
 import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
-import { VerifyWorkstation } from '@/components/workstations/VerifyWorkstation';
 import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
 import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
@@ -48,7 +47,6 @@ import { UsersWorkstation } from '@/components/workstations/UsersWorkstation';
 import { InfrastructureWorkstation } from '@/components/workstations/InfrastructureWorkstation';
 import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
-import { GISWorkstation } from '@/components/workstations/GISWorkstation';
 import { RegionalScopeDrawer } from '@/components/registry/RegionalScopeDrawer';
 import { NotificationsSheet } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
@@ -85,11 +83,9 @@ export default function SPAHub() {
     return <UserProfileSetup />;
   }
 
+  // Phase 175: Unified 'Core' group
   const navItems: { id: WorkstationView; label: string; icon: any; adminOnly?: boolean; group: string }[] = [
-    { id: 'DASHBOARD', label: 'Inventory Dashboard', icon: LayoutDashboard, group: 'Core' },
-    { id: 'REGISTRY', label: 'Asset Inventory', icon: Boxes, group: 'Core' },
-    { id: 'VERIFY', label: 'Field Audit Queue', icon: ShieldCheck, group: 'Core' },
-    { id: 'GIS', label: 'Spatial Hub', icon: Map, group: 'Core' },
+    { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, group: 'Core' },
     
     { id: 'IMPORT', label: 'Data Import Center', icon: FileUp, group: 'Tools' },
     { id: 'REPORTS', label: 'Inventory Reports', icon: Activity, group: 'Tools' },
@@ -107,9 +103,7 @@ export default function SPAHub() {
   const renderWorkstation = () => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
-      case 'REGISTRY': return <RegistryWorkstation />;
       case 'IMPORT': return <ImportWorkstation />;
-      case 'VERIFY': return <VerifyWorkstation />;
       case 'REPORTS': return <ReportsWorkstation />;
       case 'ALERTS': return <AlertsWorkstation />;
       case 'AUDIT_LOG': return <AuditLogWorkstation />;
@@ -118,7 +112,6 @@ export default function SPAHub() {
       case 'INFRASTRUCTURE': return <InfrastructureWorkstation />;
       case 'DATABASE': return <DatabaseWorkstation />;
       case 'SETTINGS': return <SettingsWorkstation />;
-      case 'GIS': return <GISWorkstation />;
       default: return <DashboardWorkstation />;
     }
   };
