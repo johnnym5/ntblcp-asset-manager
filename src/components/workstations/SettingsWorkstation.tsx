@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Control Center.
- * Phase 90: Integrated Database Mission Control & Resilience Audit into unified tabs.
- * Fixed: Added missing ArrowRightLeft import.
+ * Phase 92: Integrated System Diagnostics, Global Purge, and Infrastructure Monitor.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -12,10 +11,8 @@ import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
 import { 
   Settings, 
-  FolderKanban, 
   UserCog, 
   Palette, 
-  Database, 
   CheckCircle2, 
   Trash2, 
   Save, 
@@ -28,11 +25,9 @@ import {
   Info,
   Download,
   RotateCcw,
-  ShieldCheck,
   Lock,
   Cpu,
   GraduationCap,
-  Columns,
   Activity,
   Bomb,
   FileUp,
@@ -41,7 +36,6 @@ import {
   HardDrive,
   Monitor,
   ShieldAlert,
-  ArrowRight,
   Hammer,
   ArrowRightLeft,
   Terminal,
@@ -71,7 +65,7 @@ import { VirtualDBService } from '@/services/virtual-db-service';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { saveAs } from 'file-saver';
-import type { AppSettings, UXMode, AuthorityNode, AuthorizedUser, StorageLayer, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
+import type { AppSettings, UXMode, AuthorityNode, StorageLayer, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
 import type { DBNode } from '@/types/virtual-db';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -103,6 +97,7 @@ export function SettingsWorkstation() {
   const [isRestoring, setIsRestoring] = useState(false);
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isGlobalPurgeDialogOpen, setIsGlobalPurgeDialogOpen] = useState(false);
+  const [isTesting, setIsTesting] = useState(false);
   const [diagnosticPulse, setDiagnosticPulse] = useState<DiagnosticResult[] | null>(null);
   
   // --- Database Logic State ---
@@ -120,7 +115,6 @@ export function SettingsWorkstation() {
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [selectedErrorLog, setSelectedErrorLog] = useState<ErrorLogEntry | null>(null);
-  const [errorSearchTerm, setErrorSearchTerm] = useState("");
 
   const recoveryInputRef = useRef<HTMLInputElement>(null);
 
@@ -180,7 +174,7 @@ export function SettingsWorkstation() {
       await FirestoreService.updateSettings(draftSettings);
       await storage.saveSettings(draftSettings);
       await refreshRegistry();
-      toast({ title: "Configuration Synchronized" });
+      toast({ title: "Configuration Synchronized", description: "Global environment pulse updated." });
     } catch (e) {
       toast({ variant: "destructive", title: "Broadcast Failure" });
     } finally {
@@ -189,12 +183,15 @@ export function SettingsWorkstation() {
   };
 
   const handleSelfTest = async () => {
+    setIsTesting(true);
     try {
       const results = await SystemDiagnostics.runSelfTest();
       setDiagnosticPulse(results);
-      toast({ title: "Infrastructure Audit Complete" });
+      toast({ title: "Infrastructure Audit Complete", description: "All storage nodes successfully polled." });
     } catch (e) {
       toast({ variant: "destructive", title: "Audit Failed" });
+    } finally {
+      setIsTesting(false);
     }
   };
 
@@ -212,7 +209,7 @@ export function SettingsWorkstation() {
     setIsSaving(true);
     try {
       await VirtualDBService.purgeGlobalRegistry();
-      toast({ title: "Global Purge Complete" });
+      toast({ title: "Global Purge Complete", description: "slates cleared across all layers." });
       await refreshRegistry();
       setIsGlobalPurgeDialogOpen(false);
     } catch (e) {
@@ -241,6 +238,24 @@ export function SettingsWorkstation() {
     }
   };
 
+  const handleResolve = async (layer: StorageLayer) => {
+    if (!parityData || !selectedDbNode) return;
+    const authoritativeData = parityData[layer];
+    if (!authoritativeData) return;
+
+    setIsSaving(true);
+    try {
+      await VirtualDBService.resolveConflict(selectedDbNode.path, authoritativeData);
+      toast({ title: "Conflict Resolved", description: `Node parity established via ${layer} pulse.` });
+      const ids = await VirtualDBService.getGlobalDiscrepancies();
+      setDiscrepancyIds(ids);
+      loadDbRoot();
+      setSelectedDbNode(null);
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   if (!settingsLoaded || !draftSettings) {
     return (
       <div className="flex h-screen w-full items-center justify-center bg-background">
@@ -265,11 +280,11 @@ export function SettingsWorkstation() {
     <div className="max-w-6xl mx-auto space-y-8 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-700">
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-1">
-          <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
+          <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3 leading-none">
             <Settings className="text-primary h-8 w-8" /> Master Control
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Enterprise Governance & Orchestration Hub
+            Enterprise Governance & Registry Orchestration
           </p>
         </div>
         <Button 
@@ -375,7 +390,17 @@ export function SettingsWorkstation() {
 
         {/* --- Infrastructure Tab --- */}
         <TabsContent value="infrastructure" className="space-y-10 outline-none px-2">
-          <SectionHeading title="Infrastructure" description="High-Availability Redundancy Monitor" icon={Monitor} />
+          <div className="flex items-center justify-between">
+            <SectionHeading title="Infrastructure" description="High-Availability Redundancy Monitor" icon={Monitor} />
+            <Button 
+              variant="outline" 
+              onClick={handleSelfTest} 
+              disabled={isTesting}
+              className="h-12 px-6 rounded-xl font-black uppercase text-[10px] gap-2 border-2 hover:bg-primary/5 shadow-sm"
+            >
+              {isTesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <RefreshCw className="h-4 w-4" />} Run Diagnostics
+            </Button>
+          </div>
           
           <Card className="rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.02] overflow-hidden">
             <CardHeader className="p-8 border-b border-primary/10 flex flex-row items-center justify-between">
@@ -385,7 +410,7 @@ export function SettingsWorkstation() {
             <CardContent className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
               <button 
                 onClick={() => executeFailover('FIRESTORE')} 
-                disabled={draftSettings.readAuthority === 'FIRESTORE'}
+                disabled={draftSettings.readAuthority === 'FIRESTORE' || isSaving}
                 className={cn("p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4", draftSettings.readAuthority === 'FIRESTORE' ? "bg-primary text-white border-primary shadow-xl" : "bg-card border-border/40 hover:border-primary/40")}
               >
                 <Cloud className="h-10 w-10" />
@@ -393,7 +418,7 @@ export function SettingsWorkstation() {
               </button>
               <button 
                 onClick={() => executeFailover('RTDB')} 
-                disabled={draftSettings.readAuthority === 'RTDB'}
+                disabled={draftSettings.readAuthority === 'RTDB' || isSaving}
                 className={cn("p-8 rounded-[2rem] border-2 transition-all flex flex-col items-center gap-4", draftSettings.readAuthority === 'RTDB' ? "bg-green-600 text-white border-green-600 shadow-xl" : "bg-card border-border/40 hover:border-green-500/40")}
               >
                 <Zap className="h-10 w-10" />
@@ -401,6 +426,25 @@ export function SettingsWorkstation() {
               </button>
             </CardContent>
           </Card>
+
+          {diagnosticPulse && (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-in slide-in-from-bottom-2 duration-500">
+              {diagnosticPulse.map((res) => (
+                <Card key={res.node} className="rounded-2xl border-2 border-border/40 bg-card p-5 flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <span className="text-[8px] font-black uppercase opacity-40">{res.node} NODE</span>
+                    <p className="text-[10px] font-bold uppercase">{res.message}</p>
+                  </div>
+                  <Badge variant="outline" className={cn(
+                    "text-[8px] font-mono h-6 px-2",
+                    res.status === 'STABLE' ? "text-green-600 border-green-200" : "text-destructive border-destructive/20"
+                  )}>
+                    {res.latency}MS
+                  </Badge>
+                </Card>
+              ))}
+            </div>
+          )}
 
           <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 p-10">
             <div className="flex flex-col md:flex-row items-center justify-between gap-12 relative">
@@ -425,7 +469,19 @@ export function SettingsWorkstation() {
 
         {/* --- Database Mission Control Tab --- */}
         <TabsContent value="database" className="space-y-6 outline-none px-2 h-[600px] flex flex-col">
-          <SectionHeading title="Mission Control" description="Deterministic Cross-Layer Node Orchestration" icon={Terminal} />
+          <div className="flex items-center justify-between">
+            <SectionHeading title="Mission Control" description="Deterministic Cross-Layer Node Orchestration" icon={Terminal} />
+            <Button 
+              variant="outline" 
+              onClick={() => { setIsConflictView(!isConflictView); setSelectedDbNode(null); }}
+              className={cn(
+                "h-11 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2 transition-all", 
+                isConflictView ? "bg-destructive text-white border-destructive" : "text-destructive border-destructive/20 hover:bg-destructive/5"
+              )}
+            >
+              <Split className="h-3.5 w-3.5" /> {isConflictView ? 'Exit Conflict Mode' : 'Resolve Conflicts'}
+            </Button>
+          </div>
           <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
             <Card className="lg:col-span-4 rounded-[2rem] border-2 border-border/40 bg-card/50 overflow-hidden flex flex-col">
               <CardHeader className="bg-muted/20 border-b p-4 space-y-4">
@@ -436,7 +492,7 @@ export function SettingsWorkstation() {
                 </div>
               </CardHeader>
               <ScrollArea className="flex-1 p-2 bg-background/30">
-                {dbLoading ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin text-primary" /></div> : (
+                {dbLoading ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-8 w-8 text-primary" /></div> : (
                   <div className="space-y-1">
                     {dbNodes.map(node => (
                       <button key={node.id} onClick={() => handleDbNodeClick(node)} className={cn("w-full text-left p-3 rounded-xl transition-all flex items-center justify-between border-2 border-transparent", selectedDbNode?.id === node.id ? "bg-primary/10 border-primary/20" : "hover:bg-primary/5")}>
@@ -453,19 +509,58 @@ export function SettingsWorkstation() {
             </Card>
             <Card className="lg:col-span-8 rounded-[2rem] border-2 border-border/40 bg-card/50 overflow-hidden flex flex-col">
               {selectedDbNode ? (
-                <div className="flex flex-col h-full">
+                <Tabs defaultValue={isConflictView ? "wizard" : "editor"} className="flex-1 flex flex-col">
                   <div className="p-4 border-b bg-muted/20 flex items-center justify-between">
-                    <span className="text-[10px] font-black uppercase">{selectedDbNode.displayName} Pulse</span>
-                    <Badge variant="outline" className="text-[8px] h-5">{selectedDbNode.source}</Badge>
+                    <div className="flex flex-col">
+                      <span className="text-[10px] font-black uppercase">{selectedDbNode.displayName} Pulse</span>
+                      <span className="text-[7px] font-mono opacity-40 uppercase">Path: {selectedDbNode.path}</span>
+                    </div>
+                    <TabsList className="bg-background/50 p-1 rounded-lg h-8 border">
+                      <TabsTrigger value="editor" className="text-[8px] font-black uppercase">Editor</TabsTrigger>
+                      {isConflictView && <TabsTrigger value="wizard" className="text-[8px] font-black uppercase">Wizard</TabsTrigger>}
+                    </TabsList>
                   </div>
-                  <div className="flex-1 p-4 bg-[#0F172A] relative">
-                    <textarea value={dbEditedData} onChange={(e) => setDbEditedData(e.target.value)} className="w-full h-full bg-transparent text-blue-100 font-mono text-[10px] outline-none resize-none leading-relaxed" spellCheck="false" />
-                  </div>
-                  <div className="p-4 border-t bg-muted/20 flex justify-end gap-3">
-                    <Button variant="outline" size="sm" onClick={() => setSelectedDbNode(null)} className="h-9 px-4 rounded-xl font-black text-[9px] uppercase">Discard</Button>
-                    <Button size="sm" className="h-9 px-6 rounded-xl font-black text-[9px] uppercase bg-primary text-white">Commit Node</Button>
-                  </div>
-                </div>
+                  
+                  <TabsContent value="editor" className="flex-1 m-0 flex flex-col">
+                    <div className="flex-1 p-4 bg-[#0F172A] relative">
+                      <textarea value={dbEditedData} onChange={(e) => setDbEditedData(e.target.value)} className="w-full h-full bg-transparent text-blue-100 font-mono text-[10px] outline-none resize-none leading-relaxed" spellCheck="false" />
+                    </div>
+                    <div className="p-4 border-t bg-muted/20 flex justify-end gap-3">
+                      <Button variant="outline" size="sm" onClick={() => setSelectedDbNode(null)} className="h-9 px-4 rounded-xl font-black text-[9px] uppercase">Discard</Button>
+                      <Button onClick={() => VirtualDBService.updateNode(selectedDbNode.source, selectedDbNode.path, JSON.parse(dbEditedData))} disabled={isSaving} size="sm" className="h-9 px-6 rounded-xl font-black text-[9px] uppercase bg-primary text-white">
+                        {isSaving ? <Loader2 className="h-3 w-3 animate-spin mr-2" /> : <Save className="h-3 w-3 mr-2" />} Commit Pulse
+                      </Button>
+                    </div>
+                  </TabsContent>
+
+                  <TabsContent value="wizard" className="flex-1 m-0">
+                    <ScrollArea className="h-full">
+                      <div className="p-6 space-y-6">
+                        <div className="p-4 rounded-xl bg-destructive/5 border-2 border-dashed border-destructive/20 text-[9px] font-medium italic">
+                          Resolution Mode Active: Choosing an authoritative layer will overwrite all peer nodes to re-establish global parity.
+                        </div>
+                        <div className="space-y-2">
+                          {['FIRESTORE', 'RTDB', 'LOCAL'].map((layer) => (
+                            <button
+                              key={`resolve-${layer}`}
+                              onClick={() => handleResolve(layer as StorageLayer)}
+                              disabled={!parityData?.[layer as StorageLayer] || isSaving}
+                              className="w-full p-4 rounded-xl border-2 border-border/40 hover:border-primary/40 bg-card flex items-center justify-between group transition-all"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className={cn("p-2 rounded-lg transition-colors", parityData?.[layer as StorageLayer] ? "bg-muted group-hover:bg-primary group-hover:text-white" : "opacity-20")}>
+                                  <CheckCircle2 className="h-4 w-4" />
+                                </div>
+                                <span className="text-[10px] font-black uppercase">Enforce {layer} Pulse</span>
+                              </div>
+                              <ArrowUpRight className="h-4 w-4 opacity-20 group-hover:opacity-100" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </ScrollArea>
+                  </TabsContent>
+                </Tabs>
               ) : (
                 <div className="flex-1 flex flex-col items-center justify-center opacity-20 space-y-4">
                   <Terminal className="h-12 w-12" />
