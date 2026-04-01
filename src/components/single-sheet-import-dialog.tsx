@@ -57,7 +57,7 @@ interface ImportScannerDialogProps {
 }
 
 export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialogProps) {
-  const { appSettings, refreshRegistry, activeGrantId } = useAppState();
+  const { appSettings, refreshRegistry, activeGrantId, assets } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   
@@ -91,6 +91,8 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
             setScanResults(scannedSheets);
             setSelectedSheets(scannedSheets.map(s => s.sheetName));
           }
+        } catch (e: any) {
+          addNotification({ title: "Scan Pulse Failed", description: e.message, variant: "destructive" });
         } finally {
           setIsScanning(false);
         }
@@ -108,19 +110,24 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
   };
 
   const handleImport = async () => {
-    if (!file || selectedSheets.length === 0 || !appSettings || !activeGrant) return;
+    if (!file || selectedSheets.length === 0 || !activeGrant) return;
 
     setIsImporting(true);
     try {
       const sheetsToImport = scanResults.filter(r => selectedSheets.includes(r.sheetName));
-      const { assets: newAssets, errors } = await parseExcelFile(file, appSettings, [], sheetsToImport);
+      const { assets: newAssets, errors } = await parseExcelFile(
+        file, 
+        activeGrant.sheetDefinitions, 
+        activeGrant.enabledSheets, 
+        assets, 
+        sheetsToImport
+      );
 
       if (errors.length > 0) {
         errors.forEach(e => addNotification({ title: "Import Pulse Error", description: e, variant: "destructive" }));
       }
 
       if (newAssets.length > 0) {
-        // Enqueue all new assets for cloud sync
         for (const asset of newAssets) {
           await enqueueMutation('CREATE', 'assets', {
             ...asset,
@@ -130,14 +137,15 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
           });
         }
 
-        // Update local store immediately for responsive UX
         const currentLocal = await storage.getAssets();
         await storage.saveAssets([...currentLocal, ...newAssets]);
         
-        toast({ title: "Import Pulse Complete", description: `${newAssets.length} records merged to device storage.` });
+        toast({ title: "Import Pulse Complete", description: `${newAssets.length} records merged to registry.` });
         await refreshRegistry();
         onOpenChange(false);
       }
+    } catch (e: any) {
+      addNotification({ title: "Import Pulse Error", description: e.message, variant: "destructive" });
     } finally {
       setIsImporting(false);
     }
@@ -174,15 +182,14 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <DialogDescription className="text-sm font-medium text-white/40 leading-relaxed italic pr-10">
-              Select an Excel file to scan. The system will automatically match sheets to your templates, which you can then review and change before importing.
-            </DialogDescription>
+            <SheetDescription className="text-sm font-medium text-white/40 leading-relaxed italic pr-10">
+              Select an Excel file to scan. The system will automatically match sheets to your templates based on active project definitions.
+            </SheetDescription>
           </DialogHeader>
         </div>
 
         <ScrollArea className="max-h-[60vh] bg-black">
           <div className="p-10 space-y-8">
-            {/* File Selection Area */}
             <div className="space-y-3">
               <Label className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Excel File</Label>
               <div 
@@ -203,7 +210,6 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
               <input type="file" ref={fileInputRef} onChange={handleFileChange} accept=".xlsx,.xls" className="hidden" />
             </div>
 
-            {/* Scan Results Card */}
             {(isScanning || scanResults.length > 0 || scanErrors.length > 0) && (
               <Card className="bg-[#0A0A0A] border-2 border-white/5 rounded-[2rem] overflow-hidden shadow-none animate-in fade-in slide-in-from-bottom-2 duration-500">
                 <CardHeader className="p-8 border-b border-white/5 bg-white/[0.02]">
@@ -213,9 +219,6 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                     </CardTitle>
                     {isScanning && <Loader2 className="h-5 w-5 animate-spin text-primary" />}
                   </div>
-                  <CardDescription className="text-[10px] font-bold uppercase text-white/40 pt-1">
-                    Review the automatic matches for the sheets found in your workbook.
-                  </CardDescription>
                 </CardHeader>
                 
                 <CardContent className="p-8 space-y-6">
@@ -257,7 +260,6 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                                   <p className="text-[10px] font-bold text-white/40 uppercase">Found {result.rowCount} potential asset rows.</p>
                                 </div>
                               </div>
-                              <ChevronsUpDown className="h-4 w-4 text-white/20 opacity-0 group-hover:opacity-100 transition-opacity" />
                             </div>
 
                             <div className="space-y-2">
@@ -288,13 +290,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
         </ScrollArea>
 
         <div className="p-10 bg-[#050505] border-t border-white/5 flex flex-row items-center justify-between gap-4">
-          <Button 
-            variant="ghost" 
-            onClick={() => onOpenChange(false)}
-            className="h-14 px-10 rounded-2xl text-white font-black uppercase text-[10px] tracking-[0.2em] hover:bg-white/5"
-          >
-            Cancel
-          </Button>
+          <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-14 px-10 rounded-2xl text-white font-black uppercase text-[10px] tracking-[0.2em] hover:bg-white/5">Cancel</Button>
           <Button 
             onClick={handleImport} 
             disabled={isImporting || isScanning || selectedSheets.length === 0}

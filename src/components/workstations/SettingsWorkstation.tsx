@@ -5,7 +5,7 @@
  * Phase 100: Fully integrated redesign with high-fidelity Import Scanner pulse.
  */
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
@@ -64,6 +64,7 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
+import { parseExcelForTemplate } from '@/lib/excel-parser';
 
 export function SettingsWorkstation() {
   const { appSettings, refreshRegistry, settingsLoaded, isOnline } = useAppState();
@@ -77,14 +78,14 @@ export function SettingsWorkstation() {
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   
-  // Tab State
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
 
-  // Schema Editor State
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
+  
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (appSettings) {
@@ -139,6 +140,57 @@ export function SettingsWorkstation() {
     }
   };
 
+  const handleAddSheet = () => {
+    if (!draftSettings || !draftSettings.activeGrantId) return;
+    const newSheet: SheetDefinition = {
+      name: 'New Asset Category',
+      headers: ['S/N', 'Asset Description', 'Location', 'Serial Number'],
+      displayFields: [
+        { key: 'sn' as any, label: 'S/N', table: true, quickView: true },
+        { key: 'description' as any, label: 'Asset Description', table: true, quickView: true },
+        { key: 'location' as any, label: 'Location', table: true, quickView: true },
+        { key: 'serialNumber' as any, label: 'Serial Number', table: true, quickView: true },
+        { key: 'status' as any, label: 'Verification Status', table: true, quickView: true },
+      ]
+    };
+    
+    setSelectedSheetDef(newSheet);
+    setActiveGrantIdForSchema(draftSettings.activeGrantId);
+    setIsColumnSheetOpen(true);
+  };
+
+  const handleImportTemplateClick = () => fileInputRef.current?.click();
+
+  const handleFileImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !draftSettings || !draftSettings.activeGrantId) return;
+
+    try {
+      const templates = await parseExcelForTemplate(file);
+      const activeId = draftSettings.activeGrantId;
+      
+      const updatedGrants = draftSettings.grants.map(g => {
+        if (g.id === activeId) {
+          const newDefs = { ...g.sheetDefinitions };
+          const newEnabled = [...g.enabledSheets];
+          templates.forEach(t => {
+            newDefs[t.name] = t;
+            if (!newEnabled.includes(t.name)) newEnabled.push(t.name);
+          });
+          return { ...g, sheetDefinitions: newDefs, enabledSheets: newEnabled };
+        }
+        return g;
+      });
+
+      handleSettingChange('grants', updatedGrants);
+      toast({ title: "Templates Discovered", description: `Added ${templates.length} sheet structures to project.` });
+    } catch (err) {
+      toast({ variant: "destructive", title: "Discovery Failed" });
+    } finally {
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
   const handleCommitChanges = async () => {
     if (!draftSettings) return;
     setIsSaving(true);
@@ -154,6 +206,11 @@ export function SettingsWorkstation() {
     }
   };
 
+  const activeGrant = useMemo(() => 
+    draftSettings?.grants.find(g => g.id === draftSettings.activeGrantId), 
+    [draftSettings]
+  );
+
   if (!settingsLoaded || !draftSettings) {
     return (
       <div className="flex h-screen w-full items-center justify-center">
@@ -164,7 +221,6 @@ export function SettingsWorkstation() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in duration-700 pb-32">
-      {/* Header Pulse */}
       <div className="space-y-1 px-2">
         <h2 className="text-2xl font-black tracking-tight text-white uppercase">Settings</h2>
         <p className="text-[10px] font-bold text-muted-foreground opacity-70 uppercase tracking-widest">
@@ -190,9 +246,7 @@ export function SettingsWorkstation() {
           </TabsList>
         </div>
 
-        {/* Tab: General */}
         <TabsContent value="general" className="space-y-10 outline-none px-2 m-0">
-          {/* Appearance Section */}
           <div className="space-y-4">
             <h3 className="text-base font-black uppercase tracking-tight text-white">Appearance</h3>
             <Card className="rounded-[1.5rem] border-2 border-border/40 bg-card/50 p-6">
@@ -202,33 +256,14 @@ export function SettingsWorkstation() {
                   <Label className="text-[10px] font-black uppercase tracking-widest">Theme</Label>
                 </div>
                 <div className="flex gap-3 bg-black/40 p-1.5 rounded-xl border border-white/5">
-                  <Button 
-                    variant={theme === 'light' ? 'secondary' : 'ghost'} 
-                    onClick={() => setTheme('light')} 
-                    className="flex-1 h-10 rounded-lg font-black uppercase text-[10px] gap-2"
-                  >
-                    <Sun className="h-3.5 w-3.5" /> Light
-                  </Button>
-                  <Button 
-                    variant={theme === 'dark' ? 'secondary' : 'ghost'} 
-                    onClick={() => setTheme('dark')} 
-                    className="flex-1 h-10 rounded-lg font-black uppercase text-[10px] gap-2"
-                  >
-                    <Moon className="h-3.5 w-3.5" /> Dark
-                  </Button>
-                  <Button 
-                    variant={theme === 'system' ? 'secondary' : 'ghost'} 
-                    onClick={() => setTheme('system')} 
-                    className="flex-1 h-10 rounded-lg font-black uppercase text-[10px] gap-2"
-                  >
-                    <Monitor className="h-3.5 w-3.5" /> System
-                  </Button>
+                  <Button variant={theme === 'light' ? 'secondary' : 'ghost'} onClick={() => setTheme('light')} className="flex-1 h-10 rounded-lg font-black uppercase text-[10px] gap-2"><Sun className="h-3.5 w-3.5" /> Light</Button>
+                  <Button variant={theme === 'dark' ? 'secondary' : 'ghost'} onClick={() => setTheme('dark')} className="flex-1 h-10 rounded-lg font-black uppercase text-[10px] gap-2"><Moon className="h-3.5 w-3.5" /> Dark</Button>
+                  <Button variant={theme === 'system' ? 'secondary' : 'ghost'} onClick={() => setTheme('system')} className="flex-1 h-10 rounded-lg font-black uppercase text-[10px] gap-2"><Monitor className="h-3.5 w-3.5" /> System</Button>
                 </div>
               </div>
             </Card>
           </div>
 
-          {/* Reporting Section */}
           <div className="space-y-4">
             <h3 className="text-base font-black uppercase tracking-tight text-white">Reporting</h3>
             <Card className="rounded-[1.5rem] border-2 border-border/40 bg-card/50 p-6 space-y-4">
@@ -236,128 +271,65 @@ export function SettingsWorkstation() {
                 <h4 className="text-sm font-black uppercase text-white">Travel Report Generator</h4>
                 <p className="text-[10px] font-medium text-muted-foreground italic">Compile field verification findings into a professional Word document.</p>
               </div>
-              <Button 
-                variant="outline" 
-                onClick={() => setIsTravelReportOpen(true)}
-                className="w-full h-12 rounded-xl bg-black border-white/10 hover:bg-white/5 text-white font-black uppercase text-[10px] tracking-widest gap-2 shadow-inner"
-              >
-                <PlaneTakeoff className="h-4 w-4 text-primary" /> Create Travel Report
-              </Button>
+              <Button variant="outline" onClick={() => setIsTravelReportOpen(true)} className="w-full h-12 rounded-xl bg-black border-white/10 hover:bg-white/5 text-white font-black uppercase text-[10px] tracking-widest gap-2 shadow-inner"><PlaneTakeoff className="h-4 w-4 text-primary" /> Create Travel Report</Button>
             </Card>
           </div>
 
-          {/* Security Section */}
           <div className="space-y-4">
             <h3 className="text-base font-black uppercase tracking-tight text-white">Security</h3>
             <Card className="rounded-[1.5rem] border-2 border-border/40 bg-card/50 p-8 space-y-6">
-              <div className="flex items-center gap-3 text-muted-foreground">
-                <KeyRound className="h-4 w-4" />
-                <h4 className="text-sm font-black uppercase tracking-widest">Change Your Password</h4>
-              </div>
-              
+              <div className="flex items-center gap-3 text-muted-foreground"><KeyRound className="h-4 w-4" /><h4 className="text-sm font-black uppercase tracking-widest">Change Your Password</h4></div>
               <div className="space-y-5">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Current Password</Label>
-                  <Input type="password" placeholder="•••••" className="h-12 rounded-xl bg-black/40 border-border/40 font-bold focus-visible:ring-primary/20" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">New Password</Label>
-                  <Input type="password" className="h-12 rounded-xl bg-black/40 border-border/40 font-bold focus-visible:ring-primary/20" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Confirm New Password</Label>
-                  <Input type="password" className="h-12 rounded-xl bg-black/40 border-border/40 font-bold focus-visible:ring-primary/20" />
-                </div>
-                <div className="pt-2 space-y-4">
-                  <Button className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-transform hover:scale-[1.02]">
-                    Stage Password Change
-                  </Button>
-                  <p className="text-[9px] text-muted-foreground italic opacity-60 leading-relaxed">
-                    Your password change will be saved when you click "Save Changes" at the bottom of the panel.
-                  </p>
-                </div>
+                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Current Password</Label><Input type="password" placeholder="•••••" className="h-12 rounded-xl bg-black/40 border-border/40 font-bold focus-visible:ring-primary/20" /></div>
+                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-60">New Password</Label><Input type="password" className="h-12 rounded-xl bg-black/40 border-border/40 font-bold focus-visible:ring-primary/20" /></div>
+                <div className="space-y-2"><Label className="text-[10px] font-black uppercase tracking-widest opacity-60">Confirm New Password</Label><Input type="password" className="h-12 rounded-xl bg-black/40 border-border/40 font-bold focus-visible:ring-primary/20" /></div>
+                <Button className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">Stage Password Change</Button>
               </div>
             </Card>
           </div>
 
-          {/* Global Admin Settings Section */}
           <div className="space-y-4">
             <h3 className="text-base font-black uppercase tracking-tight text-white">Global Admin Settings</h3>
             <div className="space-y-6 px-2">
               <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <h4 className="text-sm font-black uppercase text-white">Application Mode</h4>
-                  <p className="text-[10px] text-muted-foreground italic">Verification: Users can update status/remarks.</p>
-                </div>
+                <div className="space-y-1"><h4 className="text-sm font-black uppercase text-white">Application Mode</h4><p className="text-[10px] text-muted-foreground italic">Verification: Users can update status/remarks.</p></div>
                 <Select value={draftSettings.appMode} onValueChange={(v) => handleSettingChange('appMode', v as any)}>
-                  <SelectTrigger className="w-40 h-11 rounded-xl bg-black text-white font-black uppercase text-[10px] border-white/10 shadow-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl">
-                    <SelectItem value="management" className="text-[10px] font-black uppercase">Management</SelectItem>
-                    <SelectItem value="verification" className="text-[10px] font-black uppercase">Verification</SelectItem>
-                  </SelectContent>
+                  <SelectTrigger className="w-40 h-11 rounded-xl bg-black text-white font-black uppercase text-[10px] border-white/10 shadow-sm"><SelectValue /></SelectTrigger>
+                  <SelectContent className="rounded-xl"><SelectItem value="management" className="text-[10px] font-black uppercase">Management</SelectItem><SelectItem value="verification" className="text-[10px] font-black uppercase">Verification</SelectItem></SelectContent>
                 </Select>
               </div>
-              
               <Separator className="bg-white/5" />
-
               <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <h4 className="text-sm font-black uppercase text-white">Lock Asset List</h4>
-                  <p className="text-[10px] text-muted-foreground italic">Prevent adding/deleting from main list.</p>
-                </div>
+                <div className="space-y-1"><h4 className="text-sm font-black uppercase text-white">Lock Asset List</h4><p className="text-[10px] text-muted-foreground italic">Prevent adding/deleting from main list.</p></div>
                 <Switch checked={draftSettings.lockAssetList} onCheckedChange={(v) => handleSettingChange('lockAssetList', v)} />
               </div>
             </div>
           </div>
         </TabsContent>
 
-        {/* Tab: Projects & Sheets */}
         <TabsContent value="projects" className="space-y-6 outline-none px-2 m-0">
           <div className="space-y-4">
             <h3 className="text-lg font-black uppercase tracking-tight text-white">Manage Projects (Grants)</h3>
-            
             <div className="flex gap-2">
-              <Input 
-                placeholder="New project name..." 
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                className="h-12 rounded-xl bg-card border-2 border-border/40 text-white font-bold"
-              />
-              <Button onClick={handleAddProject} className="h-12 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg">
-                <PlusCircle className="h-4 w-4" /> Add Project
-              </Button>
+              <Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-12 rounded-xl bg-card border-2 border-border/40 text-white font-bold" />
+              <Button onClick={handleAddProject} className="h-12 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg"><PlusCircle className="h-4 w-4" /> Add Project</Button>
             </div>
-
             <div className="space-y-3">
               {draftSettings.grants.map((grant) => {
                 const isActive = draftSettings.activeGrantId === grant.id;
                 return (
-                  <Card key={grant.id} className={cn(
-                    "rounded-2xl border-2 transition-all duration-300 bg-black text-white",
-                    isActive ? "border-primary shadow-xl shadow-primary/5" : "border-border/40"
-                  )}>
+                  <Card key={grant.id} className={cn("rounded-2xl border-2 transition-all duration-300 bg-black text-white", isActive ? "border-primary shadow-xl shadow-primary/5" : "border-border/40")}>
                     <div className="p-5 flex items-center justify-between">
+                      <div className="flex items-center gap-4"><ArrowRightLeft className="h-4 w-4 text-white/40" /><h4 className="font-black text-sm uppercase tracking-tight">{grant.name}</h4>{isActive && <Badge className="bg-primary text-black font-black uppercase text-[8px] h-5 px-2">Active</Badge>}</div>
                       <div className="flex items-center gap-4">
-                        <ArrowRightLeft className="h-4 w-4 text-white/40" />
-                        <h4 className="font-black text-sm uppercase tracking-tight">{grant.name}</h4>
-                        {isActive && <Badge className="bg-primary text-black font-black uppercase text-[8px] h-5 px-2">Active</Badge>}
-                      </div>
-                      <div className="flex items-center gap-4">
-                        {!isActive && (
-                          <Button variant="ghost" size="sm" onClick={() => handleSettingChange('activeGrantId', grant.id)} className="h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-black text-[9px] uppercase px-4 border border-white/10">Set Active</Button>
-                        )}
-                        <Button variant="ghost" size="sm" className="h-8 font-black text-[10px] uppercase text-white hover:text-primary">Rename</Button>
+                        {!isActive && <Button variant="ghost" size="sm" onClick={() => handleSettingChange('activeGrantId', grant.id)} className="h-8 rounded-lg bg-white/10 hover:bg-white/20 text-white font-black text-[9px] uppercase px-4 border border-white/10">Set Active</Button>}
                         <Button variant="ghost" size="sm" onClick={() => handleDeleteProject(grant.id)} className="h-8 font-black text-[10px] uppercase text-red-500 hover:text-red-400">Delete</Button>
                       </div>
                     </div>
-
                     {isActive && (
                       <div className="p-5 pt-0 animate-in slide-in-from-top-2 duration-300">
                         <div className="bg-[#111111] rounded-2xl border border-white/5 p-6 space-y-6">
                           <h5 className="text-[10px] font-black uppercase tracking-widest opacity-60">Sheet Definitions for this Project</h5>
-                          
                           <div className="py-10 text-center border-2 border-dashed border-white/5 rounded-2xl bg-black/20">
                             {Object.keys(grant.sheetDefinitions || {}).length > 0 ? (
                               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 px-4">
@@ -368,14 +340,12 @@ export function SettingsWorkstation() {
                                   </div>
                                 ))}
                               </div>
-                            ) : (
-                              <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">No sheets defined for this project.</p>
-                            )}
+                            ) : <p className="text-[10px] font-bold text-white/20 uppercase tracking-widest">No sheets defined for this project.</p>}
                           </div>
-
                           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <Button variant="outline" className="h-11 rounded-xl bg-transparent border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5"><PlusCircle className="h-3.5 w-3.5" /> Add Manually</Button>
-                            <Button variant="outline" className="h-11 rounded-xl bg-transparent border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5"><FileUp className="h-3.5 w-3.5" /> Import Template</Button>
+                            <Button variant="outline" onClick={handleAddSheet} className="h-11 rounded-xl bg-transparent border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5"><PlusCircle className="h-3.5 w-3.5" /> Add Manually</Button>
+                            <Button variant="outline" onClick={handleImportTemplateClick} className="h-11 rounded-xl bg-transparent border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5"><FileUp className="h-3.5 w-3.5" /> Import Template</Button>
+                            <input type="file" ref={fileInputRef} onChange={handleFileImport} accept=".xlsx,.xls" className="hidden" />
                             <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-11 rounded-xl bg-transparent border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-2 hover:bg-white/5"><ScanSearch className="h-3.5 w-3.5" /> Scan & Import Data</Button>
                           </div>
                         </div>
@@ -388,20 +358,10 @@ export function SettingsWorkstation() {
           </div>
         </TabsContent>
 
-        {/* Tab: Users */}
         <TabsContent value="users" className="outline-none px-2 m-0">
-          <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 overflow-hidden shadow-2xl">
-            <CardContent className="p-8">
-              <UserManagement 
-                users={draftSettings.authorizedUsers}
-                onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)}
-                adminProfile={userProfile}
-              />
-            </CardContent>
-          </Card>
+          <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 overflow-hidden shadow-2xl"><CardContent className="p-8"><UserManagement users={draftSettings.authorizedUsers} onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} /></CardContent></Card>
         </TabsContent>
 
-        {/* Tab: History */}
         <TabsContent value="history" className="space-y-6 outline-none px-2 m-0">
           {loadingLogs ? <div className="py-20 flex justify-center"><Loader2 className="animate-spin h-10 w-10 text-primary" /></div> : 
             errorLogs.length > 0 ? (
@@ -434,26 +394,13 @@ export function SettingsWorkstation() {
         </TabsContent>
       </Tabs>
 
-      {/* Main Footer */}
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-black/80 backdrop-blur-xl border-t border-white/5 z-50 flex items-center justify-between max-w-4xl mx-auto rounded-t-3xl">
-        <Button 
-          variant="outline" 
-          onClick={() => window.location.reload()} 
-          className="h-12 px-10 rounded-xl bg-black text-white font-black uppercase text-[10px] tracking-widest border-white/10 hover:bg-white/5 transition-all"
-        >
-          Cancel
-        </Button>
-        <Button 
-          onClick={handleCommitChanges}
-          disabled={!hasChanges || isSaving}
-          className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95"
-        >
-          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-          Save Changes
+        <Button variant="outline" onClick={() => window.location.reload()} className="h-12 px-10 rounded-xl bg-black text-white font-black uppercase text-[10px] tracking-widest border-white/10 hover:bg-white/5 transition-all">Cancel</Button>
+        <Button onClick={handleCommitChanges} disabled={!hasChanges || isSaving} className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />} Save Changes
         </Button>
       </div>
 
-      {/* Dialogs & Overlays */}
       <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
       <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
 
