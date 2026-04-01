@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview DashboardWorkstation - SPA Intelligence Hub.
- * Phase 85: Integrated Regional Analytics, Fidelity Index, and Temporal Pulse.
+ * Phase 98: Integrated redesigned AssetSummaryDashboard Pulse.
  */
 
 import React, { useMemo } from 'react';
@@ -36,7 +37,7 @@ import {
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
 import { useAppState } from '@/contexts/app-state-context';
-import { VerificationPulse } from '@/components/registry/VerificationPulse';
+import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
@@ -51,23 +52,6 @@ export function DashboardWorkstation() {
     const exceptions = assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')).length;
     const dataGaps = assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A' || !a.assetIdCode).length;
     
-    // Regional Aggregation
-    const regionalData = assets.reduce((acc, a) => {
-      const loc = a.location || 'Unknown';
-      if (!acc[loc]) acc[loc] = { total: 0, verified: 0 };
-      acc[loc].total++;
-      if (a.status === 'VERIFIED') acc[loc].verified++;
-      return acc;
-    }, {} as Record<string, { total: number, verified: number }>);
-
-    const regionalSummary = Object.entries(regionalData)
-      .map(([name, s]) => ({ 
-        name, 
-        ...s, 
-        percent: Math.round((s.verified / s.total) * 100) 
-      }))
-      .sort((a, b) => b.total - a.total);
-
     // Temporal Breakdown
     const temporalData = assets.reduce((acc, a) => {
       const year = a.yearBucket || 'Legacy';
@@ -95,7 +79,6 @@ export function DashboardWorkstation() {
       verified, 
       exceptions, 
       dataGaps, 
-      regionalSummary, 
       temporalSummary, 
       healthSummary,
       coverage: total > 0 ? Math.round((verified / total) * 100) : 0,
@@ -157,71 +140,12 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
-      {/* Primary Metrics Strip */}
+      {/* Primary Metrics Strip - Now using the AssetSummaryDashboard */}
       <div className="px-1">
-        <VerificationPulse 
-          total={stats?.total || 0} 
-          verified={stats?.verified || 0} 
-          exceptions={stats?.exceptions || 0} 
-          dataGaps={stats?.dataGaps || 0} 
-        />
+        <AssetSummaryDashboard />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-1">
-        {/* Regional Performance Matrix */}
-        <Card className="lg:col-span-8 rounded-[3rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
-          <CardHeader className="p-8 border-b bg-muted/20 flex flex-row items-center justify-between">
-            <div className="space-y-1">
-              <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-                <MapIcon className="h-5 w-5 text-primary" /> Regional Coverage Matrix
-              </CardTitle>
-              <p className="text-[10px] font-bold uppercase text-muted-foreground opacity-60">Verification performance aggregated by location scope</p>
-            </div>
-            <Badge variant="outline" className="font-black h-7 px-4 border-primary/20 text-primary bg-primary/5">
-              {stats?.regionalSummary.length || 0} ACTIVE REGIONS
-            </Badge>
-          </CardHeader>
-          <CardContent className="p-0 flex-1">
-            <ScrollArea className="h-[450px]">
-              <div className="divide-y-2 divide-dashed divide-border/20">
-                {stats?.regionalSummary.map((region, idx) => (
-                  <div key={region.name} className="p-6 flex items-center justify-between group hover:bg-primary/[0.02] transition-colors">
-                    <div className="flex items-center gap-6 flex-1">
-                      <div className="h-10 w-10 rounded-xl bg-muted/50 flex items-center justify-center text-[10px] font-black opacity-40 group-hover:bg-primary/10 group-hover:text-primary group-hover:opacity-100 transition-all">
-                        {String(idx + 1).padStart(2, '0')}
-                      </div>
-                      <div className="space-y-3 flex-1 max-w-md">
-                        <div className="flex justify-between items-end">
-                          <h4 className="text-sm font-black uppercase tracking-tight">{region.name}</h4>
-                          <span className="text-[10px] font-black text-primary">{region.percent}%</span>
-                        </div>
-                        <Progress value={region.percent} className="h-1.5" />
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-8 pl-10">
-                      <div className="flex flex-col items-end">
-                        <span className="text-[8px] font-black uppercase opacity-40">Registry Pulse</span>
-                        <span className="text-sm font-black tabular-nums">{region.total}</span>
-                      </div>
-                      <div className="flex flex-col items-end">
-                        <span className="text-[8px] font-black uppercase text-green-600 opacity-60">Verified</span>
-                        <span className="text-sm font-black text-green-600 tabular-nums">{region.verified}</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-                
-                {(!stats || stats.regionalSummary.length === 0) && (
-                  <div className="py-20 text-center opacity-20 flex flex-col items-center gap-4">
-                    <Target className="h-16 w-16" />
-                    <span className="text-[10px] font-black uppercase tracking-widest">No Regional Data Pulses</span>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </CardContent>
-        </Card>
-
         {/* Intelligence Sidebars */}
         <div className="lg:col-span-4 space-y-8">
           {/* Fidelity Index Card */}
@@ -235,7 +159,7 @@ export function DashboardWorkstation() {
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <span className="text-5xl font-black tracking-tighter text-foreground">
-                    {stats?.fidelityScore.toFixed(1)}%
+                    {stats?.fidelityScore.toFixed(1) || '0.0'}%
                   </span>
                   <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Global Integrity Rating</p>
                 </div>
@@ -248,7 +172,7 @@ export function DashboardWorkstation() {
                   <span className="opacity-40">Data Precision</span>
                   <span className="text-primary">High</span>
                 </div>
-                <Progress value={stats?.fidelityScore} className="h-1 bg-primary/10" />
+                <Progress value={stats?.fidelityScore || 0} className="h-1 bg-primary/10" />
               </div>
             </CardContent>
           </Card>
@@ -299,6 +223,17 @@ export function DashboardWorkstation() {
               <span className="text-[9px] font-black uppercase">GIS Grid</span>
             </Button>
           </div>
+        </div>
+
+        <div className="lg:col-span-8 flex flex-col gap-8">
+           {/* Placeholder for secondary dashboard content if needed */}
+           <Card className="flex-1 rounded-[3rem] border-2 border-border/40 shadow-none bg-muted/5 flex flex-col items-center justify-center p-20 opacity-20 text-center space-y-4">
+              <Database className="h-16 w-16" />
+              <div className="space-y-1">
+                <h3 className="text-xl font-black uppercase tracking-widest">Intelligence Layer Active</h3>
+                <p className="text-sm font-medium italic">Monitoring global project telemetry...</p>
+              </div>
+           </Card>
         </div>
       </div>
     </div>

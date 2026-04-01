@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview AppLayout - SPA Shell Persistence.
- * Phase 88: Updated navigation to point governance items to the consolidated Settings hub.
+ * Phase 98: Updated Activity Center to match high-fidelity design.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -36,16 +37,18 @@ import {
   Download,
   Upload,
   Bell,
-  Navigation
+  CheckCheck,
+  X,
+  Navigation,
+  Clock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
-import { InboxSheet } from './inbox-sheet';
 import { HelpCenter } from './HelpCenter';
 import { CommandPalette } from './CommandPalette';
 import { QRScannerDialog } from './registry/QRScannerDialog';
@@ -61,6 +64,8 @@ import {
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
+import { useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
+import { formatDistanceToNow } from 'date-fns';
 import type { WorkstationView } from '@/types/domain';
 
 interface NavItem {
@@ -87,7 +92,6 @@ const AUDIT_NAV: NavItem[] = [
 ];
 
 const GOVERNANCE_NAV: NavItem[] = [
-  // Following Phase 88 consolidation, these route to the SETTINGS workstation hub.
   { label: 'Master Control', view: 'SETTINGS', icon: <Settings className="h-4 w-4" />, adminOnly: true, shortcut: ',' },
   { label: 'Resilience Audit', view: 'ERROR_AUDIT', icon: <ShieldAlert className="h-4 w-4" />, adminOnly: true },
   { label: 'Database Control', view: 'DATABASE', icon: <Terminal className="h-4 w-4" />, superAdminOnly: true },
@@ -110,9 +114,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   } = useAppState();
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [isInboxOpen, setIsInboxOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  const { notifications, unreadCount, markAllAsRead } = useNotifications();
 
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -132,7 +138,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   const isAdmin = userProfile?.isAdmin;
   const isSuperAdmin = userProfile?.isAdmin;
-  const pendingCount = assets.filter(a => a.approvalStatus === 'PENDING').length;
   
   const alertCount = useMemo(() => {
     return assets.filter(a => 
@@ -191,6 +196,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     setActiveView('REGISTRY');
     toast({ title: "QR Pulse Detected", description: "Navigating to record profile..." });
   };
+
+  const handleNotificationsOpenChange = (open: boolean) => {
+    setIsNotificationsOpen(open);
+    if (open && unreadCount > 0) {
+      setTimeout(() => markAllAsRead(), 500);
+    }
+  }
 
   return (
     <div className="flex h-screen w-full bg-background overflow-hidden font-body selection:bg-primary/10">
@@ -395,18 +407,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   <Button 
                     variant="ghost" 
                     size="icon" 
-                    onClick={() => setIsInboxOpen(true)}
+                    onClick={() => handleNotificationsOpenChange(true)}
                     className="relative h-10 w-10 rounded-2xl hover:bg-primary/5 hover:text-primary transition-all group"
                   >
                     <Bell className="h-5 w-5 group-hover:scale-110 transition-transform" />
-                    {pendingCount > 0 && (
+                    {unreadCount > 0 && (
                       <Badge className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center p-0 rounded-full bg-primary text-white text-[8px] font-black border-2 border-background animate-pulse shadow-sm">
-                        {pendingCount}
+                        {unreadCount}
                       </Badge>
                     )}
                   </Button>
                 </TooltipTrigger>
-                <TooltipContent className="rounded-xl font-bold uppercase text-[9px] tracking-widest">Approvals & Notifications</TooltipContent>
+                <TooltipContent className="rounded-xl font-bold uppercase text-[9px] tracking-widest">Activity Center</TooltipContent>
               </Tooltip>
             </TooltipProvider>
 
@@ -452,10 +464,76 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
       </div>
 
-      <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} />
       <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
       <CommandPalette />
       <QRScannerDialog isOpen={isQRScannerOpen} onOpenChange={setIsQRScannerOpen} onScanSuccess={handleQRSuccess} />
+
+      {/* Activity Center (Notifications) */}
+      <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
+        <SheetContent className="w-full sm:max-w-md p-0 flex flex-col rounded-l-[2.5rem] border-none bg-black/95 text-white shadow-2xl">
+            <SheetHeader className="p-8 border-b border-white/5 flex flex-row items-center justify-between space-y-0">
+                <SheetTitle className="text-2xl font-black uppercase tracking-tight text-white">Activity Center</SheetTitle>
+                <Badge variant="outline" className="h-7 px-4 rounded-full border-white/10 text-white font-black text-[10px] uppercase tracking-widest bg-white/5">
+                  {unreadCount} Unread
+                </Badge>
+            </SheetHeader>
+            <ScrollArea className="flex-1 custom-scrollbar">
+              {notifications.length > 0 ? (
+                <div className="divide-y divide-white/5">
+                  {notifications.map((notification) => (
+                    <div key={notification.id} className="relative group p-8 transition-colors hover:bg-white/5">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-4">
+                          <p className={cn("text-lg font-black uppercase tracking-tight leading-none", notification.read ? "text-white/40" : "text-white")}>
+                            {notification.title}
+                          </p>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-8 w-8 rounded-xl text-white/20 opacity-0 group-hover:opacity-100 hover:text-white hover:bg-white/10"
+                            onClick={() => removeNotification(notification.id)}
+                          >
+                              <X className="h-4 w-4" />
+                          </Button>
+                        </div>
+                        {notification.description && (
+                          <p className={cn("text-sm font-medium italic leading-relaxed", notification.read ? "text-white/20" : "text-white/60")}>
+                            {notification.description}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 pt-2 opacity-20">
+                          <Clock className="h-3 w-3" />
+                          <span className="text-[10px] font-black uppercase tracking-widest">
+                            {formatDistanceToNow(notification.date, { addSuffix: true })}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-6 text-center p-20 h-full opacity-20">
+                  <div className="p-8 bg-white/5 rounded-[3rem] shadow-inner">
+                    <CheckCheck className="h-16 w-16" />
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-xl font-black uppercase tracking-widest">Center Clear</h3>
+                    <p className="text-sm font-medium italic">No operational pulses detected.</p>
+                  </div>
+                </div>
+              )}
+            </ScrollArea>
+            <SheetFooter className="p-8 border-t border-white/5 bg-black/40">
+              <Button 
+                variant="ghost" 
+                onClick={() => clearAll()}
+                className="w-full h-14 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] text-white/40 hover:text-white hover:bg-white/5 transition-all"
+              >
+                Clear All History
+              </Button>
+            </SheetFooter>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
