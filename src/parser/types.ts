@@ -20,17 +20,6 @@ export interface HeaderTemplate {
   signature: string; // Hash of header positions
 }
 
-export interface GroupBlock {
-  workbookName: string;
-  sheetName: string;
-  groupHeader: string;
-  startRow: number;
-  endRow?: number;
-  templateId: string;
-  rawHeaders: string[];
-  assets: ParsedAsset[];
-}
-
 export interface ValidationSummary {
   warnings: string[];
   errors: string[];

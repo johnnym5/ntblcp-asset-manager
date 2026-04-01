@@ -9,8 +9,7 @@ import { normalizeHeaderName } from '@/lib/registry-utils';
 import type { 
   ParsedAsset, 
   ImportRunSummary, 
-  HeaderTemplate, 
-  ParserState 
+  HeaderTemplate 
 } from './types';
 import type { Asset } from '@/types/domain';
 
@@ -132,8 +131,9 @@ export class ParserEngine {
     let bestMatch: HeaderTemplate | null = null;
     let maxOverlap = 0;
 
-    // Matching Rule: High column count similarity and row shape density
+    // Matching Rule: Match row density and populated positions to discovered templates
     this.templates.forEach(tpl => {
+      // Logic: If the row has enough columns to be part of this template
       if (tpl.columnCount >= row.length && tpl.columnCount > maxOverlap) {
         bestMatch = tpl;
         maxOverlap = tpl.columnCount;
@@ -146,9 +146,9 @@ export class ParserEngine {
   private mapRowToDomain(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
     const asset: any = {
       id: uuidv4(),
-      category: 'AUTO_DETECT', // Group becomes the functional category
+      category: group, // Section becomes the primary category for this batch
       description: '',
-      grantId: 'SYSTEM', // Contextualised during commit
+      grantId: 'SYSTEM_STAGED', 
       section: group,
       subsection: 'Base Register',
       assetFamily: 'Uncategorized',
@@ -185,17 +185,17 @@ export class ParserEngine {
       const val = row[idx];
       if (val !== undefined && val !== null) {
         const strVal = String(val).trim();
-        // If the key is recognized in the domain, map it directly
-        if (key && !key.startsWith('_') && key !== 'id') {
+        // Domain Matching: Check if key maps to Asset domain fields
+        if (this.isDomainField(key)) {
           asset[key] = strVal;
         } else {
-          // Otherwise, sequester into metadata pulse for fidelity
+          // Sequestration: Safe isolation into metadata pulse
           asset.metadata[tpl.rawHeaders[idx] || `COL_${idx}`] = val;
         }
       }
     });
 
-    // Post-Processing Cleanup
+    // Post-Processing & Quality Pulse
     if (asset.sn && !isNaN(Number(asset.sn))) asset.sn = Number(asset.sn);
     
     // Duplicate Detection Pulse
@@ -204,12 +204,20 @@ export class ParserEngine {
       asset.validation.needsReview = true;
     }
 
-    // Assign category from group header if description exists
-    if (asset.description) {
-      asset.category = group;
+    // Integrity: Must have at least an ID or Description to join the registry
+    if (asset.description || asset.assetIdCode || asset.serialNumber) {
       return asset as ParsedAsset;
     }
 
     return null;
+  }
+
+  private isDomainField(key: string): boolean {
+    const domainFields = [
+      'sn', 'description', 'location', 'custodian', 'assetIdCode', 
+      'serialNumber', 'manufacturer', 'modelNumber', 'purchaseDate', 
+      'value', 'condition', 'remarks', 'grantId', 'category'
+    ];
+    return domainFields.includes(key);
   }
 }

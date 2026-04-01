@@ -93,7 +93,7 @@ export function ImportWorkstation() {
         }
       }
       
-      // Authoritative Offline Pulse: Save to Sandbox immediately after structural discovery
+      // Authoritative Offline Pulse: Save to Sandbox immediately
       await storage.saveToSandbox(allParsedAssets as any[]);
       setStagedAssets(allParsedAssets);
       setSummary(finalSummary);
@@ -102,7 +102,7 @@ export function ImportWorkstation() {
       setTimeout(() => {
         setIsProcessing(false);
         setCurrentStep('PREVIEW');
-        setDataSource('SANDBOX'); // Force switch to sandbox view for review
+        setDataSource('SANDBOX');
       }, 800);
 
     } catch (error) {
@@ -127,7 +127,7 @@ export function ImportWorkstation() {
       
       const current = await storage.getAssets();
       await storage.saveAssets([...stagedAssets.map(a => ({ ...a, grantId: activeGrantId })), ...current]);
-      await storage.clearSandbox(); // Purge staged pulse after merge
+      await storage.clearSandbox();
       
       toast({ title: "Registration Successful", description: `${stagedAssets.length} assets integrated into the register.` });
       setDataSource('PRODUCTION');
@@ -173,7 +173,7 @@ export function ImportWorkstation() {
                 <div className="space-y-4">
                   <h3 className="text-3xl font-black uppercase text-white tracking-tight">Ingest Registry Workbook</h3>
                   <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic leading-relaxed">
-                    Traverse hierarchical Excel registers. The engine will detect sections, subsections, and asset groups automatically.
+                    Traverse hierarchical Excel registers. The engine will detect sections, subsections, and asset groups automatically from Column A.
                   </p>
                 </div>
                 <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 mt-10 bg-primary text-black">
@@ -191,7 +191,7 @@ export function ImportWorkstation() {
               <div className="space-y-4 max-w-sm w-full">
                 <h3 className="text-2xl font-black uppercase tracking-widest text-white">Discovering Hierarchy</h3>
                 <Progress value={progress} className="h-2 rounded-full" />
-                <p className="text-[10px] font-black uppercase text-white/40 tracking-widest">Analyzing structural nodes...</p>
+                <p className="text-[10px] font-black uppercase text-white/40 tracking-widest">Traversing structural nodes from Column A...</p>
               </div>
             </div>
           )}

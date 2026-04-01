@@ -21,17 +21,20 @@ export function classifyRow(row: any[]): RowClassification {
   const colA_Upper = colA.toUpperCase();
   
   // 1. SCHEMA_HEADER: Explicitly identifies the start of a data block
-  if (colA_Upper === 'S/N' || colA_Upper === 'SN') {
+  // Matches "S/N", "S.N", "SN", etc.
+  if (colA_Upper === 'S/N' || colA_Upper === 'SN' || colA_Upper === 'S.N') {
     return 'SCHEMA_HEADER';
   }
 
   // 2. GROUP_HEADER: Functional section boundary in Column A
   const populatedCount = row.filter(c => c !== null && String(c).trim() !== '').length;
+  
+  // Rule: High probability if Col A matches known structural keywords
   const isKeywordMatch = KNOWN_GROUP_KEYWORDS.some(k => colA_Upper.includes(k));
   
-  // Rule: If Column A has text and it's either a known keyword OR the rest of the row is empty/sparse
+  // Rule: standalone label in Column A with low density across the rest of the row
   if (colA && (isKeywordMatch || populatedCount <= 2)) {
-    // Avoid misclassifying actual serial numbers as group headers
+    // Avoid misclassifying actual data (like a single ID or numeric S/N) as a group header
     if (colA.length > 3 && isNaN(Number(colA))) {
       return 'GROUP_HEADER';
     }
