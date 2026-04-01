@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Settings Manager.
- * Phase 220: Achieved 100% screenshot parity for General, Projects, and History views.
- * Implements the AMOLED-Gold workstation aesthetic with consolidated administration.
+ * Phase 235: Resolved ReferenceErrors and synchronized import paths.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -144,23 +143,6 @@ export function SettingsWorkstation() {
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     if (!draftSettings) return;
     setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
-  };
-
-  const handleCommitChanges = async () => {
-    if (!draftSettings) return;
-    setIsSaving(true);
-    try {
-      await storage.saveSettings(draftSettings);
-      if (isOnline) {
-        await FirestoreService.updateSettings(draftSettings);
-      }
-      await refreshRegistry();
-      toast({ title: "Settings Synchronized" });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Broadcast Failure" });
-    } finally {
-      setIsSaving(false);
-    }
   };
 
   const handleAddProject = () => {

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Global Command Hub.
- * Phase 230: Updated logic header to use high-fidelity AssetFilterSheet.
+ * Phase 235: Resolved ReferenceError by adding ScrollArea import.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -34,6 +34,7 @@ import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useNotifications } from '@/hooks/use-notifications';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 import { SortDrawer } from '@/components/registry/SortDrawer';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
   DropdownMenuContent,
