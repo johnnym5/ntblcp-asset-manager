@@ -41,7 +41,7 @@ const superAdmin: AuthorizedUser = {
   password: 'setup',
   states: ['All'],
   isAdmin: true,
-  role: 'ADMIN',
+  role: 'SUPERADMIN',
 };
 
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
@@ -102,7 +102,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         displayName: user.displayName,
         email: user.email,
         state: state,
-        isAdmin: user.isAdmin || user.role === 'ADMIN',
+        isAdmin: user.isAdmin || user.role === 'ADMIN' || user.role === 'SUPERADMIN',
         role: user.role,
       };
       

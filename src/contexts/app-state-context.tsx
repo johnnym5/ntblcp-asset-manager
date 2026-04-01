@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 76: Unified Workstation Management & Manual Sync Triggers.
+ * Fixed: Added isHydrated to resolve AuthContext wait-loop.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
@@ -12,21 +13,6 @@ import { processSyncQueue } from '@/offline/sync';
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { Asset, AppSettings, DataSource, AuthorityNode, WorkstationView } from '@/types/domain';
 import { addNotification } from '@/hooks/use-notifications';
-
-const DEFAULT_SETTINGS: AppSettings = {
-  authorizedUsers: [],
-  lockAssetList: false,
-  appMode: 'management',
-  readAuthority: 'FIRESTORE',
-  activeGrantId: 'ntblcp-core',
-  grants: [
-    { id: 'ntblcp-core', name: 'NTBLCP Main Registry', enabledSheets: [], sheetDefinitions: {} }
-  ],
-  uxMode: 'beginner',
-  onboardingComplete: false,
-  showHelpTooltips: true,
-  sourceBranding: {}
-};
 
 interface AppStateContextType {
   assets: Asset[];
@@ -40,6 +26,7 @@ interface AppStateContextType {
   isSyncing: boolean;
   appSettings: AppSettings | null;
   settingsLoaded: boolean;
+  isHydrated: boolean;
   activeGrantId: string | null;
   activeView: WorkstationView;
   setActiveView: (view: WorkstationView) => void;
@@ -56,6 +43,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const router = useRouter();
   const searchParams = useSearchParams();
   
+  const [isHydrated, setIsHydrated] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [sandboxAssets, setSandboxAssets] = useState<Asset[]>([]);
   const [dataSource, setDataSourceStatus] = useState<DataSource>('PRODUCTION');
@@ -68,12 +56,19 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
+  // Handle Hydration
+  useEffect(() => {
+    setIsHydrated(true);
+  }, []);
+
   const setActiveView = useCallback((view: WorkstationView) => {
     setActiveViewStatus(view);
-    const params = new URLSearchParams(searchParams?.toString() || '');
-    params.set('v', view.toLowerCase());
-    router.push(`/?${params.toString()}`, { scroll: false });
-  }, [router, searchParams]);
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      params.set('v', view.toLowerCase());
+      router.push(`/?${params.toString()}`, { scroll: false });
+    }
+  }, [router]);
 
   useEffect(() => {
     const v = searchParams?.get('v');
@@ -94,7 +89,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       if (localSettings) setAppSettings(localSettings);
       setSandboxAssets(localSandbox || []);
       
-      const currentGrantId = localSettings?.activeGrantId || activeGrantId;
+      const currentGrantId = localSettings?.activeGrantId || null;
       const filtered = currentGrantId 
         ? (localAssets || []).filter(a => a.grantId === currentGrantId)
         : (localAssets || []);
@@ -103,7 +98,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     } catch (e) {
       console.error("Registry Refresh Failure", e);
     }
-  }, [activeGrantId]);
+  }, []); // Removed activeGrantId dependency to prevent bootstrap recursion
 
   const manualDownload = useCallback(async () => {
     if (!isOnline) return;
@@ -166,13 +161,16 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     await refreshRegistry();
   };
 
+  // Bootstrap sequence
   useEffect(() => {
+    if (!isHydrated) return;
+    
     const bootstrap = async () => {
       await refreshRegistry();
       setSettingsLoaded(true);
     };
     bootstrap();
-  }, [refreshRegistry]);
+  }, [isHydrated, refreshRegistry]);
 
   return (
     <AppStateContext.Provider value={{
@@ -187,6 +185,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       isSyncing,
       appSettings,
       settingsLoaded,
+      isHydrated,
       activeGrantId,
       activeView,
       setActiveView,
