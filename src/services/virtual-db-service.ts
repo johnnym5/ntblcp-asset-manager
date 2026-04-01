@@ -1,7 +1,7 @@
 /**
  * @fileOverview Virtual Database Service.
  * Abstracted orchestration layer for cross-database management (Firestore, RTDB, Local).
- * Phase 80: Enhanced with conflict detection and automated resolution pulses.
+ * Phase 86: Hardened with deterministic purge and preparation pulses.
  */
 
 import { FirestoreService } from './firebase/firestore';
@@ -185,6 +185,31 @@ export class VirtualDBService {
         await storage.saveSettings(data);
       }
     }
+  }
+
+  /**
+   * Deterministic wipe of a storage layer.
+   */
+  static async purgeLayer(layer: StorageLayer): Promise<void> {
+    if (layer === 'FIRESTORE') {
+      await FirestoreService.purgeAllAssets();
+    } else if (layer === 'LOCAL') {
+      await storage.clearAssets();
+    } else if (layer === 'RTDB') {
+      await clearRtdbAssets();
+    }
+  }
+
+  /**
+   * Synchronized global purge across all storage tiers.
+   * Prepares the system for a fresh data ingestion pulse.
+   */
+  static async purgeGlobalRegistry(): Promise<void> {
+    await Promise.all([
+      FirestoreService.purgeAllAssets(),
+      storage.clearAssets(),
+      clearRtdbAssets()
+    ]);
   }
 
   private static mapAssetToNode(asset: Asset, layer: StorageLayer, collection: string): DBNode {

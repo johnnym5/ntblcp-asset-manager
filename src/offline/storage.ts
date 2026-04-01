@@ -1,6 +1,7 @@
 /**
  * @fileOverview Low-level IndexedDB Persistence Adapter.
  * Provides isolated storage for registry data, staging sandbox, and the sync queue.
+ * Phase 86: Hardened purge logic for registry preparation.
  */
 
 import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
@@ -70,7 +71,13 @@ export const storage = {
   },
   async clearAssets(): Promise<void> {
     const db = await getDb();
-    if (db) await db.clear('assets');
+    if (!db) return;
+    // thorough wipe of operational stores
+    await Promise.all([
+      db.clear('assets'),
+      db.clear('queue'),
+      db.clear('sandbox')
+    ]);
   },
 
   // Sandbox Store (Imports)
@@ -116,5 +123,9 @@ export const storage = {
   async dequeue(id: string): Promise<void> {
     const db = await getDb();
     if (db) await db.delete('queue', id);
+  },
+  async clearQueue(): Promise<void> {
+    const db = await getDb();
+    if (db) await db.clear('queue');
   }
 };

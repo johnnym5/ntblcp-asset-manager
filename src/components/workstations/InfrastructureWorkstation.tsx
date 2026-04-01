@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview InfrastructureWorkstation - SPA Command Center.
- * Phase 85: Enriched with Live Heartbeat, Parity Ledger, and Diagnostic Self-Tests.
+ * Phase 86: Enriched with Global Purge & Registry Preparation Pulses.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -26,7 +26,10 @@ import {
   ArrowRight,
   History,
   ShieldCheck,
-  Smartphone
+  Smartphone,
+  Bomb,
+  Hammer,
+  RotateCcw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -40,6 +43,16 @@ import { VirtualDBService } from '@/services/virtual-db-service';
 import { SystemDiagnostics, type DiagnosticResult } from '@/lib/diagnostics';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
 import type { AuthorityNode } from '@/types/domain';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export function InfrastructureWorkstation() {
   const { isOnline, isSyncing, refreshRegistry, assets, appSettings, setReadAuthority } = useAppState();
@@ -50,6 +63,8 @@ export function InfrastructureWorkstation() {
   const [isTesting, setIsTesting] = useState(false);
   const [diagnosticPulse, setDiagnosticPulse] = useState<DiagnosticResult[] | null>(null);
   const [discrepancyCount, setDiscrepancyCount] = useState(0);
+  
+  const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
 
   // Simulated live heartbeat data
   const heartbeatData = useMemo(() => Array.from({ length: 20 }).map((_, i) => ({
@@ -78,6 +93,20 @@ export function InfrastructureWorkstation() {
       toast({ title: "Authority Pulse Shifted", description: `Primary read source set to ${target}.` }); 
     }
     finally { setIsProcessing(false); }
+  };
+
+  const handleGlobalPurge = async () => {
+    setIsProcessing(true);
+    try {
+      await VirtualDBService.purgeGlobalRegistry();
+      toast({ title: "Global Purge Complete", description: "Registry reset to prepare for new ingestion pulse." });
+      await refreshRegistry();
+      setIsPurgeDialogOpen(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Purge Interrupted", description: "Administrative clearance failed or connection latent." });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   if (!userProfile?.isAdmin) return (
@@ -115,7 +144,7 @@ export function InfrastructureWorkstation() {
           <Button 
             onClick={refreshRegistry} 
             disabled={isProcessing || isSyncing} 
-            className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-primary-foreground group"
+            className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 bg-primary text-primary-foreground group"
           >
             {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <RefreshCw className={cn("h-4 w-4 mr-3", isSyncing && "animate-spin")} />} 
             Reconcile Layers
@@ -227,91 +256,81 @@ export function InfrastructureWorkstation() {
         </CardContent>
       </Card>
 
-      {/* Heartbeat & Diagnostics */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-2">
-        <Card className="lg:col-span-8 rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
+      {/* Preparation & Purge Zone */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-2">
+        <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
           <CardHeader className="p-8 border-b bg-muted/20">
-            <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-              <LineChart className="h-5 w-5 text-primary" /> Live Heartbeat Monitor
+            <CardTitle className="text-xl font-black uppercase flex items-center gap-3">
+              <RotateCcw className="h-5 w-5 text-primary" /> Registry Preparation
             </CardTitle>
-            <CardDescription className="text-xs font-medium">Real-time synchronization latency pulse.</CardDescription>
+            <CardDescription className="text-xs font-medium">Reset the workstation to prepare for new data ingestion.</CardDescription>
           </CardHeader>
-          <CardContent className="p-8 flex-1">
-            <div className="h-[220px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={heartbeatData}>
-                  <defs>
-                    <linearGradient id="latencyGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="hsl(var(--primary))" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="hsl(var(--primary))" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <Area type="monotone" dataKey="latency" stroke="hsl(var(--primary))" fillOpacity={1} fill="url(#latencyGradient)" strokeWidth={3} />
-                  <XAxis hide dataKey="time" />
-                  <YAxis hide domain={[0, 100]} />
-                  <Tooltip content={() => null} />
-                </AreaChart>
-              </ResponsiveContainer>
+          <CardContent className="p-8 space-y-6">
+            <div className="p-6 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-2">
+              <h5 className="text-[10px] font-black uppercase text-primary tracking-widest">Wipe operational state</h5>
+              <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed">
+                Clearing the database removes all previous assets, sync logs, and staged sandboxes. This ensures that the new data import is deterministic and free from legacy collisions.
+              </p>
             </div>
-            <div className="flex items-center justify-between mt-6 px-4">
-              <div className="flex items-center gap-3">
-                <div className="h-2 w-2 rounded-full bg-primary animate-ping" />
-                <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Monitoring Active Pulse</span>
-              </div>
-              <Badge variant="outline" className="text-[9px] font-mono border-primary/20 text-primary uppercase">STABLE: 42MS PULSE</Badge>
-            </div>
+            <Button 
+              variant="outline" 
+              onClick={() => setIsPurgeDialogOpen(true)}
+              className="w-full h-16 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] border-2 text-destructive border-destructive/20 hover:bg-destructive/5 transition-all shadow-sm"
+            >
+              <Bomb className="h-4 w-4 mr-3" /> Initialize Global Purge
+            </Button>
           </CardContent>
         </Card>
 
-        <Card className="lg:col-span-4 rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
+        <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
           <CardHeader className="p-8 border-b bg-muted/20">
-            <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-              <ArrowRightLeft className="h-4 w-4" /> Parity Ledger
+            <CardTitle className="text-xl font-black uppercase flex items-center gap-3">
+              <ArrowRightLeft className="h-5 w-5 text-primary" /> Parity Ledger
             </CardTitle>
           </CardHeader>
-          <CardContent className="p-8 flex-1 space-y-8">
+          <CardContent className="p-8 space-y-8">
             <div className="p-6 rounded-2xl border-2 border-dashed bg-background/40 space-y-2 group hover:border-primary/20 transition-all">
               <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Cross-Layer Drift</span>
               <p className={cn("text-3xl font-black tabular-nums", discrepancyCount > 0 ? "text-destructive" : "text-green-600")}>
                 {discrepancyCount} Pulses
               </p>
             </div>
-            <div className="p-6 rounded-2xl border-2 border-dashed bg-background/40 space-y-2">
-              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">System Integrity</span>
-              <p className="text-3xl font-black text-primary">100%</p>
-            </div>
             <Button 
               variant="outline" 
               onClick={() => window.location.href = '/?v=database'}
               className="w-full h-16 rounded-2xl font-black uppercase text-xs tracking-widest border-2 hover:bg-primary/5 tactile-pulse shadow-sm"
             >
-              <ScanSearch className="h-4 w-4 mr-2" /> Initialize Forensic Sync
+              <ScanSearch className="h-4 w-4 mr-2" /> Forensic Resolution
             </Button>
           </CardContent>
         </Card>
       </div>
 
-      {/* Diagnostic Pulse Summary */}
-      {diagnosticPulse && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2 animate-in slide-in-from-bottom-4 duration-500">
-          {diagnosticPulse.map(res => (
-            <Card key={res.node} className="rounded-3xl border-2 border-border/40 bg-muted/5 group hover:border-primary/20 transition-all">
-              <CardContent className="p-6 flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-[8px] font-black uppercase opacity-40 tracking-widest">{res.node} NODE AUDIT</span>
-                  <p className="text-sm font-black uppercase leading-none">{res.message}</p>
-                </div>
-                <Badge variant="outline" className={cn(
-                  "h-10 px-4 font-mono text-[10px] border-2 rounded-xl",
-                  res.status === 'STABLE' ? "text-green-600 border-green-200 bg-green-50" : "text-destructive border-destructive/20 bg-destructive/5"
-                )}>
-                  {res.latency}MS
-                </Badge>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {/* Global Purge Dialog */}
+      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
+              <Bomb className="h-10 w-10 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe All Databases?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
+              This action is **immutable**. You are about to purge every registry record from the Cloud (Firestore), Mirror (RTDB), and this device (IndexedDB). This is required to prepare for a fresh import of new assets.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Pulse</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleGlobalPurge}
+              disabled={isProcessing}
+              className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Hammer className="h-4 w-4 mr-2" />}
+              Commit Global Wipe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 /**
  * @fileOverview Hardened Firestore Service.
- * Phase 82: Enhanced with Error Audit logging and Forensic previousState buffering.
+ * Phase 86: Enhanced with Global Purge capabilities for registry preparation.
  */
 
 import { 
@@ -16,6 +16,7 @@ import {
   limit,
   addDoc,
   updateDoc,
+  writeBatch,
   type DocumentReference
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
@@ -24,8 +25,8 @@ import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors
 import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
 import { monitoring } from '@/lib/monitoring';
-import { batchSetAssets as mirrorToRtdb, updateSettings as mirrorSettingsToRtdb } from '@/lib/database';
-import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry } from '@/types/domain';
+import { batchSetAssets as mirrorToRtdb, updateSettings as mirrorSettingsToRtdb, clearAssets as clearRtdb } from '@/lib/database';
+import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
 
 export const FirestoreService = {
   /**
@@ -134,6 +135,47 @@ export const FirestoreService = {
       this.handlePermissionError(assetRef, 'update', err, sanitized);
       throw err;
     }
+  },
+
+  /**
+   * Deletes a single asset from Firestore.
+   */
+  async deleteAsset(id: string): Promise<void> {
+    if (!db) return;
+    const assetRef = doc(db, 'assets', id);
+    try {
+      await deleteDoc(assetRef);
+    } catch (err: any) {
+      this.handlePermissionError(assetRef, 'delete', err);
+      throw err;
+    }
+  },
+
+  /**
+   * High-speed global purge of all assets.
+   * Deterministic prepare for new data ingestion.
+   */
+  async purgeAllAssets(): Promise<number> {
+    if (!db) return 0;
+    const assetsRef = collection(db, 'assets');
+    const snap = await getDocs(assetsRef);
+    const total = snap.size;
+    
+    if (total === 0) return 0;
+
+    const batch = writeBatch(db);
+    snap.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+
+    await this.logActivity({
+      assetId: 'GLOBAL_PURGE',
+      assetDescription: 'Registry Preparation: Full Asset Wipe',
+      operation: 'DELETE',
+      performedBy: 'Super Administrator',
+      userState: 'SYSTEM_RECOVERY'
+    });
+
+    return total;
   },
 
   /**
