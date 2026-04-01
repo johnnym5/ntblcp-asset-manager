@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @fileOverview NotificationsSheet - High-Fidelity System Alerts.
+ * @fileOverview NotificationsCenter - High-Fidelity System Alerts.
  * Phase 170: Amoled-Gold aesthetic with real-time notification telemetry.
  */
 
@@ -32,12 +32,12 @@ import { formatDistanceToNow } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { Badge } from './ui/badge';
 
-interface NotificationsSheetProps {
+interface NotificationsCenterProps {
   isOpen: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-export function NotificationsSheet({ isOpen, onOpenChange }: NotificationsSheetProps) {
+export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCenterProps) {
   const { notifications, unreadCount } = useNotifications();
 
   return (
