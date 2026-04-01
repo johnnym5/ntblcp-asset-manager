@@ -1,21 +1,21 @@
 'use client';
 
 /**
- * @fileOverview Professional Safe Fallback UI.
- * Shown when a component or page module fails to render.
+ * @fileOverview High-Fidelity Safety Fallback - Resilience Terminal UI.
+ * Phase 105: Redesigned to match provided design pulse with red header stripe and fault container.
  */
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { 
-  AlertTriangle, 
   RotateCcw, 
-  LayoutDashboard, 
+  Home,
   ShieldAlert,
-  ChevronLeft
+  Terminal,
+  AlertTriangle
 } from 'lucide-react';
-import Link from 'next/link';
+import { cn } from '@/lib/utils';
 
 interface ErrorFallbackProps {
   error: Error;
@@ -24,48 +24,58 @@ interface ErrorFallbackProps {
   isGlobal?: boolean;
 }
 
-export function ErrorFallback({ error, resetErrorBoundary, title = "Operational Interruption", isGlobal = false }: ErrorFallbackProps) {
+export function ErrorFallback({ error, resetErrorBoundary, title = "Safety Fallback Initialized", isGlobal = false }: ErrorFallbackProps) {
   return (
-    <div className={isGlobal ? "min-h-screen w-full flex items-center justify-center p-6 bg-background" : "w-full p-4"}>
-      <Card className="max-w-2xl w-full border-2 border-destructive/20 bg-destructive/[0.02] rounded-[2.5rem] overflow-hidden shadow-2xl">
-        <CardContent className="p-10 flex flex-col items-center text-center space-y-8">
-          <div className="p-6 bg-destructive/10 rounded-[2rem] shadow-inner animate-pulse">
-            <AlertTriangle className="h-16 w-16 text-destructive" />
-          </div>
+    <div className={cn(
+      "flex items-center justify-center p-6 bg-[#0F172A] selection:bg-primary/20",
+      isGlobal ? "min-h-screen w-full" : "w-full"
+    )}>
+      <Card className="max-w-2xl w-full border-none bg-transparent shadow-none overflow-hidden rounded-[1.5rem] bg-[#1E293B]">
+        {/* Design Stripe */}
+        <div className="h-2 w-full bg-[#B91C1C]" />
+        
+        {/* Design Header */}
+        <div className="p-10 pb-8 bg-[#334155]/20">
+          <h2 className="text-2xl font-black uppercase tracking-tight text-white mb-2">{title}</h2>
+          <p className="text-[10px] font-black uppercase tracking-[0.25em] text-[#94A3B8] opacity-60">
+            AN ANOMALY WAS DETECTED IN THE TERMINAL STREAM.
+          </p>
+        </div>
 
-          <div className="space-y-3">
-            <h2 className="text-3xl font-black uppercase tracking-tight text-foreground">{title}</h2>
-            <p className="text-sm font-medium text-muted-foreground leading-relaxed italic max-w-sm mx-auto">
-              A part of the system failed to render, but the rest of your workspace is still operational.
+        <CardContent className="p-10 space-y-10 bg-[#0F172A]">
+          {/* Fault Details Container */}
+          <div className="p-8 rounded-3xl bg-white shadow-inner space-y-3 relative overflow-hidden">
+            <div className="absolute top-0 right-0 p-4 opacity-5">
+              <ShieldAlert className="h-16 w-16 text-black" />
+            </div>
+            <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-[#64748B]">INTERNAL FAULT DETAILS</h4>
+            <p className="text-sm font-medium text-[#1E293B] italic leading-relaxed">
+              {error.message || "Unknown deterministic pulse failure."}
             </p>
           </div>
 
-          <div className="p-6 rounded-2xl bg-white border-2 border-dashed border-destructive/20 w-full text-left space-y-2">
-            <p className="text-[10px] font-black uppercase tracking-widest text-destructive">Layman Explanation:</p>
-            <p className="text-xs font-bold text-foreground">
-              {error.message.includes('permission') 
-                ? "You don't have the required administrative permission to view this section."
-                : "The module encountered a technical glitch while preparing the view."}
-            </p>
-            <p className="text-[9px] font-medium text-muted-foreground mt-2">SAFE NEXT STEP: Attempt to re-initialize the pulse or return to the main dashboard.</p>
-          </div>
-
-          <div className="flex flex-col sm:flex-row items-center gap-4 w-full">
+          {/* Action Pulses */}
+          <div className="flex flex-col sm:flex-row items-center gap-4">
             <Button 
               onClick={resetErrorBoundary}
-              className="w-full sm:flex-1 h-14 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground gap-3 transition-transform hover:scale-105"
+              className="w-full sm:flex-1 h-16 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-blue-500/20 bg-[#3B82F6] hover:bg-[#2563EB] text-white gap-3 transition-all hover:scale-[1.02] active:scale-95"
             >
-              <RotateCcw className="h-4 w-4" /> Re-Initialize Pulse
+              <RotateCcw className="h-5 w-5" /> ATTEMPT RECOVERY
             </Button>
             <Button 
               variant="outline"
-              asChild
-              className="w-full sm:flex-1 h-14 rounded-2xl font-black uppercase text-xs tracking-widest border-2 gap-3"
+              onClick={() => window.location.href = '/'}
+              className="w-full sm:flex-1 h-16 rounded-2xl font-black uppercase text-xs tracking-[0.2em] bg-transparent border-2 border-[#1E293B] hover:bg-white/5 text-white gap-3 transition-all hover:scale-[1.02] active:scale-95"
             >
-              <Link href="/">
-                <LayoutDashboard className="h-4 w-4" /> Return to Dashboard
-              </Link>
+              <Home className="h-5 w-5" /> RETURN TO LANDING
             </Button>
+          </div>
+
+          {/* Terminal Footer */}
+          <div className="pt-6 border-t border-white/5 text-center">
+            <p className="text-[9px] font-black uppercase tracking-[0.4em] text-[#475569]">
+              BASECHAN INTERNATIONAL RESILIENCE TERMINAL V1.0
+            </p>
           </div>
         </CardContent>
       </Card>

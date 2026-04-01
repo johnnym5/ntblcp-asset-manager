@@ -1,8 +1,6 @@
-
 /**
  * @fileOverview Hardened Firestore Service.
- * Phase 86: Enhanced with Global Purge capabilities for registry preparation.
- * Updated: Implemented contextual error handling architecture for Security Rules debugging.
+ * Phase 105: Reinforced Manual Tiered Sync (Local -> Firestore -> RTDB).
  */
 
 import { 
@@ -57,6 +55,7 @@ export const FirestoreService = {
       this.handlePermissionError(settingsRef, 'update', err, sanitized);
     });
 
+    // Mirroring pulse is manual/synced via Infrastructure workstation, but we maintain a hot-standby path
     try {
       const fullSettings = await this.getSettings();
       if (fullSettings) {
@@ -88,7 +87,7 @@ export const FirestoreService = {
   },
 
   /**
-   * Single record update with mandatory validation and activity logging.
+   * Tiered Mutation Pulse: Firestore Commit -> Shadow Mirror (RTDB) Broadcast.
    */
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
@@ -115,14 +114,17 @@ export const FirestoreService = {
       const currentSnap = await getDoc(assetRef);
       const previousState = currentSnap.exists() ? currentSnap.data() : null;
 
-      // Commit with forensic buffer
+      // 1. Primary Authority Commit (Firestore)
       await setDoc(assetRef, {
         ...sanitized,
         previousState: previousState ? sanitizeForFirestore(previousState) : null
       }, { merge: true });
       
-      mirrorToRtdb([sanitized as Asset]).catch(e => console.warn("Mirroring: Asset pulse latent."));
+      // 2. Tier 3: Mirror Pulse (RTDB Shadow)
+      // This follows the FireStore commit to ensure authority integrity.
+      mirrorToRtdb([sanitized as Asset]).catch(e => console.warn("Mirroring: Shadow pulse latent."));
 
+      // 3. Activity Ledger Pulse
       await this.logActivity({
         assetId: asset.id,
         assetDescription: asset.description,
@@ -175,8 +177,9 @@ export const FirestoreService = {
     
     try {
       await batch.commit();
+      // Wipe Shadow Tier as well
+      await clearRtdb();
     } catch (err: any) {
-      // For batch operations, we point to the parent collection path
       this.handlePermissionError(assetsRef.path, 'delete', err);
       throw err;
     }
