@@ -18,6 +18,7 @@ import {
   Save, 
   Sun, 
   Moon, 
+  Database, 
   Zap,
   Lock,
   PlusCircle,
@@ -26,7 +27,6 @@ import {
   Wrench,
   Users,
   Loader2,
-  Database,
   Monitor,
   PlaneTakeoff,
   Globe,
@@ -78,6 +78,7 @@ import { cn } from '@/lib/utils';
 import type { AppSettings, SheetDefinition, Grant, UXMode, AuthorityNode } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
+import { Separator } from '@/components/ui/separator';
 import { 
   Select, 
   SelectContent, 
@@ -142,7 +143,7 @@ export function SettingsWorkstation() {
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     if (!draftSettings) return;
-    setDraftSettings({ ...draftSettings, [key]: value });
+    setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
   };
 
   const handleCommitChanges = async () => {
@@ -233,7 +234,7 @@ export function SettingsWorkstation() {
     }
   };
 
-  const handleGlobalPurge = async () => {
+  const handleNukeRegistry = async () => {
     setIsSaving(true);
     try {
       await VirtualDBService.purgeGlobalRegistry();

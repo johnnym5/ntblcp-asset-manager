@@ -315,7 +315,7 @@ export function ErrorAuditWorkstation() {
           <div className="p-8 bg-white/5 border-t border-white/5 flex items-center justify-between gap-4">
             <Button variant="ghost" onClick={() => setSelectedLog(null)} className="font-bold rounded-xl px-10 text-white/40 hover:text-white">Dismiss</Button>
             <Button 
-              onClick={() => selectedLog && handleResolve(logId)}
+              onClick={() => selectedLog && handleResolve(selectedLog.id)}
               disabled={selectedLog?.status === 'RESOLVED'}
               className="h-14 px-12 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl shadow-primary/20 bg-primary text-black gap-3"
             >
