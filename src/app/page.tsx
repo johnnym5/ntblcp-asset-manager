@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SPA Orchestrator Hub.
- * Phase 107: Removed GIS Spatial Hub from the renderer pulse.
+ * Phase 115: Unified Dashboard & Registry into a single core workspace.
  */
 
 import React, { Suspense } from 'react';
@@ -16,7 +16,6 @@ import { Zap } from 'lucide-react';
 
 // Workstations
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
-import { RegistryWorkstation } from '@/components/workstations/RegistryWorkstation';
 import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
 import { VerifyWorkstation } from '@/components/workstations/VerifyWorkstation';
 import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
@@ -56,8 +55,11 @@ export default function SPAOrchestrator() {
 
 function renderWorkstation(view: string) {
   switch (view) {
-    case 'DASHBOARD': return <DashboardWorkstation />;
-    case 'REGISTRY': return <RegistryWorkstation />;
+    // Dashboard and Registry are now unified into one view
+    case 'DASHBOARD': 
+    case 'REGISTRY': 
+      return <DashboardWorkstation />;
+      
     case 'IMPORT': return <ImportWorkstation />;
     case 'VERIFY': return <VerifyWorkstation />;
     case 'REPORTS': return <ReportsWorkstation />;

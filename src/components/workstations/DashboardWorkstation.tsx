@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview DashboardWorkstation - SPA Intelligence Hub.
- * Phase 109: Optimized Adaptive Spacing & Metrics Wrapping.
+ * @fileOverview DashboardWorkstation - The Unified Intelligence Center.
+ * Phase 115: Integrated full Registry functionality directly into the Dashboard.
  */
 
 import React, { useMemo } from 'react';
@@ -19,7 +19,8 @@ import {
   TrendingUp,
   ShieldCheck,
   Database,
-  Boxes
+  Boxes,
+  LayoutGrid
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { useAppState } from '@/contexts/app-state-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
+import { RegistryWorkstation } from './RegistryWorkstation';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
@@ -73,12 +75,13 @@ export function DashboardWorkstation() {
   const otherGrants = appSettings?.grants?.filter(g => g.id !== activeGrantId) || [];
 
   return (
-    <div className="space-y-8 sm:space-y-10 animate-in fade-in duration-700">
-      {/* Contextual Navigation */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+    <div className="space-y-10 animate-in fade-in duration-700">
+      
+      {/* 1. Project Context Pulse */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
         <div className="space-y-1">
           <div className="flex flex-wrap items-center gap-4">
-            <h2 className="text-3xl sm:text-4xl font-black tracking-tighter uppercase leading-none">Intelligence Hub</h2>
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tighter uppercase leading-none text-foreground">Intelligence Center</h2>
             {appSettings?.grants && appSettings.grants.length > 1 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -104,118 +107,79 @@ export function DashboardWorkstation() {
             )}
           </div>
           <div className="flex flex-wrap items-center gap-3 mt-2">
-            <Badge className="bg-primary/5 border-2 border-primary/20 text-primary font-black uppercase text-[9px] sm:text-[10px] tracking-widest px-4 h-7 rounded-full shadow-sm">
-              {activeGrant?.name || 'Registry Hub'}
+            <Badge className="bg-primary/5 border-2 border-primary/20 text-primary font-black uppercase text-[9px] tracking-widest px-4 h-7 rounded-full shadow-sm">
+              {activeGrant?.name || 'Active Registry Pulse'}
             </Badge>
-            <Badge variant="outline" className={cn("font-black uppercase text-[9px] sm:text-[10px] tracking-widest px-4 h-7 rounded-full border-2", isOnline ? "text-green-600 border-green-200" : "text-orange-600 border-orange-200")}>
+            <Badge variant="outline" className={cn("font-black uppercase text-[9px] tracking-widest px-4 h-7 rounded-full border-2", isOnline ? "text-green-600 border-green-200" : "text-orange-600 border-orange-200")}>
               {isOnline ? <Globe className="mr-2 h-3 w-3 inline" /> : <Database className="mr-2 h-3 w-3 inline" />}
-              {isOnline ? 'Cloud Authority' : 'On-Device Pulse'}
+              {isOnline ? 'CLOUD AUTHORITY' : 'LOCAL DEVICE PULSE'}
             </Badge>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3">
-          <Button variant="outline" onClick={() => setActiveView('ALERTS')} className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2 border-2 hover:bg-destructive/5 transition-all flex-1 sm:flex-none">
-            <ShieldAlert className="h-4 w-4 text-destructive" /> Tactical Alerts
-          </Button>
-          <Button onClick={() => setActiveView('REGISTRY')} className="h-12 px-8 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-primary-foreground group flex-1 sm:flex-none">
-            Open Registry <ArrowRight className="ml-3 h-4 w-4 group-hover:translate-x-1 transition-transform" />
+        <div className="flex items-center gap-2">
+          <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2 border-2 hover:bg-primary/5 transition-all">
+            <Zap className="h-4 w-4 text-primary" /> Ingest Workbook
           </Button>
         </div>
       </div>
 
-      {/* Primary Metrics Strip */}
+      {/* 2. Interactive Analytics Pulse */}
       <AssetSummaryDashboard />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
-        {/* Intelligence Sidebars */}
-        <div className="lg:col-span-4 space-y-6 sm:space-y-8">
-          {/* Fidelity Index Card */}
-          <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
-            <CardHeader className="p-6 sm:p-8 border-b bg-primary/5">
-              <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
-                <TrendingUp className="h-4 w-4" /> Fidelity Index
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 sm:p-8 space-y-6">
-              <div className="flex items-center justify-between">
-                <div className="space-y-1">
-                  <span className="text-4xl sm:text-5xl font-black tracking-tighter text-foreground">
-                    {stats?.fidelityScore.toFixed(1) || '0.0'}%
-                  </span>
-                  <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Global Integrity Rating</p>
-                </div>
-                <div className="p-4 bg-primary/10 rounded-[2rem] shadow-inner shrink-0">
-                  <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="flex justify-between text-[10px] font-black uppercase">
-                  <span className="opacity-40">Data Precision</span>
-                  <span className="text-primary">High</span>
-                </div>
-                <Progress value={stats?.fidelityScore || 0} className="h-1 bg-primary/10" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Temporal Pulse Card */}
-          <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
-            <CardHeader className="p-6 sm:p-8 border-b bg-muted/20">
-              <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-3">
-                <HistoryIcon className="h-4 w-4" /> Temporal Pulse
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="p-6 sm:p-8">
-              <ScrollArea className="h-[180px] pr-4">
-                <div className="space-y-5">
-                  {stats?.temporalSummary.map((item) => (
-                    <div key={item.year} className="space-y-1.5">
-                      <div className="flex justify-between items-center text-[10px] font-black uppercase">
-                        <span className="opacity-60">{item.year} Register</span>
-                        <span className="text-foreground">{item.count} Assets</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Progress value={item.percent} className="h-1 flex-1" />
-                        <span className="text-[9px] font-mono opacity-40">{item.percent}%</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
-
-          {/* Tactical Shortcuts */}
-          <div className="grid grid-cols-2 gap-4">
-            <Button 
-              variant="outline" 
-              onClick={() => setActiveView('IMPORT')}
-              className="h-20 rounded-3xl border-2 flex flex-col gap-1 transition-all hover:border-primary/40 hover:bg-primary/5"
-            >
-              <Zap className="h-5 w-5 text-primary" />
-              <span className="text-[9px] font-black uppercase">Ingest</span>
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => setActiveView('REGISTRY')}
-              className="h-20 rounded-3xl border-2 flex flex-col gap-1 transition-all hover:border-primary/40 hover:bg-primary/5"
-            >
-              <Boxes className="h-5 w-5 text-primary" />
-              <span className="text-[9px] font-black uppercase">Registry</span>
-            </Button>
+      {/* 3. Global Registry Workspace */}
+      <div className="space-y-6">
+        <div className="px-1 flex items-center gap-4">
+          <div className="p-2.5 bg-primary/10 rounded-xl">
+            <Boxes className="h-6 w-6 text-primary" />
+          </div>
+          <div className="space-y-0.5">
+            <h3 className="text-xl font-black uppercase tracking-tight text-foreground">Registry Hub</h3>
+            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">Record Management & Category Orchestration</p>
           </div>
         </div>
-
-        <div className="lg:col-span-8 flex flex-col gap-8">
-           <Card className="flex-1 rounded-[3rem] border-2 border-border/40 shadow-none bg-muted/5 flex flex-col items-center justify-center p-10 sm:p-20 opacity-20 text-center space-y-4">
-              <Database className="h-12 w-12 sm:h-16 sm:w-16" />
-              <div className="space-y-1">
-                <h3 className="text-lg sm:text-xl font-black uppercase tracking-widest leading-tight">Intelligence Layer Active</h3>
-                <p className="text-xs sm:text-sm font-medium italic max-w-xs mx-auto">Monitoring global project telemetry across authorized scopes.</p>
-              </div>
-           </Card>
+        
+        {/* Integrating the full RegistryWorkstation component here */}
+        <div className="p-1 sm:p-2 rounded-[2.5rem] bg-muted/5 border-2 border-dashed border-border/40 min-h-[600px]">
+          <RegistryWorkstation />
         </div>
       </div>
+
+      {/* 4. Temporal Intelligence Sidebar (Floating Style) */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <div className="lg:col-span-12">
+          <Card className="rounded-[3rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
+            <CardHeader className="p-8 border-b bg-muted/20">
+              <div className="flex items-center justify-between">
+                <div className="space-y-1">
+                  <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
+                    <HistoryIcon className="h-4 w-4" /> Temporal Pulse Breakdown
+                  </CardTitle>
+                  <p className="text-[9px] font-medium text-muted-foreground italic">Distribution of assets by acquisition year / batch.</p>
+                </div>
+                <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary font-black uppercase h-7 px-4 rounded-full">Fidelity Level: High</Badge>
+              </div>
+            </CardHeader>
+            <CardContent className="p-8">
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-8">
+                {stats?.temporalSummary.slice(0, 4).map((item) => (
+                  <div key={item.year} className="space-y-4 p-6 rounded-[2rem] bg-background/50 border-2 border-border/40 shadow-inner group hover:border-primary/20 transition-all">
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black uppercase text-muted-foreground">{item.year} REGISTER</span>
+                      <span className="text-[10px] font-mono text-primary font-bold">{item.percent}%</span>
+                    </div>
+                    <div className="space-y-1">
+                      <p className="text-3xl font-black text-foreground">{item.count}</p>
+                      <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-widest opacity-40">Total Records</p>
+                    </div>
+                    <Progress value={item.percent} className="h-1" />
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
     </div>
   );
 }
