@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - The Unified Intelligence Center.
- * Phase 128: Fixed 'Illegal constructor' by renaming Map icon to MapIcon.
+ * Phase 129: Replaced native Map constructor with object-based counting to eliminate shadowing anomalies.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -72,11 +72,11 @@ export function DashboardWorkstation() {
     const verified = assets.filter(a => a.status === 'VERIFIED').length;
     
     // Temporal Breakdown
-    const temporalData = assets.reduce((acc, a) => {
+    const temporalData: Record<string | number, number> = {};
+    assets.forEach(a => {
       const year = a.yearBucket || 'Legacy';
-      acc[year] = (acc[year] || 0) + 1;
-      return acc;
-    }, {} as Record<string | number, number>);
+      temporalData[year] = (temporalData[year] || 0) + 1;
+    });
 
     const temporalSummary = Object.entries(temporalData)
       .map(([year, count]) => ({ year, count, percent: Math.round((count / total) * 100) }))
@@ -94,29 +94,32 @@ export function DashboardWorkstation() {
 
   // Derived Filter Options with Counts
   const locationOptions = useMemo(() => {
-    // Native Map constructor - NO LONGER SHADOWED
-    const counts = new Map<string, number>();
+    const counts: Record<string, number> = {};
     assets.forEach(a => {
       const loc = a.location || 'Global';
-      counts.set(loc, (counts.get(loc) || 0) + 1);
+      counts[loc] = (counts[loc] || 0) + 1;
     });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+    return Object.entries(counts).map(([label, count]) => ({ label, value: label, count }));
   }, [assets]);
 
   const assigneeOptions = useMemo(() => {
-    const counts = new Map<string, number>();
+    const counts: Record<string, number> = {};
     assets.forEach(a => {
-      if (a.custodian) counts.set(a.custodian, (counts.get(a.custodian) || 0) + 1);
+      if (a.custodian) {
+        counts[a.custodian] = (counts[a.custodian] || 0) + 1;
+      }
     });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+    return Object.entries(counts).map(([label, count]) => ({ label, value: label, count }));
   }, [assets]);
 
   const conditionOptions = useMemo(() => {
-    const counts = new Map<string, number>();
+    const counts: Record<string, number> = {};
     assets.forEach(a => {
-      if (a.condition) counts.set(a.condition, (counts.get(a.condition) || 0) + 1);
+      if (a.condition) {
+        counts[a.condition] = (counts[a.condition] || 0) + 1;
+      }
     });
-    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+    return Object.entries(counts).map(([label, count]) => ({ label, value: label, count }));
   }, [assets]);
 
   const statusOptions = [
