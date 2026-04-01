@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - Unified Single-Scope Hub.
- * Phase 185: Merged Inventory Reports into the unified tabbed interface.
+ * Phase 190: Merged Audit Trail and Sync Status into the unified tabbed interface.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -17,7 +17,8 @@ import {
   RefreshCw,
   Activity,
   Globe,
-  FileText
+  FileText,
+  History
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -27,9 +28,11 @@ import { RegistryWorkstation } from './RegistryWorkstation';
 import { VerifyWorkstation } from './VerifyWorkstation';
 import { GISWorkstation } from './GISWorkstation';
 import { ReportsWorkstation } from './ReportsWorkstation';
+import { AuditLogWorkstation } from './AuditLogWorkstation';
+import { SyncQueueWorkstation } from './SyncQueueWorkstation';
 import { cn } from '@/lib/utils';
 
-type DashboardTab = 'overview' | 'inventory' | 'audit' | 'reports' | 'gis';
+type DashboardTab = 'overview' | 'inventory' | 'audit' | 'reports' | 'gis' | 'trail' | 'sync';
 
 export function DashboardWorkstation() {
   const { 
@@ -47,7 +50,7 @@ export function DashboardWorkstation() {
       
       {/* 1. Global Command Bar */}
       <div className="flex flex-col lg:flex-row items-center justify-between gap-6 px-1">
-        <div className="relative group flex-1 w-full lg:max-w-2xl">
+        <div className="relative group flex-1 w-full lg:max-w-xl">
           <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />
           <Input 
             placeholder="Global search: Descriptions, Tag IDs, or Serials..." 
@@ -61,23 +64,29 @@ export function DashboardWorkstation() {
           </div>
         </div>
 
-        <div className="flex items-center gap-3 bg-muted/20 p-1.5 rounded-[1.5rem] border border-white/5 shadow-inner">
+        <div className="flex items-center gap-3 bg-muted/20 p-1.5 rounded-[1.5rem] border border-white/5 shadow-inner overflow-x-auto no-scrollbar">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="w-full">
-            <TabsList className="bg-transparent border-none p-0 h-auto gap-1">
-              <TabsTrigger value="overview" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+            <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center">
+              <TabsTrigger value="overview" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 <LayoutDashboard className="h-3.5 w-3.5" /> Overview
               </TabsTrigger>
-              <TabsTrigger value="inventory" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+              <TabsTrigger value="inventory" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 <Boxes className="h-3.5 w-3.5" /> Inventory
               </TabsTrigger>
-              <TabsTrigger value="audit" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+              <TabsTrigger value="audit" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 <ShieldCheck className="h-3.5 w-3.5" /> Audit Queue
               </TabsTrigger>
-              <TabsTrigger value="reports" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+              <TabsTrigger value="reports" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 <FileText className="h-3.5 w-3.5" /> Reports
               </TabsTrigger>
-              <TabsTrigger value="gis" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                <MapIcon className="h-3.5 w-3.5" /> Spatial Hub
+              <TabsTrigger value="gis" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+                <MapIcon className="h-3.5 w-3.5" /> GIS
+              </TabsTrigger>
+              <TabsTrigger value="trail" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+                <History className="h-3.5 w-3.5" /> Trail
+              </TabsTrigger>
+              <TabsTrigger value="sync" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+                <Activity className="h-3.5 w-3.5" /> Sync
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -106,6 +115,14 @@ export function DashboardWorkstation() {
 
           <TabsContent value="gis" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <GISWorkstation />
+          </TabsContent>
+
+          <TabsContent value="trail" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <AuditLogWorkstation />
+          </TabsContent>
+
+          <TabsContent value="sync" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <SyncQueueWorkstation />
           </TabsContent>
         </Tabs>
       </div>

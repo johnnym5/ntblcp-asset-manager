@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview Root Shell - Single Page Application Hub.
- * Phase 185: Merged Inventory Reports into the Unified Dashboard.
+ * @fileOverview Root Shell - Unified Single-Page Operational Hub.
+ * Phase 190: Merged Audit Trail and Cloud Sync Status into the Unified Dashboard.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -39,10 +39,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
 import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
-import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
 import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
-import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
-import { SyncQueueWorkstation } from '@/components/workstations/SyncQueueWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
 import { RegionalScopeDrawer } from '@/components/registry/RegionalScopeDrawer';
 import { NotificationsSheet } from '@/components/NotificationsSheet';
@@ -80,16 +77,11 @@ export default function SPAHub() {
     return <UserProfileSetup />;
   }
 
-  // Phase 185: Reports merged into Dashboard
+  // Phase 190: Audit Trail and Sync Status merged into Dashboard
   const navItems: { id: WorkstationView; label: string; icon: any; adminOnly?: boolean; group: string }[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, group: 'Core' },
-    
     { id: 'IMPORT', label: 'Data Import Center', icon: FileUp, group: 'Tools' },
     { id: 'ALERTS', label: 'Critical Exceptions', icon: AlertTriangle, group: 'Tools' },
-    
-    { id: 'AUDIT_LOG', label: 'Audit Trail', icon: History, group: 'Systems' },
-    { id: 'SYNC_QUEUE', label: 'Cloud Sync Status', icon: Activity, group: 'Systems' },
-    
     { id: 'SETTINGS', label: 'Settings', icon: Settings, group: 'System Administration' },
   ];
 
@@ -97,10 +89,7 @@ export default function SPAHub() {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
       case 'IMPORT': return <ImportWorkstation />;
-      case 'REPORTS': return <ReportsWorkstation />;
       case 'ALERTS': return <AlertsWorkstation />;
-      case 'AUDIT_LOG': return <AuditLogWorkstation />;
-      case 'SYNC_QUEUE': return <SyncQueueWorkstation />;
       case 'SETTINGS': return <SettingsWorkstation />;
       default: return <DashboardWorkstation />;
     }
@@ -146,7 +135,7 @@ export default function SPAHub() {
 
         <ScrollArea className="flex-1 px-4 py-8">
           <div className="space-y-10 pb-20">
-            {['Core', 'Tools', 'Systems', 'System Administration'].map(group => {
+            {['Core', 'Tools', 'System Administration'].map(group => {
               const items = navItems.filter(i => i.group === group && (!i.adminOnly || userProfile?.isAdmin));
               if (items.length === 0) return null;
               return (
