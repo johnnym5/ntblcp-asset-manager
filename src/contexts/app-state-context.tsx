@@ -16,6 +16,12 @@ import { addNotification } from '@/hooks/use-notifications';
 import { DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
 import { toast } from '@/hooks/use-toast';
 
+export interface OptionType {
+  label: string;
+  value: string;
+  count?: number;
+}
+
 interface AppStateContextType {
   assets: Asset[];
   sandboxAssets: Asset[];
@@ -59,6 +65,12 @@ interface AppStateContextType {
   setSelectedConditions: Dispatch<SetStateAction<string[]>>;
   missingFieldFilter: string;
   setMissingFieldFilter: Dispatch<SetStateAction<string>>;
+
+  // Filter Options (Computed)
+  locationOptions: OptionType[];
+  assigneeOptions: OptionType[];
+  conditionOptions: OptionType[];
+  statusOptions: OptionType[];
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -92,6 +104,43 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
+
+  // --- Computed Options Pulse ---
+  const locationOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      const val = a.location || 'Unknown';
+      counts.set(val, (counts.get(val) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const assigneeOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      const val = a.custodian || 'Unassigned';
+      counts.set(val, (counts.get(val) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const conditionOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      const val = a.condition || 'Unassessed';
+      counts.set(val, (counts.get(val) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count })).sort((a,b) => a.label.localeCompare(b.label));
+  }, [assets]);
+
+  const statusOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      const val = a.status || 'UNVERIFIED';
+      counts.set(val, (counts.get(val) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+  }, [assets]);
 
   useEffect(() => { setIsHydrated(true); }, []);
 
@@ -163,13 +212,12 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         if (remoteSettings.activeGrantId) {
           const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId);
           const localAssets = await storage.getAssets();
-          // Merge: keep assets from other grants, overwrite current grant assets
           const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
           await storage.saveAssets([...otherAssets, ...remoteAssets]);
           
           addNotification({ 
             title: "Download Complete", 
-            description: `Successfully synchronized ${remoteAssets.length} records for project: ${remoteSettings.activeGrantId}.` 
+            description: `Successfully synchronized ${remoteAssets.length} records.` 
           });
         }
       }
@@ -239,7 +287,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
       selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
       missingFieldFilter, setMissingFieldFilter,
-      headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir
+      headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
+      locationOptions, assigneeOptions, conditionOptions, statusOptions
     }}>
       {children}
     </AppStateContext.Provider>

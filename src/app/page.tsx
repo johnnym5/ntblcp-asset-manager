@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Global Command Hub.
- * Phase 225: Activated Global Search, Filter, and Sort triggers in the header.
+ * Phase 230: Updated logic header to use high-fidelity AssetFilterSheet.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -24,7 +24,6 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
@@ -33,7 +32,7 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useNotifications } from '@/hooks/use-notifications';
-import { FilterDrawer } from '@/components/registry/FilterDrawer';
+import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 import { SortDrawer } from '@/components/registry/SortDrawer';
 import {
   DropdownMenu,
@@ -57,16 +56,26 @@ export default function SPAHub() {
     searchTerm,
     setSearchTerm,
     headers,
+    
+    // Logic States
     selectedLocations,
-    selectedAssignees,
-    selectedStatuses,
-    selectedConditions,
-    missingFieldFilter,
     setSelectedLocations,
+    selectedAssignees,
     setSelectedAssignees,
+    selectedStatuses,
     setSelectedStatuses,
+    selectedConditions,
     setSelectedConditions,
+    missingFieldFilter,
     setMissingFieldFilter,
+    
+    // Options
+    locationOptions,
+    assigneeOptions,
+    conditionOptions,
+    statusOptions,
+    
+    // Sort
     sortKey,
     setSortKey,
     sortDir,
@@ -106,16 +115,7 @@ export default function SPAHub() {
     }
   };
 
-  const activeFilters = [
-    ...selectedLocations.map(v => ({ headerId: headers.find(h => h.normalizedName === 'location')?.id || '', operator: 'equals' as const, value: v })),
-    ...selectedAssignees.map(v => ({ headerId: headers.find(h => h.normalizedName === 'assignee_location')?.id || '', operator: 'equals' as const, value: v })),
-    ...selectedStatuses.map(v => ({ headerId: headers.find(h => h.normalizedName === 'status')?.id || '', operator: 'equals' as const, value: v })),
-    ...selectedConditions.map(v => ({ headerId: headers.find(h => h.normalizedName === 'condition')?.id || '', operator: 'equals' as const, value: v }))
-  ];
-
-  if (missingFieldFilter) {
-    activeFilters.push({ headerId: headers.find(h => h.normalizedName === missingFieldFilter)?.id || '', operator: 'exists' as const, value: '' });
-  }
+  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + selectedConditions.length + (missingFieldFilter ? 1 : 0);
 
   return (
     <div className="flex h-screen bg-black overflow-hidden font-sans selection:bg-primary/30 text-white">
@@ -170,13 +170,13 @@ export default function SPAHub() {
                 size="icon" 
                 onClick={() => setIsFilterOpen(true)}
                 className={cn(
-                  "h-9 w-9 rounded-lg text-white/20 hover:text-primary hover:bg-primary/10 transition-all",
-                  activeFilters.length > 0 && "text-primary bg-primary/5"
+                  "h-9 w-9 rounded-lg text-white/20 hover:text-primary hover:bg-primary/10 transition-all relative",
+                  activeFilterCount > 0 && "text-primary bg-primary/5"
                 )}
               >
                 <Filter className="h-4 w-4" />
-                {activeFilters.length > 0 && (
-                  <div className="absolute top-1 right-1 h-2 w-2 bg-primary rounded-full" />
+                {activeFilterCount > 0 && (
+                  <div className="absolute top-1 right-1 h-2 w-2 bg-primary rounded-full border-2 border-black" />
                 )}
               </Button>
             </div>
@@ -268,35 +268,20 @@ export default function SPAHub() {
         </ScrollArea>
       </main>
 
-      <FilterDrawer 
+      <AssetFilterSheet 
         isOpen={isFilterOpen} 
         onOpenChange={setIsFilterOpen} 
-        headers={headers} 
-        activeFilters={activeFilters as any} 
-        onUpdateFilters={(fs) => {
-          // Flatten filters back to state arrays
-          const locations: string[] = [];
-          const assignees: string[] = [];
-          const statuses: string[] = [];
-          const conditions: string[] = [];
-          let missing: string = '';
-
-          fs.forEach(f => {
-            const h = headers.find(header => header.id === f.headerId);
-            if (!h) return;
-            if (f.operator === 'exists') missing = h.normalizedName;
-            else if (h.normalizedName === 'location') locations.push(String(f.value));
-            else if (h.normalizedName === 'assignee_location') assignees.push(String(f.value));
-            else if (h.normalizedName === 'status') statuses.push(String(f.value));
-            else if (h.normalizedName === 'condition') conditions.push(String(f.value));
-          });
-
-          setSelectedLocations(locations);
-          setSelectedAssignees(assignees);
-          setSelectedStatuses(statuses);
-          setSelectedConditions(conditions);
-          setMissingFieldFilter(missing);
-        }} 
+        locationOptions={locationOptions}
+        selectedLocations={selectedLocations}
+        setSelectedLocations={setSelectedLocations}
+        assigneeOptions={assigneeOptions}
+        selectedAssignees={selectedAssignees}
+        setSelectedAssignees={setSelectedAssignees}
+        conditionOptions={conditionOptions}
+        selectedConditions={selectedConditions}
+        setSelectedConditions={setSelectedConditions}
+        missingFieldFilter={missingFieldFilter}
+        setMissingFieldFilter={setMissingFieldFilter}
       />
 
       <SortDrawer 
