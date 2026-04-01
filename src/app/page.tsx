@@ -28,6 +28,8 @@ import {
   Monitor
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
 import { RegistryWorkstation } from '@/components/workstations/RegistryWorkstation';
@@ -75,22 +77,22 @@ export default function SPAHub() {
   }
 
   const navItems: { id: WorkstationView; label: string; icon: any; adminOnly?: boolean; group: string }[] = [
-    { id: 'DASHBOARD', label: 'Intelligence', icon: LayoutDashboard, group: 'Core' },
+    { id: 'DASHBOARD', label: 'Inventory Dashboard', icon: LayoutDashboard, group: 'Core' },
     { id: 'REGISTRY', label: 'Asset Register', icon: Boxes, group: 'Core' },
     { id: 'VERIFY', label: 'Field Audit', icon: ShieldCheck, group: 'Core' },
     { id: 'GIS', label: 'Spatial Hub', icon: Map, group: 'Core' },
     
-    { id: 'IMPORT', label: 'Data Ingestion', icon: FileUp, group: 'Tools' },
-    { id: 'REPORTS', label: 'Reporting', icon: Activity, group: 'Tools' },
-    { id: 'ALERTS', label: 'Exceptions', icon: AlertTriangle, group: 'Tools' },
+    { id: 'IMPORT', label: 'Data Import Center', icon: FileUp, group: 'Tools' },
+    { id: 'REPORTS', label: 'Inventory Reports', icon: Activity, group: 'Tools' },
+    { id: 'ALERTS', label: 'Critical Exceptions', icon: AlertTriangle, group: 'Tools' },
     
     { id: 'AUDIT_LOG', label: 'Audit Trail', icon: History, group: 'Systems' },
-    { id: 'SYNC_QUEUE', label: 'Sync Status', icon: Activity, group: 'Systems' },
+    { id: 'SYNC_QUEUE', label: 'Sync Status Log', icon: Activity, group: 'Systems' },
     
-    { id: 'USERS', label: 'Users', icon: Package, adminOnly: true, group: 'Admin' },
-    { id: 'INFRASTRUCTURE', label: 'Infrastructure', icon: Monitor, adminOnly: true, group: 'Admin' },
-    { id: 'DATABASE', label: 'Database', icon: Database, adminOnly: true, group: 'Admin' },
-    { id: 'SETTINGS', label: 'Settings', icon: Settings, group: 'Admin' },
+    { id: 'USERS', label: 'User Management', icon: Package, adminOnly: true, group: 'Admin' },
+    { id: 'INFRASTRUCTURE', label: 'System Infrastructure', icon: Monitor, adminOnly: true, group: 'Admin' },
+    { id: 'DATABASE', label: 'Database Manager', icon: Database, adminOnly: true, group: 'Admin' },
+    { id: 'SETTINGS', label: 'System Settings', icon: Settings, group: 'Admin' },
   ];
 
   const renderWorkstation = () => {
@@ -146,7 +148,7 @@ export default function SPAHub() {
           </div>
           <div className="flex flex-col">
             <h1 className="text-xl font-black tracking-tighter text-white uppercase leading-none">Assetain</h1>
-            <span className="text-[8px] font-black uppercase text-primary tracking-[0.3em] mt-1.5 opacity-60">Intelligence Pulse</span>
+            <span className="text-[8px] font-black uppercase text-primary tracking-[0.3em] mt-1.5 opacity-60">Inventory Pulse</span>
           </div>
         </div>
 
@@ -227,7 +229,7 @@ export default function SPAHub() {
               <Suspense fallback={
                 <div className="h-[60vh] flex flex-col items-center justify-center gap-6 opacity-40">
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Initializing Workstation Pulse...</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Initializing Workstation...</p>
                 </div>
               }>
                 {renderWorkstation()}
@@ -236,13 +238,13 @@ export default function SPAHub() {
           </div>
         </ScrollArea>
 
-        {/* Global Floating Pulse Footer */}
+        {/* Global Floating Footer */}
         <div className="fixed bottom-10 right-10 z-50 pointer-events-none">
           <div className="flex items-center gap-4 pointer-events-auto">
             <div className="bg-[#0A0A0A]/80 backdrop-blur-2xl px-6 py-3 rounded-full border border-white/5 shadow-2xl flex items-center gap-6">
               <div className="flex items-center gap-3">
                 <div className="h-2 w-2 rounded-full bg-primary animate-ping" />
-                <span className="text-[9px] font-black uppercase text-white/40 tracking-widest whitespace-nowrap">System Pulse: Stable</span>
+                <span className="text-[9px] font-black uppercase text-white/40 tracking-widest whitespace-nowrap">System State: Stable</span>
               </div>
               <div className="w-px h-4 bg-white/10" />
               <span className="text-[9px] font-mono font-bold text-primary">v5.0.4-AMOLED</span>
