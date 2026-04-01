@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Overhauled to match requested High-Fidelity Design.
- * Phase 101: Integrated unified search, Inventory Pulse card, and the Gold Operational Bar.
+ * Phase 102: Optimized Filter and Sort triggers for high-fidelity dark UI.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -39,6 +39,7 @@ import { SortDrawer } from '@/components/registry/SortDrawer';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
+import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,7 @@ import {
   DropdownMenuItem, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
 
 const ITEMS_PER_PAGE = 24;
 
@@ -89,8 +91,14 @@ export function RegistryWorkstation() {
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [pulseView, setPulseView] = useState<'stats' | 'insights'>('stats');
 
-  // Logic State
-  const [filters, setFilters] = useState<HeaderFilter[]>([]);
+  // Advanced Filter Logic State
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
+  const [missingFieldFilter, setMissingFieldFilter] = useState('');
+
+  // Sorting Logic State
   const [sortKey, setSortKey] = useState<string>('sn');
   const [sortDir, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRecord, setSelectedRecord] = useState<AssetRecord | undefined>();
@@ -142,6 +150,38 @@ export function RegistryWorkstation() {
       .sort((a, b) => a.name.localeCompare(b.name));
   }, [assets, sandboxAssets, dataSource]);
 
+  // Derived Filter Options with Counts
+  const locationOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      const loc = a.location || 'Global';
+      counts.set(loc, (counts.get(loc) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+  }, [assets]);
+
+  const assigneeOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      if (a.custodian) counts.set(a.custodian, (counts.get(a.custodian) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+  }, [assets]);
+
+  const conditionOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      if (a.condition) counts.set(a.condition, (counts.get(a.condition) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+  }, [assets]);
+
+  const statusOptions = [
+    { label: 'Verified', value: 'VERIFIED' },
+    { label: 'Unverified', value: 'UNVERIFIED' },
+    { label: 'Discrepancy', value: 'DISCREPANCY' }
+  ];
+
   const processedRecords = useMemo(() => {
     let results = (dataSource === 'PRODUCTION' ? assets : sandboxAssets)
       .map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding));
@@ -160,20 +200,18 @@ export function RegistryWorkstation() {
       );
     }
 
-    // Apply Filter Logic
-    filters.forEach(f => {
+    // Advanced Filtering Logic Pulse
+    if (selectedLocations.length > 0) results = results.filter(r => selectedLocations.includes(String(r.rawRow.location)));
+    if (selectedAssignees.length > 0) results = results.filter(r => selectedAssignees.includes(String(r.rawRow.custodian)));
+    if (selectedStatuses.length > 0) results = results.filter(r => selectedStatuses.includes(String(r.rawRow.status)));
+    if (selectedConditions.length > 0) results = results.filter(r => selectedConditions.includes(String(r.rawRow.condition)));
+    
+    if (missingFieldFilter) {
       results = results.filter(r => {
-        const field = r.fields.find(field => field.headerId === f.headerId);
-        const val = String(field?.rawValue || '').toLowerCase();
-        const filterVal = String(f.value || '').toLowerCase();
-        switch(f.operator) {
-          case 'equals': return val === filterVal;
-          case 'contains': return val.includes(filterVal);
-          case 'exists': return val !== '' && val !== '---';
-          default: return true;
-        }
+        const val = (r.rawRow as any)[missingFieldFilter];
+        return !val || val === 'N/A' || val === '---';
       });
-    });
+    }
 
     // Apply Sort Logic
     results.sort((a, b) => {
@@ -184,7 +222,11 @@ export function RegistryWorkstation() {
     });
 
     return results;
-  }, [assets, sandboxAssets, dataSource, searchTerm, selectedCategory, headers, filters, sortKey, sortDir, appSettings?.sourceBranding]);
+  }, [
+    assets, sandboxAssets, dataSource, searchTerm, selectedCategory, headers, 
+    selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter,
+    sortKey, sortDir, appSettings?.sourceBranding
+  ]);
 
   const paginatedRecords = useMemo(() => {
     return processedRecords.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -201,12 +243,10 @@ export function RegistryWorkstation() {
 
   const handleSelectAll = () => {
     if (selectedCategory) {
-      // Select all IDs in current category list
       const allIds = new Set(processedRecords.map(r => r.id));
       if (selectedIds.size === allIds.size) setSelectedIds(new Set());
       else setSelectedIds(allIds);
     } else {
-      // Select all categories
       const allCats = new Set(categoryStats.map(c => c.name));
       if (selectedCategories.size === allCats.size) setSelectedCategories(new Set());
       else setSelectedCategories(allCats);
@@ -298,7 +338,7 @@ export function RegistryWorkstation() {
                 <div className="flex flex-col">
                   <span className="text-[11px] font-black uppercase text-white tracking-widest leading-none">
                     Overall Project Scope
-                    <span className="ml-2 text-primary font-mono opacity-80">0/987</span>
+                    <span className="ml-2 text-primary font-mono opacity-80">{processedRecords.length}/{assets.length}</span>
                   </span>
                 </div>
                 <ChevronRight className="h-4 w-4 text-white/40 rotate-90" />
@@ -306,7 +346,7 @@ export function RegistryWorkstation() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-64 bg-black border-white/10 rounded-2xl shadow-3xl text-white">
               {appSettings?.grants.map(g => (
-                <DropdownMenuItem key={g.id} className="h-12 uppercase font-black text-[10px] tracking-widest">{g.name}</DropdownMenuItem>
+                <DropdownMenuItem key={g.id} onClick={() => refreshRegistry()} className="h-12 uppercase font-black text-[10px] tracking-widest cursor-pointer hover:bg-white/5">{g.name}</DropdownMenuItem>
               ))}
             </DropdownMenuContent>
           </DropdownMenu>
@@ -472,7 +512,24 @@ export function RegistryWorkstation() {
 
       {/* Global Drawers & Dialogs */}
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={saveHeaderPrefs} onReset={() => {}} />
-      <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} />
+      <AssetFilterSheet 
+        isOpen={isFilterOpen} 
+        onOpenChange={setIsFilterOpen} 
+        locationOptions={locationOptions}
+        selectedLocations={selectedLocations}
+        setSelectedLocations={setSelectedLocations}
+        assigneeOptions={assigneeOptions}
+        selectedAssignees={selectedAssignees}
+        setSelectedAssignees={setSelectedAssignees}
+        statusOptions={statusOptions}
+        selectedStatuses={selectedStatuses}
+        setSelectedStatuses={setSelectedStatuses}
+        conditionOptions={conditionOptions}
+        selectedConditions={selectedConditions}
+        setSelectedConditions={setSelectedConditions}
+        missingFieldFilter={missingFieldFilter}
+        setMissingFieldFilter={setMissingFieldFilter}
+      />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }} />
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={() => setIsFormOpen(true)} />
       <AssetForm 

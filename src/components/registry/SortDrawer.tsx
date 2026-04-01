@@ -1,8 +1,8 @@
-
 "use client";
 
 /**
- * @fileOverview SortDrawer - Registry Ordering Workstation.
+ * @fileOverview High-Fidelity Sort Sequence Engine.
+ * Phase 102: Redesigned to match the dark high-fidelity workstation theme.
  */
 
 import React from 'react';
@@ -10,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ArrowUpDown, ArrowUp, ArrowDown, X, Layers } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, X, Layers, CheckCircle2 } from 'lucide-react';
 import type { RegistryHeader } from '@/types/registry';
 import { cn } from '@/lib/utils';
 
@@ -28,61 +28,74 @@ export function SortDrawer({ isOpen, onOpenChange, headers, sortBy, sortDirectio
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:max-w-sm flex flex-col p-0 border-primary/10 rounded-l-[2rem] shadow-2xl bg-background overflow-hidden">
-        <div className="p-8 pb-4 bg-muted/20 border-b">
+      <SheetContent side="right" className="w-full sm:max-w-sm flex flex-col p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-l-[2.5rem]">
+        <div className="p-10 pb-6 border-b border-white/5 space-y-4">
           <SheetHeader>
             <div className="flex items-center justify-between">
-              <SheetTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase">
-                <div className="p-2 bg-primary/10 rounded-xl">
-                  <ArrowUpDown className="text-primary h-6 w-6" />
-                </div>
-                Sort Pulse
-              </SheetTitle>
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl">
+              <SheetTitle className="text-2xl font-black uppercase tracking-tight text-white">Sort Sequence</SheetTitle>
+              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl text-white/40 hover:text-white hover:bg-white/5 h-10 w-10">
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <SheetDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-              Define the sequence of the registry pulse.
+            <SheetDescription className="text-sm font-medium text-white/40 leading-relaxed italic">
+              Define the primary sequence pulse for the current project registry.
             </SheetDescription>
           </SheetHeader>
         </div>
 
-        <ScrollArea className="flex-1 bg-background">
-          <div className="p-6 space-y-2">
-            {activeHeaders.map((header) => (
-              <div 
-                key={`sort-${header.id}`}
-                className={cn(
-                  "p-4 rounded-2xl border-2 transition-all flex items-center justify-between group cursor-pointer",
-                  sortBy === header.id ? "bg-primary/5 border-primary shadow-sm" : "border-border/40 hover:border-primary/20"
-                )}
-                onClick={() => onUpdateSort(header.id, sortBy === header.id && sortDirection === 'asc' ? 'desc' : 'asc')}
-              >
-                <div className="flex flex-col">
-                  <span className="text-sm font-black uppercase tracking-tight">{header.displayName}</span>
-                  <span className="text-[8px] font-bold text-muted-foreground uppercase opacity-40">Field Order</span>
-                </div>
-                
-                <div className="flex items-center gap-2">
-                  {sortBy === header.id && (
-                    <div className="p-2 bg-primary rounded-xl text-white">
-                      {sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
-                    </div>
+        <ScrollArea className="flex-1 bg-black">
+          <div className="p-8 space-y-3">
+            {activeHeaders.map((header) => {
+              const isActive = sortBy === header.id;
+              return (
+                <button 
+                  key={`sort-${header.id}`}
+                  onClick={() => onUpdateSort(header.id, isActive && sortDirection === 'asc' ? 'desc' : 'asc')}
+                  className={cn(
+                    "w-full p-6 rounded-[1.5rem] border-2 transition-all flex items-center justify-between group",
+                    isActive ? "bg-primary border-primary text-black" : "bg-[#0A0A0A] border-white/5 hover:border-white/20"
                   )}
-                </div>
-              </div>
-            ))}
+                >
+                  <div className="flex flex-col text-left">
+                    <span className={cn(
+                      "text-[11px] font-black uppercase tracking-widest",
+                      isActive ? "text-black" : "text-white"
+                    )}>
+                      {header.displayName}
+                    </span>
+                    <span className={cn(
+                      "text-[8px] font-bold uppercase opacity-40",
+                      isActive ? "text-black/60" : "text-white/40"
+                    )}>
+                      {isActive ? `Ordering: ${sortDirection.toUpperCase()}` : 'Sortable Field'}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center gap-2">
+                    {isActive ? (
+                      <div className="p-2 bg-black/20 rounded-xl">
+                        {sortDirection === 'asc' ? <ArrowUp className="h-4 w-4" /> : <ArrowDown className="h-4 w-4" />}
+                      </div>
+                    ) : (
+                      <div className="p-2 bg-white/5 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity">
+                        <ArrowUpDown className="h-4 w-4 text-white/40" />
+                      </div>
+                    )}
+                  </div>
+                </button>
+              );
+            })}
           </div>
         </ScrollArea>
 
-        <SheetFooter className="p-8 bg-muted/20 border-t">
-          <SheetClose asChild>
-            <Button className="w-full h-12 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground">
-              Close Order Pulse
-            </Button>
-          </SheetClose>
-        </SheetFooter>
+        <div className="p-10 bg-[#050505] border-t border-white/5">
+          <Button 
+            onClick={() => onOpenChange(false)}
+            className="w-full h-14 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-transform hover:scale-105 active:scale-95"
+          >
+            Done
+          </Button>
+        </div>
       </SheetContent>
     </Sheet>
   );

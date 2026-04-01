@@ -1,211 +1,245 @@
-'use client';
+"use client";
 
 /**
- * @fileOverview Semantic Filter Engine.
- * Supports hierarchical provenance filtering (Section, Subsection).
+ * @fileOverview High-Fidelity Filter Engine - Advanced Dark UI.
+ * Phase 102: Redesigned to strictly match the requested dark-themed filter image.
+ * Implements multi-select logic, dynamic counts, and missing-field heuristics.
  */
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-  DialogClose,
-} from '@/components/ui/dialog';
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+  SheetFooter,
+  SheetClose,
+} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
-import { Check, Filter, X, Layers, LayoutGrid, MapPin, Activity } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { Check, X, Search, Info, AlertCircle } from 'lucide-react';
+import { cn } from "@/lib/utils";
 import { ScrollArea } from './ui/scroll-area';
 import { Separator } from './ui/separator';
 import { Label } from './ui/label';
-import { Badge } from './ui/badge';
+import { RadioGroup, RadioGroupItem } from './ui/radio-group';
+import type { Asset } from '@/lib/types';
+import { useAppState } from '@/contexts/app-state-context';
 
-export interface FilterOption {
+export interface OptionType {
   label: string;
   value: string;
   count?: number;
 }
 
-interface AssetFilterDialogProps {
+interface AssetFilterSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
   
-  // Scoped Data for Options
-  sections: FilterOption[];
-  subsections: FilterOption[];
-  locations: FilterOption[];
-  statuses: FilterOption[];
+  locationOptions: OptionType[];
+  selectedLocations: string[];
+  setSelectedLocations: React.Dispatch<React.SetStateAction<string[]>>;
 
-  // State Management
-  filters: {
-    sections: string[];
-    subsections: string[];
-    locations: string[];
-    statuses: string[];
-  };
-  setFilters: (filters: any) => void;
-  onReset: () => void;
+  assigneeOptions: OptionType[];
+  selectedAssignees: string[];
+  setSelectedAssignees: React.Dispatch<React.SetStateAction<string[]>>;
+  
+  statusOptions: OptionType[];
+  selectedStatuses: string[];
+  setSelectedStatuses: React.Dispatch<React.SetStateAction<string[]>>;
+
+  conditionOptions: OptionType[];
+  selectedConditions: string[];
+  setSelectedConditions: React.Dispatch<React.SetStateAction<string[]>>;
+
+  missingFieldFilter: string;
+  setMissingFieldFilter: React.Dispatch<React.SetStateAction<string>>;
 }
 
-const FilterSection = ({ 
-  title, 
-  options, 
-  selected, 
-  onToggle, 
-  icon 
-}: { 
-  title: string; 
-  options: FilterOption[]; 
-  selected: string[]; 
-  onToggle: (val: string) => void;
-  icon?: React.ReactNode;
-}) => (
-  <div className="space-y-3">
-    <div className="flex items-center justify-between px-1">
-      <Label className="text-[10px] font-black uppercase tracking-widest text-muted-foreground flex items-center gap-2">
-        {icon} {title}
-      </Label>
-      {selected.length > 0 && <Badge className="bg-primary h-4 px-1.5 text-[8px] font-black uppercase">{selected.length}</Badge>}
-    </div>
-    <div className="rounded-2xl border-2 border-border/40 overflow-hidden bg-muted/5">
-      <ScrollArea className="h-[140px]">
-        <div className="p-2 space-y-0.5">
-          {options.length > 0 ? (
-            options.map((opt) => (
-              <div
-                key={opt.value}
-                onClick={() => onToggle(opt.value)}
-                className={cn(
-                  "relative flex cursor-pointer select-none items-center rounded-xl px-3 py-2 text-xs font-bold transition-all",
-                  selected.includes(opt.value) ? "bg-primary/10 text-primary" : "hover:bg-primary/5 text-muted-foreground"
-                )}
-              >
-                <div className="flex w-full items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={cn(
-                      "flex h-4 w-4 items-center justify-center rounded-md border-2",
-                      selected.includes(opt.value) ? "bg-primary border-primary text-white" : "border-muted-foreground/30"
-                    )}>
-                      {selected.includes(opt.value) && <Check className="h-3 w-3" />}
-                    </div>
-                    <span className="truncate max-w-[180px]">{opt.label}</span>
-                  </div>
-                  {opt.count !== undefined && <span className="text-[10px] font-mono opacity-40">{opt.count}</span>}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div className="py-10 text-center text-[10px] font-bold uppercase tracking-widest opacity-20 italic">No Data</div>
-          )}
-        </div>
-      </ScrollArea>
-    </div>
-  </div>
-);
+const missingFieldOptions = [
+    { label: 'S/N', value: 'sn' },
+    { label: 'Serial Number', value: 'serialNumber' },
+    { label: 'Asset ID Code', value: 'assetIdCode' },
+    { label: 'Description', value: 'description' },
+];
 
-export function AssetFilterDialog({
-  isOpen,
-  onOpenChange,
-  sections,
-  subsections,
-  locations,
-  statuses,
-  filters,
-  setFilters,
-  onReset
-}: AssetFilterDialogProps) {
-  
-  const toggleFilter = (key: keyof typeof filters, value: string) => {
-    const current = filters[key];
-    const next = current.includes(value) 
-      ? current.filter(v => v !== value)
-      : [...current, value];
-    setFilters({ ...filters, [key]: next });
+const FilterSection = ({ title, options, selected, onChange }: {
+  title: string;
+  options: OptionType[];
+  selected: string[];
+  onChange: (value: string[]) => void;
+}) => {
+  const handleSelect = (value: string) => {
+    if (selected.includes(value)) {
+      onChange(selected.filter((item) => item !== value));
+    } else {
+      onChange([...selected, value]);
+    }
   };
 
-  const activeCount = Object.values(filters).flat().length;
+  return (
+    <div className="space-y-3">
+      <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">{title}</Label>
+      <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] overflow-hidden">
+        <ScrollArea className="max-h-[180px]">
+          <div className="p-2 space-y-1">
+            {options.length > 0 ? (
+              options.map((option) => {
+                const isSelected = selected.includes(option.value);
+                return (
+                  <div
+                    key={option.value}
+                    onClick={() => handleSelect(option.value)}
+                    className={cn(
+                      "flex items-center justify-between p-3 rounded-xl cursor-pointer transition-all group",
+                      isSelected ? "bg-white/5" : "hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className={cn(
+                        "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all",
+                        isSelected ? "bg-primary border-primary" : "border-white/10 group-hover:border-white/20"
+                      )}>
+                        {isSelected && <Check className="h-3 w-3 text-black font-black" />}
+                      </div>
+                      <span className={cn(
+                        "text-[11px] font-black uppercase tracking-tight",
+                        isSelected ? "text-white" : "text-white/40 group-hover:text-white/60"
+                      )}>
+                        {option.label}
+                      </span>
+                    </div>
+                    {option.count !== undefined && (
+                      <div className="bg-black/40 px-2 py-0.5 rounded-lg border border-white/5">
+                        <span className="text-[9px] font-mono font-bold text-white/20">{option.count}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })
+            ) : (
+              <div className="py-10 text-center flex flex-col items-center gap-2 opacity-20">
+                <Search className="h-5 w-5" />
+                <span className="text-[10px] font-black uppercase tracking-widest">No options available.</span>
+              </div>
+            )}
+          </div>
+        </ScrollArea>
+      </div>
+    </div>
+  );
+};
+
+export function AssetFilterSheet({
+  isOpen,
+  onOpenChange,
+  locationOptions,
+  selectedLocations,
+  setSelectedLocations,
+  assigneeOptions,
+  selectedAssignees,
+  setSelectedAssignees,
+  statusOptions,
+  selectedStatuses,
+  setSelectedStatuses,
+  conditionOptions,
+  selectedConditions,
+  setSelectedConditions,
+  missingFieldFilter,
+  setMissingFieldFilter,
+}: AssetFilterSheetProps) {
+  
+  const handleClearAll = () => {
+    setSelectedLocations([]);
+    setSelectedAssignees([]);
+    setSelectedStatuses([]);
+    setSelectedConditions([]);
+    setMissingFieldFilter('');
+  };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl flex flex-col h-[90vh] p-0 border-primary/10 rounded-3xl overflow-hidden shadow-2xl bg-background/95 backdrop-blur-xl">
-        <div className="p-8 pb-4 bg-muted/20 border-b">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight">
-              <div className="p-2 bg-primary/10 rounded-xl">
-                <Filter className="text-primary h-6 w-6" />
-              </div>
-              Semantic Filter Engine
-            </DialogTitle>
-            <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
-              Precision query refinement across project hierarchical metadata.
-            </DialogDescription>
-          </DialogHeader>
+    <Sheet open={isOpen} onOpenChange={onOpenChange}>
+      <SheetContent side="right" className="w-full sm:max-w-md flex flex-col p-0 border-none bg-black text-white shadow-3xl overflow-hidden rounded-l-[2.5rem]">
+        <div className="p-10 pb-6 border-b border-white/5 space-y-4">
+          <SheetHeader>
+            <div className="flex items-center justify-between">
+              <SheetTitle className="text-2xl font-black uppercase tracking-tight text-white">Filter Assets</SheetTitle>
+              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl text-white/40 hover:text-white hover:bg-white/5 h-10 w-10">
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+            <SheetDescription className="text-sm font-medium text-white/40 leading-relaxed italic pr-10">
+              Refine the asset list by selecting criteria below. Logic pulses are applied in real-time to the current project scope.
+            </SheetDescription>
+          </SheetHeader>
         </div>
 
-        <ScrollArea className="flex-1 bg-background">
-          <div className="p-8 space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FilterSection
-                title="Provenances (Sections)"
-                options={sections}
-                selected={filters.sections}
-                onToggle={(v) => toggleFilter('sections', v)}
-                icon={<LayoutGrid className="h-3.5 w-3.5" />}
-              />
-              <FilterSection
-                title="Temporal Batches (Subsections)"
-                options={subsections}
-                selected={filters.subsections}
-                onToggle={(v) => toggleFilter('subsections', v)}
-                icon={<Layers className="h-3.5 w-3.5" />}
-              />
-            </div>
+        <ScrollArea className="flex-1 bg-black">
+          <div className="p-10 space-y-10">
+            <FilterSection title="Location" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
+            <FilterSection title="Assignee" options={assigneeOptions} selected={selectedAssignees} onChange={setSelectedAssignees} />
+            <FilterSection title="Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
+            <FilterSection title="Status" options={statusOptions} selected={selectedStatuses} onChange={setSelectedStatuses} />
 
-            <Separator className="opacity-50" />
-
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <FilterSection
-                title="Regional Scope"
-                options={locations}
-                selected={filters.locations}
-                onToggle={(v) => toggleFilter('locations', v)}
-                icon={<MapPin className="h-3.5 w-3.5" />}
-              />
-              <FilterSection
-                title="Registry Status"
-                options={statuses}
-                selected={filters.statuses}
-                onToggle={(v) => toggleFilter('statuses', v)}
-                icon={<Activity className="h-3.5 w-3.5" />}
-              />
+            <div className="space-y-4">
+              <Label className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 pl-1">Find Assets with Missing Fields</Label>
+              <div className="rounded-[1.5rem] border border-white/5 bg-[#0A0A0A] p-2">
+                <RadioGroup value={missingFieldFilter} onValueChange={setMissingFieldFilter} className="gap-1">
+                  <div 
+                    onClick={() => setMissingFieldFilter('')}
+                    className={cn(
+                      "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group",
+                      missingFieldFilter === '' ? "bg-white/5" : "hover:bg-white/[0.02]"
+                    )}
+                  >
+                    <div className={cn(
+                      "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all",
+                      missingFieldFilter === '' ? "bg-primary border-primary" : "border-white/10 group-hover:border-white/20"
+                    )}>
+                      {missingFieldFilter === '' && <div className="h-2 w-2 rounded-full bg-black" />}
+                    </div>
+                    <span className={cn("text-[11px] font-black uppercase", missingFieldFilter === '' ? "text-white" : "text-white/20")}>None</span>
+                  </div>
+                  {missingFieldOptions.map((opt) => (
+                    <div 
+                      key={opt.value}
+                      onClick={() => setMissingFieldFilter(opt.value)}
+                      className={cn(
+                        "flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-all group",
+                        missingFieldFilter === opt.value ? "bg-white/5" : "hover:bg-white/[0.02]"
+                      )}
+                    >
+                      <div className={cn(
+                        "h-5 w-5 rounded-full border-2 flex items-center justify-center transition-all",
+                        missingFieldFilter === opt.value ? "bg-primary border-primary" : "border-white/10 group-hover:border-white/20"
+                      )}>
+                        {missingFieldFilter === opt.value && <div className="h-2 w-2 rounded-full bg-black" />}
+                      </div>
+                      <span className={cn("text-[11px] font-black uppercase", missingFieldFilter === opt.value ? "text-white" : "text-white/20")}>{opt.label}</span>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
             </div>
           </div>
         </ScrollArea>
 
-        <DialogFooter className="p-8 bg-muted/20 border-t sm:justify-between items-center gap-4">
+        <div className="p-10 bg-[#050505] border-t border-white/5 flex flex-row items-center justify-between gap-4">
           <Button 
             variant="ghost" 
-            onClick={onReset} 
-            disabled={activeCount === 0} 
-            className="font-black uppercase text-[10px] tracking-widest rounded-xl hover:bg-destructive/10 hover:text-destructive"
+            onClick={handleClearAll}
+            className="h-14 px-10 rounded-2xl text-white font-black uppercase text-[10px] tracking-[0.2em] hover:bg-white/5"
           >
-            <X className="mr-2 h-3.5 w-3.5" /> Reset Engine
+            Clear All Filters
           </Button>
-          <div className="flex items-center gap-3">
-            <DialogClose asChild>
-              <Button variant="ghost" className="font-bold text-xs rounded-xl">Discard</Button>
-            </DialogClose>
-            <DialogClose asChild>
-              <Button className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">
-                Apply Logic Pulse
-              </Button>
-            </DialogClose>
-          </div>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+          <Button 
+            onClick={() => onOpenChange(false)}
+            className="h-14 px-12 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-transform hover:scale-105 active:scale-95"
+          >
+            Done
+          </Button>
+        </div>
+      </SheetContent>
+    </Sheet>
   );
 }
