@@ -7,10 +7,7 @@ const withPWA = withPWAInit({
 });
 
 const nextConfig = {
-  output: 'export',
-  images: {
-    unoptimized: true,
-  },
+  /* config options here */
   typescript: {
     ignoreBuildErrors: true,
   },

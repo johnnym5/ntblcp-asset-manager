@@ -1,13 +1,8 @@
-
 import type { Timestamp } from 'firebase/firestore';
 
 export interface Asset {
   id: string;
   category: string;
-  
-  // Hierarchical Context
-  section?: string;
-  subsection?: string;
   
   // Core fields
   sn?: string;
@@ -56,11 +51,11 @@ export interface Asset {
   lastModifiedByState?: string; // state of user who last modified
 
   // Approval Workflow Fields
-  approvalStatus?: 'pending'; 
+  approvalStatus?: 'pending'; // Only set when there's a pending change
   pendingChanges?: Partial<Asset>;
   changeSubmittedBy?: { 
     displayName: string;
-    loginName: string;
+    loginName: string; // for potential future notifications
     state: string;
   };
 }
@@ -88,6 +83,8 @@ export interface SheetDefinition {
   name: string;
   headers: string[];
   displayFields: DisplayField[];
+  // Optional array of header keywords that can trigger the start of this sheet's data block
+  // Useful for files where multiple tables are in one sheet.
   subSheetTriggers?: string[]; 
 }
 

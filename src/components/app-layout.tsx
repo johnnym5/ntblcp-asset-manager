@@ -1,432 +1,481 @@
-'use client';
+"use client";
 
-/**
- * @fileOverview AppLayout - Unified Command Shell.
- * Phase 131: Renamed naming scheme to be asset manager friendly.
- */
-
-import React, { useState, useMemo } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  LayoutDashboard, 
-  Boxes, 
-  FileText, 
-  Settings, 
-  Cloud, 
-  CloudOff,
+import React, { useState, useEffect } from "react";
+import { usePathname, useRouter } from 'next/navigation';
+import { motion } from 'framer-motion';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import {
+  Boxes,
+  Settings,
   LogOut,
-  Monitor,
-  History,
-  CheckCircle2,
-  ListTodo,
-  Users,
-  Activity,
-  Zap,
-  Database,
-  Globe,
-  HelpCircle,
-  Terminal,
   Search,
-  QrCode,
+  Cloud,
+  CloudOff,
+  Filter,
+  ArrowUpDown,
+  Loader2,
+  CloudDownload,
+  CloudUpload,
   Bell,
   CheckCheck,
   X,
-  Clock,
-  LayoutGrid,
-  ShieldAlert,
-  ChevronRight,
-  ShieldCheck,
-  Package,
-  Wrench,
-  Command,
-  User,
-  Power,
-  RefreshCw,
-  Upload,
-  Download,
-  ClipboardCheck,
-  ShieldX
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { useAuth } from '@/contexts/auth-context';
-import { useAppState } from '@/contexts/app-state-context';
-import { Sheet, SheetContent, SheetTrigger, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
-import { HelpCenter } from './HelpCenter';
-import { CommandPalette } from './CommandPalette';
-import { QRScannerDialog } from './registry/QRScannerDialog';
-import { ScrollArea } from './ui/scroll-area';
-import { useToast } from '@/hooks/use-toast';
-import { Separator } from './ui/separator';
-import { useNotifications, clearAll, markAllAsRead, removeNotification } from "@/hooks/use-notifications";
+  Inbox,
+} from "lucide-react";
+import { addNotification, useNotifications, clearAll, removeNotification } from "@/hooks/use-notifications";
 import { formatDistanceToNow } from 'date-fns';
-import type { WorkstationView } from '@/types/domain';
+import { cn } from "@/lib/utils";
+
+import { Button } from "./ui/button";
+import { useAuth } from "@/contexts/auth-context";
+import { Skeleton } from "./ui/skeleton";
+import { useAppState } from "@/contexts/app-state-context";
+import { Input } from "./ui/input";
+import { useDebounce } from "@/hooks/use-debounce";
+import { SettingsSheet } from "./settings-sheet";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetFooter,
+  SheetClose,
+} from '@/components/ui/sheet';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
+import { AssetFilterSheet } from "./asset-filter-sheet";
+import type { Asset } from "@/lib/types";
+import { Separator } from "./ui/separator";
+import { InboxSheet } from "./inbox-sheet";
+import { ScrollArea } from "./ui/scroll-area";
+import { saveAssets } from "@/lib/idb";
+import { sanitizeForFirestore } from "@/lib/excel-parser";
+
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { userProfile, logout } = useAuth();
-  const { toast } = useToast();
+  const { userProfile, loading, logout } = useAuth();
+  const router = useRouter();
+  const pathname = usePathname();
   const { 
-    isOnline, 
-    setIsOnline, 
-    isSyncing, 
-    assets, 
-    activeView, 
-    setActiveView,
-    manualDownload,
-    manualUpload
+    assets,
+    setAssets,
+    isOnline, setIsOnline, 
+    searchTerm, setSearchTerm, 
+    sortConfig, setSortConfig,
+    selectedLocations, selectedAssignees, selectedStatuses, missingFieldFilter,
+    locationOptions, assigneeOptions, statusOptions,
+    setSelectedLocations, setSelectedAssignees, setSelectedStatuses, setMissingFieldFilter,
+    setManualDownloadTrigger,
+    setManualUploadTrigger,
+    isSyncing,
+    dataActions,
+    unreadInboxCount,
+    setUnreadInboxCount
   } = useAppState();
-  
-  const [isHelpOpen, setIsHelpOpen] = useState(false);
-  const [isQRScannerOpen, setIsQRScannerOpen] = useState(false);
+
+  const [localSearchTerm, setLocalSearchTerm] = useState(searchTerm);
+  const debouncedSearchTerm = useDebounce(localSearchTerm, 300);
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFilterSheetOpen, setIsFilterSheetOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isPortalOpen, setIsPortalOpen] = useState(false);
+  const [isInboxOpen, setIsInboxOpen] = useState(false);
 
-  const { notifications, unreadCount } = useNotifications();
+  const { notifications, unreadCount, markAllAsRead } = useNotifications();
 
-  const isAdmin = userProfile?.isAdmin;
-  const isSuperAdmin = userProfile?.role === 'SUPERADMIN' || userProfile?.loginName === 'admin';
+  useEffect(() => {
+    setSearchTerm(debouncedSearchTerm);
+  }, [debouncedSearchTerm, setSearchTerm]);
 
-  const alertCount = useMemo(() => {
-    return assets.filter(a => 
-      ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '') ||
-      a.status === 'DISCREPANCY'
-    ).length;
-  }, [assets]);
-
-  const handlePortalNavigate = (view: WorkstationView) => {
-    setActiveView(view);
-    setIsPortalOpen(false);
+  useEffect(() => {
+    if (searchTerm === '') {
+        setLocalSearchTerm('');
+    }
+  }, [searchTerm]);
+  
+  const handleLogout = () => {
+    logout();
   };
 
-  const handleOpenNotifications = () => {
-    setIsNotificationsOpen(true);
-    if (unreadCount > 0) {
-      markAllAsRead();
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return 'U';
+    if (name.includes(' ')) {
+      return name.split(' ').map(n => n[0]).join('').substring(0, 2).toUpperCase();
     }
+    return name.substring(0, 2).toUpperCase();
+  }
+  
+  const getUserName = () => {
+    return userProfile?.displayName || "User";
+  }
+
+  const sortableFields: { key: keyof Asset, label: string }[] = [
+      { key: 'sn', label: 'S/N' },
+      { key: 'description', label: 'Description' },
+      { key: 'category', label: 'Category' },
+      { key: 'location', label: 'Location' },
+      { key: 'verifiedDate', label: 'Verified Date' },
+      { key: 'assetIdCode', label: 'Asset ID' },
+  ];
+
+  const handleSort = (key: keyof Asset) => {
+    setSortConfig(prev => {
+        if (prev?.key === key && prev.direction === 'asc') {
+            return { key, direction: 'desc' };
+        }
+        return { key, direction: 'asc' };
+    });
+  };
+  
+  const handleManualDownload = () => {
+    if (!isOnline) {
+      addNotification({
+        title: "Currently Offline",
+        description: "Please connect to the internet to download from the cloud.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (isSyncing) return;
+    setManualDownloadTrigger(c => c + 1);
+  };
+  
+  const handleManualUpload = () => {
+    if (!isOnline) {
+      addNotification({
+        title: "Currently Offline",
+        description: "Please connect to the internet to upload to the cloud.",
+        variant: "destructive"
+      });
+      return;
+    }
+    if (isSyncing) return;
+    setManualUploadTrigger(c => c + 1);
   };
 
   const handleNotificationsOpenChange = (open: boolean) => {
     setIsNotificationsOpen(open);
     if (open && unreadCount > 0) {
-      markAllAsRead();
+      setTimeout(() => markAllAsRead(), 500);
     }
+  }
+
+  const handleApprove = async (assetId: string) => {
+    const assetToApprove = assets.find(a => a.id === assetId);
+    if (!assetToApprove || !assetToApprove.pendingChanges) return;
+
+    const approvedAsset = sanitizeForFirestore({
+        ...assetToApprove,
+        ...assetToApprove.pendingChanges,
+        approvalStatus: undefined,
+        pendingChanges: undefined,
+        changeSubmittedBy: undefined,
+        syncStatus: 'local',
+    });
+
+    const newAssets = assets.map(a => a.id === assetId ? approvedAsset : a);
+    setAssets(newAssets);
+    await saveAssets(newAssets);
+
+    addNotification({
+        title: "Change Approved",
+        description: `Changes for "${approvedAsset.description}" have been applied and will be synced.`
+    });
   };
 
-  const PortalGroup = ({ title, icon: Icon, children }: { title: string, icon: any, children: React.ReactNode }) => (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3 px-2">
-        <Icon className="h-4 w-4 text-primary opacity-40" />
-        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground">{title}</h4>
-      </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-        {children}
-      </div>
-    </div>
-  );
+  const handleReject = async (assetId: string) => {
+    const assetToReject = assets.find(a => a.id === assetId);
+    if (!assetToReject) return;
 
-  const PortalItem = ({ label, view, icon: Icon, description, badge }: { label: string, view: WorkstationView, icon: any, description: string, badge?: number }) => (
-    <button 
-      onClick={() => handlePortalNavigate(view)}
-      className="w-full text-left p-5 rounded-[1.5rem] bg-muted/20 border-2 border-border/40 hover:border-primary/40 hover:bg-primary/5 transition-all group flex items-center justify-between"
-    >
-      <div className="flex items-center gap-4 min-w-0">
-        <div className="p-3 bg-card border border-border/40 rounded-xl group-hover:bg-primary/10 group-hover:text-primary transition-colors">
-          <Icon className="h-5 w-5" />
-        </div>
-        <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-black uppercase tracking-tight text-foreground group-hover:text-primary transition-colors">{label}</span>
-            {badge ? <Badge className="bg-destructive text-destructive-foreground text-[8px] h-4 min-w-4 p-0 flex items-center justify-center rounded-full">{badge}</Badge> : null}
-          </div>
-          <span className="text-[9px] font-bold text-muted-foreground uppercase truncate">{description}</span>
-        </div>
-      </div>
-      <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all text-primary" />
-    </button>
-  );
+    const rejectedAsset = {
+        ...assetToReject,
+        approvalStatus: undefined,
+        pendingChanges: undefined,
+        changeSubmittedBy: undefined,
+        syncStatus: 'local',
+    };
+    
+    const newAssets = assets.map(a => a.id === assetId ? rejectedAsset : a);
+    setAssets(newAssets);
+    await saveAssets(newAssets);
+
+    addNotification({
+        title: "Change Rejected",
+        description: `Pending changes for "${assetToReject.description}" have been discarded.`
+    });
+  };
+  
+  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + (missingFieldFilter ? 1 : 0);
+  const isAdmin = userProfile?.isAdmin || false;
+
+  useEffect(() => {
+    if (isAdmin) {
+      const pendingCount = assets.filter(a => a.approvalStatus === 'pending').length;
+      setUnreadInboxCount(pendingCount);
+    } else {
+      setUnreadInboxCount(0);
+    }
+  }, [assets, isAdmin, setUnreadInboxCount]);
 
   return (
-    <div className="flex flex-col h-screen w-full bg-background overflow-hidden font-body selection:bg-primary/20">
-      
-      {/* Header Command Strip */}
-      <header className="h-16 shrink-0 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-4 md:px-8 z-30">
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-3 cursor-pointer" onClick={() => setActiveView('DASHBOARD')}>
-            <div className="p-2 bg-primary rounded-xl shadow-lg">
-              <Package className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <div className="flex flex-col">
-              <span className="text-sm font-black tracking-tighter uppercase leading-none">Assetain</span>
-              <span className="text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-0.5">Asset Management System</span>
-            </div>
-          </div>
+    <div className="flex flex-col w-full min-h-screen">
+      <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b bg-background/95 px-4 py-2 backdrop-blur-sm md:h-16 md:flex-nowrap md:py-0 md:px-6">
+        
+        {/* Left Side */}
+        <div className="flex items-center gap-2">
+            <Boxes className="h-5 w-5 text-primary" />
+            <span className="text-lg font-semibold hidden sm:inline-block">Asset Manager</span>
         </div>
         
-        <div className="flex items-center gap-3">
-          {/* Manual Sync Triggers in Header */}
-          <div className="hidden lg:flex items-center bg-muted/30 p-1 rounded-xl border border-border/40 gap-1 mr-2">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={manualDownload} 
-              disabled={isSyncing || !isOnline}
-              className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
-              title="Download from Cloud"
-            >
-              <Download className="h-4 w-4" />
-            </Button>
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={manualUpload} 
-              disabled={isSyncing || !isOnline}
-              className="h-8 w-8 rounded-lg hover:bg-primary/10 hover:text-primary transition-all"
-              title="Upload to Cloud"
-            >
-              <Upload className="h-4 w-4" />
-            </Button>
-          </div>
+        {/* Right Side */}
+        <div className="flex items-center gap-2 md:order-3 sm:gap-4">
+            {isOnline && (
+              <>
+                <TooltipProvider>
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" onClick={handleManualDownload} disabled={isSyncing}>
+                              {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudDownload className="h-5 w-5" />}
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Download from Cloud</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
 
-          <button 
-            onClick={() => setIsOnline(!isOnline)}
-            className={cn(
-              "flex items-center gap-2 px-3 py-2 rounded-xl border-2 transition-all shadow-sm hidden xs:flex", 
-              isOnline ? "border-green-500/20 bg-green-50/5 text-green-600" : "border-destructive/20 bg-destructive/5 text-destructive animate-pulse"
+                <TooltipProvider>
+                  <Tooltip>
+                      <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" onClick={handleManualUpload} disabled={isSyncing}>
+                              {isSyncing ? <Loader2 className="h-5 w-5 animate-spin" /> : <CloudUpload className="h-5 w-5" />}
+                          </Button>
+                      </TooltipTrigger>
+                      <TooltipContent><p>Upload to Cloud</p></TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </>
             )}
-          >
-            <div className={cn("h-1.5 w-1.5 rounded-full", isOnline ? "bg-green-500 animate-pulse" : "bg-destructive")} />
-            <span className="text-[9px] font-black uppercase tracking-tighter">{isOnline ? 'CLOUD ACTIVE' : 'OFFLINE MODE'}</span>
-          </button>
 
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={handleOpenNotifications} 
-            className="relative h-10 w-10 rounded-xl bg-muted/30 hover:bg-primary/10 group transition-all"
-          >
-            <Bell className="h-5 w-5 group-hover:text-primary transition-colors" />
-            {unreadCount > 0 && (
-              <Badge className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center p-0 rounded-full bg-primary text-primary-foreground text-[8px] font-black border-2 border-background animate-in zoom-in duration-300">
-                {unreadCount}
-              </Badge>
-            )}
-          </Button>
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => {
+                                const newIsOnline = !isOnline;
+                                setIsOnline(newIsOnline);
+                                addNotification({
+                                    title: `Mode Changed to ${newIsOnline ? 'Online' : 'Offline'}`,
+                                    description: newIsOnline
+                                        ? 'Application is now connecting to the server.'
+                                        : 'Application is running in offline mode.',
+                                });
+                            }}
+                            aria-label={`Switch to ${isOnline ? 'Online' : 'Online'} mode`}
+                        >
+                            {isOnline ? (
+                                <Cloud className="h-5 w-5 text-green-500" />
+                            ) : (
+                                <CloudOff className="h-5 w-5 text-red-500" />
+                            )}
+                        </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>{isOnline ? 'Go Offline' : 'Go Online'}</p>
+                    </TooltipContent>
+                </Tooltip>
+            </TooltipProvider>
+            
+            {loading ? (
+              <Skeleton className="h-10 w-10 rounded-full" />
+            ) : (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="secondary" className="relative h-10 w-10 rounded-full">
+                    <Avatar className="h-9 w-9">
+                      <AvatarImage src={''} alt={getUserName()} />
+                      <AvatarFallback>{getInitials(userProfile?.displayName)}</AvatarFallback>
+                    </Avatar>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel className="font-normal">
+                    <div className="flex flex-col space-y-1">
+                      <p className="text-sm font-medium leading-none">{getUserName()}</p>
+                      <p className="text-xs text-muted-foreground">{userProfile?.state}</p>
+                    </div>
+                  </DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  
+                  {isAdmin && (
+                    <DropdownMenuItem onClick={() => setIsSettingsOpen(true)}>
+                      <Settings className="mr-2 h-4 w-4"/>
+                      Settings
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuSeparator />
+                  
+                  {isAdmin && (
+                     <DropdownMenuItem onClick={() => setIsInboxOpen(true)}>
+                      <Inbox className="mr-2 h-4 w-4" />
+                      <span>Approval Queue</span>
+                      {unreadInboxCount > 0 && (
+                        <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-green-500 text-xs font-bold text-white">
+                          {unreadInboxCount}
+                        </span>
+                      )}
+                    </DropdownMenuItem>
+                  )}
 
-          {/* Management Portal Trigger */}
-          <div 
-            onClick={() => setIsPortalOpen(true)}
-            className="flex items-center gap-3 cursor-pointer group hover:bg-muted/50 p-1.5 rounded-2xl transition-all border-2 border-transparent hover:border-primary/20 bg-card/50 shadow-sm ml-2 relative"
-          >
-            <Avatar className="h-9 w-9 border-2 border-primary/20 shadow-md">
-              <AvatarFallback className="font-black bg-muted text-primary text-[10px] uppercase">{userProfile?.displayName?.[0] || 'U'}</AvatarFallback>
-            </Avatar>
-            <div className="hidden sm:flex flex-col min-w-0 pr-2">
-              <span className="text-[10px] font-black truncate uppercase leading-none text-foreground">{userProfile?.displayName}</span>
-              <div className="flex items-center gap-1.5 mt-1">
-                <div className="h-1 w-1 rounded-full bg-primary" />
-                <span className="text-[8px] font-bold text-muted-foreground uppercase truncate tracking-tighter">{userProfile?.role}</span>
-              </div>
-            </div>
-            {alertCount > 0 && (
-              <Badge className="absolute -top-1 -left-1 bg-destructive text-destructive-foreground text-[7px] font-black h-4 min-w-4 p-0 flex items-center justify-center rounded-full border-2 border-background shadow-lg animate-pulse">
-                {alertCount}
-              </Badge>
+                  <DropdownMenuItem onClick={() => handleNotificationsOpenChange(true)}>
+                    <Bell className="mr-2 h-4 w-4" />
+                    <span>Notifications</span>
+                    {unreadCount > 0 && (
+                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-xs font-bold text-destructive-foreground">
+                        {unreadCount}
+                      </span>
+                    )}
+                  </DropdownMenuItem>
+
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onClick={handleLogout}>
+                    <LogOut className="mr-2 h-4 w-4" />
+                    Log out
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             )}
-          </div>
+        </div>
+
+        {/* Center Search */}
+        <div className="w-full md:flex-1 md:order-2 md:px-4">
+            {pathname === '/' && (
+                <div className="relative flex items-center w-full h-10 rounded-md border border-input bg-muted shadow-sm focus-within:border-primary focus-within:ring-1 focus-within:ring-primary">
+                    <Search className="absolute left-3 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        type="search"
+                        placeholder="Search assets..."
+                        className="pl-10 pr-20 w-full h-full bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0"
+                        value={localSearchTerm}
+                        onChange={(e) => setLocalSearchTerm(e.target.value)}
+                    />
+                    <div className="absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" aria-label="Sort assets">
+                                    <ArrowUpDown className="h-4 w-4" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                                <DropdownMenuLabel>Sort by</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                {sortableFields.map(field => (
+                                    <DropdownMenuItem key={field.key} onClick={() => handleSort(field.key)}>
+                                        {field.label}
+                                        {sortConfig?.key === field.key && (
+                                            <span className="ml-auto text-xs">{sortConfig.direction === 'asc' ? '▲' : '▼'}</span>
+                                        )}
+                                    </DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                         <Button variant="ghost" size="icon" className="h-8 w-8 relative" onClick={() => setIsFilterSheetOpen(true)}>
+                            <Filter className="h-4 w-4" />
+                            {activeFilterCount > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                                    {activeFilterCount}
+                                </span>
+                            )}
+                         </Button>
+                    </div>
+                </div>
+            )}
         </div>
       </header>
-
-      {/* Main Workspace Area */}
-      <main className="flex-1 overflow-hidden bg-muted/10 relative">
-        <ScrollArea className="h-full w-full">
-          <div className="max-w-[1600px] mx-auto px-4 sm:px-6 md:px-8 py-8 sm:py-10">
-            {children}
-          </div>
-        </ScrollArea>
-      </main>
-
-      {/* Bottom Dock */}
-      <aside className="h-20 shrink-0 border-t bg-card/80 backdrop-blur-2xl flex items-center px-4 md:px-10 z-40">
-        <div className="max-w-[1600px] mx-auto w-full flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <button 
-              onClick={() => setActiveView('DASHBOARD')} 
-              className={cn(
-                "flex items-center gap-3 px-6 h-12 rounded-2xl transition-all group shrink-0 tactile-pulse",
-                activeView === 'DASHBOARD' ? "bg-primary text-primary-foreground shadow-xl" : "text-muted-foreground hover:bg-muted"
-              )}
-            >
-              <LayoutGrid className="h-5 w-5" />
-              <span className="text-[10px] font-black uppercase tracking-widest">System Dashboard</span>
-            </button>
-            <Separator orientation="vertical" className="h-8 mx-4 opacity-20 hidden sm:block" />
-            <div className="hidden md:flex items-center gap-2">
-              <Badge variant="outline" className={cn("h-8 px-4 rounded-xl border-2 transition-all", isSyncing ? "border-primary/40 animate-pulse" : "border-border/40 opacity-40")}>
-                <Activity className="h-3 w-3 mr-2" />
-                <span className="text-[8px] font-black uppercase tracking-widest">{isSyncing ? 'SYNCING...' : 'SYSTEM IDLE'}</span>
-              </Badge>
-            </div>
-          </div>
-
-          <div className="hidden sm:flex items-center gap-4">
-            <button onClick={() => setIsHelpOpen(true)} className="flex items-center gap-2 text-[10px] font-black uppercase text-muted-foreground hover:text-primary transition-colors">
-              <HelpCircle className="h-4 w-4" /> Help Center
-            </button>
-            <Separator orientation="vertical" className="h-4 opacity-20" />
-            <p className="text-[9px] font-mono text-muted-foreground opacity-40">SYSTEM v5.0.4</p>
-          </div>
-        </div>
-      </aside>
-
-      {/* Administration Portal */}
-      <Sheet open={isPortalOpen} onOpenChange={setIsPortalOpen}>
-        <SheetContent side="bottom" className="h-[90vh] bg-background border-none rounded-t-[3rem] p-0 flex flex-col overflow-hidden shadow-3xl">
-          <div className="p-10 pb-6 border-b flex items-center justify-between bg-muted/20">
-            <div className="flex items-center gap-6">
-              <div className="p-4 bg-primary rounded-[1.5rem] shadow-2xl">
-                <Terminal className="h-8 w-8 text-primary-foreground" />
-              </div>
-              <div className="space-y-1">
-                <SheetTitle className="text-3xl font-black uppercase tracking-tight text-foreground leading-none">System Administration</SheetTitle>
-                <SheetDescription className="text-[10px] font-black uppercase text-primary tracking-[0.3em] opacity-60">Inventory Control & Governance Panel</SheetDescription>
-              </div>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => setIsPortalOpen(false)} className="h-14 w-14 rounded-2xl bg-muted/50 hover:bg-muted text-foreground">
-              <X className="h-6 w-6" />
-            </Button>
-          </div>
-
-          <ScrollArea className="flex-1 custom-scrollbar">
-            <div className="p-10 grid grid-cols-1 lg:grid-cols-12 gap-16">
-              
-              <div className="lg:col-span-12">
-                <div className="p-8 rounded-[2rem] bg-card border-2 border-border/40 flex flex-col md:flex-row items-center justify-between gap-8">
-                  <div className="flex items-center gap-6">
-                    <Avatar className="h-20 w-20 border-4 border-primary/20">
-                      <AvatarFallback className="bg-muted text-primary text-2xl font-black">{userProfile?.displayName?.[0] || 'U'}</AvatarFallback>
-                    </Avatar>
-                    <div className="space-y-1">
-                      <h3 className="text-2xl font-black uppercase tracking-tight text-foreground">{userProfile?.displayName}</h3>
-                      <div className="flex items-center gap-3">
-                        <Badge className="bg-primary text-primary-foreground font-black uppercase text-[10px]">{userProfile?.role}</Badge>
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{userProfile?.email}</span>
-                      </div>
-                      <p className="text-[10px] font-black uppercase text-primary/60 mt-2">Current Scope: {userProfile?.state || 'Global'}</p>
-                    </div>
-                  </div>
-                  <div className="flex gap-3">
-                    <Button onClick={() => logout()} className="h-14 px-10 rounded-2xl bg-destructive text-destructive-foreground font-black uppercase text-[10px] tracking-widest gap-3 shadow-xl shadow-destructive/20 transition-transform hover:scale-105 active:scale-95">
-                      <Power className="h-4 w-4" /> End Session
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="lg:col-span-4 space-y-10">
-                <PortalGroup title="Asset Auditing" icon={Activity}>
-                  <PortalItem label="Field Audit" view="VERIFY" icon={CheckCircle2} description="Field verification tasks" />
-                  <PortalItem label="Sync Log" view="SYNC_QUEUE" icon={ListTodo} description="Pending cloud updates" />
-                  <PortalItem label="Reports" view="REPORTS" icon={FileText} description="Generate inventory reports" />
-                  <PortalItem label="Audit Trail" view="AUDIT_LOG" icon={History} description="Historical record tracking" />
-                  <PortalItem label="Alerts" view="ALERTS" icon={ShieldAlert} description="Critical exceptions detected" badge={alertCount} />
-                </PortalGroup>
-              </div>
-
-              <div className="lg:col-span-4 space-y-10">
-                <PortalGroup title="System Control" icon={Wrench}>
-                  <PortalItem label="Settings" view="SETTINGS" icon={Settings} description="Global configuration" />
-                  <PortalItem label="Users" view="SETTINGS" icon={Users} description="User roles and scopes" />
-                  <PortalItem label="System Health" view="ERROR_AUDIT" icon={ShieldCheck} description="Error monitoring and logs" />
-                </PortalGroup>
-              </div>
-
-              <div className="lg:col-span-4 space-y-10">
-                {isSuperAdmin ? (
-                  <PortalGroup title="Infrastructure" icon={Database}>
-                    <PortalItem label="Database Manager" view="DATABASE" icon={Terminal} description="Direct database orchestration" />
-                    <div className="p-8 rounded-[2rem] bg-primary/5 border-2 border-dashed border-primary/20 space-y-4">
-                      <div className="flex items-center gap-3">
-                        <ShieldX className="h-5 w-5 text-primary" />
-                        <h5 className="text-[10px] font-black uppercase text-primary">Authority Control</h5>
-                      </div>
-                      <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Advanced database operations are restricted to system administrators.</p>
-                    </div>
-                  </PortalGroup>
-                ) : (
-                  <div className="h-full flex flex-col items-center justify-center p-10 opacity-20 text-center border-4 border-dashed border-border/40 rounded-[3rem]">
-                    <Lock className="h-16 w-16 mb-4" />
-                    <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed text-muted-foreground">Admin Access Required</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          </ScrollArea>
-        </SheetContent>
-      </Sheet>
-
-      {/* Notification Sheet */}
-      <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
-        <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-none shadow-3xl bg-background rounded-l-[2rem]">
-          <div className="p-8 border-b bg-muted/20">
-            <SheetHeader>
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary/10 rounded-xl">
-                    <Bell className="text-primary h-6 w-6" />
-                  </div>
-                  <SheetTitle className="text-2xl font-black uppercase tracking-tight">System Notifications</SheetTitle>
-                </div>
-                {notifications.length > 0 && (
-                  <Button variant="ghost" size="sm" onClick={() => clearAll()} className="h-8 text-[9px] font-black uppercase text-muted-foreground hover:text-destructive">
-                    Clear All
-                  </Button>
-                )}
-              </div>
-              <SheetDescription className="text-[10px] font-black uppercase tracking-widest mt-1 opacity-60">System alerts and record update status.</SheetDescription>
+      <motion.main
+        className="flex-1 flex flex-col p-4 md:p-6 bg-muted/40"
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: 'easeInOut' }}
+      >
+        {children}
+      </motion.main>
+      <SettingsSheet isOpen={isSettingsOpen} onOpenChange={setIsSettingsOpen} />
+      <AssetFilterSheet
+        isOpen={isFilterSheetOpen}
+        onOpenChange={setIsFilterSheetOpen}
+        locationOptions={locationOptions}
+        selectedLocations={selectedLocations}
+        setSelectedLocations={setSelectedLocations}
+        assigneeOptions={assigneeOptions}
+        selectedAssignees={selectedAssignees}
+        setSelectedAssignees={setSelectedAssignees}
+        statusOptions={statusOptions}
+        selectedStatuses={selectedStatuses}
+        setSelectedStatuses={setSelectedStatuses}
+        missingFieldFilter={missingFieldFilter}
+        setMissingFieldFilter={setMissingFieldFilter}
+      />
+       <InboxSheet isOpen={isInboxOpen} onOpenChange={setIsInboxOpen} onApprove={handleApprove} onReject={handleReject} />
+       <Sheet open={isNotificationsOpen} onOpenChange={handleNotificationsOpenChange}>
+        <SheetContent side="right" className="w-full sm:max-w-sm p-0 flex flex-col">
+            <SheetHeader className="p-4">
+                <SheetTitle>Notifications</SheetTitle>
             </SheetHeader>
-          </div>
-
-          <ScrollArea className="flex-1 custom-scrollbar">
-            {notifications.length > 0 ? (
-              <div className="divide-y border-b">
-                {notifications.map((n) => (
-                  <div key={n.id} className={cn("p-6 relative group hover:bg-primary/[0.02] transition-colors", !n.read && "bg-primary/[0.01]")}>
-                    <div className="flex gap-4">
-                      <div className={cn("h-2 w-2 rounded-full mt-1.5 shrink-0", n.read ? "bg-muted" : "bg-primary animate-pulse")} />
-                      <div className="space-y-1 flex-1">
-                        <p className="text-sm font-black uppercase tracking-tight leading-none text-foreground">{n.title}</p>
-                        <p className="text-xs font-medium text-muted-foreground leading-relaxed italic">{n.description}</p>
-                        <p className="text-[9px] font-bold uppercase opacity-40 pt-2 flex items-center gap-2">
-                          <Clock className="h-2.5 w-2.5" /> {formatDistanceToNow(n.date, { addSuffix: true })}
+            <Separator />
+            <ScrollArea className="flex-1">
+              {notifications.length > 0 ? (
+                notifications.map((notification, index) => (
+                  <div key={notification.id}>
+                    <div className="relative group p-4">
+                      <p className={cn("font-semibold mb-1 pr-8", !notification.read && "text-foreground", notification.read && "text-muted-foreground")}>
+                        {notification.title}
+                      </p>
+                      {notification.description && (
+                        <p className={cn("text-sm pr-8", !notification.read && "text-muted-foreground", notification.read && "text-muted-foreground/70")}>
+                          {notification.description}
                         </p>
-                      </div>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        onClick={() => removeNotification(n.id)} 
-                        className="h-8 w-8 rounded-xl opacity-0 group-hover:opacity-100 hover:bg-destructive/10 hover:text-destructive transition-all"
+                      )}
+                      {notification.action && <div className="mt-2">{notification.action}</div>}
+                      <p className="text-xs text-muted-foreground/80 mt-2">
+                        {formatDistanceToNow(notification.date, { addSuffix: true })}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="absolute top-3 right-3 h-6 w-6 text-muted-foreground opacity-0 group-hover:opacity-100"
+                        onClick={() => removeNotification(notification.id)}
+                        aria-label="Dismiss notification"
                       >
-                        <X className="h-4 w-4" />
+                          <X className="h-4 w-4" />
                       </Button>
                     </div>
+                    {index < notifications.length - 1 && <Separator />}
                   </div>
-                ))}
-              </div>
-            ) : (
-              <div className="h-full flex flex-col items-center justify-center p-10 opacity-20 text-center gap-4">
-                <CheckCheck className="h-16 w-16" />
-                <p className="text-sm font-medium uppercase tracking-widest text-muted-foreground">Notification status: Clear</p>
-              </div>
-            )}
-          </ScrollArea>
+                ))
+              ) : (
+                <div className="flex flex-col items-center justify-center gap-2 text-center p-8 text-muted-foreground h-full">
+                  <CheckCheck className="h-8 w-8" />
+                  <p className="text-sm font-medium">You're all caught up!</p>
+                  <p className="text-xs">New notifications will appear here.</p>
+                </div>
+              )}
+            </ScrollArea>
+            <SheetFooter className="p-4 border-t">
+              {notifications.length > 0 && (
+                <Button variant="link" size="sm" className="p-0 h-auto" onClick={() => clearAll()}>
+                  Clear all
+                </Button>
+              )}
+            </SheetFooter>
         </SheetContent>
       </Sheet>
-
-      <HelpCenter isOpen={isHelpOpen} onOpenChange={setIsHelpOpen} />
-      <CommandPalette />
-      <QRScannerDialog isOpen={isQRScannerOpen} onOpenChange={setIsQRScannerOpen} onScanSuccess={() => {}} />
     </div>
   );
 }

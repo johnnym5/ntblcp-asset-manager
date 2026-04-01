@@ -4,67 +4,57 @@
 
 @layer base {
   :root {
-    /* Bone Light Mode */
-    --background: 0 0% 98%;
-    --foreground: 0 0% 3.9%;
-    
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 3.9%;
-    
+    --background: 210 29% 96%;
+    --foreground: 224 71.4% 4.1%;
+    --card: 210 29% 98%;
+    --card-foreground: 224 71.4% 4.1%;
     --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 3.9%;
-    
-    --primary: 45 93% 47%; /* Assetain Gold */
-    --primary-foreground: 0 0% 0%;
-    
-    --secondary: 0 0% 96.1%;
-    --secondary-foreground: 0 0% 9%;
-    
-    --muted: 0 0% 96.1%;
-    --muted-foreground: 0 0% 45.1%;
-    
-    --accent: 45 93% 47%;
-    --accent-foreground: 0 0% 0%;
-    
+    --popover-foreground: 224 71.4% 4.1%;
+    --primary: 45 90% 50%;
+    --primary-foreground: 45 50% 10%;
+    --secondary: 220 14.3% 95.9%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 220 14.3% 95.9%;
+    --muted-foreground: 220 8.9% 46.1%;
+    --accent: 45 80% 55%;
+    --accent-foreground: 45 50% 10%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
-    
-    --border: 0 0% 89.8%;
-    --input: 0 0% 89.8%;
-    --ring: 45 93% 47%;
-    
-    --radius: 1.5rem;
+    --border: 220 13% 91%;
+    --input: 220 13% 91%;
+    --ring: 45 80% 55%;
+    --chart-1: 12 76% 61%;
+    --chart-2: 173 58% 39%;
+    --chart-3: 197 37% 24%;
+    --chart-4: 43 74% 66%;
+    --chart-5: 27 87% 67%;
+    --radius: 0.75rem;
   }
-
   .dark {
-    /* Amoled Dark Mode */
     --background: 0 0% 0%;
-    --foreground: 0 0% 98%;
-    
-    --card: 0 0% 3.9%;
-    --card-foreground: 0 0% 98%;
-    
-    --popover: 0 0% 2%;
-    --popover-foreground: 0 0% 98%;
-    
-    --primary: 45 93% 47%; /* Metallic Gold */
-    --primary-foreground: 0 0% 0%;
-    
+    --foreground: 210 40% 98%;
+    --card: 0 0% 8%;
+    --card-foreground: 210 40% 98%;
+    --popover: 0 0% 5%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 45 80% 55%;
+    --primary-foreground: 45 50% 10%;
     --secondary: 0 0% 12%;
-    --secondary-foreground: 0 0% 98%;
-    
-    --muted: 0 0% 8%;
-    --muted-foreground: 0 0% 63.9%;
-    
-    --accent: 45 93% 47%;
-    --accent-foreground: 0 0% 0%;
-    
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 0 0% 98%;
-    
-    --border: 0 0% 14.9%;
-    --input: 0 0% 14.9%;
-    --ring: 45 93% 47%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 0 0% 12%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 45 80% 55%;
+    --accent-foreground: 45 50% 10%;
+    --destructive: 0 70% 50%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 0 0% 15%;
+    --input: 0 0% 15%;
+    --ring: 45 80% 55%;
+    --chart-1: 45 90% 55%;
+    --chart-2: 45 80% 65%;
+    --chart-3: 45 70% 75%;
+    --chart-4: 45 60% 85%;
+    --chart-5: 45 50% 95%;
   }
 }
 
@@ -73,37 +63,6 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-body antialiased overflow-x-hidden;
-  }
-  h1, h2, h3, h4, h5, h6 {
-    @apply font-headline font-black uppercase tracking-tight;
-  }
-}
-
-/* Custom Scrollbar - Minimalist Terminal Aesthetic */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-::-webkit-scrollbar-track {
-  @apply bg-transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-primary/20 rounded-full hover:bg-primary/40 transition-colors;
-}
-
-.tactile-pulse {
-  @apply transition-transform active:scale-95;
-}
-
-.shadow-3xl {
-  box-shadow: 0 35px 60px -15px rgba(0, 0, 0, 0.5);
-}
-
-@media print {
-  .print\:hidden {
-    display: none !important;
+    @apply bg-background text-foreground;
   }
 }

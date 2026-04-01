@@ -1,87 +1,39 @@
 'use client';
 
-/**
- * @fileOverview SPA Orchestrator Hub.
- * Phase 115: Unified Dashboard & Registry into a single core workspace.
- */
-
-import React, { Suspense } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import AppLayout from '@/components/app-layout';
-import Loading from './loading';
-import { useAppState } from '@/contexts/app-state-context';
+import { useEffect } from 'react';
 import { useAuth } from '@/contexts/auth-context';
+import AppLayout from '@/components/app-layout';
+import AssetList from '@/components/asset-list';
+import { Loader2 } from 'lucide-react';
 import UserProfileSetup from '@/components/user-profile-setup';
-import { Zap } from 'lucide-react';
+import { useAppState } from '@/contexts/app-state-context';
 
-// Workstations
-import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
-import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
-import { VerifyWorkstation } from '@/components/workstations/VerifyWorkstation';
-import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation';
-import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
-import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
-import { SyncQueueWorkstation } from '@/components/workstations/SyncQueueWorkstation';
-import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstation';
-import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
-import { ErrorAuditWorkstation } from '@/components/workstations/ErrorAuditWorkstation';
+export default function Page() {
+  const { userProfile, loading, profileSetupComplete } = useAuth();
+  const { setGlobalStateFilter } = useAppState();
 
-export default function SPAOrchestrator() {
-  const { activeView, settingsLoaded } = useAppState();
-  const { profileSetupComplete, loading: authLoading } = useAuth();
+  useEffect(() => {
+    if (profileSetupComplete && userProfile) {
+      setGlobalStateFilter(userProfile.state || '');
+    }
+  }, [profileSetupComplete, userProfile, setGlobalStateFilter]);
 
-  if (authLoading || !settingsLoaded) return <Loading />;
-  if (!profileSetupComplete) return <UserProfileSetup />;
-
-  return (
-    <AppLayout>
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={activeView}
-          initial={{ opacity: 0, x: 10 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -10 }}
-          transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
-          className="h-full"
-        >
-          <Suspense fallback={<Loading />}>
-            {renderWorkstation(activeView)}
-          </Suspense>
-        </motion.div>
-      </AnimatePresence>
-    </AppLayout>
-  );
-}
-
-function renderWorkstation(view: string) {
-  switch (view) {
-    // Dashboard and Registry are now unified into one view
-    case 'DASHBOARD': 
-    case 'REGISTRY': 
-      return <DashboardWorkstation />;
-      
-    case 'IMPORT': return <ImportWorkstation />;
-    case 'VERIFY': return <VerifyWorkstation />;
-    case 'REPORTS': return <ReportsWorkstation />;
-    case 'ALERTS': return <AlertsWorkstation />;
-    case 'AUDIT_LOG': return <AuditLogWorkstation />;
-    case 'SYNC_QUEUE': return <SyncQueueWorkstation />;
-    case 'DATABASE': return <DatabaseWorkstation />;
-    case 'SETTINGS': return <SettingsWorkstation />;
-    case 'ERROR_AUDIT': return <ErrorAuditWorkstation />;
-    case 'USERS':
-    case 'INFRASTRUCTURE':
-      return <SettingsWorkstation />;
-    default: return (
-      <div className="flex flex-col items-center justify-center py-40 opacity-20 space-y-6">
-        <div className="p-8 bg-primary/10 rounded-[3rem] shadow-inner">
-          <Zap className="h-20 w-20 text-primary" />
-        </div>
-        <div className="text-center space-y-2">
-          <h3 className="text-3xl font-black uppercase tracking-[0.2em]">{view.replace('_', ' ')} Workstation</h3>
-          <p className="text-sm font-medium italic">Synchronizing SPA logic pulse...</p>
-        </div>
+  if (loading) {
+    return (
+      <div className="flex h-screen w-full items-center justify-center bg-background">
+        <Loader2 className="h-10 w-10 animate-spin text-primary" />
       </div>
     );
   }
+
+  if (!profileSetupComplete) {
+    return <UserProfileSetup />;
+  }
+
+
+  return (
+    <AppLayout>
+      <AssetList />
+    </AppLayout>
+  );
 }
