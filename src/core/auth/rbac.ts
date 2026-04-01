@@ -1,9 +1,9 @@
 /**
  * @fileOverview RBAC (Role-Based Access Control) Engine.
- * Phase 82: Hardened Zonal Manager scope inheritance logic.
+ * Phase 180: Hardened Zonal Administrator scope inheritance logic.
  */
 
-import type { AuthorizedUser, Asset, Action } from '@/types/domain';
+import type { AuthorizedUser, Asset } from '@/types/domain';
 import { NIGERIAN_ZONES } from '@/lib/constants';
 
 /**
@@ -26,7 +26,7 @@ export function hasPermission(user: AuthorizedUser, action: string): boolean {
     case 'EDIT_ASSET':
     case 'VIEW_REPORTS':
     case 'IMPORT_CENTER':
-      return role === 'ADMIN' || role === 'MANAGER' || role === 'SUPERADMIN';
+      return role === 'ADMIN' || role === 'MANAGER' || role === 'SUPERADMIN' || !!user.isZonalAdmin;
 
     case 'VERIFY_ASSET':
       return role !== 'VIEWER';
@@ -38,24 +38,31 @@ export function hasPermission(user: AuthorizedUser, action: string): boolean {
 
 /**
  * Validates if an operation on a specific asset is within the user's regional scope.
- * Supports State-level and Zonal-level inheritance.
+ * Supports State-level, Zonal-level, and SuperAdmin global inheritance.
  */
 export function isWithinScope(user: AuthorizedUser, asset: Asset): boolean {
-  // Admins or users with global scope bypass regional checks
-  if (user.role === 'ADMIN' || user.role === 'SUPERADMIN' || user.states.includes('All')) {
+  // 1. SuperAdmins and Admins bypass regional checks
+  if (user.role === 'ADMIN' || user.role === 'SUPERADMIN' || user.states.includes('All') || user.isAdmin) {
     return true;
   }
 
   const assetLocation = (asset.location || '').trim().toLowerCase();
   
-  // 1. Direct State Match
+  // 2. Direct State Match
   if (user.states.some(s => s.toLowerCase() === assetLocation)) {
     return true;
   }
 
-  // 2. Zonal Inheritance Check
-  // If a user is assigned a Geopolitical Zone (e.g. "North Central"), 
-  // they have scope for all states within that zone.
+  // 3. Zonal Administrator Check
+  // If a user is a Zonal Admin, we check if the asset's state falls within their assigned zone
+  if (user.isZonalAdmin && user.assignedZone) {
+    const zoneStates = NIGERIAN_ZONES[user.assignedZone];
+    if (zoneStates && zoneStates.some(s => s.toLowerCase() === assetLocation)) {
+      return true;
+    }
+  }
+
+  // 4. Fallback: Secondary check for users assigned multiple specific states via zones
   for (const assignedScope of user.states) {
     const zoneStates = NIGERIAN_ZONES[assignedScope];
     if (zoneStates && zoneStates.some(s => s.toLowerCase() === assetLocation)) {
