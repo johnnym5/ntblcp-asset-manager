@@ -1,6 +1,8 @@
+
 /**
  * @fileOverview Hardened Firestore Service.
  * Phase 86: Enhanced with Global Purge capabilities for registry preparation.
+ * Updated: Implemented contextual error handling architecture for Security Rules debugging.
  */
 
 import { 
@@ -20,8 +22,7 @@ import {
   type DocumentReference
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
-import { errorEmitter } from '@/lib/error-emitter';
-import { FirestorePermissionError, type SecurityRuleContext } from '@/lib/errors';
+import { errorEmitter, FirestorePermissionError } from '@/firebase';
 import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
 import { monitoring } from '@/lib/monitoring';
@@ -158,14 +159,27 @@ export const FirestoreService = {
   async purgeAllAssets(): Promise<number> {
     if (!db) return 0;
     const assetsRef = collection(db, 'assets');
-    const snap = await getDocs(assetsRef);
-    const total = snap.size;
+    let snap;
+    try {
+      snap = await getDocs(assetsRef);
+    } catch (err: any) {
+      this.handlePermissionError(assetsRef.path, 'list', err);
+      throw err;
+    }
     
+    const total = snap.size;
     if (total === 0) return 0;
 
     const batch = writeBatch(db);
     snap.docs.forEach(d => batch.delete(d.ref));
-    await batch.commit();
+    
+    try {
+      await batch.commit();
+    } catch (err: any) {
+      // For batch operations, we point to the parent collection path
+      this.handlePermissionError(assetsRef.path, 'delete', err);
+      throw err;
+    }
 
     await this.logActivity({
       assetId: 'GLOBAL_PURGE',
@@ -186,7 +200,8 @@ export const FirestoreService = {
     const errorRef = doc(db, 'error_logs', entry.id);
     try {
       await setDoc(errorRef, sanitizeForFirestore(entry));
-    } catch (e) {
+    } catch (e: any) {
+      this.handlePermissionError(errorRef, 'create', e, entry);
       console.error("Monitoring: Double-fault detected. Cloud logging failed.", e);
     }
   },
@@ -198,7 +213,8 @@ export const FirestoreService = {
     try {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as ErrorLogEntry));
-    } catch (e) {
+    } catch (e: any) {
+      this.handlePermissionError(errorRef.path, 'list', e);
       return [];
     }
   },
@@ -206,7 +222,10 @@ export const FirestoreService = {
   async updateErrorStatus(id: string, status: ErrorLogStatus, adminComment?: string) {
     if (!db) return;
     const errorRef = doc(db, 'error_logs', id);
-    await updateDoc(errorRef, { status, adminComment });
+    const updates = { status, adminComment };
+    updateDoc(errorRef, updates).catch(err => {
+      this.handlePermissionError(errorRef, 'update', err, updates);
+    });
   },
 
   async logActivity(entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>) {
@@ -218,8 +237,10 @@ export const FirestoreService = {
         id: crypto.randomUUID(),
         timestamp: new Date().toISOString()
       };
-      await addDoc(logRef, sanitizeForFirestore(data));
-    } catch (e) {
+      const sanitized = sanitizeForFirestore(data);
+      await addDoc(logRef, sanitized);
+    } catch (e: any) {
+      this.handlePermissionError(logRef.path, 'create', e, entry);
       console.error("Failed to log activity pulse", e);
     }
   },
@@ -231,7 +252,8 @@ export const FirestoreService = {
     try {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as ActivityLogEntry));
-    } catch (e) {
+    } catch (e: any) {
+      this.handlePermissionError(logRef.path, 'list', e);
       return [];
     }
   },
@@ -251,7 +273,8 @@ export const FirestoreService = {
         lastModifiedBy: performedBy,
         previousState: null
       };
-      await setDoc(assetRef, sanitizeForFirestore(restoredData));
+      const sanitized = sanitizeForFirestore(restoredData);
+      await setDoc(assetRef, sanitized);
       
       await this.logActivity({
         assetId,
@@ -266,7 +289,16 @@ export const FirestoreService = {
     }
   },
 
-  handlePermissionError(refOrPath: string | DocumentReference, operation: SecurityRuleContext['operation'], error: any, data?: any) {
+  /**
+   * Centralized helper to create and emit FirestorePermissionError.
+   * This is critical for Security Rules debugging and agentive fixing.
+   */
+  handlePermissionError(
+    refOrPath: string | DocumentReference, 
+    operation: 'get' | 'list' | 'create' | 'update' | 'delete' | 'write', 
+    error: any, 
+    data?: any
+  ) {
     if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
       const path = typeof refOrPath === 'string' ? refOrPath : refOrPath.path;
       const permissionError = new FirestorePermissionError({
@@ -274,7 +306,9 @@ export const FirestoreService = {
         operation,
         requestResourceData: data,
       });
+      // Emit via central emitter for FirebaseErrorListener to catch and surface
       errorEmitter.emit('permission-error', permissionError);
+      // Also log to internal resilience monitor
       monitoring.trackError(permissionError, { action: operation, module: 'Firestore' }, 'CRITICAL');
     }
   }
