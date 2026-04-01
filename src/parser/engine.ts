@@ -1,6 +1,6 @@
 /**
- * @fileOverview High-Fidelity NTBLCP Structural Parser.
- * Implementation of two-stage group detection and template matching.
+ * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
+ * Implements the two-stage structural discovery and ingestion process.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -10,14 +10,12 @@ import type {
   ParsedAsset, 
   ImportRunSummary, 
   HeaderTemplate, 
-  GroupBlock,
   ParserState 
 } from './types';
 import type { Asset } from '@/types/domain';
 
 export class ParserEngine {
   private templates: Map<string, HeaderTemplate> = new Map();
-  private groups: GroupBlock[] = [];
   private workbookName: string;
   private existingSerials: Set<string>;
 
@@ -27,59 +25,50 @@ export class ParserEngine {
   }
 
   /**
-   * PRIMARY ENTRY POINT: Two-Stage Parsing
+   * Main Pulse: Two-Stage Discovery & Import
    */
   public parseWorkbook(sheetName: string, data: any[][]): { assets: ParsedAsset[], summary: ImportRunSummary } {
-    // Stage 1: Detect Groups & Templates
-    this.detectStructure(sheetName, data);
+    // STAGE 1: Discovery Pulse - Learn the Structural Landscape
+    this.discoverTemplates(data);
 
-    // Stage 2: Full Import using discovered structure
-    const assets = this.executeImport(sheetName, data);
+    // STAGE 2: Ingestion Pulse - Map Data to Learned Templates
+    const assets = this.executeIngestion(sheetName, data);
+
+    const groupCounts: Record<string, number> = {};
+    assets.forEach(a => {
+      groupCounts[a.section] = (groupCounts[a.section] || 0) + 1;
+    });
 
     const summary: ImportRunSummary = {
       workbookName: this.workbookName,
       sheetName,
-      profileId: 'STRUCTURAL_V1',
+      profileId: 'STRUCTURAL_ENGINE_V5',
       totalRows: data.length,
-      groupCount: this.groups.length,
+      groupCount: Object.keys(groupCounts).length,
       dataRowsImported: assets.length,
       rowsRejected: 0,
       duplicatesDetected: assets.filter(a => a.validation.duplicateFlags.length > 0).length,
       templatesDiscovered: this.templates.size,
-      sectionBreakdown: this.groups.reduce((acc, g) => ({ ...acc, [g.groupHeader]: g.assets.length }), {})
+      sectionBreakdown: groupCounts
     };
 
     return { assets, summary };
   }
 
   /**
-   * STAGE 1: Scan first column, detect groups and header sets.
+   * STAGE 1: Discover structural groups and their header sets.
    */
-  private detectStructure(sheetName: string, data: any[][]) {
-    let currentGroup: string = 'INITIAL';
-    let currentStartRow = 0;
-
+  private discoverTemplates(data: any[][]) {
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
-      const classification = classifyRow(row);
-
-      if (classification === 'GROUP_HEADER') {
-        currentGroup = String(row[0]).trim();
-        currentStartRow = i;
-        
-        // Peek at next row for S/N header
-        const nextRow = data[i + 1];
-        if (nextRow && classifyRow(nextRow) === 'SCHEMA_HEADER') {
-          this.registerTemplate(nextRow);
-        }
-      } else if (classification === 'SCHEMA_HEADER') {
+      if (classifyRow(row) === 'SCHEMA_HEADER') {
         this.registerTemplate(row);
       }
     }
   }
 
   private registerTemplate(row: any[]): string {
-    const rawHeaders = row.map(c => String(c || '').trim());
+    const rawHeaders = row.map(c => String(c || '').trim()).filter(h => h.length > 0);
     const signature = rawHeaders.join('|');
     
     if (!this.templates.has(signature)) {
@@ -88,7 +77,7 @@ export class ParserEngine {
         id,
         rawHeaders,
         normalizedHeaders: rawHeaders.map(normalizeHeaderName),
-        columnCount: rawHeaders.length,
+        columnCount: row.length,
         signature
       });
       return id;
@@ -97,38 +86,40 @@ export class ParserEngine {
   }
 
   /**
-   * STAGE 2: Import assets using the saved templates.
+   * STAGE 2: Import every asset row under its detected group context.
    */
-  private executeImport(sheetName: string, data: any[][]): ParsedAsset[] {
+  private executeIngestion(sheetName: string, data: any[][]): ParsedAsset[] {
     const assets: ParsedAsset[] = [];
-    let activeGroup: string = 'General Registry';
+    let activeGroup: string = 'General Register';
     let activeTemplate: HeaderTemplate | null = null;
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       const classification = classifyRow(row);
 
+      // Context Shift: New Group Header detected in Column A
       if (classification === 'GROUP_HEADER') {
         activeGroup = String(row[0]).trim();
-        // Reset template for new group, will be assigned by next SCHEMA_HEADER or inference
-        activeTemplate = null; 
+        activeTemplate = null; // Clear active template, must find/infer new one
         continue;
       }
 
+      // Explicit Schema Anchor: S/N row found
       if (classification === 'SCHEMA_HEADER') {
-        const sig = row.map(c => String(c || '').trim()).join('|');
+        const sig = row.map(c => String(c || '').trim()).filter(h => h.length > 0).join('|');
         activeTemplate = this.templates.get(sig) || null;
         continue;
       }
 
+      // Record Pulse: Data row detected
       if (classification === 'DATA_ROW') {
-        // If no active template, infer from row shape
+        // Inference Rule: If no active anchor, match row shape to learned templates
         if (!activeTemplate) {
-          activeTemplate = this.inferTemplate(row);
+          activeTemplate = this.inferTemplateFromRow(row);
         }
 
         if (activeTemplate) {
-          const asset = this.mapRowToAsset(row, activeTemplate, activeGroup, i + 1, sheetName);
+          const asset = this.mapRowToDomain(row, activeTemplate, activeGroup, i + 1, sheetName);
           if (asset) assets.push(asset);
         }
       }
@@ -137,34 +128,40 @@ export class ParserEngine {
     return assets;
   }
 
-  private inferTemplate(row: any[]): HeaderTemplate | null {
-    // Match by column count and basic density
+  private inferTemplateFromRow(row: any[]): HeaderTemplate | null {
     let bestMatch: HeaderTemplate | null = null;
     let maxOverlap = 0;
 
+    // Matching Rule: High column count similarity and row shape density
     this.templates.forEach(tpl => {
-      if (tpl.columnCount >= row.length) {
+      if (tpl.columnCount >= row.length && tpl.columnCount > maxOverlap) {
         bestMatch = tpl;
+        maxOverlap = tpl.columnCount;
       }
     });
 
     return bestMatch;
   }
 
-  private mapRowToAsset(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
+  private mapRowToDomain(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
     const asset: any = {
       id: uuidv4(),
-      category: 'AUTO_DETECT',
+      category: 'AUTO_DETECT', // Group becomes the functional category
       description: '',
-      grantId: 'SYSTEM',
+      grantId: 'SYSTEM', // Contextualised during commit
       section: group,
       subsection: 'Base Register',
       assetFamily: 'Uncategorized',
       status: 'UNVERIFIED',
       condition: 'New',
       lastModified: new Date().toISOString(),
-      lastModifiedBy: 'Parser Engine',
-      hierarchy: { document: sheet, section: group, subsection: '', assetFamily: '' },
+      lastModifiedBy: 'Structural Parser',
+      hierarchy: { 
+        document: sheet, 
+        section: group, 
+        subsection: '', 
+        assetFamily: '' 
+      },
       importMetadata: {
         sourceFile: this.workbookName,
         sheetName: sheet,
@@ -172,32 +169,47 @@ export class ParserEngine {
         importedAt: new Date().toISOString()
       },
       metadata: {},
-      validation: { warnings: [], errors: [], duplicateFlags: [], needsReview: false, isRejected: false },
+      validation: { 
+        warnings: [], 
+        errors: [], 
+        duplicateFlags: [], 
+        needsReview: false, 
+        isRejected: false 
+      },
       sourceGroup: group,
       templateId: tpl.id
     };
 
+    // Deterministic Column Mapping Pulse
     tpl.normalizedHeaders.forEach((key, idx) => {
       const val = row[idx];
       if (val !== undefined && val !== null) {
         const strVal = String(val).trim();
-        if (key && !key.startsWith('_')) {
+        // If the key is recognized in the domain, map it directly
+        if (key && !key.startsWith('_') && key !== 'id') {
           asset[key] = strVal;
         } else {
-          asset.metadata[tpl.rawHeaders[idx]] = val;
+          // Otherwise, sequester into metadata pulse for fidelity
+          asset.metadata[tpl.rawHeaders[idx] || `COL_${idx}`] = val;
         }
       }
     });
 
-    // Basic cleaning
+    // Post-Processing Cleanup
     if (asset.sn && !isNaN(Number(asset.sn))) asset.sn = Number(asset.sn);
     
-    // Duplicate Check
+    // Duplicate Detection Pulse
     if (asset.serialNumber && this.existingSerials.has(asset.serialNumber)) {
-      asset.validation.duplicateFlags.push('Duplicate Serial Pulse');
+      asset.validation.duplicateFlags.push('Duplicate Serial Detected');
       asset.validation.needsReview = true;
     }
 
-    return asset as ParsedAsset;
+    // Assign category from group header if description exists
+    if (asset.description) {
+      asset.category = group;
+      return asset as ParsedAsset;
+    }
+
+    return null;
   }
 }

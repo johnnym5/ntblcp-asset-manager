@@ -1,15 +1,12 @@
 /**
  * @fileOverview Deterministic Structural Row Classifier.
- * Rules:
- * 1. Column A standalone text = potential GROUP_HEADER.
- * 2. Starts with S/N = SCHEMA_HEADER.
- * 3. Populated row after header = DATA_ROW.
+ * Identifies the functional role of a row based on Column A behavior and row density.
  */
 
 import { RowClassification } from './types';
 
-const KNOWN_GROUPS = [
-  'GENERAL', 'IT EQUIPMENT', 'PRINTER MACHINE', 'PMU OFFICE', 'ADDITIONAL ASSETS',
+const KNOWN_GROUP_KEYWORDS = [
+  'GENERAL', 'IT EQUIPMENT', 'PRINTER', 'PMU OFFICE', 'ADDITIONAL ASSETS',
   'GX-IV', 'TRANSFERRED ASSETS', 'COMPUTERS', 'IT-EQUIPMENTS', 'INHERITED ASSESTS',
   'MOTOR VEHICLES', 'GENEXPERT MACHINES', 'ADDITIONS', 'MOTORBIKES', 'PDX',
   'TB LAMP', 'TRUENAT', 'SAMSUNG GALAXY TABLETS', 'ECG MACHINE'
@@ -23,24 +20,24 @@ export function classifyRow(row: any[]): RowClassification {
   const colA = String(row[0] || '').trim();
   const colA_Upper = colA.toUpperCase();
   
-  // 1. Check for SCHEMA_HEADER (Must start with S/N or equivalent)
+  // 1. SCHEMA_HEADER: Explicitly identifies the start of a data block
   if (colA_Upper === 'S/N' || colA_Upper === 'SN') {
     return 'SCHEMA_HEADER';
   }
 
-  // 2. Check for GROUP_HEADER
-  // Rule: High visibility in Column A, low density in rest of row
+  // 2. GROUP_HEADER: Functional section boundary in Column A
   const populatedCount = row.filter(c => c !== null && String(c).trim() !== '').length;
-  const isKnownGroup = KNOWN_GROUPS.some(k => colA_Upper.includes(k));
+  const isKeywordMatch = KNOWN_GROUP_KEYWORDS.some(k => colA_Upper.includes(k));
   
-  if (colA && (isKnownGroup || populatedCount <= 2)) {
-    // Ensure it's not just a serial number or short description
+  // Rule: If Column A has text and it's either a known keyword OR the rest of the row is empty/sparse
+  if (colA && (isKeywordMatch || populatedCount <= 2)) {
+    // Avoid misclassifying actual serial numbers as group headers
     if (colA.length > 3 && isNaN(Number(colA))) {
       return 'GROUP_HEADER';
     }
   }
 
-  // 3. DATA_ROW
+  // 3. DATA_ROW: High density following a schema anchor
   if (populatedCount >= 3) {
     return 'DATA_ROW';
   }
