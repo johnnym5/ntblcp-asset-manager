@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Control Center.
- * Phase 92: Integrated System Diagnostics, Global Purge, and Infrastructure Monitor.
+ * Phase 93: Fixed JSX syntax errors and icon reference issues.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -45,7 +45,9 @@ import {
   XCircle,
   ScanSearch,
   ChevronRight,
-  ArrowUpRight
+  ArrowUpRight,
+  Clock,
+  AlertCircle
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -209,7 +211,7 @@ export function SettingsWorkstation() {
     setIsSaving(true);
     try {
       await VirtualDBService.purgeGlobalRegistry();
-      toast({ title: "Global Purge Complete", description: "slates cleared across all layers." });
+      toast({ title: "Global Purge Complete", description: "Registry slates cleared across all layers." });
       await refreshRegistry();
       setIsGlobalPurgeDialogOpen(false);
     } catch (e) {
@@ -319,7 +321,6 @@ export function SettingsWorkstation() {
           </TabsTrigger>
         </TabsList>
 
-        {/* --- Environment Tab --- */}
         <TabsContent value="environment" className="space-y-10 outline-none px-2">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             <div className="space-y-8">
@@ -361,7 +362,6 @@ export function SettingsWorkstation() {
           </div>
         </TabsContent>
 
-        {/* --- Governance Tab --- */}
         <TabsContent value="governance" className="space-y-10 outline-none px-2">
           <SectionHeading title="Identity Governance" description="Authorized auditors & regional jurisdictions" icon={UserCog} />
           <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
@@ -388,7 +388,6 @@ export function SettingsWorkstation() {
           </Card>
         </TabsContent>
 
-        {/* --- Infrastructure Tab --- */}
         <TabsContent value="infrastructure" className="space-y-10 outline-none px-2">
           <div className="flex items-center justify-between">
             <SectionHeading title="Infrastructure" description="High-Availability Redundancy Monitor" icon={Monitor} />
@@ -467,7 +466,6 @@ export function SettingsWorkstation() {
           </Card>
         </TabsContent>
 
-        {/* --- Database Mission Control Tab --- */}
         <TabsContent value="database" className="space-y-6 outline-none px-2 h-[600px] flex flex-col">
           <div className="flex items-center justify-between">
             <SectionHeading title="Mission Control" description="Deterministic Cross-Layer Node Orchestration" icon={Terminal} />
@@ -571,7 +569,6 @@ export function SettingsWorkstation() {
           </div>
         </TabsContent>
 
-        {/* --- Resilience Audit Tab --- */}
         <TabsContent value="resilience" className="space-y-6 outline-none px-2">
           <SectionHeading title="Resilience Audit" description="System Health Monitoring & Layman Error Pulse" icon={ShieldAlert} />
           <div className="space-y-4">
@@ -595,7 +592,7 @@ export function SettingsWorkstation() {
                   </CardContent>
                 </Card>
               )) : (
-                <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[3rem]">
+                <div className="py-40 text-center opacity-30 border-4 border-dashed rounded-[3rem]">
                   <CheckCircle2 className="h-16 w-16 mx-auto mb-4" />
                   <h3 className="text-xl font-black uppercase tracking-widest">Resilience Pulse: Stable</h3>
                 </div>
@@ -604,7 +601,6 @@ export function SettingsWorkstation() {
           </div>
         </TabsContent>
 
-        {/* --- System Tab --- */}
         <TabsContent value="system" className="space-y-10 outline-none px-2">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div className="space-y-8">
@@ -628,7 +624,7 @@ export function SettingsWorkstation() {
                   <div className="absolute top-0 right-0 p-4 opacity-10"><ShieldAlert className="h-20 w-20 text-destructive" /></div>
                   <div className="space-y-2 relative z-10">
                     <div className="flex items-center gap-3 text-destructive"><Trash2 className="h-5 w-5" /><h4 className="text-sm font-black uppercase">Local Reset Pulse</h4></div>
-                    <p className="text-[10px] font-medium text-muted-foreground leading-relaxed italic">Purging local storage is irreversible.</p>
+                    <p className="text-[10px] font-bold text-muted-foreground leading-relaxed italic">Purging local storage is irreversible.</p>
                   </div>
                   <Button variant="ghost" onClick={() => setIsResetDialogOpen(true)} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] text-destructive hover:bg-destructive/10 border-2 border-transparent hover:border-destructive/20 relative z-10">Execute Local Reset</Button>
                 </Card>
@@ -676,7 +672,6 @@ export function SettingsWorkstation() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Error Detail Dialog */}
       <Dialog open={!!selectedErrorLog} onOpenChange={() => setSelectedErrorLog(null)}>
         <DialogContent className="max-w-3xl rounded-[2.5rem] border-primary/10 shadow-2xl p-0 overflow-hidden">
           <div className="p-8 bg-muted/30 border-b">
@@ -685,6 +680,7 @@ export function SettingsWorkstation() {
                 <DialogTitle className="text-2xl font-black uppercase tracking-tight">Incident Analysis</DialogTitle>
                 <Badge variant="outline" className="border-destructive/20 text-destructive font-black uppercase px-4 h-8 rounded-full">{selectedErrorLog?.severity}</Badge>
               </div>
+              <DialogDescription className="font-bold uppercase text-[10px] tracking-widest opacity-60">Deterministic Pulse Investigation</DialogDescription>
             </DialogHeader>
           </div>
           <ScrollArea className="max-h-[60vh] p-8 space-y-8">
@@ -699,7 +695,7 @@ export function SettingsWorkstation() {
           </ScrollArea>
           <div className="p-8 border-t bg-muted/30 flex justify-end gap-4">
             <Button variant="ghost" onClick={() => setSelectedErrorLog(null)} className="font-bold rounded-xl px-10">Close</Button>
-            <Button onClick={() => selectedErrorLog && FirestoreService.updateErrorStatus(selectedErrorLog.id, 'RESOLVED')} className="h-14 px-12 rounded-2xl font-black uppercase text-xs shadow-xl shadow-primary/20 bg-primary text-primary-foreground">Mark as Resolved</Button>
+            <Button onClick={() => { if(selectedErrorLog) FirestoreService.updateErrorStatus(selectedErrorLog.id, 'RESOLVED'); setSelectedErrorLog(null); }} className="h-14 px-12 rounded-2xl font-black uppercase text-xs shadow-xl shadow-primary/20 bg-primary text-primary-foreground">Mark as Resolved</Button>
           </div>
         </DialogContent>
       </Dialog>

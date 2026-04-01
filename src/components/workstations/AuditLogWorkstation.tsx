@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AuditLogWorkstation - SPA Activity Ledger.
- * Phase 92: Enhanced with High-Fidelity Forensic Diffs.
+ * Phase 93: Stabilized syntax and added forensic diff visualization.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -35,7 +35,16 @@ import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { ActivityLogEntry } from '@/types/domain';
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle 
+} from "@/components/ui/alert-dialog";
 import { saveAs } from 'file-saver';
 
 export function AuditLogWorkstation() {
@@ -49,15 +58,22 @@ export function AuditLogWorkstation() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [entryToRestore, setEntryToRestore] = useState<ActivityLogEntry | null>(null);
 
-  useEffect(() => { if (isOnline) loadLogs(); }, [isOnline]);
+  useEffect(() => { 
+    if (isOnline) {
+      loadLogs();
+    }
+  }, [isOnline]);
 
   const loadLogs = async () => {
     setLoading(true);
     try { 
       const data = await FirestoreService.getGlobalActivity(); 
       setLog(data); 
+    } catch (e) {
+      console.error("Ledger: Pulse latency.", e);
+    } finally { 
+      setLoading(false); 
     }
-    finally { setLoading(false); }
   };
 
   const handleRestorePulse = async () => {
@@ -74,7 +90,7 @@ export function AuditLogWorkstation() {
     }
   };
 
-  const filteredLog = React.useMemo(() => {
+  const filteredLog = useMemo(() => {
     if (!searchTerm) return log;
     const term = searchTerm.toLowerCase();
     return log.filter(entry => 
@@ -223,7 +239,7 @@ export function AuditLogWorkstation() {
       </div>
 
       <AlertDialog open={!!entryToRestore} onOpenChange={() => setEntryToRestore(null)}>
-        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 p-10 shadow-3xl">
+        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 p-10 shadow-2xl bg-background">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-primary/10 rounded-2xl w-fit">
               <RotateCcw className="h-12 w-12 text-primary" />
