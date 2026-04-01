@@ -102,8 +102,8 @@ export function DashboardWorkstation() {
     };
   }, [assets]);
 
-  const activeGrant = appSettings?.grants.find(g => g.id === activeGrantId);
-  const otherGrants = appSettings?.grants.filter(g => g.id !== activeGrantId) || [];
+  const activeGrant = appSettings?.grants?.find(g => g.id === activeGrantId);
+  const otherGrants = appSettings?.grants?.filter(g => g.id !== activeGrantId) || [];
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700 pb-32">
@@ -112,7 +112,7 @@ export function DashboardWorkstation() {
         <div className="space-y-1">
           <div className="flex items-center gap-4">
             <h2 className="text-4xl font-black tracking-tighter uppercase leading-none">Intelligence Hub</h2>
-            {appSettings && appSettings.grants.length > 1 && (
+            {appSettings?.grants && appSettings.grants.length > 1 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button variant="ghost" size="sm" className="h-10 px-4 rounded-xl border-2 border-primary/10 bg-card gap-2 hover:bg-primary/5 transition-all group">
