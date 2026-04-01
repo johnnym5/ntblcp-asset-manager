@@ -10,7 +10,7 @@ export function cn(...inputs: ClassValue[]) {
  * Deep recursive utility to ensure objects are safe for Firestore.
  * - Converts Dates to Timestamps.
  * - Recursively removes undefined values from objects and arrays.
- * - Filters out sensitive local-only keys (e.g., previousState).
+ * - Filters out sensitive local-only keys (e.g., previousState) during cloud writes.
  */
 export const sanitizeForFirestore = <T extends any>(obj: T): T => {
     if (obj === null || obj === undefined) return obj as T;
@@ -30,13 +30,15 @@ export const sanitizeForFirestore = <T extends any>(obj: T): T => {
         const sanitizedObj: { [key: string]: any } = {};
         for (const key in obj) {
             if (Object.prototype.hasOwnProperty.call(obj, key)) {
-                // CRITICAL: Ensure audit buffer is NEVER pushed to the cloud
+                const value = (obj as any)[key];
+                
+                // CRITICAL: Filter undefined to prevent Firestore write crashes
+                if (value === undefined) continue;
+
+                // Strip local-only restoration buffers before committing to cloud
                 if (key === 'previousState') continue;
 
-                const value = (obj as any)[key];
-                if (value !== undefined) {
-                    sanitizedObj[key] = sanitizeForFirestore(value);
-                }
+                sanitizedObj[key] = sanitizeForFirestore(value);
             }
         }
         return sanitizedObj as T;

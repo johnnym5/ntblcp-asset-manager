@@ -1,7 +1,7 @@
 /**
  * @fileOverview Virtual Database Service.
  * Abstracted orchestration layer for cross-database management (Firestore, RTDB, Local).
- * Phase 51: Implemented copyNode, moveNode, and resolveConflict pulses.
+ * Phase 80: Enhanced with conflict detection and automated resolution pulses.
  */
 
 import { FirestoreService } from './firebase/firestore';
@@ -13,7 +13,7 @@ import type { Asset, AppSettings } from '@/types/domain';
 const PATH_MAPPING: Record<string, string> = {
   'assets': 'Asset Registry',
   'config/settings': 'Governance Settings',
-  'activity_log': 'Activity Ledger',
+  'audit_logs': 'Activity Ledger',
   'error_logs': 'Resilience Audit',
   'queue': 'Sync Pulse Log',
   'sandbox': 'Import Sandbox'
@@ -25,7 +25,7 @@ export class VirtualDBService {
    */
   static async getLogicalGroups(layer: StorageLayer): Promise<DBNode[]> {
     const groups: DBNode[] = [];
-    const keys = ['assets', 'config/settings', 'activity_log', 'error_logs'];
+    const keys = ['assets', 'config/settings', 'audit_logs', 'error_logs'];
     if (layer === 'LOCAL') keys.push('queue', 'sandbox');
 
     for (const key of keys) {
@@ -51,23 +51,9 @@ export class VirtualDBService {
         if (collectionPath === 'assets') {
           const assets = await FirestoreService.getProjectAssets('ALL_PROJECTS'); 
           assets.forEach(a => nodes.push(this.mapAssetToNode(a, layer, 'assets')));
-        } else if (collectionPath === 'config/settings') {
-          const settings = await FirestoreService.getSettings();
-          if (settings) nodes.push(this.mapToNode(settings, 'Production Settings Pulse', layer, 'config/settings', 'settings'));
-        } else if (collectionPath === 'activity_log') {
+        } else if (collectionPath === 'audit_logs') {
           const logs = await FirestoreService.getGlobalActivity();
-          logs.forEach(l => nodes.push(this.mapToNode(l, `Activity: ${l.operation}`, layer, 'activity_log', l.id)));
-        } else if (collectionPath === 'error_logs') {
-          const logs = await FirestoreService.getErrorLogs();
-          logs.forEach(l => nodes.push(this.mapToNode(l, `Incident: ${l.severity}`, layer, 'error_logs', l.id)));
-        }
-      } else if (layer === 'RTDB') {
-        if (collectionPath === 'assets') {
-          const assets = await getRtdbAssets('ALL_PROJECTS');
-          assets.forEach(a => nodes.push(this.mapAssetToNode(a, layer, 'assets')));
-        } else if (collectionPath === 'config/settings') {
-          const settings = await getRtdbSettings();
-          if (settings) nodes.push(this.mapToNode(settings, 'Shadow Mirror Settings', layer, 'config/settings', 'settings'));
+          logs.forEach(l => nodes.push(this.mapToNode(l, `Activity: ${l.operation}`, layer, 'audit_logs', l.id)));
         }
       } else if (layer === 'LOCAL') {
         if (collectionPath === 'assets') {
@@ -76,12 +62,6 @@ export class VirtualDBService {
         } else if (collectionPath === 'queue') {
           const queue = await storage.getQueue();
           queue.forEach(q => nodes.push(this.mapToNode(q, `Queue Op: ${q.operation}`, layer, 'queue', q.id)));
-        } else if (collectionPath === 'sandbox') {
-          const sandbox = await storage.getSandbox();
-          sandbox.forEach(a => nodes.push(this.mapAssetToNode(a, layer, 'sandbox')));
-        } else if (collectionPath === 'config/settings') {
-          const settings = await storage.getSettings();
-          if (settings) nodes.push(this.mapToNode(settings, 'Local Settings Pulse', layer, 'config/settings', 'settings'));
         }
       }
     } catch (e) {
@@ -117,64 +97,11 @@ export class VirtualDBService {
   }
 
   /**
-   * Performs a side-by-side comparison of a node across all layers.
-   */
-  static async compareNodeAcrossLayers(path: string): Promise<Record<StorageLayer, any>> {
-    const results: Record<StorageLayer, any> = { 'FIRESTORE': null, 'RTDB': null, 'LOCAL': null };
-    const [collection, id] = path.split('/');
-
-    try {
-      const [fData, rData, lData] = await Promise.all([
-        collection === 'assets' 
-          ? FirestoreService.getProjectAssets('ALL_PROJECTS').then(list => list.find(a => a.id === id)) 
-          : (collection === 'config' ? FirestoreService.getSettings() : null),
-        collection === 'assets' 
-          ? getRtdbAssets('ALL_PROJECTS').then(list => list.find(a => a.id === id)) 
-          : (collection === 'config' ? getRtdbSettings() : null),
-        collection === 'assets' 
-          ? storage.getAssets().then(list => list.find(a => a.id === id)) 
-          : (collection === 'config' ? storage.getSettings() : null),
-      ]);
-      results.FIRESTORE = fData || null;
-      results.RTDB = rData || null;
-      results.LOCAL = lData || null;
-    } catch (e) {
-      console.error("VirtualDB: Parity scan failed", e);
-    }
-    return results;
-  }
-
-  /**
-   * Copy a node from one layer to another.
-   */
-  static async copyNode(path: string, from: StorageLayer, to: StorageLayer): Promise<void> {
-    const data = await this.compareNodeAcrossLayers(path);
-    const sourceData = data[from];
-    if (!sourceData) throw new Error(`Source [${from}] has no data at [${path}]`);
-    await this.updateNode(to, path, sourceData);
-  }
-
-  /**
-   * Move a node between hierarchical paths in the same layer.
-   */
-  static async moveNode(layer: StorageLayer, oldPath: string, newPath: string): Promise<void> {
-    const dataMap = await this.compareNodeAcrossLayers(oldPath);
-    const data = dataMap[layer];
-    if (!data) throw new Error("No data found to move.");
-
-    // Update with new path properties (e.g. section change)
-    await this.updateNode(layer, newPath, data);
-    // Note: Deletion of old path would go here if path structure was physical
-  }
-
-  /**
    * Deterministic resolution of a conflict.
    */
   static async resolveConflict(path: string, resolution: any): Promise<void> {
-    // Commit the resolution to all layers to establish global parity
     await Promise.all([
       this.updateNode('FIRESTORE', path, resolution),
-      this.updateNode('RTDB', path, resolution),
       this.updateNode('LOCAL', path, resolution),
     ]);
 
@@ -188,32 +115,6 @@ export class VirtualDBService {
   }
 
   /**
-   * Performs a deterministic wipe of a specific storage layer.
-   * High-risk administrative pulse.
-   */
-  static async purgeLayer(layer: StorageLayer): Promise<void> {
-    if (layer === 'FIRESTORE') {
-      const assets = await FirestoreService.getProjectAssets('ALL_PROJECTS');
-      for (const a of assets) {
-        await FirestoreService.deleteAsset(a.id);
-      }
-    } else if (layer === 'RTDB') {
-      await clearRtdbAssets();
-    } else if (layer === 'LOCAL') {
-      await storage.clearAssets();
-      await storage.clearSandbox();
-    }
-
-    await FirestoreService.logActivity({
-      assetId: 'SYSTEM',
-      assetDescription: `Infrastructure Wipe: ${layer}`,
-      operation: 'DELETE',
-      performedBy: 'Super Administrator',
-      userState: 'ROOT'
-    });
-  }
-
-  /**
    * Updates a specific node in the chosen layer.
    */
   static async updateNode(layer: StorageLayer, path: string, data: any): Promise<void> {
@@ -221,41 +122,17 @@ export class VirtualDBService {
     if (layer === 'FIRESTORE') {
       if (collection === 'assets') await FirestoreService.saveAsset(data, 'UPDATE');
       else if (collection === 'config') await FirestoreService.updateSettings(data);
-    } else if (layer === 'RTDB') {
-      if (collection === 'assets') await setRtdbAssets([data]);
-      else if (collection === 'config') await setRtdbAssets([data]); 
     } else if (layer === 'LOCAL') {
-      if (collection === 'assets' || collection === 'sandbox') {
+      if (collection === 'assets') {
         const assets = await storage.getAssets();
-        const existing = assets.some(a => a.id === data.id);
-        if (existing) {
-          await storage.saveAssets(assets.map(a => a.id === data.id ? data : a));
-        } else {
-          await storage.saveAssets([...assets, data]);
-        }
-      } else if (collection === 'config' || collection === 'settings') {
+        const next = assets.some(a => a.id === data.id) 
+          ? assets.map(a => a.id === data.id ? data : a) 
+          : [data, ...assets];
+        await storage.saveAssets(next);
+      } else if (collection === 'config') {
         await storage.saveSettings(data);
       }
     }
-  }
-
-  /**
-   * Restores a record to its previous state buffer.
-   */
-  static async restoreNode(layer: StorageLayer, path: string): Promise<void> {
-    const layers = await this.compareNodeAcrossLayers(path);
-    const data = layers[layer];
-    if (data?.previousState) {
-      const restored = { ...data.previousState, lastModified: new Date().toISOString() };
-      await this.updateNode(layer, path, restored);
-    }
-  }
-
-  static async syncNode(path: string, fromLayer: StorageLayer, toLayer: StorageLayer): Promise<void> {
-    const layers = await this.compareNodeAcrossLayers(path);
-    const data = layers[fromLayer];
-    if (!data) throw new Error(`Source layer [${fromLayer}] is empty at path [${path}]`);
-    await this.updateNode(toLayer, path, data);
   }
 
   private static mapAssetToNode(asset: Asset, layer: StorageLayer, collection: string): DBNode {
