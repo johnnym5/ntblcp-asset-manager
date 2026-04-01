@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - SPA Shell Persistence.
- * Phase 78: Integrated GIS Spatial Hub into Sidebar and refined Header command topology.
+ * Phase 80: Integrated ERROR_AUDIT into Governance command group.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -89,6 +89,7 @@ const AUDIT_NAV: NavItem[] = [
 const GOVERNANCE_NAV: NavItem[] = [
   { label: 'Identities', view: 'USERS', icon: <Users className="h-4 w-4" />, adminOnly: true },
   { label: 'Infrastructure', view: 'INFRASTRUCTURE', icon: <Monitor className="h-4 w-4" />, adminOnly: true },
+  { label: 'Resilience Audit', view: 'ERROR_AUDIT', icon: <ShieldAlert className="h-4 w-4" />, adminOnly: true },
   { label: 'Database Control', view: 'DATABASE', icon: <Terminal className="h-4 w-4" />, superAdminOnly: true },
   { label: 'System Settings', view: 'SETTINGS', icon: <Settings className="h-4 w-4" />, adminOnly: true, shortcut: ',' },
 ];

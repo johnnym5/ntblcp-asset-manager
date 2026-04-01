@@ -3,7 +3,7 @@
 /**
  * @fileOverview SPA Orchestrator Hub.
  * Manages the unified workstation switching logic with high-fidelity transitions.
- * Phase 78: Added GIS Spatial Hub to deterministic workstation router.
+ * Phase 80: Added ERROR_AUDIT to workstation router.
  */
 
 import React, { Suspense } from 'react';
@@ -29,6 +29,7 @@ import { InfrastructureWorkstation } from '@/components/workstations/Infrastruct
 import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
 import { GISWorkstation } from '@/components/workstations/GISWorkstation';
+import { ErrorAuditWorkstation } from '@/components/workstations/ErrorAuditWorkstation';
 
 export default function SPAOrchestrator() {
   const { activeView, settingsLoaded } = useAppState();
@@ -72,6 +73,7 @@ function renderWorkstation(view: string) {
     case 'DATABASE': return <DatabaseWorkstation />;
     case 'SETTINGS': return <SettingsWorkstation />;
     case 'GIS': return <GISWorkstation />;
+    case 'ERROR_AUDIT': return <ErrorAuditWorkstation />;
     default: return (
       <div className="flex flex-col items-center justify-center py-40 opacity-20 space-y-6">
         <div className="p-8 bg-primary/10 rounded-[3rem] shadow-inner">

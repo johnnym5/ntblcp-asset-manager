@@ -54,6 +54,9 @@ export class VirtualDBService {
         } else if (collectionPath === 'audit_logs') {
           const logs = await FirestoreService.getGlobalActivity();
           logs.forEach(l => nodes.push(this.mapToNode(l, `Activity: ${l.operation}`, layer, 'audit_logs', l.id)));
+        } else if (collectionPath === 'error_logs') {
+          const logs = await FirestoreService.getErrorLogs();
+          logs.forEach(l => nodes.push(this.mapToNode(l, `Error: ${l.error.laymanExplanation}`, layer, 'error_logs', l.id)));
         }
       } else if (layer === 'LOCAL') {
         if (collectionPath === 'assets') {
@@ -62,12 +65,59 @@ export class VirtualDBService {
         } else if (collectionPath === 'queue') {
           const queue = await storage.getQueue();
           queue.forEach(q => nodes.push(this.mapToNode(q, `Queue Op: ${q.operation}`, layer, 'queue', q.id)));
+        } else if (collectionPath === 'sandbox') {
+          const sandbox = await storage.getSandbox();
+          sandbox.forEach(a => nodes.push(this.mapAssetToNode(a, layer, 'sandbox')));
         }
       }
     } catch (e) {
       console.error(`VirtualDB: Failed to list docs for ${layer}:${collectionPath}`, e);
     }
     return nodes;
+  }
+
+  /**
+   * Compares a specific record across all available storage layers.
+   */
+  static async compareNodeAcrossLayers(path: string): Promise<Record<StorageLayer, any>> {
+    const [collection, id] = path.split('/');
+    const results: any = { FIRESTORE: null, RTDB: null, LOCAL: null };
+
+    try {
+      if (collection === 'assets') {
+        const [f, l] = await Promise.all([
+          this.fetchFirestoreDoc('assets', id),
+          this.fetchLocalDoc('assets', id)
+        ]);
+        results.FIRESTORE = f;
+        results.LOCAL = l;
+      } else if (collection === 'config') {
+        const [f, l] = await Promise.all([
+          FirestoreService.getSettings(),
+          storage.getSettings()
+        ]);
+        results.FIRESTORE = f;
+        results.LOCAL = l;
+      }
+    } catch (e) {
+      console.warn("VirtualDB: Comparative scan latent.");
+    }
+
+    return results;
+  }
+
+  private static async fetchFirestoreDoc(col: string, id: string) {
+    // Basic implementation for direct fetch
+    const assets = await FirestoreService.getProjectAssets('ALL_PROJECTS');
+    return assets.find(a => a.id === id) || null;
+  }
+
+  private static async fetchLocalDoc(col: string, id: string) {
+    if (col === 'assets') {
+      const assets = await storage.getAssets();
+      return assets.find(a => a.id === id) || null;
+    }
+    return null;
   }
 
   /**
@@ -118,7 +168,9 @@ export class VirtualDBService {
    * Updates a specific node in the chosen layer.
    */
   static async updateNode(layer: StorageLayer, path: string, data: any): Promise<void> {
-    const [collection] = path.split('/');
+    const parts = path.split('/');
+    const collection = parts[0];
+    
     if (layer === 'FIRESTORE') {
       if (collection === 'assets') await FirestoreService.saveAsset(data, 'UPDATE');
       else if (collection === 'config') await FirestoreService.updateSettings(data);
