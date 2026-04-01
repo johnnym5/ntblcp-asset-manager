@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - Unified Single-Scope Hub.
- * Phase 190: Merged Audit Trail and Sync Status into the unified tabbed interface.
+ * Phase 195: GIS Tab disabled per operational refinement request.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -10,13 +10,11 @@ import {
   LayoutDashboard,
   Boxes,
   ShieldCheck,
-  Map as MapIcon,
   Search,
   ArrowUpDown,
   Filter,
   RefreshCw,
   Activity,
-  Globe,
   FileText,
   History
 } from 'lucide-react';
@@ -26,13 +24,12 @@ import { useAppState } from '@/contexts/app-state-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
 import { RegistryWorkstation } from './RegistryWorkstation';
 import { VerifyWorkstation } from './VerifyWorkstation';
-import { GISWorkstation } from './GISWorkstation';
 import { ReportsWorkstation } from './ReportsWorkstation';
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { SyncQueueWorkstation } from './SyncQueueWorkstation';
 import { cn } from '@/lib/utils';
 
-type DashboardTab = 'overview' | 'inventory' | 'audit' | 'reports' | 'gis' | 'trail' | 'sync';
+type DashboardTab = 'overview' | 'inventory' | 'audit' | 'reports' | 'trail' | 'sync';
 
 export function DashboardWorkstation() {
   const { 
@@ -79,9 +76,6 @@ export function DashboardWorkstation() {
               <TabsTrigger value="reports" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 <FileText className="h-3.5 w-3.5" /> Reports
               </TabsTrigger>
-              <TabsTrigger value="gis" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                <MapIcon className="h-3.5 w-3.5" /> GIS
-              </TabsTrigger>
               <TabsTrigger value="trail" className="px-5 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 <History className="h-3.5 w-3.5" /> Trail
               </TabsTrigger>
@@ -111,10 +105,6 @@ export function DashboardWorkstation() {
 
           <TabsContent value="reports" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <ReportsWorkstation />
-          </TabsContent>
-
-          <TabsContent value="gis" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <GISWorkstation />
           </TabsContent>
 
           <TabsContent value="trail" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">

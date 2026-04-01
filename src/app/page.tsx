@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Single-Page Operational Hub.
- * Phase 190: Merged Audit Trail and Cloud Sync Status into the Unified Dashboard.
+ * Phase 195: Relocated Settings to Header Avatar area and streamlined sidebar.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -15,7 +15,7 @@ import {
   FileUp, 
   ShieldCheck, 
   Activity, 
-  Settings,
+  Settings as SettingsIcon,
   Map,
   History,
   AlertTriangle,
@@ -42,7 +42,7 @@ import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
 import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
 import { RegionalScopeDrawer } from '@/components/registry/RegionalScopeDrawer';
-import { NotificationsSheet } from '@/components/NotificationsSheet';
+import { NotificationsCenter } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -77,12 +77,11 @@ export default function SPAHub() {
     return <UserProfileSetup />;
   }
 
-  // Phase 190: Audit Trail and Sync Status merged into Dashboard
+  // Phase 195: Settings moved to header avatar area
   const navItems: { id: WorkstationView; label: string; icon: any; adminOnly?: boolean; group: string }[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, group: 'Core' },
     { id: 'IMPORT', label: 'Data Import Center', icon: FileUp, group: 'Tools' },
     { id: 'ALERTS', label: 'Critical Exceptions', icon: AlertTriangle, group: 'Tools' },
-    { id: 'SETTINGS', label: 'Settings', icon: Settings, group: 'System Administration' },
   ];
 
   const renderWorkstation = () => {
@@ -117,7 +116,8 @@ export default function SPAHub() {
     <div className="flex h-screen bg-black overflow-hidden font-sans selection:bg-primary/30">
       <CommandPalette />
       <WelcomeExperience isOpen={showWelcome} onComplete={() => setShowWelcome(false)} />
-      <NotificationsSheet isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
+      {/* Note: NotificationsSheet renamed to NotificationsCenter in previous phase updates */}
+      <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       
       <aside className={cn(
         "bg-[#050505] border-r border-white/5 flex flex-col transition-all duration-700 ease-out z-50 fixed inset-y-0 left-0 lg:relative lg:translate-x-0",
@@ -210,11 +210,19 @@ export default function SPAHub() {
               </button>
             </div>
 
-            <div className="flex items-center gap-3 group cursor-pointer pl-2">
-              <div className="h-10 w-10 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center font-black text-primary text-xs shadow-xl group-hover:bg-primary group-hover:text-black transition-all">
+            <button 
+              onClick={() => setActiveView('SETTINGS')}
+              className="flex items-center gap-3 group cursor-pointer pl-2"
+            >
+              <div className={cn(
+                "h-10 w-10 rounded-full border transition-all flex items-center justify-center font-black text-xs shadow-xl",
+                activeView === 'SETTINGS' 
+                  ? "bg-primary text-black border-primary" 
+                  : "bg-primary/10 border-primary/20 text-primary group-hover:bg-primary group-hover:text-black"
+              )}>
                 {userProfile?.displayName?.[0] || 'SA'}
               </div>
-            </div>
+            </button>
           </div>
         </header>
 
