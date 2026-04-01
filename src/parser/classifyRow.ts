@@ -1,6 +1,7 @@
 /**
  * @fileOverview Deterministic Structural Row Classifier.
  * Identifies the functional role of a row based on Column A behavior and row density.
+ * Phase 185: Expanded SCHEMA_HEADER triggers and reduced DATA_ROW density threshold.
  */
 
 import { RowClassification } from './types';
@@ -12,6 +13,11 @@ const KNOWN_GROUP_KEYWORDS = [
   'TB LAMP', 'TRUENAT', 'SAMSUNG GALAXY TABLETS', 'ECG MACHINE'
 ];
 
+const SCHEMA_ANCHORS = [
+  'S/N', 'SN', 'S.N', 'SERIAL NO', 'SERIAL NUMBER', 
+  'STATE', 'LOCATION', 'DATE', 'ASSET', 'TAG'
+];
+
 export function classifyRow(row: any[]): RowClassification {
   if (!row || row.length === 0 || row.every(cell => cell === null || String(cell).trim() === '')) {
     return 'EMPTY';
@@ -21,27 +27,25 @@ export function classifyRow(row: any[]): RowClassification {
   const colA_Upper = colA.toUpperCase();
   
   // 1. SCHEMA_HEADER: Explicitly identifies the start of a data block
-  // Matches "S/N", "S.N", "SN", etc.
-  if (colA_Upper === 'S/N' || colA_Upper === 'SN' || colA_Upper === 'S.N') {
+  if (SCHEMA_ANCHORS.some(anchor => colA_Upper === anchor)) {
     return 'SCHEMA_HEADER';
   }
 
-  // 2. GROUP_HEADER: Functional section boundary in Column A
   const populatedCount = row.filter(c => c !== null && String(c).trim() !== '').length;
-  
-  // Rule: High probability if Col A matches known structural keywords
+
+  // 2. GROUP_HEADER: Structural section boundary in Column A
+  // A group header is usually a standalone label in Col A that is NOT a number.
   const isKeywordMatch = KNOWN_GROUP_KEYWORDS.some(k => colA_Upper.includes(k));
-  
-  // Rule: standalone label in Column A with low density across the rest of the row
-  if (colA && (isKeywordMatch || populatedCount <= 2)) {
-    // Avoid misclassifying actual data (like a single ID or numeric S/N) as a group header
-    if (colA.length > 3 && isNaN(Number(colA))) {
-      return 'GROUP_HEADER';
-    }
+  const isStandaloneColA = colA && populatedCount <= 2;
+  const isNotNumber = isNaN(Number(colA));
+
+  if (isStandaloneColA && isNotNumber && (isKeywordMatch || colA.length > 5)) {
+    // Basic length guard to avoid misclassifying very short text fragments
+    return 'GROUP_HEADER';
   }
 
-  // 3. DATA_ROW: High density following a schema anchor
-  if (populatedCount >= 3) {
+  // 3. DATA_ROW: Any row with content that isn't a header or group boundary
+  if (populatedCount >= 1) {
     return 'DATA_ROW';
   }
 

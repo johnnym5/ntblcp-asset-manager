@@ -1,6 +1,7 @@
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements the two-stage structural discovery and ingestion process.
+ * Phase 190: Hardened template persistence and inclusive mapping logic.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -41,7 +42,7 @@ export class ParserEngine {
     const summary: ImportRunSummary = {
       workbookName: this.workbookName,
       sheetName,
-      profileId: 'STRUCTURAL_ENGINE_V5',
+      profileId: 'STRUCTURAL_ENGINE_V5.1',
       totalRows: data.length,
       groupCount: groups.length,
       dataRowsImported: assets.length,
@@ -55,7 +56,7 @@ export class ParserEngine {
   }
 
   /**
-   * STAGE 1: Scan Column A to discover all templates used in the workbook.
+   * STAGE 1: Scan for all unique column templates in the workbook.
    */
   private discoverTemplates(data: any[][]) {
     for (let i = 0; i < data.length; i++) {
@@ -67,9 +68,8 @@ export class ParserEngine {
   }
 
   private registerTemplate(row: any[]) {
-    // Clean and normalize headers for the signature
     const rawHeaders = row.map(c => String(c || '').trim()).filter(h => h.length > 0);
-    if (rawHeaders.length < 3) return; // Ignore noisy fragments
+    if (rawHeaders.length < 2) return;
 
     const signature = rawHeaders.map(h => h.toUpperCase()).join('|');
     
@@ -85,7 +85,7 @@ export class ParserEngine {
   }
 
   /**
-   * STAGE 2: Import every asset row under its detected group context.
+   * STAGE 2: Import asset rows using discovered templates and group context.
    */
   private executeIngestion(sheetName: string, data: any[][]): { assets: ParsedAsset[], groups: DiscoveredGroup[] } {
     const assets: ParsedAsset[] = [];
@@ -93,35 +93,35 @@ export class ParserEngine {
     
     let activeGroupName: string = 'General Register';
     let activeTemplate: HeaderTemplate | null = null;
-    let groupStartRow = 1;
+    let currentGroup: DiscoveredGroup | null = null;
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       const classification = classifyRow(row);
 
-      // 1. Group Header Pulse (Column A Standalone)
+      // 1. Group Header (Section boundary)
       if (classification === 'GROUP_HEADER') {
         activeGroupName = String(row[0]).trim();
-        activeTemplate = null; // Reset template to force discovery/inference for new group
-        groupStartRow = i + 1;
+        // Note: Template persists if next rows match, but we prepare for new anchors
         continue;
       }
 
-      // 2. Explicit Schema Anchor (S/N found)
+      // 2. Explicit Schema Anchor (Found S/N or similar)
       if (classification === 'SCHEMA_HEADER') {
         const rawHeaders = row.map(c => String(c || '').trim()).filter(h => h.length > 0);
         const signature = rawHeaders.map(h => h.toUpperCase()).join('|');
         activeTemplate = this.templates.get(signature) || null;
 
         if (activeTemplate) {
-          groups.push({
+          currentGroup = {
             groupName: activeGroupName,
             headerSet: activeTemplate.rawHeaders,
             headerSource: 'explicit',
             columnCount: activeTemplate.columnCount,
             templateId: activeTemplate.id,
             startRow: i + 1
-          });
+          };
+          groups.push(currentGroup);
         }
         continue;
       }
@@ -129,19 +129,18 @@ export class ParserEngine {
       // 3. Data Record Pulse
       if (classification === 'DATA_ROW') {
         if (!activeTemplate) {
-          // If no explicit header was found for this group yet, infer one from the row shape
-          const inference = this.inferTemplate(row);
-          if (inference) {
-            activeTemplate = inference;
-            groups.push({
+          activeTemplate = this.inferTemplate(row);
+          if (activeTemplate) {
+            currentGroup = {
               groupName: activeGroupName,
               headerSet: activeTemplate.rawHeaders,
               headerSource: 'inferred',
               columnCount: activeTemplate.columnCount,
               templateId: activeTemplate.id,
-              startRow: groupStartRow,
+              startRow: i + 1,
               matchedTemplateSource: activeTemplate.id
-            });
+            };
+            groups.push(currentGroup);
           }
         }
 
@@ -156,21 +155,38 @@ export class ParserEngine {
   }
 
   private inferTemplate(row: any[]): HeaderTemplate | null {
-    // Find the best fitting template based on column density
-    const populatedIndices = row.map((c, i) => (c !== null && String(c).trim() !== '' ? i : -1)).filter(i => i !== -1);
-    
+    if (this.templates.size === 0) return null;
+
+    // Find the last populated index to judge required width
+    let lastPopulated = -1;
+    row.forEach((c, idx) => {
+      if (c !== null && String(c).trim() !== '') lastPopulated = idx;
+    });
+
     let bestMatch: HeaderTemplate | null = null;
-    let maxMatch = 0;
+    let minDifference = Infinity;
 
     this.templates.forEach(tpl => {
-      // Basic check: column count compatibility
-      if (tpl.columnCount >= row.length) {
-        if (tpl.columnCount > maxMatch) {
+      // Find template with closest column count that can contain this row's data
+      if (tpl.columnCount >= lastPopulated + 1) {
+        const diff = tpl.columnCount - (lastPopulated + 1);
+        if (diff < minDifference) {
+          minDifference = diff;
           bestMatch = tpl;
-          maxMatch = tpl.columnCount;
         }
       }
     });
+
+    // Fallback to most complex template if no perfect fit
+    if (!bestMatch) {
+      let maxCols = -1;
+      this.templates.forEach(tpl => {
+        if (tpl.columnCount > maxCols) {
+          maxCols = tpl.columnCount;
+          bestMatch = tpl;
+        }
+      });
+    }
 
     return bestMatch;
   }
@@ -180,7 +196,7 @@ export class ParserEngine {
       id: uuidv4(),
       category: group,
       description: '',
-      grantId: 'SYSTEM_STAGED', 
+      grantId: 'STAGED', 
       section: group,
       subsection: 'Base Register',
       assetFamily: 'Uncategorized',
@@ -201,7 +217,6 @@ export class ParserEngine {
       templateId: tpl.id
     };
 
-    // Map columns to fields or metadata
     tpl.normalizedHeaders.forEach((key, idx) => {
       const val = row[idx];
       if (val === undefined || val === null) return;
@@ -214,13 +229,12 @@ export class ParserEngine {
       }
     });
 
-    // Cleanup Serial Numbers
-    if (asset.serialNumber && this.existingSerials.has(asset.serialNumber)) {
-      asset.validation.duplicateFlags.push('Duplicate Serial Detected');
-      asset.validation.needsReview = true;
-    }
-
-    if (asset.description || asset.assetIdCode || asset.serialNumber) {
+    // Fidelity Check: Ensure row contains meaningful registry data
+    if (asset.description || asset.assetIdCode || asset.serialNumber || asset.sn) {
+      if (asset.serialNumber && this.existingSerials.has(asset.serialNumber)) {
+        asset.validation.duplicateFlags.push('Duplicate Serial Detected');
+        asset.validation.needsReview = true;
+      }
       return asset as ParsedAsset;
     }
 
@@ -228,7 +242,11 @@ export class ParserEngine {
   }
 
   private isDomainField(key: string): boolean {
-    const domainFields = ['sn', 'description', 'location', 'custodian', 'assetIdCode', 'serialNumber', 'manufacturer', 'modelNumber', 'purchaseDate', 'value', 'condition', 'remarks'];
+    const domainFields = [
+      'sn', 'description', 'location', 'custodian', 'assetIdCode', 
+      'serialNumber', 'manufacturer', 'modelNumber', 'purchaseDate', 
+      'value', 'condition', 'remarks'
+    ];
     return domainFields.includes(key);
   }
 
