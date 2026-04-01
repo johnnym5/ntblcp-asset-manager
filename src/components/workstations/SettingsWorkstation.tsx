@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Settings Manager.
- * Phase 131: Renamed naming scheme to be asset manager friendly.
+ * Phase 160: Activated all project and sheet orchestration pulses.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -44,7 +44,9 @@ import {
   RefreshCw,
   LayoutGrid,
   FileCode,
-  SlidersHorizontal
+  SlidersHorizontal,
+  X,
+  Plus
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -61,9 +63,7 @@ import { storage } from '@/offline/storage';
 import { discoverTemplatesFromWorkbook } from '@/lib/excel-parser';
 import { cn } from '@/lib/utils';
 import type { AppSettings, SheetDefinition, Grant, UXMode } from '@/types/domain';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { TravelReportDialog } from '@/components/travel-report-dialog';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
 import { 
   Select, 
@@ -84,7 +84,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 export function SettingsWorkstation() {
-  const { appSettings, refreshRegistry, settingsLoaded, isOnline } = useAppState();
+  const { appSettings, refreshRegistry, settingsLoaded, isOnline, setActiveGrantId, setActiveView } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const { setTheme, theme } = useTheme();
@@ -93,6 +93,8 @@ export function SettingsWorkstation() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDiscovering, setIsDiscovering] = useState(false);
   const [isNukeDialogOpen, setIsNukeDialogOpen] = useState(false);
+  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
   
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
@@ -119,13 +121,61 @@ export function SettingsWorkstation() {
     if (!draftSettings) return;
     setIsSaving(true);
     try {
-      await FirestoreService.updateSettings(draftSettings);
       await storage.saveSettings(draftSettings);
+      if (isOnline) {
+        await FirestoreService.updateSettings(draftSettings);
+      }
       await refreshRegistry();
-      toast({ title: "Configuration Updated", description: "Global settings have been saved successfully." });
+      toast({ title: "Environment Synchronized", description: "Global configuration pulse broadcasted successfully." });
+    } catch (e) {
+      toast({ variant: "destructive", title: "Broadcast Failure" });
     } finally {
       setIsSaving(false);
     }
+  };
+
+  const handleAddProject = () => {
+    if (!newProjectName.trim() || !draftSettings) return;
+    
+    const newGrant: Grant = {
+      id: crypto.randomUUID(),
+      name: newProjectName.trim(),
+      enabledSheets: [],
+      sheetDefinitions: {}
+    };
+
+    handleSettingChange('grants', [...draftSettings.grants, newGrant]);
+    setNewProjectName('');
+    toast({ title: "Project Staged", description: "Save configuration to commit this project pulse." });
+  };
+
+  const handleDeleteProject = (id: string) => {
+    if (!draftSettings || draftSettings.grants.length <= 1) {
+      toast({ variant: "destructive", title: "Operation Blocked", description: "At least one project scope is required." });
+      return;
+    }
+    const updatedGrants = draftSettings.grants.filter(g => g.id !== id);
+    handleSettingChange('grants', updatedGrants);
+    if (draftSettings.activeGrantId === id) {
+      handleSettingChange('activeGrantId', updatedGrants[0].id);
+    }
+  };
+
+  const handleDeleteSheet = (grantId: string, sheetName: string) => {
+    if (!draftSettings) return;
+    const updatedGrants = draftSettings.grants.map(g => {
+      if (g.id === grantId) {
+        const nextDefs = { ...g.sheetDefinitions };
+        delete nextDefs[sheetName];
+        return { 
+          ...g, 
+          sheetDefinitions: nextDefs,
+          enabledSheets: g.enabledSheets.filter(s => s !== sheetName)
+        };
+      }
+      return g;
+    });
+    handleSettingChange('grants', updatedGrants);
   };
 
   const handleTemplateDiscovery = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -135,11 +185,11 @@ export function SettingsWorkstation() {
     setIsDiscovering(true);
     try {
       const discovered = await discoverTemplatesFromWorkbook(file);
-      const activeGrantId = draftSettings.activeGrantId;
-      if (!activeGrantId) throw new Error("Please select an active project scope first.");
+      const activeId = draftSettings.activeGrantId;
+      if (!activeId) throw new Error("Select an active project scope first.");
 
       const updatedGrants = draftSettings.grants.map(g => {
-        if (g.id === activeGrantId) {
+        if (g.id === activeId) {
           const nextDefs = { ...g.sheetDefinitions };
           discovered.forEach(d => { nextDefs[d.name] = d; });
           return { 
@@ -152,7 +202,7 @@ export function SettingsWorkstation() {
       });
 
       handleSettingChange('grants', updatedGrants);
-      toast({ title: "Template Discovered", description: `Found ${discovered.length} record categories.` });
+      toast({ title: "Schema Synchronized", description: `Discovered ${discovered.length} record categories.` });
     } catch (err: any) {
       toast({ variant: "destructive", title: "Discovery Failure", description: err.message });
     } finally {
@@ -166,7 +216,7 @@ export function SettingsWorkstation() {
     try {
       await storage.clearAssets();
       await refreshRegistry();
-      toast({ title: "Cache Cleared", description: "Local asset data has been reset." });
+      toast({ title: "Inventory Purged", description: "Local asset data has been reset." });
       setIsNukeDialogOpen(false);
     } finally {
       setIsSaving(false);
@@ -317,7 +367,25 @@ export function SettingsWorkstation() {
         <TabsContent value="registry" className="space-y-10 outline-none m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
           <div className="space-y-10">
             <div>
-              <SectionHeading title="Project Management" description="Manage active projects and data schemas" icon={LayoutGrid} />
+              <div className="flex items-center justify-between mb-6">
+                <h3 className="text-lg font-black uppercase text-foreground tracking-tight leading-none px-1">Manage Projects</h3>
+                <div className="flex gap-3">
+                  <Input 
+                    placeholder="New project name..." 
+                    value={newProjectName}
+                    onChange={(e) => setNewProjectName(e.target.value)}
+                    className="h-14 bg-white/[0.03] border-white/10 rounded-xl font-medium text-sm focus-visible:ring-primary/20 text-white placeholder:text-white/20"
+                  />
+                  <Button 
+                    onClick={handleAddProject}
+                    disabled={!newProjectName.trim()}
+                    className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
+                  >
+                    <PlusCircle className="h-4 w-4" /> Add Project
+                  </Button>
+                </div>
+              </div>
+
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {draftSettings.grants.map((grant) => {
                   const isActive = draftSettings.activeGrantId === grant.id;
@@ -329,54 +397,66 @@ export function SettingsWorkstation() {
                       <CardHeader className="p-8 pb-4">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
-                            <div className={cn("p-2 rounded-xl shadow-inner", isActive ? "bg-primary text-primary-foreground" : "bg-muted")}>
-                              <Database className="h-5 w-5" />
-                            </div>
-                            <div>
-                              <Input 
-                                value={grant.name} 
-                                onChange={(e) => handleSettingChange('grants', draftSettings.grants.map(g => g.id === grant.id ? { ...g, name: e.target.value } : g))}
-                                className="border-none bg-transparent font-black text-xl uppercase tracking-tighter p-0 h-auto focus-visible:ring-0 shadow-none"
-                              />
-                              <p className="text-[9px] font-mono text-muted-foreground uppercase mt-1 opacity-40">PROJECT_ID: {grant.id.split('-')[0]}</p>
+                            <ChevronsUpDown className="h-4 w-4 text-white/20 shrink-0" />
+                            <div className="flex items-center gap-3">
+                              <span className="text-xl font-black uppercase text-white tracking-tight leading-none">{grant.name}</span>
+                              {isActive && (
+                                <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full shadow-lg shadow-primary/10">Active</Badge>
+                              )}
                             </div>
                           </div>
-                          {isActive ? (
-                            <Badge className="bg-primary text-primary-foreground font-black uppercase text-[8px] h-6 px-3 rounded-full">SELECTED</Badge>
-                          ) : (
-                            <Button variant="ghost" size="sm" onClick={() => handleSettingChange('activeGrantId', grant.id)} className="h-8 px-4 rounded-xl text-[9px] font-black uppercase border-2 border-border/40 hover:bg-primary/5">Activate</Button>
-                          )}
+                          
+                          <div className="flex items-center gap-4">
+                            {!isActive && (
+                              <button onClick={() => handleSettingChange('activeGrantId', grant.id)} className="text-[11px] font-black uppercase tracking-widest text-primary hover:opacity-80 transition-colors">Set Active</button>
+                            )}
+                            <button className="text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors">Rename</button>
+                            <button onClick={() => handleDeleteProject(grant.id)} className="text-[11px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors">Delete</button>
+                          </div>
                         </div>
                       </CardHeader>
-                      <CardContent className="p-8 pt-4 space-y-6">
-                        <div className="space-y-3">
-                          <h5 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60 pl-1">Record Categories</h5>
-                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                            {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
-                              <div key={sheetName} className="flex items-center justify-between p-4 rounded-2xl bg-muted/20 border border-border/40 group hover:border-primary/20 transition-all">
-                                <span className="text-[10px] font-black uppercase truncate max-w-[120px]">{sheetName}</span>
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
-                                  className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10 transition-all"
-                                  title="Configure Headers"
-                                >
-                                  <Wrench className="h-3.5 w-3.5" />
-                                </Button>
+                      <CardContent className="p-8 pt-4 space-y-8">
+                        <div className="space-y-4">
+                          <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 px-1">Sheet Definitions</h4>
+                          <div className="space-y-2.5">
+                            {Object.keys(grant.sheetDefinitions || {}).length > 0 ? (
+                              Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
+                                <div key={sheetName} className="flex items-center justify-between p-5 bg-black border border-white/5 rounded-2xl group/sheet hover:border-white/20 transition-all shadow-inner">
+                                  <span className="text-xs font-black uppercase text-white/80">{sheetName}</span>
+                                  <div className="flex items-center gap-5 text-white/20">
+                                    <button onClick={() => setActiveView('REGISTRY')} className="hover:text-white transition-colors" title="View Records"><Eye className="h-4 w-4" /></button>
+                                    <button onClick={() => setActiveView('USERS')} className="hover:text-white transition-colors" title="Audit Users"><Users className="h-4 w-4" /></button>
+                                    <button 
+                                      onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
+                                      className="hover:text-primary transition-colors" 
+                                      title="Configure Headers"
+                                    >
+                                      <Wrench className="h-4 w-4" />
+                                    </button>
+                                    <button onClick={() => handleDeleteSheet(grant.id, sheetName)} className="hover:text-red-600 transition-colors" title="Delete Sheet"><Trash2 className="h-4 w-4" /></button>
+                                  </div>
+                                </div>
+                              ))
+                            ) : (
+                              <div className="py-12 text-center border-2 border-dashed border-white/5 rounded-2xl opacity-20">
+                                <p className="text-[10px] font-black uppercase tracking-widest">No Definitions Configured</p>
                               </div>
-                            ))}
+                            )}
                           </div>
                         </div>
+
                         {isActive && (
-                          <div className="grid grid-cols-2 gap-3 pt-2">
-                            <input type="file" ref={templateInputRef} onChange={handleTemplateDiscovery} className="hidden" accept=".xlsx,.xls" />
-                            <Button variant="outline" onClick={() => templateInputRef.current?.click()} disabled={isDiscovering} className="h-12 rounded-2xl border-white/10 text-foreground font-black uppercase text-[9px] tracking-widest gap-2 bg-muted/10">
-                              {isDiscovering ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileCode className="h-3.5 w-3.5" />}
-                              Sync Schema
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                              <PlusCircle className="h-4 w-4" /> Add Manually
                             </Button>
-                            <Button variant="outline" className="h-12 rounded-2xl border-white/10 text-foreground font-black uppercase text-[9px] tracking-widest gap-2 bg-muted/10">
-                              <PlusCircle className="h-3.5 w-3.5" /> New Category
+                            <input type="file" ref={templateInputRef} onChange={handleTemplateDiscovery} className="hidden" accept=".xlsx,.xls" />
+                            <Button variant="outline" onClick={() => templateInputRef.current?.click()} disabled={isDiscovering} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                              {isDiscovering ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileUp className="h-4 w-4" />}
+                              Import Template
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                              <ScanSearch className="h-4 w-4" /> Scan & Import Data
                             </Button>
                           </div>
                         )}
@@ -436,7 +516,7 @@ export function SettingsWorkstation() {
 
             <div className="space-y-10">
               <div>
-                <SectionHeading title="Advanced Actions" description="Caution: Irreversible data operations" icon={Bomb} />
+                <SectionHeading title="Advanced Actions" description="Irreversible state operations" icon={Bomb} />
                 <div className="p-8 rounded-[3rem] bg-destructive/[0.02] border-2 border-dashed border-destructive/20 space-y-6">
                   <div className="flex items-center gap-4">
                     <div className="p-3 bg-destructive/10 rounded-2xl">
@@ -458,7 +538,6 @@ export function SettingsWorkstation() {
       </Tabs>
 
       {/* Confirmation Dialogs */}
-      
       <AlertDialog open={isNukeDialogOpen} onOpenChange={setIsNukeDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
@@ -474,6 +553,8 @@ export function SettingsWorkstation() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
 
       {selectedSheetDef && (
         <ColumnCustomizationSheet 
