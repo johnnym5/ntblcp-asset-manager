@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Overhauled to match requested High-Fidelity Design.
- * Phase 109: Optimized Adaptive Grids & Full-Width Pulse Scaling.
+ * Phase 112: Integrated Direct Import Discovery trigger.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -28,7 +28,8 @@ import {
   FileSpreadsheet,
   X,
   MoreHorizontal,
-  PlusCircle
+  PlusCircle,
+  ScanSearch
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -40,6 +41,7 @@ import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 import { SortDrawer } from '@/components/registry/SortDrawer';
+import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -97,6 +99,7 @@ export function RegistryWorkstation() {
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [pulseView, setPulseView] = useState<'stats' | 'insights'>('stats');
 
   // Sorting Logic State
@@ -255,11 +258,12 @@ export function RegistryWorkstation() {
           placeholder="Search Registry Pulse..." 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="h-14 sm:h-16 pl-14 pr-24 sm:pr-32 rounded-2xl bg-[#0A0A0A] border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 text-white"
+          className="h-14 sm:h-16 pl-14 pr-32 sm:pr-40 rounded-2xl bg-[#0A0A0A] border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 text-white"
         />
         <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2">
-          <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl"><ArrowUpDown className="h-5 w-5" /></Button>
-          <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl"><Filter className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => setIsImportScanOpen(true)} className="h-10 w-10 text-white/40 hover:text-primary rounded-xl" title="Scan Workbook"><ScanSearch className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl" title="Sort Sequence"><ArrowUpDown className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl" title="Logic Filters"><Filter className="h-5 w-5" /></Button>
         </div>
       </div>
 
@@ -352,6 +356,7 @@ export function RegistryWorkstation() {
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }} />
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={() => setIsFormOpen(true)} />
       <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async (d) => { await refreshRegistry(); setSelectedIds(new Set()); }} />
+      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
     </div>
   );
 }

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - High-Fidelity Master Control Center.
- * Phase 109: Optimized Adaptive Scaling & Fluid Content Containers.
+ * Phase 112: Activated Project Category Management & Deterministic Data Triggers.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -32,6 +32,9 @@ import {
   PlaneTakeoff,
   KeyRound,
   Globe,
+  ChevronRight,
+  Columns,
+  Settings2
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,10 +62,9 @@ import {
   SelectTrigger, 
   SelectValue 
 } from '@/components/ui/select';
-import { parseExcelForTemplate } from '@/lib/excel-parser';
 
 export function SettingsWorkstation() {
-  const { appSettings, refreshRegistry, settingsLoaded } = useAppState();
+  const { appSettings, refreshRegistry, settingsLoaded, setActiveGrantId, setActiveView } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const { setTheme, theme } = useTheme();
@@ -73,9 +75,6 @@ export function SettingsWorkstation() {
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   
-  const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
-  const [loadingLogs, setLoadingLogs] = useState(false);
-
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
@@ -126,7 +125,7 @@ export function SettingsWorkstation() {
       await FirestoreService.updateSettings(draftSettings);
       await storage.saveSettings(draftSettings);
       await refreshRegistry();
-      toast({ title: "Settings Saved" });
+      toast({ title: "Configuration Synchronized" });
     } finally {
       setIsSaving(false);
     }
@@ -159,11 +158,11 @@ export function SettingsWorkstation() {
               <TabsTrigger value="projects" className="flex-1 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white transition-all">
                 <Wrench className="h-3.5 w-3.5" /> Projects
               </TabsTrigger>
+              <TabsTrigger value="data" className="flex-1 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white transition-all">
+                <Database className="h-3.5 w-3.5" /> Data
+              </TabsTrigger>
               <TabsTrigger value="users" className="flex-1 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white transition-all">
                 <Users className="h-3.5 w-3.5" /> Users
-              </TabsTrigger>
-              <TabsTrigger value="history" className="flex-1 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-black data-[state=active]:text-white transition-all">
-                <History className="h-3.5 w-3.5" /> History
               </TabsTrigger>
             </TabsList>
             <ScrollBar orientation="horizontal" />
@@ -217,21 +216,6 @@ export function SettingsWorkstation() {
               </Card>
             </div>
           </div>
-
-          <div className="space-y-8 pt-4">
-            <h3 className="text-lg font-black uppercase tracking-tight text-white flex items-center gap-3">
-              <PlaneTakeoff className="h-5 w-5 text-primary" /> Archival Automation
-            </h3>
-            <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 p-10 space-y-6 shadow-2xl group hover:border-primary/20 transition-all">
-              <div className="flex flex-col md:flex-row md:items-center justify-between gap-8">
-                <div className="space-y-2 max-w-lg">
-                  <h4 className="text-xl font-black uppercase text-white tracking-tight">Executive Report Builder</h4>
-                  <p className="text-sm font-medium text-muted-foreground italic leading-relaxed">Deterministic compilation of regional verification findings into a high-fidelity documentation pulse.</p>
-                </div>
-                <Button variant="outline" onClick={() => setIsTravelReportOpen(true)} className="h-16 px-10 rounded-2xl bg-black border-white/10 hover:bg-white/5 text-white font-black uppercase text-xs tracking-widest gap-3 shadow-inner min-w-[240px]"><PlaneTakeoff className="h-5 w-5 text-primary" /> Create Travel Pulse</Button>
-              </div>
-            </Card>
-          </div>
         </TabsContent>
 
         <TabsContent value="projects" className="space-y-8 outline-none m-0 px-1">
@@ -252,6 +236,7 @@ export function SettingsWorkstation() {
                       </div>
                       {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full shadow-lg">ACTIVE</Badge>}
                     </div>
+                    
                     <div className="flex flex-wrap items-center justify-between gap-4 mt-auto pt-6 border-t border-white/5">
                       {!isActive ? (
                         <Button variant="ghost" onClick={() => handleSettingChange('activeGrantId', grant.id)} className="h-10 rounded-xl bg-white/5 hover:bg-white/10 text-white font-black text-[10px] uppercase px-6 border border-white/10 transition-all">Set Authority</Button>
@@ -260,11 +245,92 @@ export function SettingsWorkstation() {
                       )}
                       <Button variant="ghost" onClick={() => handleDeleteProject(grant.id)} className="h-10 font-black text-[10px] uppercase text-destructive hover:bg-destructive/10 px-4 rounded-xl">Delete</Button>
                     </div>
+
+                    {/* Category Management for Active Project */}
+                    {isActive && (
+                      <div className="mt-6 pt-6 border-t border-white/5 space-y-4 animate-in slide-in-from-top-2 duration-500">
+                        <div className="flex items-center justify-between px-1">
+                          <h5 className="text-[10px] font-black uppercase text-primary tracking-[0.2em]">Registry Schemas</h5>
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            onClick={() => setIsImportScanOpen(true)}
+                            className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest bg-white/5 hover:bg-primary/10 hover:text-primary transition-all gap-2"
+                          >
+                            <ScanSearch className="h-3 w-3" /> Auto-Discover
+                          </Button>
+                        </div>
+                        <div className="grid grid-cols-1 gap-2">
+                          {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
+                            <button 
+                              key={sheetName}
+                              onClick={() => {
+                                setSelectedSheetDef(grant.sheetDefinitions[sheetName]);
+                                setActiveGrantIdForSchema(grant.id);
+                                setIsColumnSheetOpen(true);
+                              }}
+                              className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.03] border border-white/10 hover:border-primary/40 hover:bg-primary/[0.02] transition-all group text-left"
+                            >
+                              <div className="flex items-center gap-3">
+                                <div className="p-2 rounded-lg bg-white/5 group-hover:bg-primary/10 transition-colors">
+                                  <Columns className="h-3.5 w-3.5 text-white/40 group-hover:text-primary" />
+                                </div>
+                                <span className="text-xs font-bold uppercase tracking-tight truncate max-w-[120px]">{sheetName}</span>
+                              </div>
+                              <ChevronRight className="h-3.5 w-3.5 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all text-primary" />
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </Card>
               );
             })}
           </div>
+        </TabsContent>
+
+        <TabsContent value="data" className="space-y-8 outline-none m-0 px-1">
+          <h3 className="text-lg font-black uppercase tracking-tight text-white flex items-center gap-3">
+            <Database className="h-5 w-5 text-primary" /> Registry Operations
+          </h3>
+          <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 p-8 space-y-6 shadow-2xl">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <Button 
+                variant="outline" 
+                onClick={() => setIsImportScanOpen(true)}
+                className="h-20 rounded-3xl border-2 flex items-center justify-start px-8 gap-4 transition-all hover:border-primary/40 hover:bg-primary/5 text-white"
+              >
+                <div className="p-3 bg-primary/10 rounded-2xl"><ScanSearch className="h-6 w-6 text-primary" /></div>
+                <div className="flex flex-col items-start">
+                  <span className="text-xs font-black uppercase">Scan Workbook</span>
+                  <span className="text-[9px] font-medium text-muted-foreground italic">Identify hierarchical categories.</span>
+                </div>
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setActiveView('REGISTRY')}
+                className="h-20 rounded-3xl border-2 flex items-center justify-start px-8 gap-4 transition-all hover:border-primary/40 hover:bg-primary/5 text-white"
+              >
+                <div className="p-3 bg-primary/10 rounded-2xl"><PlusCircle className="h-6 w-6 text-primary" /></div>
+                <div className="flex flex-col items-start">
+                  <span className="text-xs font-black uppercase">New Record</span>
+                  <span className="text-[9px] font-medium text-muted-foreground italic">Manual asset registration pulse.</span>
+                </div>
+              </Button>
+              <Button 
+                variant="outline" 
+                onClick={() => setIsTravelReportOpen(true)}
+                className="h-20 rounded-3xl border-2 flex items-center justify-start px-8 gap-4 transition-all hover:border-primary/40 hover:bg-primary/5 text-white"
+              >
+                <div className="p-3 bg-primary/10 rounded-2xl"><PlaneTakeoff className="h-6 w-6 text-primary" /></div>
+                <div className="flex flex-col items-start">
+                  <span className="text-xs font-black uppercase">Travel Report</span>
+                  <span className="text-[9px] font-medium text-muted-foreground italic">Automated archival export.</span>
+                </div>
+              </Button>
+            </div>
+          </Card>
         </TabsContent>
 
         <TabsContent value="users" className="outline-none px-1 m-0">
@@ -273,14 +339,6 @@ export function SettingsWorkstation() {
               <UserManagement users={draftSettings.authorizedUsers} onUsersChange={(newUsers) => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
             </CardContent>
           </Card>
-        </TabsContent>
-
-        <TabsContent value="history" className="space-y-6 outline-none px-1 m-0">
-          <div className="py-40 text-center opacity-20 border-4 border-dashed border-border/40 rounded-[3rem]">
-            <History className="h-20 w-20 mx-auto mb-6 text-white" />
-            <h3 className="text-3xl font-black uppercase tracking-widest text-white">History Silent</h3>
-            <p className="text-sm font-medium italic mt-2">No administrative mutations detected in the current audit period.</p>
-          </div>
         </TabsContent>
       </Tabs>
 
@@ -301,6 +359,31 @@ export function SettingsWorkstation() {
 
       <TravelReportDialog isOpen={isTravelReportOpen} onOpenChange={setIsTravelReportOpen} />
       <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
+      
+      {selectedSheetDef && (
+        <ColumnCustomizationSheet 
+          isOpen={isColumnSheetOpen}
+          onOpenChange={setIsColumnSheetOpen}
+          sheetDefinition={selectedSheetDef}
+          originalSheetName={selectedSheetDef.name}
+          onSave={(orig, newDef, all) => {
+            const updatedGrants = draftSettings.grants.map(grant => {
+              if (grant.id === activeGrantIdForSchema) {
+                const newSheetDefs = { ...grant.sheetDefinitions };
+                if (all) {
+                  Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
+                } else {
+                  newSheetDefs[newDef.name] = newDef;
+                  if (orig && orig !== newDef.name) delete newSheetDefs[orig];
+                }
+                return { ...grant, sheetDefinitions: newSheetDefs };
+              }
+              return grant;
+            });
+            handleSettingChange('grants', updatedGrants);
+          }}
+        />
+      )}
     </div>
   );
 }
