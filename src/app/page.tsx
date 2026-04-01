@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview SPA Orchestrator Hub.
- * Manages the unified workstation switching logic with high-fidelity transitions.
- * Phase 80: Added ERROR_AUDIT to workstation router.
+ * Phase 88: Simplified workstation router following settings consolidation.
  */
 
 import React, { Suspense } from 'react';
@@ -24,8 +23,6 @@ import { ReportsWorkstation } from '@/components/workstations/ReportsWorkstation
 import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstation';
 import { SyncQueueWorkstation } from '@/components/workstations/SyncQueueWorkstation';
-import { UsersWorkstation } from '@/components/workstations/UsersWorkstation';
-import { InfrastructureWorkstation } from '@/components/workstations/InfrastructureWorkstation';
 import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
 import { GISWorkstation } from '@/components/workstations/GISWorkstation';
@@ -68,12 +65,15 @@ function renderWorkstation(view: string) {
     case 'ALERTS': return <AlertsWorkstation />;
     case 'AUDIT_LOG': return <AuditLogWorkstation />;
     case 'SYNC_QUEUE': return <SyncQueueWorkstation />;
-    case 'USERS': return <UsersWorkstation />;
-    case 'INFRASTRUCTURE': return <InfrastructureWorkstation />;
     case 'DATABASE': return <DatabaseWorkstation />;
     case 'SETTINGS': return <SettingsWorkstation />;
     case 'GIS': return <GISWorkstation />;
     case 'ERROR_AUDIT': return <ErrorAuditWorkstation />;
+    case 'USERS':
+    case 'INFRASTRUCTURE':
+      // Following Phase 88 consolidation, these views are handled within SETTINGS.
+      // We automatically route to the Settings Workstation.
+      return <SettingsWorkstation />;
     default: return (
       <div className="flex flex-col items-center justify-center py-40 opacity-20 space-y-6">
         <div className="p-8 bg-primary/10 rounded-[3rem] shadow-inner">
