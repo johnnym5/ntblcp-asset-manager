@@ -6,7 +6,7 @@
 
 import React, { useEffect, useState } from 'react';
 import { 
-  History, 
+  History as HistoryIcon, 
   Search, 
   Filter, 
   User, 
@@ -81,7 +81,7 @@ export function AuditLogWorkstation() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-2">
           <h2 className="text-4xl font-black tracking-tighter uppercase flex items-center gap-4 leading-none">
-            <div className="p-3 bg-primary/10 rounded-2xl"><History className="h-8 w-8 text-primary" /></div>
+            <div className="p-3 bg-primary/10 rounded-2xl"><HistoryIcon className="h-8 w-8 text-primary" /></div>
             Activity Ledger
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Immutable Traceability & Forensic Pulse Replay</p>

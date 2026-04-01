@@ -9,14 +9,14 @@ import React, { useMemo } from 'react';
 import { 
   ArrowRight, 
   Globe,
-  Map,
+  Map as MapIcon,
   CheckCircle2,
   FolderKanban,
   ChevronDown,
   ShieldAlert,
   Activity,
   Target,
-  History,
+  History as HistoryIcon,
   Zap,
   TrendingUp,
   PieChart,
@@ -172,7 +172,7 @@ export function DashboardWorkstation() {
           <CardHeader className="p-8 border-b bg-muted/20 flex flex-row items-center justify-between">
             <div className="space-y-1">
               <CardTitle className="text-xl font-black uppercase tracking-tight flex items-center gap-3">
-                <Map className="h-5 w-5 text-primary" /> Regional Coverage Matrix
+                <MapIcon className="h-5 w-5 text-primary" /> Regional Coverage Matrix
               </CardTitle>
               <p className="text-[10px] font-bold uppercase text-muted-foreground opacity-60">Verification performance aggregated by location scope</p>
             </div>
@@ -256,7 +256,7 @@ export function DashboardWorkstation() {
           <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
             <CardHeader className="p-8 border-b bg-muted/20">
               <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-3">
-                <History className="h-4 w-4 text-primary" /> Temporal Pulse
+                <HistoryIcon className="h-4 w-4" /> Temporal Pulse
               </CardTitle>
             </CardHeader>
             <CardContent className="p-8">

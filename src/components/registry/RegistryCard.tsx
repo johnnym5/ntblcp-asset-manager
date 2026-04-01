@@ -1,4 +1,3 @@
-
 /**
  * @fileOverview RegistryCard - Source-Aware Professional Register Renderer.
  * Phase 63: Deterministic render with optimized Image and GIS pulse markers.
@@ -86,7 +85,7 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
               <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
                 <Checkbox 
                   checked={selected} 
-                  onToggle={() => onToggleSelect(record.id)}
+                  onCheckedChange={() => onToggleSelect(record.id)}
                   className="h-4 w-4 rounded border-2 border-primary/20 bg-background"
                 />
               </div>

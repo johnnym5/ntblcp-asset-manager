@@ -14,7 +14,7 @@ import {
   Zap, 
   ShieldCheck, 
   Activity,
-  History,
+  History as HistoryIcon,
   AlertCircle,
   ArrowRight,
   ShieldAlert,
