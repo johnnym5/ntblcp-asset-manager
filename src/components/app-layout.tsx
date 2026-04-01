@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - SPA Shell Persistence.
- * Phase 74: Manual Sync Controls and Togglable Cloud Pulse.
+ * Phase 75: Integrated Audit & Traceability Dropdown and Notifications into Header.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -39,7 +39,8 @@ import {
   FolderKanban,
   ChevronDown,
   Download,
-  Upload
+  Upload,
+  Bell
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -56,6 +57,14 @@ import { Tooltip, TooltipProvider, TooltipTrigger, TooltipContent } from '@/comp
 import { ScrollArea } from './ui/scroll-area';
 import { useToast } from '@/hooks/use-toast';
 import { Separator } from './ui/separator';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuLabel, 
+  DropdownMenuSeparator, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 import type { WorkstationView } from '@/types/domain';
 
 interface NavItem {
@@ -321,6 +330,35 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
           
           <div className="flex items-center gap-2 sm:gap-4">
+            {/* Audit & Traceability Header Shortcut */}
+            <div className="hidden lg:flex items-center gap-2 border-l border-r px-4 border-border/40 mx-2">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" size="sm" className="h-10 px-4 rounded-2xl font-black text-[9px] uppercase tracking-widest gap-2 hover:bg-primary/5 hover:text-primary transition-all group">
+                    <Activity className="h-4 w-4 text-primary group-hover:animate-pulse" />
+                    <span className="hidden xl:inline">Audit & Traceability</span>
+                    <ChevronDown className="h-3 w-3 opacity-40 group-data-[state=open]:rotate-180 transition-transform" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-64 rounded-[2rem] border-2 shadow-2xl p-2 mt-2">
+                  <DropdownMenuLabel className="text-[9px] font-black uppercase tracking-[0.3em] px-3 pb-2 opacity-40">Operational Traceability</DropdownMenuLabel>
+                  {AUDIT_NAV.map(item => (
+                    <DropdownMenuItem 
+                      key={item.view} 
+                      onClick={() => setActiveView(item.view)}
+                      className={cn(
+                        "rounded-xl h-12 flex items-center gap-3 px-3 cursor-pointer mb-1 transition-colors",
+                        activeView === item.view ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                      )}
+                    >
+                      {item.icon}
+                      <span className="font-bold text-[10px] uppercase tracking-widest">{item.label}</span>
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
+
             <Button 
               variant="outline" 
               size="icon" 
@@ -365,6 +403,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 </Tooltip>
               </TooltipProvider>
             </div>
+
+            {/* Notifications Hub */}
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    onClick={() => setIsInboxOpen(true)}
+                    className="relative h-10 w-10 rounded-2xl hover:bg-primary/5 hover:text-primary transition-all group"
+                  >
+                    <Bell className="h-5 w-5 group-hover:scale-110 transition-transform" />
+                    {pendingCount > 0 && (
+                      <Badge className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center p-0 rounded-full bg-primary text-white text-[8px] font-black border-2 border-background animate-pulse shadow-sm">
+                        {pendingCount}
+                      </Badge>
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent className="rounded-xl font-bold uppercase text-[9px] tracking-widest">Approvals & Activity Notifications</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
 
             <TooltipProvider>
               <Tooltip>
