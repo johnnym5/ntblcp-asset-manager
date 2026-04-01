@@ -1,6 +1,6 @@
 /**
  * @fileOverview RegistryCard - High-Fidelity "Quick View" Renderer.
- * Phase 125: Strictly matched to provided mockup with stacked fields and separators.
+ * Phase 127: Removed hardcoded bg-white for perfect dark mode parity.
  */
 
 import React from 'react';
@@ -32,7 +32,7 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
   return (
     <Card 
       className={cn(
-        "bg-white border-2 border-border/60 rounded-xl overflow-hidden shadow-sm transition-all hover:shadow-md cursor-pointer",
+        "bg-card border-2 border-border/60 rounded-xl overflow-hidden shadow-sm transition-all hover:shadow-md cursor-pointer",
         selected ? "ring-2 ring-primary border-primary/40" : ""
       )}
       onClick={() => onInspect(record.id)}

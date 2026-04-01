@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - Unified Command Shell.
- * Phase 126: Removed Identity Scan trigger from portal.
+ * Phase 127: Unified semantic colors for perfect light/dark parity.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -115,18 +115,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const PortalItem = ({ label, view, icon: Icon, description, badge }: { label: string, view: WorkstationView, icon: any, description: string, badge?: number }) => (
     <button 
       onClick={() => handlePortalNavigate(view)}
-      className="w-full text-left p-5 rounded-[1.5rem] bg-white/[0.03] border-2 border-white/5 hover:border-primary/40 hover:bg-primary/[0.02] transition-all group flex items-center justify-between"
+      className="w-full text-left p-5 rounded-[1.5rem] bg-muted/20 border-2 border-border/40 hover:border-primary/40 hover:bg-primary/5 transition-all group flex items-center justify-between"
     >
       <div className="flex items-center gap-4 min-w-0">
-        <div className="p-3 bg-white/5 rounded-xl group-hover:bg-primary/10 group-hover:text-primary transition-colors">
+        <div className="p-3 bg-card border border-border/40 rounded-xl group-hover:bg-primary/10 group-hover:text-primary transition-colors">
           <Icon className="h-5 w-5" />
         </div>
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-sm font-black uppercase tracking-tight text-white group-hover:text-primary transition-colors">{label}</span>
-            {badge ? <Badge className="bg-destructive text-white text-[8px] h-4 min-w-4 p-0 flex items-center justify-center rounded-full">{badge}</Badge> : null}
+            <span className="text-sm font-black uppercase tracking-tight text-foreground group-hover:text-primary transition-colors">{label}</span>
+            {badge ? <Badge className="bg-destructive text-destructive-foreground text-[8px] h-4 min-w-4 p-0 flex items-center justify-center rounded-full">{badge}</Badge> : null}
           </div>
-          <span className="text-[9px] font-bold text-white/40 uppercase truncate">{description}</span>
+          <span className="text-[9px] font-bold text-muted-foreground uppercase truncate">{description}</span>
         </div>
       </div>
       <ChevronRight className="h-4 w-4 opacity-0 group-hover:opacity-100 group-hover:translate-x-1 transition-all text-primary" />
@@ -170,7 +170,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             <Bell className="h-5 w-5 group-hover:text-primary transition-colors" />
             {unreadCount > 0 && (
-              <Badge className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center p-0 rounded-full bg-primary text-white text-[8px] font-black border-2 border-background animate-in zoom-in duration-300">
+              <Badge className="absolute -top-1 -right-1 h-4 min-w-4 flex items-center justify-center p-0 rounded-full bg-primary text-primary-foreground text-[8px] font-black border-2 border-background animate-in zoom-in duration-300">
                 {unreadCount}
               </Badge>
             )}
@@ -192,7 +192,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </div>
             </div>
             {alertCount > 0 && (
-              <Badge className="absolute -top-1 -left-1 bg-destructive text-white text-[7px] font-black h-4 min-w-4 p-0 flex items-center justify-center rounded-full border-2 border-background shadow-lg animate-pulse">
+              <Badge className="absolute -top-1 -left-1 bg-destructive text-destructive-foreground text-[7px] font-black h-4 min-w-4 p-0 flex items-center justify-center rounded-full border-2 border-background shadow-lg animate-pulse">
                 {alertCount}
               </Badge>
             )}
@@ -217,7 +217,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               onClick={() => setActiveView('DASHBOARD')} 
               className={cn(
                 "flex items-center gap-3 px-6 h-12 rounded-2xl transition-all group shrink-0 tactile-pulse",
-                activeView === 'DASHBOARD' ? "bg-primary text-black shadow-xl" : "text-muted-foreground hover:bg-muted"
+                activeView === 'DASHBOARD' ? "bg-primary text-primary-foreground shadow-xl" : "text-muted-foreground hover:bg-muted"
               )}
             >
               <LayoutDashboard className="h-5 w-5" />
@@ -244,18 +244,18 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
       {/* Management Portal */}
       <Sheet open={isPortalOpen} onOpenChange={setIsPortalOpen}>
-        <SheetContent side="bottom" className="h-[90vh] bg-black border-none rounded-t-[3rem] p-0 flex flex-col overflow-hidden text-white shadow-3xl">
-          <div className="p-10 pb-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+        <SheetContent side="bottom" className="h-[90vh] bg-background border-none rounded-t-[3rem] p-0 flex flex-col overflow-hidden shadow-3xl">
+          <div className="p-10 pb-6 border-b flex items-center justify-between bg-muted/20">
             <div className="flex items-center gap-6">
               <div className="p-4 bg-primary rounded-[1.5rem] shadow-2xl">
-                <Terminal className="h-8 w-8 text-black" />
+                <Terminal className="h-8 w-8 text-primary-foreground" />
               </div>
               <div className="space-y-1">
-                <SheetTitle className="text-3xl font-black uppercase tracking-tight text-white leading-none">Management Terminal</SheetTitle>
+                <SheetTitle className="text-3xl font-black uppercase tracking-tight text-foreground leading-none">Management Terminal</SheetTitle>
                 <SheetDescription className="text-[10px] font-black uppercase text-primary tracking-[0.3em] opacity-60">Professional Operational Orchestration Pulse</SheetDescription>
               </div>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => setIsPortalOpen(false)} className="h-14 w-14 rounded-2xl bg-white/5 hover:bg-white/10 text-white">
+            <Button variant="ghost" size="icon" onClick={() => setIsPortalOpen(false)} className="h-14 w-14 rounded-2xl bg-muted/50 hover:bg-muted text-foreground">
               <X className="h-6 w-6" />
             </Button>
           </div>
@@ -264,22 +264,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <div className="p-10 grid grid-cols-1 lg:grid-cols-12 gap-16">
               
               <div className="lg:col-span-12">
-                <div className="p-8 rounded-[2rem] bg-white/5 border-2 border-white/5 flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="p-8 rounded-[2rem] bg-card border-2 border-border/40 flex flex-col md:flex-row items-center justify-between gap-8">
                   <div className="flex items-center gap-6">
                     <Avatar className="h-20 w-20 border-4 border-primary/20">
                       <AvatarFallback className="bg-muted text-primary text-2xl font-black">{userProfile?.displayName?.[0]}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-1">
-                      <h3 className="text-2xl font-black uppercase tracking-tight">{userProfile?.displayName}</h3>
+                      <h3 className="text-2xl font-black uppercase tracking-tight text-foreground">{userProfile?.displayName}</h3>
                       <div className="flex items-center gap-3">
-                        <Badge className="bg-primary text-black font-black uppercase text-[10px]">{userProfile?.role}</Badge>
-                        <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{userProfile?.email}</span>
+                        <Badge className="bg-primary text-primary-foreground font-black uppercase text-[10px]">{userProfile?.role}</Badge>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{userProfile?.email}</span>
                       </div>
                       <p className="text-[10px] font-black uppercase text-primary/60 mt-2">Active Scope: {userProfile?.state || 'Global'}</p>
                     </div>
                   </div>
                   <div className="flex gap-3">
-                    <Button onClick={() => logout()} className="h-14 px-10 rounded-2xl bg-destructive text-white font-black uppercase text-[10px] tracking-widest gap-3 shadow-xl shadow-destructive/20 transition-transform hover:scale-105 active:scale-95">
+                    <Button onClick={() => logout()} className="h-14 px-10 rounded-2xl bg-destructive text-destructive-foreground font-black uppercase text-[10px] tracking-widest gap-3 shadow-xl shadow-destructive/20 transition-transform hover:scale-105 active:scale-95">
                       <Power className="h-4 w-4" /> Terminate Session
                     </Button>
                   </div>
@@ -313,13 +313,13 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <ShieldAlert className="h-5 w-5 text-primary" />
                         <h5 className="text-[10px] font-black uppercase text-primary">Authority Guard</h5>
                       </div>
-                      <p className="text-[10px] font-medium text-white/40 italic leading-relaxed">Infrastructure controls are restricted to the master system identity.</p>
+                      <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">Infrastructure controls are restricted to the master system identity.</p>
                     </div>
                   </PortalGroup>
                 ) : (
-                  <div className="h-full flex flex-col items-center justify-center p-10 opacity-20 text-center border-4 border-dashed border-white/5 rounded-[3rem]">
+                  <div className="h-full flex flex-col items-center justify-center p-10 opacity-20 text-center border-4 border-dashed border-border/40 rounded-[3rem]">
                     <Lock className="h-16 w-16 mb-4" />
-                    <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed">Infrastructure Clearance Required</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest leading-relaxed text-muted-foreground">Infrastructure Clearance Required</p>
                   </div>
                 )}
               </div>
@@ -358,7 +358,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     <div className="flex gap-4">
                       <div className={cn("h-2 w-2 rounded-full mt-1.5 shrink-0", n.read ? "bg-muted" : "bg-primary animate-pulse")} />
                       <div className="space-y-1 flex-1">
-                        <p className="text-sm font-black uppercase tracking-tight leading-none">{n.title}</p>
+                        <p className="text-sm font-black uppercase tracking-tight leading-none text-foreground">{n.title}</p>
                         <p className="text-xs font-medium text-muted-foreground leading-relaxed italic">{n.description}</p>
                         <p className="text-[9px] font-bold uppercase opacity-40 pt-2 flex items-center gap-2">
                           <Clock className="h-2.5 w-2.5" /> {formatDistanceToNow(n.date, { addSuffix: true })}
@@ -379,7 +379,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             ) : (
               <div className="h-full flex flex-col items-center justify-center p-10 opacity-20 text-center gap-4">
                 <CheckCheck className="h-16 w-16" />
-                <p className="text-sm font-black uppercase tracking-widest">Pulse Status: Clear</p>
+                <p className="text-sm font-black uppercase tracking-widest text-muted-foreground">Pulse Status: Clear</p>
               </div>
             )}
           </ScrollArea>

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - The Unified Intelligence Center.
- * Phase 126: Relocated Global Search to the top pulse.
+ * Phase 127: Removed hardcoded dark colors for perfect theme contrast.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -175,11 +175,11 @@ export function DashboardWorkstation() {
             placeholder="Search Registry Hub..." 
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="h-14 sm:h-16 pl-14 pr-32 sm:pr-40 rounded-2xl bg-[#0A0A0A] border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 text-white"
+            className="h-14 sm:h-16 pl-14 pr-32 sm:pr-40 rounded-2xl bg-card border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 text-foreground"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl" title="Sort Sequence"><ArrowUpDown className="h-5 w-5" /></Button>
-            <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl relative" title="Logic Filters">
+            <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-muted-foreground hover:text-primary rounded-xl" title="Sort Sequence"><ArrowUpDown className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-muted-foreground hover:text-primary rounded-xl relative" title="Logic Filters">
               <Filter className="h-5 w-5" />
               {(selectedStatuses.length + selectedConditions.length) > 0 && (
                 <div className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full animate-pulse shadow-lg" />
@@ -193,7 +193,7 @@ export function DashboardWorkstation() {
       <AssetSummaryDashboard />
 
       {/* 4. Global Registry Workspace */}
-      <div className="p-1 sm:p-2 rounded-[2.5rem] bg-muted/5 border-2 border-dashed border-border/40 min-h-[600px]">
+      <div className="p-1 sm:p-2 rounded-[2.5rem] bg-muted/10 border-2 border-dashed border-border/40 min-h-[600px]">
         <RegistryWorkstation />
       </div>
 
