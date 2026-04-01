@@ -1,9 +1,9 @@
+
 'use client';
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 76: Unified Workstation Management & Manual Sync Triggers.
- * Fixed: Added global filter states to resolve TypeError in Dashboard metrics.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react';
@@ -68,7 +68,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
 
-  // Logic Engine States (Global for cross-workstation coordination)
+  // Logic Engine States
   const [globalStateFilter, setGlobalStateFilter] = useState('All');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
@@ -78,10 +78,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
-  // Handle Hydration
-  useEffect(() => {
-    setIsHydrated(true);
-  }, []);
+  useEffect(() => { setIsHydrated(true); }, []);
 
   const setActiveView = useCallback((view: WorkstationView) => {
     setActiveViewStatus(view);
@@ -155,9 +152,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, [isOnline, refreshRegistry]);
 
-  const setDataSource = (source: DataSource) => {
-    setDataSourceStatus(source);
-  };
+  const setDataSource = (source: DataSource) => { setDataSourceStatus(source); };
 
   const setIsOnline = (status: boolean) => {
     setIsOnlineStatus(status);
@@ -183,51 +178,20 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     await refreshRegistry();
   };
 
-  // Bootstrap sequence
   useEffect(() => {
     if (!isHydrated) return;
-    
-    const bootstrap = async () => {
-      await refreshRegistry();
-      setSettingsLoaded(true);
-    };
-    bootstrap();
+    refreshRegistry().then(() => setSettingsLoaded(true));
   }, [isHydrated, refreshRegistry]);
 
   return (
     <AppStateContext.Provider value={{
-      assets,
-      sandboxAssets,
-      dataSource,
-      setDataSource,
-      isOnline,
-      setIsOnline,
-      searchTerm,
-      setSearchTerm,
-      isSyncing,
-      appSettings,
-      settingsLoaded,
-      isHydrated,
-      activeGrantId,
-      activeView,
-      setActiveView,
-      refreshRegistry,
-      manualDownload,
-      manualUpload,
-      setActiveGrantId,
-      setReadAuthority,
-      globalStateFilter,
-      setGlobalStateFilter,
-      selectedLocations,
-      setSelectedLocations,
-      selectedAssignees,
-      setSelectedAssignees,
-      selectedStatuses,
-      setSelectedStatuses,
-      selectedConditions,
-      setSelectedConditions,
-      missingFieldFilter,
-      setMissingFieldFilter
+      assets, sandboxAssets, dataSource, setDataSource, isOnline, setIsOnline,
+      searchTerm, setSearchTerm, isSyncing, appSettings, settingsLoaded, isHydrated,
+      activeGrantId, activeView, setActiveView, refreshRegistry, manualDownload, manualUpload,
+      setActiveGrantId, setReadAuthority, globalStateFilter, setGlobalStateFilter,
+      selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
+      selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
+      missingFieldFilter, setMissingFieldFilter
     }}>
       {children}
     </AppStateContext.Provider>
