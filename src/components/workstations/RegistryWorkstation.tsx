@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Overhauled to match requested High-Fidelity Design.
- * Phase 108: Enhanced Mobile Responsiveness for Category Grid and Gold Bar.
+ * Phase 109: Optimized Adaptive Grids & Full-Width Pulse Scaling.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -35,22 +35,19 @@ import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
-import { FilterDrawer } from '@/components/registry/FilterDrawer';
-import { SortDrawer } from '@/components/registry/SortDrawer';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
+import { SortDrawer } from '@/components/registry/SortDrawer';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { ExcelService } from '@/services/excel-service';
-import { storage } from '@/offline/storage';
-import { enqueueMutation } from '@/offline/queue';
 import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
-import type { RegistryHeader, AssetRecord, HeaderFilter } from '@/types/registry';
+import type { RegistryHeader, AssetRecord } from '@/types/registry';
 import type { Asset } from '@/types/domain';
 import { 
   DropdownMenu, 
@@ -70,18 +67,17 @@ export function RegistryWorkstation() {
     dataSource, 
     refreshRegistry, 
     appSettings,
-    isOnline,
     searchTerm,
     setSearchTerm,
     selectedLocations,
-    setSelectedLocations,
     selectedAssignees,
-    setSelectedAssignees,
     selectedStatuses,
-    setSelectedStatuses,
     selectedConditions,
-    setSelectedConditions,
     missingFieldFilter,
+    setSelectedLocations,
+    setSelectedAssignees,
+    setSelectedStatuses,
+    setSelectedConditions,
     setMissingFieldFilter
   } = useAppState();
   
@@ -95,7 +91,6 @@ export function RegistryWorkstation() {
   const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
 
   // UI State
-  const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -119,15 +114,10 @@ export function RegistryWorkstation() {
     }
   }, []);
 
-  const saveHeaderPrefs = (updated: RegistryHeader[]) => {
-    setHeaders(updated);
-    localStorage.setItem('registry-header-prefs', JSON.stringify(updated));
-  };
-
   const handleExcelExport = async () => {
     const sourceAssets = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
     if (sourceAssets.length === 0) {
-      toast({ variant: "destructive", title: "Export Failed", description: "Registry is empty." });
+      toast({ variant: "destructive", title: "Export Failed" });
       return;
     }
 
@@ -139,8 +129,6 @@ export function RegistryWorkstation() {
       
       await ExcelService.exportRegistry(targetAssets, headers);
       toast({ title: "Excel Pulse Complete" });
-    } catch (e: any) {
-      toast({ variant: "destructive", title: "Export Interrupted", description: e.message });
     } finally {
       setIsExportingExcel(false);
     }
@@ -206,8 +194,7 @@ export function RegistryWorkstation() {
       results = results.filter(r => 
         String(r.rawRow.description || '').toLowerCase().includes(term) || 
         String(r.rawRow.serialNumber || '').toLowerCase().includes(term) ||
-        String(r.rawRow.assetIdCode || '').toLowerCase().includes(term) ||
-        String(r.rawRow.location || '').toLowerCase().includes(term)
+        String(r.rawRow.assetIdCode || '').toLowerCase().includes(term)
       );
     }
 
@@ -217,10 +204,7 @@ export function RegistryWorkstation() {
     if (selectedConditions.length > 0) results = results.filter(r => selectedConditions.includes(String(r.rawRow.condition)));
     
     if (missingFieldFilter) {
-      results = results.filter(r => {
-        const val = (r.rawRow as any)[missingFieldFilter];
-        return !val || val === 'N/A' || val === '---';
-      });
+      results = results.filter(r => !(r.rawRow as any)[missingFieldFilter]);
     }
 
     results.sort((a, b) => {
@@ -245,304 +229,128 @@ export function RegistryWorkstation() {
 
   const toggleCategorySelection = (name: string) => {
     const next = new Set(selectedCategories);
-    if (next.has(name)) next.delete(name);
-    else next.add(name);
+    if (next.has(name)) next.delete(name); else next.add(name);
     setSelectedCategories(next);
   };
 
   const handleSelectAll = () => {
     if (selectedCategory) {
       const allIds = new Set(processedRecords.map(r => r.id));
-      if (selectedIds.size === allIds.size) setSelectedIds(new Set());
-      else setSelectedIds(allIds);
+      if (selectedIds.size === allIds.size) setSelectedIds(new Set()); else setSelectedIds(allIds);
     } else {
       const allCats = new Set(categoryStats.map(c => c.name));
-      if (selectedCategories.size === allCats.size) setSelectedCategories(new Set());
-      else setSelectedCategories(allCats);
+      if (selectedCategories.size === allCats.size) setSelectedCategories(new Set()); else setSelectedCategories(allCats);
     }
   };
 
   const isAnySelected = selectedIds.size > 0 || selectedCategories.size > 0;
 
   return (
-    <div className="space-y-6 pb-32 animate-in fade-in duration-700 max-w-[1600px] mx-auto">
+    <div className="space-y-6 pb-32 animate-in fade-in duration-700">
       
       {/* 1. Unified Search & Logic Bar */}
-      <div className="relative group px-1 sm:px-0">
-        <div className="absolute left-5 top-1/2 -translate-y-1/2">
-          <Search className="h-5 w-5 text-muted-foreground opacity-40 group-focus-within:text-primary group-focus-within:opacity-100 transition-all" />
-        </div>
+      <div className="relative group">
+        <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
         <Input 
           placeholder="Search Registry Pulse..." 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="h-14 sm:h-16 pl-12 sm:pl-14 pr-24 sm:pr-32 rounded-2xl bg-[#0A0A0A] border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 transition-all placeholder:text-muted-foreground/30 text-white"
+          className="h-14 sm:h-16 pl-14 pr-24 sm:pr-32 rounded-2xl bg-[#0A0A0A] border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 text-white"
         />
-        <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2">
-          <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-9 w-9 sm:h-10 sm:w-10 text-white opacity-40 hover:opacity-100 hover:bg-white/5 rounded-xl transition-all">
-            <ArrowUpDown className="h-4 w-4 sm:h-5 sm:w-5" />
-          </Button>
-          <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-9 w-9 sm:h-10 sm:w-10 text-white opacity-40 hover:opacity-100 hover:bg-white/5 rounded-xl transition-all">
-            <Filter className="h-4 w-4 sm:h-5 sm:w-5" />
-          </Button>
+        <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2">
+          <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl"><ArrowUpDown className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl"><Filter className="h-5 w-5" /></Button>
         </div>
       </div>
 
       {/* 2. Inventory Pulse Card */}
-      <Card className="bg-[#0A0A0A] border-none shadow-3xl rounded-[2rem] sm:rounded-[2.5rem] overflow-hidden group hover:scale-[1.005] transition-transform duration-500 mx-1 sm:mx-0">
-        <CardContent className="p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-6">
-          <div className="flex items-center gap-4 sm:gap-6">
-            <div className="p-3 sm:p-4 bg-primary/10 rounded-2xl shadow-inner group-hover:bg-primary/20 transition-colors">
-              <Activity className="h-6 w-6 sm:h-8 sm:w-8 text-primary" />
+      <Card className="bg-[#0A0A0A] border-none shadow-3xl rounded-[2.5rem] overflow-hidden group">
+        <CardContent className="p-6 sm:p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+          <div className="flex items-center gap-6">
+            <div className="p-4 bg-primary/10 rounded-2xl group-hover:bg-primary/20 transition-colors shadow-inner">
+              <Activity className="h-8 w-8 text-primary" />
             </div>
             <div className="space-y-1">
-              <h3 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white leading-none">Inventory Pulse</h3>
-              <p className="text-[8px] sm:text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground opacity-60">Global Asset Telemetry</p>
+              <h3 className="text-2xl font-black uppercase text-white leading-none">Inventory Pulse</h3>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground opacity-60">Registry Health Telemetry</p>
             </div>
           </div>
-
-          <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto">
-            <div className="flex items-center bg-black/60 p-1 rounded-2xl border border-white/5 shadow-inner flex-1 sm:flex-none">
-              <button 
-                onClick={() => setPulseView('stats')}
-                className={cn(
-                  "flex-1 sm:flex-none px-4 sm:px-6 py-2 rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest transition-all",
-                  pulseView === 'stats' ? "bg-white/10 text-white shadow-lg" : "text-muted-foreground hover:text-white"
-                )}
-              >
-                Key Stats
-              </button>
-              <button 
-                onClick={() => setPulseView('insights')}
-                className={cn(
-                  "flex-1 sm:flex-none px-4 sm:px-6 py-2 rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest transition-all",
-                  pulseView === 'insights' ? "bg-white/10 text-white shadow-lg" : "text-muted-foreground hover:text-white"
-                )}
-              >
-                Insights
-              </button>
-            </div>
-            <Button variant="ghost" size="icon" className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl text-white/20 hover:text-white transition-all hidden xs:flex">
-              <ChevronsUpDown className="h-5 w-5 sm:h-6 sm:w-6" />
-            </Button>
+          <div className="flex items-center gap-4 bg-black/60 p-1 rounded-2xl border border-white/5 w-full sm:w-auto">
+            <button onClick={() => setPulseView('stats')} className={cn("flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all", pulseView === 'stats' ? "bg-white/10 text-white shadow-lg" : "text-muted-foreground hover:text-white")}>Stats</button>
+            <button onClick={() => setPulseView('insights')} className={cn("flex-1 sm:flex-none px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all", pulseView === 'insights' ? "bg-white/10 text-white shadow-lg" : "text-muted-foreground hover:text-white")}>Insights</button>
           </div>
         </CardContent>
       </Card>
 
-      {/* 3. Categories & Inventories Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2 py-2">
-        <div className="flex items-center gap-4 sm:gap-6">
-          <div className="p-2 sm:p-3 bg-primary/10 rounded-xl">
-            <LayoutGrid className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-black tracking-tighter text-white uppercase leading-none truncate max-w-[200px] sm:max-w-none">
-            {selectedCategory || 'Registry Hub'}
-          </h2>
+      {/* 3. Header Section */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-6 py-2 px-1">
+        <div className="flex items-center gap-4">
+          <div className="p-3 bg-primary/10 rounded-xl"><LayoutGrid className="h-6 w-6 text-primary" /></div>
+          <h2 className="text-2xl sm:text-3xl font-black uppercase text-white tracking-tighter truncate max-w-[200px] sm:max-w-none">{selectedCategory || 'Registry Hub'}</h2>
         </div>
-
-        <div className="flex items-center gap-3 sm:gap-6">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <div className="relative group cursor-pointer bg-black/40 border border-white/10 px-4 sm:px-6 py-2.5 sm:py-3 rounded-2xl flex items-center gap-4 sm:gap-10 hover:border-primary/40 transition-all shadow-xl flex-1 sm:flex-none justify-between">
-                <span className="text-[9px] sm:text-[11px] font-black uppercase text-white tracking-widest leading-none">
-                  Scope
-                  <span className="ml-2 text-primary font-mono opacity-80">{processedRecords.length}</span>
-                </span>
-                <ChevronRight className="h-3.5 w-3.5 text-white/40 rotate-90" />
-              </div>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-64 bg-black border-white/10 rounded-2xl shadow-3xl text-white">
-              {appSettings?.grants.map(g => (
-                <DropdownMenuItem key={g.id} onClick={() => refreshRegistry()} className="h-12 uppercase font-black text-[10px] tracking-widest cursor-pointer hover:bg-white/5">{g.name}</DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-
-          <button 
-            onClick={handleSelectAll}
-            className="flex items-center gap-2 sm:gap-3 group px-3 py-2 hover:bg-white/5 rounded-xl transition-all"
-          >
-            <span className="text-[9px] sm:text-[11px] font-black uppercase tracking-[0.2em] text-white/40 group-hover:text-white hidden xxs:inline">ALL</span>
-            <div className={cn(
-              "h-5 w-5 sm:h-6 sm:w-6 rounded-full border-2 flex items-center justify-center transition-all",
-              ((selectedCategory && selectedIds.size === processedRecords.length) || (!selectedCategory && selectedCategories.size === categoryStats.length)) && categoryStats.length > 0
-                ? "bg-primary border-primary text-black" 
-                : "border-white/10 group-hover:border-white/30"
-            )}>
-              <CheckCircle2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            </div>
+        <div className="flex items-center gap-4 sm:gap-6 w-full sm:w-auto justify-between sm:justify-end">
+          <Badge variant="outline" className="h-8 px-4 font-black uppercase text-[10px] border-white/10 text-white/60">{processedRecords.length} RECORDS</Badge>
+          <button onClick={handleSelectAll} className="flex items-center gap-3 group px-4 py-2 hover:bg-white/5 rounded-xl transition-all">
+            <span className="text-[11px] font-black uppercase tracking-widest text-white/40 group-hover:text-white">SELECT ALL</span>
+            <div className={cn("h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all", isAnySelected ? "bg-primary border-primary text-black" : "border-white/10")}><CheckCircle2 className="h-4 w-4" /></div>
           </button>
         </div>
       </div>
 
-      {/* 4. Operational Pulse Bar (The Gold Bar) */}
-      <AnimatePresence>
-        {isAnySelected && (
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 20 }}
-            className="sticky top-2 z-50 px-1 sm:px-2"
-          >
-            <div className="bg-primary shadow-3xl shadow-primary/30 rounded-[1.5rem] sm:rounded-[2rem] h-16 sm:h-20 flex items-center px-4 sm:px-8 gap-4 sm:gap-10 overflow-hidden relative">
-              <div className="flex items-center gap-2 sm:gap-4 bg-white/20 px-3 sm:px-6 py-1.5 sm:py-2.5 rounded-xl sm:rounded-2xl backdrop-blur-md shrink-0">
-                <span className="text-[10px] sm:text-sm font-black uppercase text-black">
-                  {selectedCategory ? selectedIds.size : selectedCategories.size} Selected
-                </span>
-              </div>
-              
-              <Separator orientation="vertical" className="h-8 bg-black/10 hidden sm:block" />
-
-              <ScrollArea className="flex-1 h-full">
-                <div className="flex items-center gap-4 sm:gap-8 h-full py-2">
-                  <button onClick={() => {}} className="flex items-center gap-2 sm:gap-3 text-black font-black uppercase text-[9px] sm:text-[11px] tracking-widest shrink-0"><ArrowRightLeft className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Merge</button>
-                  <button onClick={() => setIsBatchEditOpen(true)} className="flex items-center gap-2 sm:gap-3 text-black font-black uppercase text-[9px] sm:text-[11px] tracking-widest shrink-0"><Edit3 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Batch Edit</button>
-                  <button onClick={handleExcelExport} className="flex items-center gap-2 sm:gap-3 text-black font-black uppercase text-[9px] sm:text-[11px] tracking-widest shrink-0"><FileSpreadsheet className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Excel</button>
-                  <button onClick={() => {}} className="flex items-center gap-2 sm:gap-3 text-black font-black uppercase text-[9px] sm:text-[11px] tracking-widest shrink-0"><Trash2 className="h-3.5 w-3.5 sm:h-4 sm:w-4" /> Wipe</button>
-                </div>
-                <ScrollBar orientation="horizontal" className="h-1 opacity-20" />
-              </ScrollArea>
-
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                onClick={() => { setSelectedIds(new Set()); setSelectedCategories(new Set()); }}
-                className="h-8 w-8 sm:h-10 sm:w-10 rounded-full hover:bg-black/5 text-black shrink-0"
-              >
-                <X className="h-4 w-4 sm:h-5 sm:w-5" />
-              </Button>
+      {/* 4. Adaptive Grid Surface */}
+      <AnimatePresence mode="wait">
+        {!selectedCategory ? (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+            {categoryStats.map(cat => (
+              <Card key={cat.name} className="bg-black border-2 border-white/5 rounded-[2rem] hover:border-primary/40 transition-all group cursor-pointer shadow-2xl" onClick={() => setSelectedCategory(cat.name)}>
+                <CardHeader className="p-8 pb-4 flex flex-row items-center justify-between">
+                  <h3 className="text-white font-black uppercase text-sm leading-none truncate max-w-[80%]">{cat.name}</h3>
+                  <div onClick={(e) => { e.stopPropagation(); toggleCategorySelection(cat.name); }} className={cn("h-5 w-5 rounded-full border-2 transition-all", selectedCategories.has(cat.name) ? "bg-primary border-primary text-black" : "border-white/10")}><CheckCircle2 className="h-3.5 w-3.5" /></div>
+                </CardHeader>
+                <CardContent className="p-8 pt-0 space-y-6">
+                  <div className="flex items-end justify-between">
+                    <div className="text-5xl font-black text-white tracking-tighter leading-none">{cat.total}</div>
+                    <Badge variant="outline" className="h-6 border-primary/20 text-primary text-[8px] font-black">{Math.round((cat.verified/cat.total)*100)}% VERIFIED</Badge>
+                  </div>
+                  <Button variant="outline" className="w-full h-12 rounded-xl bg-transparent border-white/10 text-white font-black text-[10px] uppercase group-hover:bg-primary group-hover:text-black">View Category <ChevronRight className="ml-2 h-4 w-4" /></Button>
+                </CardContent>
+              </Card>
+            ))}
+          </motion.div>
+        ) : (
+          <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+            <Button variant="ghost" onClick={() => setSelectedCategory(null)} className="h-12 px-6 rounded-xl bg-black border-2 border-white/5 text-white font-black uppercase text-[10px] tracking-widest"><ArrowLeft className="mr-3 h-4 w-4" /> Back to hub</Button>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+              {paginatedRecords.map(record => (
+                <RegistryCard key={record.id} record={record} onInspect={() => { setSelectedRecord(record); setIsDetailOpen(true); }} selected={selectedIds.has(record.id)} onToggleSelect={(id) => { const next = new Set(selectedIds); if (next.has(id)) next.delete(id); else next.add(id); setSelectedIds(next); }} />
+              ))}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      {/* Registry Surface */}
-      {!selectedCategory ? (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-4 sm:gap-6 px-1">
-          {categoryStats.map((cat) => (
-            <Card key={cat.name} className="bg-black border-2 border-primary/10 rounded-[1.5rem] sm:rounded-[2rem] overflow-hidden hover:border-primary/40 transition-all group shadow-2xl relative">
-              <CardHeader className="p-6 sm:p-8 pb-4 flex flex-row items-center justify-between">
-                <h3 className="text-white font-black uppercase text-[11px] sm:text-sm tracking-tight truncate max-w-[80%] leading-none">{cat.name}</h3>
-                <div onClick={(e) => { e.stopPropagation(); toggleCategorySelection(cat.name); }} className="cursor-pointer">
-                  <div className={cn(
-                    "h-5 w-5 sm:h-6 sm:w-6 rounded-full border-2 transition-all flex items-center justify-center",
-                    selectedCategories.has(cat.name) ? "bg-primary border-primary text-black" : "border-white/10 hover:border-white/30"
-                  )}>
-                    <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="p-6 sm:p-8 pt-0 space-y-6 sm:space-y-8">
-                <div className="flex items-end justify-between">
-                  <div className="space-y-1">
-                    <div className="text-4xl sm:text-5xl font-black text-white tracking-tighter leading-none">{cat.total}</div>
-                    <p className="text-[8px] sm:text-[10px] font-black text-white/40 uppercase tracking-[0.2em]">RECORDS</p>
-                  </div>
-                  <LayoutGrid className="h-8 w-8 sm:h-10 sm:w-10 text-primary opacity-10 group-hover:opacity-40 transition-all" />
-                </div>
-
-                <div className="space-y-3 pt-4 border-t border-dashed border-white/10">
-                  <div className="flex items-center justify-between text-[8px] sm:text-[10px] font-black uppercase tracking-widest text-white/40">
-                    <span>PROGRESS</span>
-                    <span className="text-primary font-mono">{cat.verified}/{cat.total}</span>
-                  </div>
-                  <div className="h-1 w-full bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary transition-all duration-1000" style={{ width: `${(cat.verified / cat.total) * 100}%` }} />
-                  </div>
-                </div>
-
-                <Button 
-                  variant="outline" 
-                  onClick={() => setSelectedCategory(cat.name)}
-                  className="w-full h-12 sm:h-14 rounded-xl sm:rounded-2xl bg-transparent border-primary/20 text-white font-black uppercase text-[9px] sm:text-[10px] tracking-[0.2em] group-hover:bg-primary group-hover:text-black transition-all shadow-inner"
-                >
-                  View Records <ChevronRight className="ml-2 h-4 w-4" />
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <div className="space-y-6">
-          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 px-2">
-            <Button 
-              variant="ghost" 
-              onClick={() => setSelectedCategory(null)} 
-              className="h-11 sm:h-12 px-4 sm:px-6 rounded-xl sm:rounded-2xl bg-black border-2 border-white/5 hover:border-primary/20 text-white font-black uppercase text-[9px] sm:text-[10px] tracking-widest w-full sm:w-auto"
-            >
-              <ArrowLeft className="mr-3 h-4 w-4" /> Back to hub
-            </Button>
-            <Badge variant="outline" className="h-8 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px] sm:text-[10px] w-full sm:w-auto justify-center">
-              {processedRecords.length} CATEGORY RECORDS
-            </Badge>
-          </div>
-
-          <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 px-1">
-            {paginatedRecords.map((record) => (
-              <RegistryCard 
-                key={record.id} 
-                record={record} 
-                onInspect={() => { setSelectedRecord(record); setIsDetailOpen(true); }} 
-                selected={selectedIds.has(record.id)} 
-                onToggleSelect={(id) => {
-                  const next = new Set(selectedIds);
-                  if (next.has(id)) next.delete(id); else next.add(id);
-                  setSelectedIds(next);
-                }} 
-              />
-            ))}
-          </div>
-
-          <div className="fixed bottom-20 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-2xl px-4 sm:px-6 py-2.5 sm:py-3 rounded-2xl sm:rounded-[2.5rem] border-2 border-primary/10 shadow-2xl flex items-center gap-4 sm:gap-6 w-[95vw] sm:w-auto justify-between sm:justify-start">
-            <div className="flex items-center gap-1 sm:gap-2">
-              <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl"><ChevronLeft className="h-4 w-4 sm:h-5 sm:w-5" /></Button>
-              <span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest px-2 sm:px-4 tabular-nums text-white">Page {currentPage} of {totalPages || 1}</span>
-              <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="h-9 w-9 sm:h-10 sm:w-10 rounded-xl"><ChevronRight className="h-4 w-4 sm:h-5 sm:w-5" /></Button>
+      {/* 5. The Gold Action Bar */}
+      <AnimatePresence>
+        {isAnySelected && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-24 sm:bottom-28 left-1/2 -translate-x-1/2 z-50 w-[95vw] lg:w-auto">
+            <div className="bg-primary shadow-3xl shadow-primary/30 rounded-[2rem] h-16 sm:h-20 flex items-center px-6 sm:px-10 gap-6 sm:gap-10 overflow-hidden">
+              <span className="text-xs sm:text-sm font-black uppercase text-black shrink-0">{selectedCategory ? selectedIds.size : selectedCategories.size} Pulses</span>
+              <Separator orientation="vertical" className="h-8 bg-black/10 hidden md:block" />
+              <div className="flex-1 overflow-x-auto custom-scrollbar flex items-center gap-6 sm:gap-10 py-2">
+                <button className="flex items-center gap-2 text-black font-black uppercase text-[10px] tracking-widest shrink-0"><ArrowRightLeft className="h-4 w-4" /> Merge</button>
+                <button onClick={() => setIsBatchEditOpen(true)} className="flex items-center gap-2 text-black font-black uppercase text-[10px] tracking-widest shrink-0"><Edit3 className="h-4 w-4" /> Edit</button>
+                <button onClick={handleExcelExport} className="flex items-center gap-2 text-black font-black uppercase text-[10px] tracking-widest shrink-0"><FileSpreadsheet className="h-4 w-4" /> Excel</button>
+                <button className="flex items-center gap-2 text-black font-black uppercase text-[10px] tracking-widest shrink-0"><Trash2 className="h-4 w-4" /> Wipe</button>
+              </div>
+              <Button variant="ghost" size="icon" onClick={() => { setSelectedIds(new Set()); setSelectedCategories(new Set()); }} className="h-10 w-10 text-black shrink-0"><X className="h-5 w-5" /></Button>
             </div>
-            <div className="h-6 w-px bg-border/40 hidden xs:block" />
-            <Button className="h-10 sm:h-12 px-4 sm:px-8 rounded-xl sm:rounded-2xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 text-black shrink-0" onClick={() => setIsFormOpen(true)}>
-              <PlusCircle className="mr-2 h-4 w-4 hidden xs:inline" /> New
-            </Button>
-          </div>
-        </div>
-      )}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {/* Global Drawers & Dialogs */}
-      <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={saveHeaderPrefs} onReset={() => {}} />
-      <AssetFilterSheet 
-        isOpen={isFilterOpen} 
-        onOpenChange={setIsFilterOpen} 
-        locationOptions={locationOptions}
-        selectedLocations={selectedLocations}
-        setSelectedLocations={setSelectedLocations}
-        assigneeOptions={assigneeOptions}
-        selectedAssignees={selectedAssignees}
-        setSelectedAssignees={setSelectedAssignees}
-        statusOptions={statusOptions}
-        selectedStatuses={selectedStatuses}
-        setSelectedStatuses={setSelectedStatuses}
-        conditionOptions={conditionOptions}
-        selectedConditions={selectedConditions}
-        setSelectedConditions={setSelectedConditions}
-        missingFieldFilter={missingFieldFilter}
-        setMissingFieldFilter={setMissingFieldFilter}
-      />
+      <AssetFilterSheet isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} locationOptions={locationOptions} selectedLocations={selectedLocations} setSelectedLocations={setSelectedLocations} assigneeOptions={assigneeOptions} selectedAssignees={selectedAssignees} setSelectedAssignees={setSelectedAssignees} statusOptions={statusOptions} selectedStatuses={selectedStatuses} setSelectedStatuses={setSelectedStatuses} conditionOptions={conditionOptions} selectedConditions={selectedConditions} setSelectedConditions={setSelectedConditions} missingFieldFilter={missingFieldFilter} setMissingFieldFilter={setMissingFieldFilter} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }} />
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={() => setIsFormOpen(true)} />
-      <AssetForm 
-        isOpen={isFormOpen} 
-        onOpenChange={setIsFormOpen} 
-        asset={processedRecords.find(r => r.id === selectedRecord?.id)?.rawRow as unknown as Asset}
-        onSave={async (a) => { 
-          const isUpdate = assets.some(x => x.id === a.id);
-          await enqueueMutation(isUpdate ? 'UPDATE' : 'CREATE', 'assets', a);
-          await refreshRegistry();
-          setIsFormOpen(false); 
-          toast({ title: "Pulse Saved" });
-        }} 
-        isReadOnly={false} 
-        onQuickSave={async () => {}} 
-      />
       <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async (d) => { await refreshRegistry(); setSelectedIds(new Set()); }} />
     </div>
   );

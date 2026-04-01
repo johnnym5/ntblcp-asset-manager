@@ -1,29 +1,23 @@
-
 'use client';
 
 /**
  * @fileOverview DashboardWorkstation - SPA Intelligence Hub.
- * Phase 98: Integrated redesigned AssetSummaryDashboard Pulse.
+ * Phase 109: Optimized Adaptive Spacing & Metrics Wrapping.
  */
 
 import React, { useMemo } from 'react';
 import { 
   ArrowRight, 
   Globe,
-  Map as MapIcon,
   CheckCircle2,
   FolderKanban,
   ChevronDown,
   ShieldAlert,
   Activity,
-  Target,
   History as HistoryIcon,
   Zap,
   TrendingUp,
-  PieChart,
   ShieldCheck,
-  AlertCircle,
-  Fingerprint,
   Database
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -63,24 +57,12 @@ export function DashboardWorkstation() {
       .map(([year, count]) => ({ year, count, percent: Math.round((count / total) * 100) }))
       .sort((a, b) => String(b.year).localeCompare(String(a.year)));
 
-    // Condition Health
-    const healthData = assets.reduce((acc, a) => {
-      const cond = a.condition || 'Unassessed';
-      acc[cond] = (acc[cond] || 0) + 1;
-      return acc;
-    }, {} as Record<string, number>);
-
-    const healthSummary = Object.entries(healthData)
-      .map(([label, count]) => ({ label, count, percent: Math.round((count / total) * 100) }))
-      .sort((a, b) => b.count - a.count);
-
     return { 
       total, 
       verified, 
       exceptions, 
       dataGaps, 
       temporalSummary, 
-      healthSummary,
       coverage: total > 0 ? Math.round((verified / total) * 100) : 0,
       fidelityScore: Math.max(0, 100 - (exceptions * 5) - (dataGaps * 0.1))
     };
@@ -90,12 +72,12 @@ export function DashboardWorkstation() {
   const otherGrants = appSettings?.grants?.filter(g => g.id !== activeGrantId) || [];
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700 pb-32">
+    <div className="space-y-8 sm:space-y-10 animate-in fade-in duration-700">
       {/* Contextual Navigation */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="space-y-1">
-          <div className="flex items-center gap-4">
-            <h2 className="text-4xl font-black tracking-tighter uppercase leading-none">Intelligence Hub</h2>
+          <div className="flex flex-wrap items-center gap-4">
+            <h2 className="text-3xl sm:text-4xl font-black tracking-tighter uppercase leading-none">Intelligence Hub</h2>
             {appSettings?.grants && appSettings.grants.length > 1 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -120,51 +102,49 @@ export function DashboardWorkstation() {
               </DropdownMenu>
             )}
           </div>
-          <div className="flex items-center gap-3 mt-2">
-            <Badge className="bg-primary/5 border-2 border-primary/20 text-primary font-black uppercase text-[10px] tracking-widest px-4 h-7 rounded-full shadow-sm">
+          <div className="flex flex-wrap items-center gap-3 mt-2">
+            <Badge className="bg-primary/5 border-2 border-primary/20 text-primary font-black uppercase text-[9px] sm:text-[10px] tracking-widest px-4 h-7 rounded-full shadow-sm">
               {activeGrant?.name || 'Registry Hub'}
             </Badge>
-            <Badge variant="outline" className={cn("font-black uppercase text-[10px] tracking-widest px-4 h-7 rounded-full border-2", isOnline ? "text-green-600 border-green-200" : "text-orange-600 border-orange-200")}>
+            <Badge variant="outline" className={cn("font-black uppercase text-[9px] sm:text-[10px] tracking-widest px-4 h-7 rounded-full border-2", isOnline ? "text-green-600 border-green-200" : "text-orange-600 border-orange-200")}>
               {isOnline ? <Globe className="mr-2 h-3 w-3 inline" /> : <Database className="mr-2 h-3 w-3 inline" />}
               {isOnline ? 'Cloud Authority' : 'On-Device Pulse'}
             </Badge>
           </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={() => setActiveView('ALERTS')} className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2 border-2 hover:bg-destructive/5 transition-all">
+        <div className="flex flex-wrap items-center gap-3">
+          <Button variant="outline" onClick={() => setActiveView('ALERTS')} className="h-12 px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest gap-2 border-2 hover:bg-destructive/5 transition-all flex-1 sm:flex-none">
             <ShieldAlert className="h-4 w-4 text-destructive" /> Tactical Alerts
           </Button>
-          <Button onClick={() => setActiveView('REGISTRY')} className="h-12 px-8 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-primary-foreground group">
+          <Button onClick={() => setActiveView('REGISTRY')} className="h-12 px-8 rounded-2xl text-[10px] font-black uppercase tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-primary-foreground group flex-1 sm:flex-none">
             Open Registry <ArrowRight className="ml-3 h-4 w-4 group-hover:translate-x-1 transition-transform" />
           </Button>
         </div>
       </div>
 
-      {/* Primary Metrics Strip - Now using the AssetSummaryDashboard */}
-      <div className="px-1">
-        <AssetSummaryDashboard />
-      </div>
+      {/* Primary Metrics Strip */}
+      <AssetSummaryDashboard />
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 px-1">
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 sm:gap-8">
         {/* Intelligence Sidebars */}
-        <div className="lg:col-span-4 space-y-8">
+        <div className="lg:col-span-4 space-y-6 sm:space-y-8">
           {/* Fidelity Index Card */}
           <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
-            <CardHeader className="p-8 border-b bg-primary/5">
+            <CardHeader className="p-6 sm:p-8 border-b bg-primary/5">
               <CardTitle className="text-xs font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
                 <TrendingUp className="h-4 w-4" /> Fidelity Index
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-8 space-y-6">
+            <CardContent className="p-6 sm:p-8 space-y-6">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
-                  <span className="text-5xl font-black tracking-tighter text-foreground">
+                  <span className="text-4xl sm:text-5xl font-black tracking-tighter text-foreground">
                     {stats?.fidelityScore.toFixed(1) || '0.0'}%
                   </span>
                   <p className="text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">Global Integrity Rating</p>
                 </div>
-                <div className="p-4 bg-primary/10 rounded-[2rem] shadow-inner">
-                  <ShieldCheck className="h-10 w-10 text-primary" />
+                <div className="p-4 bg-primary/10 rounded-[2rem] shadow-inner shrink-0">
+                  <ShieldCheck className="h-8 w-8 sm:h-10 sm:w-10 text-primary" />
                 </div>
               </div>
               <div className="space-y-2">
@@ -179,12 +159,12 @@ export function DashboardWorkstation() {
 
           {/* Temporal Pulse Card */}
           <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
-            <CardHeader className="p-8 border-b bg-muted/20">
+            <CardHeader className="p-6 sm:p-8 border-b bg-muted/20">
               <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-muted-foreground flex items-center gap-3">
                 <HistoryIcon className="h-4 w-4" /> Temporal Pulse
               </CardTitle>
             </CardHeader>
-            <CardContent className="p-8">
+            <CardContent className="p-6 sm:p-8">
               <ScrollArea className="h-[180px] pr-4">
                 <div className="space-y-5">
                   {stats?.temporalSummary.map((item) => (
@@ -216,22 +196,21 @@ export function DashboardWorkstation() {
             </Button>
             <Button 
               variant="outline" 
-              onClick={() => setActiveView('GIS')}
+              onClick={() => setActiveView('REGISTRY')}
               className="h-20 rounded-3xl border-2 flex flex-col gap-1 transition-all hover:border-primary/40 hover:bg-primary/5"
             >
-              <Globe className="h-5 w-5 text-primary" />
-              <span className="text-[9px] font-black uppercase">GIS Grid</span>
+              <Boxes className="h-5 w-5 text-primary" />
+              <span className="text-[9px] font-black uppercase">Registry</span>
             </Button>
           </div>
         </div>
 
         <div className="lg:col-span-8 flex flex-col gap-8">
-           {/* Placeholder for secondary dashboard content if needed */}
-           <Card className="flex-1 rounded-[3rem] border-2 border-border/40 shadow-none bg-muted/5 flex flex-col items-center justify-center p-20 opacity-20 text-center space-y-4">
-              <Database className="h-16 w-16" />
+           <Card className="flex-1 rounded-[3rem] border-2 border-border/40 shadow-none bg-muted/5 flex flex-col items-center justify-center p-10 sm:p-20 opacity-20 text-center space-y-4">
+              <Database className="h-12 w-12 sm:h-16 sm:w-16" />
               <div className="space-y-1">
-                <h3 className="text-xl font-black uppercase tracking-widest">Intelligence Layer Active</h3>
-                <p className="text-sm font-medium italic">Monitoring global project telemetry...</p>
+                <h3 className="text-lg sm:text-xl font-black uppercase tracking-widest leading-tight">Intelligence Layer Active</h3>
+                <p className="text-xs sm:text-sm font-medium italic max-w-xs mx-auto">Monitoring global project telemetry across authorized scopes.</p>
               </div>
            </Card>
         </div>

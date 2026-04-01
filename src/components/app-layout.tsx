@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - SPA Shell Persistence.
- * Phase 108: Mobile-optimized bottom dock and responsive layout pulses.
+ * Phase 109: Optimized Adaptive Layout & Responsive Width Orchestration.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -172,7 +172,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   };
 
   return (
-    <div className="flex flex-col h-screen w-full bg-background overflow-hidden font-body selection:bg-primary/10">
+    <div className="flex flex-col h-screen w-full bg-background overflow-hidden font-body selection:bg-primary/20">
       
       {/* Header Pulse */}
       <header className="h-16 shrink-0 border-b bg-background/80 backdrop-blur-md flex items-center justify-between px-4 md:px-6 z-30">
@@ -240,10 +240,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      {/* Workspace Area */}
+      {/* Workspace Area - Optimized Adaptive Padding */}
       <main className="flex-1 overflow-hidden bg-muted/10 relative">
         <ScrollArea className="h-full w-full custom-scrollbar">
-          <div className="p-4 sm:p-6 md:p-8 lg:p-10 max-w-[1600px] mx-auto">
+          <div className="adaptive-container py-6 sm:py-8 lg:py-10">
             {children}
           </div>
         </ScrollArea>
@@ -266,7 +266,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Separator orientation="vertical" className="h-8 opacity-20 hidden xs:block" />
 
           <ScrollArea className="flex-1 h-full">
-            <div className="flex items-center gap-1 sm:gap-2 h-full items-center">
+            <div className="flex items-center gap-1 sm:gap-2 h-full">
               {ENGINEERING_NAV.map(item => <NavItemButton key={item.view} item={item} />)}
               
               <div className="flex items-center gap-1 sm:gap-2 border-l border-r border-border/40 px-2 sm:px-4 mx-1 sm:mx-2 h-full">
@@ -317,7 +317,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem onClick={() => logout()} className="rounded-xl h-11 flex items-center gap-3 cursor-pointer text-destructive hover:bg-destructive/5">
-                <LogOut className="h-4 w-4" />
+                <LogOut className="mr-2 h-4 w-4" />
                 <span className="font-bold text-[10px] uppercase">Terminate Session</span>
               </DropdownMenuItem>
             </DropdownMenuContent>
