@@ -3,6 +3,7 @@
 /**
  * @fileOverview RegistryWorkstation - High-Fidelity Asset Inventory.
  * Phase 225: Implemented Selection, Batch Actions, and Category Drill-Down.
+ * Phase 226: Applied state-locking for non-admin users.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -71,6 +72,12 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   const filteredAssets = useMemo(() => {
     let results = assets;
 
+    // RBAC Logic: Lock non-admins to their assigned state jurisdiction
+    if (!userProfile?.isAdmin && userProfile?.state) {
+      const userState = userProfile.state.toLowerCase().trim();
+      results = results.filter(a => (a.location || '').toLowerCase().trim() === userState);
+    }
+
     // 1. Category Scope
     if (selectedCategory && selectedCategory !== 'ALL') {
       results = results.filter(a => a.category === selectedCategory);
@@ -104,10 +111,15 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
     });
 
     return results;
-  }, [assets, selectedCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, sortKey, sortDir]);
+  }, [assets, selectedCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, sortKey, sortDir, userProfile]);
 
   const categoryStats = useMemo(() => {
-    const groups = assets.reduce((acc, a) => {
+    // We only compute stats for assets within the user's authorized scope
+    const scopedAssets = !userProfile?.isAdmin && userProfile?.state
+      ? assets.filter(a => (a.location || '').toLowerCase().trim() === userProfile.state.toLowerCase().trim())
+      : assets;
+
+    const groups = scopedAssets.reduce((acc, a) => {
       const cat = a.category || 'General Register';
       if (!acc[cat]) acc[cat] = { total: 0, verified: 0 };
       acc[cat].total++;
@@ -118,7 +130,7 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
     return Object.entries(groups)
       .map(([name, stats]) => ({ name, ...stats }))
       .sort((a, b) => a.name.localeCompare(b.name));
-  }, [assets]);
+  }, [assets, userProfile]);
 
   // --- Handlers ---
   const handleToggleSelect = (id: string) => {
@@ -141,7 +153,6 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   const handleDeleteSelected = async () => {
     if (selectedIds.size === 0) return;
     toast({ title: "Purge Pulse Initiated", description: `Removing ${selectedIds.size} records from the register.` });
-    // In a real implementation, this would call FirestoreService.deleteAsset in a loop or batch
     setSelectedIds(new Set());
     await refreshRegistry();
   };

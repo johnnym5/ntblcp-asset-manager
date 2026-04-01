@@ -4,6 +4,7 @@
  * @fileOverview ReportsWorkstation - Inventory Reports Module.
  * Phase 165: Renamed to Inventory Reports.
  * Phase 170: Updated High-Risk Exceptions to Travel Report Pulse.
+ * Phase 171: Applied regional state-lock to reporting statistics.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -53,12 +54,21 @@ export function ReportsWorkstation() {
   const [isFixing, setIsFixing] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
 
-  useEffect(() => { if (activeTab === 'quality') runAuditPulse(); }, [activeTab, assets]);
+  // RBAC: Filter assets for the current user's authorized scope
+  const scopedAssets = useMemo(() => {
+    if (!userProfile?.isAdmin && userProfile?.state) {
+      const userState = userProfile.state.toLowerCase().trim();
+      return assets.filter(a => (a.location || '').toLowerCase().trim() === userState);
+    }
+    return assets;
+  }, [assets, userProfile]);
+
+  useEffect(() => { if (activeTab === 'quality') runAuditPulse(); }, [activeTab, scopedAssets]);
 
   const runAuditPulse = async () => {
     setIsScanning(true);
     try {
-      const auditIssues = await IntegrityEngine.runFullAudit(assets);
+      const auditIssues = await IntegrityEngine.runFullAudit(scopedAssets);
       setIssues(auditIssues);
     } finally {
       setIsScanning(false);
@@ -68,7 +78,7 @@ export function ReportsWorkstation() {
   const handleFixCasing = async (issue: IntegrityIssue) => {
     setIsFixing(true);
     try {
-      const affectedAssets = assets.filter(a => issue.affectedIds.includes(a.id));
+      const affectedAssets = scopedAssets.filter(a => issue.affectedIds.includes(a.id));
       for (const asset of affectedAssets) {
         const updated = { ...asset, location: IntegrityEngine.standardizeLocation(asset.location), lastModified: new Date().toISOString() };
         await enqueueMutation('UPDATE', 'assets', updated);
@@ -84,15 +94,15 @@ export function ReportsWorkstation() {
 
   const handleExceptionExport = async () => {
     setIsExporting(true);
-    try { await PdfService.exportExceptionReport(assets, userProfile?.state || 'Global Scope'); }
+    try { await PdfService.exportExceptionReport(scopedAssets, userProfile?.state || 'Global Scope'); }
     finally { setIsExporting(false); }
   };
 
   const stats = useMemo(() => {
-    const verified = assets.filter(a => a.status === 'VERIFIED').length;
-    const exceptions = assets.filter(a => a.status === 'DISCREPANCY' || ['Stolen', 'Burnt'].includes(a.condition)).length;
-    return { total: assets.length, verified, exceptions };
-  }, [assets]);
+    const verified = scopedAssets.filter(a => a.status === 'VERIFIED').length;
+    const exceptions = scopedAssets.filter(a => a.status === 'DISCREPANCY' || ['Stolen', 'Burnt'].includes(a.condition)).length;
+    return { total: scopedAssets.length, verified, exceptions };
+  }, [scopedAssets]);
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 pb-32">

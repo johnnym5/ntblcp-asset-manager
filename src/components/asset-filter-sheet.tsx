@@ -4,6 +4,7 @@
  * @fileOverview High-Fidelity Filter Engine - Advanced AMOLED UI.
  * Phase 230: Synchronized with professional screenshot parity.
  * Features circular checkboxes, real-time counts, and missing-field radio logic.
+ * Phase 231: Added isAdmin pulse to conditionally hide Location scope for normal users.
  */
 
 import React from 'react';
@@ -19,11 +20,13 @@ import { Check, X } from 'lucide-react';
 import { cn } from "@/lib/utils";
 import { ScrollArea } from './ui/scroll-area';
 import { Label } from './ui/label';
+import { Separator } from './ui/separator';
 import type { OptionType } from '@/contexts/app-state-context';
 
 interface AssetFilterSheetProps {
   isOpen: boolean;
   onOpenChange: (isOpen: boolean) => void;
+  isAdmin: boolean;
   
   locationOptions: OptionType[];
   selectedLocations: string[];
@@ -119,6 +122,7 @@ const FilterSection = ({ title, options, selected, onChange }: {
 export function AssetFilterSheet({
   isOpen,
   onOpenChange,
+  isAdmin,
   locationOptions,
   selectedLocations,
   setSelectedLocations,
@@ -160,7 +164,13 @@ export function AssetFilterSheet({
         {/* Scrollable Pulse Surface */}
         <ScrollArea className="flex-1 bg-black">
           <div className="p-10 space-y-10">
-            <FilterSection title="Location" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
+            {isAdmin && (
+              <>
+                <FilterSection title="Location" options={locationOptions} selected={selectedLocations} onChange={setSelectedLocations} />
+                <Separator className="bg-white/5" />
+              </>
+            )}
+            
             <FilterSection title="Assignee" options={assigneeOptions} selected={selectedAssignees} onChange={setSelectedAssignees} />
             <FilterSection title="Condition" options={conditionOptions} selected={selectedConditions} onChange={setSelectedConditions} />
 

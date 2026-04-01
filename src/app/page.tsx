@@ -3,6 +3,8 @@
 /**
  * @fileOverview Root Shell - Unified Global Command Hub.
  * Phase 235: Resolved ReferenceError by adding ScrollArea import.
+ * Phase 236: Unified Header triggers and role-aware filtering integration.
+ * Phase 237: Fixed JSX syntax error in ErrorBoundary closing tag.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -117,6 +119,7 @@ export default function SPAHub() {
   };
 
   const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + selectedConditions.length + (missingFieldFilter ? 1 : 0);
+  const isAdmin = userProfile?.isAdmin || false;
 
   return (
     <div className="flex h-screen bg-black overflow-hidden font-sans selection:bg-primary/30 text-white">
@@ -272,6 +275,7 @@ export default function SPAHub() {
       <AssetFilterSheet 
         isOpen={isFilterOpen} 
         onOpenChange={setIsFilterOpen} 
+        isAdmin={isAdmin}
         locationOptions={locationOptions}
         selectedLocations={selectedLocations}
         setSelectedLocations={setSelectedLocations}

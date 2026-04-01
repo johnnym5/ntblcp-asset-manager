@@ -3,6 +3,7 @@
 /**
  * @fileOverview AuditLogWorkstation - SPA Audit Trail.
  * Phase 165: Renamed to Audit Trail.
+ * Phase 166: Applied regional state-lock to activity ledger for non-admins.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -91,14 +92,24 @@ export function AuditLogWorkstation() {
   };
 
   const filteredLog = useMemo(() => {
-    if (!searchTerm) return log;
-    const term = searchTerm.toLowerCase();
-    return log.filter(entry => 
-      entry.performedBy.toLowerCase().includes(term) || 
-      entry.assetId.toLowerCase().includes(term) || 
-      entry.assetDescription.toLowerCase().includes(term)
-    );
-  }, [log, searchTerm]);
+    let results = log;
+
+    // RBAC: Lock non-admins to their state jurisdiction ledger
+    if (!userProfile?.isAdmin && userProfile?.state) {
+      const userState = userProfile.state.toLowerCase().trim();
+      results = results.filter(entry => (entry.userState || '').toLowerCase().trim() === userState);
+    }
+
+    if (searchTerm) {
+      const term = searchTerm.toLowerCase();
+      results = results.filter(entry => 
+        entry.performedBy.toLowerCase().includes(term) || 
+        entry.assetId.toLowerCase().includes(term) || 
+        entry.assetDescription.toLowerCase().includes(term)
+      );
+    }
+    return results;
+  }, [log, searchTerm, userProfile]);
 
   return (
     <div className="space-y-10 pb-32 max-w-6xl mx-auto animate-in fade-in duration-700">
@@ -117,7 +128,7 @@ export function AuditLogWorkstation() {
         <Button 
           variant="outline" 
           onClick={() => { 
-            const blob = new Blob([JSON.stringify(log, null, 2)], { type: 'application/json' }); 
+            const blob = new Blob([JSON.stringify(filteredLog, null, 2)], { type: 'application/json' }); 
             saveAs(blob, `Assetain-Ledger-${new Date().toISOString().split('T')[0]}.json`); 
           }} 
           className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 shadow-sm border-2 border-primary/10 hover:border-primary/30 transition-all"
@@ -167,13 +178,13 @@ export function AuditLogWorkstation() {
                         </h4>
                         <div className="flex flex-wrap items-center gap-4 text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
                           <span className="flex items-center gap-2 px-2.5 py-1 bg-muted/50 rounded-lg border border-border/40">
-                            <Tag className="h-3 w-3" /> ID: {entry.assetId.split('-')[0]}
+                            <Tag className="h-3.5 w-3.5" /> ID: {entry.assetId.split('-')[0]}
                           </span>
                           <span className="flex items-center gap-2">
-                            <Clock className="h-3 w-3" /> {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
+                            <Clock className="h-3.5 w-3.5" /> {formatDistanceToNow(new Date(entry.timestamp), { addSuffix: true })}
                           </span>
                           <span className="flex items-center gap-2">
-                            <User className="h-3 w-3" /> {entry.performedBy}
+                            <User className="h-3.5 w-3.5" /> {entry.performedBy}
                           </span>
                         </div>
                       </div>
@@ -207,7 +218,7 @@ export function AuditLogWorkstation() {
                     <Badge variant="outline" className="h-10 px-6 font-black uppercase border-2 rounded-2xl shadow-sm tracking-widest text-[10px]">
                       {entry.operation}
                     </Badge>
-                    {entry.operation === 'UPDATE' && (
+                    {entry.operation === 'UPDATE' && userProfile?.isAdmin && (
                       <Button 
                         variant="ghost" 
                         size="icon" 

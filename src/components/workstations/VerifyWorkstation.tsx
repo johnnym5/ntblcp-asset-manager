@@ -3,6 +3,7 @@
 /**
  * @fileOverview VerifyWorkstation - Field Audit Queue.
  * Phase 165: Renamed to Field Audit Queue.
+ * Phase 166: Applied state-locking logic for regional auditors.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -14,11 +15,13 @@ import {
   Zap, 
   CheckCircle2,
   XCircle,
-  Database
+  Database,
+  Clock
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import AssetForm from '@/components/asset-form';
@@ -33,6 +36,7 @@ import type { RegistryHeader } from '@/types/registry';
 
 export function VerifyWorkstation() {
   const { assets, refreshRegistry, settingsLoaded } = useAppState();
+  const { userProfile } = useAuth();
   const { toast } = useToast();
   
   const [searchTerm, setSearchTerm] = useState('');
@@ -51,12 +55,19 @@ export function VerifyWorkstation() {
 
   const unverified = useMemo(() => {
     let list = assets.filter(a => a.status === 'UNVERIFIED');
+
+    // RBAC: Lock non-admins to their state jurisdiction
+    if (!userProfile?.isAdmin && userProfile?.state) {
+      const userState = userProfile.state.toLowerCase().trim();
+      list = list.filter(a => (a.location || '').toLowerCase().trim() === userState);
+    }
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       list = list.filter(a => a.description.toLowerCase().includes(term) || a.assetIdCode?.toLowerCase().includes(term));
     }
     return list;
-  }, [assets, searchTerm]);
+  }, [assets, searchTerm, userProfile]);
 
   const handleQuickVerify = async (asset: Asset, newStatus: 'VERIFIED' | 'DISCREPANCY') => {
     const updated: Asset = { ...asset, status: newStatus, lastModified: new Date().toISOString() };
@@ -94,7 +105,7 @@ export function VerifyWorkstation() {
             <motion.div layout className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
               {unverified.map(asset => (
                 <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} layout className="relative group">
-                  <RegistryCard record={transformAssetToRecord(asset, headers)} onInspect={() => { setSelectedAsset(asset); setIsFormOpen(true); }} densityMode="compact" />
+                  <RegistryCard record={transformAssetToRecord(asset, headers)} onInspect={() => { setSelectedAsset(asset); setIsFormOpen(true); }} />
                   <div className="absolute top-14 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all z-20">
                     <Button size="icon" className="h-10 w-10 rounded-xl bg-green-500 text-white shadow-xl" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'VERIFIED'); }} title="Verify Asset"><CheckCircle2 className="h-5 w-5" /></Button>
                     <Button size="icon" className="h-10 w-10 rounded-xl bg-destructive text-white shadow-xl" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'DISCREPANCY'); }} title="Report Discrepancy"><XCircle className="h-5 w-5" /></Button>
