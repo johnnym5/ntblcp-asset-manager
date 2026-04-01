@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 130: Integrated Manual Sync Triggers & Unified Header State.
+ * Phase 140: Stabilized manual sync and unified registry pulses.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react';

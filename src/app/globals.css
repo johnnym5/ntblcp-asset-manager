@@ -25,7 +25,7 @@
     --ring: 45 100% 50%;
     --radius: 1.5rem;
   }
-  .dark {
+  .dark, [data-theme='dark'] {
     --background: 0 0% 0%;
     --foreground: 210 40% 98%;
     --card: 0 0% 5%;
@@ -53,7 +53,7 @@
     @apply border-border;
   }
   body {
-    @apply bg-background text-foreground font-sans;
+    @apply bg-black text-foreground font-sans;
     font-feature-settings: "rlig" 1, "calt" 1;
   }
 }
@@ -72,8 +72,15 @@
     @apply bg-transparent;
   }
   
-  /* Gold scrollbar pulse as per screenshot */
   .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-primary rounded-full hover:bg-primary/80 transition-colors;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
