@@ -1,3 +1,4 @@
+
 'use client';
 
 /**
@@ -236,7 +237,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
-          <NavGroup items={AUDIT_NAV} title="Audit & Traceability" />
           <NavGroup items={GOVERNANCE_NAV} title="Governance & Systems" />
           
           {isAdmin && (
@@ -302,7 +302,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         <span>Dashboard</span>
                       </button>
                       <NavGroup items={ENGINEERING_NAV} title="Registry Engineering" />
-                      <NavGroup items={AUDIT_NAV} title="Audit & Traceability" />
                       <NavGroup items={GOVERNANCE_NAV} title="Governance & Systems" />
                     </div>
                   </ScrollArea>
