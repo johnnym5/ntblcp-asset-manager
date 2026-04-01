@@ -243,10 +243,6 @@ export default function SPAHub() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem onClick={() => setActiveView('IMPORT')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
-                  <DatabaseZap className="mr-2 h-4 w-4" />
-                  <span className="text-[11px] font-black uppercase">Ingest Workbook</span>
-                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
                   <SettingsIcon className="mr-2 h-4 w-4" />
                   <span className="text-[11px] font-black uppercase">System Settings</span>

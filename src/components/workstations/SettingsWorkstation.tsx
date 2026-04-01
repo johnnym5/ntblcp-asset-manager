@@ -4,6 +4,7 @@
  * @fileOverview SettingsWorkstation - Master Settings Manager.
  * Phase 235: Resolved ReferenceErrors and synchronized import paths.
  * Phase 236: Implemented handleCommitChanges and strict RBAC visibility.
+ * Phase 237: Relocated Ingest Registry Workbook to Projects & Sheets tab.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -57,7 +58,8 @@ import {
   ArrowRightLeft,
   KeyRound,
   History,
-  Check
+  Check,
+  DatabaseZap
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -461,8 +463,8 @@ export function SettingsWorkstation() {
                             <Button variant="outline" onClick={() => templateInputRef.current?.click()} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
                               <FileUp className="h-4 w-4" /> Import Template
                             </Button>
-                            <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
-                              <ScanSearch className="h-4 w-4" /> Scan & Import Data
+                            <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
+                              <DatabaseZap className="h-4 w-4" /> Ingest Registry Workbook
                             </Button>
                           </div>
                         )}
