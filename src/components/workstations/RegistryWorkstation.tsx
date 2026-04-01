@@ -69,7 +69,17 @@ export function RegistryWorkstation() {
     appSettings,
     isOnline,
     searchTerm,
-    setSearchTerm
+    setSearchTerm,
+    selectedLocations,
+    setSelectedLocations,
+    selectedAssignees,
+    setSelectedAssignees,
+    selectedStatuses,
+    setSelectedStatuses,
+    selectedConditions,
+    setSelectedConditions,
+    missingFieldFilter,
+    setMissingFieldFilter
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -90,13 +100,6 @@ export function RegistryWorkstation() {
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [pulseView, setPulseView] = useState<'stats' | 'insights'>('stats');
-
-  // Advanced Filter Logic State
-  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
-  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
-  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
-  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
-  const [missingFieldFilter, setMissingFieldFilter] = useState('');
 
   // Sorting Logic State
   const [sortKey, setSortKey] = useState<string>('sn');

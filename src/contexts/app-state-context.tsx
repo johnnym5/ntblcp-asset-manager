@@ -3,10 +3,10 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 76: Unified Workstation Management & Manual Sync Triggers.
- * Fixed: Added isHydrated to resolve AuthContext wait-loop.
+ * Fixed: Added global filter states to resolve TypeError in Dashboard metrics.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { storage } from '@/offline/storage';
 import { processSyncQueue } from '@/offline/sync';
@@ -35,6 +35,20 @@ interface AppStateContextType {
   manualUpload: () => Promise<void>;
   setActiveGrantId: (id: string) => Promise<void>;
   setReadAuthority: (node: AuthorityNode) => Promise<void>;
+  
+  // Global Filter States
+  globalStateFilter: string;
+  setGlobalStateFilter: Dispatch<SetStateAction<string>>;
+  selectedLocations: string[];
+  setSelectedLocations: Dispatch<SetStateAction<string[]>>;
+  selectedAssignees: string[];
+  setSelectedAssignees: Dispatch<SetStateAction<string[]>>;
+  selectedStatuses: string[];
+  setSelectedStatuses: Dispatch<SetStateAction<string[]>>;
+  selectedConditions: string[];
+  setSelectedConditions: Dispatch<SetStateAction<string[]>>;
+  missingFieldFilter: string;
+  setMissingFieldFilter: Dispatch<SetStateAction<string>>;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -53,6 +67,14 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
+
+  // Logic Engine States (Global for cross-workstation coordination)
+  const [globalStateFilter, setGlobalStateFilter] = useState('All');
+  const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
+  const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
+  const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
+  const [missingFieldFilter, setMissingFieldFilter] = useState('');
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
@@ -98,7 +120,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     } catch (e) {
       console.error("Registry Refresh Failure", e);
     }
-  }, []); // Removed activeGrantId dependency to prevent bootstrap recursion
+  }, []);
 
   const manualDownload = useCallback(async () => {
     if (!isOnline) return;
@@ -193,7 +215,19 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       manualDownload,
       manualUpload,
       setActiveGrantId,
-      setReadAuthority
+      setReadAuthority,
+      globalStateFilter,
+      setGlobalStateFilter,
+      selectedLocations,
+      setSelectedLocations,
+      selectedAssignees,
+      setSelectedAssignees,
+      selectedStatuses,
+      setSelectedStatuses,
+      selectedConditions,
+      setSelectedConditions,
+      missingFieldFilter,
+      setMissingFieldFilter
     }}>
       {children}
     </AppStateContext.Provider>
