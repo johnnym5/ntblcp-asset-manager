@@ -7,22 +7,13 @@
 
 import React, { useMemo, useState } from 'react';
 import { 
-  ArrowRight, 
   Globe,
   CheckCircle2,
   FolderKanban,
   ChevronDown,
-  ShieldAlert,
-  Activity,
   History as HistoryIcon,
-  Zap,
-  TrendingUp,
-  ShieldCheck,
   Database,
-  Boxes,
-  LayoutGrid,
   Search,
-  ScanSearch,
   ArrowUpDown,
   Filter
 } from 'lucide-react';
@@ -40,11 +31,9 @@ import {
 import { useAppState } from '@/contexts/app-state-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
 import { RegistryWorkstation } from './RegistryWorkstation';
-import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
 import { AssetFilterSheet } from '@/components/asset-filter-sheet';
 import { SortDrawer } from '@/components/registry/SortDrawer';
 import { cn } from '@/lib/utils';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 
 export function DashboardWorkstation() {
@@ -75,7 +64,6 @@ export function DashboardWorkstation() {
   
   const [isFilterOpen, setIsFilterOpen] = useState(false);
   const [isSortOpen, setIsSortOpen] = useState(false);
-  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
 
   const stats = useMemo(() => {
     if (!assets || assets.length === 0) return null;
@@ -190,11 +178,10 @@ export function DashboardWorkstation() {
             className="h-14 sm:h-16 pl-14 pr-32 sm:pr-40 rounded-2xl bg-[#0A0A0A] border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 text-white"
           />
           <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2">
-            <Button variant="ghost" size="icon" onClick={() => setIsImportScanOpen(true)} className="h-10 w-10 text-white/40 hover:text-primary rounded-xl" title="Discover Data"><ScanSearch className="h-5 w-5" /></Button>
             <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl" title="Sort Sequence"><ArrowUpDown className="h-5 w-5" /></Button>
             <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl relative" title="Logic Filters">
               <Filter className="h-5 w-5" />
-              {(selectedLocations.length + selectedAssignees.length + selectedStatuses.length + selectedConditions.length) > 0 && (
+              {(selectedStatuses.length + selectedConditions.length) > 0 && (
                 <div className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full animate-pulse shadow-lg" />
               )}
             </Button>
@@ -273,7 +260,6 @@ export function DashboardWorkstation() {
         sortDirection={sortDir} 
         onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} 
       />
-      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
 
     </div>
   );
