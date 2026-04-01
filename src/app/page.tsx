@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Single Page Application Hub.
- * Phase 180: Consolidated Administration workstations into a unified Settings hub.
+ * Phase 185: Merged Inventory Reports into the Unified Dashboard.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -80,12 +80,11 @@ export default function SPAHub() {
     return <UserProfileSetup />;
   }
 
-  // Phase 180: Unified Administration
+  // Phase 185: Reports merged into Dashboard
   const navItems: { id: WorkstationView; label: string; icon: any; adminOnly?: boolean; group: string }[] = [
     { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, group: 'Core' },
     
     { id: 'IMPORT', label: 'Data Import Center', icon: FileUp, group: 'Tools' },
-    { id: 'REPORTS', label: 'Inventory Reports', icon: Activity, group: 'Tools' },
     { id: 'ALERTS', label: 'Critical Exceptions', icon: AlertTriangle, group: 'Tools' },
     
     { id: 'AUDIT_LOG', label: 'Audit Trail', icon: History, group: 'Systems' },

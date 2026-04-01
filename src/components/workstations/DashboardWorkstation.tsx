@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - Unified Single-Scope Hub.
- * Phase 175: Merged Inventory, Audit Queue, and GIS Hub into a unified tabbed interface.
+ * Phase 185: Merged Inventory Reports into the unified tabbed interface.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -16,7 +16,8 @@ import {
   Filter,
   RefreshCw,
   Activity,
-  Globe
+  Globe,
+  FileText
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Input } from '@/components/ui/input';
@@ -25,9 +26,10 @@ import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
 import { RegistryWorkstation } from './RegistryWorkstation';
 import { VerifyWorkstation } from './VerifyWorkstation';
 import { GISWorkstation } from './GISWorkstation';
+import { ReportsWorkstation } from './ReportsWorkstation';
 import { cn } from '@/lib/utils';
 
-type DashboardTab = 'overview' | 'inventory' | 'audit' | 'gis';
+type DashboardTab = 'overview' | 'inventory' | 'audit' | 'reports' | 'gis';
 
 export function DashboardWorkstation() {
   const { 
@@ -71,6 +73,9 @@ export function DashboardWorkstation() {
               <TabsTrigger value="audit" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 <ShieldCheck className="h-3.5 w-3.5" /> Audit Queue
               </TabsTrigger>
+              <TabsTrigger value="reports" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+                <FileText className="h-3.5 w-3.5" /> Reports
+              </TabsTrigger>
               <TabsTrigger value="gis" className="px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 <MapIcon className="h-3.5 w-3.5" /> Spatial Hub
               </TabsTrigger>
@@ -93,6 +98,10 @@ export function DashboardWorkstation() {
 
           <TabsContent value="audit" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <VerifyWorkstation />
+          </TabsContent>
+
+          <TabsContent value="reports" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
+            <ReportsWorkstation />
           </TabsContent>
 
           <TabsContent value="gis" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
