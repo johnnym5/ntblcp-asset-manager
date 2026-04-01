@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SPA Orchestrator Hub.
- * Phase 88: Simplified workstation router following settings consolidation.
+ * Phase 107: Removed GIS Spatial Hub from the renderer pulse.
  */
 
 import React, { Suspense } from 'react';
@@ -25,7 +25,6 @@ import { AuditLogWorkstation } from '@/components/workstations/AuditLogWorkstati
 import { SyncQueueWorkstation } from '@/components/workstations/SyncQueueWorkstation';
 import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
-import { GISWorkstation } from '@/components/workstations/GISWorkstation';
 import { ErrorAuditWorkstation } from '@/components/workstations/ErrorAuditWorkstation';
 
 export default function SPAOrchestrator() {
@@ -67,12 +66,9 @@ function renderWorkstation(view: string) {
     case 'SYNC_QUEUE': return <SyncQueueWorkstation />;
     case 'DATABASE': return <DatabaseWorkstation />;
     case 'SETTINGS': return <SettingsWorkstation />;
-    case 'GIS': return <GISWorkstation />;
     case 'ERROR_AUDIT': return <ErrorAuditWorkstation />;
     case 'USERS':
     case 'INFRASTRUCTURE':
-      // Following Phase 88 consolidation, these views are handled within SETTINGS.
-      // We automatically route to the Settings Workstation.
       return <SettingsWorkstation />;
     default: return (
       <div className="flex flex-col items-center justify-center py-40 opacity-20 space-y-6">
