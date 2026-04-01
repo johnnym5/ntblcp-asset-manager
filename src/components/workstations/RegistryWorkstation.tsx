@@ -1,63 +1,60 @@
 'use client';
 
 /**
- * @fileOverview RegistryWorkstation - Overhauled to match requested Category Grid design.
- * Phase 96: High-fidelity category cards with deterministic drill-down pulse.
+ * @fileOverview RegistryWorkstation - Overhauled to match requested High-Fidelity Design.
+ * Phase 101: Integrated unified search, Inventory Pulse card, and the Gold Operational Bar.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { motion, AnimatePresence, LayoutGroup } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Search, 
   Filter, 
-  Plus, 
   Boxes, 
   Loader2, 
-  Database,
-  DatabaseZap,
   ArrowUpDown,
-  ChevronLeft,
   ChevronRight,
   Zap,
   Edit3,
   Trash2,
   Settings2,
-  Palette,
-  Globe,
-  CloudOff,
-  FolderKanban,
-  ArrowRightLeft,
-  Printer,
-  FileJson,
-  FileSpreadsheet,
+  ArrowLeft,
   LayoutGrid,
-  MoreHorizontal,
-  ArrowLeft
+  Activity,
+  ChevronsUpDown,
+  CheckCircle2,
+  ArrowRightLeft,
+  Copy,
+  FileSpreadsheet,
+  X,
+  MoreHorizontal
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { RegistryCard } from '@/components/registry/RegistryCard';
-import { RegistryTable } from '@/components/registry/RegistryTable';
 import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
 import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
-import { SourceBrandingDrawer } from '@/components/registry/SourceBrandingDrawer';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
-import { TagPrintDialog } from '@/components/registry/TagPrintDialog';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Separator } from '@/components/ui/separator';
 import { ExcelService } from '@/services/excel-service';
 import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
 import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord } from '@/lib/registry-utils';
 import type { RegistryHeader, AssetRecord, HeaderFilter } from '@/types/registry';
 import type { Asset } from '@/types/domain';
+import { 
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 
 const ITEMS_PER_PAGE = 24;
 
@@ -66,7 +63,6 @@ export function RegistryWorkstation() {
     assets, 
     sandboxAssets, 
     dataSource, 
-    setDataSource, 
     refreshRegistry, 
     appSettings,
     isOnline,
@@ -81,19 +77,23 @@ export function RegistryWorkstation() {
   const [headers, setHeaders] = useState<RegistryHeader[]>([]);
   const [currentPage, setCurrentPage] = useState(1);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [selectedCategories, setSelectedCategories] = useState<Set<string>>(new Set());
+
+  // UI State
+  const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [pulseView, setPulseView] = useState<'stats' | 'insights'>('stats');
 
   // Logic State
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
   const [sortKey, setSortKey] = useState<string>('sn');
   const [sortDir, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRecord, setSelectedRecord] = useState<AssetRecord | undefined>();
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
-  const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isSortOpen, setIsSortOpen] = useState(false);
-  const [isDetailOpen, setIsDetailOpen] = useState(false);
-  const [isExportingExcel, setIsExportingExcel] = useState(false);
 
   useEffect(() => {
     const savedHeaders = localStorage.getItem('registry-header-prefs');
@@ -113,14 +113,15 @@ export function RegistryWorkstation() {
   const handleExcelExport = async () => {
     setIsExportingExcel(true);
     try {
-      await ExcelService.exportRegistry(assets, headers);
+      const sourceAssets = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
+      const targetAssets = selectedIds.size > 0 
+        ? sourceAssets.filter(a => selectedIds.has(a.id)) 
+        : sourceAssets;
+      
+      await ExcelService.exportRegistry(targetAssets, headers);
       toast({ title: "Excel Pulse Complete" });
     } catch (e: any) {
-      toast({ 
-        variant: "destructive", 
-        title: "Export Failed", 
-        description: e.message || "Workbook creation interrupted." 
-      });
+      toast({ variant: "destructive", title: "Export Failed", description: e.message });
     } finally {
       setIsExportingExcel(false);
     }
@@ -154,10 +155,12 @@ export function RegistryWorkstation() {
       results = results.filter(r => 
         String(r.rawRow.description || '').toLowerCase().includes(term) || 
         String(r.rawRow.serialNumber || '').toLowerCase().includes(term) ||
-        String(r.rawRow.assetIdCode || '').toLowerCase().includes(term)
+        String(r.rawRow.assetIdCode || '').toLowerCase().includes(term) ||
+        String(r.rawRow.location || '').toLowerCase().includes(term)
       );
     }
 
+    // Apply Filter Logic
     filters.forEach(f => {
       results = results.filter(r => {
         const field = r.fields.find(field => field.headerId === f.headerId);
@@ -172,6 +175,7 @@ export function RegistryWorkstation() {
       });
     });
 
+    // Apply Sort Logic
     results.sort((a, b) => {
       const fieldA = a.fields.find(f => f.headerId === sortKey)?.rawValue || '';
       const fieldB = b.fields.find(f => f.headerId === sortKey)?.rawValue || '';
@@ -188,45 +192,206 @@ export function RegistryWorkstation() {
 
   const totalPages = Math.ceil(processedRecords.length / ITEMS_PER_PAGE);
 
-  const handleInspect = (id: string) => {
-    const record = processedRecords.find(r => r.id === id);
-    setSelectedRecord(record);
-    setIsDetailOpen(true);
+  const toggleCategorySelection = (name: string) => {
+    const next = new Set(selectedCategories);
+    if (next.has(name)) next.delete(name);
+    else next.add(name);
+    setSelectedCategories(next);
   };
 
-  if (!selectedCategory) {
-    return (
-      <div className="space-y-10 animate-in fade-in duration-700 pb-32">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-          <div className="space-y-1">
-            <h2 className="text-4xl font-black tracking-tighter text-white uppercase flex items-center gap-4 leading-none">
-              <div className="p-3 bg-primary/10 rounded-2xl">
-                <Boxes className="h-8 w-8 text-primary" />
-              </div>
-              Asset Registry
-            </h2>
-            <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-              Select an Asset Class to view individual record pulses
-            </p>
+  const handleSelectAll = () => {
+    if (selectedCategory) {
+      // Select all IDs in current category list
+      const allIds = new Set(processedRecords.map(r => r.id));
+      if (selectedIds.size === allIds.size) setSelectedIds(new Set());
+      else setSelectedIds(allIds);
+    } else {
+      // Select all categories
+      const allCats = new Set(categoryStats.map(c => c.name));
+      if (selectedCategories.size === allCats.size) setSelectedCategories(new Set());
+      else setSelectedCategories(allCats);
+    }
+  };
+
+  const isAnySelected = selectedIds.size > 0 || selectedCategories.size > 0;
+
+  return (
+    <div className="space-y-6 pb-32 animate-in fade-in duration-700 max-w-[1600px] mx-auto">
+      
+      {/* 1. Unified Search & Logic Bar */}
+      <div className="relative group">
+        <div className="absolute left-5 top-1/2 -translate-y-1/2">
+          <Search className="h-5 w-5 text-muted-foreground opacity-40 group-focus-within:text-primary group-focus-within:opacity-100 transition-all" />
+        </div>
+        <Input 
+          placeholder="Search serials, descriptions, or locations..." 
+          value={searchTerm}
+          onChange={(e) => setSearchTerm(e.target.value)}
+          className="h-16 pl-14 pr-32 rounded-2xl bg-[#0A0A0A] border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 transition-all placeholder:text-muted-foreground/30"
+        />
+        <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+          <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-white opacity-40 hover:opacity-100 hover:bg-white/5 rounded-xl transition-all">
+            <ArrowUpDown className="h-5 w-5" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-white opacity-40 hover:opacity-100 hover:bg-white/5 rounded-xl transition-all">
+            <Filter className="h-5 w-5" />
+          </Button>
+        </div>
+      </div>
+
+      {/* 2. Inventory Pulse Card */}
+      <Card className="bg-[#0A0A0A] border-none shadow-3xl rounded-[2.5rem] overflow-hidden group hover:scale-[1.005] transition-transform duration-500">
+        <CardContent className="p-8 flex items-center justify-between">
+          <div className="flex items-center gap-6">
+            <div className="p-4 bg-primary/10 rounded-2xl shadow-inner group-hover:bg-primary/20 transition-colors">
+              <Activity className="h-8 w-8 text-primary" />
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Inventory Pulse</h3>
+              <p className="text-[10px] font-bold uppercase tracking-[0.3em] text-muted-foreground opacity-60">Real-time status of global assets</p>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <Button variant="outline" size="sm" onClick={handleExcelExport} disabled={isExportingExcel} className="h-12 px-6 rounded-xl font-black text-[9px] uppercase tracking-widest border-white/10 hover:bg-white/5 text-white gap-2">
-              <FileSpreadsheet className="h-4 w-4" /> Export All
-            </Button>
-            <Button onClick={() => setIsFormOpen(true)} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-primary/20">
-              <Plus className="mr-2 h-4 w-4" /> New Registration
+
+          <div className="flex items-center gap-6">
+            <div className="flex items-center bg-black/60 p-1.5 rounded-2xl border border-white/5 shadow-inner">
+              <button 
+                onClick={() => setPulseView('stats')}
+                className={cn(
+                  "px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all",
+                  pulseView === 'stats' ? "bg-white/10 text-white shadow-lg" : "text-muted-foreground hover:text-white"
+                )}
+              >
+                Key Stats
+              </button>
+              <button 
+                onClick={() => setPulseView('insights')}
+                className={cn(
+                  "px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest transition-all",
+                  pulseView === 'insights' ? "bg-white/10 text-white shadow-lg" : "text-muted-foreground hover:text-white"
+                )}
+              >
+                Asset Insights
+              </button>
+            </div>
+            <Button variant="ghost" size="icon" className="h-12 w-12 rounded-2xl text-white/20 hover:text-white transition-all">
+              <ChevronsUpDown className="h-6 w-6" />
             </Button>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* 3. Categories & Inventories Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2 py-4">
+        <div className="flex items-center gap-6">
+          <div className="p-3 bg-primary/10 rounded-xl">
+            <LayoutGrid className="h-6 w-6 text-primary" />
+          </div>
+          <h2 className="text-3xl font-black tracking-tighter text-white uppercase leading-none">
+            {selectedCategory || 'Categories & Inventories'}
+          </h2>
         </div>
 
+        <div className="flex items-center gap-6">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <div className="relative group cursor-pointer bg-black/40 border border-white/10 px-6 py-3 rounded-2xl flex items-center gap-10 hover:border-primary/40 transition-all shadow-xl">
+                <div className="flex flex-col">
+                  <span className="text-[11px] font-black uppercase text-white tracking-widest leading-none">
+                    Overall Project Scope
+                    <span className="ml-2 text-primary font-mono opacity-80">0/987</span>
+                  </span>
+                </div>
+                <ChevronRight className="h-4 w-4 text-white/40 rotate-90" />
+              </div>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-64 bg-black border-white/10 rounded-2xl shadow-3xl text-white">
+              {appSettings?.grants.map(g => (
+                <DropdownMenuItem key={g.id} className="h-12 uppercase font-black text-[10px] tracking-widest">{g.name}</DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+
+          <button 
+            onClick={handleSelectAll}
+            className="flex items-center gap-3 group px-4 py-2 hover:bg-white/5 rounded-xl transition-all"
+          >
+            <span className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40 group-hover:text-white">SELECT ALL</span>
+            <div className={cn(
+              "h-6 w-6 rounded-full border-2 flex items-center justify-center transition-all",
+              ((selectedCategory && selectedIds.size === processedRecords.length) || (!selectedCategory && selectedCategories.size === categoryStats.length)) && categoryStats.length > 0
+                ? "bg-primary border-primary text-black" 
+                : "border-white/10 group-hover:border-white/30"
+            )}>
+              <CheckCircle2 className="h-4 w-4" />
+            </div>
+          </button>
+        </div>
+      </div>
+
+      {/* 4. Operational Pulse Bar (The Gold Bar) */}
+      <AnimatePresence>
+        {isAnySelected && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 20 }}
+            className="sticky top-2 z-50 px-2"
+          >
+            <div className="bg-primary shadow-3xl shadow-primary/30 rounded-[2rem] h-20 flex items-center px-8 gap-10 overflow-hidden relative">
+              <div className="flex items-center gap-4 bg-white/20 px-6 py-2.5 rounded-2xl backdrop-blur-md">
+                <span className="text-sm font-black uppercase text-black">
+                  {selectedCategory ? selectedIds.size : selectedCategories.size} Selected
+                </span>
+              </div>
+              
+              <Separator orientation="vertical" className="h-8 bg-black/10" />
+
+              <div className="flex items-center gap-8 flex-1">
+                <button onClick={() => {}} className="flex items-center gap-3 text-black font-black uppercase text-[11px] tracking-widest hover:scale-105 transition-transform active:scale-95">
+                  <ArrowRightLeft className="h-4 w-4" /> Merge Selected
+                </button>
+                <button onClick={() => {}} className="flex items-center gap-3 text-black/40 font-black uppercase text-[11px] tracking-widest cursor-not-allowed">
+                  <Copy className="h-4 w-4" /> Copy to Sandbox
+                </button>
+                <button onClick={() => setIsBatchEditOpen(true)} className="flex items-center gap-3 text-black font-black uppercase text-[11px] tracking-widest hover:scale-105 transition-transform active:scale-95">
+                  <Edit3 className="h-4 w-4" /> Batch Edit
+                </button>
+                <button onClick={handleExcelExport} className="flex items-center gap-3 text-black font-black uppercase text-[11px] tracking-widest hover:scale-105 transition-transform active:scale-95">
+                  <FileSpreadsheet className="h-4 w-4" /> Export Excel
+                </button>
+                <button onClick={() => {}} className="flex items-center gap-3 text-black font-black uppercase text-[11px] tracking-widest hover:scale-105 transition-transform active:scale-95">
+                  <Trash2 className="h-4 w-4" /> Wipe Selected
+                </button>
+              </div>
+
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => { setSelectedIds(new Set()); setSelectedCategories(new Set()); }}
+                className="h-10 w-10 rounded-full hover:bg-black/5 text-black"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Registry Surface */}
+      {!selectedCategory ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6 px-1">
           {categoryStats.map((cat) => (
             <Card key={cat.name} className="bg-black border-2 border-primary/10 rounded-[2rem] overflow-hidden hover:border-primary/40 transition-all group shadow-2xl relative">
               <CardHeader className="p-8 pb-4 flex flex-row items-center justify-between">
-                <h3 className="text-white font-black uppercase text-sm tracking-tight truncate max-w-[80%] leading-tight">{cat.name}</h3>
-                <Button variant="ghost" size="icon" className="h-8 w-8 text-white/20 hover:text-white rounded-xl transition-colors">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
+                <h3 className="text-white font-black uppercase text-sm tracking-tight truncate max-w-[80%] leading-none">{cat.name}</h3>
+                <div onClick={(e) => { e.stopPropagation(); toggleCategorySelection(cat.name); }} className="cursor-pointer">
+                  <div className={cn(
+                    "h-6 w-6 rounded-full border-2 transition-all flex items-center justify-center",
+                    selectedCategories.has(cat.name) ? "bg-primary border-primary text-black" : "border-white/10 hover:border-white/30"
+                  )}>
+                    <CheckCircle2 className="h-3.5 w-3.5" />
+                  </div>
+                </div>
               </CardHeader>
               <CardContent className="p-8 pt-0 space-y-8">
                 <div className="flex items-end justify-between">
@@ -257,121 +422,59 @@ export function RegistryWorkstation() {
               </CardContent>
             </Card>
           ))}
-          
-          {categoryStats.length === 0 && (
-            <div className="col-span-full h-[400px] flex flex-col items-center justify-center opacity-20 border-4 border-dashed rounded-[4rem] space-y-6">
-              <Boxes className="h-24 w-24 mb-2" />
-              <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Registry Silent</h3>
-              <p className="text-sm font-medium italic">Import a workbook to initialize the class grid.</p>
-            </div>
-          )}
         </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="flex flex-col h-full gap-6 pb-32">
-      <motion.div layout className="flex flex-col gap-4 lg:flex-row lg:items-center justify-between px-1">
-        <div className="flex items-center gap-6">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            onClick={() => { setSelectedCategory(null); setSearchTerm(""); }} 
-            className="h-14 w-14 rounded-[1.5rem] bg-black border-2 border-white/5 hover:border-primary/20 hover:text-primary transition-all shadow-xl"
-          >
-            <ArrowLeft className="h-6 w-6" />
-          </Button>
-          <div className="space-y-1">
-            <h2 className="text-3xl lg:text-4xl font-black tracking-tighter text-white uppercase leading-tight">
-              {selectedCategory}
-            </h2>
+      ) : (
+        <div className="space-y-6">
+          <div className="flex items-center justify-between px-2">
+            <Button 
+              variant="ghost" 
+              onClick={() => setSelectedCategory(null)} 
+              className="h-12 px-6 rounded-2xl bg-black border-2 border-white/5 hover:border-primary/20 hover:text-primary transition-all text-white font-black uppercase text-[10px] tracking-widest"
+            >
+              <ArrowLeft className="mr-3 h-4 w-4" /> Back to Categories
+            </Button>
             <div className="flex items-center gap-3">
-              <Badge variant="outline" className="h-6 px-3 text-[9px] font-black tracking-widest rounded-full border-2 border-primary/20 bg-primary/5 text-primary uppercase">
-                {processedRecords.length} RECORDS IN PULSE
+              <Badge variant="outline" className="h-8 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px]">
+                {processedRecords.length} CATEGORY RECORDS
               </Badge>
-              {isOnline ? <Globe className="h-3 w-3 text-green-600 animate-pulse" /> : <CloudOff className="h-3 w-3 text-orange-600" />}
             </div>
           </div>
-        </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <Button variant="outline" size="sm" onClick={handleExcelExport} disabled={isExportingExcel} className="h-10 px-4 rounded-xl font-black text-[9px] uppercase tracking-widest border-white/10 hover:bg-white/5 text-white gap-2">
-            <FileSpreadsheet className="h-4 w-4 text-primary" /> Excel Export
-          </Button>
-          <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-xl border-2 border-primary/10 bg-card shadow-sm"><Settings2 className="h-4 w-4 text-primary" /></Button>
-        </div>
-      </motion.div>
-
-      <div className="flex flex-col gap-4 px-1">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1 group">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
-            <Input 
-              placeholder={`Scan ${selectedCategory} pulse...`} 
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-12 h-14 rounded-2xl bg-card border-none shadow-xl focus-visible:ring-primary/20 text-sm font-medium"
-            />
+          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 px-1">
+            {paginatedRecords.map((record) => (
+              <RegistryCard 
+                key={record.id} 
+                record={record} 
+                onInspect={() => { setSelectedRecord(record); setIsDetailOpen(true); }} 
+                selected={selectedIds.has(record.id)} 
+                onToggleSelect={(id) => {
+                  const next = new Set(selectedIds);
+                  if (next.has(id)) next.delete(id); else next.add(id);
+                  setSelectedIds(next);
+                }} 
+              />
+            ))}
           </div>
-          <div className="flex gap-2">
-            <Button variant="outline" onClick={() => setIsFilterOpen(true)} className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-lg">
-              <Filter className="h-4 w-4" /> Logic Filters
-            </Button>
-            <Button variant="outline" onClick={() => setIsSortOpen(true)} className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 bg-card border-none shadow-lg">
-              <ArrowUpDown className="h-4 w-4" /> Sort Sequence
+
+          <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-2xl px-6 py-3 rounded-[2.5rem] border-2 border-primary/10 shadow-2xl flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-10 w-10 rounded-xl"><ChevronLeft className="h-5 w-5" /></Button>
+              <span className="text-[10px] font-black uppercase tracking-widest px-4 tabular-nums">Page {currentPage} of {totalPages || 1}</span>
+              <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="h-10 w-10 rounded-xl"><ChevronRight className="h-5 w-5" /></Button>
+            </div>
+            <div className="h-6 w-px bg-border/40" />
+            <Button className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 text-black" onClick={() => setIsFormOpen(true)}>
+              <PlusCircle className="mr-2 h-4 w-4" /> New Asset
             </Button>
           </div>
         </div>
-      </div>
+      )}
 
-      <div className="flex-1 px-1">
-        {paginatedRecords.length > 0 ? (
-          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-            <AnimatePresence mode="popLayout">
-              {paginatedRecords.map((record) => (
-                <motion.div key={record.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} layout>
-                  <RegistryCard 
-                    record={record} 
-                    onInspect={handleInspect} 
-                    selected={selectedIds.has(record.id)} 
-                    onToggleSelect={(id) => {
-                      const next = new Set(selectedIds);
-                      if (next.has(id)) next.delete(id); else next.add(id);
-                      setSelectedIds(next);
-                    }} 
-                  />
-                </motion.div>
-              ))}
-            </AnimatePresence>
-          </div>
-        ) : (
-          <div className="h-[400px] flex flex-col items-center justify-center opacity-20 border-4 border-dashed rounded-[3rem] space-y-6 text-center">
-            <Boxes className="h-24 w-24 mb-2" />
-            <div className="space-y-1">
-              <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Category Silent</h3>
-              <p className="text-sm font-medium italic">Your query did not return any records in this scope.</p>
-            </div>
-          </div>
-        )}
-      </div>
-
-      <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-2xl px-6 py-3 rounded-[2.5rem] border-2 border-primary/10 shadow-2xl flex items-center gap-6">
-        <div className="flex items-center gap-2">
-          <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-10 w-10 rounded-xl"><ChevronLeft className="h-5 w-5" /></Button>
-          <span className="text-[10px] font-black uppercase tracking-widest px-4 tabular-nums">Page {currentPage} of {totalPages || 1}</span>
-          <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="h-10 w-10 rounded-xl"><ChevronRight className="h-5 w-5" /></Button>
-        </div>
-        <div className="h-6 w-px bg-border/40" />
-        <Button className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 text-black" onClick={() => setIsFormOpen(true)}>
-          <Plus className="mr-2 h-4 w-4" /> New Asset
-        </Button>
-      </div>
-
+      {/* Global Drawers & Dialogs */}
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={saveHeaderPrefs} onReset={() => {}} />
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }} />
-      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => {}} />
+      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={() => setIsFormOpen(true)} />
       <AssetForm 
         isOpen={isFormOpen} 
         onOpenChange={setIsFormOpen} 
@@ -379,16 +482,14 @@ export function RegistryWorkstation() {
         onSave={async (a) => { 
           const isUpdate = assets.some(x => x.id === a.id);
           await enqueueMutation(isUpdate ? 'UPDATE' : 'CREATE', 'assets', a);
-          const local = await storage.getAssets();
-          const next = isUpdate ? local.map(x => x.id === a.id ? a : x) : [a, ...local];
-          await storage.saveAssets(next);
           await refreshRegistry();
           setIsFormOpen(false); 
-          toast({ title: "Modification Staged", description: "Record pulse saved on device." });
+          toast({ title: "Pulse Saved" });
         }} 
         isReadOnly={false} 
         onQuickSave={async () => {}} 
       />
+      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async (d) => { /* Batch Logic */ await refreshRegistry(); setSelectedIds(new Set()); }} />
     </div>
   );
 }
