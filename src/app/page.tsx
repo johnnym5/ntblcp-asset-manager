@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Single-Page Operational Hub.
- * Phase 195: Relocated Settings to Header Avatar area and streamlined sidebar.
+ * Phase 210: Excised sidebar and redundant modules. Implemented Universal Back Button.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -10,36 +10,20 @@ import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
 import UserProfileSetup from '@/components/user-profile-setup';
 import { 
-  LayoutDashboard, 
   Boxes, 
-  FileUp, 
-  ShieldCheck, 
-  Activity, 
-  Settings as SettingsIcon,
-  Map,
-  History,
-  AlertTriangle,
-  Loader2,
-  Package,
-  LogOut,
-  ChevronRight,
-  Menu,
-  Database,
-  Monitor,
-  CloudDownload,
-  CloudUpload,
-  Bell,
-  Search,
-  RefreshCw,
-  LayoutGrid
+  Loader2, 
+  LogOut, 
+  ChevronRight, 
+  CloudDownload, 
+  CloudUpload, 
+  Bell, 
+  ArrowLeft,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
-import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
-import { AlertsWorkstation } from '@/components/workstations/AlertsWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
 import { RegionalScopeDrawer } from '@/components/registry/RegionalScopeDrawer';
 import { NotificationsCenter } from '@/components/NotificationsSheet';
@@ -47,14 +31,12 @@ import { CommandPalette } from '@/components/CommandPalette';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useNotifications } from '@/hooks/use-notifications';
-import type { WorkstationView } from '@/types/domain';
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
   const { activeView, setActiveView, appSettings, isOnline, isSyncing, manualDownload, manualUpload } = useAppState();
   const { unreadCount } = useNotifications();
   
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isScopeOpen, setIsScopeOpen] = useState(false);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
@@ -77,102 +59,42 @@ export default function SPAHub() {
     return <UserProfileSetup />;
   }
 
-  // Phase 195: Settings moved to header avatar area
-  const navItems: { id: WorkstationView; label: string; icon: any; adminOnly?: boolean; group: string }[] = [
-    { id: 'DASHBOARD', label: 'Dashboard', icon: LayoutDashboard, group: 'Core' },
-    { id: 'IMPORT', label: 'Data Import Center', icon: FileUp, group: 'Tools' },
-    { id: 'ALERTS', label: 'Critical Exceptions', icon: AlertTriangle, group: 'Tools' },
-  ];
-
   const renderWorkstation = () => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
-      case 'IMPORT': return <ImportWorkstation />;
-      case 'ALERTS': return <AlertsWorkstation />;
       case 'SETTINGS': return <SettingsWorkstation />;
       default: return <DashboardWorkstation />;
     }
   };
 
-  const NavButton = ({ item }: { item: typeof navItems[0] }) => (
-    <button
-      onClick={() => { setActiveView(item.id); setIsSidebarOpen(false); }}
-      className={cn(
-        "w-full flex items-center justify-between p-4 rounded-2xl transition-all duration-300 group tactile-pulse",
-        activeView === item.id 
-          ? "bg-primary text-black shadow-2xl shadow-primary/20 scale-[1.02] z-10" 
-          : "text-white/40 hover:text-white hover:bg-white/5"
-      )}
-    >
-      <div className="flex items-center gap-4">
-        <item.icon className={cn("h-5 w-5 transition-transform duration-500", activeView === item.id ? "scale-110" : "group-hover:scale-110")} />
-        <span className="text-[11px] font-black uppercase tracking-widest">{item.label}</span>
-      </div>
-      {activeView === item.id && <ChevronRight className="h-4 w-4" />}
-    </button>
-  );
-
   return (
     <div className="flex h-screen bg-black overflow-hidden font-sans selection:bg-primary/30">
       <CommandPalette />
       <WelcomeExperience isOpen={showWelcome} onComplete={() => setShowWelcome(false)} />
-      {/* Note: NotificationsSheet renamed to NotificationsCenter in previous phase updates */}
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       
-      <aside className={cn(
-        "bg-[#050505] border-r border-white/5 flex flex-col transition-all duration-700 ease-out z-50 fixed inset-y-0 left-0 lg:relative lg:translate-x-0",
-        isSidebarOpen ? "w-[280px] translate-x-0" : "w-[280px] -translate-x-full"
-      )}>
-        <div className="p-8 pb-4 flex items-center gap-4">
-          <div className="p-2.5 bg-primary rounded-2xl shadow-xl shadow-primary/20">
-            <Boxes className="h-6 w-6 text-black fill-current" />
-          </div>
-          <div className="flex flex-col">
-            <h1 className="text-xl font-black tracking-tighter text-white uppercase leading-none">NTBLCP</h1>
-            <span className="text-[8px] font-black uppercase text-primary tracking-[0.3em] mt-1.5 opacity-60">Asset Register</span>
-          </div>
-        </div>
-
-        <ScrollArea className="flex-1 px-4 py-8">
-          <div className="space-y-10 pb-20">
-            {['Core', 'Tools', 'System Administration'].map(group => {
-              const items = navItems.filter(i => i.group === group && (!i.adminOnly || userProfile?.isAdmin));
-              if (items.length === 0) return null;
-              return (
-                <div key={group} className="space-y-3">
-                  <h4 className="px-4 text-[9px] font-black uppercase tracking-[0.4em] text-white/20">{group}</h4>
-                  <div className="space-y-1">
-                    {items.map(item => <NavButton key={item.id} item={item} />)}
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </ScrollArea>
-
-        <div className="p-6 border-t border-white/5 bg-black/40">
-          <button 
-            onClick={logout}
-            className="w-full flex items-center gap-4 p-4 rounded-xl text-white/40 hover:text-red-500 hover:bg-red-500/5 transition-all"
-          >
-            <LogOut className="h-5 w-5" />
-            <span className="text-[10px] font-black uppercase tracking-widest">Sign Out</span>
-          </button>
-        </div>
-      </aside>
-
       <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
         <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/80 backdrop-blur-3xl z-40">
           <div className="flex items-center gap-6">
-            <button onClick={() => setIsSidebarOpen(!isSidebarOpen)} className="p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-colors text-white/60 hover:text-white">
-              <Menu className="h-5 w-5" />
-            </button>
-            <div className="flex items-center gap-4">
-              <div className="p-2.5 bg-primary/10 rounded-xl">
-                <Boxes className="h-5 w-5 text-primary" />
+            {activeView !== 'DASHBOARD' ? (
+              <button 
+                onClick={() => setActiveView('DASHBOARD')} 
+                className="flex items-center gap-3 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-primary group tactile-pulse"
+              >
+                <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Back to Dashboard</span>
+              </button>
+            ) : (
+              <div className="flex items-center gap-4">
+                <div className="p-2.5 bg-primary/10 rounded-xl">
+                  <Boxes className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex flex-col">
+                  <h1 className="text-xl font-black uppercase text-white tracking-tighter leading-none">NTBLCP</h1>
+                  <span className="text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Asset Intelligence</span>
+                </div>
               </div>
-              <h1 className="text-xl font-black uppercase text-white tracking-tighter">NTBLCP</h1>
-            </div>
+            )}
           </div>
 
           <div className="flex items-center gap-4">
@@ -210,19 +132,38 @@ export default function SPAHub() {
               </button>
             </div>
 
-            <button 
-              onClick={() => setActiveView('SETTINGS')}
-              className="flex items-center gap-3 group cursor-pointer pl-2"
-            >
-              <div className={cn(
-                "h-10 w-10 rounded-full border transition-all flex items-center justify-center font-black text-xs shadow-xl",
-                activeView === 'SETTINGS' 
-                  ? "bg-primary text-black border-primary" 
-                  : "bg-primary/10 border-primary/20 text-primary group-hover:bg-primary group-hover:text-black"
-              )}>
-                {userProfile?.displayName?.[0] || 'SA'}
-              </div>
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="flex items-center gap-3 group cursor-pointer pl-2">
+                  <div className={cn(
+                    "h-10 w-10 rounded-full border transition-all flex items-center justify-center font-black text-xs shadow-xl",
+                    activeView === 'SETTINGS' 
+                      ? "bg-primary text-black border-primary" 
+                      : "bg-primary/10 border-primary/20 text-primary group-hover:bg-primary group-hover:text-black"
+                  )}>
+                    {userProfile?.displayName?.[0] || 'A'}
+                  </div>
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56 bg-black border-white/5 text-white rounded-2xl">
+                <DropdownMenuLabel className="font-normal p-4">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-black uppercase tracking-tight">{userProfile?.displayName}</p>
+                    <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{userProfile?.role}</p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
+                  <SettingsIcon className="mr-2 h-4 w-4" />
+                  <span className="text-[11px] font-black uppercase">System Settings</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem onClick={logout} className="p-3 focus:bg-red-600 focus:text-white rounded-xl cursor-pointer m-1 text-red-500">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span className="text-[11px] font-black uppercase">Sign Out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
@@ -246,3 +187,13 @@ export default function SPAHub() {
     </div>
   );
 }
+
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Settings as SettingsIcon } from 'lucide-react';

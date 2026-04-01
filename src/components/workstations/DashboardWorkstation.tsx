@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview DashboardWorkstation - Unified Single-Scope Hub.
- * Phase 195: GIS Tab disabled per operational refinement request.
+ * Phase 210: Focused on Core Inventory, Audit, Reports, and System Pulses.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { 
   LayoutDashboard,
   Boxes,
@@ -28,6 +28,7 @@ import { ReportsWorkstation } from './ReportsWorkstation';
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { SyncQueueWorkstation } from './SyncQueueWorkstation';
 import { cn } from '@/lib/utils';
+import { motion } from 'framer-motion';
 
 type DashboardTab = 'overview' | 'inventory' | 'audit' | 'reports' | 'trail' | 'sync';
 
