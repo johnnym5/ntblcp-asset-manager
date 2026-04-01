@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Overhauled to match requested High-Fidelity Design.
- * Phase 102: Optimized Filter and Sort triggers for high-fidelity dark UI.
+ * Phase 103: Fixed ReferenceError by adding missing 'cn' import.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -27,7 +27,8 @@ import {
   Copy,
   FileSpreadsheet,
   X,
-  MoreHorizontal
+  MoreHorizontal,
+  PlusCircle
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -48,6 +49,7 @@ import { ExcelService } from '@/services/excel-service';
 import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
 import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord } from '@/lib/registry-utils';
+import { cn } from '@/lib/utils';
 import type { RegistryHeader, AssetRecord, HeaderFilter } from '@/types/registry';
 import type { Asset } from '@/types/domain';
 import { 
@@ -122,9 +124,14 @@ export function RegistryWorkstation() {
   };
 
   const handleExcelExport = async () => {
+    const sourceAssets = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
+    if (sourceAssets.length === 0) {
+      toast({ variant: "destructive", title: "Export Failed", description: "Registry is empty." });
+      return;
+    }
+
     setIsExportingExcel(true);
     try {
-      const sourceAssets = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
       const targetAssets = selectedIds.size > 0 
         ? sourceAssets.filter(a => selectedIds.has(a.id)) 
         : sourceAssets;
@@ -132,7 +139,7 @@ export function RegistryWorkstation() {
       await ExcelService.exportRegistry(targetAssets, headers);
       toast({ title: "Excel Pulse Complete" });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Export Failed", description: e.message });
+      toast({ variant: "destructive", title: "Export Interrupted", description: e.message });
     } finally {
       setIsExportingExcel(false);
     }
@@ -270,7 +277,7 @@ export function RegistryWorkstation() {
           placeholder="Search serials, descriptions, or locations..." 
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
-          className="h-16 pl-14 pr-32 rounded-2xl bg-[#0A0A0A] border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 transition-all placeholder:text-muted-foreground/30"
+          className="h-16 pl-14 pr-32 rounded-2xl bg-[#0A0A0A] border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 transition-all placeholder:text-muted-foreground/30 text-white"
         />
         <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
           <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-white opacity-40 hover:opacity-100 hover:bg-white/5 rounded-xl transition-all">
@@ -502,7 +509,7 @@ export function RegistryWorkstation() {
           <div className="fixed bottom-8 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-2xl px-6 py-3 rounded-[2.5rem] border-2 border-primary/10 shadow-2xl flex items-center gap-6">
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-10 w-10 rounded-xl"><ChevronLeft className="h-5 w-5" /></Button>
-              <span className="text-[10px] font-black uppercase tracking-widest px-4 tabular-nums">Page {currentPage} of {totalPages || 1}</span>
+              <span className="text-[10px] font-black uppercase tracking-widest px-4 tabular-nums text-white">Page {currentPage} of {totalPages || 1}</span>
               <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="h-10 w-10 rounded-xl"><ChevronRight className="h-5 w-5" /></Button>
             </div>
             <div className="h-6 w-px bg-border/40" />
