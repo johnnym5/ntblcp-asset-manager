@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Settings Manager.
- * Phase 180: Unified Administration workstation with consolidated Infrastructure and Database tabs.
- * Resolved template import bug by correctly mapping schema discovery results.
+ * Phase 185: Unified Administration workstation with consolidated Infrastructure and Database tabs.
+ * Resolved ReferenceErrors by implementing missing project/sheet lifecycle functions.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -115,6 +115,7 @@ export function SettingsWorkstation() {
   
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
+  const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
   const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
   
   const templateInputRef = useRef<HTMLInputElement>(null);
@@ -135,7 +136,7 @@ export function SettingsWorkstation() {
 
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     if (!draftSettings) return;
-    setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
+    setDraftSettings({ ...draftSettings, [key]: value });
   };
 
   const handleCommitChanges = async () => {
@@ -155,6 +156,64 @@ export function SettingsWorkstation() {
     }
   };
 
+  const handleAddProject = () => {
+    if (!newProjectName.trim() || !draftSettings) return;
+    const newGrant: Grant = {
+      id: crypto.randomUUID(),
+      name: newProjectName.trim(),
+      enabledSheets: [],
+      sheetDefinitions: {}
+    };
+    handleSettingChange('grants', [...draftSettings.grants, newGrant]);
+    setNewProjectName('');
+    toast({ title: "Project Staged", description: `Added ${newGrant.name} to the draft pulse.` });
+  };
+
+  const handleDeleteProject = (id: string) => {
+    if (!draftSettings || draftSettings.grants.length <= 1) {
+      toast({ variant: "destructive", title: "Action Inhibited", description: "Registry requires at least one project scope." });
+      return;
+    }
+    const updatedGrants = draftSettings.grants.filter(g => g.id !== id);
+    handleSettingChange('grants', updatedGrants);
+    if (draftSettings.activeGrantId === id) {
+      handleSettingChange('activeGrantId', updatedGrants[0]?.id || null);
+    }
+    toast({ title: "Project Removed from Draft" });
+  };
+
+  const handleDeleteSheet = (grantId: string, sheetName: string) => {
+    if (!draftSettings) return;
+    const updatedGrants = draftSettings.grants.map(g => {
+      if (g.id === grantId) {
+        const nextDefs = { ...g.sheetDefinitions };
+        delete nextDefs[sheetName];
+        return { 
+          ...g, 
+          sheetDefinitions: nextDefs, 
+          enabledSheets: g.enabledSheets.filter(s => s !== sheetName) 
+        };
+      }
+      return g;
+    });
+    handleSettingChange('grants', updatedGrants);
+    toast({ title: "Sheet Definition Staged for Removal" });
+  };
+
+  const handleNukeRegistry = async () => {
+    setIsSaving(true);
+    try {
+      await VirtualDBService.purgeGlobalRegistry();
+      toast({ title: "Global Register Purged", description: "All registry data has been wiped across storage tiers." });
+      await refreshRegistry();
+      setIsNukeDialogOpen(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Purge Failed" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleTemplateDiscovery = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !draftSettings) return;
@@ -165,7 +224,6 @@ export function SettingsWorkstation() {
       const activeId = draftSettings.activeGrantId;
       if (!activeId) throw new Error("Select an active project scope first.");
 
-      // CRITICAL FIX: Map discovered templates to the correct 'grants' key in draft state
       const updatedGrants = draftSettings.grants.map(g => {
         if (g.id === activeId) {
           const nextDefs = { ...g.sheetDefinitions };
@@ -337,22 +395,28 @@ export function SettingsWorkstation() {
                       <h4 className="text-[10px] font-black uppercase tracking-widest text-white/40">Sheet Definitions</h4>
                       <div className="space-y-2">
                         {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
-                          <div key={sheetName} className="flex items-center justify-between p-4 bg-black border border-white/5 rounded-2xl group hover:border-white/20 transition-all">
+                          <div key={sheetName} className="flex items-center justify-between p-4 bg-black border border-white/5 rounded-2xl group hover:border-white/20 transition-all shadow-inner">
                             <span className="text-xs font-black uppercase text-white/80">{sheetName}</span>
                             <div className="flex items-center gap-4 text-white/20">
-                              <button><Eye className="h-4 w-4 hover:text-white" /></button>
-                              <button onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}><Wrench className="h-4 w-4 hover:text-primary" /></button>
-                              <button onClick={() => handleDeleteSheet(grant.id, sheetName)}><Trash2 className="h-4 w-4 hover:text-red-600" /></button>
+                              <button className="hover:text-white transition-colors"><Eye className="h-4 w-4" /></button>
+                              <button onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setOriginalSheetName(sheetName); setIsColumnSheetOpen(true); }} className="hover:text-primary transition-colors"><Wrench className="h-4 w-4" /></button>
+                              <button onClick={() => handleDeleteSheet(grant.id, sheetName)} className="hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
                             </div>
                           </div>
                         ))}
                       </div>
                       {isActive && (
-                        <div className="grid grid-cols-3 gap-2">
-                          <Button variant="outline" className="h-12 text-[8px] font-black uppercase rounded-xl">Add Manually</Button>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                            <PlusCircle className="h-4 w-4" /> Add Manually
+                          </Button>
                           <input type="file" ref={templateInputRef} onChange={handleTemplateDiscovery} className="hidden" accept=".xlsx,.xls" />
-                          <Button variant="outline" onClick={() => templateInputRef.current?.click()} className="h-12 text-[8px] font-black uppercase rounded-xl">Import Template</Button>
-                          <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-12 text-[8px] font-black uppercase rounded-xl">Scan Workbook</Button>
+                          <Button variant="outline" onClick={() => templateInputRef.current?.click()} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                            <FileUp className="h-4 w-4" /> Import Template
+                          </Button>
+                          <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5 text-white/60 transition-all active:scale-95">
+                            <ScanSearch className="h-4 w-4" /> Scan & Import Data
+                          </Button>
                         </div>
                       )}
                     </CardContent>
@@ -375,14 +439,22 @@ export function SettingsWorkstation() {
         <TabsContent value="database" className="outline-none m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
           <SectionHeading title="Database Management" description="Global register controls" icon={Database} />
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-            <Card className="bg-card/50 border-border/40 rounded-2xl p-8 space-y-6">
+            <Card className="bg-card/50 border-border/40 rounded-2xl p-8 space-y-6 shadow-2xl">
               <h3 className="text-xl font-black uppercase">Synchronization</h3>
-              <Button variant="outline" onClick={refreshRegistry} className="w-full h-12 rounded-xl font-black uppercase text-[10px] gap-3 justify-start"><RefreshCw className="h-4 w-4 text-primary" /> Reconcile Cloud & Local</Button>
-              <Button variant="outline" onClick={refreshRegistry} className="w-full h-12 rounded-xl font-black uppercase text-[10px] gap-3 justify-start"><Download className="h-4 w-4 text-primary" /> Pull Full State</Button>
+              <div className="space-y-3">
+                <Button variant="outline" onClick={refreshRegistry} className="w-full h-12 rounded-xl font-black uppercase text-[10px] gap-3 justify-start px-6">
+                  <RefreshCw className="h-4 w-4 text-primary" /> Sync Local to Cloud
+                </Button>
+                <Button variant="outline" onClick={refreshRegistry} className="w-full h-12 rounded-xl font-black uppercase text-[10px] gap-3 justify-start px-6">
+                  <Download className="h-4 w-4 text-primary" /> Pull Cloud State
+                </Button>
+              </div>
             </Card>
             <Card className="bg-destructive/5 border-destructive/20 border-2 border-dashed rounded-2xl p-8 space-y-6">
               <h3 className="text-xl font-black uppercase text-destructive">Danger Zone</h3>
-              <Button onClick={() => setIsNukeDialogOpen(true)} className="w-full h-14 bg-destructive text-white rounded-xl font-black uppercase text-xs tracking-widest"><Bomb className="h-5 w-5 mr-3" /> RESET GLOBAL REGISTER</Button>
+              <Button onClick={() => setIsNukeDialogOpen(true)} className="w-full h-14 bg-destructive text-white rounded-xl font-black uppercase text-xs tracking-widest shadow-xl shadow-destructive/30">
+                <Bomb className="h-5 w-5 mr-3" /> RESET GLOBAL REGISTER
+              </Button>
             </Card>
           </div>
         </TabsContent>
@@ -390,46 +462,79 @@ export function SettingsWorkstation() {
         {/* --- 5. INFRASTRUCTURE TAB --- */}
         <TabsContent value="infrastructure" className="outline-none m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
           <SectionHeading title="System Infrastructure" description="Tiered storage redundancy" icon={Monitor} />
-          <Card className="rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.02] p-10">
+          <Card className="rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.02] p-10 shadow-2xl">
             <div className="flex flex-col md:flex-row items-center justify-between gap-12">
               <div className="flex flex-col items-center gap-4">
-                <div className="p-6 rounded-[2rem] bg-amber-500/10 border-2 border-amber-500/20"><Smartphone className="h-10 w-10 text-amber-600" /></div>
+                <div className="p-6 rounded-[2rem] bg-amber-500/10 border-2 border-amber-500/20 shadow-xl"><Smartphone className="h-10 w-10 text-amber-600" /></div>
                 <p className="text-[10px] font-black uppercase text-amber-700">Local Cache</p>
               </div>
               <ArrowRightLeft className="h-6 w-6 text-white/10" />
               <div className="flex flex-col items-center gap-4 relative">
-                <div className={cn("p-6 rounded-[2rem] border-2", appSettings?.readAuthority === 'RTDB' ? "border-green-500 bg-green-500/10" : "border-white/5")}><Zap className="h-10 w-10 text-green-600" /></div>
+                <div className={cn("p-6 rounded-[2rem] border-2 shadow-xl", appSettings?.readAuthority === 'RTDB' ? "border-green-500 bg-green-500/10" : "border-white/5")}><Zap className="h-10 w-10 text-green-600" /></div>
                 <p className="text-[10px] font-black uppercase text-green-700">Standby Mirror</p>
                 {appSettings?.readAuthority === 'RTDB' && <Badge className="absolute -top-4 bg-green-600 text-[8px] font-black uppercase h-5 px-2">Primary</Badge>}
               </div>
               <ArrowRightLeft className="h-6 w-6 text-white/10" />
               <div className="flex flex-col items-center gap-4 relative">
-                <div className={cn("p-6 rounded-[2rem] border-2", appSettings?.readAuthority === 'FIRESTORE' ? "border-blue-500 bg-blue-500/10" : "border-white/5")}><Cloud className="h-10 w-10 text-blue-600" /></div>
+                <div className={cn("p-6 rounded-[2rem] border-2 shadow-xl", appSettings?.readAuthority === 'FIRESTORE' ? "border-blue-500 bg-blue-500/10" : "border-white/5")}><Cloud className="h-10 w-10 text-blue-600" /></div>
                 <p className="text-[10px] font-black uppercase text-blue-700">Cloud Authority</p>
                 {appSettings?.readAuthority === 'FIRESTORE' && <Badge className="absolute -top-4 bg-blue-600 text-[8px] font-black uppercase h-5 px-2">Primary</Badge>}
               </div>
             </div>
             <div className="mt-12 flex justify-center">
-              <Button variant="outline" onClick={handleRunDiagnostics} disabled={isTesting} className="h-12 px-8 rounded-xl font-black uppercase text-[10px] border-2">{isTesting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Cpu className="h-4 w-4 mr-2" />} Run Diagnostics</Button>
+              <Button variant="outline" onClick={handleRunDiagnostics} disabled={isTesting} className="h-12 px-8 rounded-xl font-black uppercase text-[10px] border-2 hover:bg-primary/5">
+                {isTesting ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Cpu className="h-4 w-4 mr-2" />} Run Diagnostics
+              </Button>
             </div>
           </Card>
         </TabsContent>
       </Tabs>
 
-      <ColumnCustomizationSheet isOpen={isColumnSheetOpen} onOpenChange={setIsColumnSheetOpen} sheetDefinition={selectedSheetDef!} originalSheetName={originalSheetName} onSave={(orig, newDef) => {
-        const updatedGrants = draftSettings.grants.map(g => {
-          if (g.id === activeGrantIdForSchema) {
-            const next = { ...g.sheetDefinitions };
-            next[newDef.name] = newDef;
-            if (orig && orig !== newDef.name) delete next[orig];
-            return { ...g, sheetDefinitions: next };
-          }
-          return g;
-        });
-        handleSettingChange('grants', updatedGrants);
-      }} />
+      {selectedSheetDef && (
+        <ColumnCustomizationSheet 
+          isOpen={isColumnSheetOpen} 
+          onOpenChange={setIsColumnSheetOpen} 
+          sheetDefinition={selectedSheetDef} 
+          originalSheetName={originalSheetName} 
+          onSave={(orig, newDef, applyToAll) => {
+            if (!draftSettings) return;
+            const updatedGrants = draftSettings.grants.map(g => {
+              if (g.id === activeGrantIdForSchema) {
+                const next = { ...g.sheetDefinitions };
+                if (applyToAll) {
+                  Object.keys(next).forEach(k => { next[k] = { ...newDef, name: k }; });
+                } else {
+                  next[newDef.name] = newDef;
+                  if (orig && orig !== newDef.name) delete next[orig];
+                }
+                return { ...g, sheetDefinitions: next };
+              }
+              return g;
+            });
+            handleSettingChange('grants', updatedGrants);
+          }} 
+        />
+      )}
+      
       <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
-      <AlertDialog open={isNukeDialogOpen} onOpenChange={setIsNukeDialogOpen}><AlertDialogContent className="rounded-3xl p-10"><AlertDialogHeader className="space-y-4"><Bomb className="h-10 w-10 text-destructive" /><AlertDialogTitle className="text-2xl font-black uppercase text-destructive">Wipe Global Register?</AlertDialogTitle><AlertDialogDescription className="text-sm font-medium italic">This will delete all local, cloud, and mirror assets. Irreversible.</AlertDialogDescription></AlertDialogHeader><AlertDialogFooter className="mt-8 gap-3"><AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2">Abort</AlertDialogCancel><AlertDialogAction onClick={handleNukeRegistry} className="h-12 px-10 rounded-2xl bg-destructive text-white font-black uppercase">Confirm Wipe</AlertDialogAction></AlertDialogFooter></AlertDialogContent></AlertDialog>
+      
+      <AlertDialog open={isNukeDialogOpen} onOpenChange={setIsNukeDialogOpen}>
+        <AlertDialogContent className="rounded-3xl p-10 bg-background border-destructive/20 shadow-3xl">
+          <AlertDialogHeader className="space-y-4">
+            <Bomb className="h-12 w-12 text-destructive" />
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive">Wipe Global Register?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic leading-relaxed">
+              This will permanently delete all records from local, cloud, and mirror storage. This action is immutable.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handleNukeRegistry} className="h-12 px-10 rounded-2xl bg-destructive text-white font-black uppercase m-0">
+              Confirm Wipe Pulse
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
