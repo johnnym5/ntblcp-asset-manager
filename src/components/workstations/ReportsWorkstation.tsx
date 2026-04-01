@@ -3,6 +3,7 @@
 /**
  * @fileOverview ReportsWorkstation - Inventory Reports Module.
  * Phase 165: Renamed to Inventory Reports.
+ * Phase 170: Updated High-Risk Exceptions to Travel Report Pulse.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -24,7 +25,8 @@ import {
   Search,
   RefreshCw,
   Wrench,
-  FileWarning
+  FileWarning,
+  PlaneTakeoff
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { TravelReportDialog } from '@/components/travel-report-dialog';
@@ -111,26 +113,27 @@ export function ReportsWorkstation() {
         </TabsList>
 
         <TabsContent value="reports" className="space-y-8 px-2">
-          <Card className="border-2 border-destructive/20 bg-destructive/[0.02] rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="p-8 border-b bg-destructive/5 flex flex-row items-center justify-between">
-              <CardTitle className="text-xl font-black uppercase text-destructive flex items-center gap-3"><FileWarning className="h-5 w-5" /> High-Risk Exceptions</CardTitle>
-              <Badge variant="outline" className="border-destructive/20 text-destructive">{stats.exceptions} Critical Issues</Badge>
+          <Card className="border-2 border-primary/20 bg-primary/[0.02] rounded-[2.5rem] overflow-hidden">
+            <CardHeader className="p-8 border-b bg-primary/5 flex flex-row items-center justify-between">
+              <CardTitle className="text-xl font-black uppercase text-primary flex items-center gap-3"><PlaneTakeoff className="h-5 w-5" /> Travel Report Pulse</CardTitle>
+              <Badge variant="outline" className="border-primary/20 text-primary">{stats.exceptions} Discrepancies</Badge>
             </CardHeader>
             <CardContent className="p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-              <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed max-w-sm">Generate a PDF report of all Stolen, Burnt, and Discrepant assets.</p>
-              <Button onClick={handleExceptionExport} disabled={isExporting || stats.exceptions === 0} className="h-14 px-10 rounded-2xl bg-destructive text-white shadow-xl shadow-destructive/20 gap-3">
-                {isExporting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />} Export PDF
+              <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed max-w-sm">Generate a comprehensive Travel Report document for the current project scope.</p>
+              <Button onClick={() => setIsTravelReportOpen(true)} className="h-14 px-10 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3">
+                <FileText className="h-4 w-4" /> Build Report
               </Button>
             </CardContent>
           </Card>
 
-          <Card className="border-2 border-primary/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="p-10 border-b bg-primary/5">
-              <CardTitle className="flex items-center gap-4 text-2xl font-black uppercase"><FileText className="text-primary h-8 w-8" /> Asset Register Report</CardTitle>
+          <Card className="border-2 border-destructive/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
+            <CardHeader className="p-10 border-b bg-destructive/5 flex flex-row items-center justify-between">
+              <CardTitle className="flex items-center gap-4 text-2xl font-black uppercase text-destructive"><FileWarning className="text-destructive h-8 w-8" /> Exception Dossier</CardTitle>
+              <Badge variant="outline" className="text-destructive border-destructive/20">{stats.exceptions} Critical</Badge>
             </CardHeader>
             <CardContent className="p-10">
-              <Button onClick={() => setIsTravelReportOpen(true)} disabled={stats.total === 0} className="w-full h-20 rounded-[1.5rem] font-black uppercase shadow-2xl shadow-primary/20 bg-primary text-primary-foreground gap-4">
-                <Zap className="h-5 w-5 fill-current" /> Build Custom Report <ArrowRight className="h-5 w-5" />
+              <Button onClick={handleExceptionExport} disabled={isExporting || stats.exceptions === 0} className="w-full h-20 rounded-[1.5rem] font-black uppercase shadow-2xl shadow-destructive/20 bg-destructive text-white gap-4">
+                {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5 fill-current" />} Export Exceptions PDF <ArrowRight className="h-5 w-5" />
               </Button>
             </CardContent>
           </Card>
