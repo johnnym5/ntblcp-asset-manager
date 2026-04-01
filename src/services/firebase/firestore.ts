@@ -2,6 +2,7 @@
  * @fileOverview Hardened Firestore Service.
  * Phase 105: Reinforced Manual Tiered Sync (Local -> Firestore -> RTDB).
  * Phase 106: Added state-scoped asset retrieval for regional isolation.
+ * Phase 107: Using explicit FirestoreService references to avoid context loss.
  */
 
 import { 
@@ -39,7 +40,7 @@ export const FirestoreService = {
       const snap = await getDoc(settingsRef);
       return snap.exists() ? (snap.data() as AppSettings) : null;
     } catch (err: any) {
-      this.handlePermissionError(settingsRef, 'get', err);
+      FirestoreService.handlePermissionError(settingsRef, 'get', err);
       throw err;
     }
   },
@@ -53,12 +54,12 @@ export const FirestoreService = {
     const sanitized = sanitizeForFirestore(settings);
     
     setDoc(settingsRef, sanitized, { merge: true }).catch(err => {
-      this.handlePermissionError(settingsRef, 'update', err, sanitized);
+      FirestoreService.handlePermissionError(settingsRef, 'update', err, sanitized);
     });
 
     // Mirroring pulse is manual/synced via Infrastructure workstation, but we maintain a hot-standby path
     try {
-      const fullSettings = await this.getSettings();
+      const fullSettings = await FirestoreService.getSettings();
       if (fullSettings) {
         mirrorSettingsToRtdb({ ...fullSettings, ...settings });
       }
@@ -90,7 +91,7 @@ export const FirestoreService = {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
     } catch (err: any) {
-      this.handlePermissionError(assetsRef.path, 'list', err);
+      FirestoreService.handlePermissionError(assetsRef.path, 'list', err);
       throw err;
     }
   },
@@ -130,11 +131,10 @@ export const FirestoreService = {
       }, { merge: true });
       
       // 2. Tier 3: Mirror Pulse (RTDB Shadow)
-      // This follows the FireStore commit to ensure authority integrity.
       mirrorToRtdb([sanitized as Asset]).catch(e => console.warn("Mirroring: Shadow pulse latent."));
 
       // 3. Activity Ledger Pulse
-      await this.logActivity({
+      await FirestoreService.logActivity({
         assetId: asset.id,
         assetDescription: asset.description,
         operation,
@@ -144,7 +144,7 @@ export const FirestoreService = {
       });
 
     } catch (err: any) {
-      this.handlePermissionError(assetRef, 'update', err, sanitized);
+      FirestoreService.handlePermissionError(assetRef, 'update', err, sanitized);
       throw err;
     }
   },
@@ -158,7 +158,7 @@ export const FirestoreService = {
     try {
       await deleteDoc(assetRef);
     } catch (err: any) {
-      this.handlePermissionError(assetRef, 'delete', err);
+      FirestoreService.handlePermissionError(assetRef, 'delete', err);
       throw err;
     }
   },
@@ -174,7 +174,7 @@ export const FirestoreService = {
     try {
       snap = await getDocs(assetsRef);
     } catch (err: any) {
-      this.handlePermissionError(assetsRef.path, 'list', err);
+      FirestoreService.handlePermissionError(assetsRef.path, 'list', err);
       throw err;
     }
     
@@ -189,11 +189,11 @@ export const FirestoreService = {
       // Wipe Shadow Tier as well
       await clearRtdb();
     } catch (err: any) {
-      this.handlePermissionError(assetsRef.path, 'delete', err);
+      FirestoreService.handlePermissionError(assetsRef.path, 'delete', err);
       throw err;
     }
 
-    await this.logActivity({
+    await FirestoreService.logActivity({
       assetId: 'GLOBAL_PURGE',
       assetDescription: 'Registry Preparation: Full Asset Wipe',
       operation: 'DELETE',
@@ -213,7 +213,7 @@ export const FirestoreService = {
     try {
       await setDoc(errorRef, sanitizeForFirestore(entry));
     } catch (e: any) {
-      this.handlePermissionError(errorRef, 'create', e, entry);
+      FirestoreService.handlePermissionError(errorRef, 'create', e, entry);
       console.error("Monitoring: Double-fault detected. Cloud logging failed.", e);
     }
   },
@@ -226,7 +226,7 @@ export const FirestoreService = {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as ErrorLogEntry));
     } catch (e: any) {
-      this.handlePermissionError(errorRef.path, 'list', e);
+      FirestoreService.handlePermissionError(errorRef.path, 'list', e);
       return [];
     }
   },
@@ -236,7 +236,7 @@ export const FirestoreService = {
     const errorRef = doc(db, 'error_logs', id);
     const updates = { status, adminComment };
     updateDoc(errorRef, updates).catch(err => {
-      this.handlePermissionError(errorRef, 'update', err, updates);
+      FirestoreService.handlePermissionError(errorRef, 'update', err, updates);
     });
   },
 
@@ -252,7 +252,7 @@ export const FirestoreService = {
       const sanitized = sanitizeForFirestore(data);
       await addDoc(logRef, sanitized);
     } catch (e: any) {
-      this.handlePermissionError(logRef.path, 'create', e, entry);
+      FirestoreService.handlePermissionError(logRef.path, 'create', e, entry);
       console.error("Failed to log activity pulse", e);
     }
   },
@@ -265,7 +265,7 @@ export const FirestoreService = {
       const snap = await getDocs(q);
       return snap.docs.map(d => ({ ...d.data(), id: d.id } as ActivityLogEntry));
     } catch (e: any) {
-      this.handlePermissionError(logRef.path, 'list', e);
+      FirestoreService.handlePermissionError(logRef.path, 'list', e);
       return [];
     }
   },
@@ -288,7 +288,7 @@ export const FirestoreService = {
       const sanitized = sanitizeForFirestore(restoredData);
       await setDoc(assetRef, sanitized);
       
-      await this.logActivity({
+      await FirestoreService.logActivity({
         assetId,
         assetDescription: (restoredData as any).description,
         operation: 'RESTORE',
@@ -296,7 +296,7 @@ export const FirestoreService = {
         userState: 'SYSTEM_RECOVERY'
       });
     } catch (err: any) {
-      this.handlePermissionError(assetRef, 'update', err);
+      FirestoreService.handlePermissionError(assetRef, 'update', err);
       throw err;
     }
   },

@@ -2,13 +2,14 @@
  * @fileOverview Low-level IndexedDB Persistence Adapter.
  * Provides isolated storage for registry data, staging sandbox, and the sync queue.
  * Phase 86: Hardened purge logic for registry preparation.
+ * Phase 87: Bumped version to 10 to resolve VersionError conflicts.
  */
 
 import { openDB, type IDBPDatabase, type DBSchema } from 'idb';
 import type { Asset, AppSettings, OfflineQueueEntry } from '@/types/domain';
 
 const DB_NAME = 'assetain-core-db';
-const DB_VERSION = 1;
+const DB_VERSION = 10;
 
 interface AssetainSchema extends DBSchema {
   assets: {
