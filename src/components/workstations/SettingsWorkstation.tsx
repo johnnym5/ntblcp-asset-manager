@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Control Center.
- * Phase 93: Fixed JSX syntax errors and icon reference issues.
+ * Phase 94: Restored Projects & Registry management logic.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -47,7 +47,10 @@ import {
   ChevronRight,
   ArrowUpRight,
   Clock,
-  AlertCircle
+  AlertCircle,
+  FolderKanban,
+  Columns,
+  PlusCircle
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -59,6 +62,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
 import { UserManagement } from '@/components/admin/user-management';
+import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
 import { ArchiveService } from '@/lib/archive-service';
@@ -67,7 +71,7 @@ import { VirtualDBService } from '@/services/virtual-db-service';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
 import { saveAs } from 'file-saver';
-import type { AppSettings, UXMode, AuthorityNode, StorageLayer, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
+import type { AppSettings, UXMode, AuthorityNode, StorageLayer, ErrorLogEntry, ErrorLogStatus, SheetDefinition, Grant } from '@/types/domain';
 import type { DBNode } from '@/types/virtual-db';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -89,7 +93,7 @@ import {
 } from '@/components/ui/dialog';
 
 export function SettingsWorkstation() {
-  const { appSettings, refreshRegistry, settingsLoaded, isSyncing, isOnline, setReadAuthority } = useAppState();
+  const { appSettings, refreshRegistry, settingsLoaded, isSyncing, isOnline, setReadAuthority, setActiveGrantId } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
   const { setTheme, theme } = useTheme();
@@ -117,6 +121,11 @@ export function SettingsWorkstation() {
   const [errorLogs, setErrorLogs] = useState<ErrorLogEntry[]>([]);
   const [loadingLogs, setLoadingLogs] = useState(false);
   const [selectedErrorLog, setSelectedErrorLog] = useState<ErrorLogEntry | null>(null);
+
+  // --- Registry Management State ---
+  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
+  const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
+  const [activeGrantForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
 
   const recoveryInputRef = useRef<HTMLInputElement>(null);
 
@@ -167,6 +176,17 @@ export function SettingsWorkstation() {
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     if (!draftSettings) return;
     setDraftSettings({ ...draftSettings, [key]: value });
+  };
+
+  const handleAddGrant = () => {
+    if (!draftSettings) return;
+    const newGrant: Grant = {
+      id: crypto.randomUUID(),
+      name: 'New Asset Project',
+      enabledSheets: [],
+      sheetDefinitions: {}
+    };
+    handleSettingChange('grants', [...draftSettings.grants, newGrant]);
   };
 
   const handleCommitChanges = async () => {
@@ -304,6 +324,9 @@ export function SettingsWorkstation() {
           <TabsTrigger value="environment" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
             <GraduationCap className="h-3.5 w-3.5" /> Environment
           </TabsTrigger>
+          <TabsTrigger value="registry" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
+            <FolderKanban className="h-3.5 w-3.5" /> Projects & Schema
+          </TabsTrigger>
           <TabsTrigger value="governance" className="px-6 py-3 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-primary-foreground shadow-sm">
             <UserCog className="h-3.5 w-3.5" /> Identities
           </TabsTrigger>
@@ -359,6 +382,85 @@ export function SettingsWorkstation() {
                 </div>
               </Card>
             </div>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="registry" className="space-y-10 outline-none px-2">
+          <div className="flex items-center justify-between">
+            <SectionHeading title="Registry Orchestration" description="Multi-project management & schema alignment" icon={Columns} />
+            <Button onClick={handleAddGrant} variant="outline" className="h-11 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2 hover:bg-primary/5">
+              <PlusCircle className="h-4 w-4" /> Provision New Project
+            </Button>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-4">
+              {draftSettings.grants.map((grant) => (
+                <Card key={grant.id} className={cn(
+                  "border-2 transition-all duration-500 rounded-[2.5rem] overflow-hidden",
+                  draftSettings.activeGrantId === grant.id ? "border-primary bg-primary/5 shadow-2xl" : "border-border/40 bg-card/50"
+                )}>
+                  <CardHeader className="p-8 pb-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-4">
+                        <div className={cn("p-2 rounded-xl", draftSettings.activeGrantId === grant.id ? "bg-primary text-primary-foreground" : "bg-muted")}>
+                          <FolderKanban className="h-5 w-5" />
+                        </div>
+                        <div>
+                          <Input 
+                            value={grant.name} 
+                            onChange={(e) => handleSettingChange('grants', draftSettings.grants.map(g => g.id === grant.id ? { ...g, name: e.target.value } : g))}
+                            className="border-none bg-transparent font-black text-xl uppercase tracking-tighter p-0 h-auto focus-visible:ring-0"
+                          />
+                          <p className="text-[9px] font-mono text-muted-foreground uppercase mt-1">ID: {grant.id}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        {draftSettings.activeGrantId !== grant.id && (
+                          <Button variant="ghost" size="sm" onClick={() => handleSettingChange('activeGrantId', grant.id)} className="h-8 font-black text-[10px] uppercase text-primary">Activate</Button>
+                        )}
+                        <Badge variant="outline" className="text-[9px] font-black uppercase border-primary/20 bg-primary/5 text-primary">
+                          {Object.keys(grant.sheetDefinitions || {}).length} Asset Classes
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="p-8 pt-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
+                        <div key={sheetName} className="flex items-center justify-between p-4 rounded-2xl bg-background/50 border border-border/40 group hover:border-primary/20 transition-all shadow-sm">
+                          <div className="flex flex-col min-w-0">
+                            <span className="text-[10px] font-black uppercase truncate">{sheetName}</span>
+                            <span className="text-[7px] font-bold text-muted-foreground uppercase opacity-40">Logical Structure</span>
+                          </div>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
+                            className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
+                          >
+                            <RefreshCw className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            <aside className="space-y-6">
+              <Card className="rounded-[2rem] border-2 border-dashed border-border/40 p-8 text-center flex flex-col items-center justify-center space-y-4 bg-muted/5">
+                <div className="p-6 bg-primary/10 rounded-full"><Columns className="h-8 w-8 text-primary" /></div>
+                <h4 className="text-sm font-black uppercase">Schema Engineering</h4>
+                <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
+                  Registry schema definitions are project-specific. Changing headers here will update the column mapping pulse for all regional auditors.
+                </p>
+              </Card>
+              <Button variant="outline" className="w-full h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2 border-2 border-dashed hover:border-primary/40">
+                <FileUp className="h-4 w-4" /> Import Template from File
+              </Button>
+            </aside>
           </div>
         </TabsContent>
 
@@ -444,26 +546,6 @@ export function SettingsWorkstation() {
               ))}
             </div>
           )}
-
-          <Card className="rounded-[2.5rem] border-2 border-border/40 bg-card/50 p-10">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-12 relative">
-              <div className="absolute top-1/2 left-0 w-full h-0.5 bg-border/40 -translate-y-1/2 hidden md:block" />
-              <div className="flex flex-col items-center gap-3 z-10">
-                <div className="p-6 rounded-[2rem] bg-amber-500/10 border-2 border-amber-500/20 shadow-xl"><HardDrive className="h-10 w-10 text-amber-600" /></div>
-                <p className="text-[10px] font-black uppercase">Local Cache</p>
-              </div>
-              <ArrowRightLeft className="h-6 w-6 text-muted-foreground opacity-20 hidden md:block" />
-              <div className="flex flex-col items-center gap-3 z-10">
-                <div className={cn("p-6 rounded-[2rem] border-2 shadow-xl", draftSettings.readAuthority === 'RTDB' ? "border-green-500 bg-green-500/10" : "bg-muted/5 border-border/40")}><Activity className="h-10 w-10 text-green-600" /></div>
-                <p className="text-[10px] font-black uppercase">Mirror Pulse</p>
-              </div>
-              <ArrowRightLeft className="h-6 w-6 text-muted-foreground opacity-20 hidden md:block" />
-              <div className="flex flex-col items-center gap-3 z-10">
-                <div className={cn("p-6 rounded-[2rem] border-2 shadow-xl", draftSettings.readAuthority === 'FIRESTORE' ? "border-blue-500 bg-blue-500/10" : "bg-muted/5 border-border/40")}><Cloud className="h-10 w-10 text-blue-600" /></div>
-                <p className="text-[10px] font-black uppercase">Cloud Cluster</p>
-              </div>
-            </div>
-          </Card>
         </TabsContent>
 
         <TabsContent value="database" className="space-y-6 outline-none px-2 h-[600px] flex flex-col">
@@ -699,6 +781,32 @@ export function SettingsWorkstation() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {selectedSheetDef && (
+        <ColumnCustomizationSheet 
+          isOpen={isColumnSheetOpen}
+          onOpenChange={setIsColumnSheetOpen}
+          sheetDefinition={selectedSheetDef}
+          originalSheetName={selectedSheetDef.name}
+          onSave={(orig, newDef, all) => {
+            if (!draftSettings) return;
+            const updatedGrants = draftSettings.grants.map(grant => {
+              if (grant.id === activeGrantForSchema) {
+                const newSheetDefs = { ...grant.sheetDefinitions };
+                if (all) {
+                  Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
+                } else {
+                  newSheetDefs[newDef.name] = newDef;
+                  if (orig && orig !== newDef.name) delete newSheetDefs[orig];
+                }
+                return { ...grant, sheetDefinitions: newSheetDefs };
+              }
+              return grant;
+            });
+            handleSettingChange('grants', updatedGrants);
+          }}
+        />
+      )}
     </div>
   );
 }
