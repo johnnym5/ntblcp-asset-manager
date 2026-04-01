@@ -3,7 +3,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - High-Fidelity Asset Inventory.
- * Phase 270: Resolved ReferenceErrors and enforced strict Zonal RBAC visibility.
+ * Phase 280: Implemented Batch Deletion Pulse & Administrative Confirmation.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -22,7 +22,9 @@ import {
   Loader2,
   X,
   FileSpreadsheet,
-  ShieldAlert
+  ShieldAlert,
+  Bomb,
+  Trash
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -44,6 +46,16 @@ import { isWithinScope } from '@/core/auth/rbac';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import type { Asset } from '@/types/domain';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface RegistryWorkstationProps {
   viewAll?: boolean;
@@ -77,7 +89,8 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
+  const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
 
   // --- Derived State ---
   const selectedAsset = useMemo(() => 
@@ -166,23 +179,61 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   };
 
   const handleExcelExport = async () => {
-    setIsExporting(true);
+    setIsProcessing(true);
     try {
       await ExcelService.exportRegistry(filteredAssets, headers);
       toast({ title: "Excel Pulse Complete" });
     } catch (e: any) {
       toast({ variant: "destructive", title: "Export Failed", description: e.message });
     } finally {
-      setIsExporting(false);
+      setIsProcessing(false);
     }
   };
 
   const handleDeleteSelected = () => {
     if (!userProfile?.isAdmin) {
-      toast({ variant: "destructive", title: "Action Inhibited", description: "Wipe operation requires administrative clearance." });
+      toast({ 
+        variant: "destructive", 
+        title: "Delete Pulse Inhibited", 
+        description: "Wipe operation requires administrative clearance." 
+      });
       return;
     }
-    toast({ title: "Delete Pulse Not Initialized", description: "This is a deterministic state operation." });
+    setIsBatchDeleteDialogOpen(true);
+  };
+
+  const confirmDeleteSelected = async () => {
+    setIsBatchDeleteDialogOpen(false);
+    setIsProcessing(true);
+    
+    try {
+      const idsArray = Array.from(selectedIds);
+      // Deterministic Deletion Pulse
+      for (const id of idsArray) {
+        await enqueueMutation('DELETE', 'assets', { id });
+      }
+      
+      // Update local state immediately
+      const currentLocal = await storage.getAssets();
+      const nextLocal = currentLocal.filter(a => !selectedIds.has(a.id));
+      await storage.saveAssets(nextLocal);
+      
+      await refreshRegistry();
+      setSelectedIds(new Set());
+      
+      toast({ 
+        title: "Purge Complete", 
+        description: `Successfully removed ${idsArray.length} records from the local register.` 
+      });
+    } catch (e) {
+      toast({ 
+        variant: "destructive", 
+        title: "Purge Failure", 
+        description: "Operational heartbeat interruption during deletion." 
+      });
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const isListView = selectedCategory || viewAll;
@@ -209,10 +260,10 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
             variant="outline" 
             size="sm" 
             onClick={handleExcelExport}
-            disabled={isExporting || filteredAssets.length === 0}
+            disabled={isProcessing || filteredAssets.length === 0}
             className="h-9 md:h-10 px-3 md:px-4 rounded-xl font-black uppercase text-[8px] md:text-[9px] tracking-widest gap-2 bg-white/5 border-white/10"
           >
-            {isExporting ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileSpreadsheet className="h-3 w-3" />}
+            {isProcessing ? <Loader2 className="h-3 w-3 animate-spin" /> : <FileSpreadsheet className="h-3 w-3" />}
             Export Register
           </Button>
 
@@ -358,6 +409,30 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
 
       <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async () => { setSelectedIds(new Set()); await refreshRegistry(); }} />
       <TagPrintDialog isOpen={isPrintOpen} onOpenChange={setIsPrintOpen} records={selectedRecordsForPrint} />
+
+      {/* Batch Deletion Confirmation */}
+      <AlertDialog open={isBatchDeleteDialogOpen} onOpenChange={setIsBatchDeleteDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-background shadow-3xl">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
+              <Bomb className="h-10 w-10 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Execute Purge Pulse?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
+              You are about to permanently remove <strong>{selectedIds.size} selected records</strong> from the active register. This action is deterministic and will be broadcast to the cloud.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0 hover:bg-white/5 transition-all">Abort Action</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={confirmDeleteSelected}
+              className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0"
+            >
+              Commit Wipe Pulse
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
