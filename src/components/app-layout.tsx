@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppLayout - Unified Command Shell.
- * Phase 118: Fixed Notification interaction and unified theme pulses.
+ * Phase 126: Removed Identity Scan trigger from portal.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -279,9 +279,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                     </div>
                   </div>
                   <div className="flex gap-3">
-                    <Button variant="outline" onClick={() => setIsQRScannerOpen(true)} className="h-14 px-8 rounded-2xl border-white/10 bg-white/5 font-black uppercase text-[10px] tracking-widest gap-3">
-                      <QrCode className="h-4 w-4" /> Identity Scan
-                    </Button>
                     <Button onClick={() => logout()} className="h-14 px-10 rounded-2xl bg-destructive text-white font-black uppercase text-[10px] tracking-widest gap-3 shadow-xl shadow-destructive/20 transition-transform hover:scale-105 active:scale-95">
                       <Power className="h-4 w-4" /> Terminate Session
                     </Button>

@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 76: Unified Workstation Management & Manual Sync Triggers.
+ * Phase 126: Unified Registry State (Headers, Sorting) for Global Search.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react';
@@ -12,7 +11,9 @@ import { storage } from '@/offline/storage';
 import { processSyncQueue } from '@/offline/sync';
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { Asset, AppSettings, DataSource, AuthorityNode, WorkstationView } from '@/types/domain';
+import type { RegistryHeader } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
+import { DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
 
 interface AppStateContextType {
   assets: Asset[];
@@ -36,6 +37,14 @@ interface AppStateContextType {
   setActiveGrantId: (id: string) => Promise<void>;
   setReadAuthority: (node: AuthorityNode) => Promise<void>;
   
+  // Unified Registry State
+  headers: RegistryHeader[];
+  setHeaders: Dispatch<SetStateAction<RegistryHeader[]>>;
+  sortKey: string;
+  setSortKey: Dispatch<SetStateAction<string>>;
+  sortDir: 'asc' | 'desc';
+  setSortDir: Dispatch<SetStateAction<'asc' | 'desc'>>;
+
   // Global Filter States
   globalStateFilter: string;
   setGlobalStateFilter: Dispatch<SetStateAction<string>>;
@@ -68,6 +77,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [settingsLoaded, setSettingsLoaded] = useState(false);
   const [activeView, setActiveViewStatus] = useState<WorkstationView>('DASHBOARD');
 
+  // Unified Registry State
+  const [headers, setHeaders] = useState<RegistryHeader[]>([]);
+  const [sortKey, setSortKey] = useState<string>('sn');
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
   // Logic Engine States
   const [globalStateFilter, setGlobalStateFilter] = useState('All');
   const [selectedLocations, setSelectedLocations] = useState<string[]>([]);
@@ -79,6 +93,18 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
   useEffect(() => { setIsHydrated(true); }, []);
+
+  // Initialize Headers
+  useEffect(() => {
+    if (!isHydrated) return;
+    const savedHeaders = localStorage.getItem('registry-header-prefs');
+    if (savedHeaders) {
+      setHeaders(JSON.parse(savedHeaders));
+    } else {
+      const initial = DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i }));
+      setHeaders(initial as RegistryHeader[]);
+    }
+  }, [isHydrated]);
 
   const setActiveView = useCallback((view: WorkstationView) => {
     setActiveViewStatus(view);
@@ -191,7 +217,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       setActiveGrantId, setReadAuthority, globalStateFilter, setGlobalStateFilter,
       selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
       selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
-      missingFieldFilter, setMissingFieldFilter
+      missingFieldFilter, setMissingFieldFilter,
+      headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir
     }}>
       {children}
     </AppStateContext.Provider>

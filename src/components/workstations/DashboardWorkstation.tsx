@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview DashboardWorkstation - The Unified Intelligence Center.
- * Phase 115: Integrated full Registry functionality directly into the Dashboard.
+ * Phase 126: Relocated Global Search to the top pulse.
  */
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   ArrowRight, 
   Globe,
@@ -20,11 +20,16 @@ import {
   ShieldCheck,
   Database,
   Boxes,
-  LayoutGrid
+  LayoutGrid,
+  Search,
+  ScanSearch,
+  ArrowUpDown,
+  Filter
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -35,19 +40,47 @@ import {
 import { useAppState } from '@/contexts/app-state-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
 import { RegistryWorkstation } from './RegistryWorkstation';
+import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
+import { AssetFilterSheet } from '@/components/asset-filter-sheet';
+import { SortDrawer } from '@/components/registry/SortDrawer';
 import { cn } from '@/lib/utils';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 
 export function DashboardWorkstation() {
-  const { assets, isOnline, appSettings, activeGrantId, setActiveGrantId, setActiveView } = useAppState();
+  const { 
+    assets, 
+    isOnline, 
+    appSettings, 
+    activeGrantId, 
+    setActiveGrantId, 
+    searchTerm, 
+    setSearchTerm,
+    headers,
+    sortKey,
+    setSortKey,
+    sortDir,
+    setSortDir,
+    selectedLocations,
+    selectedAssignees,
+    selectedStatuses,
+    selectedConditions,
+    missingFieldFilter,
+    setSelectedLocations,
+    setSelectedAssignees,
+    setSelectedStatuses,
+    setSelectedConditions,
+    setMissingFieldFilter
+  } = useAppState();
   
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
+
   const stats = useMemo(() => {
     if (!assets || assets.length === 0) return null;
     const total = assets.length;
     const verified = assets.filter(a => a.status === 'VERIFIED').length;
-    const exceptions = assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable'].includes(a.condition || '')).length;
-    const dataGaps = assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A' || !a.assetIdCode).length;
     
     // Temporal Breakdown
     const temporalData = assets.reduce((acc, a) => {
@@ -62,17 +95,45 @@ export function DashboardWorkstation() {
 
     return { 
       total, 
-      verified, 
-      exceptions, 
-      dataGaps, 
       temporalSummary, 
-      coverage: total > 0 ? Math.round((verified / total) * 100) : 0,
-      fidelityScore: Math.max(0, 100 - (exceptions * 5) - (dataGaps * 0.1))
+      coverage: total > 0 ? Math.round((verified / total) * 100) : 0
     };
   }, [assets]);
 
   const activeGrant = appSettings?.grants?.find(g => g.id === activeGrantId);
   const otherGrants = appSettings?.grants?.filter(g => g.id !== activeGrantId) || [];
+
+  // Derived Filter Options with Counts
+  const locationOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      const loc = a.location || 'Global';
+      counts.set(loc, (counts.get(loc) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+  }, [assets]);
+
+  const assigneeOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      if (a.custodian) counts.set(a.custodian, (counts.get(a.custodian) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+  }, [assets]);
+
+  const conditionOptions = useMemo(() => {
+    const counts = new Map<string, number>();
+    assets.forEach(a => {
+      if (a.condition) counts.set(a.condition, (counts.get(a.condition) || 0) + 1);
+    });
+    return Array.from(counts.entries()).map(([label, count]) => ({ label, value: label, count }));
+  }, [assets]);
+
+  const statusOptions = [
+    { label: 'Verified', value: 'VERIFIED' },
+    { label: 'Unverified', value: 'UNVERIFIED' },
+    { label: 'Discrepancy', value: 'DISCREPANCY' }
+  ];
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
@@ -118,32 +179,42 @@ export function DashboardWorkstation() {
         </div>
       </div>
 
-      {/* 2. Interactive Analytics Pulse */}
-      <AssetSummaryDashboard />
-
-      {/* 3. Global Registry Workspace */}
-      <div className="space-y-6">
-        <div className="px-1 flex items-center gap-4">
-          <div className="p-2.5 bg-primary/10 rounded-xl">
-            <Boxes className="h-6 w-6 text-primary" />
+      {/* 2. Global Search & Action Bar */}
+      <div className="px-1">
+        <div className="relative group">
+          <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-5 w-5 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
+          <Input 
+            placeholder="Search Registry Hub..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="h-14 sm:h-16 pl-14 pr-32 sm:pr-40 rounded-2xl bg-[#0A0A0A] border-none text-sm font-medium shadow-2xl focus-visible:ring-primary/20 text-white"
+          />
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-1 sm:gap-2">
+            <Button variant="ghost" size="icon" onClick={() => setIsImportScanOpen(true)} className="h-10 w-10 text-white/40 hover:text-primary rounded-xl" title="Discover Data"><ScanSearch className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl" title="Sort Sequence"><ArrowUpDown className="h-5 w-5" /></Button>
+            <Button variant="ghost" size="icon" onClick={() => setIsFilterOpen(true)} className="h-10 w-10 text-white/40 hover:text-white rounded-xl relative" title="Logic Filters">
+              <Filter className="h-5 w-5" />
+              {(selectedLocations.length + selectedAssignees.length + selectedStatuses.length + selectedConditions.length) > 0 && (
+                <div className="absolute -top-1 -right-1 h-3 w-3 bg-primary rounded-full animate-pulse shadow-lg" />
+              )}
+            </Button>
           </div>
-          <div className="space-y-0.5">
-            <h3 className="text-xl font-black uppercase tracking-tight text-foreground">Registry Hub</h3>
-            <p className="text-[9px] font-bold uppercase tracking-widest text-muted-foreground opacity-60">Record Management & Category Orchestration</p>
-          </div>
-        </div>
-        
-        {/* Integrating the full RegistryWorkstation component here */}
-        <div className="p-1 sm:p-2 rounded-[2.5rem] bg-muted/5 border-2 border-dashed border-border/40 min-h-[600px]">
-          <RegistryWorkstation />
         </div>
       </div>
 
-      {/* 4. Temporal Intelligence Sidebar (Floating Style) */}
+      {/* 3. Interactive Analytics Pulse */}
+      <AssetSummaryDashboard />
+
+      {/* 4. Global Registry Workspace */}
+      <div className="p-1 sm:p-2 rounded-[2.5rem] bg-muted/5 border-2 border-dashed border-border/40 min-h-[600px]">
+        <RegistryWorkstation />
+      </div>
+
+      {/* 5. Temporal Intelligence Pulse */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         <div className="lg:col-span-12">
           <Card className="rounded-[3rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
-            <CardHeader className="p-8 border-b bg-muted/20">
+            <CardHeader className="p-8 bg-muted/20 border-b">
               <div className="flex items-center justify-between">
                 <div className="space-y-1">
                   <CardTitle className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-3">
@@ -174,6 +245,35 @@ export function DashboardWorkstation() {
           </Card>
         </div>
       </div>
+
+      {/* Drawer Triggers */}
+      <AssetFilterSheet 
+        isOpen={isFilterOpen} 
+        onOpenChange={setIsFilterOpen} 
+        locationOptions={locationOptions} 
+        selectedLocations={selectedLocations} 
+        setSelectedLocations={setSelectedLocations} 
+        assigneeOptions={assigneeOptions} 
+        selectedAssignees={selectedAssignees} 
+        setSelectedAssignees={setSelectedAssignees} 
+        statusOptions={statusOptions} 
+        selectedStatuses={selectedStatuses} 
+        setSelectedStatuses={setSelectedStatuses} 
+        conditionOptions={conditionOptions} 
+        selectedConditions={selectedConditions} 
+        setSelectedConditions={setSelectedConditions} 
+        missingFieldFilter={missingFieldFilter} 
+        setMissingFieldFilter={setMissingFieldFilter} 
+      />
+      <SortDrawer 
+        isOpen={isSortOpen} 
+        onOpenChange={setIsSortOpen} 
+        headers={headers} 
+        sortBy={sortKey} 
+        sortDirection={sortDir} 
+        onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} 
+      />
+      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
 
     </div>
   );
