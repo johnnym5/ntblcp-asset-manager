@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Single Page Application Hub.
- * Phase 165: Implemented Asset-Manager Friendly naming scheme.
+ * Phase 170: Activated sync triggers and high-fidelity notifications center.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -29,7 +29,8 @@ import {
   CloudDownload,
   CloudUpload,
   Bell,
-  Search
+  Search,
+  RefreshCw
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -49,17 +50,21 @@ import { DatabaseWorkstation } from '@/components/workstations/DatabaseWorkstati
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
 import { GISWorkstation } from '@/components/workstations/GISWorkstation';
 import { RegionalScopeDrawer } from '@/components/registry/RegionalScopeDrawer';
+import { NotificationsSheet } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { useNotifications } from '@/hooks/use-notifications';
 import type { WorkstationView } from '@/types/domain';
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
-  const { activeView, setActiveView, appSettings, isOnline, manualDownload, manualUpload } = useAppState();
+  const { activeView, setActiveView, appSettings, isOnline, isSyncing, manualDownload, manualUpload } = useAppState();
+  const { unreadCount } = useNotifications();
   
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isScopeOpen, setIsScopeOpen] = useState(false);
+  const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(false);
 
   useEffect(() => {
@@ -140,6 +145,7 @@ export default function SPAHub() {
     <div className="flex h-screen bg-black overflow-hidden font-sans selection:bg-primary/30">
       <CommandPalette />
       <WelcomeExperience isOpen={showWelcome} onComplete={() => setShowWelcome(false)} />
+      <NotificationsSheet isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       
       <aside className={cn(
         "bg-[#050505] border-r border-white/5 flex flex-col transition-all duration-700 ease-out z-50 fixed inset-y-0 left-0 lg:relative lg:translate-x-0",
@@ -199,17 +205,36 @@ export default function SPAHub() {
 
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2 mr-4">
-              <button onClick={manualDownload} className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all"><CloudDownload className="h-4 w-4" /></button>
-              <button onClick={manualUpload} className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all"><CloudUpload className="h-4 w-4" /></button>
+              <button 
+                onClick={manualDownload} 
+                disabled={isSyncing}
+                title="Fetch Cloud Updates"
+                className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
+              >
+                <CloudDownload className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
+              </button>
+              <button 
+                onClick={manualUpload} 
+                disabled={isSyncing}
+                title="Push Local Changes"
+                className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
+              >
+                <CloudUpload className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+              </button>
             </div>
             
             <div className="flex items-center gap-3 pr-4 border-r border-white/5">
               <div className={cn("h-2.5 w-2.5 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
-              <button className="relative p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all">
+              <button 
+                onClick={() => setIsNotificationsOpen(true)}
+                className="relative p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
+              >
                 <Bell className="h-4 w-4" />
-                <div className="absolute -top-1 -right-1 h-4 w-4 bg-red-600 rounded-full flex items-center justify-center border-2 border-black">
-                  <span className="text-[8px] font-black text-white leading-none">1</span>
-                </div>
+                {unreadCount > 0 && (
+                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-red-600 rounded-full flex items-center justify-center border-2 border-black animate-in zoom-in duration-300">
+                    <span className="text-[8px] font-black text-white leading-none">{unreadCount}</span>
+                  </div>
+                )}
               </button>
             </div>
 

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Phase 140: Stabilized manual sync and unified registry pulses.
+ * Phase 170: Hardened manual sync triggers with deterministic feedback.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react';
@@ -14,6 +14,7 @@ import type { Asset, AppSettings, DataSource, AuthorityNode, WorkstationView } f
 import type { RegistryHeader } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
 import { DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
+import { toast } from '@/hooks/use-toast';
 
 interface AppStateContextType {
   assets: Asset[];
@@ -151,20 +152,30 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       return;
     }
     setIsSyncing(true);
+    toast({ title: "Reconciling Authority...", description: "Fetching latest project scope from cloud." });
+    
     try {
       const remoteSettings = await FirestoreService.getSettings();
       if (remoteSettings) {
         setAppSettings(remoteSettings);
         await storage.saveSettings(remoteSettings);
+        
         if (remoteSettings.activeGrantId) {
           const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId);
           const localAssets = await storage.getAssets();
+          // Merge: keep assets from other grants, overwrite current grant assets
           const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
           await storage.saveAssets([...otherAssets, ...remoteAssets]);
+          
+          addNotification({ 
+            title: "Download Complete", 
+            description: `Successfully synchronized ${remoteAssets.length} records for project: ${remoteSettings.activeGrantId}.` 
+          });
         }
       }
       await refreshRegistry();
-      addNotification({ title: "Download Complete", description: "Cloud authority reconciled." });
+    } catch (e) {
+      addNotification({ title: "Connection Latent", description: "Cloud heartbeat failed during download.", variant: "destructive" });
     } finally {
       setIsSyncing(false);
     }
@@ -176,9 +187,13 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       return;
     }
     setIsSyncing(true);
+    toast({ title: "Broadcasting Local Pulse...", description: "Replaying sync queue to cloud registry." });
+    
     try {
       await processSyncQueue();
       await refreshRegistry();
+    } catch (e) {
+      addNotification({ title: "Sync Interrupted", description: "Background queue replay failed.", variant: "destructive" });
     } finally {
       setIsSyncing(false);
     }
