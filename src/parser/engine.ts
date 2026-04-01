@@ -38,29 +38,24 @@ export class ParserEngine {
     // STAGE 2: Ingestion Pulse - Map Data to Learned Templates
     const { assets, groups } = this.executeIngestion(sheetName, data);
 
-    const groupCounts: Record<string, number> = {};
-    assets.forEach(a => {
-      groupCounts[a.section] = (groupCounts[a.section] || 0) + 1;
-    });
-
     const summary: ImportRunSummary = {
       workbookName: this.workbookName,
       sheetName,
       profileId: 'STRUCTURAL_ENGINE_V5',
       totalRows: data.length,
-      groupCount: Object.keys(groupCounts).length,
+      groupCount: groups.length,
       dataRowsImported: assets.length,
       rowsRejected: 0,
       duplicatesDetected: assets.filter(a => a.validation.duplicateFlags.length > 0).length,
       templatesDiscovered: this.templates.size,
-      sectionBreakdown: groupCounts
+      sectionBreakdown: this.calculateBreakdown(assets)
     };
 
     return { assets, summary, groups };
   }
 
   /**
-   * STAGE 1: Discover structural groups and their header sets.
+   * STAGE 1: Scan Column A to discover all templates used in the workbook.
    */
   private discoverTemplates(data: any[][]) {
     for (let i = 0; i < data.length; i++) {
@@ -71,22 +66,22 @@ export class ParserEngine {
     }
   }
 
-  private registerTemplate(row: any[]): string {
+  private registerTemplate(row: any[]) {
+    // Clean and normalize headers for the signature
     const rawHeaders = row.map(c => String(c || '').trim()).filter(h => h.length > 0);
-    const signature = rawHeaders.join('|');
+    if (rawHeaders.length < 3) return; // Ignore noisy fragments
+
+    const signature = rawHeaders.map(h => h.toUpperCase()).join('|');
     
     if (!this.templates.has(signature)) {
-      const id = `tpl_${uuidv4().substring(0, 8)}`;
       this.templates.set(signature, {
-        id,
+        id: `TPL_${uuidv4().substring(0, 4).toUpperCase()}`,
         rawHeaders,
         normalizedHeaders: rawHeaders.map(normalizeHeaderName),
         columnCount: row.length,
         signature
       });
-      return id;
     }
-    return this.templates.get(signature)!.id;
   }
 
   /**
@@ -94,33 +89,33 @@ export class ParserEngine {
    */
   private executeIngestion(sheetName: string, data: any[][]): { assets: ParsedAsset[], groups: DiscoveredGroup[] } {
     const assets: ParsedAsset[] = [];
-    const groups: Map<string, DiscoveredGroup> = new Map();
-    let activeGroup: string = 'General Register';
+    const groups: DiscoveredGroup[] = [];
+    
+    let activeGroupName: string = 'General Register';
     let activeTemplate: HeaderTemplate | null = null;
-    let headerSource: 'explicit' | 'inferred' = 'inferred';
+    let groupStartRow = 1;
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       const classification = classifyRow(row);
 
-      // Context Shift: New Group Header detected in Column A
+      // 1. Group Header Pulse (Column A Standalone)
       if (classification === 'GROUP_HEADER') {
-        activeGroup = String(row[0]).trim();
-        activeTemplate = null; 
-        headerSource = 'inferred';
+        activeGroupName = String(row[0]).trim();
+        activeTemplate = null; // Reset template to force discovery/inference for new group
+        groupStartRow = i + 1;
         continue;
       }
 
-      // Explicit Schema Anchor: S/N row found
+      // 2. Explicit Schema Anchor (S/N found)
       if (classification === 'SCHEMA_HEADER') {
-        const sig = row.map(c => String(c || '').trim()).filter(h => h.length > 0).join('|');
-        activeTemplate = this.templates.get(sig) || null;
-        headerSource = 'explicit';
-        
-        // Track the structural node for visualization
+        const rawHeaders = row.map(c => String(c || '').trim()).filter(h => h.length > 0);
+        const signature = rawHeaders.map(h => h.toUpperCase()).join('|');
+        activeTemplate = this.templates.get(signature) || null;
+
         if (activeTemplate) {
-          groups.set(activeGroup, {
-            groupName: activeGroup,
+          groups.push({
+            groupName: activeGroupName,
             headerSet: activeTemplate.rawHeaders,
             headerSource: 'explicit',
             columnCount: activeTemplate.columnCount,
@@ -131,49 +126,56 @@ export class ParserEngine {
         continue;
       }
 
-      // Record Pulse: Data row detected
+      // 3. Data Record Pulse
       if (classification === 'DATA_ROW') {
         if (!activeTemplate) {
-          activeTemplate = this.inferTemplateFromRow(row);
-          headerSource = 'inferred';
-          
-          if (activeTemplate && !groups.has(activeGroup)) {
-            groups.set(activeGroup, {
-              groupName: activeGroup,
+          // If no explicit header was found for this group yet, infer one from the row shape
+          const inference = this.inferTemplate(row);
+          if (inference) {
+            activeTemplate = inference;
+            groups.push({
+              groupName: activeGroupName,
               headerSet: activeTemplate.rawHeaders,
               headerSource: 'inferred',
               columnCount: activeTemplate.columnCount,
               templateId: activeTemplate.id,
-              startRow: i + 1
+              startRow: groupStartRow,
+              matchedTemplateSource: activeTemplate.id
             });
           }
         }
 
         if (activeTemplate) {
-          const asset = this.mapRowToDomain(row, activeTemplate, activeGroup, i + 1, sheetName);
+          const asset = this.mapRow(row, activeTemplate, activeGroupName, i + 1, sheetName);
           if (asset) assets.push(asset);
         }
       }
     }
 
-    return { assets, groups: Array.from(groups.values()) };
+    return { assets, groups };
   }
 
-  private inferTemplateFromRow(row: any[]): HeaderTemplate | null {
+  private inferTemplate(row: any[]): HeaderTemplate | null {
+    // Find the best fitting template based on column density
+    const populatedIndices = row.map((c, i) => (c !== null && String(c).trim() !== '' ? i : -1)).filter(i => i !== -1);
+    
     let bestMatch: HeaderTemplate | null = null;
-    let maxOverlap = 0;
+    let maxMatch = 0;
 
     this.templates.forEach(tpl => {
-      if (tpl.columnCount >= row.length && tpl.columnCount > maxOverlap) {
-        bestMatch = tpl;
-        maxOverlap = tpl.columnCount;
+      // Basic check: column count compatibility
+      if (tpl.columnCount >= row.length) {
+        if (tpl.columnCount > maxMatch) {
+          bestMatch = tpl;
+          maxMatch = tpl.columnCount;
+        }
       }
     });
 
     return bestMatch;
   }
 
-  private mapRowToDomain(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
+  private mapRow(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
     const asset: any = {
       id: uuidv4(),
       category: group,
@@ -186,12 +188,7 @@ export class ParserEngine {
       condition: 'New',
       lastModified: new Date().toISOString(),
       lastModifiedBy: 'Structural Parser',
-      hierarchy: { 
-        document: sheet, 
-        section: group, 
-        subsection: '', 
-        assetFamily: '' 
-      },
+      hierarchy: { document: sheet, section: group, subsection: 'Base Register', assetFamily: 'Uncategorized' },
       importMetadata: {
         sourceFile: this.workbookName,
         sheetName: sheet,
@@ -199,31 +196,25 @@ export class ParserEngine {
         importedAt: new Date().toISOString()
       },
       metadata: {},
-      validation: { 
-        warnings: [], 
-        errors: [], 
-        duplicateFlags: [], 
-        needsReview: false, 
-        isRejected: false 
-      },
+      validation: { warnings: [], errors: [], duplicateFlags: [], needsReview: false, isRejected: false },
       sourceGroup: group,
       templateId: tpl.id
     };
 
+    // Map columns to fields or metadata
     tpl.normalizedHeaders.forEach((key, idx) => {
       const val = row[idx];
-      if (val !== undefined && val !== null) {
-        const strVal = String(val).trim();
-        if (this.isDomainField(key)) {
-          asset[key] = strVal;
-        } else {
-          asset.metadata[tpl.rawHeaders[idx] || `COL_${idx}`] = val;
-        }
+      if (val === undefined || val === null) return;
+
+      const strVal = String(val).trim();
+      if (this.isDomainField(key)) {
+        asset[key] = strVal;
+      } else {
+        asset.metadata[tpl.rawHeaders[idx]] = val;
       }
     });
 
-    if (asset.sn && !isNaN(Number(asset.sn))) asset.sn = Number(asset.sn);
-    
+    // Cleanup Serial Numbers
     if (asset.serialNumber && this.existingSerials.has(asset.serialNumber)) {
       asset.validation.duplicateFlags.push('Duplicate Serial Detected');
       asset.validation.needsReview = true;
@@ -237,11 +228,14 @@ export class ParserEngine {
   }
 
   private isDomainField(key: string): boolean {
-    const domainFields = [
-      'sn', 'description', 'location', 'custodian', 'assetIdCode', 
-      'serialNumber', 'manufacturer', 'modelNumber', 'purchaseDate', 
-      'value', 'condition', 'remarks', 'grantId', 'category'
-    ];
+    const domainFields = ['sn', 'description', 'location', 'custodian', 'assetIdCode', 'serialNumber', 'manufacturer', 'modelNumber', 'purchaseDate', 'value', 'condition', 'remarks'];
     return domainFields.includes(key);
+  }
+
+  private calculateBreakdown(assets: ParsedAsset[]): Record<string, number> {
+    return assets.reduce((acc, a) => {
+      acc[a.section] = (acc[a.section] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
   }
 }

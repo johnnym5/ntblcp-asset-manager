@@ -1,5 +1,3 @@
-'use client';
-
 /**
  * @fileOverview StructurePreview - The Template Visualization Layer.
  * Renders discovered group headers and their associated technical column sets.
@@ -16,7 +14,10 @@ import {
   Search,
   AlertCircle,
   Clock,
-  ArrowRight
+  ArrowRight,
+  Terminal,
+  Layers,
+  ChevronRight
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DiscoveredGroup } from '@/parser/types';
@@ -24,40 +25,45 @@ import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 
 interface StructurePreviewProps {
   groups: DiscoveredGroup[];
+  debugMode?: boolean;
 }
 
-export function StructurePreview({ groups }: StructurePreviewProps) {
+export function StructurePreview({ groups, debugMode = true }: StructurePreviewProps) {
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
       <div className="space-y-2 px-1">
-        <h4 className="text-xl font-black uppercase text-white tracking-tight flex items-center gap-3">
-          <LayoutGrid className="h-5 w-5 text-primary" /> Discovered Register Structure
+        <h4 className="text-2xl font-black uppercase text-white tracking-tight flex items-center gap-4 leading-none">
+          <div className="p-2.5 bg-primary/10 rounded-xl">
+            <LayoutGrid className="h-6 w-6 text-primary" />
+          </div>
+          Register Skeleton Discovery
         </h4>
-        <p className="text-[10px] font-bold uppercase text-white/40 tracking-widest leading-relaxed italic">
-          Verify group-to-header mapping before proceeding to full asset ingestion.
+        <p className="text-[11px] font-bold uppercase text-white/40 tracking-[0.25em] leading-relaxed italic">
+          Verify discovered structural groups and column templates before ingestion.
         </p>
       </div>
 
-      <div className="space-y-6">
+      <div className="space-y-8">
         {groups.length > 0 ? (
           groups.map((group, idx) => (
             <Card 
               key={`${group.groupName}-${idx}`} 
-              className="bg-[#050505] border-2 border-white/5 rounded-[2rem] overflow-hidden shadow-2xl transition-all hover:border-primary/20 group"
+              className="bg-[#050505] border-2 border-white/5 rounded-[2.5rem] overflow-hidden shadow-3xl transition-all hover:border-primary/20 group"
             >
-              <div className="p-8 border-b border-white/5 bg-white/[0.02] flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="flex items-center gap-5">
-                  <div className="h-12 w-12 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black shadow-inner">
+              {/* Group Header Pulse */}
+              <div className="p-8 border-b border-white/5 bg-white/[0.02] flex flex-col md:flex-row md:items-center justify-between gap-6">
+                <div className="flex items-center gap-6">
+                  <div className="h-14 w-14 rounded-2xl bg-primary/10 flex items-center justify-center text-primary font-black text-xl shadow-inner border border-primary/5">
                     {String(idx + 1).padStart(2, '0')}
                   </div>
-                  <div className="space-y-1">
-                    <h5 className="text-base font-black uppercase text-white tracking-tight group-hover:text-primary transition-colors">
-                      GROUP: {group.groupName}
+                  <div className="space-y-1.5">
+                    <h5 className="text-lg font-black uppercase text-white tracking-tight group-hover:text-primary transition-colors leading-none">
+                      {group.groupName}
                     </h5>
-                    <div className="flex items-center gap-4">
-                      <span className="text-[9px] font-mono text-white/20 uppercase tracking-tighter">Row {group.startRow} anchor</span>
+                    <div className="flex items-center gap-4 text-[9px] font-mono text-white/30 uppercase tracking-widest">
+                      <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Start Row: {group.startRow}</span>
                       <div className="h-1 w-1 rounded-full bg-white/10" />
-                      <span className="text-[9px] font-mono text-white/20 uppercase tracking-tighter">TPL: {group.templateId}</span>
+                      <span className="flex items-center gap-1.5"><Tag className="h-3 w-3" /> Template: {group.templateId}</span>
                     </div>
                   </div>
                 </div>
@@ -66,48 +72,67 @@ export function StructurePreview({ groups }: StructurePreviewProps) {
                   <Badge 
                     variant="outline" 
                     className={cn(
-                      "h-7 px-4 rounded-full font-black uppercase text-[8px] tracking-widest border-2",
+                      "h-8 px-5 rounded-full font-black uppercase text-[9px] tracking-[0.2em] border-2",
                       group.headerSource === 'explicit' 
                         ? "bg-green-500/5 border-green-500/20 text-green-500" 
                         : "bg-blue-500/5 border-blue-500/20 text-blue-500"
                     )}
                   >
-                    {group.headerSource === 'explicit' ? 'Explicit Header' : 'Inferred Template'}
+                    {group.headerSource === 'explicit' ? 'Explicit Anchor' : 'Inferred Mapping'}
                   </Badge>
-                  <Badge variant="outline" className="h-7 px-4 rounded-full font-black uppercase text-[8px] tracking-widest border-white/10 text-white/40">
-                    {group.columnSet?.length || group.headerSet.length} Columns
+                  <Badge variant="outline" className="h-8 px-5 rounded-full font-black uppercase text-[9px] tracking-[0.2em] border-white/10 text-white/40">
+                    {group.columnCount} COLUMNS
                   </Badge>
                 </div>
               </div>
 
-              <CardContent className="p-0">
+              {/* Column Visualization Layer */}
+              <CardContent className="p-0 bg-black">
                 <ScrollArea className="w-full">
-                  <div className="flex items-center p-8 gap-3 min-w-max">
+                  <div className="flex items-center p-8 gap-4 min-w-max">
                     {group.headerSet.map((header, hIdx) => (
                       <div 
-                        key={`${group.templateId}-${header}-${hIdx}`}
-                        className="flex flex-col gap-2 min-w-[140px] p-4 rounded-2xl bg-[#0A0A0A] border border-white/5 shadow-inner group/col"
+                        key={`${group.templateId}-${hIdx}`}
+                        className="flex flex-col gap-3 min-w-[160px] p-5 rounded-2xl bg-white/[0.02] border border-white/5 shadow-inner group/col transition-all hover:bg-white/[0.04] hover:border-primary/10"
                       >
-                        <span className="text-[8px] font-black uppercase text-white/20 tracking-[0.2em] group-hover/col:text-primary transition-colors">
-                          Column {String.fromCharCode(65 + hIdx)}
-                        </span>
-                        <p className="text-[11px] font-black uppercase text-white/80 leading-tight truncate" title={header}>
-                          {header}
+                        <div className="flex items-center justify-between">
+                          <span className="text-[8px] font-black uppercase text-white/20 tracking-[0.2em] group-hover/col:text-primary transition-colors">
+                            COL {String.fromCharCode(65 + hIdx)}
+                          </span>
+                          <div className="h-1.5 w-1.5 rounded-full bg-white/10 group-hover/col:bg-primary/40" />
+                        </div>
+                        <p className="text-xs font-black uppercase text-white/80 leading-tight truncate" title={header}>
+                          {header || 'EMPTY_HEADER'}
                         </p>
                       </div>
                     ))}
                   </div>
-                  <ScrollBar orientation="horizontal" className="bg-white/5" />
+                  <ScrollBar orientation="horizontal" className="bg-white/5 h-2" />
                 </ScrollArea>
+
+                {debugMode && (
+                  <div className="px-8 py-4 bg-white/[0.01] border-t border-white/5 flex items-center gap-6">
+                    <div className="flex items-center gap-2 text-[8px] font-black uppercase text-white/20 tracking-widest">
+                      <Terminal className="h-3 w-3" /> Technical ID: <span className="text-white/40 font-mono">{group.templateId}</span>
+                    </div>
+                    {group.matchedTemplateSource && (
+                      <div className="flex items-center gap-2 text-[8px] font-black uppercase text-white/20 tracking-widest">
+                        <Layers className="h-3 w-3" /> Shape Match: <span className="text-blue-500/60 font-mono">{group.matchedTemplateSource}</span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </CardContent>
             </Card>
           ))
         ) : (
-          <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[4rem] flex flex-col items-center gap-6">
-            <Database className="h-20 w-20" />
-            <div className="space-y-1">
-              <h4 className="text-2xl font-black uppercase tracking-widest">Discovery Silent</h4>
-              <p className="text-sm font-medium italic">Execute a scanner pulse to identify register structural nodes.</p>
+          <div className="py-48 text-center opacity-20 border-4 border-dashed border-white/5 rounded-[4rem] flex flex-col items-center gap-8 bg-white/[0.01]">
+            <div className="p-10 bg-white/5 rounded-full">
+              <Search className="h-24 w-24 text-white" />
+            </div>
+            <div className="space-y-2">
+              <h4 className="text-3xl font-black uppercase tracking-[0.3em] text-white">No Structure Pulses</h4>
+              <p className="text-sm font-medium italic text-white/60">Traverse a registry workbook to discover structural nodes.</p>
             </div>
           </div>
         )}

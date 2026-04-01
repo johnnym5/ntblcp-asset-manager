@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview Root Shell - Unified Global Command Hub.
- * Phase 235: Resolved ReferenceError by adding ScrollArea import.
- * Phase 236: Unified Header triggers and role-aware filtering integration.
- * Phase 237: Fixed JSX syntax error in ErrorBoundary closing tag.
+ * Phase 245: Integrated structural Ingestion workstation and improved tab logic.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -22,13 +20,15 @@ import {
   Search,
   Filter,
   ArrowUpDown,
-  Settings as SettingsIcon
+  Settings as SettingsIcon,
+  DatabaseZap
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
+import { ImportWorkstation } from '@/components/workstations/ImportWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
 import { WelcomeExperience } from '@/components/WelcomeExperience';
@@ -114,6 +114,7 @@ export default function SPAHub() {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
       case 'SETTINGS': return <SettingsWorkstation />;
+      case 'IMPORT': return <ImportWorkstation />;
       default: return <DashboardWorkstation />;
     }
   };
@@ -242,6 +243,10 @@ export default function SPAHub() {
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem onClick={() => setActiveView('IMPORT')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
+                  <DatabaseZap className="mr-2 h-4 w-4" />
+                  <span className="text-[11px] font-black uppercase">Ingest Workbook</span>
+                </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
                   <SettingsIcon className="mr-2 h-4 w-4" />
                   <span className="text-[11px] font-black uppercase">System Settings</span>

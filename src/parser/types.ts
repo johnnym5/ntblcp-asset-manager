@@ -17,7 +17,7 @@ export interface HeaderTemplate {
   rawHeaders: string[];
   normalizedHeaders: string[];
   columnCount: number;
-  signature: string; // Hash of header positions
+  signature: string; // Serialized header set for matching
 }
 
 export interface DiscoveredGroup {
@@ -27,6 +27,7 @@ export interface DiscoveredGroup {
   columnCount: number;
   templateId: string;
   startRow: number;
+  matchedTemplateSource?: string;
 }
 
 export interface ValidationSummary {
@@ -54,12 +55,4 @@ export interface ImportRunSummary {
   duplicatesDetected: number;
   templatesDiscovered: number;
   sectionBreakdown: Record<string, number>;
-}
-
-export interface ParserState {
-  activeGroup: string;
-  activeTemplateId: string;
-  activeHeaders: string[];
-  workbookName: string;
-  sheetName: string;
 }
