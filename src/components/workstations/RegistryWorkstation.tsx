@@ -4,6 +4,7 @@
  * @fileOverview RegistryWorkstation - High-Fidelity Asset Inventory.
  * Phase 225: Implemented Selection, Batch Actions, and Category Drill-Down.
  * Phase 226: Applied state-locking for non-admin users.
+ * Phase 227: Integrated Excel Export trigger pulse.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -21,7 +22,8 @@ import {
   Trash2,
   FolderKanban,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  FileSpreadsheet
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -34,8 +36,9 @@ import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { TagPrintDialog } from '@/components/registry/TagPrintDialog';
 import { transformAssetToRecord } from '@/lib/registry-utils';
+import { ExcelService } from '@/services/excel-service';
 import { cn } from '@/lib/utils';
-import { toast } from '@/hooks/use-toast';
+import { useToast } from '@/hooks/use-toast';
 import type { Asset } from '@/types/domain';
 
 interface RegistryWorkstationProps {
@@ -58,6 +61,7 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   } = useAppState();
   
   const { userProfile } = useAuth();
+  const { toast } = useToast();
 
   // --- UI State ---
   const [selectedCategory, setSelectedCategory] = useState<string | null>(viewAll ? 'ALL' : null);
@@ -67,6 +71,7 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
   const [isPrintOpen, setIsPrintOpen] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   // --- Filtering Logic ---
   const filteredAssets = useMemo(() => {
@@ -114,7 +119,6 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   }, [assets, selectedCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, sortKey, sortDir, userProfile]);
 
   const categoryStats = useMemo(() => {
-    // We only compute stats for assets within the user's authorized scope
     const scopedAssets = !userProfile?.isAdmin && userProfile?.state
       ? assets.filter(a => (a.location || '').toLowerCase().trim() === userProfile.state.toLowerCase().trim())
       : assets;
@@ -148,6 +152,18 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   const handleInspect = (id: string) => {
     setSelectedAssetId(id);
     setIsDetailOpen(true);
+  };
+
+  const handleExcelExport = async () => {
+    setIsExporting(true);
+    try {
+      await ExcelService.exportRegistry(filteredAssets, headers);
+      toast({ title: "Registry Pulse Exported", description: "Excel workbook generated successfully." });
+    } catch (e: any) {
+      toast({ variant: "destructive", title: "Export Failed", description: e.message });
+    } finally {
+      setIsExporting(false);
+    }
   };
 
   const handleDeleteSelected = async () => {
@@ -187,22 +203,35 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
           )}
         </div>
 
-        {isListView && (
-          <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/5">
-            <button 
-              onClick={() => setViewMode('grid')}
-              className={cn("p-2 rounded-lg transition-all", viewMode === 'grid' ? "bg-white/10 text-white" : "text-white/20 hover:text-white")}
-            >
-              <Grid className="h-4 w-4" />
-            </button>
-            <button 
-              onClick={() => setViewMode('table')}
-              className={cn("p-2 rounded-lg transition-all", viewMode === 'table' ? "bg-white/10 text-white" : "text-white/20 hover:text-white")}
-            >
-              <List className="h-4 w-4" />
-            </button>
-          </div>
-        )}
+        <div className="flex items-center gap-3">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            onClick={handleExcelExport}
+            disabled={isExporting || filteredAssets.length === 0}
+            className="h-10 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 bg-white/5 border-white/10 text-white hover:bg-white/10"
+          >
+            {isExporting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />}
+            Export Register
+          </Button>
+
+          {isListView && (
+            <div className="flex items-center bg-white/5 p-1 rounded-xl border border-white/5">
+              <button 
+                onClick={() => setViewMode('grid')}
+                className={cn("p-2 rounded-lg transition-all", viewMode === 'grid' ? "bg-white/10 text-white" : "text-white/20 hover:text-white")}
+              >
+                <Grid className="h-4 w-4" />
+              </button>
+              <button 
+                onClick={() => setViewMode('table')}
+                className={cn("p-2 rounded-lg transition-all", viewMode === 'table' ? "bg-white/10 text-white" : "text-white/20 hover:text-white")}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* 2. Content Surface */}

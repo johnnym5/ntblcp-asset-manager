@@ -1,6 +1,7 @@
 /**
  * @fileOverview Consolidated Excel Workstation Service.
  * Phase 24: Hardened to be Header-Aware and Arrangement-Synchronized.
+ * Phase 25: Enhanced for robust multi-sheet structure-preserving export.
  */
 
 import * as XLSX from 'xlsx';
@@ -31,7 +32,7 @@ export const ExcelService = {
 
   /**
    * Generates a structure-preserving Excel report from the current registry state.
-   * respects the user's custom display names and arrangement order.
+   * Respects the user's custom display names and arrangement order.
    */
   async exportRegistry(
     assets: Asset[], 
@@ -46,7 +47,7 @@ export const ExcelService = {
 
     // Group assets by category to create separate sheets
     const grouped = assets.reduce((acc, a) => {
-      const cat = a.category || 'General';
+      const cat = a.category || 'General Register';
       if (!acc[cat]) acc[cat] = [];
       acc[cat].push(a);
       return acc;
@@ -67,10 +68,12 @@ export const ExcelService = {
       } else {
         // Fallback to static definitions
         const definition = HEADER_DEFINITIONS[category] || HEADER_DEFINITIONS['NTBLCP-TB-FAR'];
-        exportHeaders = definition.headers.map(h => ({
-          key: h.toLowerCase().replace(/ /g, '_'),
-          label: h
-        }));
+        if (definition) {
+          exportHeaders = definition.headers.map(h => ({
+            key: h.toLowerCase().replace(/ /g, '_'),
+            label: h
+          }));
+        }
       }
 
       // 2. Map domain fields back to these headers
@@ -83,37 +86,41 @@ export const ExcelService = {
 
           // Map normalized keys to asset properties
           switch(key) {
-            case 'sn': row[label] = asset.serialNumber; break;
-            case 'location': row[label] = asset.location; break;
-            case 'assignee_location': row[label] = asset.custodian; break;
-            case 'asset_description': row[label] = asset.description; break;
-            case 'asset_id_code': row[label] = asset.assetIdCode; break;
-            case 'asset_class': row[label] = asset.category; break;
-            case 'condition': row[label] = asset.condition; break;
-            case 'purchase_price_ngn': row[label] = asset.value; break;
-            case 'date_purchased_received': row[label] = asset.purchaseDate; break;
-            case 'serial_number': row[label] = asset.serialNumber; break;
-            case 'source_sheet': row[label] = asset.importMetadata?.sheetName; break;
-            case 'row_number': row[label] = asset.importMetadata?.rowNumber; break;
-            case 'section_name': row[label] = asset.section; break;
-            case 'subsection_name': row[label] = asset.subsection; break;
-            case 'status': row[label] = asset.status; break;
+            case 'sn': row[label] = asset.serialNumber || ''; break;
+            case 'location': row[label] = asset.location || ''; break;
+            case 'assignee_location': row[label] = asset.custodian || ''; break;
+            case 'asset_description': row[label] = asset.description || ''; break;
+            case 'asset_id_code': row[label] = asset.assetIdCode || ''; break;
+            case 'asset_class': row[label] = asset.category || ''; break;
+            case 'condition': row[label] = asset.condition || ''; break;
+            case 'purchase_price_ngn': row[label] = asset.value || 0; break;
+            case 'date_purchased_received': row[label] = asset.purchaseDate || ''; break;
+            case 'serial_number': row[label] = asset.serialNumber || ''; break;
+            case 'source_sheet': row[label] = asset.importMetadata?.sheetName || ''; break;
+            case 'row_number': row[label] = asset.importMetadata?.rowNumber || ''; break;
+            case 'section_name': row[label] = asset.section || ''; break;
+            case 'subsection_name': row[label] = asset.subsection || ''; break;
+            case 'status': row[label] = asset.status || ''; break;
             default:
-              row[label] = (asset.metadata as any)?.[key] || '';
+              // Robust fallback for metadata pulse
+              row[label] = (asset.metadata as any)?.[label] || (asset.metadata as any)?.[key] || '';
           }
         });
 
         return row;
       });
 
-      const worksheet = XLSX.utils.json_to_sheet(sheetData, { 
-        header: exportHeaders.map(h => h.label) 
-      });
-      XLSX.utils.book_append_sheet(workbook, worksheet, category.substring(0, 31));
+      if (sheetData.length > 0) {
+        const worksheet = XLSX.utils.json_to_sheet(sheetData, { 
+          header: exportHeaders.map(h => h.label) 
+        });
+        // Sheet names limited to 31 chars
+        XLSX.utils.book_append_sheet(workbook, worksheet, category.substring(0, 31));
+      }
     }
 
     if (workbook.SheetNames.length === 0) {
-      throw new Error("Workbook creation failed. No valid sheets produced.");
+      throw new Error("Workbook creation failed. No valid data found for export.");
     }
 
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });

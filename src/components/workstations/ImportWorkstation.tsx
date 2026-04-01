@@ -3,6 +3,7 @@
 /**
  * @fileOverview ImportWorkstation - Data Import Center.
  * Phase 180: Upgraded with high-fidelity discovery metrics and group telemetry.
+ * Phase 181: Hardened sandbox-first persistence.
  */
 
 import React, { useState, useRef } from 'react';
@@ -44,7 +45,7 @@ type ImportStep = 'INGEST' | 'PROCESSING' | 'PREVIEW' | 'SUMMARY';
 
 export function ImportWorkstation() {
   const { toast } = useToast();
-  const { assets: existingAssets, refreshRegistry, activeGrantId } = useAppState();
+  const { assets: existingAssets, refreshRegistry, activeGrantId, setDataSource, setActiveView } = useAppState();
   const { userProfile } = useAuth();
   
   const [currentStep, setCurrentStep] = useState<ImportStep>('INGEST');
@@ -92,6 +93,8 @@ export function ImportWorkstation() {
         }
       }
       
+      // Authoritative Offline Pulse: Save to Sandbox immediately after structural discovery
+      await storage.saveToSandbox(allParsedAssets as any[]);
       setStagedAssets(allParsedAssets);
       setSummary(finalSummary);
       setProgress(100);
@@ -99,6 +102,7 @@ export function ImportWorkstation() {
       setTimeout(() => {
         setIsProcessing(false);
         setCurrentStep('PREVIEW');
+        setDataSource('SANDBOX'); // Force switch to sandbox view for review
       }, 800);
 
     } catch (error) {
@@ -123,8 +127,10 @@ export function ImportWorkstation() {
       
       const current = await storage.getAssets();
       await storage.saveAssets([...stagedAssets.map(a => ({ ...a, grantId: activeGrantId })), ...current]);
+      await storage.clearSandbox(); // Purge staged pulse after merge
       
       toast({ title: "Registration Successful", description: `${stagedAssets.length} assets integrated into the register.` });
+      setDataSource('PRODUCTION');
       await refreshRegistry();
       setCurrentStep('SUMMARY');
     } catch (e) {
@@ -149,7 +155,7 @@ export function ImportWorkstation() {
           </p>
         </div>
         {currentStep !== 'INGEST' && (
-          <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-12 px-6 rounded-xl font-black uppercase text-[9px] border-2 border-white/5 hover:bg-white/5 text-white">
+          <Button variant="outline" onClick={() => { setCurrentStep('INGEST'); storage.clearSandbox(); }} className="h-12 px-6 rounded-xl font-black uppercase text-[9px] border-2 border-white/5 hover:bg-white/5 text-white">
             <Trash2 className="mr-2 h-3.5 w-3.5" /> Discard Pulse
           </Button>
         )}
