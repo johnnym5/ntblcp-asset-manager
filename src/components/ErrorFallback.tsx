@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview High-Fidelity Safety Fallback - Resilience Terminal UI.
- * Phase 105: Redesigned to match provided design pulse with red header stripe and fault container.
+ * Phase 106: Rebranded to Assetain Intelligence and refined navy/gold accents.
  */
 
 import React from 'react';
@@ -32,7 +32,7 @@ export function ErrorFallback({ error, resetErrorBoundary, title = "Safety Fallb
     )}>
       <Card className="max-w-2xl w-full border-none bg-transparent shadow-none overflow-hidden rounded-[1.5rem] bg-[#1E293B]">
         {/* Design Stripe */}
-        <div className="h-2 w-full bg-[#B91C1C]" />
+        <div className="h-2 w-full bg-primary" />
         
         {/* Design Header */}
         <div className="p-10 pb-8 bg-[#334155]/20">
@@ -74,7 +74,7 @@ export function ErrorFallback({ error, resetErrorBoundary, title = "Safety Fallb
           {/* Terminal Footer */}
           <div className="pt-6 border-t border-white/5 text-center">
             <p className="text-[9px] font-black uppercase tracking-[0.4em] text-[#475569]">
-              BASECHAN INTERNATIONAL RESILIENCE TERMINAL V1.0
+              ASSETAIN INTELLIGENCE RESILIENCE TERMINAL V1.0
             </p>
           </div>
         </CardContent>

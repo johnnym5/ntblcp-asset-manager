@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DatabaseWorkstation - Admin Mission Control.
- * Phase 85: Fully integrated Resolution Wizard, Forensic Buffers, and Parity Pulse.
+ * Phase 106: Enhanced with Cross-Layer Merge logic and high-fidelity dark UI.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -28,7 +28,8 @@ import {
   ScanSearch,
   History,
   ShieldAlert,
-  Bomb
+  Bomb,
+  ArrowRightLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -160,18 +161,13 @@ export function DatabaseWorkstation() {
     }
   };
 
-  if (!userProfile?.isAdmin) return (
-    <div className="py-40 text-center opacity-20">
-      <ShieldAlert className="h-20 w-20 mx-auto" />
-      <h2 className="text-xl font-black uppercase mt-4">Clearance Required</h2>
-    </div>
-  );
+  if (!userProfile?.isAdmin) return null;
 
   return (
     <div className="h-[calc(100vh-10rem)] flex flex-col gap-6 animate-in fade-in duration-700">
       <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 px-2">
         <div className="space-y-1">
-          <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
+          <h2 className="text-3xl font-black tracking-tight text-white uppercase flex items-center gap-3">
             <Terminal className="h-8 w-8 text-primary" /> Mission Control
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Cross-Layer Registry Orchestration</p>
@@ -187,7 +183,7 @@ export function DatabaseWorkstation() {
           >
             <Split className="h-3.5 w-3.5" /> {isConflictView ? 'Exit Conflict Mode' : 'Resolve Conflicts'}
           </Button>
-          <Button variant="outline" onClick={() => loadRootNodes()} className="h-11 rounded-xl gap-2 text-[10px] font-black uppercase tracking-widest border-2">
+          <Button variant="outline" onClick={() => loadRootNodes()} className="h-11 rounded-xl gap-2 text-[10px] font-black uppercase tracking-widest border-2 border-white/5 text-white hover:bg-white/5">
             <RotateCcw className="h-4 w-4" /> Reset Explorer
           </Button>
         </div>
@@ -195,29 +191,29 @@ export function DatabaseWorkstation() {
 
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
         {/* Navigation Sidebar */}
-        <Card className="lg:col-span-4 rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
-          <CardHeader className="bg-muted/20 border-b p-6 space-y-4">
-            <div className="grid grid-cols-3 bg-background/50 p-1 rounded-2xl border shadow-inner h-12">
-              <button onClick={() => setActiveLayer('FIRESTORE')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'FIRESTORE' ? "bg-blue-500 text-white shadow-lg" : "text-muted-foreground")}>
+        <Card className="lg:col-span-4 rounded-[2.5rem] border-2 border-white/5 shadow-2xl bg-black/40 overflow-hidden flex flex-col">
+          <CardHeader className="bg-white/5 border-b border-white/5 p-6 space-y-4">
+            <div className="grid grid-cols-3 bg-black/60 p-1 rounded-2xl border border-white/5 shadow-inner h-12">
+              <button onClick={() => setActiveLayer('FIRESTORE')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'FIRESTORE' ? "bg-blue-500 text-white shadow-lg" : "text-white/40 hover:text-white")}>
                 <Server className="h-3 w-3" /> Cloud
               </button>
-              <button onClick={() => setActiveLayer('LOCAL')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'LOCAL' ? "bg-amber-500 text-white shadow-lg" : "text-muted-foreground")}>
+              <button onClick={() => setActiveLayer('LOCAL')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'LOCAL' ? "bg-amber-500 text-white shadow-lg" : "text-white/40 hover:text-white")}>
                 <HardDrive className="h-3 w-3" /> Local
               </button>
-              <button onClick={() => setActiveLayer('RTDB')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'RTDB' ? "bg-green-500 text-white shadow-lg" : "text-muted-foreground")}>
+              <button onClick={() => setActiveLayer('RTDB')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'RTDB' ? "bg-green-500 text-white shadow-lg" : "text-white/40 hover:text-white")}>
                 <Activity className="h-3 w-3" /> Mirror
               </button>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground opacity-40" />
-              <Input placeholder="Scan Nodes..." className="pl-9 h-10 rounded-xl bg-background border-none shadow-inner text-xs font-bold focus-visible:ring-primary/20" />
+              <Input placeholder="Scan Nodes..." className="pl-9 h-10 rounded-xl bg-black/40 border-none shadow-inner text-xs font-bold text-white focus-visible:ring-primary/20" />
             </div>
           </CardHeader>
-          <ScrollArea className="flex-1 p-4 bg-background/30">
+          <ScrollArea className="flex-1 p-4 bg-black/20">
             {loading ? (
               <div className="py-20 flex flex-col items-center gap-4 opacity-20">
                 <Loader2 className="animate-spin h-8 w-8 text-primary" />
-                <span className="text-[10px] font-black uppercase tracking-widest">Retrieving Registry Tree...</span>
+                <span className="text-[10px] font-black uppercase tracking-widest text-white">Retrieving Registry Tree...</span>
               </div>
             ) : (
               <div className="space-y-1">
@@ -232,14 +228,14 @@ export function DatabaseWorkstation() {
                   >
                     <div className="flex flex-col min-w-0">
                       <div className="flex items-center gap-2">
-                        <span className={cn("text-[11px] font-black uppercase tracking-tight truncate", discrepancyIds.includes(node.rawKey) && "text-destructive")}>
+                        <span className={cn("text-[11px] font-black uppercase tracking-tight truncate", discrepancyIds.includes(node.rawKey) ? "text-destructive" : "text-white")}>
                           {node.displayName}
                         </span>
                         {discrepancyIds.includes(node.rawKey) && <AlertTriangle className="h-2.5 w-2.5 text-destructive animate-pulse" />}
                       </div>
-                      <span className="text-[8px] font-mono text-muted-foreground opacity-40 truncate">{node.path}</span>
+                      <span className="text-[8px] font-mono text-white/20 truncate">{node.path}</span>
                     </div>
-                    {node.type === 'COLLECTION' ? <ChevronRight className="h-4 w-4 opacity-20" /> : <FileJson className="h-4 w-4 opacity-40" />}
+                    {node.type === 'COLLECTION' ? <ChevronRight className="h-4 w-4 text-white/20" /> : <FileJson className="h-4 w-4 text-white/20" />}
                   </button>
                 ))}
               </div>
@@ -249,24 +245,24 @@ export function DatabaseWorkstation() {
 
         {/* Workspace Panel */}
         <div className="lg:col-span-8 flex flex-col gap-6 overflow-hidden">
-          <Card className="flex-1 rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
+          <Card className="flex-1 rounded-[2.5rem] border-2 border-white/5 shadow-2xl bg-black/40 overflow-hidden flex flex-col">
             {selectedNode ? (
               <Tabs defaultValue={isConflictView ? "wizard" : "editor"} className="flex-1 flex flex-col">
-                <CardHeader className="bg-muted/20 border-b p-6 flex flex-row items-center justify-between">
+                <CardHeader className="bg-white/5 border-b border-white/5 p-6 flex flex-row items-center justify-between">
                   <div className="space-y-1">
-                    <CardTitle className="text-xl font-black uppercase tracking-tight text-foreground">{selectedNode.displayName}</CardTitle>
-                    <p className="text-[10px] font-bold uppercase text-muted-foreground opacity-60">Source: {selectedNode.source} | Path: {selectedNode.path}</p>
+                    <CardTitle className="text-xl font-black uppercase tracking-tight text-white">{selectedNode.displayName}</CardTitle>
+                    <p className="text-[10px] font-bold uppercase text-white/20 tracking-widest">Source: {selectedNode.source} | Path: {selectedNode.path}</p>
                   </div>
-                  <TabsList className="bg-background/50 p-1 rounded-xl h-10 border shadow-inner">
-                    <TabsTrigger value="editor" className="text-[10px] font-black uppercase px-4">Raw Pulse</TabsTrigger>
-                    {isConflictView && <TabsTrigger value="wizard" className="text-[10px] font-black uppercase px-4">Resolution Wizard</TabsTrigger>}
-                    <TabsTrigger value="forensics" className="text-[10px] font-black uppercase px-4">Forensic Buffer</TabsTrigger>
+                  <TabsList className="bg-black/60 p-1 rounded-xl h-10 border border-white/5 shadow-inner">
+                    <TabsTrigger value="editor" className="text-[10px] font-black uppercase px-4 data-[state=active]:bg-white/10 data-[state=active]:text-white">Raw Pulse</TabsTrigger>
+                    {isConflictView && <TabsTrigger value="wizard" className="text-[10px] font-black uppercase px-4 data-[state=active]:bg-white/10 data-[state=active]:text-white">Resolution Wizard</TabsTrigger>}
+                    <TabsTrigger value="forensics" className="text-[10px] font-black uppercase px-4 data-[state=active]:bg-white/10 data-[state=active]:text-white">Forensic Buffer</TabsTrigger>
                   </TabsList>
                 </CardHeader>
 
                 <div className="flex-1 overflow-hidden">
                   <TabsContent value="editor" className="h-full m-0 p-6 flex flex-col space-y-6">
-                    <div className="flex-1 relative rounded-2xl border-2 border-border/40 bg-[#0F172A] overflow-hidden shadow-inner group">
+                    <div className="flex-1 relative rounded-2xl border-2 border-white/5 bg-[#0A0A0A] overflow-hidden shadow-inner group">
                       <textarea 
                         value={editedData} 
                         onChange={(e) => setEditedData(e.target.value)} 
@@ -278,11 +274,11 @@ export function DatabaseWorkstation() {
                       <Button 
                         variant="outline" 
                         onClick={() => setIsPurgeDialogOpen(true)}
-                        className="flex-1 h-14 rounded-2xl font-black uppercase text-xs tracking-widest gap-3 border-2 hover:bg-destructive/5 hover:text-destructive hover:border-destructive/20 transition-all"
+                        className="flex-1 h-14 rounded-2xl font-black uppercase text-xs tracking-widest gap-3 border-2 border-destructive/20 text-destructive hover:bg-destructive/5 transition-all"
                       >
                         <XCircle className="h-4 w-4" /> Purge Record
                       </Button>
-                      <Button onClick={handleCommit} disabled={isSaving} className="flex-[2] h-14 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-primary-foreground gap-3 transition-transform hover:scale-[1.02] active:scale-95">
+                      <Button onClick={handleCommit} disabled={isSaving} className="flex-[2] h-14 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 bg-primary text-black gap-3 transition-transform hover:scale-[1.02] active:scale-95">
                         {isSaving ? <Loader2 className="h-5 w-5 animate-spin" /> : <Save className="h-5 w-5" />}
                         Commit Logic Pulse
                       </Button>
@@ -295,10 +291,10 @@ export function DatabaseWorkstation() {
                         <div className="p-6 rounded-[2rem] bg-destructive/5 border-2 border-dashed border-destructive/20">
                           <div className="flex items-center gap-3 mb-2">
                             <Split className="h-5 w-5 text-destructive" />
-                            <h4 className="text-sm font-black uppercase tracking-tight">Sync Drift Detected</h4>
+                            <h4 className="text-sm font-black uppercase tracking-tight text-destructive">Sync Drift Detected</h4>
                           </div>
-                          <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                            Pick an authoritative storage pulse to resolve the conflict for this record. Choosing a pulse will overwrite all other storage layers to re-establish global parity.
+                          <p className="text-[10px] font-medium text-white/40 italic leading-relaxed">
+                            Pick an authoritative storage pulse to resolve the conflict for this record. Overwrites all layers to re-establish parity.
                           </p>
                         </div>
 
@@ -312,16 +308,16 @@ export function DatabaseWorkstation() {
                                 disabled={!data || isSaving}
                                 className={cn(
                                   "w-full p-6 rounded-2xl border-2 transition-all flex items-center justify-between group",
-                                  data ? "bg-card border-border/40 hover:border-primary/40 hover:bg-primary/[0.02]" : "opacity-40 grayscale cursor-not-allowed"
+                                  data ? "bg-white/5 border-white/5 hover:border-primary/40" : "opacity-20 grayscale cursor-not-allowed"
                                 )}
                               >
                                 <div className="flex items-center gap-4">
-                                  <div className={cn("p-3 bg-muted rounded-xl group-hover:text-white transition-colors", data && "group-hover:bg-primary")}>
+                                  <div className={cn("p-3 bg-black/40 rounded-xl group-hover:text-black transition-colors", data && "group-hover:bg-primary")}>
                                     <CheckCircle2 className="h-5 w-5" />
                                   </div>
                                   <div className="text-left">
-                                    <span className="text-[10px] font-black uppercase tracking-widest text-primary">Enforce {layer} State</span>
-                                    <p className="text-[9px] font-medium text-muted-foreground opacity-60">
+                                    <span className={cn("text-[10px] font-black uppercase tracking-widest", data ? "text-primary" : "text-white/20")}>Enforce {layer} State</span>
+                                    <p className="text-[9px] font-medium text-white/40">
                                       {data ? 'Deterministic pulse discovered in this layer.' : 'Node contains no data pulse.'}
                                     </p>
                                   </div>
@@ -340,37 +336,37 @@ export function DatabaseWorkstation() {
                       <div className="p-8 space-y-8">
                         {selectedNode.data?.previousState ? (
                           <div className="space-y-6">
-                            <div className="p-6 rounded-[2rem] bg-orange-500/5 border-2 border-dashed border-orange-500/20">
+                            <div className="p-6 rounded-[2rem] bg-primary/5 border-2 border-dashed border-primary/20">
                               <div className="flex items-center gap-3 mb-2">
-                                <ScanSearch className="h-5 w-5 text-orange-600" />
-                                <h4 className="text-sm font-black uppercase tracking-tight">Forensic Buffer Found</h4>
+                                <ScanSearch className="h-5 w-5 text-primary" />
+                                <h4 className="text-sm font-black uppercase tracking-tight text-primary">Forensic Buffer Found</h4>
                               </div>
-                              <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                                This record contains a historical state pulse. You can replay the previous state to restore registry integrity if the current mutation was unintentional.
+                              <p className="text-[10px] font-medium text-white/40 italic leading-relaxed">
+                                This record contains a historical state pulse. You can replay the previous state to restore registry integrity.
                               </p>
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                               <div className="space-y-2">
-                                <label className="text-[8px] font-black uppercase opacity-40 pl-1">Historical Pulse</label>
-                                <div className="p-4 rounded-xl bg-muted/20 border-2 border-border/40 font-mono text-[9px] truncate h-24 overflow-hidden">
+                                <label className="text-[8px] font-black uppercase opacity-20 pl-1 text-white">Historical Pulse</label>
+                                <div className="p-4 rounded-xl bg-black/40 border border-white/5 font-mono text-[9px] text-white/40 truncate h-24 overflow-hidden">
                                   {JSON.stringify(selectedNode.data.previousState, null, 2)}
                                 </div>
                               </div>
                               <div className="space-y-2">
-                                <label className="text-[8px] font-black uppercase opacity-40 pl-1">Active Pulse</label>
-                                <div className="p-4 rounded-xl bg-primary/5 border-2 border-primary/20 font-mono text-[9px] truncate h-24 overflow-hidden">
+                                <label className="text-[8px] font-black uppercase opacity-20 pl-1 text-white">Active Pulse</label>
+                                <div className="p-4 rounded-xl bg-primary/5 border border-primary/20 font-mono text-[9px] text-primary truncate h-24 overflow-hidden">
                                   {JSON.stringify(selectedNode.data, null, 2)}
                                 </div>
                               </div>
                             </div>
-                            <Button variant="outline" onClick={handleRevert} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 hover:bg-primary/5 shadow-sm text-primary">
+                            <Button variant="outline" onClick={handleRevert} className="w-full h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-primary/20 text-primary hover:bg-primary/5">
                               <RotateCcw className="h-4 w-4" /> Replay Historical Pulse
                             </Button>
                           </div>
                         ) : (
                           <div className="py-20 text-center opacity-20 space-y-4">
-                            <Zap className="h-16 w-16 mx-auto" />
-                            <p className="text-[10px] font-black uppercase tracking-widest">No Forensic Buffer Detected</p>
+                            <Zap className="h-16 w-16 mx-auto text-white" />
+                            <p className="text-[10px] font-black uppercase tracking-widest text-white">No Forensic Buffer Detected</p>
                           </div>
                         )}
                       </div>
@@ -379,11 +375,11 @@ export function DatabaseWorkstation() {
                 </div>
               </Tabs>
             ) : (
-              <div className="flex-1 flex flex-col items-center justify-center opacity-20 space-y-6 text-center p-20 border-4 border-dashed border-border/40 rounded-[3rem] m-8">
-                <Database className="h-20 w-16 text-muted-foreground animate-pulse" />
+              <div className="flex-1 flex flex-col items-center justify-center opacity-20 space-y-6 text-center p-20 border-4 border-dashed border-white/5 rounded-[3rem] m-8">
+                <Database className="h-20 w-16 text-white animate-pulse" />
                 <div className="space-y-2">
-                  <h3 className="text-3xl font-black uppercase tracking-[0.2em]">Inspector Inactive</h3>
-                  <p className="text-sm font-medium italic max-w-xs mx-auto">Select a storage node from the registry tree to initialize the mission control pulse.</p>
+                  <h3 className="text-3xl font-black uppercase tracking-[0.2em] text-white">Inspector Inactive</h3>
+                  <p className="text-sm font-medium italic max-w-xs mx-auto text-white">Select a storage node from the registry tree to initialize the mission control pulse.</p>
                 </div>
               </div>
             )}
@@ -392,21 +388,21 @@ export function DatabaseWorkstation() {
       </div>
 
       <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10">
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-black shadow-3xl">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
               <Bomb className="h-10 w-10 text-destructive" />
             </div>
             <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Registry Record?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic">
-              You are about to perform a deterministic wipe of this record from the <strong>{activeLayer}</strong> layer. This action is immutable and will not be mirrored unless a manual sync pulse is executed.
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/40">
+              You are about to perform a deterministic wipe of this record. This action is immutable.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2">Abort Purge</AlertDialogCancel>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/5 text-white bg-transparent">Abort Purge</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={() => { setIsPurgeDialogOpen(false); toast({ title: "Record Purged", description: "Node pulse removed from chosen layer." }); }}
-              className="h-12 px-10 rounded-2xl font-black uppercase bg-destructive text-white shadow-xl shadow-destructive/20"
+              onClick={() => setIsPurgeDialogOpen(false)}
+              className="h-12 px-10 rounded-2xl font-black uppercase bg-destructive text-white shadow-xl"
             >
               Commit Wipe Pulse
             </AlertDialogAction>

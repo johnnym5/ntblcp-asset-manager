@@ -1,4 +1,3 @@
-
 "use client";
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -8,13 +7,13 @@ import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { addNotification } from '@/hooks/use-notifications';
-import { Loader2, FileUp, FileCheck2, AlertTriangle, ScanSearch, ChevronsUpDown, Layers, Check, X } from 'lucide-react';
+import { Loader2, FileUp, FileCheck2, AlertTriangle, ScanSearch, ChevronsUpDown, Check, X, Layers } from 'lucide-react';
 import { scanExcelFile, parseExcelFile, type ScannedSheetInfo } from '@/lib/excel-parser';
 import { getLockedOfflineAssets, saveLockedOfflineAssets } from '@/lib/idb';
 import { Label } from './ui/label';
 import { ScrollArea } from './ui/scroll-area';
 import { Checkbox } from './ui/checkbox';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from './ui/separator';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from './ui/collapsible';
 import { Badge } from './ui/badge';
@@ -51,7 +50,9 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
         try {
           const { scannedSheets, errors } = await scanExcelFile(file, appSettings);
           
-          if (errors.length > 0) setScanErrors(errors);
+          if (errors.length > 0) {
+            setScanErrors(errors);
+          }
           if (scannedSheets.length > 0) {
             setScanResults(scannedSheets);
             setSelectedSheets(scannedSheets.map(s => s.sheetName));
@@ -92,6 +93,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
       lastModified: new Date().toISOString(),
       lastModifiedBy: userProfile?.displayName,
       lastModifiedByState: userProfile?.state,
+      syncStatus: undefined
     }));
 
     if (allChanges.length > 0) {
@@ -101,7 +103,7 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
       
       await saveLockedOfflineAssets(combinedAssets);
       setOfflineAssets(combinedAssets);
-      addNotification({ title: 'Import Successful', description: `${allChanges.length} assets staged in Locked Offline store.` });
+      addNotification({ title: 'Imported to Locked Offline Store', description: `${allChanges.length} records staged for review.` });
       setDataSource('local_locked');
     }
 
@@ -142,9 +144,9 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                 <X className="h-5 w-5" />
               </Button>
             </div>
-            <SheetDescription className="text-sm font-medium text-white/40 leading-relaxed italic pr-10">
+            <DialogDescription className="text-sm font-medium text-white/40 leading-relaxed italic pr-10">
               Select an Excel file to scan for hierarchical groups and asset categories.
-            </SheetDescription>
+            </DialogDescription>
           </DialogHeader>
         </div>
 
@@ -214,17 +216,6 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                               </div>
                               <Badge variant="outline" className="h-6 px-3 border-primary/20 bg-primary/5 text-primary text-[8px] font-black uppercase">{result.definitionName}</Badge>
                             </div>
-
-                            {result.sectionsDetected.length > 0 && (
-                              <div className="flex flex-wrap gap-2 pt-2 border-t border-white/5">
-                                {result.sectionsDetected.slice(0, 3).map((s, idx) => (
-                                  <Badge key={idx} variant="secondary" className="bg-white/5 text-white/40 border-none font-black text-[7px] uppercase px-2 h-5">
-                                    <Layers className="h-2 w-2 mr-1" /> {s}
-                                  </Badge>
-                                ))}
-                                {result.sectionsDetected.length > 3 && <span className="text-[7px] font-black text-white/20">+{result.sectionsDetected.length - 3} GROUPS</span>}
-                              </div>
-                            )}
                           </div>
                         ))}
                       </div>
