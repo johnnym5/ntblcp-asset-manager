@@ -55,7 +55,7 @@ import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
 import { SourceBrandingDrawer } from '@/components/registry/SourceBrandingDrawer';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
-import { AssetForm } from '@/components/asset-form';
+import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { VerificationPulse } from '@/components/registry/VerificationPulse';
 import { TagPrintDialog } from '@/components/registry/TagPrintDialog';
@@ -461,7 +461,7 @@ export default function AssetRegistryPage() {
                 <div className="flex items-center gap-1 md:gap-2 shrink-0">
                   <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-10 w-10 rounded-xl"><ChevronLeft className="h-5 w-5" /></Button>
                   <span className="text-[10px] font-black uppercase tracking-widest px-4 tabular-nums whitespace-nowrap">Page {currentPage} of {totalPages || 1}</span>
-                  <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="h-10 w-10 rounded-xl"><ChevronRight className="h-5 w-5" /></Button>
+                  <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="h-10 w-10 rounded-xl"><ChevronRight className="h-5 w-5" /></Button>
                 </div>
                 <div className="h-6 w-px bg-border/40 hidden xs:block" />
                 <div className="flex items-center gap-2">
@@ -481,7 +481,7 @@ export default function AssetRegistryPage() {
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }} />
       <SourceBrandingDrawer isOpen={isBrandingOpen} onOpenChange={setIsBrandingOpen} />
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => {}} />
-      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAssetForForm} headers={headers} isReadOnly={false} onSave={async (a) => { await refreshRegistry(); setIsFormOpen(false); }} onQuickSave={async () => {}} />
+      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAssetForForm} onSave={async (a) => { await refreshRegistry(); setIsFormOpen(false); }} onQuickSave={async () => {}} isReadOnly={false} />
       <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async (d) => { await refreshRegistry(); setSelectedIds(new Set()); }} />
       <TagPrintDialog isOpen={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen} records={selectedRecordsForPrint} />
       

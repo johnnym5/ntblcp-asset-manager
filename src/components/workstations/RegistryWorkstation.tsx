@@ -41,7 +41,7 @@ import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
 import { SourceBrandingDrawer } from '@/components/registry/SourceBrandingDrawer';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
-import { AssetForm } from '@/components/asset-form';
+import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { VerificationPulse } from '@/components/registry/VerificationPulse';
 import { TagPrintDialog } from '@/components/registry/TagPrintDialog';
@@ -262,7 +262,7 @@ export function RegistryWorkstation() {
         <div className="flex items-center gap-2">
           <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-10 w-10 rounded-xl"><ChevronLeft className="h-5 w-5" /></Button>
           <span className="text-[10px] font-black uppercase tracking-widest px-4">Page {currentPage} of {totalPages || 1}</span>
-          <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)} className="h-10 w-10 rounded-xl"><ChevronRight className="h-5 w-5" /></Button>
+          <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="h-10 w-10 rounded-xl"><ChevronRight className="h-5 w-5" /></Button>
         </div>
         <div className="h-6 w-px bg-border/40" />
         <Button className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 text-white" onClick={() => setIsFormOpen(true)}>

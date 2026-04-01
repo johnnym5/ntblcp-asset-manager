@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -23,7 +22,7 @@ import { Button } from '@/components/ui/button';
 import { useAppState } from '@/contexts/app-state-context';
 import { Badge } from '@/components/ui/badge';
 import { RegistryCard } from '@/components/registry/RegistryCard';
-import { AssetForm } from '@/components/asset-form';
+import AssetForm from '@/components/asset-form';
 import { VerificationPulse } from '@/components/registry/VerificationPulse';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
@@ -216,8 +215,6 @@ export default function VerificationQueuePage() {
         isOpen={isFormOpen}
         onOpenChange={setIsFormOpen}
         asset={selectedAsset}
-        headers={headers}
-        isReadOnly={false}
         onSave={async (a) => {
           await enqueueMutation('UPDATE', 'assets', a);
           const current = await storage.getAssets();
@@ -227,6 +224,7 @@ export default function VerificationQueuePage() {
           setIsFormOpen(false);
         }}
         onQuickSave={async () => {}}
+        isReadOnly={false}
       />
     </AppLayout>
   );
