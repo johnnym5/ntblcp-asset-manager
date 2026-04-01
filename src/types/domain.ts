@@ -10,10 +10,6 @@ export type UXMode = 'beginner' | 'advanced';
 export type StorageLayer = 'FIRESTORE' | 'RTDB' | 'LOCAL';
 export type AuthorityNode = 'FIRESTORE' | 'RTDB';
 
-/**
- * SPA Workstation View Enumeration.
- * Defines the logical sections available in the unified app shell.
- */
 export type WorkstationView = 
   | 'DASHBOARD' 
   | 'REGISTRY' 
@@ -39,7 +35,7 @@ export interface ImportMetadata {
   sourceFile: string;
   sheetName: string;
   rowNumber: number;
-  importedAt: string; // ISO 8601
+  importedAt: string;
 }
 
 export interface Geotag {
@@ -54,7 +50,7 @@ export interface Asset {
   name?: string;
   description: string;
   category: string;
-  grantId: string; // Link to the specific project/grant
+  grantId: string; 
   
   // Hierarchical Context
   section: string;
@@ -64,6 +60,8 @@ export interface Asset {
   // Location & Assignment
   location: string;
   custodian: string;
+  lga?: string;
+  assignee?: string;
   
   // State & Assessment
   status: VerificationStatus;
@@ -71,41 +69,54 @@ export interface Asset {
   
   // Financial & Technical
   purchaseDate?: string;
-  value: number;
+  value: number; // NGN
+  valueUsd?: number;
   serialNumber: string;
   assetIdCode?: string;
-  
-  // Media Persistence
-  photoDataUri?: string; // Local visual evidence pulse (base64)
-  photoUrl?: string;     // Remote storage pulse (Firebase Storage URL)
-  
-  // Forensic Verification Pulse
-  signatureDataUri?: string; // Local signature pulse (base64)
-  signatureUrl?: string;     // Remote storage pulse (Firebase Storage URL)
-  
-  geotag?: Geotag; // Spatial field protocol
+  manufacturer?: string;
+  modelNumber?: string;
+  chassisNo?: string;
+  engineNo?: string;
+  supplier?: string;
+  usefulLife?: string;
+  remarks?: string;
+  grant?: string;
+  pvJvNo?: string;
+  imei?: string;
 
-  // Metadata & Provenance
+  // TB Depreciation Pulse
+  depreciation?: {
+    ngn: Record<string, number>;
+    usd: Record<string, number>;
+    accumulatedNgn?: number;
+    netBookValueNgn?: number;
+    accumulatedUsd?: number;
+    netBookValueUsd?: number;
+  };
+  addedAssetsContext?: string;
+
+  // Metadata & Traceability
   hierarchy: SectionHierarchy;
   importMetadata: ImportMetadata;
   metadata: Record<string, unknown>;
+  rawRow?: any[];
+  rawHeader?: string[];
+  formulas?: Record<string, string>;
   
   // System Fields
-  lastModified: string; // ISO 8601
+  lastModified: string;
   lastModifiedBy: string;
   lastModifiedByState?: string;
 
-  // Governance & Approval Workflow
+  // Governance
   approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   pendingChanges?: Partial<Asset>;
-  adminComment?: string;
   changeSubmittedBy?: {
     displayName: string;
     loginName: string;
     state: string;
   };
 
-  // Restoration Buffer
   previousState?: Partial<Asset>;
   yearBucket?: number;
 }
@@ -115,17 +126,13 @@ export interface AppSettings {
   lockAssetList: boolean;
   appMode: 'management' | 'verification';
   activeDatabase: 'firestore' | 'rtdb';
-  readAuthority: AuthorityNode; // PRD: Failover authority
+  readAuthority: AuthorityNode;
   activeGrantId: string | null;
   grants: Grant[];
-  sourceBranding?: Record<string, string>; // Maps sheetName to HSL/Hex color
-  
-  // UX Preferences
+  sourceBranding?: Record<string, string>;
   uxMode: UXMode;
   onboardingComplete: boolean;
   showHelpTooltips: boolean;
-  
-  // Automation Preferences
   autoSync: boolean;
   autoAnalyze: boolean;
   autoSuggestFilters: boolean;
@@ -146,7 +153,7 @@ export interface AuthorizedUser {
   states: string[];
   role: UserRole;
   isAdmin: boolean; 
-  isSuperAdmin?: boolean; // Unlocks virtual database management
+  isSuperAdmin?: boolean;
   isGuest?: boolean;
 }
 

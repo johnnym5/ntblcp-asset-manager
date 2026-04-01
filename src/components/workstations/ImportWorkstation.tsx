@@ -1,12 +1,11 @@
 'use client';
 
 /**
- * @fileOverview ImportWorkstation - SPA Ingestion Module.
- * Phase 72: Verified imports and added missing Badge reference.
+ * @fileOverview ImportWorkstation - Advanced Ingestion Center.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -21,144 +20,100 @@ import {
   ChevronLeft,
   Activity,
   Layers,
-  Columns
+  Columns,
+  Search,
+  FileSpreadsheet,
+  AlertTriangle,
+  Info
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { parseSheetToAssets } from '@/parser/buildHierarchy';
-import { ReconciliationView } from '@/modules/import/components/ReconciliationView';
-import { SchemaMapper } from '@/modules/import/components/SchemaMapper';
+import { ParserEngine } from '@/parser/engine';
 import { storage } from '@/offline/storage';
 import { enqueueMutation } from '@/offline/queue';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import * as XLSX from 'xlsx';
 import type { Asset } from '@/types/domain';
+import type { ParsedAsset, ImportRunSummary } from '@/parser/types';
 import { motion, AnimatePresence } from 'framer-motion';
+import { ScrollArea } from '@/components/ui/scroll-area';
 
-type ImportStep = 'INGEST' | 'TRAVERSAL' | 'MAPPER' | 'RECONCILIATION' | 'COMMIT';
-
-const STEPS: { id: ImportStep; label: string; description: string; icon: any }[] = [
-  { id: 'INGEST', label: 'Ingest', description: 'Upload Workbook', icon: FileUp },
-  { id: 'TRAVERSAL', label: 'Traversal', description: 'Scan Headers', icon: ScanSearch },
-  { id: 'MAPPER', label: 'Mapper', description: 'Align Schema', icon: Columns },
-  { id: 'RECONCILIATION', label: 'Review', description: 'Review Sandbox', icon: Layers },
-  { id: 'COMMIT', label: 'Commit', description: 'Registry Merge', icon: DatabaseZap },
-];
+type ImportStep = 'INGEST' | 'PROCESSING' | 'PREVIEW' | 'SUMMARY';
 
 export function ImportWorkstation() {
   const { toast } = useToast();
-  const { refreshRegistry, activeGrantId } = useAppState();
+  const { assets: existingAssets, refreshRegistry } = useAppState();
   const { userProfile } = useAuth();
   
   const [currentStep, setCurrentStep] = useState<ImportStep>('INGEST');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [stagedAssets, setStagedAssets] = useState<Asset[]>([]);
-  const [analysisProgress, setAnalysisProgress] = useState(0);
-  const [detectedHeaders, setDetectedHeaders] = useState<string[]>([]);
-  const [rawSheetData, setRawSheetData] = useState<{ name: string; data: any[][] }[]>([]);
-  const [activeFileName, setActiveFileName] = useState('');
+  const [stagedAssets, setStagedAssets] = useState<ParsedAsset[]>([]);
+  const [runSummary, setSummary] = useState<ImportRunSummary | null>(null);
+  const [progress, setProgress] = useState(0);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    storage.getSandbox().then(existing => {
-      if (existing.length > 0) {
-        setStagedAssets(existing);
-        setCurrentStep('RECONCILIATION');
-      }
-    });
-  }, []);
-
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (!file || !activeGrantId) {
-      if (!activeGrantId) toast({ variant: "destructive", title: "Project Required" });
-      return;
-    }
+    if (!file) return;
 
-    setActiveFileName(file.name);
-    setCurrentStep('TRAVERSAL');
+    setCurrentStep('PROCESSING');
     setIsProcessing(true);
-    setAnalysisProgress(10);
+    setProgress(10);
 
     try {
       const buffer = await file.arrayBuffer();
-      const workbook = XLSX.read(buffer, { type: 'array' });
-      const sheets: { name: string; data: any[][] }[] = [];
-      const headers = new Set<string>();
+      const workbook = XLSX.read(buffer, { type: 'array', cellFormula: true, cellStyles: true });
+      setProgress(40);
+
+      // We process the first compatible sheet for now
+      const sheetName = workbook.SheetNames[0];
+      const data = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { header: 1 }) as any[][];
       
-      workbook.SheetNames.forEach(name => {
-        const sheet = workbook.Sheets[name];
-        const data = XLSX.utils.sheet_to_json(sheet, { header: 1 }) as any[][];
-        sheets.push({ name, data });
-        data.slice(0, 50).forEach(row => {
-          if (Array.isArray(row)) {
-            row.forEach(cell => {
-              if (typeof cell === 'string' && cell.length > 1) headers.add(cell.trim());
-            });
-          }
-        });
-      });
+      const engine = new ParserEngine(file.name, existingAssets);
+      setProgress(60);
+      
+      const result = engine.parseSheet(sheetName, data);
+      
+      setStagedAssets(result.assets);
+      setSummary(result.summary);
+      setProgress(100);
 
-      setRawSheetData(sheets);
-      setDetectedHeaders(Array.from(headers));
-      setAnalysisProgress(100);
-      setTimeout(() => { setIsProcessing(false); setCurrentStep('MAPPER'); }, 800);
+      setTimeout(() => {
+        setIsProcessing(false);
+        setCurrentStep('PREVIEW');
+      }, 800);
+
     } catch (error) {
-      setIsProcessing(false);
+      console.error("Ingestion error:", error);
+      toast({ variant: "destructive", title: "Ingestion Failure", description: "The workbook structure is not deterministic." });
       setCurrentStep('INGEST');
-      toast({ variant: "destructive", title: "Ingestion Failure" });
     }
   };
 
-  const handleConfirmMapping = async (mapping: Record<string, string>) => {
-    setIsProcessing(true);
-    setCurrentStep('TRAVERSAL');
-    setAnalysisProgress(20);
-
-    try {
-      let allParsedAssets: Asset[] = [];
-      rawSheetData.forEach((sheet, idx) => {
-        const assets = parseSheetToAssets(sheet.data, activeFileName, sheet.name, mapping);
-        const taggedAssets = assets.map(a => ({
-          ...a,
-          grantId: activeGrantId!,
-          lastModifiedBy: userProfile?.displayName || 'System Import',
-        }));
-        allParsedAssets = [...allParsedAssets, ...taggedAssets];
-        setAnalysisProgress(20 + ((idx + 1) / rawSheetData.length) * 60);
-      });
-
-      await storage.saveToSandbox(allParsedAssets);
-      setStagedAssets(allParsedAssets);
-      setAnalysisProgress(100);
-      setTimeout(() => { setIsProcessing(false); setCurrentStep('RECONCILIATION'); }, 800);
-    } catch (e) {
-      setIsProcessing(false);
-      setCurrentStep('MAPPER');
-      toast({ variant: "destructive", title: "Mapping Failure" });
-    }
-  };
-
-  const handleCommitToRegistry = async () => {
+  const handleCommit = async () => {
     setIsProcessing(true);
     try {
-      for (const asset of stagedAssets) await enqueueMutation('CREATE', 'assets', asset);
-      const currentAssets = await storage.getAssets();
-      await storage.saveAssets([...stagedAssets, ...currentAssets]);
-      await storage.clearSandbox();
-      toast({ title: "Registry Merged", description: `${stagedAssets.length} records pushed.` });
-      setStagedAssets([]);
-      setCurrentStep('INGEST');
+      const validAssets = stagedAssets.filter(a => !a.validation.isRejected);
+      
+      for (const asset of validAssets) {
+        await enqueueMutation('CREATE', 'assets', asset);
+      }
+      
+      const current = await storage.getAssets();
+      await storage.saveAssets([...validAssets, ...current]);
+      
+      toast({ title: "Registry Merged", description: `${validAssets.length} records pushed to production pulse.` });
       await refreshRegistry();
+      setCurrentStep('SUMMARY');
+    } catch (e) {
+      toast({ variant: "destructive", title: "Merge Failure" });
     } finally {
       setIsProcessing(false);
     }
   };
-
-  const currentStepIndex = STEPS.findIndex(s => s.id === currentStep);
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 pb-32">
@@ -168,97 +123,163 @@ export function ImportWorkstation() {
             <div className="p-3 bg-primary/10 rounded-2xl">
               <DatabaseZap className="h-8 w-8 text-primary" />
             </div>
-            Import Wizard
+            Ingestion Center
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Data Engineering & Hierarchical Ingestion Pulse
+            Multi-Profile Registry Engineering & Extraction Pulse
           </p>
         </div>
         {currentStep !== 'INGEST' && (
-          <Button variant="outline" onClick={() => { storage.clearSandbox(); setStagedAssets([]); setCurrentStep('INGEST'); }} className="h-12 px-6 rounded-xl font-black uppercase text-[9px] tracking-widest text-destructive hover:bg-destructive/10 border-2">
-            <Trash2 className="mr-2 h-3.5 w-3.5" /> Discard Pulse
+          <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-12 px-6 rounded-xl font-black uppercase text-[9px] border-2">
+            <Trash2 className="mr-2 h-3.5 w-3.5" /> Discard Run
           </Button>
         )}
-      </div>
-
-      {/* Stepper Pulse */}
-      <div className="px-2 overflow-x-auto pb-4 custom-scrollbar">
-        <div className="flex items-center justify-between relative min-w-[600px] px-4">
-          <div className="absolute top-1/2 left-0 w-full h-0.5 bg-muted/30 -translate-y-1/2 -z-10" />
-          <div className="absolute top-1/2 left-0 h-0.5 bg-primary -translate-y-1/2 -z-10 transition-all duration-700" style={{ width: `${(currentStepIndex / (STEPS.length - 1)) * 100}%` }} />
-          {STEPS.map((step, idx) => (
-            <div key={step.id} className="flex flex-col items-center gap-3">
-              <div className={cn(
-                "h-12 w-12 rounded-2xl flex items-center justify-center transition-all duration-500 border-2", 
-                idx === currentStepIndex ? "bg-primary border-primary text-primary-foreground shadow-xl shadow-primary/20 scale-110" : 
-                idx < currentStepIndex ? "bg-primary/10 border-primary text-primary" : 
-                "bg-card border-border text-muted-foreground opacity-40"
-              )}>
-                {idx < currentStepIndex ? <CheckCircle2 className="h-5 w-5" /> : <step.icon className="h-5 w-5" />}
-              </div>
-              <span className={cn("text-[10px] font-black uppercase tracking-widest transition-colors", idx === currentStepIndex ? "text-primary" : "text-muted-foreground")}>{step.label}</span>
-            </div>
-          ))}
-        </div>
       </div>
 
       <div className="px-2">
         <AnimatePresence mode="wait">
           {currentStep === 'INGEST' && (
-            <motion.div key="step-ingest" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <Card className="border-4 border-dashed border-border/40 bg-card/50 hover:border-primary/40 transition-all rounded-[3rem] p-12 flex flex-col items-center justify-center text-center h-[400px] cursor-pointer group" onClick={() => fileInputRef.current?.click()}>
+            <motion.div key="ingest" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+              <Card className="border-4 border-dashed border-border/40 bg-card/50 hover:border-primary/40 transition-all rounded-[3rem] p-16 flex flex-col items-center justify-center text-center h-[450px] cursor-pointer group" onClick={() => fileInputRef.current?.click()}>
                 <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx,.xls" />
-                <div className="p-10 bg-primary/10 rounded-full w-32 h-32 flex items-center justify-center mb-8 shadow-inner">
-                  <FileUp className="h-16 w-16 text-primary" />
+                <div className="p-10 bg-primary/10 rounded-full mb-8 shadow-inner group-hover:scale-110 transition-transform duration-500">
+                  <FileSpreadsheet className="h-16 w-16 text-primary" />
                 </div>
-                <h3 className="text-3xl font-black uppercase">Upload Pulse</h3>
-                <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl mt-10">Select Registry Workbook</Button>
+                <div className="space-y-4">
+                  <h3 className="text-3xl font-black uppercase">Ingest Workbook</h3>
+                  <p className="text-sm font-medium text-muted-foreground max-w-sm mx-auto italic opacity-70">
+                    The deterministic analyzer supports TB.xlsx and C19 ASSETS.xlsx profiles with full section context preservation.
+                  </p>
+                </div>
+                <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 mt-10">
+                  Select Data Pulse
+                </Button>
               </Card>
             </motion.div>
           )}
 
-          {currentStep === 'TRAVERSAL' && (
+          {currentStep === 'PROCESSING' && (
             <div className="flex flex-col items-center justify-center py-32 text-center space-y-10">
-              <ScanSearch className="h-20 w-20 text-primary animate-pulse" />
+              <div className="p-16 bg-primary/10 rounded-[3rem] animate-pulse">
+                <ScanSearch className="h-20 w-20 text-primary" />
+              </div>
               <div className="space-y-4 max-w-sm w-full">
-                <h3 className="text-2xl font-black uppercase tracking-widest">Processing Pulse</h3>
-                <Progress value={analysisProgress} className="h-2 rounded-full" />
+                <h3 className="text-2xl font-black uppercase tracking-widest">Executing Extraction</h3>
+                <Progress value={progress} className="h-2 rounded-full" />
+                <p className="text-[10px] font-black uppercase text-muted-foreground opacity-60">Building Section Hierarchy...</p>
               </div>
             </div>
           )}
 
-          {currentStep === 'MAPPER' && (
-            <motion.div key="step-mapper" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -20 }}>
-              <div className="flex items-center justify-between mb-8">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-primary rounded-xl shadow-lg"><Columns className="h-5 w-5 text-white" /></div>
-                  <h3 className="text-xl font-black uppercase tracking-tight text-foreground">Interactive Schema Mapper</h3>
+          {currentStep === 'PREVIEW' && (
+            <motion.div key="preview" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
+              {/* Summary Stats Bar */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="p-6 rounded-3xl bg-card border-2 border-border/40 shadow-sm">
+                  <span className="text-[9px] font-black uppercase opacity-40">Profile Pulse</span>
+                  <p className="text-sm font-black text-primary uppercase">{runSummary?.profileId}</p>
                 </div>
-                <Badge variant="outline" className="h-8 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px]">
-                  {detectedHeaders.length} HEADERS DISCOVERED
-                </Badge>
+                <div className="p-6 rounded-3xl bg-card border-2 border-border/40 shadow-sm">
+                  <span className="text-[9px] font-black uppercase opacity-40">Data Records</span>
+                  <p className="text-sm font-black">{runSummary?.dataRowsImported}</p>
+                </div>
+                <div className={cn("p-6 rounded-3xl bg-card border-2 shadow-sm", (runSummary?.duplicatesDetected || 0) > 0 ? "border-destructive/20 bg-destructive/5" : "border-border/40")}>
+                  <span className="text-[9px] font-black uppercase opacity-40">Duplicates</span>
+                  <p className={cn("text-sm font-black", (runSummary?.duplicatesDetected || 0) > 0 ? "text-destructive" : "text-foreground")}>{runSummary?.duplicatesDetected}</p>
+                </div>
+                <div className="p-6 rounded-3xl bg-card border-2 border-border/40 shadow-sm">
+                  <span className="text-[9px] font-black uppercase opacity-40">Rejected</span>
+                  <p className="text-sm font-black text-destructive">{runSummary?.rowsRejected}</p>
+                </div>
               </div>
-              <SchemaMapper headers={detectedHeaders} onConfirm={handleConfirmMapping} isProcessing={isProcessing} />
-            </motion.div>
-          )}
 
-          {currentStep === 'RECONCILIATION' && (
-            <motion.div key="step-recon" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-10">
-              <ReconciliationView assets={stagedAssets} />
-              <Button onClick={() => setCurrentStep('COMMIT')} className="w-full h-20 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl bg-primary text-white gap-4">Proceed to Commit <ChevronRight className="h-5 w-5" /></Button>
-            </motion.div>
-          )}
+              {/* Preview List */}
+              <Card className="rounded-[2.5rem] border-2 border-border/40 overflow-hidden bg-card/50">
+                <CardHeader className="p-8 bg-muted/20 border-b flex flex-row items-center justify-between">
+                  <div className="space-y-1">
+                    <CardTitle className="text-xl font-black uppercase tracking-tight">Sandbox Reconciliation</CardTitle>
+                    <CardDescription className="text-[10px] font-bold uppercase">Source: {runSummary?.sheetName}</CardDescription>
+                  </div>
+                  <Badge variant="outline" className="border-primary/20 bg-primary/5 text-primary font-black px-4 h-8 rounded-full">
+                    {stagedAssets.length} PULSES DISCOVERED
+                  </Badge>
+                </CardHeader>
+                <CardContent className="p-0">
+                  <ScrollArea className="h-[500px]">
+                    <div className="divide-y border-b">
+                      {stagedAssets.map((asset, idx) => (
+                        <div key={idx} className="p-6 flex flex-col md:flex-row md:items-center justify-between gap-6 hover:bg-primary/[0.02] transition-colors">
+                          <div className="flex items-start gap-5">
+                            <div className={cn(
+                              "p-3 rounded-xl shrink-0 shadow-inner",
+                              asset.validation.isRejected ? "bg-red-100 text-red-600" :
+                              asset.validation.needsReview ? "bg-orange-100 text-orange-600" :
+                              "bg-primary/10 text-primary"
+                            )}>
+                              {asset.validation.isRejected ? <AlertTriangle className="h-5 w-5" /> : <ShieldCheck className="h-5 w-5" />}
+                            </div>
+                            <div className="space-y-1">
+                              <h5 className="font-black text-sm uppercase tracking-tight">{asset.description}</h5>
+                              <div className="flex flex-wrap items-center gap-3 text-[9px] font-bold text-muted-foreground uppercase opacity-60">
+                                <span className="flex items-center gap-1"><Layers className="h-2.5 w-2.5" /> {asset.section}</span>
+                                <span className="flex items-center gap-1">•</span>
+                                <span className="font-mono">SN: {asset.serialNumber}</span>
+                              </div>
+                              {asset.validation.duplicateFlags.length > 0 && (
+                                <div className="mt-2 flex gap-2">
+                                  {asset.validation.duplicateFlags.map(f => (
+                                    <Badge key={f} className="bg-destructive text-white text-[7px] font-black uppercase h-4 px-1.5">{f}</Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="shrink-0 flex items-center gap-3">
+                            <Badge variant="outline" className="text-[8px] font-black border-border">ROW {asset.importMetadata.rowNumber}</Badge>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
 
-          {currentStep === 'COMMIT' && (
-            <div className="flex flex-col items-center justify-center py-20 text-center space-y-10">
-              <DatabaseZap className="h-32 w-28 text-muted-foreground opacity-20" />
-              <div className="space-y-6">
-                <h3 className="text-3xl font-black uppercase">Commit Selection</h3>
-                <Button onClick={handleCommitToRegistry} disabled={isProcessing} className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-4 bg-primary text-white">
-                  {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
+              <div className="p-10 rounded-[3rem] bg-primary/5 border-2 border-dashed border-primary/20 flex flex-col md:flex-row items-center justify-between gap-8">
+                <div className="flex items-start gap-4 max-w-lg">
+                  <div className="p-3 bg-white rounded-2xl shadow-sm"><Info className="h-6 w-6 text-primary" /></div>
+                  <div className="space-y-1">
+                    <h5 className="text-xs font-black uppercase tracking-tight">Final Verification Protocol</h5>
+                    <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
+                      Rejected rows (Red) will not be imported. Review rows (Orange) contain warnings or duplicate serials but can still be merged into the registry pulse.
+                    </p>
+                  </div>
+                </div>
+                <Button 
+                  onClick={handleCommit}
+                  disabled={isProcessing}
+                  className="h-16 px-12 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-4 transition-transform hover:scale-105 active:scale-95 min-w-[240px]"
+                >
+                  {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <DatabaseZap className="h-5 w-5" />}
                   Execute Merge Pulse
                 </Button>
               </div>
+            </motion.div>
+          )}
+
+          {currentStep === 'SUMMARY' && (
+            <div className="flex flex-col items-center justify-center py-20 text-center space-y-10">
+              <div className="p-16 bg-green-500/10 rounded-[4rem] shadow-inner text-green-600">
+                <CheckCircle2 className="h-24 w-20" />
+              </div>
+              <div className="space-y-4 max-w-lg">
+                <h3 className="text-3xl font-black uppercase">Ingestion Complete</h3>
+                <p className="text-sm font-medium text-muted-foreground italic leading-relaxed">
+                  Registry pulse successfully reconciled. {runSummary?.dataRowsImported} records have been merged and enqueued for cloud synchronization.
+                </p>
+              </div>
+              <Button onClick={() => setCurrentStep('INGEST')} variant="outline" className="h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest border-2">
+                Return to Center
+              </Button>
             </div>
           )}
         </AnimatePresence>
