@@ -1,204 +1,97 @@
 /**
- * @fileOverview RegistryCard - Source-Aware Professional Register Renderer.
- * Phase 63: Deterministic render with optimized Image and GIS pulse markers.
+ * @fileOverview RegistryCard - High-Fidelity "Quick View" Renderer.
+ * Phase 125: Strictly matched to provided mockup with stacked fields and separators.
  */
 
 import React from 'react';
-import Image from 'next/image';
 import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
+import { MoreVertical, Tag, MapPin, User, FileText, Database } from 'lucide-react';
 import { 
-  Tag, 
-  MapPin, 
-  User, 
-  Activity, 
-  Hash, 
-  Calendar,
-  ShieldCheck,
-  Package,
-  Database,
-  Camera,
-  Cloud,
-  Smartphone,
-  Truck,
-  LayoutGrid,
-  PenTool,
-  Navigation
-} from 'lucide-react';
-import { Checkbox } from '@/components/ui/checkbox';
+  DropdownMenu, 
+  DropdownMenuContent, 
+  DropdownMenuItem, 
+  DropdownMenuTrigger 
+} from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
-import type { AssetRecord, DensityMode } from '@/types/registry';
-import type { Asset } from '@/types/domain';
-import images from '@/app/lib/placeholder-images.json';
+import type { AssetRecord } from '@/types/registry';
 
 interface RegistryCardProps {
   record: AssetRecord;
   onInspect: (id: string) => void;
   selected?: boolean;
   onToggleSelect?: (id: string) => void;
-  densityMode?: DensityMode;
 }
 
-export function RegistryCard({ record, onInspect, selected, onToggleSelect, densityMode = "expanded" }: RegistryCardProps) {
-  const asset = record.rawRow as unknown as Asset;
-
-  const visibleFields = record.fields.filter(f => {
-    const header = record.headers.find(h => h.id === f.headerId);
-    if (!header || !header.visible) return false;
-    if (['sn', 'asset_description', 'row_number'].includes(header.normalizedName)) return false;
-    return true;
-  });
-
-  const descriptionField = record.fields.find(f => {
+export function RegistryCard({ record, onInspect, selected, onToggleSelect }: RegistryCardProps) {
+  // Filter for fields specifically marked for Quick View
+  const quickFields = record.fields.filter(f => {
     const h = record.headers.find(header => header.id === f.headerId);
-    return h?.normalizedName === 'asset_description';
+    return h?.visible && h?.normalizedName !== 'row_number';
   });
-
-  const getSemanticImage = () => {
-    if (asset.photoUrl) return { url: asset.photoUrl };
-    if (asset.photoDataUri) return { url: asset.photoDataUri };
-    
-    const cat = asset.category?.toLowerCase() || '';
-    if (cat.includes('vehicle') || cat.includes('motorcycle')) return images.asset_categories.vehicles;
-    if (cat.includes('computer') || cat.includes('laptop') || cat.includes('it')) return images.asset_categories.it_equipment;
-    if (cat.includes('medical') || cat.includes('device') || cat.includes('truenat')) return images.asset_categories.medical_devices;
-    if (cat.includes('furniture')) return images.asset_categories.furniture;
-    return images.placeholders.default;
-  };
-
-  const imagePulse = getSemanticImage();
 
   return (
     <Card 
       className={cn(
-        "border-2 transition-all duration-300 rounded-[1.5rem] overflow-hidden group cursor-pointer shadow-md tactile-pulse relative",
-        selected ? "bg-primary/5 border-primary shadow-primary/5" : "bg-card hover:border-primary/20"
+        "bg-white border-2 border-border/60 rounded-xl overflow-hidden shadow-sm transition-all hover:shadow-md cursor-pointer",
+        selected ? "ring-2 ring-primary border-primary/40" : ""
       )}
-      style={{ borderLeft: `6px solid ${record.accentColor || 'var(--primary)'}` }}
       onClick={() => onInspect(record.id)}
     >
       <CardContent className="p-0">
-        {/* Top Strip: Primary Identity Anchor & Sync State */}
-        <div className="px-5 py-3 bg-muted/30 border-b flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {onToggleSelect && (
-              <div onClick={(e) => e.stopPropagation()} className="flex items-center justify-center">
-                <Checkbox 
-                  checked={selected} 
-                  onCheckedChange={() => onToggleSelect(record.id)}
-                  className="h-4 w-4 rounded border-2 border-primary/20 bg-background"
-                />
-              </div>
-            )}
-            <div className="flex items-center gap-2">
-              {asset.photoUrl ? <Cloud className="h-3 w-3 text-green-600 animate-pulse" /> : asset.lastModifiedByState ? <Cloud className="h-3 w-3 text-primary opacity-40" /> : <Smartphone className="h-3 w-3 text-muted-foreground opacity-40" />}
-              <span className="text-[9px] font-black uppercase tracking-[0.2em] opacity-60">
-                {asset.photoUrl ? 'Media Cloud Pulse' : asset.lastModifiedByState ? 'Synchronized' : 'Saved on Device'}
-              </span>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {asset.geotag && (
-              <Badge variant="outline" className="h-6 px-2 border-primary/20 bg-primary/5 text-primary">
-                <Navigation className="h-3 w-3" />
-              </Badge>
-            )}
-            {(asset.signatureUrl || asset.signatureDataUri) && (
-              <Badge variant="outline" className="h-6 px-2 border-green-500/20 bg-green-50 text-green-600">
-                <PenTool className="h-3 w-3" />
-              </Badge>
-            )}
-            <div className="h-6 w-6 rounded-lg overflow-hidden border-2 border-primary/20 shadow-sm shrink-0 bg-muted relative">
-              <Image 
-                src={imagePulse.url} 
-                width={600}
-                height={400}
-                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-110" 
-                alt="Asset Evidence" 
-                unoptimized
-              />
-            </div>
-          </div>
-        </div>
-
-        {/* Register Body */}
-        <div className={cn(
-          "p-5 space-y-4",
-          densityMode === 'compact' ? "space-y-2" : "space-y-5"
-        )}>
-          <div className="space-y-1">
-            <label className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-50 flex items-center gap-2">
-              <Tag className="h-2 w-2" /> Asset Identity
-            </label>
-            <p className={cn(
-              "font-black uppercase tracking-tight text-foreground truncate leading-tight transition-colors group-hover:text-primary",
-              densityMode === 'compact' ? "text-sm" : "text-base"
-            )}>
-              {descriptionField?.displayValue || 'Untitled Registry Pulse'}
-            </p>
-          </div>
-
-          <div className={cn(
-            "grid gap-y-4",
-            densityMode === 'compact' ? "grid-cols-2 gap-x-4 gap-y-2" : "grid-cols-1"
-          )}>
-            {visibleFields.slice(0, densityMode === 'compact' ? 4 : 6).map((field) => {
-              const header = record.headers.find(h => h.id === field.headerId);
-              if (!header) return null;
-
-              return (
-                <div key={field.headerId} className="space-y-0.5 border-l-2 border-transparent hover:border-primary/20 pl-2 transition-all">
-                  <label className="text-[7px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-40 flex items-center gap-1.5">
-                    {getFieldIcon(header.normalizedName)}
-                    {header.displayName}
-                  </label>
-                  <p className={cn(
-                    "font-black uppercase tracking-tight text-foreground/90 truncate leading-tight",
-                    densityMode === 'compact' ? "text-[10px]" : "text-sm"
-                  )}>
-                    {field.displayValue}
-                  </p>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Bottom Strip: Source Fidelity */}
-        <div className="px-5 py-3 border-t border-dashed bg-muted/10 flex flex-wrap items-center gap-2">
-          {record.sourceSheet && (
-            <Badge 
-              variant="outline" 
-              className="h-5 px-2 text-[8px] font-black tracking-widest rounded-lg border-2"
-              style={{ borderColor: `${record.accentColor}40`, backgroundColor: `${record.accentColor}10`, color: record.accentColor }}
+        {quickFields.map((field, idx) => {
+          const header = record.headers.find(h => h.id === field.headerId);
+          const isFirst = idx === 0;
+          
+          return (
+            <div 
+              key={field.headerId} 
+              className={cn(
+                "p-4 flex flex-col gap-1 relative",
+                !isFirst && "border-t border-border/40"
+              )}
             >
-              <Database className="h-2 w-2 mr-1" /> {record.sourceSheet}
-            </Badge>
-          )}
-          {record.sn && (
-            <Badge variant="secondary" className="h-5 px-2 text-[8px] font-black tracking-widest rounded-lg bg-muted text-muted-foreground">
-              SN: {record.sn}
-            </Badge>
-          )}
-          <div className="ml-auto text-[7px] font-bold text-muted-foreground/30 uppercase tracking-[0.2em]">
-            Hierarchy Aware Pulse
-          </div>
-        </div>
+              {/* Row info and Menu pulse only on the first field (S/N typically) */}
+              {isFirst && (
+                <div className="absolute top-4 right-4 flex items-center gap-3">
+                  <span className="text-[9px] font-medium text-muted-foreground opacity-60 uppercase tracking-tighter">
+                    Row {record.sourceRow || '---'}
+                  </span>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button className="h-6 w-6 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors">
+                          <MoreVertical className="h-4 w-4" />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="rounded-xl border-2">
+                        <DropdownMenuItem onClick={() => onInspect(record.id)}>Inspect Pulse</DropdownMenuItem>
+                        {onToggleSelect && (
+                          <DropdownMenuItem onClick={() => onToggleSelect(record.id)}>
+                            {selected ? 'Deselect Record' : 'Select for Batch'}
+                          </DropdownMenuItem>
+                        )}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+              )}
+
+              <span className="text-[10px] font-black uppercase tracking-widest text-muted-foreground/60 leading-none">
+                {header?.displayName || 'Unknown Field'}
+              </span>
+              <p className="text-sm font-bold text-foreground leading-tight truncate pr-16">
+                {field.displayValue || '---'}
+              </p>
+            </div>
+          );
+        })}
+        
+        {/* Visual Source Indicator at Base */}
+        <div 
+          className="h-1.5 w-full opacity-80" 
+          style={{ backgroundColor: record.accentColor || 'var(--primary)' }} 
+        />
       </CardContent>
     </Card>
   );
-}
-
-function getFieldIcon(key: string) {
-  switch(key) {
-    case 'location': return <MapPin className="h-2.5 w-2.5" />;
-    case 'assignee_location': return <User className="h-2.5 w-2.5" />;
-    case 'asset_id_code': return <Hash className="h-2.5 w-2.5" />;
-    case 'condition': return <Activity className="h-2.5 w-2.5" />;
-    case 'serial_number': return <ShieldCheck className="h-2.5 w-2.5" />;
-    case 'asset_class': return <Package className="h-2.5 w-2.5" />;
-    case 'manufacturer': return <Truck className="h-2.5 w-2.5" />;
-    case 'date_purchased_received': return <Calendar className="h-2.5 w-2.5" />;
-    default: return <Database className="h-2.5 w-2.5" />;
-  }
 }

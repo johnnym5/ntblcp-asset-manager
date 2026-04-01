@@ -1,11 +1,9 @@
-
 /**
- * @fileOverview AssetDetailSheet - High-Fidelity Detail Workstation.
- * Phase 63: Deterministic render without AI metadata hints.
+ * @fileOverview AssetDetailSheet - High-Fidelity "Full View" Workstation.
+ * Phase 125: Overhauled to match the professional stacked field aesthetic.
  */
 
-import React, { useState } from 'react';
-import Image from 'next/image';
+import React from 'react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFooter, SheetClose } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -15,26 +13,13 @@ import {
   ChevronRight, 
   Edit3, 
   Share2, 
-  Trash2, 
-  Tag, 
-  MapPin, 
-  User, 
-  Calendar, 
-  History, 
-  Info,
   Database,
-  ShieldCheck,
-  X,
-  Camera,
-  Navigation,
-  FileDown,
-  Loader2,
-  PenTool
+  Tag,
+  MapPin,
+  X
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import type { AssetRecord, RegistryFieldValue } from '@/types/registry';
-import type { Asset } from '@/types/domain';
-import { PdfService } from '@/services/pdf-service';
+import type { AssetRecord } from '@/types/registry';
 
 interface AssetDetailSheetProps {
   isOpen: boolean;
@@ -45,210 +30,111 @@ interface AssetDetailSheetProps {
   onPrevious?: () => void;
 }
 
-const DetailField = ({ label, value, icon: Icon, isFullWidth = false }: { label: string, value: string, icon?: any, isFullWidth?: boolean }) => (
+const FullViewField = ({ label, value, isLast }: { label: string, value: string, isLast?: boolean }) => (
   <div className={cn(
-    "p-5 rounded-[1.5rem] bg-muted/30 border-2 border-transparent hover:border-primary/10 transition-all space-y-1.5",
-    isFullWidth ? "col-span-2" : "col-span-1"
+    "p-6 flex flex-col gap-1 relative transition-colors hover:bg-muted/5",
+    !isLast && "border-b border-border/40"
   )}>
-    <div className="flex items-center gap-2 opacity-40">
-      {Icon && <Icon className="h-2.5 w-2.5" />}
-      <span className="text-[8px] font-black uppercase tracking-[0.2em]">{label}</span>
-    </div>
-    <div className="text-sm font-black uppercase tracking-tight text-foreground leading-tight">
+    <span className="text-[10px] font-black uppercase tracking-[0.25em] text-muted-foreground opacity-60 leading-none">
+      {label}
+    </span>
+    <p className="text-base font-black uppercase tracking-tight text-foreground leading-tight">
       {value || '---'}
-    </div>
+    </p>
   </div>
 );
 
 export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext, onPrevious }: AssetDetailSheetProps) {
-  const [isExporting, setIsExporting] = useState(false);
-
   if (!record) return null;
-  const asset = record.rawRow as unknown as Asset;
-
-  const getFieldValue = (normalizedName: string) => {
-    const field = record.fields.find(f => {
-      const header = record.headers.find(h => h.id === f.headerId);
-      return header?.normalizedName === normalizedName;
-    });
-    return field?.displayValue || '---';
-  };
-
-  const handlePdfExport = async () => {
-    setIsExporting(true);
-    try {
-      await PdfService.exportTechnicalProfile(asset);
-    } finally {
-      setIsExporting(false);
-    }
-  };
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
       <SheetContent side="right" className="w-full sm:max-w-2xl flex flex-col p-0 border-none rounded-l-[2.5rem] shadow-2xl bg-background overflow-hidden">
-        {/* Navigation Strip */}
+        {/* Command Strip */}
         <SheetHeader className="p-0 space-y-0">
-          <div className="flex items-center justify-between p-4 border-b bg-background/80 backdrop-blur-md z-30">
-            <div className="flex items-center gap-3">
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-10 w-10">
-                <ChevronLeft className="h-5 w-5" />
+          <div className="flex items-center justify-between p-6 border-b bg-background/80 backdrop-blur-md z-30">
+            <div className="flex items-center gap-4">
+              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-12 w-12 bg-muted/20">
+                <X className="h-6 w-6" />
               </Button>
               <div className="flex flex-col">
-                <SheetTitle className="text-sm font-black tracking-tight uppercase leading-none truncate max-w-[180px]">
-                  {record.sn || record.id.split('-')[0]} Pulse
+                <SheetTitle className="text-xl font-black tracking-tighter uppercase leading-none truncate max-w-[240px]">
+                  Full Asset Pulse
                 </SheetTitle>
-                <SheetDescription className="text-[8px] font-black uppercase text-muted-foreground tracking-[0.2em] mt-1 opacity-60">Record Analysis</SheetDescription>
+                <SheetDescription className="text-[9px] font-black uppercase text-primary tracking-[0.3em] mt-1.5">
+                  Fidelity Analysis & Forensic Record
+                </SheetDescription>
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <div className="flex items-center bg-muted/50 rounded-xl p-1">
-                <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-8 w-8 rounded-lg"><ChevronLeft className="h-4 w-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-8 w-8 rounded-lg"><ChevronRight className="h-4 w-4" /></Button>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center bg-muted/50 rounded-2xl p-1.5 border border-border/40">
+                <Button variant="ghost" size="icon" onClick={onPrevious} disabled={!onPrevious} className="h-10 w-10 rounded-xl"><ChevronLeft className="h-5 w-5" /></Button>
+                <div className="w-px h-6 bg-border/40 mx-1" />
+                <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-10 w-10 rounded-xl"><ChevronRight className="h-5 w-5" /></Button>
               </div>
-              <Button variant="ghost" size="icon" onClick={handlePdfExport} disabled={isExporting} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10">
-                {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <FileDown className="h-5 w-5" />}
-              </Button>
-              <Button variant="ghost" size="icon" onClick={() => onEdit(record.id)} className="text-primary h-10 w-10 rounded-xl hover:bg-primary/10"><Edit3 className="h-5 w-5" /></Button>
+              <Button variant="outline" size="icon" className="h-12 w-12 rounded-2xl border-2"><Share2 className="h-5 w-5" /></Button>
             </div>
           </div>
         </SheetHeader>
 
         <ScrollArea className="flex-1 bg-background custom-scrollbar">
-          <div className="pb-32">
-            {/* Visual Evidence Pulse */}
-            {(asset.photoUrl || asset.photoDataUri) && (
-              <div className="px-8 pt-8">
-                <div className="relative group aspect-video bg-muted rounded-[2rem] overflow-hidden border-2 border-primary/10 shadow-lg">
-                  <Image 
-                    src={asset.photoUrl || asset.photoDataUri || ''} 
-                    width={600}
-                    height={400}
-                    className="w-full h-full object-cover" 
-                    alt="Asset Evidence" 
-                    unoptimized
+          <div className="pb-40">
+            {/* Source Identity Badge */}
+            <div className="px-6 pt-8 pb-4">
+              <Badge 
+                variant="outline" 
+                className="h-8 px-4 text-[10px] font-black uppercase tracking-widest rounded-full border-2"
+                style={{ borderColor: `${record.accentColor}40`, backgroundColor: `${record.accentColor}10`, color: record.accentColor }}
+              >
+                <Database className="h-3.5 w-3.5 mr-2" /> {record.sourceSheet || 'REGISTRY AUTHORITY'}
+              </Badge>
+            </div>
+
+            {/* Structured "Full View" Field Stack */}
+            <div className="bg-card/30">
+              {record.fields.map((field, idx) => {
+                const header = record.headers.find(h => h.id === field.headerId);
+                return (
+                  <FullViewField 
+                    key={field.headerId} 
+                    label={header?.displayName || 'Technical Parameter'} 
+                    value={field.displayValue} 
+                    isLast={idx === record.fields.length - 1}
                   />
-                  <Badge className="absolute bottom-4 left-4 bg-primary/90 backdrop-blur-md font-black uppercase text-[8px] tracking-[0.2em] px-3 h-6 rounded-lg">
-                    <Camera className="h-3 w-3 mr-2" /> VERIFIED VISUAL PULSE
-                  </Badge>
+                );
+              })}
+            </div>
+
+            {/* Audit Metadata Pulse */}
+            <div className="p-8 border-t border-dashed mt-10 space-y-6 bg-muted/5">
+              <div className="flex items-center gap-3 opacity-40">
+                <Tag className="h-4 w-4" />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em]">System Traceability Pulse</span>
+              </div>
+              <div className="grid grid-cols-2 gap-6">
+                <div className="space-y-1">
+                  <span className="text-[8px] font-black uppercase text-muted-foreground">Internal UUID</span>
+                  <p className="font-mono text-[10px] font-bold">{record.id}</p>
                 </div>
-              </div>
-            )}
-
-            {/* Primary ID Pulse */}
-            <div className="p-8 space-y-6">
-              <div className="flex flex-col gap-2">
-                <Badge variant="outline" className="w-fit h-6 px-3 text-[8px] font-black uppercase tracking-widest border-primary/20 bg-primary/5 text-primary">
-                  {record.sectionName || 'Primary Asset'}
-                </Badge>
-                <h2 className="text-3xl font-black tracking-tighter uppercase text-foreground leading-none">
-                  {getFieldValue('asset_description')}
-                </h2>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <DetailField label="Tag ID Code" value={getFieldValue('asset_id_code')} icon={Tag} />
-                <DetailField label="Manufacturer Serial" value={getFieldValue('serial_number')} icon={ShieldCheck} />
-              </div>
-            </div>
-
-            {/* Spatial Pulse */}
-            {asset.geotag && (
-              <>
-                <div className="px-8 py-4 bg-muted/20 border-y border-border/40 flex items-center gap-3">
-                  <Navigation className="h-4 w-4 text-primary opacity-60" />
-                  <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Spatial Field Protocol</h4>
-                </div>
-                <div className="p-8 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
-                    <DetailField label="Latitude Anchor" value={asset.geotag.lat.toFixed(6)} icon={MapPin} />
-                    <DetailField label="Longitude Anchor" value={asset.geotag.lng.toFixed(6)} icon={MapPin} />
-                  </div>
-                  <div className="p-5 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 flex items-center justify-between">
-                    <div className="space-y-1">
-                      <span className="text-[8px] font-black uppercase opacity-40">Anchor Precision</span>
-                      <p className="text-xs font-bold text-primary">+/- {Math.round(asset.geotag.accuracy)} Meters</p>
-                    </div>
-                    <Badge variant="outline" className="h-6 px-2 text-[8px] font-black uppercase border-primary/20">Verified GPS Pulse</Badge>
-                  </div>
-                </div>
-              </>
-            )}
-
-            {/* Forensic Receipt Pulse */}
-            <div className="px-8 py-4 bg-muted/20 border-y border-border/40 flex items-center gap-3">
-              <PenTool className="h-4 w-4 text-primary opacity-60" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Verification Receipt</h4>
-            </div>
-            <div className="p-8">
-              <div className="p-6 rounded-[2rem] bg-card border-2 border-dashed border-border/40 shadow-inner flex flex-col items-center justify-center text-center">
-                {asset.signatureUrl || asset.signatureDataUri ? (
-                  <div className="space-y-4 w-full">
-                    <Image 
-                      src={asset.signatureUrl || asset.signatureDataUri || ''} 
-                      width={600}
-                      height={200}
-                      className="max-h-24 mx-auto mix-blend-multiply opacity-80" 
-                      alt="Custodian Signature" 
-                      unoptimized
-                    />
-                    <div className="h-px bg-border/40 w-1/2 mx-auto" />
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground opacity-60">Custodian Signature Anchor</p>
-                  </div>
-                ) : (
-                  <div className="py-6 opacity-20 space-y-2">
-                    <PenTool className="h-10 w-10 mx-auto" />
-                    <p className="text-[10px] font-black uppercase tracking-widest">No Signature Captured</p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Regional Pulse */}
-            <div className="px-8 py-4 bg-muted/20 border-y border-border/40 flex items-center gap-3">
-              <MapPin className="h-4 w-4 text-primary opacity-60" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Regional Scope & Context</h4>
-            </div>
-            <div className="p-8 grid grid-cols-2 gap-4">
-              <DetailField label="Physical Location" value={getFieldValue('location')} icon={MapPin} />
-              <DetailField label="Assigned Auditor" value={getFieldValue('assignee_location')} icon={User} />
-              <DetailField label="Field Condition" value={getFieldValue('condition')} icon={History} />
-              <DetailField label="Verification Status" value={getFieldValue('verification_status')} icon={ShieldCheck} />
-            </div>
-
-            {/* Source Provenance Pulse */}
-            <div className="px-8 py-4 bg-muted/20 border-y border-border/40 flex items-center gap-3">
-              <Info className="h-4 w-4 text-primary opacity-60" />
-              <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Fidelity & Provenance</h4>
-            </div>
-            <div className="p-8 grid grid-cols-2 gap-4 opacity-60">
-              <DetailField label="Source Sheet" value={record.sourceSheet || '---'} />
-              <DetailField label="Source Row" value={String(record.sourceRow || '---')} />
-              <DetailField label="Temporal Subsection" value={record.subsectionName || '---'} />
-              <DetailField label="Asset Family" value={record.assetFamily || '---'} />
-            </div>
-
-            {/* Remarks Pulse */}
-            <div className="p-8 border-t border-dashed">
-              <div className="space-y-3">
-                <label className="text-[9px] font-black uppercase tracking-0.3em opacity-40">Auditor Field Remarks</label>
-                <div className="p-6 rounded-[2rem] bg-muted/10 border-2 border-dashed font-medium text-xs leading-relaxed italic">
-                  {getFieldValue('remarks') || 'Zero supplementary pulses recorded for this entry.'}
+                <div className="space-y-1">
+                  <span className="text-[8px] font-black uppercase text-muted-foreground">Registry Row</span>
+                  <p className="font-mono text-[10px] font-bold"># {record.sourceRow || 'Manual'}</p>
                 </div>
               </div>
             </div>
           </div>
         </ScrollArea>
 
-        <SheetFooter className="p-8 bg-background/80 backdrop-blur-xl border-t flex flex-row items-center gap-3 absolute bottom-0 left-0 right-0 z-40">
+        <SheetFooter className="p-8 bg-background/80 backdrop-blur-xl border-t flex flex-row items-center gap-4 absolute bottom-0 left-0 right-0 z-40">
           <SheetClose asChild>
-            <Button variant="ghost" className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl">Close Profile</Button>
+            <Button variant="ghost" className="flex-1 h-16 font-black uppercase text-xs tracking-widest rounded-[1.5rem]">Close Profile</Button>
           </SheetClose>
           <Button 
             onClick={() => onEdit(record.id)}
-            className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest shadow-2xl shadow-primary/30 rounded-2xl bg-primary text-primary-foreground"
+            className="flex-1 h-16 rounded-[1.5rem] font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/30 bg-primary text-primary-foreground gap-3 transition-transform hover:scale-105 active:scale-95"
           >
-            Audit Record
+            <Edit3 className="h-5 w-5" /> Audit Record Pulse
           </Button>
         </SheetFooter>
       </SheetContent>
