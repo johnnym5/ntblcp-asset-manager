@@ -3,6 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Master Settings Manager.
  * Phase 235: Resolved ReferenceErrors and synchronized import paths.
+ * Phase 236: Implemented handleCommitChanges and strict RBAC visibility.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -136,6 +137,8 @@ export function SettingsWorkstation() {
     }
   }, [appSettings]);
 
+  const isAdmin = userProfile?.isAdmin || false;
+
   const hasChanges = useMemo(() => {
     return JSON.stringify(appSettings) !== JSON.stringify(draftSettings);
   }, [appSettings, draftSettings]);
@@ -143,6 +146,24 @@ export function SettingsWorkstation() {
   const handleSettingChange = (key: keyof AppSettings, value: any) => {
     if (!draftSettings) return;
     setDraftSettings(prev => prev ? ({ ...prev, [key]: value }) : null);
+  };
+
+  const handleCommitChanges = async () => {
+    if (!draftSettings) return;
+    setIsSaving(true);
+    try {
+      await storage.saveSettings(draftSettings);
+      if (isOnline) {
+        await FirestoreService.updateSettings(draftSettings);
+      }
+      setAppSettings(draftSettings);
+      toast({ title: "Configuration Applied", description: "Global registry settings have been synchronized." });
+      await refreshRegistry();
+    } catch (e) {
+      toast({ variant: "destructive", title: "Save Interrupted", description: "Connectivity pulse lost during commit." });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const handleAddProject = () => {
@@ -258,15 +279,21 @@ export function SettingsWorkstation() {
             <TabsTrigger value="general" className="flex-1 px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
               <Settings className="h-3.5 w-3.5" /> General
             </TabsTrigger>
-            <TabsTrigger value="projects" className="flex-1 px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-              <PlusCircle className="h-3.5 w-3.5" /> Projects & Sheets
-            </TabsTrigger>
-            <TabsTrigger value="users" className="flex-1 px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-              <Users className="h-3.5 w-3.5" /> Users
-            </TabsTrigger>
-            <TabsTrigger value="history" className="flex-1 px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-              <History className="h-3.5 w-3.5" /> History
-            </TabsTrigger>
+            {isAdmin && (
+              <TabsTrigger value="projects" className="flex-1 px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
+                <PlusCircle className="h-3.5 w-3.5" /> Projects & Sheets
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="users" className="flex-1 px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
+                <Users className="h-3.5 w-3.5" /> Users
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="history" className="flex-1 px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
+                <History className="h-3.5 w-3.5" /> History
+              </TabsTrigger>
+            )}
           </TabsList>
         </div>
 
@@ -337,7 +364,7 @@ export function SettingsWorkstation() {
           </div>
 
           {/* Global Admin Section */}
-          {userProfile?.isAdmin && (
+          {isAdmin && (
             <div className="space-y-6">
               <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Global Admin Settings</h3>
               <Card className="bg-[#050505] border-white/5 rounded-[1.5rem] overflow-hidden shadow-xl">
@@ -375,108 +402,118 @@ export function SettingsWorkstation() {
 
         {/* --- 4. PROJECTS & SHEETS TAB --- */}
         <TabsContent value="projects" className="space-y-10 m-0 animate-in fade-in slide-in-from-bottom-2">
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
-              <h3 className="text-xl font-black uppercase text-white tracking-tight">Manage Projects</h3>
-              <div className="flex gap-3">
-                <Input placeholder="New project name..." value={newProjectName} onChange={e => setNewProjectName(e.target.value)} className="h-14 bg-white/[0.03] border-white/10 rounded-xl font-medium text-sm text-white" />
-                <Button onClick={handleAddProject} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl shadow-primary/20">
-                  <PlusCircle className="h-4 w-4" /> Add Project
-                </Button>
+          {isAdmin && (
+            <div className="space-y-6">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
+                <h3 className="text-xl font-black uppercase text-white tracking-tight">Manage Projects</h3>
+                <div className="flex gap-3">
+                  <Input placeholder="New project name..." value={newProjectName} onChange={e => setNewProjectName(e.target.value)} className="h-14 bg-white/[0.03] border-white/10 rounded-xl font-medium text-sm text-white" />
+                  <Button onClick={handleAddProject} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl shadow-primary/20">
+                    <PlusCircle className="h-4 w-4" /> Add Project
+                  </Button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 gap-6">
+                {draftSettings.grants.map(grant => {
+                  const isActive = draftSettings.activeGrantId === grant.id;
+                  return (
+                    <Card key={grant.id} className={cn(
+                      "bg-[#050505] border-2 rounded-[2rem] overflow-hidden shadow-xl transition-all duration-500",
+                      isActive ? "border-primary/40 ring-4 ring-primary/5" : "border-white/5"
+                    )}>
+                      <CardHeader className="p-8 pb-4">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-4">
+                            <ChevronsUpDown className="h-4 w-4 text-white/20" />
+                            <span className="text-xl font-black uppercase text-white tracking-tight">{grant.name}</span>
+                            {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
+                          </div>
+                          <div className="flex items-center gap-6">
+                            {!isActive && (
+                              <button onClick={() => handleSettingChange('activeGrantId', grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80 transition-opacity">Set Active</button>
+                            )}
+                            <button className="text-[10px] font-black uppercase tracking-widest text-white/40">Rename</button>
+                            <button onClick={() => handleDeleteProject(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500">Delete</button>
+                          </div>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-8 pt-4 space-y-8">
+                        <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40">Sheet Definitions</h4>
+                        <div className="space-y-2.5">
+                          {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
+                            <div key={sheetName} className="flex items-center justify-between p-5 bg-black border border-white/5 rounded-2xl group hover:border-white/20 transition-all shadow-inner">
+                              <span className="text-xs font-black uppercase text-white/80">{sheetName}</span>
+                              <div className="flex items-center gap-5 text-white/20">
+                                <button className="hover:text-white transition-colors"><Eye className="h-4 w-4" /></button>
+                                <button onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setOriginalSheetName(sheetName); setIsColumnSheetOpen(true); }} className="hover:text-primary transition-colors"><Wrench className="h-4 w-4" /></button>
+                                <button onClick={() => handleDeleteSheet(grant.id, sheetName)} className="hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                        {isActive && (
+                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                            <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
+                              <PlusCircle className="h-4 w-4" /> Add Manually
+                            </Button>
+                            <input type="file" ref={templateInputRef} onChange={handleTemplateDiscovery} className="hidden" accept=".xlsx,.xls" />
+                            <Button variant="outline" onClick={() => templateInputRef.current?.click()} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
+                              <FileUp className="h-4 w-4" /> Import Template
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
+                              <ScanSearch className="h-4 w-4" /> Scan & Import Data
+                            </Button>
+                          </div>
+                        )}
+                      </CardContent>
+                    </Card>
+                  );
+                })}
               </div>
             </div>
-
-            <div className="grid grid-cols-1 gap-6">
-              {draftSettings.grants.map(grant => {
-                const isActive = draftSettings.activeGrantId === grant.id;
-                return (
-                  <Card key={grant.id} className={cn(
-                    "bg-[#050505] border-2 rounded-[2rem] overflow-hidden shadow-xl transition-all duration-500",
-                    isActive ? "border-primary/40 ring-4 ring-primary/5" : "border-white/5"
-                  )}>
-                    <CardHeader className="p-8 pb-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4">
-                          <ChevronsUpDown className="h-4 w-4 text-white/20" />
-                          <span className="text-xl font-black uppercase text-white tracking-tight">{grant.name}</span>
-                          {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
-                        </div>
-                        <div className="flex items-center gap-6">
-                          {!isActive && (
-                            <button onClick={() => handleSettingChange('activeGrantId', grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80 transition-opacity">Set Active</button>
-                          )}
-                          <button className="text-[10px] font-black uppercase tracking-widest text-white/40">Rename</button>
-                          <button onClick={() => handleDeleteProject(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500">Delete</button>
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-8 pt-4 space-y-8">
-                      <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40">Sheet Definitions</h4>
-                      <div className="space-y-2.5">
-                        {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
-                          <div key={sheetName} className="flex items-center justify-between p-5 bg-black border border-white/5 rounded-2xl group hover:border-white/20 transition-all shadow-inner">
-                            <span className="text-xs font-black uppercase text-white/80">{sheetName}</span>
-                            <div className="flex items-center gap-5 text-white/20">
-                              <button className="hover:text-white transition-colors"><Eye className="h-4 w-4" /></button>
-                              <button onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setOriginalSheetName(sheetName); setIsColumnSheetOpen(true); }} className="hover:text-primary transition-colors"><Wrench className="h-4 w-4" /></button>
-                              <button onClick={() => handleDeleteSheet(grant.id, sheetName)} className="hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                      {isActive && (
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
-                            <PlusCircle className="h-4 w-4" /> Add Manually
-                          </Button>
-                          <input type="file" ref={templateInputRef} onChange={handleTemplateDiscovery} className="hidden" accept=".xlsx,.xls" />
-                          <Button variant="outline" onClick={() => templateInputRef.current?.click()} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
-                            <FileUp className="h-4 w-4" /> Import Template
-                          </Button>
-                          <Button variant="outline" onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
-                            <ScanSearch className="h-4 w-4" /> Scan & Import Data
-                          </Button>
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          </div>
+          )}
         </TabsContent>
 
         {/* --- 5. USERS TAB --- */}
         <TabsContent value="users" className="m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
-          <h3 className="text-xl font-black uppercase text-white tracking-tight mb-6">User Management</h3>
-          <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 shadow-xl">
-            <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
-          </Card>
+          {isAdmin && (
+            <>
+              <h3 className="text-xl font-black uppercase text-white tracking-tight mb-6">User Management</h3>
+              <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 shadow-xl">
+                <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
+              </Card>
+            </>
+          )}
         </TabsContent>
 
         {/* --- 6. HISTORY TAB --- */}
         <TabsContent value="history" className="space-y-10 m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
-          <h3 className="text-xl font-black uppercase text-white tracking-tight">System History & Health</h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-            <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 space-y-6 shadow-xl">
-              <h4 className="text-sm font-black uppercase text-white">Register Synchronization</h4>
-              <div className="space-y-3">
-                <Button variant="outline" onClick={refreshRegistry} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-6 border-white/10">
-                  <RefreshCw className="h-4 w-4 text-primary" /> Sync Local to Cloud Database
-                </Button>
-                <Button variant="outline" onClick={refreshRegistry} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-6 border-white/10">
-                  <Download className="h-4 w-4 text-primary" /> Pull Cloud State to Register
-                </Button>
-              </div>
-            </Card>
+          {isAdmin && (
+            <>
+              <h3 className="text-xl font-black uppercase text-white tracking-tight">System History & Health</h3>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 space-y-6 shadow-xl">
+                  <h4 className="text-sm font-black uppercase text-white">Register Synchronization</h4>
+                  <div className="space-y-3">
+                    <Button variant="outline" onClick={refreshRegistry} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-6 border-white/10">
+                      <RefreshCw className="h-4 w-4 text-primary" /> Sync Local to Cloud Database
+                    </Button>
+                    <Button variant="outline" onClick={refreshRegistry} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-6 border-white/10">
+                      <Download className="h-4 w-4 text-primary" /> Pull Cloud State to Register
+                    </Button>
+                  </div>
+                </Card>
 
-            <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 space-y-6 shadow-xl">
-              <h4 className="text-sm font-black uppercase text-white">Maintenance Pulses</h4>
-              <Button variant="outline" onClick={() => setIsNukeDialogOpen(true)} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-6 border-destructive/20 text-destructive hover:bg-destructive/5 transition-all">
-                <Bomb className="h-4 w-4" /> Reset Global Asset Register
-              </Button>
-            </Card>
-          </div>
+                <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 space-y-6 shadow-xl">
+                  <h4 className="text-sm font-black uppercase text-white">Maintenance Pulses</h4>
+                  <Button variant="outline" onClick={() => setIsNukeDialogOpen(true)} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-6 border-destructive/20 text-destructive hover:bg-destructive/5 transition-all">
+                    <Bomb className="h-4 w-4" /> Reset Global Asset Register
+                  </Button>
+                </Card>
+              </div>
+            </>
+          )}
         </TabsContent>
       </Tabs>
 

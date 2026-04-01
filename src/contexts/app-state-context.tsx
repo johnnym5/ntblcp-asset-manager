@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 170: Hardened manual sync triggers with deterministic feedback.
+ * Phase 171: Implemented state-scoped downloads for regional isolation.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react';
@@ -200,8 +201,14 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       addNotification({ title: "Offline Pulse", description: "Internet connection required for cloud pull.", variant: "destructive" });
       return;
     }
+
+    // RBAC: Identify the authorized regional scope for the current session
+    const userSession = localStorage.getItem('assetain-user-session');
+    const profile = userSession ? JSON.parse(userSession) : null;
+    const stateScope = (profile && !profile.isAdmin) ? profile.state : undefined;
+
     setIsSyncing(true);
-    toast({ title: "Reconciling Authority...", description: "Fetching latest project scope from cloud." });
+    toast({ title: "Reconciling Authority...", description: stateScope ? `Fetching latest records for ${stateScope}.` : "Fetching latest project scope from cloud." });
     
     try {
       const remoteSettings = await FirestoreService.getSettings();
@@ -210,9 +217,15 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         await storage.saveSettings(remoteSettings);
         
         if (remoteSettings.activeGrantId) {
-          const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId);
+          // Pulse: Fetch only state-specific assets if the user is not an admin
+          const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId, stateScope);
           const localAssets = await storage.getAssets();
-          const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
+          
+          // Merge logic: Keep assets from other projects/states, overwrite active scope
+          const otherAssets = stateScope
+            ? localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId || (a.location || '').toLowerCase() !== stateScope.toLowerCase())
+            : localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
+            
           await storage.saveAssets([...otherAssets, ...remoteAssets]);
           
           addNotification({ 

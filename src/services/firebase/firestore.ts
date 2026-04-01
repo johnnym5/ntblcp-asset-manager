@@ -1,6 +1,7 @@
 /**
  * @fileOverview Hardened Firestore Service.
  * Phase 105: Reinforced Manual Tiered Sync (Local -> Firestore -> RTDB).
+ * Phase 106: Added state-scoped asset retrieval for regional isolation.
  */
 
 import { 
@@ -68,14 +69,22 @@ export const FirestoreService = {
 
   /**
    * Fetches assets for the active project scope.
+   * Supports regional state-locking for non-admin downloads.
    */
-  async getProjectAssets(grantId: string): Promise<Asset[]> {
+  async getProjectAssets(grantId: string, stateScope?: string): Promise<Asset[]> {
     if (!db) return [];
     const assetsRef = collection(db, 'assets');
     
-    const q = grantId === 'ALL_PROJECTS' 
-      ? query(assetsRef)
-      : query(assetsRef, where('grantId', '==', grantId));
+    let q;
+    if (grantId === 'ALL_PROJECTS') {
+      q = stateScope 
+        ? query(assetsRef, where('location', '==', stateScope))
+        : query(assetsRef);
+    } else {
+      q = stateScope
+        ? query(assetsRef, where('grantId', '==', grantId), where('location', '==', stateScope))
+        : query(assetsRef, where('grantId', '==', grantId));
+    }
 
     try {
       const snap = await getDocs(q);
