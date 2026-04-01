@@ -1,7 +1,7 @@
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements the two-stage structural discovery and ingestion process.
- * Phase 200: Hardened for high-volume (14k+) registers with sticky templates.
+ * Phase 260: Authoritatively using Sheet Name as Category for group-card parity.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -201,10 +201,10 @@ export class ParserEngine {
   private mapRow(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
     const asset: any = {
       id: uuidv4(),
-      category: group,
+      category: sheet, // Use Sheet Name as the primary Group/Category (matches user screenshot requirements)
       description: '',
       grantId: 'STAGED', 
-      section: group,
+      section: group, // Use Discovered Column A Group Header as the internal Section
       subsection: 'Base Register',
       assetFamily: 'Uncategorized',
       status: 'UNVERIFIED',
