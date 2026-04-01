@@ -11,6 +11,37 @@ import { HEADER_DEFINITIONS } from '@/lib/constants';
 import type { Asset } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 
+/**
+ * Normalizes source headers for comparison.
+ */
+const normalizeHeader = (header: any): string => {
+  if (header === null || header === undefined) return '';
+  return String(header).trim().toUpperCase().replace(/\s+/g, ' ');
+};
+
+/**
+ * Deterministically locates the header row index.
+ */
+const findHeaderRowIndex = (sheetData: any[][], definitiveHeaders: string[], startRow: number = 0): number => {
+  if (!definitiveHeaders || !Array.isArray(definitiveHeaders)) return -1;
+  
+  const normalizedDefinitiveHeaders = definitiveHeaders.map(normalizeHeader);
+  
+  for (let i = startRow; i < Math.min(sheetData.length, startRow + 50); i++) {
+    const row = sheetData[i];
+    if (!Array.isArray(row) || row.length === 0) continue;
+
+    const normalizedRow = row.map(normalizeHeader);
+    const matchCount = normalizedDefinitiveHeaders.filter(h => normalizedRow.includes(h)).length;
+    
+    // High-fidelity match threshold (70%)
+    if (matchCount / normalizedDefinitiveHeaders.length >= 0.7) {
+      return i;
+    }
+  }
+  return -1;
+};
+
 export const ExcelService = {
   /**
    * Parses an Excel file into strictly-typed hierarchical assets.
@@ -68,7 +99,7 @@ export const ExcelService = {
       } else {
         // Fallback to static definitions
         const definition = HEADER_DEFINITIONS[category] || HEADER_DEFINITIONS['NTBLCP-TB-FAR'];
-        if (definition) {
+        if (definition && definition.headers) {
           exportHeaders = definition.headers.map(h => ({
             key: h.toLowerCase().replace(/ /g, '_'),
             label: h
