@@ -162,8 +162,12 @@ export default function AssetRegistryPage() {
     try {
       await ExcelService.exportRegistry(assets, headers);
       toast({ title: "Excel Pulse Complete", description: "Registry data exported with template alignment." });
-    } catch (e) {
-      toast({ variant: "destructive", title: "Export Failed" });
+    } catch (e: any) {
+      toast({ 
+        variant: "destructive", 
+        title: "Export Failed", 
+        description: e.message || "Workbook creation interrupted." 
+      });
     } finally {
       setIsExportingExcel(false);
     }

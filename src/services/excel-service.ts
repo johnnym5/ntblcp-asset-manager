@@ -38,6 +38,10 @@ export const ExcelService = {
     activeHeaders?: RegistryHeader[],
     fileName: string = `Registry-Export-${new Date().toISOString().split('T')[0]}.xlsx`
   ) {
+    if (!assets || assets.length === 0) {
+      throw new Error("Registry is empty. No data pulses available for export.");
+    }
+
     const workbook = XLSX.utils.book_new();
 
     // Group assets by category to create separate sheets
@@ -95,7 +99,7 @@ export const ExcelService = {
             case 'subsection_name': row[label] = asset.subsection; break;
             case 'status': row[label] = asset.status; break;
             default:
-              row[label] = (asset.metadata as any)[key] || '';
+              row[label] = (asset.metadata as any)?.[key] || '';
           }
         });
 
@@ -106,6 +110,10 @@ export const ExcelService = {
         header: exportHeaders.map(h => h.label) 
       });
       XLSX.utils.book_append_sheet(workbook, worksheet, category.substring(0, 31));
+    }
+
+    if (workbook.SheetNames.length === 0) {
+      throw new Error("Workbook creation failed. No valid sheets produced.");
     }
 
     const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });

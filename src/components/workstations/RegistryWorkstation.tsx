@@ -123,6 +123,12 @@ export function RegistryWorkstation() {
     try {
       await ExcelService.exportRegistry(assets, headers);
       toast({ title: "Excel Pulse Complete" });
+    } catch (e: any) {
+      toast({ 
+        variant: "destructive", 
+        title: "Export Failed", 
+        description: e.message || "Workbook creation interrupted." 
+      });
     } finally {
       setIsExportingExcel(false);
     }
