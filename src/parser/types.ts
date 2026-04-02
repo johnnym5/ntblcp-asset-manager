@@ -12,19 +12,24 @@ export type RowClassification =
   | 'DATA_ROW' 
   | 'UNKNOWN';
 
+export type HeaderSource = 'explicit' | 'inferred' | 'synthetic';
+export type HeaderSetType = 'real_template' | 'inferred_template' | 'generated_template';
+
 export interface HeaderTemplate {
   id: string;
   rawHeaders: string[];
   normalizedHeaders: string[];
   columnCount: number;
   signature: string; // Serialized header set for matching
+  type: HeaderSetType;
 }
 
 export interface DiscoveredGroup {
   id: string;
   groupName: string;
   headerSet: string[];
-  headerSource: 'explicit' | 'inferred';
+  headerSource: HeaderSource;
+  headerSetType: HeaderSetType;
   columnCount: number;
   rowCount: number;
   startRow: number;
@@ -60,6 +65,8 @@ export interface ParsedAsset extends Asset {
   sourceGroup: string;
   templateId: string;
   sourceColumnAGroup?: string;
+  headerSource: HeaderSource;
+  headerSetType: HeaderSetType;
 }
 
 export interface GroupImportContainer extends DiscoveredGroup {

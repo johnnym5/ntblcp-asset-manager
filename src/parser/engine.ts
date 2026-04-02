@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
- * Implements two-stage structural discovery and positional mapping for single-sheet registries.
- * Phase 600: Strictly ignores workbook-level sheets and focuses on internal group blocks.
+ * Implements two-stage structural discovery and group-aware mapping for single-sheet registries.
+ * Phase 700: implements Synthetic Template logic for headerless groups.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -13,7 +13,9 @@ import type {
   ParsedAsset, 
   HeaderTemplate,
   DiscoveredGroup,
-  GroupImportContainer
+  GroupImportContainer,
+  HeaderSource,
+  HeaderSetType
 } from './types';
 import type { Asset } from '@/types/domain';
 
@@ -29,81 +31,54 @@ export class ParserEngine {
 
   /**
    * STAGE 1: Template Detection & Structural Inventory Pulse.
-   * Traverses a single sheet to identify repeating group blocks in Column A.
+   * Traverses a single sheet to identify every group block in Column A.
    */
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
     const discovered: DiscoveredGroup[] = [];
-    let pendingGroupName: string | null = null;
+    let pendingGroupLabel: string | null = null;
     let activeGroup: DiscoveredGroup | null = null;
     
     data.forEach((row, idx) => {
       const type = classifyRow(row);
 
-      // 1. Detect Group Title Pulse (Column A Authority)
+      // 1. Capture Group Marker from Column A
       if (type === 'GROUP_HEADER') {
-        if (activeGroup) {
-          activeGroup.endRow = idx - 1;
-        }
-        pendingGroupName = String(row[0]).trim();
+        if (activeGroup) activeGroup.endRow = idx - 1;
+        pendingGroupLabel = String(row[0]).trim();
       }
 
-      // 2. Detect Header Row Pulse (Explicit S/N anchor)
+      // 2. Capture Explicit Header Row (S/N Signature)
       if (type === 'SCHEMA_HEADER') {
-        const signature = this.registerTemplate(row);
+        const signature = this.registerTemplate(row, 'real_template');
         const tpl = this.templates.get(signature)!;
-
-        // The previous group header (if any) or a default starts the group at this header row
-        const name = pendingGroupName || "GENERAL REGISTER";
+        const name = pendingGroupLabel || "GENERAL REGISTER";
         
-        activeGroup = {
-          id: uuidv4(),
-          groupName: name,
-          headerSet: tpl.rawHeaders,
-          headerSource: 'explicit',
-          columnCount: tpl.columnCount,
-          rowCount: 0,
-          startRow: idx, 
-          endRow: data.length - 1,
-          headerStart: idx,
-          headerEnd: idx,
-          rawText: name,
-          visibleHeaderRow: tpl.rawHeaders,
-          templateId: tpl.id,
-          sheetName,
-          workbookName: this.workbookName
-        };
+        activeGroup = this.createNewGroup(name, tpl, 'explicit', idx, sheetName);
+        activeGroup.headerStart = idx;
+        activeGroup.headerEnd = idx;
         discovered.push(activeGroup);
-        pendingGroupName = null; 
+        pendingGroupLabel = null; 
       }
 
-      // 3. Handle Inferred Headers (Group starts directly with asset rows)
-      if (type === 'DATA_ROW' && pendingGroupName) {
-        const inferredTpl = this.inferTemplate(row);
+      // 3. Handle Headerless Group (Starts directly with asset rows)
+      if (type === 'DATA_ROW' && pendingGroupLabel) {
+        // Attempt to match width with existing templates (Inferred)
+        // Else generate a new one (Synthetic)
+        const matchedTpl = this.matchOrGenerateTemplate(row);
         
-        activeGroup = {
-          id: uuidv4(),
-          groupName: pendingGroupName,
-          headerSet: inferredTpl.rawHeaders,
-          headerSource: 'inferred',
-          columnCount: inferredTpl.columnCount,
-          rowCount: 0,
-          startRow: idx,
-          endRow: data.length - 1,
-          headerStart: null,
-          headerEnd: null,
-          rawText: pendingGroupName,
-          visibleHeaderRow: null,
-          templateId: inferredTpl.id,
-          sheetName,
-          workbookName: this.workbookName,
-          notes: "Template matched via structural similarity pulse."
-        };
+        activeGroup = this.createNewGroup(
+          pendingGroupLabel, 
+          matchedTpl, 
+          matchedTpl.type === 'inferred_template' ? 'inferred' : 'synthetic', 
+          idx, 
+          sheetName
+        );
         discovered.push(activeGroup);
-        pendingGroupName = null;
+        pendingGroupLabel = null;
       }
     });
 
-    // Asset Count Pulse: Re-traversing discovered boundaries to count data rows
+    // Asset Count Pulse & Boundary Finalization
     discovered.forEach((group, idx) => {
       const nextGroup = discovered[idx + 1];
       const stopRow = nextGroup ? nextGroup.startRow : data.length;
@@ -121,7 +96,7 @@ export class ParserEngine {
 
   /**
    * STAGE 2: Targeted Group Ingestion.
-   * Replays the data rows using the templates discovered in Stage 1.
+   * Maps rows using the templates discovered or generated in Stage 1.
    */
   public ingestGroups(sheetName: string, data: any[][], selectedGroups: DiscoveredGroup[]): GroupImportContainer[] {
     const containers: GroupImportContainer[] = [];
@@ -139,7 +114,7 @@ export class ParserEngine {
       for (let i = group.startRow; i <= group.endRow; i++) {
         const row = data[i];
         if (classifyRow(row) === 'DATA_ROW') {
-          const asset = this.mapRowToTemplate(row, tpl, group.groupName, i, sheetName);
+          const asset = this.mapRowToTemplate(row, tpl, group, i);
           if (asset) {
             container.assets.push(asset);
             container.metrics.valid++;
@@ -148,14 +123,34 @@ export class ParserEngine {
           }
         }
       }
-
       containers.push(container);
     });
 
     return containers;
   }
 
-  private registerTemplate(row: any[]): string {
+  private createNewGroup(name: string, tpl: HeaderTemplate, source: HeaderSource, start: number, sheet: string): DiscoveredGroup {
+    return {
+      id: uuidv4(),
+      groupName: name,
+      headerSet: tpl.rawHeaders,
+      headerSource: source,
+      headerSetType: tpl.type,
+      columnCount: tpl.columnCount,
+      rowCount: 0,
+      startRow: start,
+      endRow: 0,
+      headerStart: null,
+      headerEnd: null,
+      rawText: name,
+      visibleHeaderRow: source === 'explicit' ? tpl.rawHeaders : null,
+      templateId: tpl.id,
+      sheetName: sheet,
+      workbookName: this.workbookName
+    };
+  }
+
+  private registerTemplate(row: any[], type: HeaderSetType): string {
     const lastPopulatedIndex = row.reduce((max, cell, idx) => 
       (cell !== null && String(cell).trim() !== '') ? idx : max, 0);
     
@@ -169,45 +164,61 @@ export class ParserEngine {
         rawHeaders,
         normalizedHeaders: rawHeaders.map(normalizeHeaderName),
         columnCount: rawHeaders.length,
-        signature
+        signature,
+        type
       });
     }
     return signature;
   }
 
-  private inferTemplate(row: any[]): HeaderTemplate {
+  private matchOrGenerateTemplate(row: any[]): HeaderTemplate {
     const populatedCount = row.filter(c => c !== null && String(c).trim() !== '').length;
+    
+    // 1. Try to find a width-matched explicit template (Inferred)
     for (const tpl of this.templates.values()) {
-      if (Math.abs(tpl.columnCount - populatedCount) <= 2) return tpl;
+      if (tpl.columnCount === row.length || Math.abs(tpl.columnCount - populatedCount) <= 1) {
+        return { ...tpl, type: 'inferred_template' };
+      }
     }
-    const templates = Array.from(this.templates.values());
-    return templates[0] || {
-      id: 'FALLBACK',
-      rawHeaders: ['Inferred Fields'],
-      normalizedHeaders: ['metadata'],
-      columnCount: row.length,
-      signature: 'FALLBACK'
-    };
+
+    // 2. Generate a Synthetic Template (Synthetic)
+    const syntheticHeaders = row.map((_, i) => `Synthetic Column ${i + 1}`);
+    const signature = `SYNTH_${row.length}`;
+    
+    if (!this.templates.has(signature)) {
+      const tplId = `GEN_${this.templates.size + 1}`;
+      this.templates.set(signature, {
+        id: tplId,
+        rawHeaders: syntheticHeaders,
+        normalizedHeaders: syntheticHeaders.map(normalizeHeaderName),
+        columnCount: row.length,
+        signature,
+        type: 'generated_template'
+      });
+    }
+    return this.templates.get(signature)!;
   }
 
-  private mapRowToTemplate(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
+  private mapRowToTemplate(row: any[], tpl: HeaderTemplate, group: DiscoveredGroup, rowNum: number): ParsedAsset | null {
     const asset: any = {
       id: uuidv4(),
-      category: sheet,
+      category: group.sheetName,
       description: '',
       grantId: 'STAGED',
-      section: group,
+      section: group.groupName,
       subsection: 'Base Register',
       assetFamily: 'Uncategorized',
       status: 'UNVERIFIED',
       condition: 'New',
       lastModified: new Date().toISOString(),
       lastModifiedBy: 'Structural Parser',
-      hierarchy: { document: sheet, section: group, subsection: 'Base Register', assetFamily: 'Uncategorized' },
-      importMetadata: { sourceFile: this.workbookName, sheetName: sheet, rowNumber: rowNum + 1, importedAt: new Date().toISOString() },
+      hierarchy: { document: group.sheetName, section: group.groupName, subsection: 'Base Register', assetFamily: 'Uncategorized' },
+      importMetadata: { sourceFile: this.workbookName, sheetName: group.sheetName, rowNumber: rowNum + 1, importedAt: new Date().toISOString() },
       metadata: {},
       validation: { warnings: [], errors: [], duplicateFlags: [], needsReview: false, isRejected: false, logs: [] },
-      sourceGroup: group,
+      headerSource: group.headerSource,
+      headerSetType: group.headerSetType,
+      sourceGroup: group.groupName,
       templateId: tpl.id
     };
 
