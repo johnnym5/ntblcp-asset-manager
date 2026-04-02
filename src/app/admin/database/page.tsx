@@ -171,7 +171,7 @@ export default function DatabaseExplorerPage() {
     setIsSaving(true);
     try {
       await VirtualDBService.copyNode(selectedNode.path, from, to);
-      toast({ title: "Parity Established", description: `Synchronized ${from} -> ${to}.` });
+      toast({ title: "Parity Established", description: `Synchronized ${from} to ${to}.` });
       loadParity(selectedNode.path);
       runGlobalScan();
     } catch (e) {
@@ -379,8 +379,8 @@ export default function DatabaseExplorerPage() {
                         <div className="p-6 rounded-3xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-4">
                           <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Authority Reconciler</h4>
                           <div className="grid grid-cols-2 gap-2">
-                            <Button variant="outline" onClick={() => handleReconcile('LOCAL', 'FIRESTORE')} className="h-10 text-[8px] font-black uppercase gap-2"><Cloud className="h-3 w-3" /> Local -> Cloud</Button>
-                            <Button variant="outline" onClick={() => handleReconcile('FIRESTORE', 'LOCAL')} className="h-10 text-[8px] font-black uppercase gap-2"><HardDrive className="h-3 w-3" /> Cloud -> Local</Button>
+                            <Button variant="outline" onClick={() => handleReconcile('LOCAL', 'FIRESTORE')} className="h-10 text-[8px] font-black uppercase gap-2"><Cloud className="h-3 w-3" /> Local &gt; Cloud</Button>
+                            <Button variant="outline" onClick={() => handleReconcile('FIRESTORE', 'LOCAL')} className="h-10 text-[8px] font-black uppercase gap-2"><HardDrive className="h-3 w-3" /> Cloud &gt; Local</Button>
                           </div>
                         </div>
                       </div>
