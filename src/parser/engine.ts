@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
- * Phase 320: Implemented pre-import asset counting and persistent group naming.
+ * Phase 325: Overhauled group discovery to prioritize internal labels over sheet names.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -45,41 +45,52 @@ export class ParserEngine {
     }
 
     // Pass 2: Map boundaries, names, and count rows
-    let activeGroupName = sheetName.toUpperCase(); // Fallback to sheet name if no labels found
+    let activeGroupName = "GENERAL REGISTER";
+    const sheetNameUpper = sheetName.toUpperCase();
     
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       const classification = classifyRow(row);
 
+      // Capture specific group titles
       if (classification === 'GROUP_HEADER') {
-        activeGroupName = String(row[0]).trim().toUpperCase();
+        const potentialLabel = String(row[0]).trim().toUpperCase();
+        // Ignore labels that are just the sheet name or technical noise
+        if (potentialLabel !== sheetNameUpper && potentialLabel.length > 2) {
+          activeGroupName = potentialLabel;
+        }
         continue;
       }
 
+      // When a header row is found, a new group starts
       if (classification === 'SCHEMA_HEADER') {
         const rawHeaders = row.map(c => String(c || '').trim()).filter(h => h.length > 0);
         const signature = rawHeaders.map(h => h.toUpperCase()).join('|');
         const foundTemplate = this.templates.get(signature);
 
         if (foundTemplate) {
-          // Count assets belonging to this group
+          // Count assets belonging to this specific group pulse
           let rowCount = 0;
           let j = i + 1;
           while (j < data.length) {
             const nextRow = data[j];
             const nextClass = classifyRow(nextRow);
+            // Group ends at next header or section boundary
             if (nextClass === 'SCHEMA_HEADER' || nextClass === 'GROUP_HEADER') break;
             if (nextClass === 'DATA_ROW') rowCount++;
             j++;
           }
 
+          // Use sheet name if still stuck on default
+          const finalGroupName = activeGroupName === "GENERAL REGISTER" ? sheetNameUpper : activeGroupName;
+
           this.discoveredGroups.push({
             id: uuidv4(),
-            groupName: activeGroupName,
+            groupName: finalGroupName,
             headerSet: foundTemplate.rawHeaders,
             headerSource: 'explicit',
             columnCount: foundTemplate.columnCount,
-            rowCount, //amount of assets in group
+            rowCount,
             templateId: foundTemplate.id,
             startRow: i + 1,
             sheetName,
@@ -88,6 +99,17 @@ export class ParserEngine {
         }
       }
     }
+
+    // Secondary pass: Deduplicate group names if multiple headers appear under one title
+    const seenNames = new Map<string, number>();
+    this.discoveredGroups = this.discoveredGroups.map(group => {
+      const count = seenNames.get(group.groupName) || 0;
+      seenNames.set(group.groupName, count + 1);
+      return {
+        ...group,
+        groupName: count > 0 ? `${group.groupName} (PART ${count + 1})` : group.groupName
+      };
+    });
 
     return this.discoveredGroups;
   }
@@ -102,8 +124,9 @@ export class ParserEngine {
     const selectedGroups = this.discoveredGroups.filter(g => selectedGroupIds.has(g.id));
 
     selectedGroups.forEach((group) => {
-      const currentIdx = this.discoveredGroups.findIndex(g => g.id === group.id);
-      const nextGroupInWorkbook = this.discoveredGroups[currentIdx + 1];
+      // Respect the start row of the NEXT discovered group, even if not selected
+      const currentIdxInAll = this.discoveredGroups.findIndex(g => g.id === group.id);
+      const nextGroupInWorkbook = this.discoveredGroups[currentIdxInAll + 1];
       const nextBoundaryRow = nextGroupInWorkbook ? nextGroupInWorkbook.startRow : data.length + 1;
       
       const groupData = data.slice(group.startRow, nextBoundaryRow - 1);
@@ -123,6 +146,7 @@ export class ParserEngine {
 
       groupData.forEach((row, rowIdx) => {
         const rowClassification = classifyRow(row);
+        // Positional row exclusion: ignore empty, headers, or group labels mid-run
         if (rowClassification === 'EMPTY' || rowClassification === 'GROUP_HEADER' || rowClassification === 'SCHEMA_HEADER') return;
 
         container.metrics.total++;
@@ -160,6 +184,7 @@ export class ParserEngine {
   private mapPositionalRow(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
     const logs: ValidationLog[] = [];
     
+    // Normalize: remove leading empty columns often found in complex registers
     let alignedRow = [...row];
     while (alignedRow.length > 0 && (alignedRow[0] === null || String(alignedRow[0]).trim() === '')) {
       alignedRow.shift();
