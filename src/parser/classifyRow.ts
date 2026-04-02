@@ -1,17 +1,10 @@
 /**
  * @fileOverview Deterministic Structural Row Classifier.
  * Identifies the functional role of a row based on Column A behavior and row density.
- * Phase 315: Hardened keywords and loosened standalone checks for group names.
+ * Phase 320: Hardened group detection to prevent "General Register" fallbacks.
  */
 
 import { RowClassification } from './types';
-
-const KNOWN_GROUP_KEYWORDS = [
-  'GENERAL', 'IT EQUIPMENT', 'PRINTER', 'PMU OFFICE', 'ADDITIONAL ASSETS',
-  'GX-IV', 'TRANSFERRED ASSETS', 'COMPUTERS', 'IT-EQUIPMENTS', 'INHERITED ASSESTS',
-  'MOTOR VEHICLES', 'GENEXPERT MACHINES', 'ADDITIONS', 'MOTORBIKES', 'PDX',
-  'TB LAMP', 'TRUENAT', 'SAMSUNG GALAXY TABLETS', 'ECG MACHINE', 'REGISTER'
-];
 
 const SCHEMA_ANCHORS = [
   'S/N', 'SN', 'S.N', 'SERIAL NO', 'SERIAL NUMBER', 
@@ -31,7 +24,7 @@ export function classifyRow(row: any[]): RowClassification {
     return 'SCHEMA_HEADER';
   }
 
-  // 2. DATA_ROW: If Col A is numeric, it is almost certainly an S/N data row in NTBLCP registers
+  // 2. DATA_ROW: If Col A is numeric, it is almost certainly a sequence pulse
   const isNumericColA = colA !== '' && !isNaN(Number(colA.replace(/[^0-9.]/g, '')));
   if (isNumericColA) {
     return 'DATA_ROW';
@@ -40,11 +33,10 @@ export function classifyRow(row: any[]): RowClassification {
   const populatedCount = row.filter(c => c !== null && String(c).trim() !== '').length;
 
   // 3. GROUP_HEADER: Structural section boundary in Column A
-  // Relaxed the populatedCount to 3 to catch group names that might have minor noise in Row B/C
-  const isKeywordMatch = KNOWN_GROUP_KEYWORDS.some(k => colA_Upper.includes(k));
-  const isStandaloneColA = colA && populatedCount <= 3;
-
-  if (isStandaloneColA && (isKeywordMatch || colA.length > 4)) {
+  // If Column A has text and the rest of the row is nearly empty, it's a Group Label
+  if (colA && populatedCount <= 2 && colA.length > 3) {
+    // Ignore technical noise like "Total" or page numbers
+    if (colA_Upper.startsWith('TOTAL') || colA_Upper.includes('PAGE ')) return 'EMPTY';
     return 'GROUP_HEADER';
   }
 

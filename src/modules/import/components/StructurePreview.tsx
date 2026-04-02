@@ -1,6 +1,6 @@
 /**
  * @fileOverview StructurePreview - The Template Visualization Layer.
- * Phase 310: Enhanced with multi-group selection pulses.
+ * Phase 320: Enhanced with group names and asset counts.
  */
 
 import React from 'react';
@@ -19,7 +19,8 @@ import {
   Layers,
   ChevronRight,
   Check,
-  Circle
+  Circle,
+  Boxes
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DiscoveredGroup } from '@/parser/types';
@@ -50,7 +51,7 @@ export function StructurePreview({
           Register Skeleton Discovery
         </h4>
         <p className="text-[11px] font-bold uppercase text-white/40 tracking-[0.25em] leading-relaxed italic">
-          Verify discovered structural groups and column templates before ingestion.
+          Verify discovered structural groups and row counts before ingestion.
         </p>
       </div>
 
@@ -61,7 +62,7 @@ export function StructurePreview({
             
             return (
               <Card 
-                key={`${group.groupName}-${idx}`} 
+                key={`${group.id}`} 
                 className={cn(
                   "bg-[#050505] border-2 rounded-[2.5rem] overflow-hidden shadow-3xl transition-all group",
                   isSelected ? "border-primary/20 opacity-100" : "border-white/5 opacity-60"
@@ -86,29 +87,18 @@ export function StructurePreview({
                       {String(idx + 1).padStart(2, '0')}
                     </div>
                     <div className="space-y-1.5">
-                      <h5 className="text-lg font-black uppercase text-white tracking-tight group-hover:text-primary transition-colors leading-none">
+                      <h5 className="text-xl font-black uppercase text-white tracking-tight group-hover:text-primary transition-colors leading-none">
                         {group.groupName}
                       </h5>
                       <div className="flex items-center gap-4 text-[9px] font-mono text-white/30 uppercase tracking-widest">
-                        <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Start Row: {group.startRow}</span>
+                        <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Row {group.startRow}</span>
                         <div className="h-1 w-1 rounded-full bg-white/10" />
-                        <span className="flex items-center gap-1.5"><Database className="h-3 w-3" /> {group.sheetName}</span>
+                        <span className="flex items-center gap-1.5 text-primary"><Boxes className="h-3 w-3" /> {group.rowCount} Records Found</span>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <Badge 
-                      variant="outline" 
-                      className={cn(
-                        "h-8 px-5 rounded-full font-black uppercase text-[9px] tracking-[0.2em] border-2",
-                        group.headerSource === 'explicit' 
-                          ? "bg-green-500/5 border-green-500/20 text-green-500" 
-                          : "bg-blue-500/5 border-blue-500/20 text-blue-500"
-                      )}
-                    >
-                      {group.headerSource === 'explicit' ? 'Explicit Anchor' : 'Inferred Template'}
-                    </Badge>
                     <Badge variant="outline" className="h-8 px-5 rounded-full font-black uppercase text-[9px] tracking-[0.2em] border-white/10 text-white/40">
                       {group.columnCount} COLUMNS
                     </Badge>
@@ -144,11 +134,6 @@ export function StructurePreview({
                       <div className="flex items-center gap-2 text-[8px] font-black uppercase text-white/20 tracking-widest">
                         <Terminal className="h-3 w-3" /> Template ID: <span className="text-white/40 font-mono">{group.templateId}</span>
                       </div>
-                      {group.matchedTemplateSource && (
-                        <div className="flex items-center gap-2 text-[8px] font-black uppercase text-white/20 tracking-widest">
-                          <Layers className="h-3 w-3" /> Mapping Source: <span className="text-blue-500/60 font-mono">{group.matchedTemplateSource}</span>
-                        </div>
-                      )}
                     </div>
                   )}
                 </CardContent>

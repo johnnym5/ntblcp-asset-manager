@@ -26,6 +26,7 @@ export interface DiscoveredGroup {
   headerSet: string[];
   headerSource: 'explicit' | 'inferred';
   columnCount: number;
+  rowCount: number; // Added: Amount of assets in this group
   templateId: string;
   startRow: number;
   endRow?: number;

@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
- * Phase 310: Implemented Controlled Import with Positional Mapping & Group Selection.
- * Phase 315: Fixed group boundary slicing and enhanced name discovery logic.
+ * Phase 320: Implemented pre-import asset counting and persistent group naming.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -31,7 +30,7 @@ export class ParserEngine {
   }
 
   /**
-   * STAGE 1: Discovery Pulse - Identify all structural groups and their header sets.
+   * STAGE 1: Discovery Pulse - Identify all structural groups, names, and counts.
    */
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
     this.templates.clear();
@@ -45,37 +44,43 @@ export class ParserEngine {
       }
     }
 
-    // Pass 2: Map boundaries and assign templates
-    let activeGroupName = 'General Register';
-    let currentActiveTemplate: HeaderTemplate | null = null;
-
+    // Pass 2: Map boundaries, names, and count rows
+    let activeGroupName = sheetName.toUpperCase(); // Fallback to sheet name if no labels found
+    
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       const classification = classifyRow(row);
 
-      if (classification === 'EMPTY') continue;
-
-      // Update the name pulse if we find a structural label
       if (classification === 'GROUP_HEADER') {
         activeGroupName = String(row[0]).trim().toUpperCase();
         continue;
       }
 
-      // If we hit an explicit anchor, start a new group container
       if (classification === 'SCHEMA_HEADER') {
         const rawHeaders = row.map(c => String(c || '').trim()).filter(h => h.length > 0);
         const signature = rawHeaders.map(h => h.toUpperCase()).join('|');
         const foundTemplate = this.templates.get(signature);
 
         if (foundTemplate) {
-          currentActiveTemplate = foundTemplate;
+          // Count assets belonging to this group
+          let rowCount = 0;
+          let j = i + 1;
+          while (j < data.length) {
+            const nextRow = data[j];
+            const nextClass = classifyRow(nextRow);
+            if (nextClass === 'SCHEMA_HEADER' || nextClass === 'GROUP_HEADER') break;
+            if (nextClass === 'DATA_ROW') rowCount++;
+            j++;
+          }
+
           this.discoveredGroups.push({
             id: uuidv4(),
             groupName: activeGroupName,
-            headerSet: currentActiveTemplate.rawHeaders,
+            headerSet: foundTemplate.rawHeaders,
             headerSource: 'explicit',
-            columnCount: currentActiveTemplate.columnCount,
-            templateId: currentActiveTemplate.id,
+            columnCount: foundTemplate.columnCount,
+            rowCount, //amount of assets in group
+            templateId: foundTemplate.id,
             startRow: i + 1,
             sheetName,
             workbookName: this.workbookName
@@ -94,20 +99,14 @@ export class ParserEngine {
     const containers: GroupImportContainer[] = [];
     const allAssets: ParsedAsset[] = [];
 
-    // Filter for groups the user actually requested
     const selectedGroups = this.discoveredGroups.filter(g => selectedGroupIds.has(g.id));
 
     selectedGroups.forEach((group) => {
-      // CRITICAL FIX: Find the next boundary in the FULL DISCOVERED list, not the selected list
-      // This prevents "overflow" where selecting Group 1 also pulls in Group 2 data
       const currentIdx = this.discoveredGroups.findIndex(g => g.id === group.id);
       const nextGroupInWorkbook = this.discoveredGroups[currentIdx + 1];
       const nextBoundaryRow = nextGroupInWorkbook ? nextGroupInWorkbook.startRow : data.length + 1;
       
-      // The group data ends right before the next schema header or group label starts
-      // We look back from the next boundary to find the last meaningful row
       const groupData = data.slice(group.startRow, nextBoundaryRow - 1);
-      
       const tpl = Array.from(this.templates.values()).find(t => t.id === group.templateId);
       if (!tpl) return;
 
@@ -124,7 +123,6 @@ export class ParserEngine {
 
       groupData.forEach((row, rowIdx) => {
         const rowClassification = classifyRow(row);
-        // Skip noise rows that might be sitting between group data and next group header
         if (rowClassification === 'EMPTY' || rowClassification === 'GROUP_HEADER' || rowClassification === 'SCHEMA_HEADER') return;
 
         container.metrics.total++;
@@ -147,7 +145,7 @@ export class ParserEngine {
     return {
       workbookName: this.workbookName,
       sheetName,
-      profileId: 'CONTROLLED_ENGINE_V1.1',
+      profileId: 'CONTROLLED_ENGINE_V1.2',
       totalRows: data.length,
       groupCount: containers.length,
       dataRowsImported: allAssets.length,
@@ -162,21 +160,12 @@ export class ParserEngine {
   private mapPositionalRow(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
     const logs: ValidationLog[] = [];
     
-    // Trim empty leading cells to align shifted rows (common in merged header sheets)
     let alignedRow = [...row];
-    let leadingEmpties = 0;
     while (alignedRow.length > 0 && (alignedRow[0] === null || String(alignedRow[0]).trim() === '')) {
       alignedRow.shift();
-      leadingEmpties++;
     }
 
-    // Safeguard: if row was almost entirely empty, it's not a real data pulse
     if (alignedRow.length === 0) return null;
-
-    // If shifting makes the row much shorter than expected, it might not be data
-    if (alignedRow.length < tpl.columnCount * 0.3) {
-      return null;
-    }
 
     const asset: any = {
       id: uuidv4(),
@@ -203,7 +192,6 @@ export class ParserEngine {
       templateId: tpl.id
     };
 
-    // STRICT POSITIONAL MAPPING
     tpl.normalizedHeaders.forEach((key, idx) => {
       const val = alignedRow[idx];
       const headerLabel = tpl.rawHeaders[idx];
@@ -221,21 +209,15 @@ export class ParserEngine {
       }
     });
 
-    // Fidelity requirement: must have at least one identifying pulse
     const hasIdentification = asset.description || asset.assetIdCode || asset.serialNumber || asset.sn;
     if (!hasIdentification) {
       asset.validation.isRejected = true;
       asset.validation.logs.push({
         rowNumber: rowNum,
         type: 'missing_columns',
-        message: 'No identifying markers (S/N, ID, Serial, Description) found in row.',
+        message: 'No identifying markers found.',
         rawData: row
       });
-    }
-
-    if (asset.serialNumber && asset.serialNumber !== 'N/A' && this.existingSerials.has(asset.serialNumber)) {
-      asset.validation.duplicateFlags.push('Duplicate Serial Detected');
-      asset.validation.needsReview = true;
     }
 
     return asset as ParsedAsset;
