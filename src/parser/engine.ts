@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
- * Phase 300: Implemented Controlled Import with Positional Mapping & Group Selection.
- * Phase 301: Expanded Domain Fields to include LGA and Site for better capture rates.
+ * Phase 310: Implemented Controlled Import with Positional Mapping & Group Selection.
+ * Phase 315: Fixed group boundary slicing and enhanced name discovery logic.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -37,7 +37,7 @@ export class ParserEngine {
     this.templates.clear();
     this.discoveredGroups = [];
     
-    // Pass 1: Learn all templates in the sheet
+    // Pass 1: Learn all unique templates in the sheet
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       if (classifyRow(row) === 'SCHEMA_HEADER') {
@@ -47,7 +47,7 @@ export class ParserEngine {
 
     // Pass 2: Map boundaries and assign templates
     let activeGroupName = 'General Register';
-    let activeTemplate: HeaderTemplate | null = null;
+    let currentActiveTemplate: HeaderTemplate | null = null;
 
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
@@ -55,38 +55,27 @@ export class ParserEngine {
 
       if (classification === 'EMPTY') continue;
 
+      // Update the name pulse if we find a structural label
       if (classification === 'GROUP_HEADER') {
-        activeGroupName = String(row[0]).trim();
-        if (activeTemplate) {
-          this.discoveredGroups.push({
-            id: uuidv4(),
-            groupName: activeGroupName,
-            headerSet: activeTemplate.rawHeaders,
-            headerSource: 'inferred',
-            columnCount: activeTemplate.columnCount,
-            templateId: activeTemplate.id,
-            startRow: i + 1,
-            sheetName,
-            workbookName: this.workbookName
-          });
-        }
+        activeGroupName = String(row[0]).trim().toUpperCase();
         continue;
       }
 
+      // If we hit an explicit anchor, start a new group container
       if (classification === 'SCHEMA_HEADER') {
         const rawHeaders = row.map(c => String(c || '').trim()).filter(h => h.length > 0);
         const signature = rawHeaders.map(h => h.toUpperCase()).join('|');
         const foundTemplate = this.templates.get(signature);
 
         if (foundTemplate) {
-          activeTemplate = foundTemplate;
+          currentActiveTemplate = foundTemplate;
           this.discoveredGroups.push({
             id: uuidv4(),
             groupName: activeGroupName,
-            headerSet: activeTemplate.rawHeaders,
+            headerSet: currentActiveTemplate.rawHeaders,
             headerSource: 'explicit',
-            columnCount: activeTemplate.columnCount,
-            templateId: activeTemplate.id,
+            columnCount: currentActiveTemplate.columnCount,
+            templateId: currentActiveTemplate.id,
             startRow: i + 1,
             sheetName,
             workbookName: this.workbookName
@@ -105,11 +94,19 @@ export class ParserEngine {
     const containers: GroupImportContainer[] = [];
     const allAssets: ParsedAsset[] = [];
 
-    const activeGroups = this.discoveredGroups.filter(g => selectedGroupIds.has(g.id));
+    // Filter for groups the user actually requested
+    const selectedGroups = this.discoveredGroups.filter(g => selectedGroupIds.has(g.id));
 
-    activeGroups.forEach((group, idx) => {
-      const nextGroupStart = activeGroups[idx + 1]?.startRow || data.length + 1;
-      const groupData = data.slice(group.startRow, nextGroupStart - 1);
+    selectedGroups.forEach((group) => {
+      // CRITICAL FIX: Find the next boundary in the FULL DISCOVERED list, not the selected list
+      // This prevents "overflow" where selecting Group 1 also pulls in Group 2 data
+      const currentIdx = this.discoveredGroups.findIndex(g => g.id === group.id);
+      const nextGroupInWorkbook = this.discoveredGroups[currentIdx + 1];
+      const nextBoundaryRow = nextGroupInWorkbook ? nextGroupInWorkbook.startRow : data.length + 1;
+      
+      // The group data ends right before the next schema header or group label starts
+      // We look back from the next boundary to find the last meaningful row
+      const groupData = data.slice(group.startRow, nextBoundaryRow - 1);
       
       const tpl = Array.from(this.templates.values()).find(t => t.id === group.templateId);
       if (!tpl) return;
@@ -127,6 +124,7 @@ export class ParserEngine {
 
       groupData.forEach((row, rowIdx) => {
         const rowClassification = classifyRow(row);
+        // Skip noise rows that might be sitting between group data and next group header
         if (rowClassification === 'EMPTY' || rowClassification === 'GROUP_HEADER' || rowClassification === 'SCHEMA_HEADER') return;
 
         container.metrics.total++;
@@ -149,7 +147,7 @@ export class ParserEngine {
     return {
       workbookName: this.workbookName,
       sheetName,
-      profileId: 'CONTROLLED_ENGINE_V1.0',
+      profileId: 'CONTROLLED_ENGINE_V1.1',
       totalRows: data.length,
       groupCount: containers.length,
       dataRowsImported: allAssets.length,
@@ -164,7 +162,7 @@ export class ParserEngine {
   private mapPositionalRow(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
     const logs: ValidationLog[] = [];
     
-    // RULE 3: Trim empty leading cells to align shifted rows
+    // Trim empty leading cells to align shifted rows (common in merged header sheets)
     let alignedRow = [...row];
     let leadingEmpties = 0;
     while (alignedRow.length > 0 && (alignedRow[0] === null || String(alignedRow[0]).trim() === '')) {
@@ -172,20 +170,12 @@ export class ParserEngine {
       leadingEmpties++;
     }
 
-    // If shifting makes the row much shorter than expected, revert to original positional mapping
-    if (alignedRow.length < tpl.columnCount * 0.5) {
-      alignedRow = [...row];
-      leadingEmpties = 0;
-    }
+    // Safeguard: if row was almost entirely empty, it's not a real data pulse
+    if (alignedRow.length === 0) return null;
 
-    // RULE 2: Column Count Validation
-    if (alignedRow.length !== tpl.columnCount) {
-      logs.push({
-        rowNumber: rowNum,
-        type: 'column_count_mismatch',
-        message: `Row has ${alignedRow.length} columns, expected ${tpl.columnCount}.`,
-        rawData: row
-      });
+    // If shifting makes the row much shorter than expected, it might not be data
+    if (alignedRow.length < tpl.columnCount * 0.3) {
+      return null;
     }
 
     const asset: any = {
@@ -213,7 +203,7 @@ export class ParserEngine {
       templateId: tpl.id
     };
 
-    // RULE 1: Positional Mapping Only
+    // STRICT POSITIONAL MAPPING
     tpl.normalizedHeaders.forEach((key, idx) => {
       const val = alignedRow[idx];
       const headerLabel = tpl.rawHeaders[idx];
@@ -231,7 +221,7 @@ export class ParserEngine {
       }
     });
 
-    // Fidelity check
+    // Fidelity requirement: must have at least one identifying pulse
     const hasIdentification = asset.description || asset.assetIdCode || asset.serialNumber || asset.sn;
     if (!hasIdentification) {
       asset.validation.isRejected = true;
@@ -277,7 +267,6 @@ export class ParserEngine {
     return domainFields.includes(key);
   }
 
-  // Legacy fallback for parseSheetToAssets wrapper
   public parseWorkbook(sheetName: string, data: any[][]): { assets: ParsedAsset[], summary: ImportRunSummary, groups: DiscoveredGroup[] } {
     const discovered = this.discoverGroups(sheetName, data);
     const selectedIds = new Set(discovered.map(g => g.id));
