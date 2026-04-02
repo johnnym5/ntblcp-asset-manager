@@ -3,6 +3,7 @@
 /**
  * @fileOverview DashboardWorkstation - Mobile-Optimized SPA Hub.
  * Phase 250: Implemented swipeable tabs and responsive telemetry stacking.
+ * Phase 251: Finalized Inventory Pulse reference parity.
  */
 
 import React, { useState } from 'react';
@@ -38,35 +39,35 @@ export function DashboardWorkstation() {
       {/* 1. Header Navigation Tabs */}
       <div className="flex flex-col lg:flex-row items-center justify-between gap-4 md:gap-6 px-1">
         <div className="flex items-center gap-3 md:gap-4 self-start">
-          <div className="p-2 md:p-3 bg-primary/10 rounded-2xl shadow-inner">
+          <div className="p-2.5 md:p-3 bg-primary/10 rounded-2xl shadow-inner border border-primary/5">
             <LayoutDashboard className="h-5 w-5 md:h-6 md:w-6 text-primary" />
           </div>
           <div className="space-y-0.5">
             <h2 className="text-xl md:text-2xl font-black uppercase text-white tracking-tight leading-none">Operational Hub</h2>
-            <p className="text-[8px] md:text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">Unified Registry Pulse</p>
+            <p className="text-[8px] md:text-[10px] font-bold text-white/40 uppercase tracking-[0.25em] leading-none">Unified Registry Pulse</p>
           </div>
         </div>
 
-        <div className="w-full lg:w-auto bg-white/[0.02] p-1 rounded-2xl md:rounded-[1.5rem] border border-white/5 shadow-2xl overflow-x-auto no-scrollbar backdrop-blur-xl">
+        <div className="w-full lg:w-auto bg-white/[0.03] p-1 rounded-2xl md:rounded-[1.5rem] border border-white/5 shadow-2xl overflow-x-auto no-scrollbar backdrop-blur-xl">
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="w-full">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center min-w-max">
-              <TabsTrigger value="overview" className="px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+              <TabsTrigger value="overview" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 Overview
               </TabsTrigger>
-              <TabsTrigger value="inventory" className="px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Inventory
+              <TabsTrigger value="inventory" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+                Inventories
               </TabsTrigger>
-              <TabsTrigger value="audit" className="px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Queue
+              <TabsTrigger value="audit" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+                Audit Queue
               </TabsTrigger>
-              <TabsTrigger value="reports" className="px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+              <TabsTrigger value="reports" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 Reports
               </TabsTrigger>
-              <TabsTrigger value="trail" className="px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Trail
+              <TabsTrigger value="trail" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+                Audit Trail
               </TabsTrigger>
-              <TabsTrigger value="sync" className="px-4 md:px-5 py-2 md:py-2.5 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Sync
+              <TabsTrigger value="sync" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+                Sync Status
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -102,20 +103,18 @@ export function DashboardWorkstation() {
         </Tabs>
       </div>
 
-      {/* 3. System Connectivity Status Pill */}
-      {!isMobile && (
-        <div className="fixed bottom-10 right-10 z-50">
-          <div className={cn(
-            "px-6 py-3 rounded-2xl border-2 backdrop-blur-3xl shadow-3xl flex items-center gap-4 transition-all duration-700",
-            isOnline ? "bg-green-500/5 border-green-500/20 text-green-500" : "bg-red-500/5 border-red-500/20 text-red-500"
-          )}>
-            <div className={cn("h-2.5 w-2.5 rounded-full", isOnline ? "bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
-            <span className="text-[10px] font-black uppercase tracking-widest">
-              {isOnline ? 'Registry Online' : 'Offline Mode'}
-            </span>
-          </div>
+      {/* 3. Connection Heartbeat */}
+      <div className="fixed bottom-10 right-10 z-50 pointer-events-none">
+        <div className={cn(
+          "px-6 py-3 rounded-2xl border-2 backdrop-blur-3xl shadow-3xl flex items-center gap-4 transition-all duration-700",
+          isOnline ? "bg-green-500/5 border-green-500/20 text-green-500" : "bg-red-500/5 border-red-500/20 text-red-500"
+        )}>
+          <div className={cn("h-2.5 w-2.5 rounded-full", isOnline ? "bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
+          <span className="text-[10px] font-black uppercase tracking-[0.25em]">
+            {isOnline ? 'CLOUD HEARTBEAT ACTIVE' : 'OFFLINE MODE'}
+          </span>
         </div>
-      )}
+      </div>
 
     </div>
   );

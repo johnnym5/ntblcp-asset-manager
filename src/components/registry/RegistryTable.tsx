@@ -1,36 +1,29 @@
-
 /**
- * @fileOverview RegistryTable - High-Performance Tabular Workstation.
- * Phase 350: Updated status pulse to "Pill Capsule" aesthetic.
+ * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
+ * Phase 1000: Replaced Table architecture with Accordion-based Collapsible Pills.
+ * Each pill provides a status capsule and expands into a full technical detail view.
  */
 
 import React from 'react';
 import { 
-  Table, 
-  TableBody, 
-  TableCell, 
-  TableHead, 
-  TableHeader, 
-  TableRow 
-} from '@/components/ui/table';
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { 
-  ChevronRight, 
-  Camera, 
   Database, 
-  Box,
-  MapPin,
-  ShieldCheck,
-  User,
-  Activity,
-  History,
+  MapPin, 
+  Edit3,
   Clock,
-  Navigation,
-  PenTool,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  FileText,
+  User,
+  MoreVertical
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -59,95 +52,138 @@ export function RegistryTable({
 }: RegistryTableProps) {
   const allSelected = records.length > 0 && records.every(r => selectedIds.has(r.id));
 
-  // Limit columns for density
-  const visibleHeaders = records[0]?.headers.filter(h => h.visible).slice(0, 5) || [];
-
   return (
-    <div className="rounded-[2rem] border-2 border-border/40 overflow-hidden bg-card/50 shadow-xl custom-scrollbar">
-      <Table>
-        <TableHeader className="bg-muted/30">
-          <TableRow className="hover:bg-transparent">
-            <TableHead className="w-12 px-6">
-              <Checkbox 
-                checked={allSelected} 
-                onCheckedChange={(v) => onSelectAll(!!v)} 
-                className="h-5 w-5 rounded-lg border-2"
-              />
-            </TableHead>
-            <TableHead className="px-4 py-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground min-w-[240px]">Primary Identity</TableHead>
-            {visibleHeaders.map(h => (
-              <TableHead key={h.id} className="px-4 py-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">{h.displayName}</TableHead>
-            ))}
-            <TableHead className="px-4 py-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Status Pulse</TableHead>
-            <TableHead className="px-6 text-right text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Action</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {records.map((record) => {
-            const status = record.rawRow.status as string;
-            return (
-              <TableRow 
-                key={record.id} 
-                className={cn(
-                  "hover:bg-primary/[0.02] transition-colors cursor-pointer border-b last:border-0",
-                  selectedIds.has(record.id) ? "bg-primary/5" : "bg-transparent"
-                )}
-                onClick={() => onInspect(record.id)}
-              >
-                <TableCell className="px-6" onClick={(e) => e.stopPropagation()}>
+    <div className="space-y-4 pb-40 animate-in fade-in duration-700">
+      {/* List Protocol Header */}
+      <div className="flex items-center justify-between px-6 py-3 bg-white/[0.03] rounded-2xl border border-white/5 mb-6">
+        <div className="flex items-center gap-4">
+          <Checkbox 
+            checked={allSelected} 
+            onCheckedChange={(v) => onSelectAll(!!v)} 
+            className="h-5 w-5 rounded-lg border-2 border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
+          />
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Select All Pulses</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <Badge variant="outline" className="text-[8px] font-black border-white/10 text-white/20 uppercase tracking-widest px-3">
+            List Protocol: Collapsible Pills
+          </Badge>
+        </div>
+      </div>
+
+      <Accordion type="multiple" className="space-y-2.5">
+        {records.map((record) => {
+          const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
+          const isSelected = selectedIds.has(record.id);
+
+          return (
+            <AccordionItem 
+              key={record.id} 
+              value={record.id} 
+              className={cn(
+                "border-2 rounded-[1.5rem] transition-all duration-300 overflow-hidden",
+                isSelected ? "border-primary/40 bg-primary/5 shadow-xl shadow-primary/5" : "border-white/5 bg-[#0A0A0A] hover:border-white/10"
+              )}
+            >
+              <div className="flex items-center group/item">
+                {/* Selection Slot */}
+                <div className="pl-6 pr-2 py-4" onClick={(e) => e.stopPropagation()}>
                   <Checkbox 
-                    checked={selectedIds.has(record.id)} 
+                    checked={isSelected} 
                     onCheckedChange={() => onToggleSelect(record.id)}
-                    className="h-5 w-5 rounded-lg border-2"
+                    className="h-6 w-6 rounded-full border-2 border-white/10 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                   />
-                </TableCell>
-                <TableCell className="py-4 px-4">
-                  <div className="flex flex-col gap-1.5 min-w-0">
-                    <span className="font-black text-[11px] uppercase tracking-tight text-white group-hover:text-primary transition-colors truncate">{String(record.rawRow.description || 'Untitled')}</span>
-                    <span className="text-[8px] font-mono font-bold text-white/20 uppercase">S/N: {record.sn || '---'}</span>
-                  </div>
-                </TableCell>
-                
-                {visibleHeaders.map(h => {
-                  const field = record.fields.find(f => f.headerId === h.id);
-                  return (
-                    <TableCell key={h.id} className="py-4 px-4">
-                      <span className="text-[10px] font-black uppercase text-white/60 truncate">{field?.displayValue || '---'}</span>
-                    </TableCell>
-                  );
-                })}
+                </div>
 
-                <TableCell className="py-4 px-4" onClick={(e) => e.stopPropagation()}>
-                  <Select value={status}>
-                    <SelectTrigger className={cn(
-                      "h-8 w-32 rounded-full font-black uppercase text-[8px] tracking-widest border-2 transition-all",
-                      status === 'VERIFIED' ? "bg-green-500/10 text-green-500 border-green-500/20" : 
-                      status === 'DISCREPANCY' ? "bg-red-500/10 text-red-500 border-red-500/20" :
-                      "bg-white/5 text-white/40 border-white/10"
-                    )}>
-                      <div className="flex items-center gap-2">
-                        <div className={cn("h-1.5 w-1.5 rounded-full", status === 'VERIFIED' ? "bg-green-500" : status === 'DISCREPANCY' ? "bg-red-500" : "bg-white/20")} />
-                        <SelectValue />
+                <AccordionTrigger className="flex-1 hover:no-underline py-4 px-4 text-left">
+                  <div className="flex items-center justify-between w-full pr-4">
+                    <div className="flex items-center gap-6 min-w-0">
+                      <div className="flex flex-col gap-1 min-w-0">
+                        <span className="font-black text-[13px] uppercase tracking-tight text-white truncate max-w-[280px] md:max-w-[400px]">
+                          {String(record.rawRow.description || 'Untitled Registry Record')}
+                        </span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-[9px] font-mono font-bold text-white/20 uppercase tracking-[0.2em]">S/N: {record.sn || '---'}</span>
+                          <div className="h-1 w-1 rounded-full bg-white/10" />
+                          <span className="text-[9px] font-bold text-primary/60 uppercase tracking-widest">{record.sourceSheet}</span>
+                        </div>
                       </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#0A0A0A] border-white/10">
-                      <SelectItem value="VERIFIED" className="text-[9px] font-black uppercase">Verified</SelectItem>
-                      <SelectItem value="UNVERIFIED" className="text-[9px] font-black uppercase">Unverified</SelectItem>
-                      <SelectItem value="DISCREPANCY" className="text-[9px] font-black uppercase">Discrepancy</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </TableCell>
+                    </div>
 
-                <TableCell className="px-6 text-right">
-                  <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl bg-white/5 opacity-40 group-hover:opacity-100 transition-all">
-                    <ChevronRight className="h-4 w-4" />
-                  </Button>
-                </TableCell>
-              </TableRow>
-            );
-          })}
-        </TableBody>
-      </Table>
+                    {/* Pill Capsule Status select */}
+                    <div className="flex items-center gap-6" onClick={(e) => e.stopPropagation()}>
+                      <Select value={status}>
+                        <SelectTrigger className={cn(
+                          "h-8 w-32 rounded-full font-black uppercase text-[8px] tracking-[0.2em] border-2 transition-all shadow-lg",
+                          status === 'VERIFIED' ? "bg-green-500/10 text-green-500 border-green-500/20" : 
+                          status === 'DISCREPANCY' ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                          "bg-white/5 text-white/40 border-white/10"
+                        )}>
+                          <div className="flex items-center gap-2">
+                            <div className={cn("h-1.5 w-1.5 rounded-full", status === 'VERIFIED' ? "bg-green-500" : status === 'DISCREPANCY' ? "bg-red-500" : "bg-white/20")} />
+                            <SelectValue />
+                          </div>
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0A0A0A] border-white/10">
+                          <SelectItem value="VERIFIED" className="text-[9px] font-black uppercase">Verified</SelectItem>
+                          <SelectItem value="UNVERIFIED" className="text-[9px] font-black uppercase">Unverified</SelectItem>
+                          <SelectItem value="DISCREPANCY" className="text-[9px] font-black uppercase">Discrepancy</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </AccordionTrigger>
+              </div>
+
+              <AccordionContent className="bg-white/[0.01] border-t border-white/5 p-8 animate-in slide-in-from-top-2 duration-500">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-10 gap-y-8">
+                  {record.fields.filter(f => f.displayValue !== '---').map((field) => {
+                    const header = record.headers.find(h => h.id === field.headerId);
+                    return (
+                      <div key={field.headerId} className="space-y-1.5 group/field">
+                        <p className="text-[9px] font-black uppercase tracking-[0.25em] text-white/20 group-hover/field:text-primary/40 transition-colors">
+                          {header?.displayName || 'Technical field'}
+                        </p>
+                        <p className="text-sm font-black uppercase text-white/80 leading-tight">
+                          {field.displayValue}
+                        </p>
+                      </div>
+                    );
+                  })}
+                </div>
+                
+                <div className="mt-10 pt-8 border-t border-dashed border-white/10 flex flex-col sm:flex-row items-center justify-between gap-6">
+                  <div className="flex items-center gap-8">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/5 rounded-lg"><User className="h-3.5 w-3.5 text-white/20" /></div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1">Auditor Pulse</span>
+                        <span className="text-[10px] font-bold text-white/60 leading-none">{String(record.rawRow.lastModifiedBy || 'System')}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 bg-white/5 rounded-lg"><Clock className="h-3.5 w-3.5 text-white/20" /></div>
+                      <div className="flex flex-col">
+                        <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1">Timestamp</span>
+                        <span className="text-[10px] font-bold text-white/60 leading-none">{new Date(record.rawRow.lastModified as string).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-center gap-3 w-full sm:w-auto">
+                    <Button 
+                      onClick={() => onInspect(record.id)}
+                      className="flex-1 sm:flex-none h-12 px-8 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 bg-primary text-black shadow-xl shadow-primary/20 hover:scale-105 transition-transform"
+                    >
+                      <Edit3 className="h-3.5 w-3.5" /> Full Audit Profile
+                    </Button>
+                  </div>
+                </div>
+              </AccordionContent>
+            </AccordionItem>
+          );
+        })}
+      </Accordion>
     </div>
   );
 }
