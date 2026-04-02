@@ -1,10 +1,9 @@
 'use client';
 
 /**
- * @fileOverview VerifyWorkstation - Field Audit Queue.
+ * @fileOverview VerifyWorkstation - Verification Center.
  * Phase 165: Renamed to Field Audit Queue.
- * Phase 166: Applied state-locking logic for regional auditors.
- * Phase 167: Hardened search filters against undefined pulses.
+ * Phase 260: Applied user-friendly terminology (Verification Tasks, Audit progress).
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -90,20 +89,20 @@ export function VerifyWorkstation() {
             <div className="p-3 bg-primary/10 rounded-2xl">
               <ClipboardCheck className="h-8 w-8 text-primary" />
             </div>
-            Field Audit Queue
+            Verification Tasks
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Mandatory Field Assessments & Audit Tasks
+            Mandatory Field Assessments & Audit Records
           </p>
         </div>
         <Badge variant="outline" className="h-10 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest border-primary/20 bg-primary/5 text-primary">
-          <Zap className="h-3.5 w-3.5 mr-2 fill-current" /> {unverified.length} Tasks Pending Audit
+          <Zap className="h-3.5 w-3.5 mr-2 fill-current" /> {unverified.length} Items to Verify
         </Badge>
       </div>
 
       <div className="relative group px-2">
         <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-colors" />
-        <Input placeholder="Search Audit Queue..." className="pl-12 h-14 rounded-2xl bg-card border-none shadow-xl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
+        <Input placeholder="Search verification queue..." className="pl-12 h-14 rounded-2xl bg-card border-none shadow-xl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
       <div className="px-2">
@@ -114,7 +113,7 @@ export function VerifyWorkstation() {
                 <motion.div key={asset.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} layout className="relative group">
                   <RegistryCard record={transformAssetToRecord(asset, headers)} onInspect={() => { setSelectedAsset(asset); setIsFormOpen(true); }} />
                   <div className="absolute top-14 right-2 flex flex-col gap-2 opacity-0 group-hover:opacity-100 transition-all z-20">
-                    <Button size="icon" className="h-10 w-10 rounded-xl bg-green-500 text-white shadow-xl" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'VERIFIED'); }} title="Verify Asset"><CheckCircle2 className="h-5 w-5" /></Button>
+                    <Button size="icon" className="h-10 w-10 rounded-xl bg-green-500 text-white shadow-xl" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'VERIFIED'); }} title="Mark Verified"><CheckCircle2 className="h-5 w-5" /></Button>
                     <Button size="icon" className="h-10 w-10 rounded-xl bg-destructive text-white shadow-xl" onClick={(e) => { e.stopPropagation(); handleQuickVerify(asset, 'DISCREPANCY'); }} title="Report Discrepancy"><XCircle className="h-5 w-5" /></Button>
                   </div>
                 </motion.div>
@@ -123,7 +122,7 @@ export function VerifyWorkstation() {
           ) : (
             <div className="py-40 text-center opacity-20 border-4 border-dashed rounded-[3rem]">
               <CheckCircle2 className="h-32 w-32 mx-auto mb-4 text-green-600" />
-              <h3 className="text-3xl font-black uppercase tracking-[0.2em]">Audit Queue Clear</h3>
+              <h3 className="text-3xl font-black uppercase tracking-[0.2em]">All Tasks Verified</h3>
             </div>
           )}
         </AnimatePresence>

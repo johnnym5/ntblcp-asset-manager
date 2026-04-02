@@ -3,6 +3,7 @@
 /**
  * @fileOverview Root Shell - Unified Global Command Hub.
  * Phase 250: Mobile-Optimized Layout & Responsive Command Pulses.
+ * Phase 260: Applied user-friendly Asset Management terminology.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -142,7 +143,7 @@ export default function SPAHub() {
                 className="flex items-center gap-2 p-2.5 md:p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-primary group tactile-pulse"
               >
                 <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Dashboard</span>
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Back to Dashboard</span>
               </button>
             ) : (
               <div className="flex items-center gap-2 md:gap-4">
@@ -151,17 +152,17 @@ export default function SPAHub() {
                 </div>
                 <div className="flex flex-col">
                   <h1 className="text-lg md:text-xl font-black uppercase text-white tracking-tighter leading-none">NTBLCP</h1>
-                  <span className="text-[7px] md:text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Intelligence</span>
+                  <span className="text-[7px] md:text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Asset Manager</span>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Global Command Hub Pulse */}
+          {/* Global Search Interface */}
           <div className="flex-1 max-w-2xl relative group hidden md:block">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />
             <Input 
-              placeholder="Global Search..." 
+              placeholder="Search all assets..." 
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="h-12 pl-11 pr-24 rounded-xl bg-white/[0.03] border-white/5 text-sm font-medium focus-visible:ring-primary/20 text-white placeholder:text-white/20 shadow-inner"
@@ -205,6 +206,7 @@ export default function SPAHub() {
               <button 
                 onClick={manualDownload} 
                 disabled={isSyncing}
+                title="Fetch updates from cloud"
                 className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
               >
                 <CloudDownload className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
@@ -212,6 +214,7 @@ export default function SPAHub() {
               <button 
                 onClick={manualUpload} 
                 disabled={isSyncing}
+                title="Save changes to cloud"
                 className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
               >
                 <CloudUpload className={cn("h-4 w-4", isSyncing && "animate-spin")} />
@@ -262,11 +265,11 @@ export default function SPAHub() {
                   <>
                     <DropdownMenuItem onClick={manualDownload} className="p-3 focus:bg-white/10 rounded-xl cursor-pointer m-1">
                       <CloudDownload className="mr-2 h-4 w-4" />
-                      <span className="text-[11px] font-black uppercase">Fetch Cloud</span>
+                      <span className="text-[11px] font-black uppercase">Fetch Updates</span>
                     </DropdownMenuItem>
                     <DropdownMenuItem onClick={manualUpload} className="p-3 focus:bg-white/10 rounded-xl cursor-pointer m-1">
                       <CloudUpload className="mr-2 h-4 w-4" />
-                      <span className="text-[11px] font-black uppercase">Push Local</span>
+                      <span className="text-[11px] font-black uppercase">Save Locally</span>
                     </DropdownMenuItem>
                   </>
                 )}
@@ -286,7 +289,7 @@ export default function SPAHub() {
             <div className="relative">
               <Input 
                 autoFocus
-                placeholder="Global Search..." 
+                placeholder="Search inventory..." 
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="h-12 bg-white/[0.03] border-white/10 rounded-xl text-white pr-10"
@@ -311,7 +314,7 @@ export default function SPAHub() {
               <Suspense fallback={
                 <div className="h-[60vh] flex flex-col items-center justify-center gap-6 opacity-40">
                   <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Waking Workstation...</p>
+                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Opening Workspace...</p>
                 </div>
               }>
                 {renderWorkstation()}

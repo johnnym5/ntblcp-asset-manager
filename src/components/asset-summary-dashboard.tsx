@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * @fileOverview Inventory Pulse - High-Fidelity Diagnostic Dashboard.
+ * @fileOverview Inventory Dashboard - High-Fidelity Analytics Grid.
  * Phase 400: Implemented 10-point metric grid with real-time telemetry.
- * Matches requested "Inventory Pulse" reference design.
+ * Phase 410: Applied user-friendly terminology (Audit Progress, Need Verification).
  */
 
 import React, { useMemo, useState } from 'react';
@@ -89,8 +89,7 @@ export function AssetSummaryDashboard() {
     
     const [view, setView] = useState<DashboardView>('stats');
 
-    // --- High-Fidelity Telemetry Calculation ---
-    const telemetry = useMemo(() => {
+    const metrics = useMemo(() => {
         const total = assets.length;
         const verified = assets.filter(a => a.status === 'VERIFIED').length;
         const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
@@ -101,40 +100,40 @@ export function AssetSummaryDashboard() {
 
         return {
             coverage: `${coverage}%`,
-            coverageDesc: `Showing ${verified} verified items out of ${total} assets in this scope.`,
+            coverageDesc: `Verified ${verified} of ${total} assets in current scope.`,
             
             pending: assets.filter(a => a.status === 'UNVERIFIED').length,
-            pendingDesc: "Assets currently marked as unverified and requiring field inspection.",
+            pendingDesc: "Assets awaiting mandatory physical field assessment.",
             
             missingId: assets.filter(a => !a.assetIdCode).length,
-            missingIdDesc: "Assets lacking a unique tag or system ID code. Crucial for audits.",
+            missingIdDesc: "Records missing unique Tag IDs or System Codes.",
             
             missingSerial: assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A').length,
-            missingSerialDesc: "Items missing manufacturer serial numbers. Risk for identification.",
+            missingSerialDesc: "Items missing manufacturer serial numbers.",
             
             critical: assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable', 'Writeoff'].includes(a.condition || '')).length,
-            criticalDesc: "Assets reported as stolen, burnt, or unsalvageable.",
+            criticalDesc: "Assets reported as stolen, burnt, or destroyed.",
             
             maintenance: assets.filter(a => ['Bad condition', 'F2: Major repairs required-poor condition'].includes(a.condition || '')).length,
-            maintenanceDesc: "Assets in poor or bad condition requiring technical assessment.",
+            maintenanceDesc: "Assets in poor condition requiring technical attention.",
             
             exceptions: assets.filter(a => a.status === 'DISCREPANCY').length,
-            exceptionsDesc: "Records where field data conflicts with previous system information.",
+            exceptionsDesc: "Records with verified discrepancies from field audits.",
             
             feedback: assets.filter(a => a.remarks && a.remarks.trim().length > 0).length,
-            feedbackDesc: "Assets containing specific comments or remarks from field officers.",
+            feedbackDesc: "Assets containing specific officer comments or field notes.",
             
             modified: assets.filter(a => {
                 const d = new Date(a.lastModified).getTime();
                 return now - d < oneDay;
             }).length,
-            modifiedDesc: "Updates or creations performed in the last 24 hours.",
+            modifiedDesc: "Inventory records updated in the last 24 hours.",
             
             newInFlow: assets.filter(a => {
                 const d = new Date(a.importMetadata?.importedAt || 0).getTime();
                 return now - d < oneWeek;
             }).length,
-            newInFlowDesc: "Fresh records newly registered in the system this week."
+            newInFlowDesc: "New asset records added to the system this week."
         };
     }, [assets]);
 
@@ -152,9 +151,9 @@ export function AssetSummaryDashboard() {
                         <BarChart2 className="h-5 w-5 text-primary" />
                     </div>
                     <div className="space-y-0.5">
-                        <h3 className="text-lg font-black tracking-tight text-white uppercase leading-none">Inventory Pulse</h3>
+                        <h3 className="text-lg font-black tracking-tight text-white uppercase leading-none">Inventory Dashboard</h3>
                         <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">
-                            Real-time status of global assets
+                            Real-time inventory statistics
                         </p>
                     </div>
                 </div>
@@ -168,7 +167,7 @@ export function AssetSummaryDashboard() {
                                 view === 'stats' ? "bg-white/10 text-white" : "text-white/20 hover:text-white"
                             )}
                         >
-                            Key Stats
+                            Quick Stats
                         </button>
                         <button 
                             onClick={() => setView('insights')} 
@@ -177,7 +176,7 @@ export function AssetSummaryDashboard() {
                                 view === 'insights' ? "bg-white/10 text-white" : "text-white/20 hover:text-white"
                             )}
                         >
-                            Asset Insights
+                            Category Insights
                         </button>
                     </div>
                     <Button variant="ghost" size="icon" onClick={refreshRegistry} className="rounded-xl bg-white/5 border border-white/5 text-white/40 hover:text-primary">
@@ -186,86 +185,86 @@ export function AssetSummaryDashboard() {
                 </div>
             </div>
 
-            {/* 2. Diagnostic Grid */}
+            {/* 2. Metric Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6">
                 <StatCard 
-                    label="Verification Coverage" 
-                    value={telemetry.coverage} 
-                    description={telemetry.coverageDesc} 
+                    label="Audit Progress" 
+                    value={metrics.coverage} 
+                    description={metrics.coverageDesc} 
                     icon={ShieldCheck} 
                     iconColor="text-green-500"
                     onClick={() => navigateTo(() => setSelectedStatuses(['VERIFIED']))}
                 />
                 <StatCard 
-                    label="Pending Action" 
-                    value={telemetry.pending} 
-                    description={telemetry.pendingDesc} 
+                    label="Need Verification" 
+                    value={metrics.pending} 
+                    description={metrics.pendingDesc} 
                     icon={Zap} 
                     iconColor="text-primary"
                     onClick={() => navigateTo(() => setSelectedStatuses(['UNVERIFIED']))}
                 />
                 <StatCard 
-                    label="Missing Asset ID" 
-                    value={telemetry.missingId} 
-                    description={telemetry.missingIdDesc} 
+                    label="Missing Tag ID" 
+                    value={metrics.missingId} 
+                    description={metrics.missingIdDesc} 
                     icon={Tag} 
                     iconColor="text-orange-500"
                     onClick={() => navigateTo(() => setMissingFieldFilter('assetIdCode'))}
                 />
                 <StatCard 
                     label="Missing Serials" 
-                    value={telemetry.missingSerial} 
-                    description={telemetry.missingSerialDesc} 
+                    value={metrics.missingSerial} 
+                    description={metrics.missingSerialDesc} 
                     icon={Hash} 
                     iconColor="text-blue-500"
                     onClick={() => navigateTo(() => setMissingFieldFilter('serialNumber'))}
                 />
                 <StatCard 
-                    label="Critical Condition" 
-                    value={telemetry.critical} 
-                    description={telemetry.criticalDesc} 
+                    label="Critical Issues" 
+                    value={metrics.critical} 
+                    description={metrics.criticalDesc} 
                     icon={AlertCircle} 
                     iconColor="text-destructive"
                     isCritical
                     onClick={() => navigateTo(() => setSelectedConditions(['Stolen', 'Burnt', 'Unsalvageable']))}
                 />
                 <StatCard 
-                    label="Maintenance Alert" 
-                    value={telemetry.maintenance} 
-                    description={telemetry.maintenanceDesc} 
+                    label="Need Repairs" 
+                    value={metrics.maintenance} 
+                    description={metrics.maintenanceDesc} 
                     icon={Wrench} 
                     iconColor="text-orange-600"
                     onClick={() => navigateTo(() => setSelectedConditions(['Bad condition']))}
                 />
                 <StatCard 
-                    label="Audit Exceptions" 
-                    value={telemetry.exceptions} 
-                    description={telemetry.exceptionsDesc} 
+                    label="Discrepancies" 
+                    value={metrics.exceptions} 
+                    description={metrics.exceptionsDesc} 
                     icon={FileWarning} 
                     iconColor="text-destructive"
                     isCritical
                     onClick={() => navigateTo(() => setSelectedStatuses(['DISCREPANCY']))}
                 />
                 <StatCard 
-                    label="Field Feedback" 
-                    value={telemetry.feedback} 
-                    description={telemetry.feedbackDesc} 
+                    label="Field Notes" 
+                    value={metrics.feedback} 
+                    description={metrics.feedbackDesc} 
                     icon={MessageSquare} 
                     iconColor="text-teal-500"
                     onClick={() => navigateTo(() => setSearchTerm('remark'))}
                 />
                 <StatCard 
-                    label="Modified Today" 
-                    value={telemetry.modified} 
-                    description={telemetry.modifiedDesc} 
+                    label="Updated Today" 
+                    value={metrics.modified} 
+                    description={metrics.modifiedDesc} 
                     icon={Clock} 
                     iconColor="text-primary"
                     onClick={() => navigateTo(() => setSearchTerm('today'))}
                 />
                 <StatCard 
-                    label="New In-Flow" 
-                    value={telemetry.newInFlow} 
-                    description={telemetry.newInFlowDesc} 
+                    label="Recently Added" 
+                    value={metrics.newInFlow} 
+                    description={metrics.newInFlowDesc} 
                     icon={PlusCircle} 
                     iconColor="text-green-600"
                     onClick={() => navigateTo(() => setSearchTerm('new'))}

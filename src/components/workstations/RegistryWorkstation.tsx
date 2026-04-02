@@ -3,8 +3,7 @@
 /**
  * @fileOverview RegistryWorkstation - High-Fidelity Asset Hub.
  * Phase 600: Implemented Folder-First navigation and persistent view state.
- * Phase 601: Synchronized multi-select action bar for Grid and List views.
- * Phase 602: Integrated Batch Verify and high-fidelity folder transitions.
+ * Phase 610: Applied user-friendly terminology (Categories, Asset Lists).
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -190,7 +189,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
   }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
 
-  // --- Pulse Handlers ---
+  // --- Action Handlers ---
   const handleInspect = (id: string) => {
     setSelectedAssetId(id);
     setIsDetailOpen(true);
@@ -231,7 +230,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (!activeGrant) return;
     const nextEnabled = activeGrant.enabledSheets.filter(s => s !== name);
     await updateActiveGrant({ enabledSheets: nextEnabled });
-    toast({ title: "Group Hidden", description: "The register block is now sequestered." });
+    toast({ title: "Category Hidden", description: "This category has been removed from your active list." });
   };
 
   const handleWipeCategory = async () => {
@@ -253,7 +252,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       });
 
       await refreshRegistry();
-      toast({ title: "Local Pulse Purged", description: "All records in category cleared." });
+      toast({ title: "Category Data Cleared", description: "All local records for this category have been removed." });
       setIsCategoryWipeDialogOpen(false);
     } finally {
       setIsProcessing(false);
@@ -272,7 +271,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       }
       await refreshRegistry();
       setSelectedAssetIds(new Set());
-      toast({ title: "Batch Verification Complete", description: "All selected records marked as verified." });
+      toast({ title: "Batch Verify Complete", description: "Selected items marked as verified." });
     } finally {
       setIsProcessing(false);
     }
@@ -287,7 +286,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       }
       await refreshRegistry();
       setSelectedAssetIds(new Set());
-      toast({ title: "Records Purged" });
+      toast({ title: "Records Removed" });
     } finally {
       setIsProcessing(false);
     }
@@ -298,7 +297,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   return (
     <div className="space-y-8 min-h-[60vh] pb-40">
       
-      {/* 1. Dynamic Workstation Header */}
+      {/* 1. Header Control */}
       <div className="px-1 space-y-6">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4 self-start">
@@ -314,9 +313,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <h2 className="text-3xl font-black uppercase text-white tracking-tight leading-none">{selectedCategory}</h2>
                   <div className="flex items-center gap-2">
                     <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[9px] h-5 px-2">
-                      {filteredAssets.length} RECORDS
+                      {filteredAssets.length} TOTAL ITEMS
                     </Badge>
-                    <span className="text-[9px] font-bold text-white/20 uppercase tracking-[0.25em]">| VIEWING ALL</span>
+                    <span className="text-[9px] font-bold text-white/20 uppercase tracking-[0.25em]">| ASSET LIST</span>
                   </div>
                 </div>
               </div>
@@ -326,8 +325,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <FolderKanban className="h-6 w-6 text-primary" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-2xl font-black uppercase text-white tracking-tight leading-none">Categories & Inventories</h2>
-                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Global Registry Hub</p>
+                  <h2 className="text-2xl font-black uppercase text-white tracking-tight leading-none">Asset Categories</h2>
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Category Overview</p>
                 </div>
               </div>
             )}
@@ -349,7 +348,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
         </div>
 
-        {/* 2. Top Action Command Bar */}
+        {/* 2. Top Action Bar */}
         <AnimatePresence>
           {(selectedAssetIds.size > 0 && selectedCategory) && (
             <motion.div 
@@ -374,7 +373,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </Button>
                 <div className="w-px h-6 bg-white/5 mx-2" />
                 <Button onClick={handleDeleteSelectedAssets} variant="ghost" className="h-11 text-[10px] font-black uppercase tracking-widest gap-2.5 text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-all">
-                  <Trash2 className="h-4 w-4" /> Delete
+                  <Trash2 className="h-4 w-4" /> Remove
                 </Button>
               </div>
               
@@ -386,7 +385,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </AnimatePresence>
       </div>
 
-      {/* 3. Main Operational Surface */}
+      {/* 3. Main Display Area */}
       <div className="px-1">
         <AnimatePresence mode="wait">
           {!selectedCategory ? (
@@ -407,7 +406,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                           <DropdownMenuContent align="end" className="w-56 bg-black border-white/10 rounded-2xl p-2 shadow-3xl">
                             <DropdownMenuItem onClick={() => setSelectedCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
                               <LayoutGrid className="h-4 w-4 text-white/40" />
-                              <span className="text-[11px] font-black uppercase">Open Register</span>
+                              <span className="text-[11px] font-black uppercase">Open Category</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => { setCustomizingCategory(cat.name); setIsColumnSheetOpen(true); }} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
                               <Wrench className="h-4 w-4 text-white/40" />
@@ -415,12 +414,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => handleHideCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
                               <EyeOff className="h-4 w-4 text-white/40" />
-                              <span className="text-[11px] font-black uppercase">Hide Group</span>
+                              <span className="text-[11px] font-black uppercase">Hide Category</span>
                             </DropdownMenuItem>
                             <div className="h-px bg-white/5 my-2" />
                             <DropdownMenuItem onClick={() => { setCategoryToWipe(cat.name); setIsCategoryWipeDialogOpen(true); }} className="p-3 rounded-xl focus:bg-red-600/10 text-red-500 gap-3">
                               <Bomb className="h-4 w-4" />
-                              <span className="text-[11px] font-black uppercase">Wipe Local Pulse</span>
+                              <span className="text-[11px] font-black uppercase">Clear Records</span>
                             </DropdownMenuItem>
                           </DropdownMenuContent>
                         </DropdownMenu>
@@ -430,13 +429,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                       <div className="flex items-end justify-between">
                         <div className="space-y-1">
                           <p className="text-4xl font-black tracking-tighter text-white">{cat.total}</p>
-                          <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">ASSET RECORDS</p>
+                          <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">ASSET COUNT</p>
                         </div>
                         <div className="p-4 bg-white/5 rounded-2xl shadow-inner"><Boxes className="h-8 w-8 text-white/10" /></div>
                       </div>
                       <div className="space-y-3">
                         <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-[0.2em]">
-                          <span className="text-white/40">VERIFICATION</span>
+                          <span className="text-white/40">AUDIT PROGRESS</span>
                           <span className="text-primary">{cat.verified} / {cat.total}</span>
                         </div>
                         <Progress value={(cat.verified / cat.total) * 100} className="h-1 bg-white/5" />
@@ -448,7 +447,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                         variant="outline" 
                         className="w-full h-12 rounded-xl border-white/10 font-black uppercase text-[10px] tracking-widest gap-2 bg-transparent hover:bg-white/5 text-white/60 hover:text-white transition-all"
                       >
-                        View Records <ChevronRight className="h-4 w-4" />
+                        Open List <ChevronRight className="h-4 w-4" />
                       </Button>
                     </CardFooter>
                   </Card>
@@ -459,10 +458,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <Table>
                   <TableHeader className="bg-muted/30">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="py-5 px-8 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Register Block Identity</TableHead>
-                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Volume Pulse</TableHead>
-                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Verification state</TableHead>
-                      <TableHead className="py-5 px-8 text-right text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Action</TableHead>
+                      <TableHead className="py-5 px-8 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Category Name</TableHead>
+                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Total Items</TableHead>
+                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Audit Progress</TableHead>
+                      <TableHead className="py-5 px-8 text-right text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -480,7 +479,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                         <TableCell className="py-6 px-4 w-[350px]">
                           <div className="space-y-2">
                             <div className="flex justify-between text-[8px] font-black uppercase tracking-[0.2em]">
-                              <span className="text-white/40">{cat.verified} PULSES VERIFIED</span>
+                              <span className="text-white/40">{cat.verified} VERIFIED</span>
                               <span className="text-primary">{Math.round((cat.verified/cat.total)*100)}%</span>
                             </div>
                             <Progress value={(cat.verified/cat.total)*100} className="h-1 bg-white/5" />
@@ -554,15 +553,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
               <Bomb className="h-12 w-12 text-destructive" />
             </div>
-            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Wipe Local Pulse?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Clear Category Data?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium italic text-white/60">
-              This will permanently delete all local records for <strong>{categoryToWipe}</strong> and remove its technical definition from your workstation. Cloud authority remains intact.
+              This will permanently delete all local records for <strong>{categoryToWipe}</strong> and remove its technical definition from your workstation. Cloud records are not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0">Abort</AlertDialogCancel>
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleWipeCategory} disabled={isProcessing} className="h-14 px-12 rounded-2xl font-black uppercase bg-destructive text-white m-0">
-              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />} Execute Wipe
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />} Confirm Clear
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -583,7 +582,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               if (orig && orig !== newDef.name) delete nextDefs[orig];
             }
             await updateActiveGrant({ sheetDefinitions: nextDefs });
-            toast({ title: "Schema Layout Updated" });
+            toast({ title: "Inventory Layout Updated" });
           }}
         />
       )}

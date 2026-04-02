@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * @fileOverview DashboardWorkstation - Mobile-Optimized SPA Hub.
+ * @fileOverview DashboardWorkstation - Mobile-Optimized Asset Hub.
  * Phase 250: Implemented swipeable tabs and responsive telemetry stacking.
- * Phase 251: Finalized Inventory Pulse reference parity.
+ * Phase 260: Applied user-friendly terminology (Dashboard, Categories, Verification).
  */
 
 import React, { useState } from 'react';
@@ -43,8 +43,8 @@ export function DashboardWorkstation() {
             <LayoutDashboard className="h-5 w-5 md:h-6 md:w-6 text-primary" />
           </div>
           <div className="space-y-0.5">
-            <h2 className="text-xl md:text-2xl font-black uppercase text-white tracking-tight leading-none">Operational Hub</h2>
-            <p className="text-[8px] md:text-[10px] font-bold text-white/40 uppercase tracking-[0.25em] leading-none">Unified Registry Pulse</p>
+            <h2 className="text-xl md:text-2xl font-black uppercase text-white tracking-tight leading-none">Manager Dashboard</h2>
+            <p className="text-[8px] md:text-[10px] font-bold text-white/40 uppercase tracking-[0.25em] leading-none">Inventory Overview</p>
           </div>
         </div>
 
@@ -52,22 +52,22 @@ export function DashboardWorkstation() {
           <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="w-full">
             <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center min-w-max">
               <TabsTrigger value="overview" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Overview
+                Dashboard
               </TabsTrigger>
               <TabsTrigger value="inventory" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Inventories
+                Asset Categories
               </TabsTrigger>
               <TabsTrigger value="audit" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Audit Queue
+                Field Audits
               </TabsTrigger>
               <TabsTrigger value="reports" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
                 Reports
               </TabsTrigger>
               <TabsTrigger value="trail" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Audit Trail
+                History
               </TabsTrigger>
               <TabsTrigger value="sync" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Sync Status
+                Cloud Sync
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -111,7 +111,7 @@ export function DashboardWorkstation() {
         )}>
           <div className={cn("h-2.5 w-2.5 rounded-full", isOnline ? "bg-green-500 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
           <span className="text-[10px] font-black uppercase tracking-[0.25em]">
-            {isOnline ? 'CLOUD HEARTBEAT ACTIVE' : 'OFFLINE MODE'}
+            {isOnline ? 'CLOUD SYNC ACTIVE' : 'OFFLINE MODE'}
           </span>
         </div>
       </div>
