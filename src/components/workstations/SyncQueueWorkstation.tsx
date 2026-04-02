@@ -3,6 +3,7 @@
 /**
  * @fileOverview SyncQueueWorkstation - Grouped Multi-Select Sync.
  * Phase 400: Implemented Asset Grouping, Multi-Select Pushing, and mode switch.
+ * Phase 410: Integrated "Select All" master control pulse.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -79,8 +80,11 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
   };
 
   const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedIds(new Set(queue.map(q => q.id)));
-    else setSelectedIds(new Set());
+    if (checked) {
+      setSelectedIds(new Set(queue.map(q => q.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
   };
 
   const handleDiscardSelected = async () => {
@@ -98,8 +102,6 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
       toast({ variant: "destructive", title: "Offline Pulse", description: "Internet connection required for cloud broadcast." });
       return;
     }
-    // Note: processSyncQueue usually handles the whole queue, but we can iterate if needed.
-    // For simplicity in this logic, we'll force a full sync as it's safer for state integrity.
     await manualUpload();
     setSelectedIds(new Set());
   };
@@ -112,6 +114,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
 
   const pendingCount = queue.filter(q => q.status === 'PENDING').length;
   const failedCount = queue.filter(q => q.status === 'FAILED').length;
+  const allSelected = queue.length > 0 && selectedIds.size === queue.length;
 
   return (
     <div className={cn("space-y-8", !isEmbedded && "max-w-5xl mx-auto pb-32 animate-in fade-in duration-700")}>
@@ -161,17 +164,31 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
 
       {/* Multi-Select Action Bar */}
       <AnimatePresence>
-        {selectedIds.size > 0 && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="px-2">
-            <div className="bg-primary/5 border-2 border-primary/20 rounded-2xl p-2 flex items-center justify-between shadow-xl">
-              <div className="flex items-center gap-4 ml-4">
-                <Badge className="bg-primary text-black font-black text-[10px] h-7 px-4 rounded-xl">{selectedIds.size} SELECTED</Badge>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" onClick={handleDiscardSelected} className="h-10 px-4 rounded-xl font-black text-[9px] uppercase text-destructive/60 hover:text-destructive hover:bg-destructive/10">Discard Selection</Button>
-                <Button onClick={handlePushSelected} className="h-10 px-6 rounded-xl font-black text-[9px] uppercase bg-primary text-black shadow-lg">Push Pulse</Button>
-              </div>
+        {queue.length > 0 && (
+          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="px-2 space-y-4">
+            <div className="flex items-center gap-3 px-6 py-3 bg-white/5 rounded-2xl border border-white/10 group transition-all hover:border-primary/20">
+              <Checkbox 
+                id="sync-select-all" 
+                checked={allSelected} 
+                onCheckedChange={handleSelectAll}
+                className="h-5 w-5 rounded-lg border-2 data-[state=checked]:bg-primary"
+              />
+              <label htmlFor="sync-select-all" className="text-[10px] font-black uppercase tracking-[0.25em] text-white/60 cursor-pointer group-hover:text-primary transition-colors">
+                Select All Pending Pulses ({queue.length})
+              </label>
             </div>
+
+            {selectedIds.size > 0 && (
+              <div className="bg-primary/5 border-2 border-primary/20 rounded-2xl p-2 flex items-center justify-between shadow-xl animate-in zoom-in-95 duration-200">
+                <div className="flex items-center gap-4 ml-4">
+                  <Badge className="bg-primary text-black font-black text-[10px] h-7 px-4 rounded-xl">{selectedIds.size} SELECTED</Badge>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Button variant="ghost" onClick={handleDiscardSelected} className="h-10 px-4 rounded-xl font-black text-[9px] uppercase text-destructive/60 hover:text-destructive hover:bg-destructive/10">Discard Selection</Button>
+                  <Button onClick={handlePushSelected} className="h-10 px-6 rounded-xl font-black text-[9px] uppercase bg-primary text-black shadow-lg">Push Pulse</Button>
+                </div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
@@ -199,7 +216,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                       <Checkbox 
                         checked={selectedIds.has(entry.id)} 
                         onCheckedChange={() => handleToggleSelect(entry.id)}
-                        className="h-6 w-6 rounded-full border-2 border-white/10"
+                        className="h-6 w-6 rounded-full border-2 border-white/10 data-[state=checked]:bg-primary"
                       />
                       
                       <div className="flex-1 min-w-0">

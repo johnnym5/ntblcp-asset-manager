@@ -47,6 +47,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { ASSET_CONDITIONS } from "@/lib/constants";
 import { AssetSchema } from "@/core/registry/validation";
 import { AssetChecklist } from "./asset-checklist";
+import { Badge } from "./ui/badge";
 import type { Asset } from "@/types/domain";
 
 interface AssetFormProps {
@@ -82,7 +83,12 @@ export default function AssetForm({
     if (isAdmin) return false; // Admins override everything
 
     // In Management Mode, audit-specific fields are strictly locked for normal users
-    if (isManagementMode && ['verifiedStatus', 'condition', 'remarks', 'status'].includes(fieldName)) {
+    if (isManagementMode && ['status', 'condition', 'remarks'].includes(fieldName)) {
+      return true;
+    }
+
+    // Secondary Check: In Verification mode, non-admins can ONLY edit audit fields
+    if (appSettings?.appMode === 'verification' && !['status', 'condition', 'remarks'].includes(fieldName)) {
       return true;
     }
 
@@ -141,7 +147,7 @@ export default function AssetForm({
               </DialogTitle>
               <div className="flex items-center gap-3">
                 <DialogDescription className="text-sm font-medium text-white/40 italic">
-                  {asset ? 'Viewing current registry pulse.' : 'Initializing new asset pulse.'}
+                  {asset ? 'Viewing current registry record.' : 'Initializing new asset record.'}
                 </DialogDescription>
                 {isManagementMode && !isAdmin && (
                   <Badge className="bg-orange-500/10 text-orange-500 border-orange-500/20 text-[8px] font-black uppercase">
@@ -164,7 +170,7 @@ export default function AssetForm({
                     
                     {/* Identification Section */}
                     <div className="space-y-6">
-                      <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Identity Pulse</h4>
+                      <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Identity Markers</h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <FormField control={form.control} name="sn" render={({ field }) => (
                           <FormItem>
@@ -221,8 +227,8 @@ export default function AssetForm({
                     {/* Audit Assessment - Mode Sensitive */}
                     <div className="space-y-6">
                       <div className="flex items-center justify-between">
-                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Verification Pulse</h4>
-                        {isManagementMode && <Lock className="h-3 w-3 text-white/20" />}
+                        <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary">Field Audit Assessment</h4>
+                        {(isManagementMode && !isAdmin) && <Lock className="h-3 w-3 text-white/20" />}
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                         <FormField control={form.control} name="status" render={({ field }) => (
@@ -256,13 +262,13 @@ export default function AssetForm({
                               disabled={isFieldDisabled('condition')}
                             >
                               <FormControl>
-                                <SelectTrigger className="h-12 bg-white/[0.03] border-2 border-white/5 rounded-xl font-bold text-xs">
+                                <SelectTrigger className="h-12 bg-white/[0.03] border-2 border-white/5 rounded-xl font-bold text-xs text-white">
                                   <SelectValue placeholder="Assess condition..." />
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent className="bg-black border-white/10 max-h-[300px]">
                                 {ASSET_CONDITIONS.map(c => (
-                                  <SelectItem key={c} value={c} className="font-bold text-xs py-3">{c}</SelectItem>
+                                  <SelectItem key={c} value={c} className="font-bold text-xs py-3 text-white">{c}</SelectItem>
                                 ))}
                               </SelectContent>
                             </Select>
@@ -299,8 +305,8 @@ export default function AssetForm({
                   </div>
                   <div className="space-y-3">
                     <div className="flex justify-between">
-                      <span className="text-[8px] font-black uppercase text-white/20">Source Sheet</span>
-                      <span className="text-[9px] font-bold text-white/60">{formValues.category || 'Manual'}</span>
+                      <span className="text-[8px] font-black uppercase text-white/20">Source Group</span>
+                      <span className="text-[9px] font-bold text-white/60">{formValues.category || 'Manual Entry'}</span>
                     </div>
                     <div className="flex justify-between">
                       <span className="text-[8px] font-black uppercase text-white/20">Registry Row</span>
@@ -318,7 +324,7 @@ export default function AssetForm({
 
           {/* Footer Controls */}
           <div className="p-8 border-t border-white/5 bg-white/[0.02] flex items-center justify-between">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-widest bg-white/5 hover:bg-white/10">
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-14 px-10 rounded-2xl font-black uppercase text-xs tracking-widest bg-white/5 hover:bg-white/10 text-white/60">
               Discard Changes
             </Button>
             {!externalReadOnly && (

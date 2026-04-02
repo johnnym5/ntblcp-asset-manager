@@ -30,7 +30,9 @@ import {
   Smartphone,
   ShieldCheck,
   Eye,
-  ShieldAlert
+  ShieldAlert,
+  Sun,
+  Moon
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,26 +43,12 @@ import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
 import { UserManagement } from '@/components/admin/user-management';
-import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
-import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { cn } from '@/lib/utils';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
 import { AuditLogWorkstation } from './AuditLogWorkstation';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import type { AppSettings, SheetDefinition, Grant } from '@/types/domain';
-import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible";
+import type { AppSettings, Grant } from '@/types/domain';
 
 export function SettingsWorkstation() {
   const { 
@@ -76,32 +64,30 @@ export function SettingsWorkstation() {
   const { toast } = useToast();
   const { setTheme, theme } = useTheme();
 
-  const [isDiscovering, setIsDiscovering] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
-
-  const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
-  const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
-  const [originalSheetName, setOriginalSheetName] = useState<string | null>(null);
-  const [activeGrantIdForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
-  
-  const templateInputRef = useRef<HTMLInputElement>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   const isAdmin = userProfile?.isAdmin || false;
 
   const handleSettingChange = async (key: keyof AppSettings, value: any) => {
     if (!appSettings) return;
+    setIsSaving(true);
     
     try {
+      const updatedSettings = { ...appSettings, [key]: value };
+      
       if (isOnline) {
         await FirestoreService.updateSettings({ [key]: value });
       }
       
-      const updatedSettings = { ...appSettings, [key]: value };
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
+      toast({ title: "Settings Updated", description: "Governance pulse broadcasted successfully." });
       
     } catch (e: any) {
       toast({ variant: "destructive", title: "Broadcast Failure" });
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -115,7 +101,6 @@ export function SettingsWorkstation() {
     };
     await handleSettingChange('grants', [...appSettings.grants, newGrant]);
     setNewProjectName('');
-    toast({ title: "Project Added" });
   };
 
   if (!settingsLoaded || !appSettings) return (
@@ -212,6 +197,7 @@ export function SettingsWorkstation() {
                   <Switch 
                     checked={appSettings.appMode === 'management'} 
                     onCheckedChange={(v) => handleSettingChange('appMode', v ? 'management' : 'verification')}
+                    disabled={isSaving}
                     className="data-[state=checked]:bg-primary"
                   />
                 </div>
@@ -223,6 +209,7 @@ export function SettingsWorkstation() {
                   <Switch 
                     checked={appSettings.appMode === 'verification'} 
                     onCheckedChange={(v) => handleSettingChange('appMode', v ? 'verification' : 'management')}
+                    disabled={isSaving}
                     className="data-[state=checked]:bg-primary"
                   />
                 </div>
