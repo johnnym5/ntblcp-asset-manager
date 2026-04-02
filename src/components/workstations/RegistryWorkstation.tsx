@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview RegistryWorkstation - High-Fidelity Asset Inventory.
  * Phase 280: Implemented Batch Deletion Pulse & Administrative Confirmation.
+ * Phase 281: Hardened search filters against undefined data pulses.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -115,9 +115,9 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       results = results.filter(a => 
-        a.description.toLowerCase().includes(term) || 
-        a.assetIdCode?.toLowerCase().includes(term) ||
-        a.serialNumber.toLowerCase().includes(term)
+        (a.description || '').toLowerCase().includes(term) || 
+        (a.assetIdCode || '').toLowerCase().includes(term) ||
+        (a.serialNumber || '').toLowerCase().includes(term)
       );
     }
 
@@ -428,6 +428,7 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
               onClick={confirmDeleteSelected}
               className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0"
             >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Hammer className="h-4 w-4 mr-2" />}
               Commit Wipe Pulse
             </AlertDialogAction>
           </AlertDialogFooter>

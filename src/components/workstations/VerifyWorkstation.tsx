@@ -4,6 +4,7 @@
  * @fileOverview VerifyWorkstation - Field Audit Queue.
  * Phase 165: Renamed to Field Audit Queue.
  * Phase 166: Applied state-locking logic for regional auditors.
+ * Phase 167: Hardened search filters against undefined pulses.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -64,7 +65,10 @@ export function VerifyWorkstation() {
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      list = list.filter(a => a.description.toLowerCase().includes(term) || a.assetIdCode?.toLowerCase().includes(term));
+      list = list.filter(a => 
+        (a.description || '').toLowerCase().includes(term) || 
+        (a.assetIdCode || '').toLowerCase().includes(term)
+      );
     }
     return list;
   }, [assets, searchTerm, userProfile]);
@@ -83,7 +87,10 @@ export function VerifyWorkstation() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-2">
           <h2 className="text-3xl font-black tracking-tight text-foreground uppercase flex items-center gap-3">
-            <ClipboardCheck className="h-8 w-8 text-primary" /> Field Audit Queue
+            <div className="p-3 bg-primary/10 rounded-2xl">
+              <ClipboardCheck className="h-8 w-8 text-primary" />
+            </div>
+            Field Audit Queue
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
             Mandatory Field Assessments & Audit Tasks
@@ -95,7 +102,7 @@ export function VerifyWorkstation() {
       </div>
 
       <div className="relative group px-2">
-        <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40" />
+        <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-colors" />
         <Input placeholder="Search Audit Queue..." className="pl-12 h-14 rounded-2xl bg-card border-none shadow-xl" value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
       </div>
 
@@ -122,7 +129,7 @@ export function VerifyWorkstation() {
         </AnimatePresence>
       </div>
 
-      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} headers={headers} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} onQuickSave={async () => {}} />
+      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
     </div>
   );
 }

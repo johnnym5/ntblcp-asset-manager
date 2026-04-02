@@ -3,6 +3,7 @@
 /**
  * @fileOverview ImportWorkstation - Controlled Registry Ingestion.
  * Phase 310: Implemented Group Selection Layer and positional ingestion pulse.
+ * Phase 311: Optimized button widths for mobile responsiveness.
  */
 
 import React, { useState, useRef } from 'react';
@@ -280,7 +281,7 @@ export function ImportWorkstation() {
                 <Button 
                   onClick={handleExecuteImport}
                   disabled={selectedGroupIds.size === 0 || isProcessing}
-                  className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl bg-primary text-black gap-4 transition-transform hover:scale-105 active:scale-95 min-w-[300px]"
+                  className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl bg-primary text-black gap-4 transition-transform hover:scale-105 active:scale-95 w-full md:min-w-[300px] md:w-auto"
                 >
                   {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <ChevronRight className="h-6 w-6" />}
                   Finalize Selection
@@ -303,7 +304,7 @@ export function ImportWorkstation() {
                 <Button 
                   onClick={handleCommitToRegistry}
                   disabled={isProcessing}
-                  className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-transform hover:scale-105 active:scale-95 bg-primary text-black min-w-[300px]"
+                  className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-transform hover:scale-105 active:scale-95 bg-primary text-black w-full md:min-w-[300px] md:w-auto"
                 >
                   {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <DatabaseZap className="h-6 w-6" />}
                   Merge Valid Pulses

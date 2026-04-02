@@ -3,6 +3,7 @@
 /**
  * @fileOverview AlertsWorkstation - Critical Exceptions Dashboard.
  * Phase 165: Renamed to Critical Exceptions.
+ * Phase 166: Hardened search filters against undefined data.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -46,8 +47,8 @@ export function AlertsWorkstation() {
     if (!searchTerm) return criticalAssets;
     const term = searchTerm.toLowerCase();
     return criticalAssets.filter(a => 
-      a.description.toLowerCase().includes(term) || 
-      a.assetIdCode?.toLowerCase().includes(term)
+      (a.description || '').toLowerCase().includes(term) || 
+      (a.assetIdCode || '').toLowerCase().includes(term)
     );
   }, [criticalAssets, searchTerm]);
 

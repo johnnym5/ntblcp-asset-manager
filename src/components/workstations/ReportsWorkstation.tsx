@@ -5,6 +5,7 @@
  * Phase 165: Renamed to Inventory Reports.
  * Phase 170: Updated High-Risk Exceptions to Travel Report Pulse.
  * Phase 171: Applied regional state-lock to reporting statistics.
+ * Phase 172: Hardened stats calculation against undefined condition metadata.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -100,7 +101,7 @@ export function ReportsWorkstation() {
 
   const stats = useMemo(() => {
     const verified = scopedAssets.filter(a => a.status === 'VERIFIED').length;
-    const exceptions = scopedAssets.filter(a => a.status === 'DISCREPANCY' || ['Stolen', 'Burnt'].includes(a.condition)).length;
+    const exceptions = scopedAssets.filter(a => a.status === 'DISCREPANCY' || ['Stolen', 'Burnt'].includes(a.condition || '')).length;
     return { total: scopedAssets.length, verified, exceptions };
   }, [scopedAssets]);
 

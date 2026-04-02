@@ -1,6 +1,9 @@
+'use client';
+
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Phase 300: Implemented Controlled Import with Positional Mapping & Group Selection.
+ * Phase 301: Expanded Domain Fields to include LGA and Site for better capture rates.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -269,7 +272,7 @@ export class ParserEngine {
     const domainFields = [
       'sn', 'description', 'location', 'custodian', 'assetIdCode', 
       'serialNumber', 'manufacturer', 'modelNumber', 'purchaseDate', 
-      'value', 'condition', 'remarks'
+      'value', 'condition', 'remarks', 'lga', 'site'
     ];
     return domainFields.includes(key);
   }
