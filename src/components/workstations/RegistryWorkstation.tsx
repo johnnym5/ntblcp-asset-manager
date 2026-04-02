@@ -1,10 +1,10 @@
-
 'use client';
 
 /**
  * @fileOverview RegistryWorkstation - High-Fidelity Asset Inventory.
  * Phase 500: Implemented View State Persistence & New Action Bar Pulse.
  * Phase 501: Achieved 100% parity with "ECG monitors" reference header and action bar.
+ * Phase 502: Fixed Grant-level settings path for Category Wipe/Hide.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -60,7 +60,8 @@ import { isWithinScope } from '@/core/auth/rbac';
 import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
-import type { Asset, SheetDefinition } from '@/types/domain';
+import { FirestoreService } from '@/services/firebase/firestore';
+import type { Asset, SheetDefinition, Grant } from '@/types/domain';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -140,8 +141,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   // --- Data Logic ---
   const categoryStats = useMemo(() => {
+    const activeGrant = appSettings?.grants.find(g => g.id === appSettings.activeGrantId);
+    const enabledSheets = new Set(activeGrant?.enabledSheets || []);
+
     const groups = assets.reduce((acc, a) => {
       const cat = a.category || 'General';
+      if (!enabledSheets.has(cat)) return acc; // Only show enabled ones
+      
       if (!acc[cat]) acc[cat] = { total: 0, verified: 0 };
       acc[cat].total++;
       if (a.status === 'VERIFIED') acc[cat].verified++;
@@ -149,7 +155,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }, {} as Record<string, { total: number, verified: number }>);
 
     return Object.entries(groups).map(([name, stats]) => ({ name, ...stats })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [assets]);
+  }, [assets, appSettings]);
 
   const filteredAssets = useMemo(() => {
     let results = assets;
@@ -163,7 +169,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         (a.assetIdCode || '').toLowerCase().includes(term)
       );
     }
-    return results.sort((a, b) => String((a as any)[sortKey] ?? '').localeCompare(String((b as any)[sortKey] ?? ''), undefined, { numeric: true }) * (sortDir === 'asc' ? 1 : -1));
+    return results.sort((a, b) => {
+      const valA = String((a as any)[sortKey] ?? '');
+      const valB = String((b as any)[sortKey] ?? '');
+      return valA.localeCompare(valB, undefined, { numeric: true }) * (sortDir === 'asc' ? 1 : -1);
+    });
   }, [assets, selectedCategory, searchTerm, sortKey, sortDir, userProfile]);
 
   const selectedRecord = useMemo(() => {
@@ -184,6 +194,79 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setSelectedAssetIds(next);
   };
 
+  const handleHideCategory = async (categoryName: string) => {
+    if (!appSettings || !appSettings.activeGrantId) return;
+    
+    const nextGrants = appSettings.grants.map(grant => {
+      if (grant.id === appSettings.activeGrantId) {
+        return {
+          ...grant,
+          enabledSheets: (grant.enabledSheets || []).filter(s => s !== categoryName)
+        };
+      }
+      return grant;
+    });
+
+    const nextSettings = { ...appSettings, grants: nextGrants };
+    setAppSettings(nextSettings);
+    await storage.saveSettings(nextSettings);
+    if (isOnline) {
+      await FirestoreService.updateSettings({ grants: nextGrants });
+    }
+    toast({ title: "View Scope Updated", description: `${categoryName} has been hidden from the workstation.` });
+  };
+
+  const handleWipeCategory = async () => {
+    if (!categoryToWipe || !appSettings || !appSettings.activeGrantId) return;
+    setIsProcessing(true);
+    try {
+      // 1. Delete all assets in the category
+      const idsToPurge = assets.filter(a => a.category === categoryToWipe).map(a => a.id);
+      for (const id of idsToPurge) await enqueueMutation('DELETE', 'assets', { id });
+      
+      // 2. Remove group from active grant in settings
+      const nextGrants = appSettings.grants.map(grant => {
+        if (grant.id === appSettings.activeGrantId) {
+          const nextEnabled = (grant.enabledSheets || []).filter(s => s !== categoryToWipe);
+          const nextDefs = { ...grant.sheetDefinitions };
+          delete nextDefs[categoryToWipe];
+          return { ...grant, enabledSheets: nextEnabled, sheetDefinitions: nextDefs };
+        }
+        return grant;
+      });
+      
+      const nextSettings = { ...appSettings, grants: nextGrants };
+      setAppSettings(nextSettings);
+      await storage.saveSettings(nextSettings);
+      if (isOnline) {
+        await FirestoreService.updateSettings({ grants: nextGrants });
+      }
+      
+      await refreshRegistry();
+      toast({ title: "Group & Data Purged", description: "Category removed from system configuration." });
+      setIsCategoryWipeDialogOpen(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Purge Failed" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleInspectCategory = (name: string) => {
+    setSelectedCategory(name);
+    setSelectedAssetIds(new Set());
+  };
+
+  const handleNext = () => {
+    const idx = filteredAssets.findIndex(a => a.id === selectedAssetId);
+    if (idx < filteredAssets.length - 1) setSelectedAssetId(filteredAssets[idx + 1].id);
+  };
+
+  const handlePrevious = () => {
+    const idx = filteredAssets.findIndex(a => a.id === selectedAssetId);
+    if (idx > 0) setSelectedAssetId(filteredAssets[idx - 1].id);
+  };
+
   const handleDeleteSelectedAssets = async () => {
     if (selectedAssetIds.size === 0) return;
     setIsProcessing(true);
@@ -199,37 +282,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
-  const handleWipeCategory = async () => {
-    if (!categoryToWipe || !appSettings) return;
-    setIsProcessing(true);
-    try {
-      // 1. Delete all assets in the category
-      const idsToPurge = assets.filter(a => a.category === categoryToWipe).map(a => a.id);
-      for (const id of idsToPurge) await enqueueMutation('DELETE', 'assets', { id });
-      
-      // 2. Remove group from settings
-      const nextEnabled = appSettings.enabledSheets.filter(s => s !== categoryToWipe);
-      const nextDefs = { ...appSettings.sheetDefinitions };
-      delete nextDefs[categoryToWipe];
-      
-      const nextSettings = { ...appSettings, enabledSheets: nextEnabled, sheetDefinitions: nextDefs };
-      setAppSettings(nextSettings);
-      await storage.saveSettings(nextSettings);
-      
-      await refreshRegistry();
-      toast({ title: "Group & Data Purged", description: "Category removed from system configuration." });
-      setIsCategoryWipeDialogOpen(false);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const isListView = !!selectedCategory;
+
+  if (!isHydrated) return null;
 
   return (
     <div className="space-y-8 min-h-[60vh] pb-40">
       
-      {/* 1. Dynamic Workstation Header (Screenshot Parity) */}
+      {/* 1. Dynamic Workstation Header */}
       <div className="px-1 space-y-6">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4 self-start">
@@ -270,7 +330,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
         </div>
 
-        {/* 2. Top Action Bar (Screenshot Parity) - Visible when assets are selected */}
+        {/* 2. Top Action Bar */}
         <AnimatePresence>
           {selectedAssetIds.size > 0 && isListView && (
             <motion.div 
@@ -348,7 +408,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                       </div>
                     </CardContent>
                     <CardFooter className="px-8 pb-8 pt-0">
-                      <Button onClick={() => setSelectedCategory(cat.name)} variant="outline" className="w-full h-12 rounded-xl border-white/10 font-black uppercase text-[10px] tracking-widest gap-2 bg-transparent hover:bg-white/5 text-white/60 hover:text-white transition-all">
+                      <Button onClick={() => handleInspectCategory(cat.name)} variant="outline" className="w-full h-12 rounded-xl border-white/10 font-black uppercase text-[10px] tracking-widest gap-2 bg-transparent hover:bg-white/5 text-white/60 hover:text-white transition-all">
                         View Records <ChevronRight className="h-3.5 w-3.5" />
                       </Button>
                     </CardFooter>
@@ -368,7 +428,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   </TableHeader>
                   <TableBody>
                     {categoryStats.map(cat => (
-                      <TableRow key={cat.name} className="group hover:bg-primary/[0.02] border-b last:border-0 cursor-pointer" onClick={() => setSelectedCategory(cat.name)}>
+                      <TableRow key={cat.name} className="group hover:bg-primary/[0.02] border-b last:border-0 cursor-pointer" onClick={() => handleInspectCategory(cat.name)}>
                         <TableCell className="py-6 px-6">
                           <div className="flex items-center gap-4">
                             <div className="p-3 bg-white/5 rounded-xl"><TableIcon className="h-5 w-5 text-white/20" /></div>
@@ -435,6 +495,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         onOpenChange={setIsDetailOpen} 
         record={selectedRecord} 
         onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} 
+        onNext={handleNext} 
+        onPrevious={handlePrevious} 
       />
       
       <AssetForm 
@@ -459,18 +521,35 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         onSave={async () => { setSelectedCategoryNames(new Set()); await refreshRegistry(); }} 
       />
       
-      {customizingCategory && appSettings?.sheetDefinitions[customizingCategory] && (
+      {customizingCategory && appSettings?.grants.find(g => g.id === appSettings.activeGrantId)?.sheetDefinitions[customizingCategory] && (
         <ColumnCustomizationSheet 
           isOpen={isColumnSheetOpen} 
           onOpenChange={setIsColumnSheetOpen} 
-          sheetDefinition={appSettings.sheetDefinitions[customizingCategory]} 
+          sheetDefinition={appSettings.grants.find(g => g.id === appSettings.activeGrantId)!.sheetDefinitions[customizingCategory]} 
           originalSheetName={customizingCategory} 
           onSave={async (orig, newDef, applyToAll) => {
-            if (!appSettings) return;
-            const nextDefs = { ...appSettings.sheetDefinitions, [newDef.name]: newDef };
-            const nextSettings = { ...appSettings, sheetDefinitions: nextDefs };
+            if (!appSettings || !appSettings.activeGrantId) return;
+            
+            const nextGrants = appSettings.grants.map(grant => {
+              if (grant.id === appSettings.activeGrantId) {
+                const nextDefs = { ...grant.sheetDefinitions };
+                if (applyToAll) {
+                  Object.keys(nextDefs).forEach(k => { nextDefs[k] = { ...newDef, name: k }; });
+                } else {
+                  nextDefs[newDef.name] = newDef;
+                  if (orig && orig !== newDef.name) delete nextDefs[orig];
+                }
+                return { ...grant, sheetDefinitions: nextDefs };
+              }
+              return grant;
+            });
+
+            const nextSettings = { ...appSettings, grants: nextGrants };
             setAppSettings(nextSettings);
             await storage.saveSettings(nextSettings);
+            if (isOnline) {
+              await FirestoreService.updateSettings({ grants: nextGrants });
+            }
             toast({ title: "Template Arrangement Synchronized" });
           }} 
         />
