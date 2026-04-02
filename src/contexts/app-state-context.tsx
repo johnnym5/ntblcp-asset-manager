@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 270: Implemented multi-state scope downloads for Zonal Administrators.
+ * Phase 360: Integrated Real-Time Settings Pulse via Firestore onSnapshot.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react';
@@ -10,6 +11,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { storage } from '@/offline/storage';
 import { processSyncQueue } from '@/offline/sync';
 import { FirestoreService } from '@/services/firebase/firestore';
+import { db } from '@/lib/firebase';
+import { onSnapshot, doc } from 'firebase/firestore';
 import type { Asset, AppSettings, DataSource, AuthorityNode, WorkstationView } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
@@ -150,6 +153,38 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, [isHydrated]);
 
+  // Establish Real-time Governance Pulse
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    // 1. Initial Local State Recovery
+    storage.getSettings().then(local => {
+      if (local) {
+        setAppSettings(local);
+        setSettingsLoaded(true);
+      }
+    });
+
+    // 2. Continuous Cloud Synchronization
+    if (db) {
+      const settingsRef = doc(db, 'config', 'settings');
+      const unsubscribe = onSnapshot(settingsRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const remoteSettings = snapshot.data() as AppSettings;
+          setAppSettings(remoteSettings);
+          // Sync to local IDB for offline parity
+          storage.saveSettings(remoteSettings);
+          setSettingsLoaded(true);
+        } else {
+          setSettingsLoaded(true);
+        }
+      }, (error) => {
+        console.warn("Governance Pulse: Latency detected in settings sync.", error);
+      });
+      return () => unsubscribe();
+    }
+  }, [isHydrated]);
+
   const setActiveView = useCallback((view: WorkstationView) => {
     setActiveViewStatus(view);
     if (typeof window !== 'undefined') {
@@ -197,8 +232,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
     const userSession = localStorage.getItem('assetain-user-session');
     const profile = userSession ? JSON.parse(userSession) : null;
-    
-    // Phase 270: Extract all authorized state scopes for the user (Zonal Admin support)
     const stateScopes = (profile && !profile.isAdmin) ? profile.states : undefined;
 
     setIsSyncing(true);
@@ -214,11 +247,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         await storage.saveSettings(remoteSettings);
         
         if (remoteSettings.activeGrantId) {
-          // Fetch only authorized records
           const remoteAssets = await FirestoreService.getProjectAssets(remoteSettings.activeGrantId, stateScopes);
           const localAssets = await storage.getAssets();
           
-          // Selective merge logic: preserve other projects, overwrite active scope
           let nextAssets;
           if (stateScopes) {
             const scopeSet = new Set(stateScopes.map(s => s.toLowerCase()));
