@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
- * Phase 61: Integrated Structure-Preserving Excel Export Pulse.
+ * Phase 62: Implemented multi-select value discovery for all headers.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -18,28 +18,16 @@ import {
   Plus, 
   Boxes, 
   Loader2, 
-  FileDown, 
   Database,
   DatabaseZap,
-  X,
-  Columns,
   ArrowUpDown,
   ChevronLeft,
   ChevronRight,
-  FilterX,
-  LayoutGrid,
-  List,
   Zap,
   Edit3,
   Trash2,
   Settings2,
-  ShieldCheck,
   Palette,
-  Bookmark,
-  Info,
-  CheckSquare,
-  Square,
-  Activity,
   Globe,
   CloudOff,
   FolderKanban,
@@ -62,8 +50,8 @@ import { TagPrintDialog } from '@/components/registry/TagPrintDialog';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import type { Asset } from '@/types/domain';
-import type { RegistryHeader, AssetRecord, HeaderFilter, RegistryPreset } from '@/types/registry';
-import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord, REGISTRY_PRESETS } from '@/lib/registry-utils';
+import type { RegistryHeader, AssetRecord, HeaderFilter } from '@/types/registry';
+import { DEFAULT_REGISTRY_HEADERS, transformAssetToRecord } from '@/lib/registry-utils';
 import { Badge } from '@/components/ui/badge';
 import { ExcelService } from '@/services/excel-service';
 import { storage } from '@/offline/storage';
@@ -103,7 +91,6 @@ export default function AssetRegistryPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [searchTerm, setSearchTerm] = useState("");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [activePresetId, setActivePresetId] = useState<string>("quick");
   
   // --- Selection State ---
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
@@ -122,7 +109,7 @@ export default function AssetRegistryPage() {
 
   // --- Logic State ---
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
-  const [sortKey, setSortKey] = useState<string>('sn');
+  const [sortKey, setSortKey] = useState<string>('');
   const [sortDir, setSortDirection] = useState<'asc' | 'desc'>('asc');
   const [selectedRecord, setSelectedRecord] = useState<AssetRecord | undefined>();
   const [selectedAssetForForm, setSelectedAssetForForm] = useState<Asset | undefined>();
@@ -131,12 +118,17 @@ export default function AssetRegistryPage() {
 
   useEffect(() => {
     const savedHeaders = localStorage.getItem('registry-header-prefs');
+    let loadedHeaders: RegistryHeader[] = [];
     if (savedHeaders) {
-      setHeaders(JSON.parse(savedHeaders));
+      loadedHeaders = JSON.parse(savedHeaders);
     } else {
-      const initial = DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i }));
-      setHeaders(initial as RegistryHeader[]);
+      loadedHeaders = DEFAULT_REGISTRY_HEADERS.map((h, i) => ({ ...h, id: `h-${i}`, orderIndex: i })) as RegistryHeader[];
     }
+    setHeaders(loadedHeaders);
+    
+    // Set default sort to S/N header
+    const snHeader = loadedHeaders.find(h => h.normalizedName === 'sn');
+    if (snHeader) setSortKey(snHeader.id);
   }, []);
 
   const saveHeaderPrefs = (updated: RegistryHeader[]) => {
@@ -144,30 +136,13 @@ export default function AssetRegistryPage() {
     localStorage.setItem('registry-header-prefs', JSON.stringify(updated));
   };
 
-  const handleQuickExport = () => {
-    const activeProject = appSettings?.grants.find(g => g.id === activeGrantId)?.name || 'Registry';
-    const snapshot = {
-      project: activeProject,
-      timestamp: new Date().toISOString(),
-      source: dataSource,
-      records: assets
-    };
-    const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
-    saveAs(blob, `Registry-Pulse-${activeProject.replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.json`);
-    toast({ title: "Registry Pulse Exported", description: "Project snapshot saved to local storage." });
-  };
-
   const handleExcelExport = async () => {
     setIsExportingExcel(true);
     try {
       await ExcelService.exportRegistry(assets, headers);
-      toast({ title: "Excel Pulse Complete", description: "Registry data exported with template alignment." });
+      toast({ title: "Excel Pulse Complete" });
     } catch (e: any) {
-      toast({ 
-        variant: "destructive", 
-        title: "Export Failed", 
-        description: e.message || "Workbook creation interrupted." 
-      });
+      toast({ variant: "destructive", title: "Export Failed" });
     } finally {
       setIsExportingExcel(false);
     }
@@ -176,7 +151,6 @@ export default function AssetRegistryPage() {
   const handleReassignGrant = async (targetGrantId: string) => {
     if (selectedIds.size === 0) return;
     setIsReassigning(true);
-    
     try {
       const assetsToMove = assets.filter(a => selectedIds.has(a.id));
       for (const asset of assetsToMove) {
@@ -190,17 +164,39 @@ export default function AssetRegistryPage() {
         const currentLocal = await storage.getAssets();
         await storage.saveAssets(currentLocal.map(a => a.id === asset.id ? updated : a));
       }
-      
       await refreshRegistry();
       setSelectedIds(new Set());
       setIsReassignDialogOpen(false);
-      toast({ title: "Migration Pulse Complete", description: `Reassigned ${assetsToMove.length} records to new project scope.` });
+      toast({ title: "Migration Pulse Complete" });
     } finally {
       setIsReassigning(false);
     }
   };
 
   const currentRegistry = dataSource === 'PRODUCTION' ? assets : sandboxAssets;
+
+  // 1. Transform raw registry to structured records first
+  const allRecords = useMemo(() => {
+    return currentRegistry.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding));
+  }, [currentRegistry, headers, appSettings?.sourceBranding]);
+
+  // 2. Discover all unique values for each sortable header (Options for the new multi-select filter)
+  const optionsMap = useMemo(() => {
+    const map: Record<string, Set<string>> = {};
+    headers.filter(h => h.sortEnabled).forEach(h => map[h.id] = new Set<string>());
+    
+    allRecords.forEach(r => {
+      r.fields.forEach(f => {
+        if (map[f.headerId] && f.displayValue && f.displayValue !== "---") {
+          map[f.headerId].add(f.displayValue);
+        }
+      });
+    });
+    
+    const finalMap: Record<string, string[]> = {};
+    Object.keys(map).forEach(id => finalMap[id] = Array.from(map[id]).sort());
+    return finalMap;
+  }, [allRecords, headers]);
 
   const metrics = useMemo(() => {
     const total = currentRegistry.length;
@@ -210,36 +206,8 @@ export default function AssetRegistryPage() {
     return { total, verified, exceptions, dataGaps };
   }, [currentRegistry]);
 
-  const applyMetricFilter = (type: 'verified' | 'exceptions' | 'gaps' | 'pending') => {
-    let targetHeaderId = '';
-    let targetValue = '';
-    
-    switch(type) {
-      case 'verified': 
-        targetHeaderId = headers.find(h => h.normalizedName === 'verification_status')?.id || '';
-        targetValue = 'VERIFIED';
-        break;
-      case 'exceptions':
-        targetHeaderId = headers.find(h => h.normalizedName === 'verification_status')?.id || '';
-        targetValue = 'DISCREPANCY';
-        break;
-      case 'pending':
-        targetHeaderId = headers.find(h => h.normalizedName === 'verification_status')?.id || '';
-        targetValue = 'UNVERIFIED';
-        break;
-      case 'gaps':
-        targetHeaderId = headers.find(h => h.normalizedName === 'serial_number')?.id || '';
-        setFilters([{ headerId: targetHeaderId, operator: 'exists', value: '' }]);
-        return;
-    }
-
-    if (targetHeaderId) {
-      setFilters([{ headerId: targetHeaderId, operator: 'equals', value: targetValue }]);
-    }
-  };
-
   const processedRecords = useMemo(() => {
-    let results = currentRegistry.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding));
+    let results = [...allRecords];
 
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
@@ -253,29 +221,42 @@ export default function AssetRegistryPage() {
     filters.forEach(f => {
       results = results.filter(r => {
         const field = r.fields.find(field => field.headerId === f.headerId);
-        const val = String(field?.rawValue || '').toLowerCase();
+        if (!field) return true;
+        
+        const val = String(field.displayValue || '');
+        const rawVal = String(field.rawValue || '').toLowerCase();
+
+        // Handle the new 'in' operator for multi-select checklists
+        if (f.operator === 'in' && Array.isArray(f.value)) {
+          if (f.value.length === 0) return true;
+          return f.value.includes(val);
+        }
+
+        const lowerVal = val.toLowerCase();
         const filterVal = String(f.value || '').toLowerCase();
 
         switch(f.operator) {
-          case 'equals': return val === filterVal;
-          case 'contains': return val.includes(filterVal);
-          case 'startsWith': return val.startsWith(filterVal);
-          case 'endsWith': return val.endsWith(filterVal);
-          case 'exists': return val === '' || val === '---' || val === 'n/a';
+          case 'equals': return lowerVal === filterVal;
+          case 'contains': return lowerVal.includes(filterVal);
+          case 'startsWith': return lowerVal.startsWith(filterVal);
+          case 'endsWith': return lowerVal.endsWith(filterVal);
+          case 'exists': return rawVal === '' || rawVal === '---' || rawVal === 'n/a';
           default: return true;
         }
       });
     });
 
-    results.sort((a, b) => {
-      const fieldA = a.fields.find(f => f.headerId === sortKey)?.rawValue || '';
-      const fieldB = b.fields.find(f => f.headerId === sortKey)?.rawValue || '';
-      const comparison = String(fieldA).localeCompare(String(fieldB), undefined, { numeric: true });
-      return sortDir === 'asc' ? comparison : -comparison;
-    });
+    if (sortKey) {
+      results.sort((a, b) => {
+        const fieldA = a.fields.find(f => f.headerId === sortKey)?.rawValue || '';
+        const fieldB = b.fields.find(f => f.headerId === sortKey)?.rawValue || '';
+        const comparison = String(fieldA).localeCompare(String(fieldB), undefined, { numeric: true });
+        return sortDir === 'asc' ? comparison : -comparison;
+      });
+    }
 
     return results;
-  }, [currentRegistry, searchTerm, headers, filters, sortKey, sortDir, appSettings?.sourceBranding]);
+  }, [allRecords, searchTerm, filters, sortKey, sortDir]);
 
   const paginatedRecords = useMemo(() => {
     return processedRecords.slice((currentPage - 1) * ITEMS_PER_PAGE, currentPage * ITEMS_PER_PAGE);
@@ -283,12 +264,8 @@ export default function AssetRegistryPage() {
 
   const totalPages = Math.ceil(processedRecords.length / ITEMS_PER_PAGE);
 
-  const selectedRecordsForPrint = useMemo(() => {
-    return processedRecords.filter(r => selectedIds.has(r.id));
-  }, [processedRecords, selectedIds]);
-
   const handleInspect = (id: string) => {
-    const record = processedRecords.find(r => r.id === id);
+    const record = allRecords.find(r => r.id === id);
     setSelectedRecord(record);
     setIsDetailOpen(true);
   };
@@ -300,21 +277,8 @@ export default function AssetRegistryPage() {
     setSelectedIds(next);
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      const allIds = new Set(paginatedRecords.map(r => r.id));
-      setSelectedIds(allIds);
-    } else {
-      setSelectedIds(new Set());
-    }
-  };
-
   if (authLoading || !settingsLoaded) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
+    return <div className="flex h-screen w-full items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
   }
 
   return (
@@ -337,47 +301,26 @@ export default function AssetRegistryPage() {
 
             <div className="flex flex-wrap items-center gap-2 sm:gap-3">
               <div className="flex items-center bg-muted/50 p-1 rounded-2xl border-2 border-border/40 shadow-inner">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleExcelExport}
-                  disabled={isExportingExcel}
-                  className="h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2"
-                >
+                <Button variant="ghost" size="sm" onClick={handleExcelExport} disabled={isExportingExcel} className="h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2">
                   {isExportingExcel ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <FileSpreadsheet className="h-3.5 w-3.5" />} Excel
                 </Button>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  onClick={handleQuickExport}
-                  className="h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2"
-                >
+                <Button variant="ghost" size="sm" onClick={() => saveAs(new Blob([JSON.stringify(assets, null, 2)], { type: 'application/json' }), 'Registry-Export.json')} className="h-8 px-3 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2">
                   <FileJson className="h-3.5 w-3.5" /> JSON
                 </Button>
               </div>
 
               <div className="flex items-center bg-muted/50 p-1 rounded-2xl border-2 border-border/40 shadow-inner">
-                <Button 
-                  variant={dataSource === 'PRODUCTION' ? 'secondary' : 'ghost'} 
-                  size="sm" 
-                  onClick={() => setDataSource('PRODUCTION')}
-                  className="h-8 px-3 md:px-4 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest gap-2"
-                >
-                  <Database className="h-3.5 w-3.5" /> Authoritative
+                <Button variant={dataSource === 'PRODUCTION' ? 'secondary' : 'ghost'} size="sm" onClick={() => setDataSource('PRODUCTION')} className="h-8 px-3 md:px-4 rounded-lg text-[9px] font-black uppercase gap-2">
+                  <Database className="h-3.5 w-3.5" /> Production
                 </Button>
-                <Button 
-                  variant={dataSource === 'SANDBOX' ? 'secondary' : 'ghost'} 
-                  size="sm" 
-                  onClick={() => setDataSource('SANDBOX')}
-                  className="h-8 px-3 md:px-4 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest gap-2"
-                >
+                <Button variant={dataSource === 'SANDBOX' ? 'secondary' : 'ghost'} size="sm" onClick={() => setDataSource('SANDBOX')} className="h-8 px-3 md:px-4 rounded-lg text-[9px] font-black uppercase gap-2">
                   <DatabaseZap className="h-3.5 w-3.5" /> Sandbox
                 </Button>
               </div>
 
               <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" onClick={() => setIsBrandingOpen(true)} className="h-10 w-10 rounded-xl border-2 border-primary/10 bg-card shadow-sm"><Palette className="h-4 w-4 text-primary" /></Button>
-                <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-xl border-2 border-primary/10 bg-card shadow-sm"><Settings2 className="h-4 w-4 text-primary" /></Button>
+                <Button variant="outline" size="icon" onClick={() => setIsBrandingOpen(true)} className="h-10 w-10 rounded-xl border-2 border-primary/10 bg-card"><Palette className="h-4 w-4 text-primary" /></Button>
+                <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-xl border-2 border-primary/10 bg-card"><Settings2 className="h-4 w-4 text-primary" /></Button>
               </div>
             </div>
           </motion.div>
@@ -389,7 +332,6 @@ export default function AssetRegistryPage() {
               verified={metrics.verified}
               exceptions={metrics.exceptions}
               dataGaps={metrics.dataGaps}
-              onAction={applyMetricFilter}
             />
           </motion.div>
 
@@ -426,54 +368,45 @@ export default function AssetRegistryPage() {
                   <AnimatePresence mode="popLayout">
                     {paginatedRecords.map((record) => (
                       <motion.div key={record.id} initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }} exit={{ opacity: 0, scale: 0.95 }} layout>
-                        <RegistryCard record={record} onInspect={handleInspect} densityMode={activePresetId === 'quick' ? 'compact' : 'expanded'} selected={selectedIds.has(record.id)} onToggleSelect={handleToggleSelect} />
+                        <RegistryCard record={record} onInspect={handleInspect} selected={selectedIds.has(record.id)} onToggleSelect={handleToggleSelect} />
                       </motion.div>
                     ))}
                   </AnimatePresence>
                 </div>
               ) : (
-                <div className="overflow-x-auto rounded-[2rem] border-2 border-border/40 bg-card/50 shadow-xl"><RegistryTable records={paginatedRecords} onInspect={handleInspect} selectedIds={selectedIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} /></div>
+                <RegistryTable records={paginatedRecords} onInspect={handleInspect} selectedIds={selectedIds} onToggleSelect={handleToggleSelect} onSelectAll={(c) => setSelectedIds(c ? new Set(paginatedRecords.map(r => r.id)) : new Set())} />
               )
             ) : (
-              <div className="h-[400px] flex flex-col items-center justify-center text-center p-10 opacity-20 border-4 border-dashed rounded-[3rem] space-y-6">
-                <Boxes className="h-24 w-24 mb-2" />
+              <div className="h-[400px] flex flex-col items-center justify-center text-center p-10 opacity-20 border-4 border-dashed rounded-[3rem]">
+                <Boxes className="h-24 w-24 mb-4" />
                 <h3 className="text-2xl font-black uppercase tracking-[0.2em]">Registry Silent</h3>
               </div>
             )}
           </motion.div>
 
-          {/* Operational Pulse Bar */}
+          {/* Pagination Pulse */}
           <motion.div layout className="fixed bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-2xl px-4 md:px-6 py-2 md:py-3 rounded-[2.5rem] border-2 border-primary/10 shadow-2xl flex items-center gap-4 md:gap-6 transition-all w-[95vw] md:w-auto overflow-hidden">
             {selectedIds.size > 0 ? (
-              <div className="flex items-center gap-4 md:gap-6 animate-in slide-in-from-bottom-2 duration-300 w-full justify-between sm:justify-start">
-                <div className="flex flex-col shrink-0">
-                  <span className="text-[9px] md:text-[10px] font-black uppercase text-primary leading-none">{selectedIds.size} Selected</span>
-                  <Button variant="ghost" className="h-4 p-0 text-[7px] font-bold uppercase text-muted-foreground hover:bg-transparent" onClick={() => setSelectedIds(new Set())}>Clear Selection</Button>
-                </div>
-                <div className="h-8 w-px bg-border/40 hidden xs:block" />
-                <div className="flex items-center gap-1 md:gap-2">
-                  <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-primary hover:bg-primary/5"><Edit3 className="h-3.5 w-3.5" /> Batch Edit</Button>
-                  <Button variant="ghost" size="sm" onClick={() => setIsPrintDialogOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-blue-600 hover:bg-blue-50"><Printer className="h-3.5 w-3.5" /> Print Tags</Button>
-                  {userProfile?.isAdmin && (
-                    <Button variant="ghost" size="sm" onClick={() => setIsReassignDialogOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-primary hover:bg-primary/5"><FolderKanban className="h-3.5 w-3.5" /> Reassign</Button>
-                  )}
-                  <Button variant="ghost" size="sm" onClick={() => setIsBatchDeleteDialogOpen(true)} className="h-11 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 text-destructive hover:bg-destructive/5"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
-                </div>
+              <div className="flex items-center gap-4 animate-in slide-in-from-bottom-2 duration-300">
+                <span className="text-[10px] font-black uppercase text-primary">{selectedIds.size} Selected</span>
+                <Button variant="ghost" onClick={() => setIsPrintDialogOpen(true)} className="h-10 px-4 rounded-xl font-black uppercase text-[9px] gap-2"><Printer className="h-3.5 w-3.5" /> Print</Button>
+                <Button variant="ghost" onClick={() => setIsBatchEditOpen(true)} className="h-10 px-4 rounded-xl font-black uppercase text-[9px] gap-2"><Edit3 className="h-3.5 w-3.5" /> Edit</Button>
+                {userProfile?.isAdmin && (
+                  <Button variant="ghost" onClick={() => setIsReassignDialogOpen(true)} className="h-10 px-4 rounded-xl font-black uppercase text-[9px] gap-2"><FolderKanban className="h-3.5 w-3.5" /> Move</Button>
+                )}
+                <Button variant="ghost" onClick={() => setIsBatchDeleteDialogOpen(true)} className="h-10 px-4 rounded-xl font-black uppercase text-[9px] gap-2 text-destructive"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
+                <Button variant="ghost" onClick={() => setSelectedIds(new Set())} className="h-10 px-4 rounded-xl font-black uppercase text-[9px]">Cancel</Button>
               </div>
             ) : (
-              <>
-                <div className="flex items-center gap-1 md:gap-2 shrink-0">
-                  <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-10 w-10 rounded-xl"><ChevronLeft className="h-5 w-5" /></Button>
-                  <span className="text-[10px] font-black uppercase tracking-widest px-4 tabular-nums whitespace-nowrap">Page {currentPage} of {totalPages || 1}</span>
-                  <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="h-10 w-10 rounded-xl"><ChevronRight className="h-5 w-5" /></Button>
-                </div>
-                <div className="h-6 w-px bg-border/40 hidden xs:block" />
-                <div className="flex items-center gap-2">
-                  <Button className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary shadow-xl shadow-primary/20 text-white" onClick={() => setIsFormOpen(true)}>
-                    <Plus className="mr-2 h-4 w-4 hidden xs:inline" /> New Asset
-                  </Button>
-                </div>
-              </>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)} className="h-10 w-10 rounded-xl"><ChevronLeft className="h-5 w-5" /></Button>
+                <span className="text-[10px] font-black uppercase tracking-widest px-4">Page {currentPage} of {totalPages || 1}</span>
+                <Button variant="ghost" size="icon" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p + 1)} className="h-10 w-10 rounded-xl"><ChevronRight className="h-5 w-5" /></Button>
+                <div className="h-6 w-px bg-border/40 mx-2" />
+                <Button className="h-12 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest bg-primary text-white shadow-xl shadow-primary/20" onClick={() => setIsFormOpen(true)}>
+                  <Plus className="mr-2 h-4 w-4" /> New Asset
+                </Button>
+              </div>
             )}
           </motion.div>
         </div>
@@ -481,41 +414,28 @@ export default function AssetRegistryPage() {
 
       {/* Drawers & Dialogs */}
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={saveHeaderPrefs} onReset={() => {}} />
-      <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} />
+      <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }} />
       <SourceBrandingDrawer isOpen={isBrandingOpen} onOpenChange={setIsBrandingOpen} />
-      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => {}} />
-      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAssetForForm} onSave={async (a) => { await refreshRegistry(); setIsFormOpen(false); }} onQuickSave={async () => {}} isReadOnly={false} />
-      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async (d) => { await refreshRegistry(); setSelectedIds(new Set()); }} />
-      <TagPrintDialog isOpen={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen} records={selectedRecordsForPrint} />
+      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={() => {}} />
+      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAssetForForm} onSave={async () => { await refreshRegistry(); setIsFormOpen(false); }} isReadOnly={false} />
+      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async () => { await refreshRegistry(); setSelectedIds(new Set()); }} />
+      <TagPrintDialog isOpen={isPrintDialogOpen} onOpenChange={setIsPrintDialogOpen} records={Array.from(selectedIds).map(id => allRecords.find(r => r.id === id)!).filter(Boolean)} />
       
       <AlertDialog open={isReassignDialogOpen} onOpenChange={setIsReassignDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-primary/10">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Migrate Record Pulse?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic leading-relaxed">Select the target project scope for the {selectedIds.size} selected assets.</AlertDialogDescription>
+            <AlertDialogDescription className="text-sm font-medium italic">Select the target project scope for the {selectedIds.size} selected assets.</AlertDialogDescription>
           </AlertDialogHeader>
           <div className="py-6 grid grid-cols-1 gap-2">
             {appSettings?.grants.map(grant => (
-              <Button 
-                key={grant.id} 
-                variant="outline" 
-                onClick={() => handleReassignGrant(grant.id)}
-                disabled={isReassigning || grant.id === activeGrantId}
-                className={cn(
-                  "h-12 justify-start font-black uppercase text-[10px] tracking-widest rounded-xl border-2 transition-all",
-                  grant.id === activeGrantId ? "opacity-40" : "hover:border-primary/40 hover:bg-primary/5"
-                )}
-              >
-                <ArrowRightLeft className="mr-3 h-4 w-4 opacity-40" />
-                {grant.name}
-                {grant.id === activeGrantId && <span className="ml-auto opacity-40">(ACTIVE)</span>}
+              <Button key={grant.id} variant="outline" onClick={() => handleReassignGrant(grant.id)} disabled={isReassigning || grant.id === activeGrantId} className="h-12 justify-start font-black uppercase text-[10px] tracking-widest rounded-xl">
+                <ArrowRightLeft className="mr-3 h-4 w-4 opacity-40" /> {grant.name}
               </Button>
             ))}
           </div>
-          <AlertDialogFooter className="gap-2">
-            <AlertDialogCancel className="rounded-xl font-bold">Discard</AlertDialogCancel>
-          </AlertDialogFooter>
+          <AlertDialogFooter><AlertDialogCancel className="rounded-xl font-bold">Discard</AlertDialogCancel></AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
@@ -527,7 +447,7 @@ export default function AssetRegistryPage() {
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4 gap-2">
             <AlertDialogCancel className="rounded-xl font-bold">Discard</AlertDialogCancel>
-            <AlertDialogAction onClick={() => setSelectedIds(new Set())} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black uppercase text-[10px] tracking-widest h-11 px-6">Confirm Delete</AlertDialogAction>
+            <AlertDialogAction onClick={() => setSelectedIds(new Set())} className="bg-destructive hover:bg-destructive/90 rounded-xl font-black uppercase text-[10px] h-11 px-6">Confirm Delete</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
