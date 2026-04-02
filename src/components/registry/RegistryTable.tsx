@@ -1,8 +1,6 @@
 /**
  * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
- * Phase 1200: Optimized layout with 5-column grid pulse and sticky headers.
- * Phase 1210: Applied business terminology and improved horizontal spacing.
- * Phase 1220: Added Header Configuration trigger for administrators.
+ * Phase 400: Mode-aware UI. Hides status select in Management mode for normal users.
  */
 
 import React from 'react';
@@ -23,7 +21,8 @@ import {
   MapPin,
   Hash,
   FileText,
-  Settings2
+  Settings2,
+  Lock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -34,6 +33,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 
 interface RegistryTableProps {
   records: AssetRecord[];
@@ -52,11 +53,16 @@ export function RegistryTable({
   onSelectAll,
   onConfigureHeaders
 }: RegistryTableProps) {
+  const { appSettings } = useAppState();
+  const { userProfile } = useAuth();
+  
   const allSelected = records.length > 0 && records.every(r => selectedIds.has(r.id));
+  const isManagementMode = appSettings?.appMode === 'management';
+  const isAdmin = userProfile?.isAdmin || false;
 
   return (
     <div className="space-y-4 pb-40 animate-in fade-in duration-700">
-      {/* 1. List Protocol Header - Sticky for column context */}
+      {/* 1. List Protocol Header - Sticky */}
       <div className="flex items-center px-8 py-5 bg-white/[0.03] rounded-2xl border border-white/5 mb-6 sticky top-0 z-30 backdrop-blur-3xl shadow-2xl">
         <div className="w-[40px] shrink-0 flex items-center justify-center">
           <Checkbox 
@@ -68,9 +74,9 @@ export function RegistryTable({
         
         <div className="flex-1 grid grid-cols-12 gap-6 ml-6 items-center">
           <div className="col-span-1 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">S/N</div>
-          <div className="col-span-4 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Description</div>
+          <div className="col-span-4 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Asset Description</div>
           <div className="col-span-2 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Asset ID / Tag</div>
-          <div className="col-span-3 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Regional Scope</div>
+          <div className="col-span-3 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Location Scope</div>
           <div className="col-span-2 flex items-center justify-center gap-2">
             <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Audit Status</span>
             {onConfigureHeaders && (
@@ -137,30 +143,42 @@ export function RegistryTable({
                         </span>
                       </div>
                     </div>
-                    <div className="col-span-2" /> {/* Layout Alignment Spacer */}
+                    <div className="col-span-2" />
                   </div>
                 </AccordionTrigger>
 
-                {/* Status Capsule (Decoupled Action) */}
+                {/* Status Capsule - Mode Sensitive */}
                 <div className="w-[140px] shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
-                  <Select value={status}>
-                    <SelectTrigger className={cn(
-                      "h-9 w-32 rounded-full font-black uppercase text-[8px] tracking-[0.25em] border-2 transition-all shadow-xl",
-                      status === 'VERIFIED' ? "bg-green-500/10 text-green-500 border-green-500/20" : 
-                      status === 'DISCREPANCY' ? "bg-red-500/10 text-red-500 border-red-500/20" :
-                      "bg-white/5 text-white/40 border-white/10"
+                  {isManagementMode && !isAdmin ? (
+                    <Badge variant="outline" className={cn(
+                      "h-9 w-32 rounded-full font-black uppercase text-[8px] tracking-[0.25em] border-2",
+                      status === 'VERIFIED' ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-white/5 text-white/20 border-white/10"
                     )}>
                       <div className="flex items-center gap-2">
-                        <div className={cn("h-1.5 w-1.5 rounded-full", status === 'VERIFIED' ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : status === 'DISCREPANCY' ? "bg-red-500" : "bg-white/20")} />
-                        <SelectValue />
+                        <Lock className="h-2.5 w-2.5 opacity-40" />
+                        <span>{status}</span>
                       </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-[#0A0A0A] border-white/10 rounded-2xl">
-                      <SelectItem value="VERIFIED" className="text-[9px] font-black uppercase tracking-widest py-3">Verified</SelectItem>
-                      <SelectItem value="UNVERIFIED" className="text-[9px] font-black uppercase tracking-widest py-3">Unverified</SelectItem>
-                      <SelectItem value="DISCREPANCY" className="text-[9px] font-black uppercase tracking-widest py-3 text-destructive">Discrepancy</SelectItem>
-                    </SelectContent>
-                  </Select>
+                    </Badge>
+                  ) : (
+                    <Select value={status}>
+                      <SelectTrigger className={cn(
+                        "h-9 w-32 rounded-full font-black uppercase text-[8px] tracking-[0.25em] border-2 transition-all shadow-xl",
+                        status === 'VERIFIED' ? "bg-green-500/10 text-green-500 border-green-500/20" : 
+                        status === 'DISCREPANCY' ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                        "bg-white/5 text-white/40 border-white/10"
+                      )}>
+                        <div className="flex items-center gap-2">
+                          <div className={cn("h-1.5 w-1.5 rounded-full", status === 'VERIFIED' ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : status === 'DISCREPANCY' ? "bg-red-500" : "bg-white/20")} />
+                          <SelectValue />
+                        </div>
+                      </SelectTrigger>
+                      <SelectContent className="bg-[#0A0A0A] border-white/10 rounded-2xl">
+                        <SelectItem value="VERIFIED" className="text-[9px] font-black uppercase tracking-widest py-3">Verified</SelectItem>
+                        <SelectItem value="UNVERIFIED" className="text-[9px] font-black uppercase tracking-widest py-3">Unverified</SelectItem>
+                        <SelectItem value="DISCREPANCY" className="text-[9px] font-black uppercase tracking-widest py-3 text-destructive">Discrepancy</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  )}
                 </div>
               </div>
 
@@ -171,7 +189,7 @@ export function RegistryTable({
                     return (
                       <div key={field.headerId} className="space-y-2.5 group/field">
                         <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20 group-hover/field:text-primary transition-colors">
-                          {header?.displayName || 'Technical field'}
+                          {header?.displayName || 'Technical Parameter'}
                         </p>
                         <p className="text-sm font-black uppercase text-white/80 leading-tight">
                           {field.displayValue}
@@ -186,14 +204,14 @@ export function RegistryTable({
                     <div className="flex items-center gap-4">
                       <div className="p-2.5 bg-white/5 rounded-xl"><User className="h-4 w-4 text-white/20" /></div>
                       <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1.5">Last Audit By</span>
+                        <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1.5">Last Record Update</span>
                         <span className="text-[10px] font-bold text-white/60 leading-none">{String(record.rawRow.lastModifiedBy || 'System')}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-4">
                       <div className="p-2.5 bg-white/5 rounded-xl"><Clock className="h-4 w-4 text-white/20" /></div>
                       <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1.5">Audit Pulse</span>
+                        <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1.5">Update Timestamp</span>
                         <span className="text-[10px] font-bold text-white/60 leading-none">{new Date(record.rawRow.lastModified as string).toLocaleDateString()}</span>
                       </div>
                     </div>
@@ -204,7 +222,7 @@ export function RegistryTable({
                       onClick={() => onInspect(record.id)}
                       className="flex-1 sm:flex-none h-14 px-10 rounded-[1.5rem] font-black uppercase text-[10px] tracking-widest gap-3 bg-primary text-black shadow-2xl shadow-primary/30 transition-transform hover:scale-105"
                     >
-                      <Edit3 className="h-4 w-4" /> Open Full Audit Profile
+                      <Edit3 className="h-4 w-4" /> Open Full Profile
                     </Button>
                   </div>
                 </div>

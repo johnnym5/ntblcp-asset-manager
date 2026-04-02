@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview DashboardWorkstation - Unified Mission Control.
- * Phase 300: Merged Cloud Sync, Reports, and Audit Trail into a single unified Dashboard tab.
+ * Phase 400: Removed Field Audit tab per user request. Unified Management/Verification scope.
  */
 
 import React, { useState } from 'react';
@@ -18,17 +18,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
 import { RegistryWorkstation } from './RegistryWorkstation';
-import { VerifyWorkstation } from './VerifyWorkstation';
 import { ReportsWorkstation } from './ReportsWorkstation';
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { SyncQueueWorkstation } from './SyncQueueWorkstation';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-type DashboardTab = 'dashboard' | 'inventory' | 'audit';
+type DashboardTab = 'dashboard' | 'inventory';
 
 export function DashboardWorkstation() {
-  const { isOnline, isSyncing } = useAppState();
+  const { isOnline, isSyncing, appSettings } = useAppState();
   const isMobile = useIsMobile();
   const [activeTab, setActiveTab] = useState<DashboardTab>('dashboard');
   
@@ -42,7 +41,9 @@ export function DashboardWorkstation() {
             <LayoutDashboard className="h-5 w-5 md:h-6 md:w-6 text-primary" />
           </div>
           <div className="space-y-0.5">
-            <h2 className="text-xl md:text-2xl font-black uppercase text-white tracking-tight leading-none">Mission Control</h2>
+            <h2 className="text-xl md:text-2xl font-black uppercase text-white tracking-tight leading-none">
+              {appSettings?.appMode === 'management' ? 'Management Center' : 'Verification Hub'}
+            </h2>
             <p className="text-[8px] md:text-[10px] font-bold text-white/40 uppercase tracking-[0.25em] leading-none">Registry Intelligence</p>
           </div>
         </div>
@@ -54,10 +55,7 @@ export function DashboardWorkstation() {
                 Dashboard
               </TabsTrigger>
               <TabsTrigger value="inventory" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Categories
-              </TabsTrigger>
-              <TabsTrigger value="audit" className="px-4 md:px-6 py-2.5 md:py-3 rounded-xl font-black uppercase text-[9px] md:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                Field Audits
+                Asset Categories
               </TabsTrigger>
             </TabsList>
           </Tabs>
@@ -102,10 +100,6 @@ export function DashboardWorkstation() {
 
           <TabsContent value="inventory" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
             <RegistryWorkstation viewAll />
-          </TabsContent>
-
-          <TabsContent value="audit" className="m-0 animate-in fade-in slide-in-from-bottom-2 duration-500">
-            <VerifyWorkstation />
           </TabsContent>
         </Tabs>
       </div>
