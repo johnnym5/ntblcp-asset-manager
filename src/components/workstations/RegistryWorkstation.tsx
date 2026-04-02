@@ -39,7 +39,8 @@ import {
   CloudUpload,
   ClipboardEdit,
   Zap,
-  Tag
+  Tag,
+  Settings2
 } from 'lucide-react';
 import { 
   Table, 
@@ -146,9 +147,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   // --- Computed Data ---
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === appSettings.activeGrantId), [appSettings]);
-  const enabledSheets = useMemo(() => new Set(activeGrant?.enabledSheets || []), [activeGrant]);
-
+  
   const categoryStats = useMemo(() => {
+    if (!activeGrant) return [];
+    const enabledSheets = new Set(activeGrant.enabledSheets || []);
+    
     const groups = assets.reduce((acc, a) => {
       const cat = a.category || 'General';
       if (!enabledSheets.has(cat)) return acc;
@@ -160,7 +163,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }, {} as Record<string, { total: number, verified: number }>);
 
     return Object.entries(groups).map(([name, stats]) => ({ name, ...stats })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [assets, enabledSheets]);
+  }, [assets, activeGrant]);
 
   const filteredAssets = useMemo(() => {
     let results = assets;
@@ -306,19 +309,34 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             )}
           </div>
 
-          <div className="flex items-center bg-black/40 p-1 rounded-2xl border border-white/5 shadow-inner backdrop-blur-xl">
-            <button 
-              onClick={() => selectedCategory ? setViewMode('grid') : setGroupViewMode('grid')} 
-              className={cn("p-2.5 rounded-xl transition-all", (selectedCategory ? viewMode === 'grid' : groupViewMode === 'grid') ? "bg-white/10 text-white shadow-lg" : "text-white/20 hover:text-white")}
-            >
-              <Grid className="h-4 w-4" />
-            </button>
-            <button 
-              onClick={() => selectedCategory ? setViewMode('table') : setGroupViewMode('table')} 
-              className={cn("p-2.5 rounded-xl transition-all", (selectedCategory ? viewMode === 'table' : groupViewMode === 'table') ? "bg-white/10 text-white shadow-lg" : "text-white/20 hover:text-white")}
-            >
-              <List className="h-4 w-4" />
-            </button>
+          <div className="flex items-center gap-3">
+            {/* Header Configuration Shortcut for Grid View Too */}
+            {selectedCategory && userProfile?.isAdmin && (
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={() => { setCustomizingCategory(selectedCategory); setIsColumnSheetOpen(true); }}
+                className="h-11 w-11 rounded-xl bg-white/5 border-white/10 text-white/40 hover:text-primary transition-all"
+                title="Configure Group Headers"
+              >
+                <Settings2 className="h-5 w-5" />
+              </Button>
+            )}
+
+            <div className="flex items-center bg-black/40 p-1 rounded-2xl border border-white/5 shadow-inner backdrop-blur-xl">
+              <button 
+                onClick={() => selectedCategory ? setViewMode('grid') : setGroupViewMode('grid')} 
+                className={cn("p-2.5 rounded-xl transition-all", (selectedCategory ? viewMode === 'grid' : groupViewMode === 'grid') ? "bg-white/10 text-white shadow-lg" : "text-white/20 hover:text-white")}
+              >
+                <Grid className="h-4 w-4" />
+              </button>
+              <button 
+                onClick={() => selectedCategory ? setViewMode('table') : setGroupViewMode('table')} 
+                className={cn("p-2.5 rounded-xl transition-all", (selectedCategory ? viewMode === 'table' : groupViewMode === 'table') ? "bg-white/10 text-white shadow-lg" : "text-white/20 hover:text-white")}
+              >
+                <List className="h-4 w-4" />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -568,7 +586,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               if (orig && orig !== newDef.name) delete nextDefs[orig];
             }
 
-            const nextGrants = appSettings.grants.map(g => g.id === activeGrant.id ? { ...g, sheetDefinitions: nextDefs } : g);
             await updateActiveGrant({ sheetDefinitions: nextDefs });
             toast({ title: "Inventory Layout Updated" });
           }}

@@ -3,6 +3,7 @@
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity "Full View" Pop-up.
  * Phase 130: Converted to Dialog (Pop-up) for centered dual-pane auditing.
+ * Phase 131: Integrated ScrollArea and Data Fidelity Checklist.
  */
 
 import React from 'react';
@@ -21,14 +22,15 @@ import {
   ChevronLeft, 
   ChevronRight, 
   Edit3, 
-  Share2, 
   Database,
   Tag,
   X,
-  ShieldCheck
+  ShieldCheck,
+  ClipboardCheck
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
+import { AssetChecklist } from '@/components/asset-checklist';
 
 interface AssetDetailSheetProps {
   isOpen: boolean;
@@ -58,10 +60,10 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[800px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-black text-white border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.8)]">
+      <DialogContent className="max-w-[1100px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-black text-white border-white/10 rounded-[2rem] shadow-[0_0_50px_rgba(0,0,0,0.8)]">
         <div className="flex flex-col h-full">
           {/* Header Pulse */}
-          <div className="p-8 pb-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02]">
+          <div className="p-8 pb-6 border-b border-white/5 flex items-center justify-between bg-white/[0.02] shrink-0">
             <div className="flex items-center gap-4">
               <div className="p-2.5 bg-primary/10 rounded-xl">
                 <ShieldCheck className="h-6 w-6 text-primary" />
@@ -86,55 +88,74 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
             </div>
           </div>
 
-          <ScrollArea className="flex-1 bg-black custom-scrollbar">
-            <div className="pb-32">
-              {/* Source Identity Badge */}
-              <div className="px-8 pt-8 pb-4">
-                <Badge 
-                  variant="outline" 
-                  className="h-8 px-4 text-[10px] font-black uppercase tracking-widest rounded-full border-2 bg-white/5"
-                  style={{ borderColor: `${record.accentColor}40`, color: record.accentColor }}
-                >
-                  <Database className="h-3.5 w-3.5 mr-2" /> {record.sourceSheet || 'REGISTRY AUTHORITY'}
-                </Badge>
-              </div>
-
-              {/* Structured Technical Field Stack */}
-              <div className="bg-white/[0.01]">
-                {record.fields.map((field, idx) => {
-                  const header = record.headers.find(h => h.id === field.headerId);
-                  return (
-                    <FullViewField 
-                      key={field.headerId} 
-                      label={header?.displayName || 'Technical Parameter'} 
-                      value={field.displayValue} 
-                      isLast={idx === record.fields.length - 1}
-                    />
-                  );
-                })}
-              </div>
-
-              {/* Traceability Metadata */}
-              <div className="p-8 border-t border-dashed border-white/10 mt-10 space-y-6 bg-white/[0.02]">
-                <div className="flex items-center gap-3 opacity-20">
-                  <Tag className="h-4 w-4" />
-                  <span className="text-[10px] font-black uppercase tracking-[0.3em]">System Traceability Pulse</span>
+          <div className="flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-12 overflow-hidden">
+            {/* Left Pane: Technical Data Register */}
+            <ScrollArea className="lg:col-span-7 bg-black border-r border-white/5">
+              <div className="pb-32">
+                <div className="px-8 pt-8 pb-4">
+                  <Badge 
+                    variant="outline" 
+                    className="h-8 px-4 text-[10px] font-black uppercase tracking-widest rounded-full border-2 bg-white/5"
+                    style={{ borderColor: `${record.accentColor}40`, color: record.accentColor }}
+                  >
+                    <Database className="h-3.5 w-3.5 mr-2" /> {record.sourceSheet || 'REGISTRY AUTHORITY'}
+                  </Badge>
                 </div>
-                <div className="grid grid-cols-2 gap-8">
-                  <div className="space-y-1">
-                    <span className="text-[8px] font-black uppercase text-white/40 tracking-widest">Internal UUID</span>
-                    <p className="font-mono text-[10px] font-bold text-white/60">{record.id}</p>
+
+                <div className="bg-white/[0.01]">
+                  {record.fields.map((field, idx) => {
+                    const header = record.headers.find(h => h.id === field.headerId);
+                    return (
+                      <FullViewField 
+                        key={field.headerId} 
+                        label={header?.displayName || 'Technical Parameter'} 
+                        value={field.displayValue} 
+                        isLast={idx === record.fields.length - 1}
+                      />
+                    );
+                  })}
+                </div>
+
+                <div className="p-8 border-t border-dashed border-white/10 mt-10 space-y-6 bg-white/[0.02]">
+                  <div className="flex items-center gap-3 opacity-20">
+                    <Tag className="h-4 w-4" />
+                    <span className="text-[10px] font-black uppercase tracking-[0.3em]">System Traceability Pulse</span>
                   </div>
-                  <div className="space-y-1">
-                    <span className="text-[8px] font-black uppercase text-white/40 tracking-widest">Registry Row</span>
-                    <p className="font-mono text-[10px] font-bold text-white/60"># {record.sourceRow || 'Manual'}</p>
+                  <div className="grid grid-cols-2 gap-8">
+                    <div className="space-y-1">
+                      <span className="text-[8px] font-black uppercase text-white/40 tracking-widest">Internal UUID</span>
+                      <p className="font-mono text-[10px] font-bold text-white/60">{record.id}</p>
+                    </div>
+                    <div className="space-y-1">
+                      <span className="text-[8px] font-black uppercase text-white/40 tracking-widest">Registry Row</span>
+                      <p className="font-mono text-[10px] font-bold text-white/60"># {record.sourceRow || 'Manual'}</p>
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
-          </ScrollArea>
+            </ScrollArea>
 
-          <div className="p-8 bg-black/80 backdrop-blur-3xl border-t border-white/5 flex flex-row items-center gap-4">
+            {/* Right Pane: Fidelity Checklist */}
+            <ScrollArea className="lg:col-span-5 bg-[#050505] p-10">
+              <div className="space-y-10">
+                <div className="flex items-center gap-4 text-primary">
+                  <ClipboardCheck className="h-6 w-6" />
+                  <h4 className="text-sm font-black uppercase tracking-widest">Fidelity Audit Pulse</h4>
+                </div>
+                <AssetChecklist values={record.rawRow as any} />
+                
+                <div className="p-8 rounded-[2rem] bg-primary/5 border-2 border-dashed border-primary/20 space-y-4">
+                  <p className="text-[10px] font-black uppercase text-primary tracking-widest">Auditor Hint</p>
+                  <p className="text-xs font-medium text-white/60 italic leading-relaxed">
+                    Ensure all required fields are populated before committing the physical verification pulse. High-fidelity records improve regional reporting accuracy.
+                  </p>
+                </div>
+              </div>
+            </ScrollArea>
+          </div>
+
+          {/* Footer Controls */}
+          <div className="p-8 bg-black/80 backdrop-blur-3xl border-t border-white/5 flex flex-row items-center gap-4 shrink-0">
             <Button 
               variant="ghost" 
               onClick={() => onOpenChange(false)}
