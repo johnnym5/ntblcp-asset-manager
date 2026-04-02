@@ -3,6 +3,7 @@
 /**
  * @fileOverview Registry Workspace - Decentralized Hierarchical Register.
  * Phase 62: Implemented multi-select value discovery for all headers.
+ * Phase 63: Hardened Sorting logic for Natural Numeric sequence (1, 2, 3, 10).
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -180,7 +181,7 @@ export default function AssetRegistryPage() {
     return currentRegistry.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding));
   }, [currentRegistry, headers, appSettings?.sourceBranding]);
 
-  // 2. Discover all unique values for each sortable header (Options for the new multi-select filter)
+  // 2. Discover all unique values for each sortable header
   const optionsMap = useMemo(() => {
     const map: Record<string, Set<string>> = {};
     headers.filter(h => h.sortEnabled).forEach(h => map[h.id] = new Set<string>());
@@ -226,7 +227,6 @@ export default function AssetRegistryPage() {
         const val = String(field.displayValue || '');
         const rawVal = String(field.rawValue || '').toLowerCase();
 
-        // Handle the new 'in' operator for multi-select checklists
         if (f.operator === 'in' && Array.isArray(f.value)) {
           if (f.value.length === 0) return true;
           return f.value.includes(val);
@@ -248,9 +248,15 @@ export default function AssetRegistryPage() {
 
     if (sortKey) {
       results.sort((a, b) => {
-        const fieldA = a.fields.find(f => f.headerId === sortKey)?.rawValue || '';
-        const fieldB = b.fields.find(f => f.headerId === sortKey)?.rawValue || '';
-        const comparison = String(fieldA).localeCompare(String(fieldB), undefined, { numeric: true });
+        const fieldA = String(a.fields.find(f => f.headerId === sortKey)?.rawValue || '');
+        const fieldB = String(b.fields.find(f => f.headerId === sortKey)?.rawValue || '');
+        
+        // NATURAL NUMERIC SORT Pulse
+        const comparison = fieldA.localeCompare(fieldB, undefined, { 
+          numeric: true, 
+          sensitivity: 'base' 
+        });
+        
         return sortDir === 'asc' ? comparison : -comparison;
       });
     }
@@ -285,7 +291,6 @@ export default function AssetRegistryPage() {
     <AppLayout>
       <LayoutGroup>
         <div className="flex flex-col h-full gap-4 md:gap-6 relative pb-24 md:pb-32">
-          {/* Header Section */}
           <motion.div layout className="flex flex-col gap-4 lg:flex-row lg:items-center justify-between px-1">
             <div className="space-y-1">
               <h2 className="text-2xl md:text-3xl lg:text-4xl font-black tracking-tighter text-foreground uppercase leading-tight flex items-center gap-3">
@@ -325,7 +330,6 @@ export default function AssetRegistryPage() {
             </div>
           </motion.div>
 
-          {/* Metrics Pulse Row */}
           <motion.div layout className="px-1">
             <VerificationPulse 
               total={metrics.total}
@@ -335,7 +339,6 @@ export default function AssetRegistryPage() {
             />
           </motion.div>
 
-          {/* Action Toolbar */}
           <motion.div layout className="flex flex-col gap-4 px-1">
             <div className="flex flex-col sm:flex-row gap-3 md:gap-4">
               <div className="relative flex-1 group min-w-0">
@@ -360,7 +363,6 @@ export default function AssetRegistryPage() {
             </div>
           </motion.div>
 
-          {/* Registry Surface */}
           <motion.div layout className="flex-1 px-1">
             {paginatedRecords.length > 0 ? (
               viewMode === 'grid' ? (
@@ -384,7 +386,6 @@ export default function AssetRegistryPage() {
             )}
           </motion.div>
 
-          {/* Pagination Pulse */}
           <motion.div layout className="fixed bottom-6 md:bottom-8 left-1/2 -translate-x-1/2 z-40 bg-background/80 backdrop-blur-2xl px-4 md:px-6 py-2 md:py-3 rounded-[2.5rem] border-2 border-primary/10 shadow-2xl flex items-center gap-4 md:gap-6 transition-all w-[95vw] md:w-auto overflow-hidden">
             {selectedIds.size > 0 ? (
               <div className="flex items-center gap-4 animate-in slide-in-from-bottom-2 duration-300">
@@ -412,7 +413,6 @@ export default function AssetRegistryPage() {
         </div>
       </LayoutGroup>
 
-      {/* Drawers & Dialogs */}
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={saveHeaderPrefs} onReset={() => {}} />
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDirection(dir); }} />

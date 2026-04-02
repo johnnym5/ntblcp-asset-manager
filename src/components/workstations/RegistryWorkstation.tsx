@@ -5,6 +5,7 @@
  * Phase 280: Implemented Batch Deletion Pulse & Administrative Confirmation.
  * Phase 281: Hardened search filters against undefined data pulses.
  * Phase 282: Fixed ReferenceError for Hammer icon.
+ * Phase 283: Implemented Natural Numeric Sorting for S/N pulse.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -136,11 +137,17 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
     if (selectedConditions.length > 0) results = results.filter(a => selectedConditions.includes(a.condition));
     if (missingFieldFilter) results = results.filter(a => !(a as any)[missingFieldFilter]);
     
-    // Sort Sequence
+    // Sort Sequence - NATURAL NUMERIC SORT
     results = [...results].sort((a, b) => {
-      const valA = String((a as any)[sortKey] || '').toLowerCase();
-      const valB = String((b as any)[sortKey] || '').toLowerCase();
-      return sortDir === 'asc' ? valA.localeCompare(valB) : valB.localeCompare(valA);
+      const valA = String((a as any)[sortKey] ?? '');
+      const valB = String((b as any)[sortKey] ?? '');
+      
+      const comparison = valA.localeCompare(valB, undefined, { 
+        numeric: true, 
+        sensitivity: 'base' 
+      });
+      
+      return sortDir === 'asc' ? comparison : -comparison;
     });
 
     return results;
