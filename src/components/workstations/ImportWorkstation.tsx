@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview ImportWorkstation - Registry Ingestion Wizard.
- * Orchestrates the transition from structural discovery to asset reconciliation.
+ * @fileOverview ImportWorkstation - Controlled Registry Ingestion.
+ * Phase 310: Implemented Group Selection Layer and positional ingestion pulse.
  */
 
 import React, { useState, useRef } from 'react';
@@ -22,7 +22,9 @@ import {
   Activity,
   FileSpreadsheet,
   Zap,
-  LayoutGrid
+  LayoutGrid,
+  CheckSquare,
+  Square
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
@@ -32,7 +34,7 @@ import { enqueueMutation } from '@/offline/queue';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import * as XLSX from 'xlsx';
-import type { ParsedAsset, ImportRunSummary, DiscoveredGroup } from '@/parser/types';
+import type { ParsedAsset, ImportRunSummary, DiscoveredGroup, GroupImportContainer } from '@/parser/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StructurePreview } from '@/modules/import/components/StructurePreview';
 import { ReconciliationView } from '@/modules/import/components/ReconciliationView';
@@ -48,10 +50,13 @@ export function ImportWorkstation() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [stagedAssets, setStagedAssets] = useState<ParsedAsset[]>([]);
   const [discoveredGroups, setDiscoveredGroups] = useState<DiscoveredGroup[]>([]);
+  const [selectedGroupIds, setSelectedGroupIds] = useState<Set<string>>(new Set());
   const [runSummary, setSummary] = useState<ImportRunSummary | null>(null);
   const [progress, setProgress] = useState(0);
+  const [activeSheetData, setActiveSheetData] = useState<{name: string, data: any[][]}[]>([]);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const engineRef = useRef<ParserEngine | null>(null);
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -66,34 +71,22 @@ export function ImportWorkstation() {
       const workbook = XLSX.read(buffer, { type: 'array' });
       setProgress(40);
 
-      const engine = new ParserEngine(file.name, existingAssets);
-      let allParsedAssets: ParsedAsset[] = [];
+      engineRef.current = new ParserEngine(file.name, existingAssets);
       let allDiscoveredGroups: DiscoveredGroup[] = [];
-      let finalSummary: ImportRunSummary | null = null;
+      const sheets: {name: string, data: any[][]}[] = [];
 
-      // Scan each sheet
-      for (const sheetName of workbook.SheetNames) {
+      workbook.SheetNames.forEach(sheetName => {
         const sheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
-        
-        const result = engine.parseWorkbook(sheetName, data);
-        allParsedAssets = [...allParsedAssets, ...result.assets];
-        allDiscoveredGroups = [...allDiscoveredGroups, ...result.groups];
-        
-        if (!finalSummary) {
-          finalSummary = result.summary;
-        } else {
-          finalSummary.dataRowsImported += result.summary.dataRowsImported;
-          finalSummary.duplicatesDetected += result.summary.duplicatesDetected;
-        }
-      }
-      
-      // Stage to sandbox immediately
-      await storage.saveToSandbox(allParsedAssets as any[]);
-      
-      setStagedAssets(allParsedAssets);
+        sheets.push({ name: sheetName, data });
+        const groups = engineRef.current!.discoverGroups(sheetName, data);
+        allDiscoveredGroups = [...allDiscoveredGroups, ...groups];
+      });
+
+      setActiveSheetData(sheets);
       setDiscoveredGroups(allDiscoveredGroups);
-      setSummary(finalSummary);
+      // Auto-select all by default for convenience
+      setSelectedGroupIds(new Set(allDiscoveredGroups.map(g => g.id)));
       setProgress(100);
 
       setTimeout(() => {
@@ -107,29 +100,91 @@ export function ImportWorkstation() {
     }
   };
 
-  const handleCommit = async () => {
+  const handleExecuteImport = async () => {
+    if (selectedGroupIds.size === 0) {
+      toast({ variant: "destructive", title: "Selection Required", description: "Select at least one group to import." });
+      return;
+    }
+
+    setIsProcessing(true);
+    setProgress(0);
+
+    try {
+      let finalSummary: ImportRunSummary | null = null;
+      let allAssets: ParsedAsset[] = [];
+
+      activeSheetData.forEach((sheet, idx) => {
+        const summary = engineRef.current!.ingestGroups(sheet.name, sheet.data, selectedGroupIds);
+        
+        if (!finalSummary) {
+          finalSummary = summary;
+        } else {
+          finalSummary.dataRowsImported += summary.dataRowsImported;
+          finalSummary.groups = [...finalSummary.groups, ...summary.groups];
+        }
+        allAssets = [...allAssets, ...summary.groups.flatMap(g => g.assets)];
+        setProgress(Math.round(((idx + 1) / activeSheetData.length) * 100));
+      });
+
+      setSummary(finalSummary);
+      setStagedAssets(allAssets);
+      
+      // Stage to sandbox for reconciliation review
+      await storage.saveToSandbox(allAssets as any[]);
+      
+      setTimeout(() => {
+        setIsProcessing(false);
+        setCurrentStep('RECONCILE');
+      }, 500);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Ingestion Interrupted" });
+      setIsProcessing(false);
+    }
+  };
+
+  const handleCommitToRegistry = async () => {
     if (!activeGrantId) {
-      toast({ variant: "destructive", title: "Project Required", description: "Select an active grant in settings." });
+      toast({ variant: "destructive", title: "Project Required", description: "Select an active project in settings." });
       return;
     }
 
     setIsProcessing(true);
     try {
+      // 1. Enqueue creation pulses
       for (const asset of stagedAssets) {
+        if (asset.validation.isRejected) continue;
         const assetWithGrant = { ...asset, grantId: activeGrantId };
         await enqueueMutation('CREATE', 'assets', assetWithGrant);
       }
+
+      // 2. Update local state
       const current = await storage.getAssets();
-      await storage.saveAssets([...stagedAssets.map(a => ({ ...a, grantId: activeGrantId })), ...current]);
+      const validAssets = stagedAssets
+        .filter(a => !a.validation.isRejected)
+        .map(a => ({ ...a, grantId: activeGrantId }));
+      
+      await storage.saveAssets([...validAssets, ...current]);
       await storage.clearSandbox();
       
-      toast({ title: "Merge Complete", description: `${stagedAssets.length} records pushed to registry.` });
+      toast({ title: "Merge Complete", description: `${validAssets.length} records pushed to registry.` });
       setDataSource('PRODUCTION');
       await refreshRegistry();
       setCurrentStep('SUMMARY');
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const toggleGroupSelection = (id: string) => {
+    const next = new Set(selectedGroupIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedGroupIds(next);
+  };
+
+  const selectAllGroups = (select: boolean) => {
+    if (select) setSelectedGroupIds(new Set(discoveredGroups.map(g => g.id)));
+    else setSelectedGroupIds(new Set());
   };
 
   return (
@@ -144,12 +199,12 @@ export function ImportWorkstation() {
             Registry Ingestion
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Structural Engineering & Multi-Stage Data Import
+            Structural Discovery & Controlled Data Merge
           </p>
         </div>
-        {currentStep !== 'INGEST' && (
-          <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-12 px-6 rounded-xl font-black uppercase text-[9px] border-2 border-white/5 hover:bg-white/5 text-white">
-            <Trash2 className="mr-2 h-3.5 w-3.5" /> Discard Batch
+        {currentStep !== 'INGEST' && currentStep !== 'SUMMARY' && (
+          <Button variant="outline" onClick={() => { engineRef.current = null; setCurrentStep('INGEST'); }} className="h-12 px-6 rounded-xl font-black uppercase text-[9px] border-2 border-white/5 hover:bg-white/5 text-white">
+            <Trash2 className="mr-2 h-3.5 w-3.5" /> Discard Pulse
           </Button>
         )}
       </div>
@@ -169,11 +224,11 @@ export function ImportWorkstation() {
                 <div className="space-y-4">
                   <h3 className="text-3xl font-black uppercase text-white tracking-tight">Ingest Registry Workbook</h3>
                   <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic leading-relaxed">
-                    Select TB.xlsx or C19 ASSETS.xlsx. The structural engine will learn group templates from Column A.
+                    The structural engine scans Column A to discover section headers and build repeatable templates per group.
                   </p>
                 </div>
                 <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs mt-10 bg-primary text-black shadow-2xl shadow-primary/20 transition-all hover:-translate-y-1">
-                  Select Pulse File
+                  Initialize Discovery Pulse
                 </Button>
               </Card>
             </motion.div>
@@ -185,7 +240,7 @@ export function ImportWorkstation() {
                 <ScanSearch className="h-20 w-20 text-primary" />
               </div>
               <div className="space-y-4 max-w-sm w-full">
-                <h3 className="text-2xl font-black uppercase tracking-widest text-white">Traversing Registers</h3>
+                <h3 className="text-2xl font-black uppercase tracking-widest text-white">Structural Discovery</h3>
                 <div className="space-y-2">
                   <Progress value={progress} className="h-2 rounded-full" />
                   <span className="text-[9px] font-mono font-bold text-primary">{progress}% COMPLETE</span>
@@ -196,21 +251,39 @@ export function ImportWorkstation() {
 
           {currentStep === 'STRUCTURE' && (
             <motion.div key="structure" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-10">
-              <StructurePreview groups={discoveredGroups} />
+              <div className="flex items-center justify-between px-4">
+                <div className="space-y-1">
+                  <h4 className="text-xl font-black uppercase text-white">Group Selection</h4>
+                  <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60">Select discovered structural blocks for ingestion.</p>
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="ghost" size="sm" onClick={() => selectAllGroups(true)} className="h-9 px-4 rounded-lg font-black text-[9px] uppercase text-primary hover:bg-primary/5"><CheckSquare className="h-3.5 w-3.5 mr-2" /> Select All</Button>
+                  <Button variant="ghost" size="sm" onClick={() => selectAllGroups(false)} className="h-9 px-4 rounded-lg font-black text-[9px] uppercase text-white/40 hover:bg-white/5"><Square className="h-3.5 w-3.5 mr-2" /> Clear</Button>
+                </div>
+              </div>
+
+              <StructurePreview 
+                groups={discoveredGroups} 
+                selectable 
+                selectedIds={selectedGroupIds} 
+                onToggle={toggleGroupSelection}
+              />
               
               <div className="p-10 rounded-[3rem] bg-white/[0.02] border-2 border-dashed border-white/10 flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-primary/20 transition-all shadow-3xl">
                 <div className="flex items-start gap-6 max-w-xl">
-                  <div className="p-4 bg-primary/10 rounded-2xl"><CheckCircle2 className="h-8 w-8 text-primary" /></div>
+                  <div className="p-4 bg-primary/10 rounded-2xl"><ShieldCheck className="h-8 w-8 text-primary" /></div>
                   <div className="space-y-2">
-                    <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Structure Validated?</h4>
-                    <p className="text-sm font-medium text-white/40 italic leading-relaxed">Discovered {discoveredGroups.length} structural groups. Review the column sets above before proceeding.</p>
+                    <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Execute Import Pulse?</h4>
+                    <p className="text-sm font-medium text-white/40 italic leading-relaxed">Importing {selectedGroupIds.size} selected groups using strict positional mapping.</p>
                   </div>
                 </div>
                 <Button 
-                  onClick={() => setCurrentStep('RECONCILE')}
+                  onClick={handleExecuteImport}
+                  disabled={selectedGroupIds.size === 0 || isProcessing}
                   className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl bg-primary text-black gap-4 transition-transform hover:scale-105 active:scale-95 min-w-[300px]"
                 >
-                  Proceed to Ingestion <ChevronRight className="h-5 w-5" />
+                  {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <ChevronRight className="h-6 w-6" />}
+                  Finalize Selection
                 </Button>
               </div>
             </motion.div>
@@ -218,22 +291,22 @@ export function ImportWorkstation() {
 
           {currentStep === 'RECONCILE' && (
             <motion.div key="reconcile" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-10">
-              <ReconciliationView assets={stagedAssets as any} />
+              <ReconciliationView assets={stagedAssets as any} summary={runSummary!} />
               
               <div className="p-10 rounded-[3rem] bg-primary/5 border-2 border-dashed border-primary/20 flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-primary/40 transition-all shadow-3xl">
                 <div className="space-y-2 max-w-xl">
-                  <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Execute Merge Pulse?</h4>
+                  <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Commit to Registry?</h4>
                   <p className="text-sm font-medium text-white/40 italic leading-relaxed">
-                    Structural and data validation complete. This will integrate {stagedAssets.length} records into the authoritative register.
+                    Successfully mapped {stagedAssets.filter(a => !a.validation.isRejected).length} valid records. Mismatched or rejected rows will be logged for administrative review.
                   </p>
                 </div>
                 <Button 
-                  onClick={handleCommit}
+                  onClick={handleCommitToRegistry}
                   disabled={isProcessing}
                   className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-transform hover:scale-105 active:scale-95 bg-primary text-black min-w-[300px]"
                 >
                   {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <DatabaseZap className="h-6 w-6" />}
-                  Finalize Registry Merge
+                  Merge Valid Pulses
                 </Button>
               </div>
             </motion.div>
@@ -250,14 +323,17 @@ export function ImportWorkstation() {
                 <CheckCircle2 className="h-24 w-20" />
               </div>
               <div className="space-y-4 max-w-lg">
-                <h3 className="text-4xl font-black uppercase text-white tracking-tighter leading-none">Ingestion Complete</h3>
+                <h3 className="text-4xl font-black uppercase text-white tracking-tighter leading-none">Merge Complete</h3>
                 <p className="text-sm font-medium text-white/40 italic leading-relaxed">
-                  Successfully integrated {runSummary?.dataRowsImported} records into the register pulse.
+                  Successfully integrated {stagedAssets.filter(a => !a.validation.isRejected).length} records into the active register.
                 </p>
               </div>
-              <Button onClick={() => setActiveView('REGISTRY')} className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-widest bg-primary text-black shadow-2xl shadow-primary/20">
-                Enter Registry Workstation
-              </Button>
+              <div className="flex gap-4">
+                <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs border-2">Import Another</Button>
+                <Button onClick={() => setActiveView('REGISTRY')} className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-widest bg-primary text-black shadow-2xl shadow-primary/20">
+                  View Registry Workstation
+                </Button>
+              </div>
             </motion.div>
           )}
         </AnimatePresence>

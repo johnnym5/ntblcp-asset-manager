@@ -21,13 +21,24 @@ export interface HeaderTemplate {
 }
 
 export interface DiscoveredGroup {
+  id: string;
   groupName: string;
   headerSet: string[];
   headerSource: 'explicit' | 'inferred';
   columnCount: number;
   templateId: string;
   startRow: number;
+  endRow?: number;
   matchedTemplateSource?: string;
+  sheetName: string;
+  workbookName: string;
+}
+
+export interface ValidationLog {
+  rowNumber: number;
+  type: 'header_mismatch' | 'missing_columns' | 'extra_columns' | 'empty_row' | 'unassigned_group' | 'column_count_mismatch';
+  message: string;
+  rawData: any[];
 }
 
 export interface ValidationSummary {
@@ -36,12 +47,28 @@ export interface ValidationSummary {
   duplicateFlags: string[];
   needsReview: boolean;
   isRejected: boolean;
+  logs: ValidationLog[];
 }
 
 export interface ParsedAsset extends Asset {
   validation: ValidationSummary;
   sourceGroup: string;
   templateId: string;
+}
+
+export interface GroupImportContainer {
+  id: string;
+  groupName: string;
+  templateId: string;
+  workbookName: string;
+  sheetName: string;
+  headerSet: string[];
+  assets: ParsedAsset[];
+  metrics: {
+    total: number;
+    valid: number;
+    invalid: number;
+  };
 }
 
 export interface ImportRunSummary {
@@ -55,4 +82,5 @@ export interface ImportRunSummary {
   duplicatesDetected: number;
   templatesDiscovered: number;
   sectionBreakdown: Record<string, number>;
+  groups: GroupImportContainer[];
 }
