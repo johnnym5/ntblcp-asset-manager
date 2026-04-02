@@ -4,9 +4,10 @@
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 270: Implemented multi-state scope downloads for Zonal Administrators.
  * Phase 360: Integrated Real-Time Settings Pulse via Firestore onSnapshot.
+ * Phase 361: Wrapped search params in Suspense to resolve build pulse bailout.
  */
 
-import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { storage } from '@/offline/storage';
 import { processSyncQueue } from '@/offline/sync';
@@ -76,9 +77,29 @@ interface AppStateContextType {
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
+/**
+ * Internal component to sync state with URL parameters within a Suspense boundary.
+ */
+function ViewParamSync({ 
+  activeView, 
+  setActiveViewStatus 
+}: { 
+  activeView: WorkstationView, 
+  setActiveViewStatus: (v: WorkstationView) => void 
+}) {
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const v = searchParams?.get('v');
+    if (v) {
+      const matched = v.toUpperCase() as WorkstationView;
+      if (matched !== activeView) setActiveViewStatus(matched);
+    }
+  }, [searchParams, activeView, setActiveViewStatus]);
+  return null;
+}
+
 export const AppStateProvider = ({ children }: { children: React.ReactNode }) => {
   const router = useRouter();
-  const searchParams = useSearchParams();
   
   const [isHydrated, setIsHydrated] = useState(false);
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -193,14 +214,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       router.push(`/?${params.toString()}`, { scroll: false });
     }
   }, [router]);
-
-  useEffect(() => {
-    const v = searchParams?.get('v');
-    if (v) {
-      const matched = v.toUpperCase() as WorkstationView;
-      if (matched !== activeView) setActiveViewStatus(matched);
-    }
-  }, [searchParams, activeView]);
 
   const refreshRegistry = useCallback(async () => {
     try {
@@ -339,6 +352,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
       locationOptions, assigneeOptions, conditionOptions, statusOptions
     }}>
+      <Suspense fallback={null}>
+        <ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} />
+      </Suspense>
       {children}
     </AppStateContext.Provider>
   );
