@@ -1,91 +1,96 @@
+
 'use client';
 
 /**
  * @fileOverview AssetChecklist - High-Fidelity Data Quality Monitor.
- * Phase 130: Respects Schema Orchestrator toggles for checklist visibility.
+ * Phase 300: Matches the professional vertical checklist architecture.
  */
 
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CheckCircle2, XCircle, FileText, User, ShieldQuestion, ListTree, Hash, MapPin, Building, Tag, Settings2 } from 'lucide-react';
+import { CheckCircle2, XCircle, FileText, User, ShieldCheck, ListTree, Hash, MapPin, Building, Tag } from 'lucide-react';
 import type { Asset } from '@/types/domain';
-import type { DisplayField } from '@/types/domain';
-import { Button } from './ui/button';
-import { ScrollArea } from './ui/scroll-area';
+import { cn } from '@/lib/utils';
 
 interface AssetChecklistProps {
   values: Partial<Asset>;
-  displayFields?: DisplayField[];
-  isAdmin?: boolean;
-  onEdit?: () => void;
 }
 
-const getFieldIcon = (key: string) => {
-    const k = key.toLowerCase();
-    if (k.includes('category') || k.includes('class')) return <ListTree className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('sn') || k.includes('serial') || k.includes('model') || k.includes('engine') || k.includes('chasis')) return <Hash className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('location') || k.includes('state') || k.includes('lga') || k.includes('site')) return <MapPin className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('assignee') || k.includes('user')) return <User className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('condition')) return <ShieldQuestion className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('id') || k.includes('tag')) return <Tag className="h-4 w-4 text-muted-foreground" />;
-    if (k.includes('manufacturer') || k.includes('supplier') || k.includes('building')) return <Building className="h-4 w-4 text-muted-foreground" />;
-    return <FileText className="h-4 w-4 text-muted-foreground" />;
-};
-
-const ChecklistItem = ({ label, isCompleted, icon }: { label: string; isCompleted: boolean; icon: React.ReactNode }) => (
-  <div className="flex items-center justify-between text-sm py-2 px-3 rounded-xl border border-transparent hover:bg-muted/30 transition-colors">
-    <div className="flex items-center gap-3 min-w-0">
-      <div className="shrink-0 opacity-40">{icon}</div>
-      <span className="truncate font-bold uppercase text-[10px] tracking-tight opacity-70" title={label}>{label}</span>
+const ChecklistItem = ({ label, isCompleted, icon: Icon }: { label: string; isCompleted: boolean; icon: any }) => (
+  <div className="flex items-center justify-between group transition-all">
+    <div className="flex items-center gap-4">
+      <div className={cn(
+        "p-2 rounded-lg transition-colors",
+        isCompleted ? "bg-primary/5 text-primary" : "bg-white/5 text-white/20"
+      )}>
+        <Icon className="h-4 w-4" />
+      </div>
+      <span className={cn(
+        "text-xs font-black uppercase tracking-tight transition-colors",
+        isCompleted ? "text-white" : "text-white/20"
+      )}>{label}</span>
     </div>
-    <div className="shrink-0 ml-2">
+    <div className="shrink-0">
         {isCompleted ? (
-        <CheckCircle2 className="h-4 w-4 text-green-500" />
+          <div className="h-5 w-5 rounded-full border-2 border-primary flex items-center justify-center bg-primary/10">
+            <CheckCircle2 className="h-3.5 w-3.5 text-primary" />
+          </div>
         ) : (
-        <XCircle className="h-4 w-4 text-destructive/40" />
+          <div className="h-5 w-5 rounded-full border-2 border-white/10 flex items-center justify-center">
+            <XCircle className="h-3.5 w-3.5 text-red-600/40" />
+          </div>
         )}
     </div>
   </div>
 );
 
-export function AssetChecklist({ values, displayFields = [], isAdmin, onEdit }: AssetChecklistProps) {
-  // Use display fields marked for checklist in the editor
-  const checklistFields = displayFields.filter(f => f.inChecklist || f.table); // Default to table fields if checklist is empty
-  
-  const items = checklistFields.map(f => ({ 
-    label: f.label, 
-    completed: !!(values as any)[f.key], 
-    icon: getFieldIcon(f.key) 
-  }));
+export function AssetChecklist({ values }: AssetChecklistProps) {
+  const requiredItems = [
+    { label: 'Category', completed: !!values.category, icon: ListTree },
+    { label: 'Asset Description', completed: !!values.description, icon: FileText },
+    { label: 'Serial Number', completed: !!values.serialNumber && values.serialNumber !== 'N/A', icon: Hash },
+    { label: 'Location', completed: !!values.location, icon: MapPin },
+    { label: 'Condition', completed: !!values.condition, icon: ShieldCheck },
+  ];
 
-  const hasFields = items.length > 0;
+  const importantItems = [
+    { label: 'Asset ID Code', completed: !!values.assetIdCode, icon: Tag },
+    { label: 'LGA', completed: !!values.lga, icon: MapPin },
+    { label: 'Assignee', completed: !!values.custodian, icon: User },
+    { label: 'Manufacturer', completed: !!values.manufacturer, icon: Building },
+    { label: 'Model Number', completed: !!values.modelNumber, icon: Hash },
+    { label: 'Asset Class', completed: !!values.category, icon: ListTree },
+    { label: 'Remarks/Notes', completed: !!values.remarks, icon: FileText },
+  ];
 
   return (
-    <Card className="shadow-none border-none bg-transparent">
-      <CardHeader className="p-0 pb-4 flex flex-row items-center justify-between space-y-0">
-        <div className="space-y-0.5">
-          <CardTitle className="text-xs font-black uppercase tracking-widest text-primary">Data Fidelity Checklist</CardTitle>
-          <p className="text-[8px] font-bold text-muted-foreground uppercase opacity-60">Deterministic required fields pulse.</p>
+    <div className="space-y-10 animate-in fade-in duration-700">
+      <div className="space-y-2">
+        <h3 className="text-3xl font-black uppercase tracking-tight text-white leading-none">Asset Data Checklist</h3>
+        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-white/40">Fidelity Assurance Pulse</p>
+      </div>
+
+      <div className="space-y-8">
+        <div className="space-y-4">
+          <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-primary">Required Fields</h4>
+          <div className="space-y-3">
+            {requiredItems.map((item) => (
+              <ChecklistItem key={item.label} {...item} />
+            ))}
+          </div>
         </div>
-        {isAdmin && (
-            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-xl bg-muted/20" onClick={onEdit} title="Configure Checklist">
-                <Settings2 className="h-4 w-4 text-muted-foreground" />
-            </Button>
-        )}
-      </CardHeader>
-      <CardContent className="p-0 space-y-1">
-        {!hasFields ? (
-            <div className="p-6 border-2 border-dashed rounded-[1.5rem] text-center bg-muted/10 opacity-40">
-                <p className="text-[10px] font-bold uppercase tracking-tighter">No fields configured.</p>
-            </div>
-        ) : (
-            <div className="space-y-1 bg-muted/10 rounded-[1.5rem] p-2 border border-border/40">
-                {items.map((item) => (
-                  <ChecklistItem key={item.label} label={item.label} isCompleted={item.completed} icon={item.icon} />
-                ))}
-            </div>
-        )}
-      </CardContent>
-    </Card>
+
+        <div className="w-full h-px bg-white/5" />
+
+        <div className="space-y-4">
+          <h4 className="text-[11px] font-black uppercase tracking-[0.2em] text-white/40">Important Fields</h4>
+          <div className="space-y-3">
+            {importantItems.map((item) => (
+              <ChecklistItem key={item.label} {...item} />
+            ))}
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
