@@ -3,6 +3,7 @@
 /**
  * @fileOverview InfrastructureWorkstation - System Infrastructure Module.
  * Phase 165: Renamed to System Infrastructure.
+ * Phase 167: Updated Purge pulse to be local-only per user request.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -39,6 +40,7 @@ import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { storage } from '@/offline/storage';
 import { VirtualDBService } from '@/services/virtual-db-service';
 import { SystemDiagnostics, type DiagnosticResult } from '@/lib/diagnostics';
 import { ResponsiveContainer, AreaChart, Area, XAxis, YAxis, Tooltip } from 'recharts';
@@ -94,15 +96,15 @@ export function InfrastructureWorkstation() {
     finally { setIsProcessing(false); }
   };
 
-  const handleGlobalPurge = async () => {
+  const handleLocalWipe = async () => {
     setIsProcessing(true);
     try {
-      await VirtualDBService.purgeGlobalRegistry();
-      toast({ title: "Global Purge Complete", description: "Register reset to prepare for new data import." });
+      await storage.clearAssets(); // Deterministic local wipe (assets, sandbox, queue)
+      toast({ title: "Local Registry Wiped", description: "Device cache purged. Cloud Authority remains intact." });
       await refreshRegistry();
       setIsPurgeDialogOpen(false);
     } catch (e) {
-      toast({ variant: "destructive", title: "Purge Interrupted", description: "Administrative clearance failed or connection latent." });
+      toast({ variant: "destructive", title: "Wipe Interrupted", description: "Local persistence layer is currently locked." });
     } finally {
       setIsProcessing(false);
     }
@@ -266,9 +268,9 @@ export function InfrastructureWorkstation() {
           </CardHeader>
           <CardContent className="p-8 space-y-6">
             <div className="p-6 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-2">
-              <h5 className="text-[10px] font-black uppercase text-primary tracking-widest">Wipe operational state</h5>
+              <h5 className="text-[10px] font-black uppercase text-primary tracking-widest">Wipe local operational state</h5>
               <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed">
-                Clearing the database removes all previous assets, sync logs, and staged sandboxes. This ensures that the new data import is deterministic and free from legacy collisions.
+                Selecting this wipe will purge all asset records from your local device cache and sandbox. This ensures your workstation is clear for a new import. Cloud records will not be affected.
               </p>
             </div>
             <Button 
@@ -276,7 +278,7 @@ export function InfrastructureWorkstation() {
               onClick={() => setIsPurgeDialogOpen(true)}
               className="w-full h-16 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] border-2 text-destructive border-destructive/20 hover:bg-destructive/5 transition-all shadow-sm"
             >
-              <Bomb className="h-4 w-4 mr-3" /> Initialize Global Purge
+              <Bomb className="h-4 w-4 mr-3" /> Initialize Local Registry Wipe
             </Button>
           </CardContent>
         </Card>
@@ -296,7 +298,7 @@ export function InfrastructureWorkstation() {
             </div>
             <Button 
               variant="outline" 
-              onClick={() => window.location.href = '/?v=database'}
+              onClick={() => setActiveView('DATABASE')}
               className="w-full h-16 rounded-2xl font-black uppercase text-xs tracking-widest border-2 hover:bg-primary/5 tactile-pulse shadow-sm"
             >
               <ScanSearch className="h-4 w-4 mr-2" /> Forensic Resolution
@@ -311,20 +313,20 @@ export function InfrastructureWorkstation() {
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
               <Bomb className="h-10 w-10 text-destructive" />
             </div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe All Databases?</AlertDialogTitle>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Local Database?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
-              This action is **immutable**. You are about to purge every record from the Cloud (Firestore), Mirror (RTDB), and this device (IndexedDB). This is required to prepare for a fresh import.
+              This action will purge all asset records, sync logs, and staging sandboxes <strong>on this device only</strong>. It is intended to prepare your workstation for a fresh workbook import. Cloud Authority data is preserved.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Action</AlertDialogCancel>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0 hover:bg-white/5 transition-all">Abort Action</AlertDialogCancel>
             <AlertDialogAction 
-              onClick={handleGlobalPurge}
+              onClick={handleLocalWipe}
               disabled={isProcessing}
               className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0"
             >
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Hammer className="h-4 w-4 mr-2" />}
-              Commit Global Wipe
+              Commit Local Wipe
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
