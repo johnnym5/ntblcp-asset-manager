@@ -1,4 +1,5 @@
 import type { Timestamp } from 'firebase/firestore';
+import type { DiscoveredGroup } from '@/parser/types';
 
 export interface Asset {
   id: string;
@@ -83,6 +84,7 @@ export interface SheetDefinition {
   name: string;
   headers: string[];
   displayFields: DisplayField[];
+  groups?: DiscoveredGroup[];
   // Optional array of header keywords that can trigger the start of this sheet's data block
   // Useful for files where multiple tables are in one sheet.
   subSheetTriggers?: string[]; 

@@ -2,10 +2,8 @@
 
 /**
  * @fileOverview SettingsWorkstation - Master Settings Manager.
- * Phase 235: Resolved ReferenceErrors and synchronized import paths.
- * Phase 236: Implemented handleCommitChanges and strict RBAC visibility.
- * Phase 237: Relocated Ingest Registry Workbook to Projects & Sheets tab.
- * Phase 238: Enhanced error reporting for configuration commits.
+ * Phase 240: Overhauled Sheet Definitions to include Structural Template Inspection.
+ * Implemented separation of Template Discovery from Asset Ingestion.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -60,7 +58,9 @@ import {
   KeyRound,
   History,
   Check,
-  DatabaseZap
+  DatabaseZap,
+  ListFilter,
+  ChevronDown
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -99,6 +99,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 
 export function SettingsWorkstation() {
   const { 
@@ -122,7 +127,6 @@ export function SettingsWorkstation() {
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   
-  // Password State
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -281,7 +285,6 @@ export function SettingsWorkstation() {
       </div>
 
       <Tabs defaultValue="general" className="space-y-10">
-        {/* 2. Tab Bar */}
         <div className="bg-[#080808] p-1 rounded-2xl border border-white/5 shadow-inner">
           <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center w-full">
             <TabsTrigger value="general" className="flex-1 px-6 py-2.5 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
@@ -305,111 +308,24 @@ export function SettingsWorkstation() {
           </TabsList>
         </div>
 
-        {/* --- 3. GENERAL TAB --- */}
-        <TabsContent value="general" className="space-y-12 m-0 animate-in fade-in slide-in-from-bottom-2">
-          
-          {/* Appearance Section */}
+        <TabsContent value="general" className="space-y-12 m-0">
           <div className="space-y-6">
             <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Appearance</h3>
             <Card className="bg-[#050505] border-white/5 rounded-[1.5rem] p-8 shadow-xl">
               <div className="flex items-center gap-4 mb-6">
                 <div className="p-2 bg-white/5 rounded-lg"><Globe className="h-4 w-4 text-white/40" /></div>
-                <span className="text-[11px] font-black uppercase tracking-widest text-white/60">Theme</span>
+                <span className="text-[11px] font-black uppercase tracking-widest text-white/60">Theme Selection</span>
               </div>
-              <div className="flex flex-wrap gap-4 justify-center md:justify-start">
-                <Button 
-                  variant={theme === 'light' ? 'secondary' : 'outline'} 
-                  onClick={() => setTheme('light')}
-                  className="h-14 px-12 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-white/10"
-                >
-                  <Sun className="h-4 w-4" /> Light
-                </Button>
-                <Button 
-                  variant={theme === 'dark' ? 'secondary' : 'outline'} 
-                  onClick={() => setTheme('dark')}
-                  className="h-14 px-12 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-white/10"
-                >
-                  <Moon className="h-4 w-4" /> Dark
-                </Button>
-                <Button 
-                  variant={theme === 'system' ? 'secondary' : 'outline'} 
-                  onClick={() => setTheme('system')}
-                  className="h-14 px-12 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-white/10"
-                >
-                  <Database className="h-4 w-4" /> System
-                </Button>
+              <div className="flex flex-wrap gap-4">
+                <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="h-14 px-12 rounded-2xl font-black uppercase text-[10px] tracking-widest border-white/10">Light</Button>
+                <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="h-14 px-12 rounded-2xl font-black uppercase text-[10px] tracking-widest border-white/10">Dark</Button>
+                <Button variant={theme === 'system' ? 'secondary' : 'outline'} onClick={() => setTheme('system')} className="h-14 px-12 rounded-2xl font-black uppercase text-[10px] tracking-widest border-white/10">System</Button>
               </div>
             </Card>
           </div>
-
-          {/* Security Section */}
-          <div className="space-y-6">
-            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Security</h3>
-            <Card className="bg-[#050505] border-white/5 rounded-[1.5rem] p-8 shadow-xl space-y-8">
-              <div className="flex items-center gap-4">
-                <div className="p-2 bg-white/5 rounded-lg"><KeyRound className="h-4 w-4 text-white/40" /></div>
-                <span className="text-[11px] font-black uppercase tracking-widest text-white/60">Change Your Password</span>
-              </div>
-              
-              <div className="grid grid-cols-1 gap-6 max-w-2xl">
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-white/40 pl-1">Current Password</Label>
-                  <Input type="password" value={currentPassword} onChange={e => setCurrentPassword(e.target.value)} className="h-14 bg-black border-white/10 rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-white/40 pl-1">New Password</Label>
-                  <Input type="password" value={newPassword} onChange={e => setNewPassword(e.target.value)} className="h-14 bg-black border-white/10 rounded-xl" />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-[10px] font-black uppercase text-white/40 pl-1">Confirm New Password</Label>
-                  <Input type="password" value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} className="h-14 bg-black border-white/10 rounded-xl" />
-                </div>
-                <Button className="w-fit h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">
-                  Stage Password Change
-                </Button>
-              </div>
-            </Card>
-          </div>
-
-          {/* Global Admin Section */}
-          {isAdmin && (
-            <div className="space-y-6">
-              <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Global Admin Settings</h3>
-              <Card className="bg-[#050505] border-white/5 rounded-[1.5rem] overflow-hidden shadow-xl">
-                <div className="p-8 space-y-8">
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-black uppercase text-white">Application Mode</Label>
-                      <p className="text-[10px] font-medium text-white/40 italic">Management: Structural data is locked for non-admins.</p>
-                    </div>
-                    <Select value={draftSettings.appMode} onValueChange={v => handleSettingChange('appMode', v)}>
-                      <SelectTrigger className="w-48 h-12 bg-black border-white/10 rounded-xl font-black uppercase text-[10px] tracking-widest">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="bg-[#0A0A0A] border-white/10">
-                        <SelectItem value="management" className="text-[10px] font-black uppercase">Management</SelectItem>
-                        <SelectItem value="verification" className="text-[10px] font-black uppercase">Verification</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  
-                  <Separator className="bg-white/5" />
-
-                  <div className="flex items-center justify-between">
-                    <div className="space-y-1">
-                      <Label className="text-sm font-black uppercase text-white">Lock Asset List</Label>
-                      <p className="text-[10px] font-medium text-white/40 italic">Disable record creation and deletion for all users.</p>
-                    </div>
-                    <Switch checked={draftSettings.lockAssetList} onCheckedChange={v => handleSettingChange('lockAssetList', v)} className="data-[state=checked]:bg-primary" />
-                  </div>
-                </div>
-              </Card>
-            </div>
-          )}
         </TabsContent>
 
-        {/* --- 4. PROJECTS & SHEETS TAB --- */}
-        <TabsContent value="projects" className="space-y-10 m-0 animate-in fade-in slide-in-from-bottom-2">
+        <TabsContent value="projects" className="space-y-10 m-0">
           {isAdmin && (
             <div className="space-y-6">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 px-1">
@@ -430,7 +346,7 @@ export function SettingsWorkstation() {
                       "bg-[#050505] border-2 rounded-[2rem] overflow-hidden shadow-xl transition-all duration-500",
                       isActive ? "border-primary/40 ring-4 ring-primary/5" : "border-white/5"
                     )}>
-                      <CardHeader className="p-8 pb-4">
+                      <CardHeader className="p-8 pb-4 border-b border-white/5">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-4">
                             <ChevronsUpDown className="h-4 w-4 text-white/20" />
@@ -438,39 +354,102 @@ export function SettingsWorkstation() {
                             {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
                           </div>
                           <div className="flex items-center gap-6">
-                            {!isActive && (
-                              <button onClick={() => handleSettingChange('activeGrantId', grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80 transition-opacity">Set Active</button>
-                            )}
-                            <button className="text-[10px] font-black uppercase tracking-widest text-white/40">Rename</button>
+                            {!isActive && <button onClick={() => handleSettingChange('activeGrantId', grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80 transition-opacity">Set Active</button>}
                             <button onClick={() => handleDeleteProject(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500">Delete</button>
                           </div>
                         </div>
                       </CardHeader>
-                      <CardContent className="p-8 pt-4 space-y-8">
-                        <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40">Sheet Definitions</h4>
-                        <div className="space-y-2.5">
-                          {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
-                            <div key={sheetName} className="flex items-center justify-between p-5 bg-black border border-white/5 rounded-2xl group hover:border-white/20 transition-all shadow-inner">
-                              <span className="text-xs font-black uppercase text-white/80">{sheetName}</span>
-                              <div className="flex items-center gap-5 text-white/20">
-                                <button className="hover:text-white transition-colors"><Eye className="h-4 w-4" /></button>
-                                <button onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setOriginalSheetName(sheetName); setIsColumnSheetOpen(true); }} className="hover:text-primary transition-colors"><Wrench className="h-4 w-4" /></button>
-                                <button onClick={() => handleDeleteSheet(grant.id, sheetName)} className="hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
-                              </div>
-                            </div>
-                          ))}
+                      <CardContent className="p-8 pt-6 space-y-10">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between px-1">
+                            <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40">Registered Templates</h4>
+                            <Badge variant="outline" className="h-6 px-3 border-white/10 text-white/40 font-black text-[9px]">{Object.keys(grant.sheetDefinitions || {}).length} SHEETS</Badge>
+                          </div>
+                          
+                          <div className="space-y-3">
+                            {Object.keys(grant.sheetDefinitions || {}).map(sheetName => {
+                              const definition = grant.sheetDefinitions[sheetName];
+                              return (
+                                <Collapsible key={sheetName}>
+                                  <div className="flex flex-col rounded-2xl bg-black border border-white/5 overflow-hidden group hover:border-white/20 transition-all shadow-inner">
+                                    <div className="flex items-center justify-between p-5">
+                                      <CollapsibleTrigger asChild>
+                                        <div className="flex items-center gap-4 cursor-pointer group-hover:text-primary transition-colors">
+                                          <div className="p-2 bg-white/5 rounded-lg"><LayoutGrid className="h-4 w-4 text-white/40 group-hover:text-primary" /></div>
+                                          <div className="flex flex-col">
+                                            <span className="text-xs font-black uppercase text-white/80">{sheetName}</span>
+                                            <span className="text-[8px] font-bold text-white/20 uppercase tracking-widest">Structural Template</span>
+                                          </div>
+                                          <ChevronDown className="h-3 w-3 opacity-20" />
+                                        </div>
+                                      </CollapsibleTrigger>
+                                      
+                                      <div className="flex items-center gap-4">
+                                        <Button 
+                                          variant="ghost" 
+                                          size="sm" 
+                                          onClick={() => setActiveView('IMPORT')}
+                                          className="h-8 px-3 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 bg-white/5 hover:bg-primary hover:text-black"
+                                        >
+                                          <ScanSearch className="h-3 w-3" /> Sync Data
+                                        </Button>
+                                        <div className="flex items-center gap-3 text-white/20 border-l border-white/5 pl-4">
+                                          <button onClick={() => { setSelectedSheetDef(definition); setActiveGrantIdForSchema(grant.id); setOriginalSheetName(sheetName); setIsColumnSheetOpen(true); }} className="hover:text-primary transition-all"><Wrench className="h-4 w-4" /></button>
+                                          <button onClick={() => handleDeleteSheet(grant.id, sheetName)} className="hover:text-red-600 transition-all"><Trash2 className="h-4 w-4" /></button>
+                                        </div>
+                                      </div>
+                                    </div>
+
+                                    <CollapsibleContent className="px-5 pb-5 animate-in slide-in-from-top-2 duration-300">
+                                      <div className="pt-4 border-t border-white/5 space-y-6">
+                                        {definition.groups && definition.groups.length > 0 ? (
+                                          <div className="space-y-4">
+                                            <p className="text-[9px] font-black uppercase text-white/20 tracking-widest">Discovered Structural Nodes</p>
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                              {definition.groups.map((group: any, idx: number) => (
+                                                <Collapsible key={idx}>
+                                                  <div className="p-4 rounded-xl bg-white/[0.02] border border-white/5 space-y-3 group/node">
+                                                    <CollapsibleTrigger asChild>
+                                                      <div className="flex items-center justify-between cursor-pointer">
+                                                        <div className="flex items-center gap-3">
+                                                          <Badge className="bg-primary/10 text-primary border-primary/20 text-[8px] font-black">{idx + 1}</Badge>
+                                                          <span className="text-[10px] font-black uppercase text-white/60 group-hover/node:text-white">{group.groupName}</span>
+                                                        </div>
+                                                        <ChevronDown className="h-3 w-3 opacity-20" />
+                                                      </div>
+                                                    </CollapsibleTrigger>
+                                                    <CollapsibleContent className="pt-3 border-t border-white/5">
+                                                      <div className="flex flex-wrap gap-1.5">
+                                                        {group.headerSet.map((h: string, i: number) => (
+                                                          <Badge key={i} variant="secondary" className="bg-black border border-white/5 text-[7px] font-mono text-white/20">{h}</Badge>
+                                                        ))}
+                                                      </div>
+                                                    </CollapsibleContent>
+                                                  </div>
+                                                </Collapsible>
+                                              ))}
+                                            </div>
+                                          </div>
+                                        ) : (
+                                          <div className="py-6 text-center opacity-20"><Info className="h-8 w-8 mx-auto mb-2" /><p className="text-[9px] font-black uppercase">No structural node pulses detected.</p></div>
+                                        )}
+                                      </div>
+                                    </CollapsibleContent>
+                                  </div>
+                                </Collapsible>
+                              );
+                            })}
+                          </div>
                         </div>
+
                         {isActive && (
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                            <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
-                              <PlusCircle className="h-4 w-4" /> Add Manually
-                            </Button>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                             <input type="file" ref={templateInputRef} onChange={handleTemplateDiscovery} className="hidden" accept=".xlsx,.xls" />
-                            <Button variant="outline" onClick={() => templateInputRef.current?.click()} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
-                              <FileUp className="h-4 w-4" /> Import Template
+                            <Button variant="outline" onClick={() => templateInputRef.current?.click()} className="h-16 rounded-[1.5rem] bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/5 text-white/60">
+                              <FileCode className="h-5 w-5 text-primary" /> Import Template Pulse
                             </Button>
-                            <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[9px] tracking-widest gap-2.5 text-white/60 hover:text-white">
-                              <DatabaseZap className="h-4 w-4" /> Ingest Registry Workbook
+                            <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="h-16 rounded-[1.5rem] bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/5 text-white/60">
+                              <DatabaseZap className="h-5 w-5 text-primary" /> Ingest Multi-Template Workbook
                             </Button>
                           </div>
                         )}
@@ -483,68 +462,21 @@ export function SettingsWorkstation() {
           )}
         </TabsContent>
 
-        {/* --- 5. USERS TAB --- */}
-        <TabsContent value="users" className="m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
-          {isAdmin && (
-            <>
-              <h3 className="text-xl font-black uppercase text-white tracking-tight mb-6">User Management</h3>
-              <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 shadow-xl">
-                <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
-              </Card>
-            </>
-          )}
-        </TabsContent>
-
-        {/* --- 6. HISTORY TAB --- */}
-        <TabsContent value="history" className="space-y-10 m-0 animate-in fade-in slide-in-from-bottom-2 px-1">
-          {isAdmin && (
-            <>
-              <h3 className="text-xl font-black uppercase text-white tracking-tight">System History & Health</h3>
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 space-y-6 shadow-xl">
-                  <h4 className="text-sm font-black uppercase text-white">Register Synchronization</h4>
-                  <div className="space-y-3">
-                    <Button variant="outline" onClick={refreshRegistry} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-6 border-white/10">
-                      <RefreshCw className="h-4 w-4 text-primary" /> Sync Local to Cloud Database
-                    </Button>
-                    <Button variant="outline" onClick={refreshRegistry} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-6 border-white/10">
-                      <Download className="h-4 w-4 text-primary" /> Pull Cloud State to Register
-                    </Button>
-                  </div>
-                </Card>
-
-                <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 space-y-6 shadow-xl">
-                  <h4 className="text-sm font-black uppercase text-white">Maintenance Pulses</h4>
-                  <Button variant="outline" onClick={() => setIsNukeDialogOpen(true)} className="w-full h-14 rounded-xl font-black uppercase text-[10px] tracking-widest gap-4 justify-start px-6 border-destructive/20 text-destructive hover:bg-destructive/5 transition-all">
-                    <Bomb className="h-4 w-4" /> Reset Global Asset Register
-                  </Button>
-                </Card>
-              </div>
-            </>
-          )}
+        <TabsContent value="users" className="m-0">
+          <h3 className="text-xl font-black uppercase text-white tracking-tight mb-6 px-1">User Governance</h3>
+          <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 shadow-xl">
+            <UserManagement users={draftSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
+          </Card>
         </TabsContent>
       </Tabs>
 
-      {/* 4. Global Footer Actions */}
       <div className="fixed bottom-0 left-0 right-0 p-8 bg-black/80 backdrop-blur-3xl border-t border-white/5 flex items-center justify-between z-50">
-        <Button 
-          variant="ghost" 
-          onClick={() => setActiveView('DASHBOARD')}
-          className="h-14 px-12 rounded-2xl bg-white/[0.05] text-white font-black uppercase text-[11px] tracking-[0.25em] hover:bg-white/10 transition-all active:scale-95"
-        >
-          Cancel
-        </Button>
-        <Button 
-          onClick={handleCommitChanges}
-          disabled={!hasChanges || isSaving}
-          className="h-14 px-16 rounded-2xl bg-primary text-black font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 hover:bg-primary/90 transition-all active:scale-95"
-        >
-          {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Check className="h-5 w-5 mr-3" />}
-          Apply Configuration
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-14 px-12 rounded-2xl bg-white/[0.05] text-white font-black uppercase text-[11px] tracking-[0.25em] hover:bg-white/10">Cancel</Button>
+        <Button onClick={handleCommitChanges} disabled={!hasChanges || isSaving} className="h-14 px-16 rounded-2xl bg-primary text-black font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 hover:bg-primary/90">
+          {isSaving ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <ShieldCheck className="h-5 w-5 mr-3" />} Commit Configuration
         </Button>
       </div>
 
-      {/* Modals & Drawers */}
       {selectedSheetDef && (
         <ColumnCustomizationSheet 
           isOpen={isColumnSheetOpen} 
@@ -556,12 +488,8 @@ export function SettingsWorkstation() {
             const updatedGrants = draftSettings.grants.map(g => {
               if (g.id === activeGrantIdForSchema) {
                 const next = { ...g.sheetDefinitions };
-                if (applyToAll) {
-                  Object.keys(next).forEach(k => { next[k] = { ...newDef, name: k }; });
-                } else {
-                  next[newDef.name] = newDef;
-                  if (orig && orig !== newDef.name) delete next[orig];
-                }
+                if (applyToAll) Object.keys(next).forEach(k => { next[k] = { ...newDef, name: k }; });
+                else { next[newDef.name] = newDef; if (orig && orig !== newDef.name) delete next[orig]; }
                 return { ...g, sheetDefinitions: next };
               }
               return g;
@@ -570,22 +498,6 @@ export function SettingsWorkstation() {
           }} 
         />
       )}
-      <ImportScannerDialog isOpen={isImportScanOpen} onOpenChange={setIsImportScanOpen} />
-      <AlertDialog open={isNukeDialogOpen} onOpenChange={setIsNukeDialogOpen}>
-        <AlertDialogContent className="rounded-3xl p-10 bg-black border-destructive/20 shadow-3xl text-white">
-          <AlertDialogHeader className="space-y-4">
-            <Bomb className="h-12 w-12 text-destructive" />
-            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive">Wipe Global Register?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic leading-relaxed text-white/60">
-              This action is immutable. You are about to purge all records from local, cloud, and mirror storage.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 hover:bg-white/5 transition-all">Abort</AlertDialogCancel>
-            <AlertDialogAction onClick={handleNukeRegistry} className="h-12 px-10 rounded-2xl bg-destructive text-white font-black uppercase m-0">Confirm Wipe</AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
     </div>
   );
 }
