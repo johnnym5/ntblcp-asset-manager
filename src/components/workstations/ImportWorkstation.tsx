@@ -2,11 +2,11 @@
 
 /**
  * @fileOverview ImportWorkstation - Controlled Registry Ingestion.
- * Phase 300: Overhauled to use the High-Fidelity Structural Parser Engine.
+ * Phase 650: strictly processes only the first sheet and focuses on structural groups.
  */
 
 import React, { useState, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { 
@@ -21,7 +21,8 @@ import {
   ChevronLeft,
   Activity,
   FileSpreadsheet,
-  Zap
+  Zap,
+  Layers
 } from 'lucide-react';
 import { Progress } from '@/components/ui/progress';
 import { useToast } from '@/hooks/use-toast';
@@ -50,7 +51,7 @@ export function ImportWorkstation() {
   const [selectedGroupIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [runSummary, setSummary] = useState<ImportRunSummary | null>(null);
   const [progress, setProgress] = useState(0);
-  const [activeSheetData, setActiveSheetData] = useState<{name: string, data: any[][]}[]>([]);
+  const [activeSheetData, setActiveSheetData] = useState<{name: string, data: any[][]} | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
   const engineRef = useRef<ParserEngine | null>(null);
@@ -68,22 +69,17 @@ export function ImportWorkstation() {
       const workbook = XLSX.read(buffer, { type: 'array' });
       setProgress(40);
 
+      // CRITICAL: take only the first relevant sheet
+      const sheetName = workbook.SheetNames[0];
+      const sheet = workbook.Sheets[sheetName];
+      const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
+      
       engineRef.current = new ParserEngine(file.name, existingAssets);
-      let allDiscoveredGroups: DiscoveredGroup[] = [];
-      const sheets: {name: string, data: any[][]}[] = [];
+      const groups = engineRef.current!.discoverGroups(sheetName, data);
 
-      workbook.SheetNames.forEach(sheetName => {
-        const sheet = workbook.Sheets[sheetName];
-        const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
-        sheets.push({ name: sheetName, data });
-        const groups = engineRef.current!.discoverGroups(sheetName, data);
-        allDiscoveredGroups = [...allDiscoveredGroups, ...groups];
-      });
-
-      setActiveSheetData(sheets);
-      setDiscoveredGroups(allDiscoveredGroups);
-      // Auto-select all discovered groups by default
-      setSelectedIds(new Set(allDiscoveredGroups.map(g => g.id)));
+      setActiveSheetData({ name: sheetName, data });
+      setDiscoveredGroups(groups);
+      setSelectedIds(new Set(groups.map(g => g.id)));
       setProgress(100);
 
       setTimeout(() => {
@@ -98,44 +94,35 @@ export function ImportWorkstation() {
   };
 
   const handleExecuteImport = async () => {
-    if (!engineRef.current || selectedGroupIds.size === 0) return;
+    if (!engineRef.current || selectedGroupIds.size === 0 || !activeSheetData) return;
     
     setIsProcessing(true);
-    setProgress(0);
+    setProgress(50);
 
     try {
-      let allStaged: ParsedAsset[] = [];
-      const containers: GroupImportContainer[] = [];
-
       const selectedGroups = discoveredGroups.filter(g => selectedGroupIds.has(g.id));
-
-      activeSheetData.forEach((sheet, idx) => {
-        const sheetGroups = selectedGroups.filter(g => g.sheetName === sheet.name);
-        if (sheetGroups.length > 0) {
-          const results = engineRef.current!.ingestGroups(sheet.name, sheet.data, sheetGroups);
-          containers.push(...results);
-          allStaged = [...allStaged, ...results.flatMap(c => c.assets)];
-        }
-        setProgress(Math.round(((idx + 1) / activeSheetData.length) * 100));
-      });
+      const results = engineRef.current!.ingestGroups(activeSheetData.name, activeSheetData.data, selectedGroups);
+      
+      const allStaged = results.flatMap(c => c.assets);
 
       setSummary({
         workbookName: engineRef.current['workbookName'],
-        sheetName: 'BATCH_IMPORT',
-        profileId: 'CONTROLLED_V5',
-        totalRows: activeSheetData.reduce((s, d) => s + d.data.length, 0),
-        groupCount: containers.length,
+        sheetName: activeSheetData.name,
+        profileId: 'CONTROLLED_V6',
+        totalRows: activeSheetData.data.length,
+        groupCount: results.length,
         dataRowsImported: allStaged.length,
         rowsRejected: 0,
         duplicatesDetected: 0,
         templatesDiscovered: selectedGroupIds.size,
         sectionBreakdown: {},
-        groups: containers
+        groups: results
       });
 
       setStagedAssets(allStaged);
       await storage.saveToSandbox(allStaged as any[]);
       
+      setProgress(100);
       setTimeout(() => {
         setIsProcessing(false);
         setCurrentStep('RECONCILE');
@@ -181,10 +168,10 @@ export function ImportWorkstation() {
             <div className="p-3 bg-primary/10 rounded-2xl">
               <DatabaseZap className="h-8 w-8 text-primary" />
             </div>
-            Registry Ingestion
+            Single-Sheet Registry Import
           </h2>
           <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Structural Discovery & Controlled Data Merge
+            Group Discovery & Internal Block Ingestion
           </p>
         </div>
         {currentStep !== 'INGEST' && currentStep !== 'SUMMARY' && (
@@ -207,13 +194,13 @@ export function ImportWorkstation() {
                   <FileSpreadsheet className="h-16 w-16 text-primary" />
                 </div>
                 <div className="space-y-4">
-                  <h3 className="text-3xl font-black uppercase text-white tracking-tight">Ingest Registry Workbook</h3>
+                  <h3 className="text-3xl font-black uppercase text-white tracking-tight">Ingest Primary Sheet</h3>
                   <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic leading-relaxed">
-                    The structural engine scans Column A to discover section headers and build repeating templates per group.
+                    The structural engine traverses the first sheet to identify all internal group boundaries in Column A.
                   </p>
                 </div>
                 <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 mt-10 transition-all hover:-translate-y-1">
-                  Initialize Discovery Pulse
+                  Initialize Group Discovery
                 </Button>
               </Card>
             </motion.div>
@@ -225,7 +212,7 @@ export function ImportWorkstation() {
                 <ScanSearch className="h-20 w-20 text-primary" />
               </div>
               <div className="space-y-4 max-w-sm">
-                <h3 className="text-2xl font-black uppercase tracking-widest text-white">Structural Discovery</h3>
+                <h3 className="text-2xl font-black uppercase tracking-widest text-white">Discovering Internal Groups</h3>
                 <div className="space-y-2">
                   <Progress value={progress} className="h-2 rounded-full" />
                   <span className="text-[9px] font-mono font-bold text-primary">{progress}% COMPLETE</span>
@@ -244,10 +231,10 @@ export function ImportWorkstation() {
               
               <div className="p-10 rounded-[3rem] bg-white/[0.02] border-2 border-dashed border-white/10 flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-primary/20 transition-all shadow-3xl">
                 <div className="flex items-start gap-6 max-w-xl">
-                  <div className="p-4 bg-primary/10 rounded-2xl"><ShieldCheck className="h-8 w-8 text-primary" /></div>
+                  <div className="p-4 bg-primary/10 rounded-2xl"><Layers className="h-8 w-8 text-primary" /></div>
                   <div className="space-y-2">
-                    <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Execute Ingestion?</h4>
-                    <p className="text-sm font-medium text-white/40 italic leading-relaxed">Importing {selectedGroupIds.size} selected groups using strict positional mapping.</p>
+                    <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Map Internal Groups?</h4>
+                    <p className="text-sm font-medium text-white/40 italic leading-relaxed">Preparing to import {selectedGroupIds.size} structural sections found in the primary sheet.</p>
                   </div>
                 </div>
                 <Button 
@@ -255,7 +242,7 @@ export function ImportWorkstation() {
                   disabled={selectedGroupIds.size === 0}
                   className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-transform hover:scale-105 active:scale-95"
                 >
-                  <Zap className="h-6 w-6" /> Start Ingestion <ChevronRight className="h-6 w-6" />
+                  <Zap className="h-6 w-6" /> Start Group Mapping <ChevronRight className="h-6 w-6" />
                 </Button>
               </div>
             </motion.div>
@@ -268,7 +255,7 @@ export function ImportWorkstation() {
               <div className="p-10 rounded-[3rem] bg-primary/5 border-2 border-dashed border-primary/20 flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-primary/40 transition-all shadow-3xl">
                 <div className="space-y-2 max-w-xl">
                   <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Commit to Registry?</h4>
-                  <p className="text-sm font-medium text-white/40 italic leading-relaxed">Successfully mapped {stagedAssets.length} valid records. Review the group summaries above before merging.</p>
+                  <p className="text-sm font-medium text-white/40 italic leading-relaxed">Review the mapping metrics for each group above before merging with the central database.</p>
                 </div>
                 <Button 
                   onClick={handleCommitToRegistry}
@@ -276,7 +263,7 @@ export function ImportWorkstation() {
                   className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-transform hover:scale-105 active:scale-95 bg-primary text-black"
                 >
                   {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <DatabaseZap className="h-6 w-6" />}
-                  Merge Staged Records
+                  Merge Internal Records
                 </Button>
               </div>
             </motion.div>
@@ -293,15 +280,15 @@ export function ImportWorkstation() {
                 <CheckCircle2 className="h-24 w-20" />
               </div>
               <div className="space-y-4 max-w-lg">
-                <h3 className="text-4xl font-black uppercase text-white tracking-tighter leading-none">Merge Complete</h3>
+                <h3 className="text-4xl font-black uppercase text-white tracking-tighter leading-none">Internal Merge Complete</h3>
                 <p className="text-sm font-medium text-white/40 italic leading-relaxed">
-                  Successfully integrated {stagedAssets.length} records into the active register.
+                  The {stagedAssets.length} records from the discovered groups have been successfully integrated.
                 </p>
               </div>
               <div className="flex gap-4">
-                <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs border-2">Import Another</Button>
+                <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs border-2">Process New File</Button>
                 <Button onClick={() => setActiveView('REGISTRY')} className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-widest bg-primary text-black shadow-2xl shadow-primary/20">
-                  View Registry
+                  View Group Inventory
                 </Button>
               </div>
             </motion.div>

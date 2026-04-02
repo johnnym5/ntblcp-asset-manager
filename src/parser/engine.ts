@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
- * Implements two-stage structural discovery and positional mapping.
- * Phase 500: Strict adherence to Column A priority and group-block isolation.
+ * Implements two-stage structural discovery and positional mapping for single-sheet registries.
+ * Phase 600: Strictly ignores workbook-level sheets and focuses on internal group blocks.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -29,7 +29,7 @@ export class ParserEngine {
 
   /**
    * STAGE 1: Template Detection & Structural Inventory Pulse.
-   * Scans the workbook to build a complete inventory of every asset group.
+   * Traverses a single sheet to identify repeating group blocks in Column A.
    */
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
     const discovered: DiscoveredGroup[] = [];
@@ -39,22 +39,20 @@ export class ParserEngine {
     data.forEach((row, idx) => {
       const type = classifyRow(row);
 
-      // 1. Detect Group Title Pulse
+      // 1. Detect Group Title Pulse (Column A Authority)
       if (type === 'GROUP_HEADER') {
-        // If we were already in a group, it ends here
         if (activeGroup) {
           activeGroup.endRow = idx - 1;
         }
         pendingGroupName = String(row[0]).trim();
       }
 
-      // 2. Detect Header Row Pulse (Explicit)
+      // 2. Detect Header Row Pulse (Explicit S/N anchor)
       if (type === 'SCHEMA_HEADER') {
         const signature = this.registerTemplate(row);
         const tpl = this.templates.get(signature)!;
 
-        // If we found a header but haven't started a group yet, 
-        // the header itself starts the group block.
+        // The previous group header (if any) or a default starts the group at this header row
         const name = pendingGroupName || "GENERAL REGISTER";
         
         activeGroup = {
@@ -64,7 +62,7 @@ export class ParserEngine {
           headerSource: 'explicit',
           columnCount: tpl.columnCount,
           rowCount: 0,
-          startRow: idx, // Group starts at header
+          startRow: idx, 
           endRow: data.length - 1,
           headerStart: idx,
           headerEnd: idx,
@@ -75,12 +73,11 @@ export class ParserEngine {
           workbookName: this.workbookName
         };
         discovered.push(activeGroup);
-        pendingGroupName = null; // Consume the pending name
+        pendingGroupName = null; 
       }
 
-      // 3. Handle Inferred Headers (Group starts directly with data)
+      // 3. Handle Inferred Headers (Group starts directly with asset rows)
       if (type === 'DATA_ROW' && pendingGroupName) {
-        // Find closest existing template
         const inferredTpl = this.inferTemplate(row);
         
         activeGroup = {
@@ -99,14 +96,14 @@ export class ParserEngine {
           templateId: inferredTpl.id,
           sheetName,
           workbookName: this.workbookName,
-          notes: "Header set inferred from row density and positional mapping."
+          notes: "Template matched via structural similarity pulse."
         };
         discovered.push(activeGroup);
         pendingGroupName = null;
       }
     });
 
-    // Asset Count Pulse: Calculate exact data-row volume for each group
+    // Asset Count Pulse: Re-traversing discovered boundaries to count data rows
     discovered.forEach((group, idx) => {
       const nextGroup = discovered[idx + 1];
       const stopRow = nextGroup ? nextGroup.startRow : data.length;
@@ -123,7 +120,8 @@ export class ParserEngine {
   }
 
   /**
-   * STAGE 2: Targeted Ingestion Pulse.
+   * STAGE 2: Targeted Group Ingestion.
+   * Replays the data rows using the templates discovered in Stage 1.
    */
   public ingestGroups(sheetName: string, data: any[][], selectedGroups: DiscoveredGroup[]): GroupImportContainer[] {
     const containers: GroupImportContainer[] = [];
@@ -179,15 +177,9 @@ export class ParserEngine {
 
   private inferTemplate(row: any[]): HeaderTemplate {
     const populatedCount = row.filter(c => c !== null && String(c).trim() !== '').length;
-    
-    // Search for best match among registered templates
     for (const tpl of this.templates.values()) {
-      if (Math.abs(tpl.columnCount - populatedCount) <= 2) {
-        return tpl;
-      }
+      if (Math.abs(tpl.columnCount - populatedCount) <= 2) return tpl;
     }
-
-    // Fallback: Use the most generic template pulse
     const templates = Array.from(this.templates.values());
     return templates[0] || {
       id: 'FALLBACK',
@@ -211,27 +203,10 @@ export class ParserEngine {
       condition: 'New',
       lastModified: new Date().toISOString(),
       lastModifiedBy: 'Structural Parser',
-      hierarchy: {
-        document: sheet,
-        section: group,
-        subsection: 'Base Register',
-        assetFamily: 'Uncategorized'
-      },
-      importMetadata: {
-        sourceFile: this.workbookName,
-        sheetName: sheet,
-        rowNumber: rowNum + 1,
-        importedAt: new Date().toISOString()
-      },
+      hierarchy: { document: sheet, section: group, subsection: 'Base Register', assetFamily: 'Uncategorized' },
+      importMetadata: { sourceFile: this.workbookName, sheetName: sheet, rowNumber: rowNum + 1, importedAt: new Date().toISOString() },
       metadata: {},
-      validation: {
-        warnings: [],
-        errors: [],
-        duplicateFlags: [],
-        needsReview: false,
-        isRejected: false,
-        logs: []
-      },
+      validation: { warnings: [], errors: [], duplicateFlags: [], needsReview: false, isRejected: false, logs: [] },
       sourceGroup: group,
       templateId: tpl.id
     };
@@ -242,7 +217,7 @@ export class ParserEngine {
       if (val === undefined || val === null) return;
       
       const strVal = String(val).trim();
-      if (this.isDomainField(key)) {
+      if (['sn', 'description', 'location', 'custodian', 'assetIdCode', 'serialNumber', 'manufacturer', 'modelNumber', 'purchaseDate', 'value', 'condition', 'remarks', 'lga', 'site', 'chassisNo', 'engineNo'].includes(key)) {
         asset[key] = strVal;
       } else {
         asset.metadata[headerLabel] = val;
@@ -251,13 +226,5 @@ export class ParserEngine {
 
     if (!asset.description && !asset.assetIdCode && !asset.serialNumber) return null;
     return asset as ParsedAsset;
-  }
-
-  private isDomainField(key: string): boolean {
-    return [
-      'sn', 'description', 'location', 'custodian', 'assetIdCode', 
-      'serialNumber', 'manufacturer', 'modelNumber', 'purchaseDate', 
-      'value', 'condition', 'remarks', 'lga', 'site', 'chassisNo', 'engineNo'
-    ].includes(key);
   }
 }
