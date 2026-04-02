@@ -3,20 +3,21 @@ import { initializeApp, getApps, getApp, type FirebaseApp } from "firebase/app";
 import { getFirestore, type Firestore } from "firebase/firestore";
 import { getDatabase, type Database } from "firebase/database";
 import { getAuth, type Auth } from "firebase/auth";
+import { firebaseConfig as staticConfig } from "@/firebase/config";
 
-// Your web app's Firebase configuration is now loaded from environment variables.
+// Your web app's Firebase configuration is loaded from environment variables with static fallbacks.
 const firebaseConfig = {
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL,
+  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || staticConfig.apiKey,
+  authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || staticConfig.authDomain,
+  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || staticConfig.projectId,
+  storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || staticConfig.storageBucket,
+  messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || staticConfig.messagingSenderId,
+  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || staticConfig.appId,
+  databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || (staticConfig as any).databaseURL,
 };
 
 
-// Check if all essential keys are present and not placeholders
+// Check if all essential keys are present
 export const isConfigValid = 
     !!firebaseConfig.apiKey &&
     !!firebaseConfig.projectId;
@@ -44,7 +45,7 @@ if (typeof window !== 'undefined') {
     }
   } else {
     // This warning helps developers who haven't set up their .env file.
-    console.warn("Firebase configuration is missing or incomplete. Online features will be disabled. Please create and populate a .env file for local development as described in the README.");
+    console.warn("Firebase configuration is missing or incomplete. Online features will be disabled.");
   }
 }
 

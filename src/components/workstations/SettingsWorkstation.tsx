@@ -5,6 +5,7 @@
  * Phase 235: Resolved ReferenceErrors and synchronized import paths.
  * Phase 236: Implemented handleCommitChanges and strict RBAC visibility.
  * Phase 237: Relocated Ingest Registry Workbook to Projects & Sheets tab.
+ * Phase 238: Enhanced error reporting for configuration commits.
  */
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
@@ -161,8 +162,13 @@ export function SettingsWorkstation() {
       setAppSettings(draftSettings);
       toast({ title: "Configuration Applied", description: "Global registry settings have been synchronized." });
       await refreshRegistry();
-    } catch (e) {
-      toast({ variant: "destructive", title: "Save Interrupted", description: "Connectivity pulse lost during commit." });
+    } catch (e: any) {
+      const errorMessage = e?.message || "Connectivity pulse lost during commit.";
+      toast({ 
+        variant: "destructive", 
+        title: "Save Interrupted", 
+        description: errorMessage 
+      });
     } finally {
       setIsSaving(false);
     }
