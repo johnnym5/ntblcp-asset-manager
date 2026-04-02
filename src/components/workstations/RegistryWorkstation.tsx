@@ -1,9 +1,9 @@
 'use client';
 
 /**
- * @fileOverview RegistryWorkstation - High-Fidelity Asset Hub.
- * Phase 600: Implemented Folder-First navigation and persistent view state.
- * Phase 610: Applied user-friendly terminology (Categories, Asset Lists).
+ * @fileOverview RegistryWorkstation - Asset Inventory & Category Hub.
+ * Phase 650: Hardened view state persistence and business terminology.
+ * Phase 660: Synchronized with high-fidelity action bars and circular selection triggers.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -110,9 +110,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [groupViewMode, setGroupViewMode] = useState<'grid' | 'table'>('grid');
   const [isHydrated, setIsHydrated] = useState(false);
 
-  // --- Selection & Adjudication ---
+  // --- Selection State ---
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
-  const [selectedCategoryNames, setSelectedCategoryNames] = useState<Set<string>>(new Set());
 
   // --- Modals ---
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -126,7 +125,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [customizingCategory, setCustomizingCategory] = useState<string | null>(null);
 
-  // Hydrate State
+  // Hydrate state from local storage
   useEffect(() => {
     const savedCat = localStorage.getItem('registry-active-category');
     const savedAssetView = localStorage.getItem('registry-asset-view-mode') as any;
@@ -138,7 +137,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsHydrated(true);
   }, []);
 
-  // Persist State
+  // Persist state to local storage
   useEffect(() => {
     if (!isHydrated) return;
     localStorage.setItem('registry-active-category', selectedCategory || 'HUB');
@@ -189,7 +188,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
   }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
 
-  // --- Action Handlers ---
+  // --- Handlers ---
   const handleInspect = (id: string) => {
     setSelectedAssetId(id);
     setIsDetailOpen(true);
@@ -230,63 +229,22 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (!activeGrant) return;
     const nextEnabled = activeGrant.enabledSheets.filter(s => s !== name);
     await updateActiveGrant({ enabledSheets: nextEnabled });
-    toast({ title: "Category Hidden", description: "This category has been removed from your active list." });
+    toast({ title: "Category Hidden" });
   };
 
   const handleWipeCategory = async () => {
     if (!categoryToWipe || !activeGrant) return;
     setIsProcessing(true);
     try {
-      // 1. Wipe local data
       const current = await storage.getAssets();
       await storage.saveAssets(current.filter(a => a.category !== categoryToWipe));
-      
-      // 2. Remove group from settings
       const nextEnabled = activeGrant.enabledSheets.filter(s => s !== categoryToWipe);
       const nextDefs = { ...activeGrant.sheetDefinitions };
       delete nextDefs[categoryToWipe];
-      
-      await updateActiveGrant({ 
-        enabledSheets: nextEnabled,
-        sheetDefinitions: nextDefs
-      });
-
+      await updateActiveGrant({ enabledSheets: nextEnabled, sheetDefinitions: nextDefs });
       await refreshRegistry();
-      toast({ title: "Category Data Cleared", description: "All local records for this category have been removed." });
+      toast({ title: "Category Data Cleared" });
       setIsCategoryWipeDialogOpen(false);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleBatchVerify = async () => {
-    if (selectedAssetIds.size === 0) return;
-    setIsProcessing(true);
-    try {
-      for (const id of Array.from(selectedAssetIds)) {
-        const asset = assets.find(a => a.id === id);
-        if (asset) {
-          await enqueueMutation('UPDATE', 'assets', { ...asset, status: 'VERIFIED' });
-        }
-      }
-      await refreshRegistry();
-      setSelectedAssetIds(new Set());
-      toast({ title: "Batch Verify Complete", description: "Selected items marked as verified." });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleDeleteSelectedAssets = async () => {
-    if (selectedAssetIds.size === 0) return;
-    setIsProcessing(true);
-    try {
-      for (const id of Array.from(selectedAssetIds)) {
-        await enqueueMutation('DELETE', 'assets', { id });
-      }
-      await refreshRegistry();
-      setSelectedAssetIds(new Set());
-      toast({ title: "Records Removed" });
     } finally {
       setIsProcessing(false);
     }
@@ -313,9 +271,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <h2 className="text-3xl font-black uppercase text-white tracking-tight leading-none">{selectedCategory}</h2>
                   <div className="flex items-center gap-2">
                     <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[9px] h-5 px-2">
-                      {filteredAssets.length} TOTAL ITEMS
+                      {filteredAssets.length} ASSETS TOTAL
                     </Badge>
-                    <span className="text-[9px] font-bold text-white/20 uppercase tracking-[0.25em]">| ASSET LIST</span>
+                    <span className="text-[9px] font-bold text-white/20 uppercase tracking-[0.25em]">| INVENTORY LIST</span>
                   </div>
                 </div>
               </div>
@@ -325,8 +283,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <FolderKanban className="h-6 w-6 text-primary" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-2xl font-black uppercase text-white tracking-tight leading-none">Asset Categories</h2>
-                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Category Overview</p>
+                  <h2 className="text-2xl font-black uppercase text-white tracking-tight leading-none">Inventory Hub</h2>
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Manage Asset Categories</p>
                 </div>
               </div>
             )}
@@ -362,14 +320,17 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               </div>
               
               <div className="flex items-center gap-1">
-                <Button onClick={handleBatchVerify} variant="ghost" className="h-11 text-[10px] font-black uppercase tracking-widest gap-2.5 text-white/60 hover:text-white hover:bg-white/5 transition-all">
-                  <CheckCircle2 className="h-4 w-4" /> Verify
-                </Button>
-                <Button onClick={() => setIsBatchEditOpen(true)} variant="ghost" className="h-11 text-[10px] font-black uppercase tracking-widest gap-2.5 text-white/60 hover:text-white hover:bg-white/5 transition-all">
-                  <ClipboardEdit className="h-4 w-4" /> Edit
-                </Button>
                 <Button variant="ghost" className="h-11 text-[10px] font-black uppercase tracking-widest gap-2.5 text-white/60 hover:text-white hover:bg-white/5 transition-all">
                   <RefreshCw className="h-4 w-4" /> Sync
+                </Button>
+                <Button variant="ghost" className="h-11 text-[10px] font-black uppercase tracking-widest gap-2.5 text-white/60 hover:text-white hover:bg-white/5 transition-all">
+                  <Database className="h-4 w-4" /> Sandbox
+                </Button>
+                <Button variant="ghost" className="h-11 text-[10px] font-black uppercase tracking-widest gap-2.5 text-white/60 hover:text-white hover:bg-white/5 transition-all">
+                  <Edit3 className="h-4 w-4" /> Edit
+                </Button>
+                <Button onClick={() => setIsBatchEditOpen(true)} variant="ghost" className="h-11 text-[10px] font-black uppercase tracking-widest gap-2.5 text-white/60 hover:text-white hover:bg-white/5 transition-all">
+                  <Layers className="h-4 w-4" /> Batch
                 </Button>
                 <div className="w-px h-6 bg-white/5 mx-2" />
                 <Button onClick={handleDeleteSelectedAssets} variant="ghost" className="h-11 text-[10px] font-black uppercase tracking-widest gap-2.5 text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-all">
@@ -447,7 +408,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                         variant="outline" 
                         className="w-full h-12 rounded-xl border-white/10 font-black uppercase text-[10px] tracking-widest gap-2 bg-transparent hover:bg-white/5 text-white/60 hover:text-white transition-all"
                       >
-                        Open List <ChevronRight className="h-4 w-4" />
+                        Open Category <ChevronRight className="h-4 w-4" />
                       </Button>
                     </CardFooter>
                   </Card>
@@ -458,8 +419,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <Table>
                   <TableHeader className="bg-muted/30">
                     <TableRow className="hover:bg-transparent">
-                      <TableHead className="py-5 px-8 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Category Name</TableHead>
-                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Total Items</TableHead>
+                      <TableHead className="py-5 px-8 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Inventory Category</TableHead>
+                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Total Assets</TableHead>
                       <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Audit Progress</TableHead>
                       <TableHead className="py-5 px-8 text-right text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Actions</TableHead>
                     </TableRow>
@@ -555,7 +516,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             </div>
             <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Clear Category Data?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium italic text-white/60">
-              This will permanently delete all local records for <strong>{categoryToWipe}</strong> and remove its technical definition from your workstation. Cloud records are not affected.
+              This will permanently delete all local records for <strong>{categoryToWipe}</strong> and remove its configuration from your workstation. Cloud records are not affected.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
@@ -582,7 +543,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
               if (orig && orig !== newDef.name) delete nextDefs[orig];
             }
             await updateActiveGrant({ sheetDefinitions: nextDefs });
-            toast({ title: "Inventory Layout Updated" });
+            toast({ title: "Layout Updated" });
           }}
         />
       )}

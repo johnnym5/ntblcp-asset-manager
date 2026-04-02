@@ -1,7 +1,7 @@
 /**
  * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
- * Phase 1000: Replaced Table architecture with Accordion-based Collapsible Pills.
- * Each pill provides a status capsule and expands into a full technical detail view.
+ * Phase 1100: Resolved nested button error by decoupling Select from AccordionTrigger.
+ * Phase 1110: Applied user-friendly business terminology.
  */
 
 import React from 'react';
@@ -62,11 +62,11 @@ export function RegistryTable({
             onCheckedChange={(v) => onSelectAll(!!v)} 
             className="h-5 w-5 rounded-lg border-2 border-white/20 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
           />
-          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Select All Pulses</span>
+          <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40">Select All Items</span>
         </div>
         <div className="flex items-center gap-2">
           <Badge variant="outline" className="text-[8px] font-black border-white/10 text-white/20 uppercase tracking-widest px-3">
-            List Protocol: Collapsible Pills
+            Layout: Interactive List
           </Badge>
         </div>
       </div>
@@ -86,7 +86,7 @@ export function RegistryTable({
               )}
             >
               <div className="flex items-center group/item">
-                {/* Selection Slot */}
+                {/* 1. Selection Slot (Outside Trigger to avoid nesting) */}
                 <div className="pl-6 pr-2 py-4" onClick={(e) => e.stopPropagation()}>
                   <Checkbox 
                     checked={isSelected} 
@@ -95,44 +95,41 @@ export function RegistryTable({
                   />
                 </div>
 
+                {/* 2. Identity Pulse (The Button Trigger) */}
                 <AccordionTrigger className="flex-1 hover:no-underline py-4 px-4 text-left">
-                  <div className="flex items-center justify-between w-full pr-4">
-                    <div className="flex items-center gap-6 min-w-0">
-                      <div className="flex flex-col gap-1 min-w-0">
-                        <span className="font-black text-[13px] uppercase tracking-tight text-white truncate max-w-[280px] md:max-w-[400px]">
-                          {String(record.rawRow.description || 'Untitled Registry Record')}
-                        </span>
-                        <div className="flex items-center gap-3">
-                          <span className="text-[9px] font-mono font-bold text-white/20 uppercase tracking-[0.2em]">S/N: {record.sn || '---'}</span>
-                          <div className="h-1 w-1 rounded-full bg-white/10" />
-                          <span className="text-[9px] font-bold text-primary/60 uppercase tracking-widest">{record.sourceSheet}</span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Pill Capsule Status select */}
-                    <div className="flex items-center gap-6" onClick={(e) => e.stopPropagation()}>
-                      <Select value={status}>
-                        <SelectTrigger className={cn(
-                          "h-8 w-32 rounded-full font-black uppercase text-[8px] tracking-[0.2em] border-2 transition-all shadow-lg",
-                          status === 'VERIFIED' ? "bg-green-500/10 text-green-500 border-green-500/20" : 
-                          status === 'DISCREPANCY' ? "bg-red-500/10 text-red-500 border-red-500/20" :
-                          "bg-white/5 text-white/40 border-white/10"
-                        )}>
-                          <div className="flex items-center gap-2">
-                            <div className={cn("h-1.5 w-1.5 rounded-full", status === 'VERIFIED' ? "bg-green-500" : status === 'DISCREPANCY' ? "bg-red-500" : "bg-white/20")} />
-                            <SelectValue />
-                          </div>
-                        </SelectTrigger>
-                        <SelectContent className="bg-[#0A0A0A] border-white/10">
-                          <SelectItem value="VERIFIED" className="text-[9px] font-black uppercase">Verified</SelectItem>
-                          <SelectItem value="UNVERIFIED" className="text-[9px] font-black uppercase">Unverified</SelectItem>
-                          <SelectItem value="DISCREPANCY" className="text-[9px] font-black uppercase">Discrepancy</SelectItem>
-                        </SelectContent>
-                      </Select>
+                  <div className="flex flex-col gap-1 min-w-0">
+                    <span className="font-black text-[13px] uppercase tracking-tight text-white truncate max-w-[280px] md:max-w-[400px]">
+                      {String(record.rawRow.description || 'Untitled Inventory Item')}
+                    </span>
+                    <div className="flex items-center gap-3">
+                      <span className="text-[9px] font-mono font-bold text-white/20 uppercase tracking-[0.2em]">S/N: {record.sn || '---'}</span>
+                      <div className="h-1 w-1 rounded-full bg-white/10" />
+                      <span className="text-[9px] font-bold text-primary/60 uppercase tracking-widest">{record.sourceSheet}</span>
                     </div>
                   </div>
                 </AccordionTrigger>
+
+                {/* 3. Status Capsule (Outside Trigger to fix Nested Button error) */}
+                <div className="pr-10 py-4 flex items-center gap-6" onClick={(e) => e.stopPropagation()}>
+                  <Select value={status}>
+                    <SelectTrigger className={cn(
+                      "h-8 w-32 rounded-full font-black uppercase text-[8px] tracking-[0.2em] border-2 transition-all shadow-lg",
+                      status === 'VERIFIED' ? "bg-green-500/10 text-green-500 border-green-500/20" : 
+                      status === 'DISCREPANCY' ? "bg-red-500/10 text-red-500 border-red-500/20" :
+                      "bg-white/5 text-white/40 border-white/10"
+                    )}>
+                      <div className="flex items-center gap-2">
+                        <div className={cn("h-1.5 w-1.5 rounded-full", status === 'VERIFIED' ? "bg-green-500" : status === 'DISCREPANCY' ? "bg-red-500" : "bg-white/20")} />
+                        <SelectValue />
+                      </div>
+                    </SelectTrigger>
+                    <SelectContent className="bg-[#0A0A0A] border-white/10">
+                      <SelectItem value="VERIFIED" className="text-[9px] font-black uppercase">Verified</SelectItem>
+                      <SelectItem value="UNVERIFIED" className="text-[9px] font-black uppercase">Unverified</SelectItem>
+                      <SelectItem value="DISCREPANCY" className="text-[9px] font-black uppercase">Discrepancy</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <AccordionContent className="bg-white/[0.01] border-t border-white/5 p-8 animate-in slide-in-from-top-2 duration-500">
@@ -157,14 +154,14 @@ export function RegistryTable({
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-white/5 rounded-lg"><User className="h-3.5 w-3.5 text-white/20" /></div>
                       <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1">Auditor Pulse</span>
+                        <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1">Auditor Identity</span>
                         <span className="text-[10px] font-bold text-white/60 leading-none">{String(record.rawRow.lastModifiedBy || 'System')}</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-white/5 rounded-lg"><Clock className="h-3.5 w-3.5 text-white/20" /></div>
                       <div className="flex flex-col">
-                        <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1">Timestamp</span>
+                        <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1">Last Update</span>
                         <span className="text-[10px] font-bold text-white/60 leading-none">{new Date(record.rawRow.lastModified as string).toLocaleDateString()}</span>
                       </div>
                     </div>
