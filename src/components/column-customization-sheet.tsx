@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * @fileOverview ColumnCustomizationSheet - High-Fidelity Schema Editor.
- * Phase 140: Synchronized with professional arrangement mockup.
+ * @fileOverview ColumnCustomizationSheet - High-Fidelity Asset Group Schema Editor.
+ * Phase 350: Overhauled to focus on Asset Groups rather than physical sheets.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -23,17 +23,19 @@ import {
   ArrowDown, 
   ArrowUp, 
   GripVertical, 
-  PlusCircle, 
   Hash,
-  X
+  X,
+  Layers,
+  Database
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import type { SheetDefinition, DisplayField } from '@/types/domain';
 
 interface ColumnCustomizationSheetProps {
   isOpen: boolean;
-  onOpenChange: (isOpen: boolean) => void;
+  onOpenChange: (open: boolean) => void;
   sheetDefinition: SheetDefinition;
   originalSheetName: string | null;
   onSave: (originalName: string | null, newDefinition: SheetDefinition, applyToAll: boolean) => void;
@@ -64,7 +66,7 @@ export function ColumnCustomizationSheet({
     });
   };
 
-  const handleToggle = (index: number, key: 'table' | 'quickView' | 'inChecklist') => {
+  const handleToggle = (index: number, key: 'table' | 'quickView') => {
     setEditedFields(current => {
       const next = [...current];
       next[index] = { ...next[index], [key]: !next[index][key] };
@@ -99,22 +101,34 @@ export function ColumnCustomizationSheet({
         <div className="p-10 pb-6 bg-white/5 border-b border-white/5">
           <SheetHeader>
             <div className="flex items-center justify-between">
-              <SheetTitle className="text-3xl font-black uppercase tracking-tight text-white leading-none">Customize Sheet Layout</SheetTitle>
+              <div className="flex items-center gap-4">
+                <div className="p-2.5 bg-primary/10 rounded-xl">
+                  <Layers className="h-6 w-6 text-primary" />
+                </div>
+                <div className="flex flex-col">
+                  <SheetTitle className="text-3xl font-black uppercase tracking-tight text-white leading-none">Group Layout</SheetTitle>
+                  <SheetDescription className="font-bold uppercase text-[9px] tracking-[0.3em] text-primary mt-1.5">STRUCTURAL SCHEMA ORCHESTRATION</SheetDescription>
+                </div>
+              </div>
               <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-12 w-12 bg-white/5 hover:bg-white/10 text-white">
                 <X className="h-6 w-6" />
               </Button>
             </div>
-            <SheetDescription className="font-bold uppercase text-[10px] tracking-widest text-white/40 mt-2">TECHNICAL ORCHESTRATION & FIELD VISIBILITY</SheetDescription>
           </SheetHeader>
         </div>
 
-        <div className="px-10 py-6 border-b border-white/5 bg-black">
-          <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Sheet Name</Label>
-          <Input value={editedName} readOnly className="h-14 mt-2 bg-white/5 border-2 border-white/10 rounded-xl font-black uppercase text-sm cursor-not-allowed opacity-60 text-white" />
+        <div className="px-10 py-6 border-b border-white/5 bg-black flex items-center justify-between">
+          <div className="space-y-1">
+            <Label className="text-[10px] font-black uppercase tracking-[0.3em] text-white/20">Asset Group Name</Label>
+            <p className="text-base font-black uppercase text-white tracking-tight">{editedName}</p>
+          </div>
+          <Badge variant="outline" className="h-8 px-4 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px]">
+            <Database className="h-3.5 w-3.5 mr-2" /> Padded Registry
+          </Badge>
         </div>
 
         <div className="flex items-center px-10 py-4 bg-white/5 border-b border-white/5 text-[10px] font-black uppercase tracking-[0.2em] text-white/40">
-          <div className="flex-1">Field Label (Header Name)</div>
+          <div className="flex-1">Field Label (Header Map)</div>
           <div className="w-20 text-center">In Table</div>
           <div className="w-24 text-center">Quick View</div>
         </div>
@@ -136,14 +150,26 @@ export function ColumnCustomizationSheet({
                 </div>
 
                 <div className="flex-1 pr-6">
-                  <Input value={field.label} onChange={(e) => handleLabelChange(idx, e.target.value)} className="h-12 rounded-xl border-2 border-transparent bg-transparent hover:border-white/10 focus:border-primary/40 font-black uppercase text-sm tracking-tight text-white transition-all px-0 hover:px-4 focus:px-4" />
+                  <Input value={field.label} onChange={(e) => handleLabelChange(idx, e.target.value)} className="h-12 rounded-xl border-2 border-transparent bg-transparent hover:border-white/10 focus:border-primary/40 font-black uppercase text-sm tracking-tight text-white transition-all px-0 hover:px-4 focus:px-4 shadow-none" />
                   <div className="flex items-center gap-1.5 mt-1 opacity-20 group-hover:opacity-40 transition-opacity pl-0 group-hover:pl-4">
                     <Hash className="h-2.5 w-2.5" /><span className="text-[8px] font-mono font-bold uppercase">{field.key}</span>
                   </div>
                 </div>
 
-                <div className="w-20 flex justify-center"><Switch checked={field.table} onCheckedChange={() => handleToggle(idx, 'table')} className="data-[state=checked]:bg-primary" /></div>
-                <div className="w-24 flex justify-center"><Switch checked={field.quickView} onCheckedChange={() => handleToggle(idx, 'quickView')} className="data-[state=checked]:bg-primary" /></div>
+                <div className="w-20 flex justify-center">
+                  <Switch 
+                    checked={field.table} 
+                    onCheckedChange={() => handleToggle(idx, 'table')} 
+                    className="data-[state=checked]:bg-primary" 
+                  />
+                </div>
+                <div className="w-24 flex justify-center">
+                  <Switch 
+                    checked={field.quickView} 
+                    onCheckedChange={() => handleToggle(idx, 'quickView')} 
+                    className="data-[state=checked]:bg-primary" 
+                  />
+                </div>
               </div>
             ))}
           </div>
@@ -154,8 +180,8 @@ export function ColumnCustomizationSheet({
             <Button variant="ghost" className="flex-1 h-16 font-black uppercase text-xs tracking-widest rounded-[1.5rem] bg-white/5 hover:bg-white/10 text-white">Cancel</Button>
           </SheetClose>
           <div className="flex-[3] flex gap-4">
-            <Button variant="outline" onClick={() => handleSaveChanges(true)} className="flex-1 h-16 font-black uppercase text-[10px] tracking-[0.2em] rounded-[1.5rem] border-2 border-white/10 text-white hover:bg-white/5">Apply to All Sheets</Button>
-            <Button onClick={() => handleSaveChanges(false)} className="flex-1 h-16 rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/30 bg-primary text-black hover:bg-primary/90">Apply to This Sheet</Button>
+            <Button variant="outline" onClick={() => handleSaveChanges(true)} className="flex-1 h-16 font-black uppercase text-[10px] tracking-[0.2em] rounded-[1.5rem] border-2 border-white/10 text-white hover:bg-white/5">Apply to All Groups</Button>
+            <Button onClick={() => handleSaveChanges(false)} className="flex-1 h-16 rounded-[1.5rem] font-black uppercase text-[10px] tracking-[0.2em] shadow-2xl shadow-primary/30 bg-primary text-black hover:bg-primary/90">Apply to This Group</Button>
           </div>
         </SheetFooter>
       </SheetContent>
