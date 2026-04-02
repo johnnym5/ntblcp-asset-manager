@@ -3,7 +3,7 @@
 /**
  * @fileOverview RegistryWorkstation - High-Fidelity Asset Inventory.
  * Phase 400: Implemented Group List View & Batch Orchestration for Categories.
- * Achieved 100% parity with category card dropdown reference.
+ * Phase 401: Fixed ReferenceErrors for selectedRecord and selection pulses.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -119,23 +119,6 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [customizingCategory, setCustomizingCategory] = useState<string | null>(null);
 
-  // --- Handlers ---
-  const handleInspect = (id: string) => {
-    setSelectedAssetId(id);
-    setIsDetailOpen(true);
-  };
-
-  const toggleCategorySelection = (name: string) => {
-    const next = new Set(selectedCategoryNames);
-    if (next.has(name)) next.delete(name); else next.add(name);
-    setSelectedCategoryNames(next);
-  };
-
-  const handleSelectAllCategories = (checked: boolean) => {
-    if (checked) setSelectedCategoryNames(new Set(categoryStats.map(c => c.name)));
-    else setSelectedCategoryNames(new Set());
-  };
-
   // --- Logic Pulse ---
   const categoryStats = useMemo(() => {
     const groups = assets.reduce((acc, a) => {
@@ -155,10 +138,44 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
     if (selectedCategory && selectedCategory !== 'ALL') results = results.filter(a => a.category === selectedCategory);
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      results = results.filter(a => (a.description || '').toLowerCase().includes(term) || (a.assetIdCode || '').toLowerCase().includes(term));
+      results = results.filter(a => 
+        (a.description || '').toLowerCase().includes(term) || 
+        (a.assetIdCode || '').toLowerCase().includes(term) ||
+        (a.serialNumber || '').toLowerCase().includes(term)
+      );
     }
     return results.sort((a, b) => String((a as any)[sortKey] ?? '').localeCompare(String((b as any)[sortKey] ?? ''), undefined, { numeric: true }) * (sortDir === 'asc' ? 1 : -1));
   }, [assets, selectedCategory, searchTerm, sortKey, sortDir, userProfile]);
+
+  const selectedRecord = useMemo(() => {
+    if (!selectedAssetId) return undefined;
+    const asset = assets.find(a => a.id === selectedAssetId);
+    return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
+  }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
+
+  // --- Handlers ---
+  const handleInspect = (id: string) => {
+    setSelectedAssetId(id);
+    setIsDetailOpen(true);
+  };
+
+  const handleToggleSelect = (id: string) => {
+    const next = new Set(selectedAssetIds);
+    if (next.has(id)) next.delete(id);
+    else next.add(id);
+    setSelectedAssetIds(next);
+  };
+
+  const toggleCategorySelection = (name: string) => {
+    const next = new Set(selectedCategoryNames);
+    if (next.has(name)) next.delete(name); else next.add(name);
+    setSelectedCategoryNames(next);
+  };
+
+  const handleSelectAllCategories = (checked: boolean) => {
+    if (checked) setSelectedCategoryNames(new Set(categoryStats.map(c => c.name)));
+    else setSelectedCategoryNames(new Set());
+  };
 
   const handleHideCategory = async (name: string) => {
     if (!appSettings) return;
@@ -181,6 +198,16 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
     } finally {
       setIsProcessing(false);
     }
+  };
+
+  const handleNext = () => {
+    const idx = filteredAssets.findIndex(a => a.id === selectedAssetId);
+    if (idx < filteredAssets.length - 1) setSelectedAssetId(filteredAssets[idx + 1].id);
+  };
+
+  const handlePrevious = () => {
+    const idx = filteredAssets.findIndex(a => a.id === selectedAssetId);
+    if (idx > 0) setSelectedAssetId(filteredAssets[idx - 1].id);
   };
 
   const isListView = !!selectedCategory;
@@ -341,7 +368,6 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
             )
           ) : (
             <motion.div key="assets" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
-              {/* Asset list rendering logic preserved from previous history */}
               <div className="flex items-center justify-between px-2">
                 <div className="flex items-center gap-4">
                   <Badge className="bg-primary text-black font-black uppercase text-[10px] h-8 px-4 rounded-xl shadow-lg">{selectedCategory}</Badge>
@@ -349,21 +375,27 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
                 </div>
               </div>
               {viewMode === 'grid' || isMobile ? (
-                <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
                   {filteredAssets.map(asset => (
-                    <RegistryCard key={asset.id} record={transformAssetToRecord(asset, headers)} onInspect={handleInspect} selected={selectedAssetIds.has(asset.id)} onToggleSelect={(id) => {
-                      const next = new Set(selectedAssetIds);
-                      if (next.has(id)) next.delete(id); else next.add(id);
-                      setSelectedAssetIds(next);
-                    }} />
+                    <RegistryCard 
+                      key={asset.id} 
+                      record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
+                      onInspect={() => handleInspect(asset.id)} 
+                      selected={selectedAssetIds.has(asset.id)} 
+                      onToggleSelect={handleToggleSelect} 
+                    />
                   ))}
                 </div>
               ) : (
-                <RegistryTable records={filteredAssets.map(a => transformAssetToRecord(a, headers))} onInspect={handleInspect} selectedIds={selectedAssetIds} onToggleSelect={(id) => {
-                  const next = new Set(selectedAssetIds);
-                  if (next.has(id)) next.delete(id); else next.add(id);
-                  setSelectedAssetIds(next);
-                }} onSelectAll={(c) => setSelectedAssetIds(c ? new Set(filteredAssets.map(a => a.id)) : new Set())} />
+                <div className="pb-40">
+                  <RegistryTable 
+                    records={filteredAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
+                    onInspect={(id) => handleInspect(id)} 
+                    selectedIds={selectedAssetIds} 
+                    onToggleSelect={handleToggleSelect} 
+                    onSelectAll={(c) => setSelectedAssetIds(c ? new Set(filteredAssets.map(a => a.id)) : new Set())} 
+                  />
+                </div>
               )}
             </motion.div>
           )}
@@ -372,27 +404,53 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
 
       {/* 3. Floating Group Command Pulse */}
       <AnimatePresence>
-        {selectedCategoryNames.size > 0 && !isListView && (
+        {(selectedCategoryNames.size > 0 && !isListView) || (selectedAssetIds.size > 0 && isListView) ? (
           <motion.div initial={{ y: 100, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 100, opacity: 0 }} className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-black/90 backdrop-blur-3xl border-2 border-primary/20 rounded-[2.5rem] px-8 py-4 flex items-center gap-8 shadow-[0_0_50px_rgba(0,0,0,0.5)]">
             <div className="flex flex-col border-r border-white/5 pr-8">
-              <span className="text-primary font-black text-2xl leading-none">{selectedCategoryNames.size}</span>
-              <span className="text-[9px] font-black uppercase tracking-widest text-white/40 mt-1">Staged Groups</span>
+              <span className="text-primary font-black text-2xl leading-none">{isListView ? selectedAssetIds.size : selectedCategoryNames.size}</span>
+              <span className="text-[9px] font-black uppercase tracking-widest text-white/40 mt-1">Staged {isListView ? 'Records' : 'Groups'}</span>
             </div>
             <div className="flex items-center gap-2">
-              <Button variant="ghost" onClick={() => setIsCategoryBatchEditOpen(true)} className="h-12 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2.5 text-white/60 hover:text-primary transition-all"><Edit3 className="h-4 w-4" /> Batch Audit</Button>
-              <Button variant="ghost" onClick={() => setSelectedCategoryNames(new Set())} className="h-12 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2.5 text-destructive/60 hover:text-destructive transition-all"><Trash2 className="h-4 w-4" /> Purge Selection</Button>
+              <Button variant="ghost" onClick={() => isListView ? setIsBatchEditOpen(true) : setIsCategoryBatchEditOpen(true)} className="h-12 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2.5 text-white/60 hover:text-primary transition-all"><Edit3 className="h-4 w-4" /> Batch Audit</Button>
+              <Button variant="ghost" onClick={() => isListView ? setSelectedAssetIds(new Set()) : setSelectedCategoryNames(new Set())} className="h-12 px-6 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-2.5 text-destructive/60 hover:text-destructive transition-all"><Trash2 className="h-4 w-4" /> Purge Selection</Button>
             </div>
             <div className="w-px h-8 bg-white/5 mx-2" />
-            <button onClick={() => setSelectedCategoryNames(new Set())} className="p-2.5 bg-white/5 rounded-xl text-white/20 hover:text-white transition-all"><X className="h-5 w-5" /></button>
+            <button onClick={() => isListView ? setSelectedAssetIds(new Set()) : setSelectedCategoryNames(new Set())} className="p-2.5 bg-white/5 rounded-xl text-white/20 hover:text-white transition-all"><X className="h-5 w-5" /></button>
           </motion.div>
-        )}
+        ) : null}
       </AnimatePresence>
 
       {/* Dialogs & Sheets */}
-      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} onNext={handleNext} onPrevious={handlePrevious} />
-      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={assets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
-      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={async () => { setSelectedAssetIds(new Set()); await refreshRegistry(); }} />
-      <CategoryBatchEditForm isOpen={isCategoryBatchEditOpen} onOpenChange={setIsCategoryBatchEditOpen} selectedCategoryCount={selectedCategoryNames.size} onSave={async () => { setSelectedCategoryNames(new Set()); await refreshRegistry(); }} />
+      <AssetDetailSheet 
+        isOpen={isDetailOpen} 
+        onOpenChange={setIsDetailOpen} 
+        record={selectedRecord} 
+        onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} 
+        onNext={handleNext} 
+        onPrevious={handlePrevious} 
+      />
+      
+      <AssetForm 
+        isOpen={isFormOpen} 
+        onOpenChange={setIsFormOpen} 
+        asset={assets.find(a => a.id === selectedAssetId)} 
+        isReadOnly={false} 
+        onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} 
+      />
+      
+      <AssetBatchEditForm 
+        isOpen={isBatchEditOpen} 
+        onOpenChange={setIsBatchEditOpen} 
+        selectedAssetCount={selectedAssetIds.size} 
+        onSave={async () => { setSelectedAssetIds(new Set()); await refreshRegistry(); }} 
+      />
+      
+      <CategoryBatchEditForm 
+        isOpen={isCategoryBatchEditOpen} 
+        onOpenChange={setIsCategoryBatchEditOpen} 
+        selectedCategoryCount={selectedCategoryNames.size} 
+        onSave={async () => { setSelectedCategoryNames(new Set()); await refreshRegistry(); }} 
+      />
       
       {customizingCategory && appSettings?.sheetDefinitions[customizingCategory] && (
         <ColumnCustomizationSheet 
@@ -426,13 +484,4 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
       </AlertDialog>
     </div>
   );
-
-  function handleNext() {
-    const idx = filteredAssets.findIndex(a => a.id === selectedAssetId);
-    if (idx < filteredAssets.length - 1) setSelectedAssetId(filteredAssets[idx + 1].id);
-  }
-  function handlePrevious() {
-    const idx = filteredAssets.findIndex(a => a.id === selectedAssetId);
-    if (idx > 0) setSelectedAssetId(filteredAssets[idx - 1].id);
-  }
 }
