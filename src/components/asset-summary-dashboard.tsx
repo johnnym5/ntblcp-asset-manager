@@ -26,6 +26,7 @@ import {
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
 import { Card, CardContent } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 
 type DashboardView = 'stats' | 'insights';
