@@ -2,10 +2,7 @@
 
 /**
  * @fileOverview ReportsWorkstation - Inventory Reports Module.
- * Phase 165: Renamed to Inventory Reports.
- * Phase 170: Updated High-Risk Exceptions to Travel Report Pulse.
- * Phase 171: Applied regional state-lock to reporting statistics.
- * Phase 172: Hardened stats calculation against undefined condition metadata.
+ * Phase 300: Added isEmbedded support for Dashboard merging.
  */
 
 import React, { useState, useMemo, useEffect } from 'react';
@@ -43,7 +40,7 @@ import { useToast } from '@/hooks/use-toast';
 import { PdfService } from '@/services/pdf-service';
 import { useAuth } from '@/contexts/auth-context';
 
-export function ReportsWorkstation() {
+export function ReportsWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { assets, refreshRegistry } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
@@ -106,72 +103,80 @@ export function ReportsWorkstation() {
   }, [scopedAssets]);
 
   return (
-    <div className="max-w-6xl mx-auto space-y-10 pb-32">
-      <div className="space-y-2 px-2">
-        <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase flex items-center gap-4 leading-none">
-          <div className="p-3 bg-primary/10 rounded-2xl"><FileText className="h-8 w-8 text-primary" /></div>
-          Inventory Reports
-        </h2>
-        <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Executive Documentation & Data Quality Tools</p>
-      </div>
+    <div className={cn("space-y-10", !isEmbedded && "max-w-6xl mx-auto pb-32")}>
+      {!isEmbedded && (
+        <div className="space-y-2 px-2">
+          <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase flex items-center gap-4 leading-none">
+            <div className="p-3 bg-primary/10 rounded-2xl"><FileText className="h-8 w-8 text-primary" /></div>
+            Inventory Reports
+          </h2>
+          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">Executive Documentation & Data Quality Tools</p>
+        </div>
+      )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-8">
-        <TabsList className="bg-muted/30 p-1.5 rounded-2xl h-auto border-2 border-border/40 ml-2">
-          <TabsTrigger value="reports" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest">Executive Reports</TabsTrigger>
-          <TabsTrigger value="quality" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest">
-            Data Quality {issues.length > 0 && <Badge className="ml-2 bg-destructive">{issues.length}</Badge>}
+        <TabsList className="bg-muted/30 p-1.5 rounded-2xl h-auto border-2 border-border/40 ml-2 w-fit">
+          <TabsTrigger value="reports" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-black transition-all">Executive Reports</TabsTrigger>
+          <TabsTrigger value="quality" className="px-8 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
+            Data Quality {issues.length > 0 && <Badge className="ml-2 bg-destructive text-white h-5 px-2">{issues.length}</Badge>}
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="reports" className="space-y-8 px-2">
-          <Card className="border-2 border-primary/20 bg-primary/[0.02] rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="p-8 border-b bg-primary/5 flex flex-row items-center justify-between">
-              <CardTitle className="text-xl font-black uppercase text-primary flex items-center gap-3"><PlaneTakeoff className="h-5 w-5" /> Travel Report Pulse</CardTitle>
-              <Badge variant="outline" className="border-primary/20 text-primary">{stats.exceptions} Discrepancies</Badge>
-            </CardHeader>
-            <CardContent className="p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
-              <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed max-w-sm">Generate a comprehensive Travel Report document for the current project scope.</p>
-              <Button onClick={() => setIsTravelReportOpen(true)} className="h-14 px-10 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3">
-                <FileText className="h-4 w-4" /> Build Report
-              </Button>
-            </CardContent>
-          </Card>
+        <TabsContent value="reports" className="space-y-8 px-2 m-0 outline-none">
+          <div className={cn("grid gap-8", isEmbedded ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-12")}>
+            <div className={cn("space-y-8", !isEmbedded && "lg:col-span-12")}>
+              {/* Travel Report Pulse */}
+              <Card className="border-2 border-primary/20 bg-primary/[0.02] rounded-[2.5rem] overflow-hidden shadow-2xl">
+                <CardHeader className="p-8 border-b bg-primary/5 flex flex-row items-center justify-between">
+                  <CardTitle className="text-xl font-black uppercase text-primary flex items-center gap-3"><PlaneTakeoff className="h-5 w-5" /> Travel Report</CardTitle>
+                  <Badge variant="outline" className="border-primary/20 text-primary uppercase text-[9px] font-black">Official Pulse</Badge>
+                </CardHeader>
+                <CardContent className="p-8 flex flex-col sm:flex-row items-center justify-between gap-6">
+                  <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed max-w-sm">Generate a comprehensive Travel Report document for the current project scope.</p>
+                  <Button onClick={() => setIsTravelReportOpen(true)} className="h-14 px-10 rounded-2xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3">
+                    <FileText className="h-4 w-4" /> Build Report
+                  </Button>
+                </CardContent>
+              </Card>
 
-          <Card className="border-2 border-destructive/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
-            <CardHeader className="p-10 border-b bg-destructive/5 flex flex-row items-center justify-between">
-              <CardTitle className="flex items-center gap-4 text-2xl font-black uppercase text-destructive"><FileWarning className="text-destructive h-8 w-8" /> Exception Dossier</CardTitle>
-              <Badge variant="outline" className="text-destructive border-destructive/20">{stats.exceptions} Critical</Badge>
-            </CardHeader>
-            <CardContent className="p-10">
-              <Button onClick={handleExceptionExport} disabled={isExporting || stats.exceptions === 0} className="w-full h-20 rounded-[1.5rem] font-black uppercase shadow-2xl shadow-destructive/20 bg-destructive text-white gap-4">
-                {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5 fill-current" />} Export Exceptions PDF <ArrowRight className="h-5 w-5" />
-              </Button>
-            </CardContent>
-          </Card>
+              {/* Exception Dossier */}
+              <Card className="border-2 border-destructive/10 bg-card shadow-2xl rounded-[2.5rem] overflow-hidden">
+                <CardHeader className="p-8 border-b bg-destructive/5 flex flex-row items-center justify-between">
+                  <CardTitle className="flex items-center gap-4 text-xl font-black uppercase text-destructive"><FileWarning className="text-destructive h-6 w-6" /> Exception Dossier</CardTitle>
+                  <Badge variant="outline" className="text-destructive border-destructive/20 font-black text-[9px]">{stats.exceptions} Critical</Badge>
+                </CardHeader>
+                <CardContent className="p-8">
+                  <Button onClick={handleExceptionExport} disabled={isExporting || stats.exceptions === 0} className="w-full h-16 rounded-2xl font-black uppercase shadow-2xl shadow-destructive/20 bg-destructive text-white gap-4 transition-transform hover:scale-105 active:scale-95">
+                    {isExporting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Zap className="h-5 w-5 fill-current" />} Export Exceptions PDF <ArrowRight className="h-5 w-5" />
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
         </TabsContent>
 
-        <TabsContent value="quality" className="px-2">
+        <TabsContent value="quality" className="px-2 m-0 outline-none">
           <Card className="border-2 border-border/40 shadow-2xl bg-card/50 rounded-[2.5rem] overflow-hidden">
             <CardHeader className="p-8 border-b bg-muted/20 flex flex-row items-center justify-between">
               <CardTitle className="text-xl font-black uppercase flex items-center gap-3"><Wrench className="h-5 w-5 text-primary" /> Integrity Analysis</CardTitle>
               <Button variant="outline" size="sm" onClick={runAuditPulse} disabled={isScanning} className="h-9 px-4 rounded-xl font-black text-[9px] uppercase"><RefreshCw className="h-3 w-3 mr-2" /> Scan Now</Button>
             </CardHeader>
-            <ScrollArea className="h-[500px]">
+            <ScrollArea className="h-[400px]">
               {isScanning ? <div className="h-full flex items-center justify-center opacity-40"><Loader2 className="h-12 w-12 animate-spin" /></div> : 
                 issues.length > 0 ? issues.map(issue => (
-                  <div key={issue.id} className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 border-b">
+                  <div key={issue.id} className="p-8 flex flex-col md:flex-row md:items-center justify-between gap-6 border-b border-white/5 hover:bg-white/[0.02] transition-colors">
                     <div className="flex items-start gap-5">
-                      <div className={cn("p-4 rounded-2xl shadow-inner", issue.severity === 'CRITICAL' ? "bg-red-100 text-red-600" : "bg-orange-100 text-orange-600")}>
+                      <div className={cn("p-4 rounded-2xl shadow-inner", issue.severity === 'CRITICAL' ? "bg-red-100/10 text-red-600" : "bg-orange-100/10 text-orange-600")}>
                         <ShieldAlert className="h-6 w-6" />
                       </div>
                       <div className="space-y-1">
-                        <h5 className="font-black text-sm uppercase">{issue.description}</h5>
-                        <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">{issue.suggestedFix}</p>
+                        <h5 className="font-black text-sm uppercase text-white">{issue.description}</h5>
+                        <p className="text-[10px] font-medium text-white/40 italic leading-relaxed">{issue.suggestedFix}</p>
                       </div>
                     </div>
-                    {issue.type === 'CASE_MISMATCH' && <Button onClick={() => handleFixCasing(issue)} disabled={isFixing} className="h-11 px-6 rounded-xl font-black uppercase text-[9px]">Apply Fix</Button>}
+                    {issue.type === 'CASE_MISMATCH' && <Button onClick={() => handleFixCasing(issue)} disabled={isFixing} className="h-11 px-6 rounded-xl font-black uppercase text-[9px] bg-primary text-black">Apply Fix</Button>}
                   </div>
-                )) : <div className="py-24 text-center opacity-20"><CheckCircle2 className="h-20 w-20 mx-auto mb-4" /><h4 className="text-2xl font-black uppercase">Data Quality: Perfect</h4></div>}
+                )) : <div className="py-24 text-center opacity-20"><CheckCircle2 className="h-20 w-20 mx-auto mb-4 text-green-600" /><h4 className="text-2xl font-black uppercase text-white">Registry Perfect</h4></div>}
             </ScrollArea>
           </Card>
         </TabsContent>

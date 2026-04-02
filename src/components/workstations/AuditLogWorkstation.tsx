@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AuditLogWorkstation - SPA Audit Trail.
- * Phase 165: Renamed to Audit Trail.
- * Phase 166: Applied regional state-lock to activity ledger for non-admins.
+ * Phase 300: Added isEmbedded support for Dashboard merging.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -48,7 +47,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { saveAs } from 'file-saver';
 
-export function AuditLogWorkstation() {
+export function AuditLogWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { isOnline, refreshRegistry } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
@@ -112,58 +111,60 @@ export function AuditLogWorkstation() {
   }, [log, searchTerm, userProfile]);
 
   return (
-    <div className="space-y-10 pb-32 max-w-6xl mx-auto animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
-        <div className="space-y-2">
-          <h2 className="text-4xl font-black tracking-tighter uppercase flex items-center gap-4 leading-none">
-            <div className="p-3 bg-primary/10 rounded-2xl">
-              <HistoryIcon className="h-8 w-8 text-primary" />
-            </div>
-            Audit Trail
-          </h2>
-          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Immutable Traceability & Forensic Register Replay
-          </p>
+    <div className={cn("space-y-10 animate-in fade-in duration-700", !isEmbedded && "pb-32 max-w-6xl mx-auto")}>
+      {!isEmbedded && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
+          <div className="space-y-2">
+            <h2 className="text-4xl font-black tracking-tighter uppercase flex items-center gap-4 leading-none text-white">
+              <div className="p-3 bg-primary/10 rounded-2xl">
+                <HistoryIcon className="h-8 w-8 text-primary" />
+              </div>
+              Audit Trail
+            </h2>
+            <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
+              Immutable Traceability & Forensic Register Replay
+            </p>
+          </div>
+          <Button 
+            variant="outline" 
+            onClick={() => { 
+              const blob = new Blob([JSON.stringify(filteredLog, null, 2)], { type: 'application/json' }); 
+              saveAs(blob, `Assetain-Ledger-${new Date().toISOString().split('T')[0]}.json`); 
+            }} 
+            className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 shadow-sm border-2 border-white/5 hover:bg-white/5 transition-all text-white"
+          >
+            <FileJson className="h-4 w-4 text-primary" /> Export Audit Log
+          </Button>
         </div>
-        <Button 
-          variant="outline" 
-          onClick={() => { 
-            const blob = new Blob([JSON.stringify(filteredLog, null, 2)], { type: 'application/json' }); 
-            saveAs(blob, `Assetain-Ledger-${new Date().toISOString().split('T')[0]}.json`); 
-          }} 
-          className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 shadow-sm border-2 border-primary/10 hover:border-primary/30 transition-all"
-        >
-          <FileJson className="h-4 w-4 text-primary" /> Export Audit Log
-        </Button>
-      </div>
+      )}
 
       <div className="relative group px-2">
         <Search className="absolute left-6 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground opacity-40 group-focus-within:text-primary transition-all" />
         <Input 
-          placeholder="Search Tag ID, Auditor, or Asset Description..." 
-          className="h-16 pl-14 rounded-[1.5rem] bg-card border-none shadow-xl font-bold text-sm focus-visible:ring-primary/20 transition-all" 
+          placeholder="Search Activity History..." 
+          className="h-16 pl-14 rounded-[1.5rem] bg-black/40 border-white/5 shadow-xl font-bold text-sm focus-visible:ring-primary/20 transition-all placeholder:opacity-20 text-white" 
           value={searchTerm} 
           onChange={(e) => setSearchTerm(e.target.value)} 
         />
       </div>
 
-      <div className="space-y-6 px-2">
+      <div className={cn("space-y-6 px-2", isEmbedded ? "pb-10" : "pb-32")}>
         {loading ? (
           <div className="py-40 flex flex-col items-center gap-4 opacity-20">
             <Loader2 className="h-14 w-14 animate-spin text-primary" />
-            <p className="text-[10px] font-black uppercase tracking-widest">Replaying Audit Trail...</p>
+            <p className="text-[10px] font-black uppercase tracking-widest text-white">Replaying Audit Trail...</p>
           </div>
         ) : filteredLog.length > 0 ? (
           filteredLog.map((entry, idx) => (
-            <Card key={`log-${entry.id}-${idx}`} className="border-2 border-border/40 hover:border-primary/20 transition-all rounded-[2.5rem] overflow-hidden bg-card/50 shadow-2xl">
+            <Card key={`log-${entry.id}-${idx}`} className="border-2 border-white/5 hover:border-primary/20 transition-all rounded-[2rem] overflow-hidden bg-white/[0.02] shadow-2xl">
               <CardContent className="p-8">
                 <div className="flex flex-col lg:flex-row lg:items-start justify-between gap-8">
                   <div className="flex items-start gap-6 flex-1 min-w-0">
                     <div className={cn(
                       "p-5 rounded-[1.5rem] shadow-inner shrink-0", 
-                      entry.operation === 'CREATE' ? "bg-green-100 text-green-600" : 
-                      entry.operation === 'RESTORE' ? "bg-blue-100 text-blue-600" : 
-                      entry.operation === 'DELETE' ? "bg-red-100 text-red-600" :
+                      entry.operation === 'CREATE' ? "bg-green-100/10 text-green-600" : 
+                      entry.operation === 'RESTORE' ? "bg-blue-100/10 text-blue-600" : 
+                      entry.operation === 'DELETE' ? "bg-red-100/10 text-red-600" :
                       "bg-primary/10 text-primary"
                     )}>
                       {entry.operation === 'CREATE' ? <CheckCircle2 className="h-7 w-7" /> : 
@@ -173,11 +174,11 @@ export function AuditLogWorkstation() {
                     </div>
                     <div className="space-y-4 min-w-0 flex-1">
                       <div className="space-y-1">
-                        <h4 className="font-black text-lg uppercase tracking-tight text-foreground truncate leading-none">
-                          {entry.assetDescription || 'Register Mutation'}
+                        <h4 className="font-black text-lg uppercase tracking-tight text-white truncate leading-none">
+                          {entry.assetDescription || 'Registry Update Pulse'}
                         </h4>
-                        <div className="flex flex-wrap items-center gap-4 text-[9px] font-bold text-muted-foreground uppercase tracking-widest opacity-60">
-                          <span className="flex items-center gap-2 px-2.5 py-1 bg-muted/50 rounded-lg border border-border/40">
+                        <div className="flex flex-wrap items-center gap-4 text-[9px] font-bold text-white/20 uppercase tracking-widest opacity-60">
+                          <span className="flex items-center gap-2 px-2.5 py-1 bg-white/5 rounded-lg border border-white/10">
                             <Tag className="h-3.5 w-3.5" /> ID: {entry.assetId.split('-')[0]}
                           </span>
                           <span className="flex items-center gap-2">
@@ -190,20 +191,20 @@ export function AuditLogWorkstation() {
                       </div>
 
                       {entry.changes && Object.keys(entry.changes).length > 0 && (
-                        <div className="p-6 rounded-[1.5rem] bg-muted/20 border-2 border-dashed border-border/40 space-y-4">
+                        <div className="p-6 rounded-[1.5rem] bg-black/40 border-2 border-dashed border-white/5 space-y-4">
                           <p className="text-[10px] font-black uppercase text-primary tracking-[0.3em] flex items-center gap-2">
-                            <Zap className="h-3 w-3 fill-current" /> Forensic Value Pulse:
+                            <Zap className="h-3 w-3 fill-current" /> Technical Diff
                           </p>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-10 gap-y-3">
                             {Object.entries(entry.changes).map(([key, val]: [string, any]) => (
                               <div key={key} className="flex flex-col gap-1.5">
-                                <span className="text-[8px] font-black uppercase text-muted-foreground opacity-40">{key.replace(/([A-Z])/g, ' $1')}</span>
+                                <span className="text-[8px] font-black uppercase text-white/20 opacity-40">{key.replace(/([A-Z])/g, ' $1')}</span>
                                 <div className="flex items-center gap-3 text-[10px] font-bold">
-                                  <div className="flex items-center gap-2 bg-red-500/5 border border-red-500/10 px-2 py-1 rounded-lg line-through text-destructive/60 truncate max-w-[120px] italic">
+                                  <div className="flex items-center gap-2 bg-red-500/5 border border-white/5 px-2 py-1 rounded-lg line-through text-red-500/40 truncate max-w-[120px] italic font-mono">
                                     {String(val.old || 'EMPTY')}
                                   </div>
-                                  <ArrowRightLeft className="h-3 w-3 text-muted-foreground shrink-0 opacity-20" />
-                                  <div className="flex items-center gap-2 bg-green-500/5 border border-green-500/10 px-2 py-1 rounded-lg text-green-600 font-black truncate max-w-[120px]">
+                                  <ArrowRightLeft className="h-3 w-3 text-white/10 shrink-0" />
+                                  <div className="flex items-center gap-2 bg-green-500/5 border border-white/5 px-2 py-1 rounded-lg text-green-500 font-black truncate max-w-[120px] font-mono">
                                     {String(val.new)}
                                   </div>
                                 </div>
@@ -215,7 +216,7 @@ export function AuditLogWorkstation() {
                     </div>
                   </div>
                   <div className="flex items-center gap-3 shrink-0">
-                    <Badge variant="outline" className="h-10 px-6 font-black uppercase border-2 rounded-2xl shadow-sm tracking-widest text-[10px]">
+                    <Badge variant="outline" className="h-10 px-6 font-black uppercase border-2 border-white/10 rounded-2xl shadow-sm tracking-widest text-[10px] text-white/60 bg-white/5">
                       {entry.operation}
                     </Badge>
                     {entry.operation === 'UPDATE' && userProfile?.isAdmin && (
@@ -223,8 +224,8 @@ export function AuditLogWorkstation() {
                         variant="ghost" 
                         size="icon" 
                         onClick={() => setEntryToRestore(entry)} 
-                        className="h-12 w-12 rounded-2xl bg-muted/50 hover:bg-primary/10 hover:text-primary transition-all tactile-pulse"
-                        title="Prepare Reversion"
+                        className="h-12 w-12 rounded-2xl bg-white/5 hover:bg-primary/10 hover:text-primary transition-all text-white/20"
+                        title="Revert Update"
                       >
                         <RotateCcw className="h-5 w-5" />
                       </Button>
@@ -235,14 +236,12 @@ export function AuditLogWorkstation() {
             </Card>
           ))
         ) : (
-          <div className="py-40 text-center opacity-30 flex flex-col items-center gap-8">
-            <div className="p-16 bg-muted rounded-[4rem] shadow-inner">
-              <Database className="h-28 w-24 text-muted-foreground" />
-            </div>
-            <div className="space-y-3">
-              <h3 className="text-3xl font-black uppercase tracking-[0.3em]">Audit Trail Clear</h3>
-              <p className="text-sm font-medium italic max-w-xs mx-auto leading-relaxed">
-                No register modifications detected in the current query scope.
+          <div className="py-24 text-center opacity-30 flex flex-col items-center gap-8 border-2 border-dashed border-white/5 rounded-[3rem]">
+            <HistoryIcon className="h-16 w-16 text-white/20" />
+            <div className="space-y-2">
+              <h3 className="text-xl font-black uppercase tracking-[0.3em] text-white">Log Silence</h3>
+              <p className="text-sm font-medium italic max-w-xs mx-auto leading-relaxed text-white/40">
+                No recent register modifications detected.
               </p>
             </div>
           </div>
@@ -250,22 +249,22 @@ export function AuditLogWorkstation() {
       </div>
 
       <AlertDialog open={!!entryToRestore} onOpenChange={() => setEntryToRestore(null)}>
-        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 p-10 shadow-2xl bg-background">
+        <AlertDialogContent className="rounded-[2.5rem] border-primary/10 p-10 shadow-3xl bg-black">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-primary/10 rounded-2xl w-fit">
               <RotateCcw className="h-12 w-12 text-primary" />
             </div>
-            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight">Initialize Reversion?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic">
-              This will overwrite the current state for <strong>{entryToRestore?.assetDescription}</strong> with the data from before this mutation. This action is deterministic and will be broadcast to the cloud authority.
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-white">Restore Forensic State?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/40">
+              This will overwrite the current registry record for <strong>{entryToRestore?.assetDescription}</strong> with the technical pulse from before this modification.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Discard Action</AlertDialogCancel>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 text-white hover:bg-white/5">Abort</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleRestorePulse} 
               disabled={isProcessing} 
-              className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-primary-foreground m-0"
+              className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-black m-0"
             >
               {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Zap className="h-4 w-4 mr-2" />} 
               Commit Reversion
