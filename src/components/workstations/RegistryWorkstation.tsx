@@ -4,6 +4,7 @@
  * @fileOverview RegistryWorkstation - High-Fidelity Asset Inventory.
  * Phase 280: Implemented Batch Deletion Pulse & Administrative Confirmation.
  * Phase 281: Hardened search filters against undefined data pulses.
+ * Phase 282: Fixed ReferenceError for Hammer icon.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -24,7 +25,8 @@ import {
   FileSpreadsheet,
   ShieldAlert,
   Bomb,
-  Trash
+  Trash,
+  Hammer
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -98,6 +100,12 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
     [assets, selectedAssetId]
   );
 
+  const selectedRecordsForPrint = useMemo(() => {
+    return assets
+      .filter(a => selectedIds.has(a.id))
+      .map(a => transformAssetToRecord(a, headers));
+  }, [assets, selectedIds, headers]);
+
   const filteredAssets = useMemo(() => {
     let results = assets;
 
@@ -137,12 +145,6 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
 
     return results;
   }, [assets, selectedCategory, searchTerm, selectedLocations, selectedAssignees, selectedStatuses, selectedConditions, missingFieldFilter, sortKey, sortDir, userProfile]);
-
-  const selectedRecordsForPrint = useMemo(() => {
-    return filteredAssets
-      .filter(a => selectedIds.has(a.id))
-      .map(a => transformAssetToRecord(a, headers));
-  }, [filteredAssets, selectedIds, headers]);
 
   const categoryStats = useMemo(() => {
     const scopedAssets = !userProfile?.isAdmin
