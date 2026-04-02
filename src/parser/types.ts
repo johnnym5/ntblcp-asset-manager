@@ -29,10 +29,14 @@ export interface DiscoveredGroup {
   rowCount: number;
   startRow: number;
   endRow: number;
-  headerRowIndex: number | null;
+  headerStart: number | null;
+  headerEnd: number | null;
+  rawText: string;
+  visibleHeaderRow: string[] | null;
   templateId: string;
   sheetName: string;
   workbookName: string;
+  notes?: string;
 }
 
 export interface ValidationLog {
@@ -58,13 +62,7 @@ export interface ParsedAsset extends Asset {
   sourceColumnAGroup?: string;
 }
 
-export interface GroupImportContainer {
-  id: string;
-  groupName: string;
-  templateId: string;
-  workbookName: string;
-  sheetName: string;
-  headerSet: string[];
+export interface GroupImportContainer extends DiscoveredGroup {
   assets: ParsedAsset[];
   metrics: {
     valid: number;

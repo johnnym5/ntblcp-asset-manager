@@ -3,7 +3,7 @@
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements two-stage structural discovery and positional mapping.
- * Optimized for TB.xlsx and C19 ASSETS.xlsx.
+ * Phase 500: Strict adherence to Column A priority and group-block isolation.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -20,80 +20,93 @@ import type { Asset } from '@/types/domain';
 export class ParserEngine {
   private templates: Map<string, HeaderTemplate> = new Map();
   private workbookName: string;
-  private existingSerials: Set<string>;
+  private existingAssets: Asset[];
 
   constructor(workbookName: string, existingAssets: Asset[] = []) {
     this.workbookName = workbookName;
-    this.existingSerials = new Set(existingAssets.map(a => a.serialNumber).filter(Boolean));
+    this.existingAssets = existingAssets;
   }
 
   /**
-   * STAGE 1: Template Discovery Pulse.
-   * Scans Column A to identify group boundaries and learn header sets.
+   * STAGE 1: Template Detection & Structural Inventory Pulse.
+   * Scans the workbook to build a complete inventory of every asset group.
    */
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
     const discovered: DiscoveredGroup[] = [];
-    let activeGroupName = "START_OF_SHEET";
-    let activeGroupStart = 0;
+    let pendingGroupName: string | null = null;
+    let activeGroup: DiscoveredGroup | null = null;
     
     data.forEach((row, idx) => {
       const type = classifyRow(row);
 
-      // 1. Capture Section Title
+      // 1. Detect Group Title Pulse
       if (type === 'GROUP_HEADER') {
-        activeGroupName = String(row[0]).trim();
-        activeGroupStart = idx;
+        // If we were already in a group, it ends here
+        if (activeGroup) {
+          activeGroup.endRow = idx - 1;
+        }
+        pendingGroupName = String(row[0]).trim();
       }
 
-      // 2. Capture Schema Anchor
+      // 2. Detect Header Row Pulse (Explicit)
       if (type === 'SCHEMA_HEADER') {
         const signature = this.registerTemplate(row);
         const tpl = this.templates.get(signature)!;
 
-        // Finalize previous group end if necessary
-        if (discovered.length > 0) {
-          discovered[discovered.length - 1].endRow = idx - 1;
-        }
-
-        discovered.push({
+        // If we found a header but haven't started a group yet, 
+        // the header itself starts the group block.
+        const name = pendingGroupName || "GENERAL REGISTER";
+        
+        activeGroup = {
           id: uuidv4(),
-          groupName: activeGroupName,
+          groupName: name,
           headerSet: tpl.rawHeaders,
           headerSource: 'explicit',
           columnCount: tpl.columnCount,
           rowCount: 0,
-          startRow: activeGroupStart,
+          startRow: idx, // Group starts at header
           endRow: data.length - 1,
-          headerRowIndex: idx,
+          headerStart: idx,
+          headerEnd: idx,
+          rawText: name,
+          visibleHeaderRow: tpl.rawHeaders,
           templateId: tpl.id,
           sheetName,
           workbookName: this.workbookName
-        });
+        };
+        discovered.push(activeGroup);
+        pendingGroupName = null; // Consume the pending name
       }
 
-      // 3. Handle data rows without explicit headers (Inference)
-      if (type === 'DATA_ROW' && !this.isInsideActiveGroup(idx, discovered)) {
-        // Find best existing template match
+      // 3. Handle Inferred Headers (Group starts directly with data)
+      if (type === 'DATA_ROW' && pendingGroupName) {
+        // Find closest existing template
         const inferredTpl = this.inferTemplate(row);
         
-        discovered.push({
+        activeGroup = {
           id: uuidv4(),
-          groupName: activeGroupName,
+          groupName: pendingGroupName,
           headerSet: inferredTpl.rawHeaders,
           headerSource: 'inferred',
           columnCount: inferredTpl.columnCount,
           rowCount: 0,
-          startRow: activeGroupStart,
+          startRow: idx,
           endRow: data.length - 1,
-          headerRowIndex: null,
+          headerStart: null,
+          headerEnd: null,
+          rawText: pendingGroupName,
+          visibleHeaderRow: null,
           templateId: inferredTpl.id,
           sheetName,
-          workbookName: this.workbookName
-        });
+          workbookName: this.workbookName,
+          notes: "Header set inferred from row density and positional mapping."
+        };
+        discovered.push(activeGroup);
+        pendingGroupName = null;
       }
     });
 
-    // Asset Count Pulse: Calculate row counts for discovered blocks
+    // Asset Count Pulse: Calculate exact data-row volume for each group
     discovered.forEach((group, idx) => {
       const nextGroup = discovered[idx + 1];
       const stopRow = nextGroup ? nextGroup.startRow : data.length;
@@ -110,7 +123,7 @@ export class ParserEngine {
   }
 
   /**
-   * STAGE 2: Targeted Ingestion.
+   * STAGE 2: Targeted Ingestion Pulse.
    */
   public ingestGroups(sheetName: string, data: any[][], selectedGroups: DiscoveredGroup[]): GroupImportContainer[] {
     const containers: GroupImportContainer[] = [];
@@ -132,6 +145,8 @@ export class ParserEngine {
           if (asset) {
             container.assets.push(asset);
             container.metrics.valid++;
+          } else {
+            container.metrics.invalid++;
           }
         }
       }
@@ -172,24 +187,15 @@ export class ParserEngine {
       }
     }
 
-    // Create a generic "Fallback" template if no match found
-    const signature = `INFERRED_${populatedCount}`;
-    if (!this.templates.has(signature)) {
-      const tplId = `INFERRED_${this.templates.size + 1}`;
-      const mockHeaders = Array.from({ length: row.length }).map((_, i) => `Inferred Col ${i + 1}`);
-      this.templates.set(signature, {
-        id: tplId,
-        rawHeaders: mockHeaders,
-        normalizedHeaders: mockHeaders.map(normalizeHeaderName),
-        columnCount: row.length,
-        signature
-      });
-    }
-    return this.templates.get(signature)!;
-  }
-
-  private isInsideActiveGroup(idx: number, groups: DiscoveredGroup[]): boolean {
-    return groups.some(g => idx >= g.startRow && idx <= g.endRow);
+    // Fallback: Use the most generic template pulse
+    const templates = Array.from(this.templates.values());
+    return templates[0] || {
+      id: 'FALLBACK',
+      rawHeaders: ['Inferred Fields'],
+      normalizedHeaders: ['metadata'],
+      columnCount: row.length,
+      signature: 'FALLBACK'
+    };
   }
 
   private mapRowToTemplate(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {

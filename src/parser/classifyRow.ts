@@ -1,7 +1,7 @@
 /**
  * @fileOverview Deterministic Structural Row Classifier.
  * Identifies the functional role of a row based on Column A behavior and row density.
- * Phase 400: Strict adherence to NTBLCP Workbook structural patterns.
+ * Phase 500: Hardened for Column A priority and structural group detection.
  */
 
 import { RowClassification } from './types';
@@ -26,25 +26,27 @@ export function classifyRow(row: any[]): RowClassification {
   const isNumeric = firstCellRaw !== '' && !isNaN(Number(firstCellRaw));
 
   // 1. SCHEMA_HEADER: Explicitly starts with S/N or variations
+  // Must have significant density to be a table header
   if (normalizedAnchors.some(anchor => firstCell === anchor || firstCell.startsWith(anchor))) {
-    // Header rows in NTBLCP registers are high-density
     if (populatedCount >= 4) {
       return 'SCHEMA_HEADER';
     }
   }
 
   // 2. GROUP_HEADER: Structural marker in Column A
-  // Rules: Stands alone in Col A (or very few cells populated), NOT numeric.
+  // Rules: Stands alone in Col A (or very low density), NOT numeric.
+  // This is the primary boundary detection pulse.
   if (firstCellRaw !== '' && !isNumeric && populatedCount <= 3) {
     const lower = firstCellRaw.toLowerCase();
     
-    // Noise filtering for technical workbook labels
+    // Ignore known technical noise
     const isNoise = 
+      lower === 'sn' || 
+      lower === 's/n' || 
       lower.includes('total') || 
       lower.includes('page') || 
-      lower.includes('grand') || 
       lower.includes('prepared by') ||
-      lower.includes('date:');
+      lower.includes('checked by');
 
     if (!isNoise) {
       return 'GROUP_HEADER';
@@ -52,7 +54,7 @@ export function classifyRow(row: any[]): RowClassification {
   }
 
   // 3. DATA_ROW: Likely an asset record
-  // Rules: Starts with a number OR is a continuation row in an active block.
+  // Rules: Starts with a number OR is a high-density row.
   if (isNumeric || (populatedCount >= 5)) {
     return 'DATA_ROW';
   }
