@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -34,6 +33,7 @@ interface AppStateContextType {
   setSearchTerm: (term: string) => void;
   isSyncing: boolean;
   appSettings: AppSettings | null;
+  setAppSettings: Dispatch<SetStateAction<AppSettings | null>>;
   settingsLoaded: boolean;
   isHydrated: boolean;
   activeGrantId: string | null;
@@ -299,7 +299,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   return (
     <AppStateContext.Provider value={{
       assets, sandboxAssets, dataSource, setDataSource, isOnline, setIsOnline,
-      searchTerm, setSearchTerm, isSyncing, appSettings, settingsLoaded, isHydrated,
+      searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
       activeGrantId, activeView, setActiveView, refreshRegistry, manualDownload, manualUpload,
       setActiveGrantId, setReadAuthority, globalStateFilter, setGlobalStateFilter,
       selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
