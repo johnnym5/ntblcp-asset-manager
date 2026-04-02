@@ -4,6 +4,7 @@
  * @fileOverview RegistryWorkstation - Asset Inventory & Category Hub.
  * Phase 650: Hardened view state persistence and business terminology.
  * Phase 660: Synchronized with high-fidelity action bars and circular selection triggers.
+ * Phase 670: Integrated Sticky Header Configuration for administrators.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -59,7 +60,6 @@ import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { Progress } from '@/components/ui/progress';
 import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
-import { CategoryBatchEditForm } from '@/components/category-batch-edit-form';
 import { transformAssetToRecord } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -118,12 +118,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
-  const [isCategoryBatchEditOpen, setIsCategoryBatchEditOpen] = useState(false);
-  const [isCategoryWipeDialogOpen, setIsCategoryWipeDialogOpen] = useState(false);
-  const [categoryToWipe, setCategoryToWipe] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [customizingCategory, setCustomizingCategory] = useState<string | null>(null);
+  const [isCategoryWipeDialogOpen, setIsCategoryWipeDialogOpen] = useState(false);
+  const [categoryToWipe, setCategoryToWipe] = useState<string | null>(null);
 
   // Hydrate state from local storage
   useEffect(() => {
@@ -165,7 +164,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const filteredAssets = useMemo(() => {
     let results = assets;
-    if (!userProfile?.isAdmin) results = results.filter(a => isWithinScope(userProfile as any, a));
+    if (!userProfile?.isAdmin && userProfile?.state) results = results.filter(a => isWithinScope(userProfile as any, a));
     if (selectedCategory && selectedCategory !== 'ALL') results = results.filter(a => a.category === selectedCategory);
     
     if (searchTerm) {
@@ -250,6 +249,24 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
+  const handleDeleteSelectedAssets = async () => {
+    if (selectedAssetIds.size === 0) return;
+    setIsProcessing(true);
+    try {
+      const ids = Array.from(selectedAssetIds);
+      for (const id of ids) {
+        await enqueueMutation('DELETE', 'assets', { id });
+      }
+      const current = await storage.getAssets();
+      await storage.saveAssets(current.filter(a => !selectedAssetIds.has(a.id)));
+      await refreshRegistry();
+      setSelectedAssetIds(new Set());
+      toast({ title: "Assets Removed" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   if (!isHydrated) return null;
 
   return (
@@ -271,9 +288,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   <h2 className="text-3xl font-black uppercase text-white tracking-tight leading-none">{selectedCategory}</h2>
                   <div className="flex items-center gap-2">
                     <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[9px] h-5 px-2">
-                      {filteredAssets.length} ASSETS TOTAL
+                      {filteredAssets.length} RECORDS | VIEWING ALL
                     </Badge>
-                    <span className="text-[9px] font-bold text-white/20 uppercase tracking-[0.25em]">| INVENTORY LIST</span>
                   </div>
                 </div>
               </div>
@@ -284,7 +300,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </div>
                 <div className="space-y-0.5">
                   <h2 className="text-2xl font-black uppercase text-white tracking-tight leading-none">Inventory Hub</h2>
-                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Manage Asset Categories</p>
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">Asset Categories & Registers</p>
                 </div>
               </div>
             )}
@@ -367,7 +383,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                           <DropdownMenuContent align="end" className="w-56 bg-black border-white/10 rounded-2xl p-2 shadow-3xl">
                             <DropdownMenuItem onClick={() => setSelectedCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
                               <LayoutGrid className="h-4 w-4 text-white/40" />
-                              <span className="text-[11px] font-black uppercase">Open Category</span>
+                              <span className="text-[11px] font-black uppercase">Open Inventory</span>
                             </DropdownMenuItem>
                             <DropdownMenuItem onClick={() => { setCustomizingCategory(cat.name); setIsColumnSheetOpen(true); }} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
                               <Wrench className="h-4 w-4 text-white/40" />
@@ -408,7 +424,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                         variant="outline" 
                         className="w-full h-12 rounded-xl border-white/10 font-black uppercase text-[10px] tracking-widest gap-2 bg-transparent hover:bg-white/5 text-white/60 hover:text-white transition-all"
                       >
-                        Open Category <ChevronRight className="h-4 w-4" />
+                        View Category <ChevronRight className="h-4 w-4" />
                       </Button>
                     </CardFooter>
                   </Card>
@@ -476,6 +492,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   selectedIds={selectedAssetIds} 
                   onToggleSelect={handleToggleSelect} 
                   onSelectAll={(c) => setSelectedAssetIds(c ? new Set(filteredAssets.map(a => a.id)) : new Set())} 
+                  onConfigureHeaders={userProfile?.isAdmin ? () => {
+                    if (selectedCategory) {
+                      setCustomizingCategory(selectedCategory);
+                      setIsColumnSheetOpen(true);
+                    }
+                  } : undefined}
                 />
               )}
             </motion.div>
@@ -535,15 +557,20 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           sheetDefinition={activeGrant.sheetDefinitions[customizingCategory]}
           originalSheetName={customizingCategory}
           onSave={async (orig, newDef, applyToAll) => {
-            const nextDefs = { ...activeGrant.sheetDefinitions };
+            const currentGrant = appSettings.grants.find(g => g.id === activeGrant.id);
+            if (!currentGrant) return;
+
+            const nextDefs = { ...currentGrant.sheetDefinitions };
             if (applyToAll) {
               Object.keys(nextDefs).forEach(k => { nextDefs[k] = { ...newDef, name: k }; });
             } else {
               nextDefs[newDef.name] = newDef;
               if (orig && orig !== newDef.name) delete nextDefs[orig];
             }
+
+            const nextGrants = appSettings.grants.map(g => g.id === activeGrant.id ? { ...g, sheetDefinitions: nextDefs } : g);
             await updateActiveGrant({ sheetDefinitions: nextDefs });
-            toast({ title: "Layout Updated" });
+            toast({ title: "Inventory Layout Updated" });
           }}
         />
       )}

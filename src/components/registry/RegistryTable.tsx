@@ -2,6 +2,7 @@
  * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
  * Phase 1200: Optimized layout with 5-column grid pulse and sticky headers.
  * Phase 1210: Applied business terminology and improved horizontal spacing.
+ * Phase 1220: Added Header Configuration trigger for administrators.
  */
 
 import React from 'react';
@@ -21,7 +22,8 @@ import {
   Tag,
   MapPin,
   Hash,
-  FileText
+  FileText,
+  Settings2
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -39,6 +41,7 @@ interface RegistryTableProps {
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   onSelectAll: (checked: boolean) => void;
+  onConfigureHeaders?: () => void;
 }
 
 export function RegistryTable({ 
@@ -46,7 +49,8 @@ export function RegistryTable({
   onInspect, 
   selectedIds, 
   onToggleSelect, 
-  onSelectAll 
+  onSelectAll,
+  onConfigureHeaders
 }: RegistryTableProps) {
   const allSelected = records.length > 0 && records.every(r => selectedIds.has(r.id));
 
@@ -62,12 +66,23 @@ export function RegistryTable({
           />
         </div>
         
-        <div className="flex-1 grid grid-cols-12 gap-6 ml-6">
+        <div className="flex-1 grid grid-cols-12 gap-6 ml-6 items-center">
           <div className="col-span-1 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">S/N</div>
           <div className="col-span-4 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Description</div>
           <div className="col-span-2 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Asset ID / Tag</div>
           <div className="col-span-3 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Regional Scope</div>
-          <div className="col-span-2 text-[9px] font-black uppercase tracking-[0.3em] text-white/30 text-center">Audit Status</div>
+          <div className="col-span-2 flex items-center justify-center gap-2">
+            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Audit Status</span>
+            {onConfigureHeaders && (
+              <button 
+                onClick={(e) => { e.stopPropagation(); onConfigureHeaders(); }}
+                className="p-1.5 rounded-lg bg-white/5 text-white/20 hover:text-primary hover:bg-primary/10 transition-all tactile-pulse"
+                title="Configure Headers"
+              >
+                <Settings2 className="h-3 w-3" />
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
