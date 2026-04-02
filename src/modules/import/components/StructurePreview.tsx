@@ -1,6 +1,6 @@
 /**
  * @fileOverview StructurePreview - The Template Visualization Layer.
- * Renders discovered group blocks and their unique header sets for auditor verification.
+ * Phase 400: Enhanced with Explicit vs Inferred status and row counting.
  */
 
 import React from 'react';
@@ -18,7 +18,9 @@ import {
   Terminal,
   Layers,
   ChevronRight,
-  Check
+  Check,
+  FileCheck,
+  ScanSearch
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DiscoveredGroup } from '@/parser/types';
@@ -30,10 +32,9 @@ interface StructurePreviewProps {
   selectedIds: Set<string>;
   onToggleId: (id: string) => void;
   onSelectAll: (checked: boolean) => void;
-  debugMode?: boolean;
 }
 
-export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll, debugMode = true }: StructurePreviewProps) {
+export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll }: StructurePreviewProps) {
   const allSelected = groups.length > 0 && selectedIds.size === groups.length;
 
   return (
@@ -42,12 +43,12 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll,
         <div className="space-y-2">
           <h4 className="text-2xl font-black uppercase text-white tracking-tight flex items-center gap-4 leading-none">
             <div className="p-2.5 bg-primary/10 rounded-xl">
-              <LayoutGrid className="h-6 w-6 text-primary" />
+              <ScanSearch className="h-6 w-6 text-primary" />
             </div>
-            Register Skeleton Discovery
+            Registry Skeleton Discovery
           </h4>
           <p className="text-[11px] font-bold uppercase text-white/40 tracking-[0.25em] leading-relaxed italic">
-            Verify discovered structural groups and row counts before full ingestion.
+            Structural boundaries identified via Column A traversal.
           </p>
         </div>
 
@@ -59,18 +60,20 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll,
             className="h-5 w-5 rounded-lg border-2"
           />
           <label htmlFor="select-all-groups" className="text-[10px] font-black uppercase tracking-widest text-white/60 cursor-pointer pr-4">
-            Select All Groups ({groups.length})
+            Select All Blocks ({groups.length})
           </label>
         </div>
       </div>
 
       <div className="space-y-8">
         {groups.length > 0 ? (
-          groups.map((group, idx) => {
+          groups.map((group) => {
             const isSelected = selectedIds.has(group.id);
+            const isExplicit = group.headerSource === 'explicit';
+
             return (
               <Card 
-                key={`${group.id}`} 
+                key={group.id} 
                 className={cn(
                   "bg-[#050505] border-2 rounded-[2.5rem] overflow-hidden shadow-3xl transition-all group",
                   isSelected ? "border-primary/40 bg-primary/[0.01]" : "border-white/5 opacity-60 grayscale hover:opacity-100 hover:grayscale-0"
@@ -96,19 +99,19 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll,
                         {group.groupName}
                       </h5>
                       <div className="flex items-center gap-4 text-[9px] font-mono text-white/30 uppercase tracking-widest">
-                        <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Row {group.startRow + 1}</span>
+                        <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> Rows {group.startRow + 1}-{group.endRow + 1}</span>
                         <div className="h-1 w-1 rounded-full bg-white/10" />
-                        <span className="flex items-center gap-1.5"><Terminal className="h-3 w-3" /> {group.headerSource} Header Pulse</span>
+                        <span className="flex items-center gap-1.5">
+                          {isExplicit ? <FileCheck className="h-3 w-3 text-green-500" /> : <Layers className="h-3 w-3 text-orange-500" />}
+                          {group.headerSource} Template Pulse
+                        </span>
                       </div>
                     </div>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <Badge variant="outline" className={cn(
-                      "h-8 px-5 rounded-full font-black uppercase text-[9px] tracking-[0.2em] border-2",
-                      isSelected ? "border-primary/20 text-primary" : "border-white/10 text-white/40"
-                    )}>
-                      {group.columnCount} COLUMNS
+                    <Badge variant="outline" className="h-8 px-5 rounded-full font-black uppercase text-[9px] tracking-[0.2em] border-primary/20 text-primary bg-primary/5">
+                      {group.rowCount} RECORDS FOUND
                     </Badge>
                   </div>
                 </div>
@@ -119,7 +122,7 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll,
                     <div className="flex items-center p-8 gap-4 min-w-max">
                       {group.headerSet.map((header, hIdx) => (
                         <div 
-                          key={`${group.templateId}-${hIdx}`}
+                          key={`${group.id}-${hIdx}`}
                           className={cn(
                             "flex flex-col gap-3 min-w-[160px] p-5 rounded-2xl border transition-all shadow-inner group/col",
                             isSelected ? "bg-white/[0.03] border-white/10" : "bg-white/[0.01] border-white/5"
@@ -132,21 +135,13 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll,
                             <div className="h-1.5 w-1.5 rounded-full bg-white/10" />
                           </div>
                           <p className="text-xs font-black uppercase text-white/80 leading-tight truncate" title={header}>
-                            {header || 'EMPTY_HEADER'}
+                            {header || 'NULL_FIELD'}
                           </p>
                         </div>
                       ))}
                     </div>
                     <ScrollBar orientation="horizontal" className="bg-white/5 h-2" />
                   </ScrollArea>
-
-                  {debugMode && (
-                    <div className="px-8 py-4 bg-white/[0.01] border-t border-white/5 flex items-center gap-6">
-                      <div className="flex items-center gap-2 text-[8px] font-black uppercase text-white/20 tracking-widest">
-                        <Terminal className="h-3 w-3" /> Template ID: <span className="text-white/40 font-mono">{group.templateId}</span>
-                      </div>
-                    </div>
-                  )}
                 </CardContent>
               </Card>
             );
@@ -157,8 +152,8 @@ export function StructurePreview({ groups, selectedIds, onToggleId, onSelectAll,
               <Search className="h-24 w-24 text-white" />
             </div>
             <div className="space-y-2">
-              <h4 className="text-3xl font-black uppercase tracking-[0.3em] text-white">No Structure Pulses</h4>
-              <p className="text-sm font-medium italic text-white/60">Traverse a registry workbook to discover structural nodes.</p>
+              <h4 className="text-3xl font-black uppercase tracking-[0.3em] text-white">Discovery Inactive</h4>
+              <p className="text-sm font-medium italic text-white/60">Upload a registry workbook to begin structural analysis.</p>
             </div>
           </div>
         )}

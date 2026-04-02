@@ -28,7 +28,8 @@ export interface DiscoveredGroup {
   columnCount: number;
   rowCount: number;
   startRow: number;
-  endRow?: number;
+  endRow: number;
+  headerRowIndex: number | null;
   templateId: string;
   sheetName: string;
   workbookName: string;
@@ -54,6 +55,7 @@ export interface ParsedAsset extends Asset {
   validation: ValidationSummary;
   sourceGroup: string;
   templateId: string;
+  sourceColumnAGroup?: string;
 }
 
 export interface GroupImportContainer {
@@ -64,6 +66,10 @@ export interface GroupImportContainer {
   sheetName: string;
   headerSet: string[];
   assets: ParsedAsset[];
+  metrics: {
+    valid: number;
+    invalid: number;
+  };
 }
 
 export interface ImportRunSummary {
