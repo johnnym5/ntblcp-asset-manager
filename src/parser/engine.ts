@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
- * Phase 325: Overhauled group discovery to prioritize internal labels over sheet names.
+ * Phase 326: Hardened section name discovery to prioritize labels above headers.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -45,16 +45,18 @@ export class ParserEngine {
     }
 
     // Pass 2: Map boundaries, names, and count rows
-    let activeGroupName = "GENERAL REGISTER";
+    let activeGroupName: string | null = null;
     const sheetNameUpper = sheetName.toUpperCase();
     
     for (let i = 0; i < data.length; i++) {
       const row = data[i];
       const classification = classifyRow(row);
 
-      // Capture specific group titles
+      // Capture specific group titles found above headers
       if (classification === 'GROUP_HEADER') {
-        const potentialLabel = String(row[0]).trim().toUpperCase();
+        const firstPopulated = row.find(c => c !== null && String(c).trim() !== '');
+        const potentialLabel = String(firstPopulated).trim().toUpperCase();
+        
         // Ignore labels that are just the sheet name or technical noise
         if (potentialLabel !== sheetNameUpper && potentialLabel.length > 2) {
           activeGroupName = potentialLabel;
@@ -75,14 +77,13 @@ export class ParserEngine {
           while (j < data.length) {
             const nextRow = data[j];
             const nextClass = classifyRow(nextRow);
-            // Group ends at next header or section boundary
             if (nextClass === 'SCHEMA_HEADER' || nextClass === 'GROUP_HEADER') break;
             if (nextClass === 'DATA_ROW') rowCount++;
             j++;
           }
 
-          // Use sheet name if still stuck on default
-          const finalGroupName = activeGroupName === "GENERAL REGISTER" ? sheetNameUpper : activeGroupName;
+          // Use active name if found, otherwise use sheet name as last resort
+          const finalGroupName = activeGroupName || sheetNameUpper;
 
           this.discoveredGroups.push({
             id: uuidv4(),
@@ -96,11 +97,15 @@ export class ParserEngine {
             sheetName,
             workbookName: this.workbookName
           });
+
+          // Reset active name after assigning it to a group, so subsequent headers
+          // don't inherit it unless a new label is found.
+          activeGroupName = null;
         }
       }
     }
 
-    // Secondary pass: Deduplicate group names if multiple headers appear under one title
+    // Only deduplicate if names are actually identical
     const seenNames = new Map<string, number>();
     this.discoveredGroups = this.discoveredGroups.map(group => {
       const count = seenNames.get(group.groupName) || 0;
@@ -124,7 +129,6 @@ export class ParserEngine {
     const selectedGroups = this.discoveredGroups.filter(g => selectedGroupIds.has(g.id));
 
     selectedGroups.forEach((group) => {
-      // Respect the start row of the NEXT discovered group, even if not selected
       const currentIdxInAll = this.discoveredGroups.findIndex(g => g.id === group.id);
       const nextGroupInWorkbook = this.discoveredGroups[currentIdxInAll + 1];
       const nextBoundaryRow = nextGroupInWorkbook ? nextGroupInWorkbook.startRow : data.length + 1;
@@ -146,7 +150,6 @@ export class ParserEngine {
 
       groupData.forEach((row, rowIdx) => {
         const rowClassification = classifyRow(row);
-        // Positional row exclusion: ignore empty, headers, or group labels mid-run
         if (rowClassification === 'EMPTY' || rowClassification === 'GROUP_HEADER' || rowClassification === 'SCHEMA_HEADER') return;
 
         container.metrics.total++;
@@ -184,7 +187,6 @@ export class ParserEngine {
   private mapPositionalRow(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
     const logs: ValidationLog[] = [];
     
-    // Normalize: remove leading empty columns often found in complex registers
     let alignedRow = [...row];
     while (alignedRow.length > 0 && (alignedRow[0] === null || String(alignedRow[0]).trim() === '')) {
       alignedRow.shift();
