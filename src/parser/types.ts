@@ -26,18 +26,17 @@ export interface DiscoveredGroup {
   headerSet: string[];
   headerSource: 'explicit' | 'inferred';
   columnCount: number;
-  rowCount: number; // Added: Amount of assets in this group
-  templateId: string;
+  rowCount: number;
   startRow: number;
   endRow?: number;
-  matchedTemplateSource?: string;
+  templateId: string;
   sheetName: string;
   workbookName: string;
 }
 
 export interface ValidationLog {
   rowNumber: number;
-  type: 'header_mismatch' | 'missing_columns' | 'extra_columns' | 'empty_row' | 'unassigned_group' | 'column_count_mismatch';
+  type: 'header_mismatch' | 'missing_columns' | 'extra_columns' | 'empty_row' | 'unassigned_group';
   message: string;
   rawData: any[];
 }
@@ -65,11 +64,6 @@ export interface GroupImportContainer {
   sheetName: string;
   headerSet: string[];
   assets: ParsedAsset[];
-  metrics: {
-    total: number;
-    valid: number;
-    invalid: number;
-  };
 }
 
 export interface ImportRunSummary {
