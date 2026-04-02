@@ -41,6 +41,14 @@ import {
   Zap,
   Tag
 } from 'lucide-react';
+import { 
+  Table, 
+  TableBody, 
+  TableCell, 
+  TableHead, 
+  TableHeader, 
+  TableRow 
+} from '@/components/ui/table';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
@@ -188,10 +196,68 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsDetailOpen(true);
   };
 
+  const handleNext = () => {
+    if (!selectedAssetId) return;
+    const idx = filteredAssets.findIndex(a => a.id === selectedAssetId);
+    if (idx < filteredAssets.length - 1) setSelectedAssetId(filteredAssets[idx+1].id);
+  };
+
+  const handlePrevious = () => {
+    if (!selectedAssetId) return;
+    const idx = filteredAssets.findIndex(a => a.id === selectedAssetId);
+    if (idx > 0) setSelectedAssetId(filteredAssets[idx-1].id);
+  };
+
   const handleToggleSelect = (id: string) => {
     const next = new Set(selectedAssetIds);
     if (next.has(id)) next.delete(id); else next.add(id);
     setSelectedAssetIds(next);
+  };
+
+  const updateActiveGrant = async (updates: Partial<Grant>) => {
+    if (!appSettings || !activeGrant) return;
+    const nextGrants = appSettings.grants.map(g => g.id === activeGrant.id ? { ...g, ...updates } : g);
+    const nextSettings = { ...appSettings, grants: nextGrants };
+    try {
+      if (isOnline) await FirestoreService.updateSettings({ grants: nextGrants });
+      await storage.saveSettings(nextSettings);
+      setAppSettings(nextSettings);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Update Failure" });
+    }
+  };
+
+  const handleHideCategory = async (name: string) => {
+    if (!activeGrant) return;
+    const nextEnabled = activeGrant.enabledSheets.filter(s => s !== name);
+    await updateActiveGrant({ enabledSheets: nextEnabled });
+    toast({ title: "Group Hidden", description: "The register block is now sequestered." });
+  };
+
+  const handleWipeCategory = async () => {
+    if (!categoryToWipe || !activeGrant) return;
+    setIsProcessing(true);
+    try {
+      // 1. Wipe local data
+      const current = await storage.getAssets();
+      await storage.saveAssets(current.filter(a => a.category !== categoryToWipe));
+      
+      // 2. Remove group from settings
+      const nextEnabled = activeGrant.enabledSheets.filter(s => s !== categoryToWipe);
+      const nextDefs = { ...activeGrant.sheetDefinitions };
+      delete nextDefs[categoryToWipe];
+      
+      await updateActiveGrant({ 
+        enabledSheets: nextEnabled,
+        sheetDefinitions: nextDefs
+      });
+
+      await refreshRegistry();
+      toast({ title: "Local Pulse Purged", description: "All records in category cleared." });
+      setIsCategoryWipeDialogOpen(false);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   const handleBatchVerify = async () => {
@@ -285,7 +351,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
         {/* 2. Top Action Command Bar */}
         <AnimatePresence>
-          {selectedAssetIds.size > 0 && selectedCategory && (
+          {(selectedAssetIds.size > 0 && selectedCategory) && (
             <motion.div 
               initial={{ opacity: 0, y: -10 }} 
               animate={{ opacity: 1, y: 0 }} 
@@ -334,7 +400,30 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                           <div className="p-2 bg-primary/10 rounded-lg"><TableIcon className="h-4 w-4 text-primary" /></div>
                           <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{cat.name}</h3>
                         </div>
-                        <button className="h-8 w-8 flex items-center justify-center bg-white/5 rounded-xl text-white/40 hover:text-white transition-all opacity-0 group-hover:opacity-100"><MoreHorizontal className="h-4 w-4" /></button>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <button className="h-8 w-8 flex items-center justify-center bg-white/5 rounded-xl text-white/40 hover:text-white transition-all"><MoreHorizontal className="h-4 w-4" /></button>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" className="w-56 bg-black border-white/10 rounded-2xl p-2 shadow-3xl">
+                            <DropdownMenuItem onClick={() => setSelectedCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
+                              <LayoutGrid className="h-4 w-4 text-white/40" />
+                              <span className="text-[11px] font-black uppercase">Open Register</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => { setCustomizingCategory(cat.name); setIsColumnSheetOpen(true); }} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
+                              <Wrench className="h-4 w-4 text-white/40" />
+                              <span className="text-[11px] font-black uppercase">Field Setup</span>
+                            </DropdownMenuItem>
+                            <DropdownMenuItem onClick={() => handleHideCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
+                              <EyeOff className="h-4 w-4 text-white/40" />
+                              <span className="text-[11px] font-black uppercase">Hide Group</span>
+                            </DropdownMenuItem>
+                            <div className="h-px bg-white/5 my-2" />
+                            <DropdownMenuItem onClick={() => { setCategoryToWipe(cat.name); setIsCategoryWipeDialogOpen(true); }} className="p-3 rounded-xl focus:bg-red-600/10 text-red-500 gap-3">
+                              <Bomb className="h-4 w-4" />
+                              <span className="text-[11px] font-black uppercase">Wipe Local Pulse</span>
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
                       </div>
                     </CardHeader>
                     <CardContent className="p-8 pt-6 space-y-8">
@@ -355,7 +444,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                     </CardContent>
                     <CardFooter className="px-8 pb-8 pt-0">
                       <Button 
-                        onClick={() => handleInspectCategory(cat.name)} 
+                        onClick={() => setSelectedCategory(cat.name)} 
                         variant="outline" 
                         className="w-full h-12 rounded-xl border-white/10 font-black uppercase text-[10px] tracking-widest gap-2 bg-transparent hover:bg-white/5 text-white/60 hover:text-white transition-all"
                       >
@@ -378,7 +467,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                   </TableHeader>
                   <TableBody>
                     {categoryStats.map(cat => (
-                      <TableRow key={cat.name} className="group hover:bg-primary/[0.02] border-b last:border-0 cursor-pointer" onClick={() => handleInspectCategory(cat.name)}>
+                      <TableRow key={cat.name} className="group hover:bg-primary/[0.02] border-b last:border-0 cursor-pointer" onClick={() => setSelectedCategory(cat.name)}>
                         <TableCell className="py-6 px-8">
                           <div className="flex items-center gap-5">
                             <div className="p-3 bg-white/5 rounded-xl group-hover:bg-primary/10 group-hover:text-primary transition-all"><TableIcon className="h-5 w-5 opacity-40" /></div>
@@ -434,12 +523,14 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </AnimatePresence>
       </div>
 
-      {/* High-Fidelity Audit Sheets & Dialogs */}
+      {/* Dialogs & Sheets */}
       <AssetDetailSheet 
         isOpen={isDetailOpen} 
         onOpenChange={setIsDetailOpen} 
         record={selectedRecord} 
         onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} 
+        onNext={handleNext}
+        onPrevious={handlePrevious}
       />
       
       <AssetForm 
@@ -456,11 +547,46 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         selectedAssetCount={selectedAssetIds.size} 
         onSave={async () => { setSelectedAssetIds(new Set()); await refreshRegistry(); }} 
       />
+
+      <AlertDialog open={isCategoryWipeDialogOpen} onOpenChange={setIsCategoryWipeDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-black text-white">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
+              <Bomb className="h-12 w-12 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Wipe Local Pulse?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/60">
+              This will permanently delete all local records for <strong>{categoryToWipe}</strong> and remove its technical definition from your workstation. Cloud authority remains intact.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handleWipeCategory} disabled={isProcessing} className="h-14 px-12 rounded-2xl font-black uppercase bg-destructive text-white m-0">
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />} Execute Wipe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {isColumnSheetOpen && customizingCategory && activeGrant && (
+        <ColumnCustomizationSheet 
+          isOpen={isColumnSheetOpen}
+          onOpenChange={setIsColumnSheetOpen}
+          sheetDefinition={activeGrant.sheetDefinitions[customizingCategory]}
+          originalSheetName={customizingCategory}
+          onSave={async (orig, newDef, applyToAll) => {
+            const nextDefs = { ...activeGrant.sheetDefinitions };
+            if (applyToAll) {
+              Object.keys(nextDefs).forEach(k => { nextDefs[k] = { ...newDef, name: k }; });
+            } else {
+              nextDefs[newDef.name] = newDef;
+              if (orig && orig !== newDef.name) delete nextDefs[orig];
+            }
+            await updateActiveGrant({ sheetDefinitions: nextDefs });
+            toast({ title: "Schema Layout Updated" });
+          }}
+        />
+      )}
     </div>
   );
-
-  function handleInspectCategory(name: string) {
-    setSelectedCategory(name);
-    setSelectedAssetIds(new Set());
-  }
 }

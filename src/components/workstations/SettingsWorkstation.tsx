@@ -3,7 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Real-Time Master Governance.
  * Phase 360: Implemented Auto-Sync Logic & Retired Manual Commit Requirement.
- * All changes now broadcast to all users in real-time.
+ * Phase 370: Renamed Governance to Users and added Database/History tabs.
  */
 
 import React, { useState, useRef } from 'react';
@@ -24,7 +24,9 @@ import {
   X,
   Loader2,
   Zap,
-  CheckCircle2
+  CheckCircle2,
+  Terminal,
+  History
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -39,6 +41,8 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { cn } from '@/lib/utils';
+import { DatabaseWorkstation } from './DatabaseWorkstation';
+import { AuditLogWorkstation } from './AuditLogWorkstation';
 import type { AppSettings, SheetDefinition, Grant } from '@/types/domain';
 import {
   Collapsible,
@@ -190,19 +194,29 @@ export function SettingsWorkstation() {
       </div>
 
       <Tabs defaultValue="general" className="space-y-10">
-        <div className="bg-[#080808] p-1 rounded-2xl border border-white/5 shadow-inner">
-          <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center w-full">
-            <TabsTrigger value="general" className="flex-1 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
+        <div className="bg-[#080808] p-1 rounded-2xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar">
+          <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center w-full min-w-max">
+            <TabsTrigger value="general" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
               <Settings className="h-3.5 w-3.5" /> General
             </TabsTrigger>
             {isAdmin && (
-              <TabsTrigger value="groups" className="flex-1 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
+              <TabsTrigger value="groups" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
                 <PlusCircle className="h-3.5 w-3.5" /> Asset Groups
               </TabsTrigger>
             )}
             {isAdmin && (
-              <TabsTrigger value="users" className="flex-1 px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-                <Users className="h-3.5 w-3.5" /> Governance
+              <TabsTrigger value="users" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
+                <Users className="h-3.5 w-3.5" /> Users
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="database" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
+                <Terminal className="h-3.5 w-3.5" /> Database
+              </TabsTrigger>
+            )}
+            {isAdmin && (
+              <TabsTrigger value="history" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
+                <History className="h-3.5 w-3.5" /> History
               </TabsTrigger>
             )}
           </TabsList>
@@ -341,9 +355,23 @@ export function SettingsWorkstation() {
             </Card>
           </div>
         </TabsContent>
+
+        <TabsContent value="database" className="m-0 outline-none">
+          <div className="space-y-6">
+            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Infrastructure Command</h3>
+            <DatabaseWorkstation />
+          </div>
+        </TabsContent>
+
+        <TabsContent value="history" className="m-0 outline-none">
+          <div className="space-y-6">
+            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Activity Ledger</h3>
+            <AuditLogWorkstation />
+          </div>
+        </TabsContent>
       </Tabs>
 
-      {/* Persistent Status Bar (Replaces manual commit footer) */}
+      {/* Persistent Status Bar */}
       <div className="fixed bottom-0 left-0 right-0 p-6 bg-black/80 backdrop-blur-3xl border-t border-white/5 flex items-center justify-between z-50">
         <div className="flex items-center gap-5">
           <div className="relative">
@@ -372,17 +400,21 @@ export function SettingsWorkstation() {
           onOpenChange={setIsColumnSheetOpen} 
           sheetDefinition={selectedSheetDef} 
           originalSheetName={originalSheetName} 
-          onSave={(orig, newDef, applyToAll) => {
-            const updatedGrants = appSettings.grants.map(g => {
-              if (g.id === activeGrantIdForSchema) {
-                const next = { ...g.sheetDefinitions };
-                if (applyToAll) Object.keys(next).forEach(k => { next[k] = { ...newDef, name: k }; });
-                else { next[newDef.name] = newDef; if (orig && orig !== newDef.name) delete next[orig]; }
-                return { ...g, sheetDefinitions: next };
-              }
-              return g;
-            });
-            handleSettingChange('grants', updatedGrants);
+          onSave={async (orig, newDef, applyToAll) => {
+            const currentGrant = appSettings.grants.find(g => g.id === activeGrantIdForSchema);
+            if (!currentGrant) return;
+
+            const nextDefs = { ...currentGrant.sheetDefinitions };
+            if (applyToAll) {
+              Object.keys(nextDefs).forEach(k => { nextDefs[k] = { ...newDef, name: k }; });
+            } else {
+              nextDefs[newDef.name] = newDef;
+              if (orig && orig !== newDef.name) delete nextDefs[orig];
+            }
+
+            const nextGrants = appSettings.grants.map(g => g.id === activeGrantIdForSchema ? { ...g, sheetDefinitions: nextDefs } : g);
+            await handleSettingChange('grants', nextGrants);
+            toast({ title: "Schema Layout Updated" });
           }} 
         />
       )}
