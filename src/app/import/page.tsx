@@ -3,6 +3,7 @@
 /**
  * @fileOverview Guided Import Wizard - Deterministic Hierarchical Ingestion.
  * Phase 73: Fixed ReferenceError by adding missing Badge import.
+ * Phase 74: Refined mobile spacing and traversal pulse.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -133,7 +134,7 @@ export default function ImportPage() {
 
   const handleConfirmMapping = async (mapping: Record<string, string>) => {
     setIsProcessing(true);
-    setCurrentStep('TRAVERSAL'); // Show analysis state while parsing with map
+    setCurrentStep('TRAVERSAL'); 
     setAnalysisProgress(20);
 
     try {
@@ -208,7 +209,6 @@ export default function ImportPage() {
   return (
     <AppLayout>
       <div className="max-w-6xl mx-auto space-y-10 pb-32 animate-in fade-in slide-in-from-bottom-4 duration-700">
-        {/* Wizard Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
           <div className="space-y-2">
             <h2 className="text-4xl font-black tracking-tighter text-foreground uppercase flex items-center gap-4 leading-none">
@@ -228,7 +228,6 @@ export default function ImportPage() {
           )}
         </div>
 
-        {/* Stepper Pulse */}
         <div className="px-2 overflow-x-auto pb-4 custom-scrollbar">
           <div className="flex items-center justify-between relative min-w-[600px] px-4">
             <div className="absolute top-1/2 left-0 w-full h-0.5 bg-muted/30 -translate-y-1/2 -z-10" />
@@ -259,7 +258,6 @@ export default function ImportPage() {
           </div>
         </div>
 
-        {/* Wizard Content Surface */}
         <div className="px-2">
           <AnimatePresence mode="wait">
             {currentStep === 'INGEST' && (
@@ -271,20 +269,20 @@ export default function ImportPage() {
                 className="grid grid-cols-1 lg:grid-cols-3 gap-8"
               >
                 <Card 
-                  className="lg:col-span-2 border-4 border-dashed border-border/40 bg-card/50 hover:border-primary/40 hover:bg-primary/[0.02] transition-all rounded-[3rem] p-12 flex flex-col items-center justify-center text-center h-[450px] cursor-pointer group"
+                  className="lg:col-span-2 border-4 border-dashed border-border/40 bg-card/50 hover:border-primary/40 hover:bg-primary/[0.02] transition-all rounded-[3rem] p-8 md:p-12 flex flex-col items-center justify-center text-center min-h-[400px] md:h-[450px] cursor-pointer group"
                   onClick={() => fileInputRef.current?.click()}
                 >
                   <input type="file" ref={fileInputRef} onChange={handleFileChange} className="hidden" accept=".xlsx,.xls" />
-                  <div className="p-10 bg-primary/10 rounded-full w-32 h-32 flex items-center justify-center mb-8 shadow-inner transition-transform group-hover:scale-110 duration-500">
-                    <FileUp className="h-16 w-16 text-primary" />
+                  <div className="p-10 bg-primary/10 rounded-full w-24 h-24 md:w-32 md:h-32 flex items-center justify-center mb-8 shadow-inner transition-transform group-hover:scale-110 duration-500">
+                    <FileUp className="h-12 w-12 md:h-16 md:w-16 text-primary" />
                   </div>
                   <div className="space-y-4">
-                    <h3 className="text-3xl font-black tracking-tight uppercase">Upload Pulse</h3>
-                    <p className="text-sm font-medium text-muted-foreground max-w-sm mx-auto leading-relaxed italic opacity-70">
+                    <h3 className="text-2xl md:text-3xl font-black tracking-tight uppercase">Upload Pulse</h3>
+                    <p className="text-xs md:text-sm font-medium text-muted-foreground max-w-sm mx-auto leading-relaxed italic opacity-70">
                       Rule-based analyzer detects document context markers and prepares technical headers for mapping.
                     </p>
                   </div>
-                  <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 mt-10 transition-all hover:-translate-y-1">
+                  <Button className="h-14 md:h-16 px-10 md:px-12 rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 mt-10 transition-all hover:-translate-y-1">
                     Select Registry Workbook
                   </Button>
                 </Card>
@@ -375,20 +373,20 @@ export default function ImportPage() {
                 animate={{ opacity: 1, x: 0 }}
                 className="space-y-10"
               >
-                <div className="flex items-center justify-between">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div className="flex items-center gap-3">
                     <div className="p-2 bg-primary rounded-xl shadow-lg shadow-primary/20"><ShieldCheck className="h-5 w-5 text-white" /></div>
                     <h3 className="text-xl font-black uppercase tracking-tight">Sandbox Reconciliation</h3>
                   </div>
-                  <Badge variant="outline" className="h-8 px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px]">
+                  <Badge variant="outline" className="h-8 w-fit px-4 rounded-xl border-primary/20 bg-primary/5 text-primary font-black uppercase text-[10px]">
                     {stagedAssets.length} RECORDS ANALYZED
                   </Badge>
                 </div>
 
                 <ReconciliationView assets={stagedAssets} />
 
-                <div className="p-10 rounded-[3rem] bg-card border-2 border-primary/10 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-primary/20 transition-all">
-                  <div className="space-y-2">
+                <div className="p-8 md:p-10 rounded-[3rem] bg-card border-2 border-primary/10 shadow-2xl flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-primary/20 transition-all">
+                  <div className="space-y-2 text-center md:text-left">
                     <h4 className="text-2xl font-black uppercase tracking-tight text-foreground">Finalize Ingestion Pulse?</h4>
                     <p className="text-sm font-medium text-muted-foreground italic leading-relaxed opacity-70">
                       Once confirmed, these records will be merged into the production registry and enqueued for cloud synchronization.
@@ -396,7 +394,7 @@ export default function ImportPage() {
                   </div>
                   <Button 
                     onClick={() => setCurrentStep('COMMIT')}
-                    className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-transform hover:scale-105 active:scale-95"
+                    className="w-full md:w-auto h-16 md:h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-transform hover:scale-105 active:scale-95"
                   >
                     Proceed to Commit <ChevronRight className="h-5 w-5" />
                   </Button>
@@ -416,22 +414,22 @@ export default function ImportPage() {
                   {isProcessing && <Loader2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 h-16 w-16 animate-spin text-primary" />}
                 </div>
                 
-                <div className="space-y-6 max-w-lg">
+                <div className="space-y-6 max-w-lg px-4">
                   <div className="space-y-2">
-                    <h3 className="text-3xl font-black uppercase tracking-tighter">Commit Selection</h3>
+                    <h3 className="text-2xl md:text-3xl font-black uppercase tracking-tighter">Commit Selection</h3>
                     <p className="text-sm font-medium text-muted-foreground leading-relaxed italic">
                       This action is deterministic. All {stagedAssets.length} hierarchical records will be merged into the production registry pulse.
                     </p>
                   </div>
                   
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6">
-                    <Button variant="ghost" onClick={() => setCurrentStep('RECONCILIATION')} disabled={isProcessing} className="h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest">
+                    <Button variant="ghost" onClick={() => setCurrentStep('RECONCILIATION')} disabled={isProcessing} className="w-full sm:w-auto h-14 px-10 rounded-2xl font-black uppercase text-[10px] tracking-widest">
                       <ChevronLeft className="mr-2 h-4 w-4" /> Review Again
                     </Button>
                     <Button 
                       onClick={handleCommitToRegistry} 
                       disabled={isProcessing}
-                      className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-4"
+                      className="w-full sm:w-auto h-16 px-12 rounded-2xl font-black uppercase text-[10px] md:text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 gap-4"
                     >
                       {isProcessing ? <Loader2 className="h-5 w-5 animate-spin" /> : <ShieldCheck className="h-5 w-5" />}
                       Execute Merge Pulse

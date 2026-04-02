@@ -2,8 +2,8 @@
 
 /**
  * @fileOverview Root Shell - Unified Global Command Hub.
- * Phase 250: Mobile-Optimized Layout & Responsive Command Pulses.
  * Phase 260: Applied user-friendly Asset Management terminology.
+ * Phase 300: Mobile optimization with Notch Safety & Device padding.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -158,7 +158,7 @@ export default function SPAHub() {
             )}
           </div>
 
-          {/* Global Search Interface */}
+          {/* Global Search Interface - Tablet & Desktop */}
           <div className="flex-1 max-w-2xl relative group hidden md:block">
             <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />
             <Input 
@@ -283,7 +283,7 @@ export default function SPAHub() {
           </div>
         </header>
 
-        {/* Mobile Search Overlay */}
+        {/* Mobile Search Overlay - High Fidelity */}
         {showMobileSearch && (
           <div className="md:hidden bg-black/90 backdrop-blur-2xl border-b border-white/5 p-4 animate-in slide-in-from-top duration-300 z-30">
             <div className="relative">
@@ -308,20 +308,20 @@ export default function SPAHub() {
           </div>
         )}
 
-        <ScrollArea className="flex-1">
-          <div className="p-4 md:p-10 min-h-full">
-            <ErrorBoundary module={activeView}>
-              <Suspense fallback={
-                <div className="h-[60vh] flex flex-col items-center justify-center gap-6 opacity-40">
-                  <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Opening Workspace...</p>
-                </div>
-              }>
+        <div className="flex-1 min-h-0 relative">
+          <ErrorBoundary module={activeView}>
+            <Suspense fallback={
+              <div className="h-full flex flex-col items-center justify-center gap-6 opacity-40">
+                <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Opening Workspace...</p>
+              </div>
+            }>
+              <div className="h-full p-4 md:p-10">
                 {renderWorkstation()}
-              </Suspense>
-            </ErrorBoundary>
-          </div>
-        </ScrollArea>
+              </div>
+            </Suspense>
+          </ErrorBoundary>
+        </div>
       </main>
 
       <AssetFilterSheet 

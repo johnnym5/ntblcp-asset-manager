@@ -16,6 +16,7 @@ const Card = React.forwardRef<
         "rounded-[1.5rem] border-2 bg-card/60 text-card-foreground shadow-xl backdrop-blur-lg transition-all duration-300",
         className
       )}
+      // Disable scale/hover pulse on mobile to prevent "sticky" UI states
       whileHover={!isMobile ? { 
         y: -8, 
         scale: 1.01,
