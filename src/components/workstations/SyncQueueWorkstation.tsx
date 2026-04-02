@@ -3,7 +3,7 @@
 /**
  * @fileOverview SyncQueueWorkstation - Grouped Multi-Select Sync Hub.
  * Phase 450: Implemented Asset Grouping and Selective Category Pushing.
- * Matches the high-fidelity folder hub aesthetic.
+ * Phase 451: Fixed JSX mapping syntax error.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';

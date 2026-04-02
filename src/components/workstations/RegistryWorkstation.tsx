@@ -4,7 +4,7 @@
  * @fileOverview RegistryWorkstation - Asset Inventory & Category Hub.
  * Phase 650: Hardened view state persistence and business terminology.
  * Phase 660: Synchronized with high-fidelity action bars and circular selection triggers.
- * Phase 670: Integrated Sticky Header Configuration for administrators.
+ * Phase 670: Integrated ScrollArea for results and Header Configuration shortcut.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -71,6 +71,7 @@ import { storage } from '@/offline/storage';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { Asset, SheetDefinition, Grant } from '@/types/domain';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -101,7 +102,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     isOnline
   } = useAppState();
   
-  const { userProfile } = useAuth();
+  const { userProfile, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -310,7 +311,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Header Configuration Shortcut for Grid View Too */}
+            {/* Header Configuration Shortcut */}
             {selectedCategory && userProfile?.isAdmin && (
               <Button 
                 variant="outline" 
@@ -380,147 +381,149 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </AnimatePresence>
       </div>
 
-      {/* 3. Main Display Area */}
+      {/* 3. Main Display Area with Dedicated ScrollArea */}
       <div className="px-1">
-        <AnimatePresence mode="wait">
-          {!selectedCategory ? (
-            groupViewMode === 'grid' ? (
-              <motion.div key="grid-hub" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {categoryStats.map(cat => (
-                  <Card key={cat.name} className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden group hover:border-primary/20 transition-all shadow-3xl">
-                    <CardHeader className="p-8 pb-4 border-b border-white/5 bg-white/[0.01]">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="p-2 bg-primary/10 rounded-lg"><TableIcon className="h-4 w-4 text-primary" /></div>
-                          <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{cat.name}</h3>
-                        </div>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <button className="h-8 w-8 flex items-center justify-center bg-white/5 rounded-xl text-white/40 hover:text-white transition-all"><MoreHorizontal className="h-4 w-4" /></button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end" className="w-56 bg-black border-white/10 rounded-2xl p-2 shadow-3xl">
-                            <DropdownMenuItem onClick={() => setSelectedCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
-                              <LayoutGrid className="h-4 w-4 text-white/40" />
-                              <span className="text-[11px] font-black uppercase">Open Inventory</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => { setCustomizingCategory(cat.name); setIsColumnSheetOpen(true); }} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
-                              <Wrench className="h-4 w-4 text-white/40" />
-                              <span className="text-[11px] font-black uppercase">Field Setup</span>
-                            </DropdownMenuItem>
-                            <DropdownMenuItem onClick={() => handleHideCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
-                              <EyeOff className="h-4 w-4 text-white/40" />
-                              <span className="text-[11px] font-black uppercase">Hide Category</span>
-                            </DropdownMenuItem>
-                            <div className="h-px bg-white/5 my-2" />
-                            <DropdownMenuItem onClick={() => { setCategoryToWipe(cat.name); setIsCategoryWipeDialogOpen(true); }} className="p-3 rounded-xl focus:bg-red-600/10 text-red-500 gap-3">
-                              <Bomb className="h-4 w-4" />
-                              <span className="text-[11px] font-black uppercase">Clear Records</span>
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="p-8 pt-6 space-y-8">
-                      <div className="flex items-end justify-between">
-                        <div className="space-y-1">
-                          <p className="text-4xl font-black tracking-tighter text-white">{cat.total}</p>
-                          <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">ASSET COUNT</p>
-                        </div>
-                        <div className="p-4 bg-white/5 rounded-2xl shadow-inner"><Boxes className="h-8 w-8 text-white/10" /></div>
-                      </div>
-                      <div className="space-y-3">
-                        <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-[0.2em]">
-                          <span className="text-white/40">AUDIT PROGRESS</span>
-                          <span className="text-primary">{cat.verified} / {cat.total}</span>
-                        </div>
-                        <Progress value={(cat.verified / cat.total) * 100} className="h-1 bg-white/5" />
-                      </div>
-                    </CardContent>
-                    <CardFooter className="px-8 pb-8 pt-0">
-                      <Button 
-                        onClick={() => setSelectedCategory(cat.name)} 
-                        variant="outline" 
-                        className="w-full h-12 rounded-xl border-white/10 font-black uppercase text-[10px] tracking-widest gap-2 bg-transparent hover:bg-white/5 text-white/60 hover:text-white transition-all"
-                      >
-                        View Category <ChevronRight className="h-4 w-4" />
-                      </Button>
-                    </CardFooter>
-                  </Card>
-                ))}
-              </motion.div>
-            ) : (
-              <motion.div key="list-hub" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-[2.5rem] border-2 border-border/40 overflow-hidden bg-card/50 shadow-2xl">
-                <Table>
-                  <TableHeader className="bg-muted/30">
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead className="py-5 px-8 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Inventory Category</TableHead>
-                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Total Assets</TableHead>
-                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Audit Progress</TableHead>
-                      <TableHead className="py-5 px-8 text-right text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Actions</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {categoryStats.map(cat => (
-                      <TableRow key={cat.name} className="group hover:bg-primary/[0.02] border-b last:border-0 cursor-pointer" onClick={() => setSelectedCategory(cat.name)}>
-                        <TableCell className="py-6 px-8">
-                          <div className="flex items-center gap-5">
-                            <div className="p-3 bg-white/5 rounded-xl group-hover:bg-primary/10 group-hover:text-primary transition-all"><TableIcon className="h-5 w-5 opacity-40" /></div>
-                            <span className="font-black text-sm uppercase tracking-tight text-white">{cat.name}</span>
+        <ScrollArea className="h-[calc(100vh-25rem)] pr-4 custom-scrollbar">
+          <AnimatePresence mode="wait">
+            {!selectedCategory ? (
+              groupViewMode === 'grid' ? (
+                <motion.div key="grid-hub" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {categoryStats.map(cat => (
+                    <Card key={cat.name} className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden group hover:border-primary/20 transition-all shadow-3xl">
+                      <CardHeader className="p-8 pb-4 border-b border-white/5 bg-white/[0.01]">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="p-2 bg-primary/10 rounded-lg"><TableIcon className="h-4 w-4 text-primary" /></div>
+                            <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{cat.name}</h3>
                           </div>
-                        </TableCell>
-                        <TableCell className="py-6 px-4">
-                          <span className="font-black text-lg text-white">{cat.total}</span>
-                        </TableCell>
-                        <TableCell className="py-6 px-4 w-[350px]">
-                          <div className="space-y-2">
-                            <div className="flex justify-between text-[8px] font-black uppercase tracking-[0.2em]">
-                              <span className="text-white/40">{cat.verified} VERIFIED</span>
-                              <span className="text-primary">{Math.round((cat.verified/cat.total)*100)}%</span>
-                            </div>
-                            <Progress value={(cat.verified/cat.total)*100} className="h-1 bg-white/5" />
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <button className="h-8 w-8 flex items-center justify-center bg-white/5 rounded-xl text-white/40 hover:text-white transition-all"><MoreHorizontal className="h-4 w-4" /></button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-56 bg-black border-white/10 rounded-2xl p-2 shadow-3xl">
+                              <DropdownMenuItem onClick={() => setSelectedCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
+                                <LayoutGrid className="h-4 w-4 text-white/40" />
+                                <span className="text-[11px] font-black uppercase">Open Inventory</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => { setCustomizingCategory(cat.name); setIsColumnSheetOpen(true); }} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
+                                <Wrench className="h-4 w-4 text-white/40" />
+                                <span className="text-[11px] font-black uppercase">Field Setup</span>
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleHideCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
+                                <EyeOff className="h-4 w-4 text-white/40" />
+                                <span className="text-[11px] font-black uppercase">Hide Category</span>
+                              </DropdownMenuItem>
+                              <div className="h-px bg-white/5 my-2" />
+                              <DropdownMenuItem onClick={() => { setCategoryToWipe(cat.name); setIsCategoryWipeDialogOpen(true); }} className="p-3 rounded-xl focus:bg-red-600/10 text-red-500 gap-3">
+                                <Bomb className="h-4 w-4" />
+                                <span className="text-[11px] font-black uppercase">Clear Records</span>
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </CardHeader>
+                      <CardContent className="p-8 pt-6 space-y-8">
+                        <div className="flex items-end justify-between">
+                          <div className="space-y-1">
+                            <p className="text-4xl font-black tracking-tighter text-white">{cat.total}</p>
+                            <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">ASSET COUNT</p>
                           </div>
-                        </TableCell>
-                        <TableCell className="py-6 px-8 text-right">
-                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/5 opacity-40 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all"><ChevronRight className="h-5 w-5" /></Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </motion.div>
-            )
-          ) : (
-            <motion.div key="asset-register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
-              {viewMode === 'grid' || isMobile ? (
-                <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                  {filteredAssets.map(asset => (
-                    <RegistryCard 
-                      key={asset.id} 
-                      record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
-                      onInspect={() => handleInspect(asset.id)} 
-                      selected={selectedAssetIds.has(asset.id)} 
-                      onToggleSelect={handleToggleSelect} 
-                    />
+                          <div className="p-4 bg-white/5 rounded-2xl shadow-inner"><Boxes className="h-8 w-8 text-white/10" /></div>
+                        </div>
+                        <div className="space-y-3">
+                          <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-[0.2em]">
+                            <span className="text-white/40">AUDIT PROGRESS</span>
+                            <span className="text-primary">{cat.verified} / {cat.total}</span>
+                          </div>
+                          <Progress value={(cat.verified / cat.total) * 100} className="h-1 bg-white/5" />
+                        </div>
+                      </CardContent>
+                      <CardFooter className="px-8 pb-8 pt-0">
+                        <Button 
+                          onClick={() => setSelectedCategory(cat.name)} 
+                          variant="outline" 
+                          className="w-full h-12 rounded-xl border-white/10 font-black uppercase text-[10px] tracking-widest gap-2 bg-transparent hover:bg-white/5 text-white/60 hover:text-white transition-all"
+                        >
+                          View Category <ChevronRight className="h-4 w-4" />
+                        </Button>
+                      </CardFooter>
+                    </Card>
                   ))}
-                </div>
+                </motion.div>
               ) : (
-                <RegistryTable 
-                  records={filteredAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
-                  onInspect={handleInspect} 
-                  selectedIds={selectedAssetIds} 
-                  onToggleSelect={handleToggleSelect} 
-                  onSelectAll={(c) => setSelectedAssetIds(c ? new Set(filteredAssets.map(a => a.id)) : new Set())} 
-                  onConfigureHeaders={userProfile?.isAdmin ? () => {
-                    if (selectedCategory) {
-                      setCustomizingCategory(selectedCategory);
-                      setIsColumnSheetOpen(true);
-                    }
-                  } : undefined}
-                />
-              )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+                <motion.div key="list-hub" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-[2.5rem] border-2 border-border/40 overflow-hidden bg-card/50 shadow-2xl">
+                  <Table>
+                    <TableHeader className="bg-muted/30">
+                      <TableRow className="hover:bg-transparent">
+                        <TableHead className="py-5 px-8 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Inventory Category</TableHead>
+                        <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Total Assets</TableHead>
+                        <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Audit Progress</TableHead>
+                        <TableHead className="py-5 px-8 text-right text-[9px] font-black uppercase tracking-[0.2em] text-muted-foreground">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {categoryStats.map(cat => (
+                        <TableRow key={cat.name} className="group hover:bg-primary/[0.02] border-b last:border-0 cursor-pointer" onClick={() => setSelectedCategory(cat.name)}>
+                          <TableCell className="py-6 px-8">
+                            <div className="flex items-center gap-5">
+                              <div className="p-3 bg-white/5 rounded-xl group-hover:bg-primary/10 group-hover:text-primary transition-all"><TableIcon className="h-5 w-5 opacity-40" /></div>
+                              <span className="font-black text-sm uppercase tracking-tight text-white">{cat.name}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-6 px-4">
+                            <span className="font-black text-lg text-white">{cat.total}</span>
+                          </TableCell>
+                          <TableCell className="py-6 px-4 w-[350px]">
+                            <div className="space-y-2">
+                              <div className="flex justify-between text-[8px] font-black uppercase tracking-[0.2em]">
+                                <span className="text-white/40">{cat.verified} VERIFIED</span>
+                                <span className="text-primary">{Math.round((cat.verified/cat.total)*100)}%</span>
+                              </div>
+                              <Progress value={(cat.verified/cat.total)*100} className="h-1 bg-white/5" />
+                            </div>
+                          </TableCell>
+                          <TableCell className="py-6 px-8 text-right">
+                            <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/5 opacity-40 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all"><ChevronRight className="h-5 w-5" /></Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </motion.div>
+              )
+            ) : (
+              <motion.div key="asset-register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-6">
+                {viewMode === 'grid' || isMobile ? (
+                  <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                    {filteredAssets.map(asset => (
+                      <RegistryCard 
+                        key={asset.id} 
+                        record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
+                        onInspect={() => handleInspect(asset.id)} 
+                        selected={selectedAssetIds.has(asset.id)} 
+                        onToggleSelect={handleToggleSelect} 
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <RegistryTable 
+                    records={filteredAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
+                    onInspect={handleInspect} 
+                    selectedIds={selectedAssetIds} 
+                    onToggleSelect={handleToggleSelect} 
+                    onSelectAll={(c) => setSelectedAssetIds(c ? new Set(filteredAssets.map(a => a.id)) : new Set())} 
+                    onConfigureHeaders={userProfile?.isAdmin ? () => {
+                      if (selectedCategory) {
+                        setCustomizingCategory(selectedCategory);
+                        setIsColumnSheetOpen(true);
+                      }
+                    } : undefined}
+                  />
+                )}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </ScrollArea>
       </div>
 
       {/* Dialogs & Sheets */}
