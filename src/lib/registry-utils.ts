@@ -1,6 +1,7 @@
 /**
  * @fileOverview Registry Utilities.
  * Handles header normalization, hierarchical data transformation, and color coding.
+ * Phase 800: Updated transformAssetToRecord to use authoritative 'sn' and camelCase properties.
  */
 
 import type { Asset } from "@/types/domain";
@@ -31,12 +32,10 @@ export function normalizeHeaderName(name: string): string {
 
 /**
  * Deterministic Color Coding Engine.
- * Generates consistent HSL accents for sheet separation.
- * Supports manual override via branding map.
  */
 export function getColorForSource(source: string, branding?: Record<string, string>): string {
   if (branding && branding[source]) return branding[source];
-  if (!source) return "hsl(45, 95%, 40%)"; // Default Gold
+  if (!source) return "hsl(45, 100%, 50%)"; // Assetain Gold
   
   let hash = 0;
   for (let i = 0; i < source.length; i++) {
@@ -68,12 +67,7 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
   // Procurement
   { rawName: "Suppliers", displayName: "Suppliers", normalizedName: "suppliers", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Procurement" },
   { rawName: "Date Purchased or Received", displayName: "Date Purchased or Received", normalizedName: "date_purchased_received", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "date", group: "Procurement" },
-  { rawName: "Chq No / Goods Received Note No.", displayName: "Chq No / GRN No.", normalizedName: "goods_received_note_no", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Procurement" },
-  { rawName: "PV No", displayName: "PV No", normalizedName: "pv_no", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Procurement" },
   { rawName: "Purchase price (Naira)", displayName: "Price (NGN)", normalizedName: "purchase_price_ngn", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "currency", group: "Procurement" },
-  { rawName: "Purchase Price [USD]", displayName: "Price (USD)", normalizedName: "purchase_price_usd", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "currency", group: "Procurement" },
-  { rawName: "Funder", displayName: "Funder", normalizedName: "funder", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Procurement" },
-  { rawName: "Useful life", displayName: "Useful life", normalizedName: "useful_life", visible: false, editable: true, filterable: true, sortEnabled: true, dataType: "number", group: "Procurement" },
   
   // Condition
   { rawName: "Condition", displayName: "Condition", normalizedName: "condition", visible: true, editable: true, filterable: true, sortEnabled: true, dataType: "text", group: "Condition" },
@@ -82,8 +76,6 @@ export const DEFAULT_REGISTRY_HEADERS: Omit<RegistryHeader, "id" | "orderIndex">
   // Metadata & Hierarchy
   { rawName: "Source Sheet", displayName: "Source Sheet", normalizedName: "source_sheet", visible: true, editable: false, filterable: true, sortEnabled: true, dataType: "text", group: "Metadata" },
   { rawName: "Row Number", displayName: "Row Number", normalizedName: "row_number", visible: true, editable: false, filterable: true, sortEnabled: true, dataType: "number", group: "Metadata" },
-  { rawName: "Section", displayName: "Major Section", normalizedName: "section_name", visible: true, editable: false, filterable: true, sortEnabled: true, dataType: "text", group: "Hierarchy" },
-  { rawName: "Subsection", displayName: "Subsection", normalizedName: "subsection_name", visible: true, editable: false, filterable: true, sortEnabled: true, dataType: "text", group: "Hierarchy" },
 ];
 
 /**
@@ -94,7 +86,7 @@ export const REGISTRY_PRESETS: RegistryPreset[] = [
     id: "quick",
     name: "Quick View",
     description: "Optimized for fast field scanning.",
-    visibleHeaderNames: ["sn", "location", "assignee_location", "asset_description", "asset_id_code", "asset_class", "manufacturer", "model_number", "serial_number", "condition", "row_number", "source_sheet", "section_name"],
+    visibleHeaderNames: ["sn", "location", "assignee_location", "asset_description", "asset_id_code", "serial_number", "condition", "row_number"],
     densityMode: "compact"
   },
   {
@@ -103,25 +95,18 @@ export const REGISTRY_PRESETS: RegistryPreset[] = [
     description: "Total registry transparency.",
     visibleHeaderNames: DEFAULT_REGISTRY_HEADERS.map(h => h.normalizedName),
     densityMode: "expanded"
-  },
-  {
-    id: "procurement",
-    name: "Procurement View",
-    description: "Focused on financial and supplier data.",
-    visibleHeaderNames: ["sn", "asset_description", "suppliers", "date_purchased_received", "purchase_price_ngn", "funder", "useful_life"],
-    densityMode: "comfortable"
   }
 ];
 
 /**
- * Transforms a Domain Asset to an AssetRecord.
+ * Transforms a Domain Asset to an AssetRecord for the high-density grid.
  */
 export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], branding?: Record<string, string>): AssetRecord {
   const fields: RegistryFieldValue[] = headers.map(header => {
     let rawValue: any = "";
     
     switch(header.normalizedName) {
-      case "sn": rawValue = asset.serialNumber || ""; break;
+      case "sn": rawValue = asset.sn || ""; break;
       case "location": rawValue = asset.location || ""; break;
       case "assignee_location": rawValue = asset.custodian || ""; break;
       case "asset_description": rawValue = asset.description || ""; break;
@@ -133,12 +118,9 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
       case "serial_number": rawValue = asset.serialNumber || ""; break;
       case "source_sheet": rawValue = asset.importMetadata?.sheetName || ""; break;
       case "row_number": rawValue = asset.importMetadata?.rowNumber || 0; break;
-      case "section_name": rawValue = asset.section || ""; break;
-      case "subsection_name": rawValue = asset.subsection || ""; break;
       default:
-        // Use optional chaining and default to empty object to prevent TypeError if metadata is missing
         const metadata = asset.metadata || {};
-        rawValue = (metadata as any)[header.rawName] || (metadata as any)[header.normalizedName] || "";
+        rawValue = metadata[header.rawName] || metadata[header.normalizedName] || "";
     }
 
     return {
@@ -148,13 +130,13 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
     };
   });
 
-  const sheetName = asset.importMetadata?.sheetName || "";
+  const sourceName = asset.category || asset.importMetadata?.sheetName || "Registry";
 
   return {
     id: asset.id,
     rowNumber: asset.importMetadata?.rowNumber || 0,
-    sn: asset.serialNumber,
-    sourceSheet: sheetName,
+    sn: asset.sn,
+    sourceSheet: sourceName,
     sourceRow: asset.importMetadata?.rowNumber,
     sectionName: asset.section,
     subsectionName: asset.subsection,
@@ -163,7 +145,7 @@ export function transformAssetToRecord(asset: Asset, headers: RegistryHeader[], 
     headers,
     fields,
     rawRow: { ...asset } as any,
-    accentColor: getColorForSource(sheetName, branding)
+    accentColor: getColorForSource(sourceName, branding)
   };
 }
 

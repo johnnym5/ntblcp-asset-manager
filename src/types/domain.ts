@@ -47,6 +47,7 @@ export interface Geotag {
 
 export interface Asset {
   id: string;
+  sn?: string; // Preserved numeric sequence from Column A
   name?: string;
   description: string;
   category: string;
@@ -61,6 +62,7 @@ export interface Asset {
   location: string;
   custodian: string;
   lga?: string;
+  site?: string;
   
   // State & Assessment
   status: VerificationStatus;

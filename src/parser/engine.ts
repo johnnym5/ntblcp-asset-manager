@@ -3,7 +3,7 @@
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements two-stage structural discovery and group-aware mapping for single-sheet registries.
- * Phase 700: implements Synthetic Template logic for headerless groups.
+ * Phase 800: Unified key mapping to fix registry data alignment issue.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -31,7 +31,6 @@ export class ParserEngine {
 
   /**
    * STAGE 1: Template Detection & Structural Inventory Pulse.
-   * Traverses a single sheet to identify every group block in Column A.
    */
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
     const discovered: DiscoveredGroup[] = [];
@@ -41,17 +40,15 @@ export class ParserEngine {
     data.forEach((row, idx) => {
       const type = classifyRow(row);
 
-      // 1. Capture Group Marker from Column A
       if (type === 'GROUP_HEADER') {
         if (activeGroup) activeGroup.endRow = idx - 1;
         pendingGroupLabel = String(row[0]).trim();
       }
 
-      // 2. Capture Explicit Header Row (S/N Signature)
       if (type === 'SCHEMA_HEADER') {
         const signature = this.registerTemplate(row, 'real_template');
         const tpl = this.templates.get(signature)!;
-        const name = pendingGroupLabel || "GENERAL REGISTER";
+        const name = pendingGroupLabel || "GENERAL";
         
         activeGroup = this.createNewGroup(name, tpl, 'explicit', idx, sheetName);
         activeGroup.headerStart = idx;
@@ -60,12 +57,8 @@ export class ParserEngine {
         pendingGroupLabel = null; 
       }
 
-      // 3. Handle Headerless Group (Starts directly with asset rows)
       if (type === 'DATA_ROW' && pendingGroupLabel) {
-        // Attempt to match width with existing templates (Inferred)
-        // Else generate a new one (Synthetic)
         const matchedTpl = this.matchOrGenerateTemplate(row);
-        
         activeGroup = this.createNewGroup(
           pendingGroupLabel, 
           matchedTpl, 
@@ -78,7 +71,6 @@ export class ParserEngine {
       }
     });
 
-    // Asset Count Pulse & Boundary Finalization
     discovered.forEach((group, idx) => {
       const nextGroup = discovered[idx + 1];
       const stopRow = nextGroup ? nextGroup.startRow : data.length;
@@ -96,7 +88,6 @@ export class ParserEngine {
 
   /**
    * STAGE 2: Targeted Group Ingestion.
-   * Maps rows using the templates discovered or generated in Stage 1.
    */
   public ingestGroups(sheetName: string, data: any[][], selectedGroups: DiscoveredGroup[]): GroupImportContainer[] {
     const containers: GroupImportContainer[] = [];
@@ -173,18 +164,13 @@ export class ParserEngine {
 
   private matchOrGenerateTemplate(row: any[]): HeaderTemplate {
     const populatedCount = row.filter(c => c !== null && String(c).trim() !== '').length;
-    
-    // 1. Try to find a width-matched explicit template (Inferred)
     for (const tpl of this.templates.values()) {
       if (tpl.columnCount === row.length || Math.abs(tpl.columnCount - populatedCount) <= 1) {
         return { ...tpl, type: 'inferred_template' };
       }
     }
-
-    // 2. Generate a Synthetic Template (Synthetic)
-    const syntheticHeaders = row.map((_, i) => `Synthetic Column ${i + 1}`);
+    const syntheticHeaders = row.map((_, i) => `Col ${i + 1}`);
     const signature = `SYNTH_${row.length}`;
-    
     if (!this.templates.has(signature)) {
       const tplId = `GEN_${this.templates.size + 1}`;
       this.templates.set(signature, {
@@ -202,7 +188,8 @@ export class ParserEngine {
   private mapRowToTemplate(row: any[], tpl: HeaderTemplate, group: DiscoveredGroup, rowNum: number): ParsedAsset | null {
     const asset: any = {
       id: uuidv4(),
-      category: group.sheetName,
+      sn: '',
+      category: group.groupName, // Use group name as the logical category
       description: '',
       grantId: 'STAGED',
       section: group.groupName,
@@ -222,14 +209,42 @@ export class ParserEngine {
       templateId: tpl.id
     };
 
+    // AUTHORITATIVE KEY MAPPING Pulse
+    const fieldMapping: Record<string, keyof Asset> = {
+      'sn': 'sn' as any,
+      'asset_description': 'description' as any,
+      'location': 'location' as any,
+      'lga': 'lga' as any,
+      'assignee_location': 'custodian' as any,
+      'asset_id_code': 'assetIdCode' as any,
+      'serial_number': 'serialNumber' as any,
+      'manufacturer': 'manufacturer' as any,
+      'model_number': 'modelNumber' as any,
+      'date_purchased_received': 'purchaseDate' as any,
+      'purchase_price_ngn': 'value' as any,
+      'condition': 'condition' as any,
+      'remarks': 'remarks' as any,
+      'chasis_no': 'chassisNo' as any,
+      'chassis_no': 'chassisNo' as any,
+      'engine_no': 'engineNo' as any,
+      'site': 'site' as any
+    };
+
     tpl.normalizedHeaders.forEach((key, idx) => {
       const val = row[idx];
       const headerLabel = tpl.rawHeaders[idx];
       if (val === undefined || val === null) return;
       
       const strVal = String(val).trim();
-      if (['sn', 'description', 'location', 'custodian', 'assetIdCode', 'serialNumber', 'manufacturer', 'modelNumber', 'purchaseDate', 'value', 'condition', 'remarks', 'lga', 'site', 'chassisNo', 'engineNo'].includes(key)) {
-        asset[key] = strVal;
+      const targetProp = fieldMapping[key];
+
+      if (targetProp) {
+        if (targetProp === 'value') {
+          const numericVal = parseFloat(strVal.replace(/[^0-9.]/g, ''));
+          asset[targetProp] = isNaN(numericVal) ? 0 : numericVal;
+        } else {
+          (asset as any)[targetProp] = strVal;
+        }
       } else {
         asset.metadata[headerLabel] = val;
       }
