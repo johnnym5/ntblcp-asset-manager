@@ -31,13 +31,12 @@ export class ParserEngine {
 
   /**
    * STAGE 1: Template Discovery Pulse.
-   * Scans the sheet to identify structural groups and learn their header sets.
+   * Traverses the sheet to identify structural boundaries and learn unique header sets.
    */
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
-    let activeGroupName = "GENERAL REGISTER";
-    let lastHeaderRow: any[] | null = null;
+    let activeGroupName = sheetName.toUpperCase();
     let groupStartRow = 0;
-
+    
     this.templates.clear();
     this.discoveredGroups = [];
 
@@ -45,24 +44,41 @@ export class ParserEngine {
       const classification = classifyRow(row);
 
       if (classification === 'GROUP_HEADER') {
-        activeGroupName = String(row[0]).trim().toUpperCase();
-        groupStartRow = idx;
+        const label = String(row[0]).trim().toUpperCase();
+        // Ignore labels that match the sheet name to avoid "TB (PART 1)" noise
+        if (label !== sheetName.toUpperCase()) {
+          activeGroupName = label;
+          groupStartRow = idx;
+        }
       }
 
       if (classification === 'SCHEMA_HEADER') {
-        this.registerTemplate(row);
-        lastHeaderRow = row;
+        const signature = this.registerTemplate(row);
+        const tpl = this.templates.get(signature);
         
-        // Define the group boundary
-        const tpl = this.getTemplateBySignature(row);
         if (tpl) {
+          // Count rows until next boundary or end of sheet
+          let assetCount = 0;
+          for (let i = idx + 1; i < data.length; i++) {
+            const nextClass = classifyRow(data[i]);
+            if (nextClass === 'GROUP_HEADER' || nextClass === 'SCHEMA_HEADER') break;
+            if (nextClass === 'DATA_ROW') assetCount++;
+          }
+
+          // Check for duplicate group names in the same sheet
+          let finalName = activeGroupName;
+          const existingCount = this.discoveredGroups.filter(g => g.groupName.startsWith(activeGroupName)).length;
+          if (existingCount > 0) {
+            finalName = `${activeGroupName} (PART ${existingCount + 1})`;
+          }
+
           this.discoveredGroups.push({
             id: uuidv4(),
-            groupName: activeGroupName,
-            headerSet: row.filter(h => h !== null).map(String),
+            groupName: finalName,
+            headerSet: tpl.rawHeaders,
             headerSource: 'explicit',
-            columnCount: row.length,
-            rowCount: 0, // Calculated in Stage 2
+            columnCount: tpl.columnCount,
+            rowCount: assetCount,
             startRow: idx,
             templateId: tpl.id,
             sheetName,
@@ -72,7 +88,7 @@ export class ParserEngine {
       }
     });
 
-    // If no groups found, create a fallback group using the sheet name
+    // Fallback if no schema headers found (flat sheet)
     if (this.discoveredGroups.length === 0 && data.length > 0) {
       this.inferFallbackGroup(sheetName, data);
     }
@@ -81,70 +97,57 @@ export class ParserEngine {
   }
 
   /**
-   * STAGE 2: Full Ingestion.
-   * Maps every row to its discovered group template.
+   * STAGE 2: Targeted Ingestion.
+   * Processes only the selected groups using their specific positional templates.
    */
-  public parseWorkbook(sheetName: string, data: any[][]): ImportRunSummary {
-    const groups = this.discoverGroups(sheetName, data);
+  public ingestGroups(sheetName: string, data: any[][], selectedGroups: DiscoveredGroup[]): GroupImportContainer[] {
     const containers: GroupImportContainer[] = [];
-    let currentContainer: GroupImportContainer | null = null;
 
-    data.forEach((row, idx) => {
-      const classification = classifyRow(row);
+    selectedGroups.forEach(group => {
+      const tpl = Array.from(this.templates.values()).find(t => t.id === group.templateId);
+      if (!tpl) return;
 
-      // Switch context if we hit a known group boundary
-      const groupMatch = groups.find(g => g.startRow === idx);
-      if (groupMatch) {
-        currentContainer = {
-          ...groupMatch,
-          assets: []
-        };
-        containers.push(currentContainer);
-        return; // Skip the header row itself
-      }
+      const container: GroupImportContainer = {
+        ...group,
+        assets: []
+      };
 
-      if (classification === 'DATA_ROW' && currentContainer) {
-        const tpl = Array.from(this.templates.values()).find(t => t.id === currentContainer?.templateId);
-        if (tpl) {
-          const asset = this.mapRowToTemplate(row, tpl, currentContainer.groupName, idx, sheetName);
-          if (asset) currentContainer.assets.push(asset);
+      // Determine the stop row based on the next DISCOVERED group (not just selected)
+      const nextGroup = this.discoveredGroups.find(dg => dg.startRow > group.startRow);
+      const endRow = nextGroup ? nextGroup.startRow : data.length;
+
+      // Process rows within this group's boundaries
+      for (let i = group.startRow + 1; i < endRow; i++) {
+        const row = data[i];
+        if (classifyRow(row) === 'DATA_ROW') {
+          const asset = this.mapRowToTemplate(row, tpl, group.groupName, i, sheetName);
+          if (asset) container.assets.push(asset);
         }
       }
+
+      containers.push(container);
     });
 
-    return {
-      workbookName: this.workbookName,
-      sheetName,
-      profileId: 'STRUCTURAL_ENGINE_V5',
-      totalRows: data.length,
-      groupCount: containers.length,
-      dataRowsImported: containers.reduce((sum, c) => sum + c.assets.length, 0),
-      rowsRejected: 0,
-      duplicatesDetected: 0,
-      templatesDiscovered: this.templates.size,
-      sectionBreakdown: {},
-      groups: containers
-    };
+    return containers;
   }
 
-  private registerTemplate(row: any[]) {
-    const rawHeaders = row.map(c => String(c || '').trim()).filter(h => h.length > 0);
+  private registerTemplate(row: any[]): string {
+    // POSITIONAL MAPPING: We must keep all cells until the last populated one
+    const lastPopulatedIndex = row.reduce((max, cell, idx) => (cell !== null && String(cell).trim() !== '') ? idx : max, 0);
+    const rawHeaders = row.slice(0, lastPopulatedIndex + 1).map(c => String(c || '').trim());
+    
     const signature = rawHeaders.map(h => h.toUpperCase()).join('|');
     
     if (!this.templates.has(signature)) {
       this.templates.set(signature, {
-        id: `TPL_${uuidv4().substring(0, 4).toUpperCase()}`,
+        id: `TPL_${this.templates.size + 1}`,
         rawHeaders,
         normalizedHeaders: rawHeaders.map(normalizeHeaderName),
-        columnCount: row.length,
+        columnCount: rawHeaders.length,
         signature
       });
     }
-  }
-
-  private getTemplateBySignature(row: any[]): HeaderTemplate | null {
-    const sig = row.map(c => String(c || '').trim().toUpperCase()).join('|');
-    return Array.from(this.templates.values()).find(t => t.signature === sig) || null;
+    return signature;
   }
 
   private mapRowToTemplate(row: any[], tpl: HeaderTemplate, group: string, rowNum: number, sheet: string): ParsedAsset | null {
@@ -152,7 +155,7 @@ export class ParserEngine {
       id: uuidv4(),
       category: sheet,
       description: '',
-      grantId: 'STAGED', 
+      grantId: 'STAGED',
       section: group,
       subsection: 'Base Register',
       assetFamily: 'Uncategorized',
@@ -185,8 +188,16 @@ export class ParserEngine {
       templateId: tpl.id
     };
 
+    // Attempt alignment: if row starts empty but data is shifted
+    let activeRow = [...row];
+    if (activeRow[0] === null || activeRow[0] === '') {
+      const firstDataIdx = activeRow.findIndex(c => c !== null && String(c).trim() !== '');
+      if (firstDataIdx > 0) activeRow = activeRow.slice(firstDataIdx);
+    }
+
+    // Positional Mapping Loop
     tpl.normalizedHeaders.forEach((key, idx) => {
-      const val = row[idx];
+      const val = activeRow[idx];
       const headerLabel = tpl.rawHeaders[idx];
 
       if (val === undefined || val === null) return;
@@ -199,7 +210,7 @@ export class ParserEngine {
       }
     });
 
-    // Integrity Guard: Ensure at least a description or ID exists
+    // Integrity Guard
     if (!asset.description && !asset.assetIdCode && !asset.serialNumber) {
       return null;
     }
@@ -211,29 +222,30 @@ export class ParserEngine {
     const domainFields = [
       'sn', 'description', 'location', 'custodian', 'assetIdCode', 
       'serialNumber', 'manufacturer', 'modelNumber', 'purchaseDate', 
-      'value', 'condition', 'remarks'
+      'value', 'condition', 'remarks', 'lga', 'site'
     ];
     return domainFields.includes(key);
   }
 
   private inferFallbackGroup(sheetName: string, data: any[][]) {
-    // Basic implementation for flat sheets
-    const firstRow = data[0];
-    this.registerTemplate(firstRow);
-    const tpl = this.getTemplateBySignature(firstRow);
-    if (tpl) {
-      this.discoveredGroups.push({
-        id: uuidv4(),
-        groupName: sheetName.toUpperCase(),
-        headerSet: tpl.rawHeaders,
-        headerSource: 'inferred',
-        columnCount: tpl.columnCount,
-        rowCount: data.length - 1,
-        startRow: 0,
-        templateId: tpl.id,
-        sheetName,
-        workbookName: this.workbookName
-      });
+    const firstRow = data.find(r => classifyRow(r) === 'SCHEMA_HEADER');
+    if (firstRow) {
+      const signature = this.registerTemplate(firstRow);
+      const tpl = this.templates.get(signature);
+      if (tpl) {
+        this.discoveredGroups.push({
+          id: uuidv4(),
+          groupName: sheetName.toUpperCase(),
+          headerSet: tpl.rawHeaders,
+          headerSource: 'inferred',
+          columnCount: tpl.columnCount,
+          rowCount: data.length, 
+          startRow: data.indexOf(firstRow),
+          templateId: tpl.id,
+          sheetName,
+          workbookName: this.workbookName
+        });
+      }
     }
   }
 }

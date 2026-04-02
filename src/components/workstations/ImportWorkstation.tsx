@@ -31,7 +31,7 @@ import { enqueueMutation } from '@/offline/queue';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import * as XLSX from 'xlsx';
-import type { ParsedAsset, ImportRunSummary, DiscoveredGroup } from '@/parser/types';
+import type { ParsedAsset, ImportRunSummary, DiscoveredGroup, GroupImportContainer } from '@/parser/types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { StructurePreview } from '@/modules/import/components/StructurePreview';
 import { ReconciliationView } from '@/modules/import/components/ReconciliationView';
@@ -47,6 +47,7 @@ export function ImportWorkstation() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [stagedAssets, setStagedAssets] = useState<ParsedAsset[]>([]);
   const [discoveredGroups, setDiscoveredGroups] = useState<DiscoveredGroup[]>([]);
+  const [selectedGroupIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [runSummary, setSummary] = useState<ImportRunSummary | null>(null);
   const [progress, setProgress] = useState(0);
   const [activeSheetData, setActiveSheetData] = useState<{name: string, data: any[][]}[]>([]);
@@ -81,6 +82,8 @@ export function ImportWorkstation() {
 
       setActiveSheetData(sheets);
       setDiscoveredGroups(allDiscoveredGroups);
+      // Auto-select all discovered groups by default
+      setSelectedIds(new Set(allDiscoveredGroups.map(g => g.id)));
       setProgress(100);
 
       setTimeout(() => {
@@ -95,30 +98,43 @@ export function ImportWorkstation() {
   };
 
   const handleExecuteImport = async () => {
+    if (!engineRef.current || selectedGroupIds.size === 0) return;
+    
     setIsProcessing(true);
     setProgress(0);
 
     try {
-      let finalSummary: ImportRunSummary | null = null;
-      let allAssets: ParsedAsset[] = [];
+      let allStaged: ParsedAsset[] = [];
+      const containers: GroupImportContainer[] = [];
+
+      const selectedGroups = discoveredGroups.filter(g => selectedGroupIds.has(g.id));
 
       activeSheetData.forEach((sheet, idx) => {
-        const summary = engineRef.current!.parseWorkbook(sheet.name, sheet.data);
-        if (!finalSummary) {
-          finalSummary = summary;
-        } else {
-          finalSummary.dataRowsImported += summary.dataRowsImported;
-          finalSummary.groups = [...finalSummary.groups, ...summary.groups];
+        const sheetGroups = selectedGroups.filter(g => g.sheetName === sheet.name);
+        if (sheetGroups.length > 0) {
+          const results = engineRef.current!.ingestGroups(sheet.name, sheet.data, sheetGroups);
+          containers.push(...results);
+          allStaged = [...allStaged, ...results.flatMap(c => c.assets)];
         }
-        allAssets = [...allAssets, ...summary.groups.flatMap(g => g.assets)];
         setProgress(Math.round(((idx + 1) / activeSheetData.length) * 100));
       });
 
-      setSummary(finalSummary);
-      setStagedAssets(allAssets);
-      
-      // Stage to sandbox for reconciliation review
-      await storage.saveToSandbox(allAssets as any[]);
+      setSummary({
+        workbookName: engineRef.current['workbookName'],
+        sheetName: 'BATCH_IMPORT',
+        profileId: 'CONTROLLED_V5',
+        totalRows: activeSheetData.reduce((s, d) => s + d.data.length, 0),
+        groupCount: containers.length,
+        dataRowsImported: allStaged.length,
+        rowsRejected: 0,
+        duplicatesDetected: 0,
+        templatesDiscovered: selectedGroupIds.size,
+        sectionBreakdown: {},
+        groups: containers
+      });
+
+      setStagedAssets(allStaged);
+      await storage.saveToSandbox(allStaged as any[]);
       
       setTimeout(() => {
         setIsProcessing(false);
@@ -138,13 +154,11 @@ export function ImportWorkstation() {
 
     setIsProcessing(true);
     try {
-      // 1. Enqueue creation pulses
       for (const asset of stagedAssets) {
         const assetWithGrant = { ...asset, grantId: activeGrantId };
         await enqueueMutation('CREATE', 'assets', assetWithGrant);
       }
 
-      // 2. Update local state
       const current = await storage.getAssets();
       const validAssets = stagedAssets.map(a => ({ ...a, grantId: activeGrantId }));
       await storage.saveAssets([...validAssets, ...current]);
@@ -161,7 +175,6 @@ export function ImportWorkstation() {
 
   return (
     <div className="max-w-6xl mx-auto space-y-10 pb-32 animate-in fade-in duration-700">
-      {/* Wizard Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
         <div className="space-y-2">
           <h2 className="text-4xl font-black tracking-tighter text-white uppercase flex items-center gap-4 leading-none">
@@ -196,7 +209,7 @@ export function ImportWorkstation() {
                 <div className="space-y-4">
                   <h3 className="text-3xl font-black uppercase text-white tracking-tight">Ingest Registry Workbook</h3>
                   <p className="text-sm font-medium text-white/40 max-w-sm mx-auto italic leading-relaxed">
-                    The structural engine scans Column A to discover section headers and build repeatable templates per group.
+                    The structural engine scans Column A to discover section headers and build repeating templates per group.
                   </p>
                 </div>
                 <Button className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-2xl shadow-primary/20 mt-10 transition-all hover:-translate-y-1">
@@ -223,18 +236,23 @@ export function ImportWorkstation() {
 
           {currentStep === 'STRUCTURE' && (
             <motion.div key="structure" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-10">
-              <StructurePreview groups={discoveredGroups} />
+              <StructurePreview groups={discoveredGroups} selectedIds={selectedGroupIds} onToggleId={(id) => {
+                const next = new Set(selectedGroupIds);
+                if (next.has(id)) next.delete(id); else next.add(id);
+                setSelectedIds(next);
+              }} onSelectAll={(c) => setSelectedIds(c ? new Set(discoveredGroups.map(g => g.id)) : new Set())} />
               
               <div className="p-10 rounded-[3rem] bg-white/[0.02] border-2 border-dashed border-white/10 flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-primary/20 transition-all shadow-3xl">
                 <div className="flex items-start gap-6 max-w-xl">
                   <div className="p-4 bg-primary/10 rounded-2xl"><ShieldCheck className="h-8 w-8 text-primary" /></div>
                   <div className="space-y-2">
-                    <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Execute Import Pulse?</h4>
-                    <p className="text-sm font-medium text-white/40 italic leading-relaxed">Importing {discoveredGroups.length} discovered groups using strict positional mapping.</p>
+                    <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Execute Ingestion?</h4>
+                    <p className="text-sm font-medium text-white/40 italic leading-relaxed">Importing {selectedGroupIds.size} selected groups using strict positional mapping.</p>
                   </div>
                 </div>
                 <Button 
                   onClick={handleExecuteImport}
+                  disabled={selectedGroupIds.size === 0}
                   className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-transform hover:scale-105 active:scale-95"
                 >
                   <Zap className="h-6 w-6" /> Start Ingestion <ChevronRight className="h-6 w-6" />
@@ -250,7 +268,7 @@ export function ImportWorkstation() {
               <div className="p-10 rounded-[3rem] bg-primary/5 border-2 border-dashed border-primary/20 flex flex-col md:flex-row items-center justify-between gap-8 group hover:border-primary/40 transition-all shadow-3xl">
                 <div className="space-y-2 max-w-xl">
                   <h4 className="text-2xl font-black uppercase tracking-tight text-white leading-none">Commit to Registry?</h4>
-                  <p className="text-sm font-medium text-white/40 italic leading-relaxed">Successfully mapped {stagedAssets.length} valid records. Mismatched or rejected rows will be logged for administrative review.</p>
+                  <p className="text-sm font-medium text-white/40 italic leading-relaxed">Successfully mapped {stagedAssets.length} valid records. Review the group summaries above before merging.</p>
                 </div>
                 <Button 
                   onClick={handleCommitToRegistry}
@@ -258,7 +276,7 @@ export function ImportWorkstation() {
                   className="h-20 px-12 rounded-[1.5rem] font-black uppercase text-sm tracking-[0.2em] shadow-2xl shadow-primary/30 gap-4 transition-transform hover:scale-105 active:scale-95 bg-primary text-black"
                 >
                   {isProcessing ? <Loader2 className="h-6 w-6 animate-spin" /> : <DatabaseZap className="h-6 w-6" />}
-                  Merge Valid Pulses
+                  Merge Staged Records
                 </Button>
               </div>
             </motion.div>
@@ -277,13 +295,13 @@ export function ImportWorkstation() {
               <div className="space-y-4 max-w-lg">
                 <h3 className="text-4xl font-black uppercase text-white tracking-tighter leading-none">Merge Complete</h3>
                 <p className="text-sm font-medium text-white/40 italic leading-relaxed">
-                  Successfully integrated {stagedAssets.length} records into the active register. All structural boundaries have been preserved.
+                  Successfully integrated {stagedAssets.length} records into the active register.
                 </p>
               </div>
               <div className="flex gap-4">
                 <Button variant="outline" onClick={() => setCurrentStep('INGEST')} className="h-16 px-10 rounded-2xl font-black uppercase text-xs border-2">Import Another</Button>
                 <Button onClick={() => setActiveView('REGISTRY')} className="h-16 px-12 rounded-2xl font-black uppercase text-xs tracking-widest bg-primary text-black shadow-2xl shadow-primary/20">
-                  View Registry Workstation
+                  View Registry
                 </Button>
               </div>
             </motion.div>
