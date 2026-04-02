@@ -26,6 +26,8 @@ import {
   Activity,
   HardDrive,
   ShieldCheck,
+  ShieldAlert,
+  Smartphone,
   Search,
   ScanSearch,
   X,
