@@ -1,7 +1,7 @@
 /**
  * @fileOverview Background Synchronization Engine.
  * Responsible for queue replay and conflict reconciliation.
- * Phase 74: Auto-pulse de-integrated for fully manual user triggers.
+ * Phase 75: Implemented Selective Sync Pulse for targeted group commitment.
  */
 
 import { storage } from './storage';
@@ -9,36 +9,43 @@ import { getPendingOperations } from './queue';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { logger } from '@/lib/logger';
 import { addNotification } from '@/hooks/use-notifications';
+import type { OfflineQueueEntry } from '@/types/domain';
 
 let isSyncing = false;
 
 /**
- * Replays the offline queue to the cloud services.
- * Implements deterministic sequential processing to maintain state integrity.
- * This is now ONLY called by manual user triggers.
+ * Processes a specific set of operations from the queue.
+ * Used for selective group sync.
  */
-export async function processSyncQueue(): Promise<void> {
+export async function processSelectedSyncQueue(ids?: string[]): Promise<void> {
   if (isSyncing || typeof window === 'undefined' || !navigator.onLine) return;
   
-  const pending = await getPendingOperations();
-  if (pending.length === 0) return;
+  const allPending = await getPendingOperations();
+  const targetOps = ids 
+    ? allPending.filter(op => ids.includes(op.id))
+    : allPending;
+
+  if (targetOps.length === 0) return;
 
   isSyncing = true;
-  logger.info(`Sync Engine: Processing ${pending.length} queued operations...`);
+  logger.info(`Sync Engine: Processing ${targetOps.length} targeted operations...`);
 
   let successCount = 0;
 
-  for (const op of pending) {
+  // Crucial: Process in chronological order to maintain state integrity
+  const sortedOps = [...targetOps].sort((a, b) => a.timestamp - b.timestamp);
+
+  for (const op of sortedOps) {
     try {
-      // 1. Process by operation type
+      // 1. Execute based on operation type
       switch (op.operation) {
         case 'CREATE':
         case 'UPDATE':
-          await FirestoreService.saveAsset(op.payload as any);
+        case 'RESTORE':
+          await FirestoreService.saveAsset(op.payload as any, op.operation);
           break;
         
         case 'DELETE':
-          // The payload for a delete operation contains the ID
           const idToDelete = (op.payload as any).id;
           if (idToDelete) {
             await FirestoreService.deleteAsset(idToDelete);
@@ -55,7 +62,7 @@ export async function processSyncQueue(): Promise<void> {
       
     } catch (error) {
       logger.error(`Sync Engine: Failed to process op [${op.id}]`, error);
-      // We stop the queue on error to prevent out-of-order state corruption for the remaining items
+      // Stop on first error to prevent data corruption for the same document in later steps
       break; 
     }
   }
@@ -63,13 +70,7 @@ export async function processSyncQueue(): Promise<void> {
   if (successCount > 0) {
     addNotification({
       title: "Synchronization Complete",
-      description: `Successfully broadcast ${successCount} local modifications to the cloud registry.`
-    });
-  } else {
-    addNotification({
-      title: "Sync Heartbeat latent",
-      description: "No local changes were successfully broadcast.",
-      variant: "destructive"
+      description: `Successfully broadcast ${successCount} selected modifications.`
     });
   }
 
@@ -78,6 +79,8 @@ export async function processSyncQueue(): Promise<void> {
 }
 
 /**
- * Phase 74: Window-level online auto-sync de-integrated.
- * Auditors must explicitly execute the sync pulse via the workstation triggers.
+ * Standard entry point for full queue synchronization.
  */
+export async function processSyncQueue(): Promise<void> {
+  return processSelectedSyncQueue();
+}
