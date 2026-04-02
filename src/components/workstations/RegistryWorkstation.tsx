@@ -1,9 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview RegistryWorkstation - High-Fidelity Asset Inventory.
- * Phase 350: Implemented multi-select, batch actions, and folder-based navigation.
+ * Phase 355: Fixed handleInspect ReferenceError and implemented browse navigation.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -43,7 +42,6 @@ import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { TagPrintDialog } from '@/components/registry/TagPrintDialog';
 import { transformAssetToRecord } from '@/lib/registry-utils';
-import { ExcelService } from '@/services/excel-service';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -71,8 +69,6 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
     assets, 
     searchTerm,
     headers,
-    selectedLocations,
-    selectedStatuses,
     sortKey,
     sortDir,
     refreshRegistry
@@ -86,28 +82,36 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
   const [selectedCategory, setSelectedCategory] = useState<string | null>(viewAll ? 'ALL' : null);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [selectedCategoryNames, setSelectedCategoryNames] = useState<Set<string>>(new Set());
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
-  const [isPrintOpen, setIsPrintOpen] = useState(false);
   const [isBatchDeleteDialogOpen, setIsBatchDeleteDialogOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
-  // --- Derived State ---
-  const totalVerified = useMemo(() => assets.filter(a => a.status === 'VERIFIED').length, [assets]);
-  
-  const selectedAsset = useMemo(() => 
-    assets.find(a => a.id === selectedAssetId), 
-    [assets, selectedAssetId]
-  );
+  // --- Handlers ---
+  const handleInspect = (id: string) => {
+    setSelectedAssetId(id);
+    setIsDetailOpen(true);
+  };
 
+  const handleToggleSelect = (id: string) => {
+    const next = new Set(selectedIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedIds(next);
+  };
+
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) setSelectedIds(new Set(filteredAssets.map(a => a.id)));
+    else setSelectedIds(new Set());
+  };
+
+  // --- Derived State ---
   const filteredAssets = useMemo(() => {
     let results = assets;
 
     // RBAC Scope
-    if (!userProfile?.isAdmin) {
+    if (!userProfile?.isAdmin && userProfile?.role !== 'SUPERADMIN') {
       results = results.filter(a => isWithinScope(userProfile as any, a));
     }
 
@@ -121,7 +125,8 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
       const term = searchTerm.toLowerCase();
       results = results.filter(a => 
         (a.description || '').toLowerCase().includes(term) || 
-        (a.assetIdCode || '').toLowerCase().includes(term)
+        (a.assetIdCode || '').toLowerCase().includes(term) ||
+        (a.serialNumber || '').toLowerCase().includes(term)
       );
     }
 
@@ -135,6 +140,12 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
     return results;
   }, [assets, selectedCategory, searchTerm, sortKey, sortDir, userProfile]);
 
+  const selectedRecord = useMemo(() => {
+    if (!selectedAssetId) return undefined;
+    const asset = assets.find(a => a.id === selectedAssetId);
+    return asset ? transformAssetToRecord(asset, headers) : undefined;
+  }, [selectedAssetId, assets, headers]);
+
   const categoryStats = useMemo(() => {
     const groups = assets.reduce((acc, a) => {
       const cat = a.category || 'General';
@@ -147,23 +158,24 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
     return Object.entries(groups).map(([name, stats]) => ({ name, ...stats })).sort((a, b) => a.name.localeCompare(b.name));
   }, [assets]);
 
-  // --- Handlers ---
-  const handleToggleSelect = (id: string) => {
-    const next = new Set(selectedIds);
-    if (next.has(id)) next.delete(id); else next.add(id);
-    setSelectedIds(next);
+  const handleNext = () => {
+    const currentIndex = filteredAssets.findIndex(a => a.id === selectedAssetId);
+    if (currentIndex < filteredAssets.length - 1) {
+      setSelectedAssetId(filteredAssets[currentIndex + 1].id);
+    }
   };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) setSelectedIds(new Set(filteredAssets.map(a => a.id)));
-    else setSelectedIds(new Set());
+  const handlePrevious = () => {
+    const currentIndex = filteredAssets.findIndex(a => a.id === selectedAssetId);
+    if (currentIndex > 0) {
+      setSelectedAssetId(filteredAssets[currentIndex - 1].id);
+    }
   };
 
   const handleBatchVerify = async () => {
     setIsProcessing(true);
     try {
-      const idsArray = Array.from(selectedIds);
-      for (const id of idsArray) {
+      for (const id of Array.from(selectedIds)) {
         const asset = assets.find(a => a.id === id);
         if (asset) {
           const updated = { ...asset, status: 'VERIFIED' as const, lastModified: new Date().toISOString() };
@@ -203,7 +215,7 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
           {isListView ? (
             <button onClick={() => { setSelectedCategory(null); setSelectedIds(new Set()); }} className="flex items-center gap-3 p-3 bg-white/5 rounded-2xl text-primary hover:bg-white/10 transition-all tactile-pulse">
               <ArrowLeft className="h-5 w-5" />
-              <span className="text-xs font-black uppercase tracking-widest">Back to Group Folders</span>
+              <span className="text-xs font-black uppercase tracking-widest">Back to Groups</span>
             </button>
           ) : (
             <div className="flex items-center gap-4">
@@ -212,7 +224,7 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
               </div>
               <div className="space-y-0.5">
                 <h2 className="text-2xl font-black uppercase text-white tracking-tight leading-none">Inventories</h2>
-                <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] leading-none">Structural Group Navigation</p>
+                <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em] leading-none">Group Navigation</p>
               </div>
             </div>
           )}
@@ -310,11 +322,24 @@ export function RegistryWorkstation({ viewAll = false }: RegistryWorkstationProp
         )}
       </AnimatePresence>
 
-      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={selectedAsset} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
+      <AssetDetailSheet 
+        isOpen={isDetailOpen} 
+        onOpenChange={setIsDetailOpen} 
+        record={selectedRecord}
+        onEdit={(id) => {
+          setSelectedAssetId(id);
+          setIsFormOpen(true);
+          setIsDetailOpen(false);
+        }}
+        onNext={handleNext}
+        onPrevious={handlePrevious}
+      />
+
+      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={assets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
       <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedIds.size} onSave={async () => { setSelectedIds(new Set()); await refreshRegistry(); }} />
       
       <AlertDialog open={isBatchDeleteDialogOpen} onOpenChange={setIsBatchDeleteDialogOpen}>
-        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-black">
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 bg-black shadow-3xl text-white">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Bomb className="h-10 w-10 text-destructive" /></div>
             <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Execute Batch Purge?</AlertDialogTitle>
