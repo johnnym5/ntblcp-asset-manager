@@ -4,6 +4,7 @@
  * @fileOverview Dashboard Workstation - Unified Mission Control.
  * Optimized for Responsive Fidelity and Executive Density.
  * Phase 1105: Wrapped sections in Accordion to start in closed view per user request.
+ * Phase 1106: Implemented Sticky Header Pulse for "Adaptive Cage" layout.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -57,35 +58,40 @@ export function DashboardWorkstation() {
   }, [assets]);
 
   return (
-    <div className="space-y-8 sm:space-y-12 animate-in fade-in duration-700 max-w-[1600px] mx-auto pb-40">
+    <div className="space-y-8 sm:space-y-12 animate-in fade-in duration-700">
       
-      {/* Header & Tab Toggle - Mobile Optimized */}
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-6 px-1">
-        <div className="flex items-center gap-4 self-start">
-          <div className="p-2.5 sm:p-3 bg-primary/10 rounded-xl sm:rounded-2xl shadow-inner border border-primary/5">
-            <LayoutDashboard className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+      {/* 
+          Sticky Header Pulse: 
+          Stays persistent within the adaptive cage cage during scroll.
+      */}
+      <div className="sticky top-[-2rem] sm:top-[-4rem] lg:top-[-5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 sm:pt-4 pb-6 px-1 border-b border-white/5 mb-8 -mx-1">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-6 max-w-[1600px] mx-auto w-full">
+          <div className="flex items-center gap-4 self-start">
+            <div className="p-2.5 sm:p-3 bg-primary/10 rounded-xl sm:rounded-2xl shadow-inner border border-primary/5">
+              <LayoutDashboard className="h-5 w-5 sm:h-6 sm:w-6 text-primary" />
+            </div>
+            <div className="space-y-0.5">
+              <h2 className="text-xl sm:text-2xl font-black uppercase text-white tracking-tight leading-none">
+                Control Hub
+              </h2>
+              <p className="text-[8px] sm:text-[10px] font-bold text-white/40 uppercase tracking-[0.25em] leading-none">
+                {isAdvanced ? 'Registry Intelligence' : 'Inventory Overview'}
+              </p>
+            </div>
           </div>
-          <div className="space-y-0.5">
-            <h2 className="text-xl sm:text-2xl font-black uppercase text-white tracking-tight leading-none">
-              Control Hub
-            </h2>
-            <p className="text-[8px] sm:text-[10px] font-bold text-white/40 uppercase tracking-[0.25em] leading-none">
-              {isAdvanced ? 'Registry Intelligence' : 'Inventory Overview'}
-            </p>
-          </div>
-        </div>
 
-        <div className="w-full lg:w-auto bg-white/[0.03] p-1 rounded-xl sm:rounded-2xl border border-white/5 shadow-2xl overflow-x-auto no-scrollbar backdrop-blur-xl shrink-0">
-          <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="w-full">
-            <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center min-w-max">
-              <TabsTrigger value="overview" className="flex-1 px-6 sm:px-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
-                Overview
-              </TabsTrigger>
-              <TabsTrigger value="inventory" className="flex-1 px-6 sm:px-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
-                Inventory
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
+          <div className="w-full lg:w-auto bg-white/[0.03] p-1 rounded-xl sm:rounded-2xl border border-white/5 shadow-2xl overflow-x-auto no-scrollbar backdrop-blur-xl shrink-0">
+            <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="w-full">
+              <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center min-w-max">
+                <TabsTrigger value="overview" className="flex-1 px-6 sm:px-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
+                  Overview
+                </TabsTrigger>
+                <TabsTrigger value="inventory" className="flex-1 px-6 sm:px-12 py-2.5 sm:py-3 rounded-lg sm:rounded-xl font-black uppercase text-[9px] sm:text-[10px] tracking-widest gap-2.5 data-[state=active]:bg-primary data-[state=active]:text-black transition-all whitespace-nowrap">
+                  Inventory
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
         </div>
       </div>
 

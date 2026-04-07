@@ -3,6 +3,7 @@
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
  * Phase 1013: Upgraded to multi-select Group Orchestrator with metrics and renaming.
+ * Phase 1014: Optimized Sticky Header Pulse for enclosed workstation cage.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -34,7 +35,9 @@ import {
   Plus,
   Check,
   MoreVertical,
-  Type
+  Type,
+  Globe,
+  CloudOff
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -329,148 +332,154 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   return (
     <div className="space-y-4 h-full flex flex-col animate-in fade-in duration-700 relative">
-      {/* Responsive Header Pulse */}
-      <div className="flex flex-col lg:flex-row items-center justify-between gap-4 px-1 shrink-0">
-        <div className="flex items-center gap-3 self-start">
-          <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><Database className="h-5 w-5 text-primary" /></div>
-          <div className="space-y-0.5">
-            <h2 className="text-lg font-black uppercase text-white tracking-tight leading-none">Inventory</h2>
-            <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">Registry Pulse</p>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-          <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5 mr-1 shrink-0">
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
-              className="h-9 w-9 rounded-lg text-white/40 hover:text-primary"
-            >
-              {viewMode === 'grid' ? <Grid className="h-4 w-4" /> : <Boxes className="h-4 w-4" />}
-            </Button>
-            <div className="w-px h-4 bg-white/10 mx-1" />
-            <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Download className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Pull from Cloud</TooltipContent></Tooltip></TooltipProvider>
-            <div className="w-px h-4 bg-white/10 mx-1" /><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Push to Cloud</TooltipContent></Tooltip></TooltipProvider>
+      
+      {/* 
+          Workstation Sticky Header Pulse:
+          Persistent within the windowed cage during scrolling.
+      */}
+      <div className="sticky top-[-1rem] sm:top-[-2rem] lg:top-[-2.5rem] z-40 bg-[#050505]/95 backdrop-blur-2xl pt-2 pb-4 px-1 border-b border-white/5 mb-4 -mx-1">
+        <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
+          <div className="flex items-center gap-3 self-start">
+            <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><Database className="h-5 w-5 text-primary" /></div>
+            <div className="space-y-0.5">
+              <h2 className="text-lg font-black uppercase text-white tracking-tight leading-none">Inventory</h2>
+              <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">Registry Pulse</p>
+            </div>
           </div>
 
-          <div className="flex items-center justify-end flex-1 min-w-0">
-            <AnimatePresence mode="wait">
-              {!isSearchExpanded ? (
-                <Button variant="outline" size="icon" onClick={handleExpandSearch} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 hover:bg-primary/10 text-primary shrink-0"><Search className="h-4 w-4" /></Button>
-              ) : (
-                <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group min-w-[120px]">
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
-                  <Input ref={searchInputRef} placeholder="Search..." value={searchTerm} onChange={(e) => handleSearchChange(e.target.value)} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-white/[0.05] border-2 border-primary/20 text-white text-xs focus:border-primary" />
-                  <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-3.5 w-3.5" /></button>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
-          
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>
-            <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className={cn("h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary relative", filters.length > 0 && "border-primary/40")}>
-              <ListFilter className="h-4 w-4" />
-              {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">{filters.length}</span>}
-            </Button>
-            <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary"><ArrowUpDown className="h-4 w-4" /></Button>
-            {!isMobile && (
-              <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary"><Settings2 className="h-4 w-4" /></Button>
-            )}
-          </div>
-        </div>
-      </div>
+          <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+            <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5 mr-1 shrink-0">
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')}
+                className="h-9 w-9 rounded-lg text-white/40 hover:text-primary"
+              >
+                {viewMode === 'grid' ? <Grid className="h-4 w-4" /> : <Boxes className="h-4 w-4" />}
+              </Button>
+              <div className="w-px h-4 bg-white/10 mx-1" />
+              <TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Download className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Pull from Cloud</TooltipContent></Tooltip></TooltipProvider>
+              <div className="w-px h-4 bg-white/10 mx-1" /><TooltipProvider><Tooltip><TooltipTrigger asChild><Button variant="ghost" size="icon" onClick={manualUpload} disabled={isSyncing || !isOnline} className="h-9 w-9 rounded-lg hover:bg-primary/10 text-white/40 hover:text-primary"><Upload className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent>Push to Cloud</TooltipContent></Tooltip></TooltipProvider>
+            </div>
 
-      {/* Multifunctional Group Selector Pulse */}
-      <div className="px-1 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 pb-2">
-        <Badge variant="outline" className="h-7 px-3 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[8px] tracking-widest whitespace-nowrap shrink-0">{processedAssets.length} Records</Badge>
-        
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="outline" className="h-7 px-3 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[8px] tracking-widest whitespace-nowrap gap-1.5 hover:text-white hover:border-primary/20 transition-all shrink-0">
-              <FolderOpen className="h-3 w-3 text-primary opacity-60" />
-              {selectedCategories.length === 0 ? 'Overall Register' : 
-               selectedCategories.length === 1 ? `Group: ${selectedCategories[0]}` : 
-               `${selectedCategories.length} Groups Selected`}
-              
-              {isVerificationMode && selectionMetrics.total > 0 && (
-                <div className="flex items-center gap-2 ml-2 border-l border-white/10 pl-2">
-                  <span className="text-white/60 font-mono">{selectionMetrics.verified}/{selectionMetrics.total}</span>
-                  <div className="w-12 h-1 bg-white/5 rounded-full overflow-hidden">
-                    <div className="h-full bg-primary" style={{ width: `${(selectionMetrics.verified / selectionMetrics.total) * 100}%` }} />
-                  </div>
-                </div>
-              )}
-              <ChevronDown className="h-2.5 w-2.5 opacity-40 ml-1" />
-            </Button>
-          </PopoverTrigger>
-          <PopoverContent align="start" className="w-[320px] p-0 bg-[#0A0A0A] border-white/10 shadow-3xl overflow-hidden rounded-2xl">
-            <div className="p-4 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
-              <div className="flex flex-col">
-                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Technical Containers</span>
-                <span className="text-[8px] font-bold text-white/20 uppercase">ORCHESTRATION PULSE</span>
-              </div>
-              <Button variant="ghost" size="sm" onClick={() => setSelectedCategories([])} className="h-7 px-2 text-[8px] font-black uppercase hover:bg-white/5">Clear Selection</Button>
+            <div className="flex items-center justify-end flex-1 min-w-0">
+              <AnimatePresence mode="wait">
+                {!isSearchExpanded ? (
+                  <Button variant="outline" size="icon" onClick={handleExpandSearch} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 hover:bg-primary/10 text-primary shrink-0"><Search className="h-4 w-4" /></Button>
+                ) : (
+                  <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group min-w-[120px]">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
+                    <Input ref={searchInputRef} placeholder="Search..." value={searchTerm} onChange={(e) => handleSearchChange(e.target.value)} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-white/[0.05] border-2 border-primary/20 text-white text-xs focus:border-primary" />
+                    <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-3.5 w-3.5" /></button>
+                  </motion.div>
+                )}
+              </AnimatePresence>
             </div>
             
-            <ScrollArea className="h-72">
-              <div className="p-2 space-y-1">
-                {categories.map(cat => {
-                  const stats = groupStats[cat] || { total: 0, verified: 0 };
-                  const isSelected = selectedCategories.includes(cat);
-                  const percent = stats.total > 0 ? (stats.verified / stats.total) * 100 : 0;
+            <div className="flex items-center gap-1.5 shrink-0">
+              <Button variant="outline" size="icon" onClick={() => setIsFormOpen(true)} className="h-10 w-10 rounded-lg border-primary/20 bg-primary/5 text-primary"><Plus className="h-4 w-4" /></Button>
+              <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className={cn("h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary relative", filters.length > 0 && "border-primary/40")}>
+                <ListFilter className="h-4 w-4" />
+                {filters.length > 0 && <span className="absolute -top-1 -right-1 h-4 w-4 bg-primary text-black text-[8px] font-black rounded-full flex items-center justify-center border-2 border-black">{filters.length}</span>}
+              </Button>
+              <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary"><ArrowUpDown className="h-4 w-4" /></Button>
+              {!isMobile && (
+                <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 text-primary"><Settings2 className="h-4 w-4" /></Button>
+              )}
+            </div>
+          </div>
+        </div>
 
-                  return (
-                    <div key={cat} className={cn("flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group", isSelected ? "bg-primary/10" : "hover:bg-white/5")}>
-                      <Checkbox 
-                        checked={isSelected} 
-                        onCheckedChange={() => toggleCategorySelection(cat)}
-                        className="h-4 w-4 border-white/20"
-                      />
-                      <div className="flex-1 min-w-0" onClick={() => toggleCategorySelection(cat)}>
-                        <div className="flex items-center justify-between">
-                          <span className={cn("text-[11px] font-black uppercase truncate pr-4 transition-colors", isSelected ? "text-primary" : "text-white/60")}>{cat}</span>
-                          <span className="text-[9px] font-mono font-bold text-white/20 shrink-0">{stats.total}</span>
-                        </div>
-                        {isVerificationMode && (
-                          <div className="mt-1.5 space-y-1">
-                            <div className="flex justify-between text-[7px] font-black uppercase opacity-40">
-                              <span>Coverage</span>
-                              <span>{Math.round(percent)}%</span>
-                            </div>
-                            <Progress value={percent} className="h-0.5 bg-white/5" />
+        {/* Multifunctional Group Selector Pulse */}
+        <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-2">
+          <Badge variant="outline" className="h-7 px-3 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[8px] tracking-widest whitespace-nowrap shrink-0">{processedAssets.length} Records</Badge>
+          
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="h-7 px-3 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[8px] tracking-widest whitespace-nowrap gap-1.5 hover:text-white hover:border-primary/20 transition-all shrink-0">
+                <FolderOpen className="h-3 w-3 text-primary opacity-60" />
+                {selectedCategories.length === 0 ? 'Overall Register' : 
+                 selectedCategories.length === 1 ? `Group: ${selectedCategories[0]}` : 
+                 `${selectedCategories.length} Groups Selected`}
+                
+                {isVerificationMode && selectionMetrics.total > 0 && (
+                  <div className="flex items-center gap-2 ml-2 border-l border-white/10 pl-2">
+                    <span className="text-white/60 font-mono">{selectionMetrics.verified}/{selectionMetrics.total}</span>
+                    <div className="w-12 h-1 bg-white/5 rounded-full overflow-hidden">
+                      <div className="h-full bg-primary" style={{ width: `${(selectionMetrics.verified / selectionMetrics.total) * 100}%` }} />
+                    </div>
+                  </div>
+                )}
+                <ChevronDown className="h-2.5 w-2.5 opacity-40 ml-1" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[320px] p-0 bg-[#0A0A0A] border-white/10 shadow-3xl overflow-hidden rounded-2xl">
+              <div className="p-4 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-primary">Technical Containers</span>
+                  <span className="text-[8px] font-bold text-white/20 uppercase">ORCHESTRATION PULSE</span>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedCategories([])} className="h-7 px-2 text-[8px] font-black uppercase hover:bg-white/5">Clear Selection</Button>
+              </div>
+              
+              <ScrollArea className="h-72">
+                <div className="p-2 space-y-1">
+                  {categories.map(cat => {
+                    const stats = groupStats[cat] || { total: 0, verified: 0 };
+                    const isSelected = selectedCategories.includes(cat);
+                    const percent = stats.total > 0 ? (stats.verified / stats.total) * 100 : 0;
+
+                    return (
+                      <div key={cat} className={cn("flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group", isSelected ? "bg-primary/10" : "hover:bg-white/5")}>
+                        <Checkbox 
+                          checked={isSelected} 
+                          onCheckedChange={() => toggleCategorySelection(cat)}
+                          className="h-4 w-4 border-white/20"
+                        />
+                        <div className="flex-1 min-w-0" onClick={() => toggleCategorySelection(cat)}>
+                          <div className="flex items-center justify-between">
+                            <span className={cn("text-[11px] font-black uppercase truncate pr-4 transition-colors", isSelected ? "text-primary" : "text-white/60")}>{cat}</span>
+                            <span className="text-[9px] font-mono font-bold text-white/20 shrink-0">{stats.total}</span>
                           </div>
+                          {isVerificationMode && (
+                            <div className="mt-1.5 space-y-1">
+                              <div className="flex justify-between text-[7px] font-black uppercase opacity-40">
+                                <span>Coverage</span>
+                                <span>{Math.round(percent)}%</span>
+                              </div>
+                              <Progress value={percent} className="h-0.5 bg-white/5" />
+                            </div>
+                          )}
+                        </div>
+                        
+                        {isAdmin && (
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); setCategoryToRename(cat); setNewCategoryName(cat); setIsRenameDialogOpen(true); }}
+                            className="p-1.5 rounded-lg text-white/10 hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
+                          >
+                            <Edit3 className="h-3.5 w-3.5" />
+                          </button>
                         )}
                       </div>
-                      
-                      {isAdmin && (
-                        <button 
-                          onClick={(e) => { e.stopPropagation(); setCategoryToRename(cat); setNewCategoryName(cat); setIsRenameDialogOpen(true); }}
-                          className="p-1.5 rounded-lg text-white/10 hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
-                        >
-                          <Edit3 className="h-3 w-3" />
-                        </button>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            </ScrollArea>
+                    );
+                  })}
+                </div>
+              </ScrollArea>
 
-            {selectedCategories.length > 0 && (
-              <div className="p-4 bg-primary/5 border-t border-white/5 flex gap-2">
-                <Button onClick={() => setIsBatchEditOpen(true)} className="flex-1 h-9 rounded-xl bg-primary text-black font-black uppercase text-[9px] tracking-widest gap-2">
-                  <Zap className="h-3 w-3 fill-current" /> Bulk Modify Groups
-                </Button>
-              </div>
-            )}
-          </PopoverContent>
-        </Popover>
+              {selectedCategories.length > 0 && (
+                <div className="p-4 bg-primary/5 border-t border-white/5 flex gap-2">
+                  <Button onClick={() => setIsBatchEditOpen(true)} className="flex-1 h-9 rounded-xl bg-primary text-black font-black uppercase text-[9px] tracking-widest gap-2">
+                    <Zap className="h-3.5 w-3.5 fill-current" /> Bulk Modify Groups
+                  </Button>
+                </div>
+              )}
+            </PopoverContent>
+          </Popover>
+        </div>
       </div>
 
       {/* Primary Registry Grid / Table */}
-      <div className="flex-1 min-h-0 px-1">
+      <div className="flex-1 min-h-0 px-1 pt-4">
         {viewMode === 'grid' ? (
           <div className="grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40">
             <AnimatePresence mode="popLayout">
@@ -541,38 +550,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </AnimatePresence>
       </div>
 
-      {/* Rename Logic Dialog */}
-      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
-        <DialogContent className="max-w-md rounded-[2rem] border-primary/10 bg-black text-white p-8">
-          <DialogHeader className="space-y-4">
-            <div className="p-3 bg-primary/10 rounded-2xl w-fit"><Type className="h-8 w-8 text-primary" /></div>
-            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Rename Container</DialogTitle>
-            <DialogDescription className="text-sm font-medium italic text-white/40 leading-relaxed">
-              Modifying the group name will update the identity pulse for all {groupStats[categoryToRename!]?.total || 0} records in this technical block.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="py-6 space-y-2">
-            <Label className="text-[10px] font-black uppercase text-white/20 tracking-widest pl-1">New Category Identity</Label>
-            <Input 
-              value={newCategoryName} 
-              onChange={(e) => setNewCategoryName(e.target.value)}
-              className="h-14 rounded-xl bg-white/5 border-2 border-white/5 text-sm font-black uppercase focus:border-primary/40 transition-all"
-            />
-          </div>
-          <DialogFooter className="gap-3">
-            <Button variant="ghost" onClick={() => setIsRenameDialogOpen(false)} className="h-12 rounded-xl font-bold">Cancel</Button>
-            <Button 
-              onClick={handleRenameGroup}
-              disabled={isProcessing || !newCategoryName.trim() || newCategoryName === categoryToRename}
-              className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
-            >
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
-              Commit Identity Pulse
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
       <AssetDetailSheet 
         isOpen={isDetailOpen} 
         onOpenChange={setIsDetailOpen} 
@@ -608,6 +585,38 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
+      
+      {/* Rename Logic Dialog */}
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent className="max-w-md rounded-[2rem] border-primary/10 bg-black text-white p-8">
+          <DialogHeader className="space-y-4">
+            <div className="p-3 bg-primary/10 rounded-2xl w-fit"><Type className="h-8 w-8 text-primary" /></div>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Rename Container</DialogTitle>
+            <DialogDescription className="text-sm font-medium italic text-white/40 leading-relaxed">
+              Modifying the group name will update the identity pulse for all {groupStats[categoryToRename!]?.total || 0} records in this technical block.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-2">
+            <Label className="text-[10px] font-black uppercase text-white/20 tracking-widest pl-1">New Category Identity</Label>
+            <Input 
+              value={newCategoryName} 
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              className="h-14 rounded-xl bg-white/5 border-2 border-white/5 text-sm font-black uppercase focus:border-primary/40 transition-all"
+            />
+          </div>
+          <DialogFooter className="gap-3">
+            <Button variant="ghost" onClick={() => setIsRenameDialogOpen(false)} className="h-12 rounded-xl font-bold">Cancel</Button>
+            <Button 
+              onClick={handleRenameGroup}
+              disabled={isProcessing || !newCategoryName.trim() || newCategoryName === categoryToRename}
+              className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+              Commit Identity Pulse
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
