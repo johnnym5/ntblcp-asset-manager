@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview ImportWorkstation - Controlled Registry Ingestion.
  * Phase 651: Added specific pulse notifications for discovery and commit.
+ * Phase 652: Automatically generate Sheet Definitions for new categories during commit.
  */
 
 import React, { useState, useRef } from 'react';
@@ -170,9 +170,32 @@ export function ImportWorkstation() {
       const newCategories = Array.from(new Set(validAssets.map(a => a.category)));
       const nextEnabledSheets = Array.from(new Set([...appSettings.enabledSheets, ...newCategories]));
       
-      const nextSettings = { ...appSettings, enabledSheets: nextEnabledSheets };
+      // DYNAMIC SCHEMA GENERATION: Ensure new categories have sheet definitions so they appear in the UI
+      const nextSheetDefs = { ...appSettings.sheetDefinitions };
+      newCategories.forEach(cat => {
+        if (!nextSheetDefs[cat]) {
+          nextSheetDefs[cat] = {
+            name: cat,
+            headers: ['S/N', 'Description', 'Asset ID Code', 'Location', 'Serial Number'],
+            displayFields: [
+              { key: 'sn', label: 'S/N', table: true, quickView: true },
+              { key: 'description', label: 'Description', table: true, quickView: true },
+              { key: 'assetIdCode', label: 'Asset ID Code', table: true, quickView: true },
+              { key: 'location', label: 'Location', table: true, quickView: true },
+              { key: 'status', label: 'Status', table: true, quickView: true },
+            ]
+          };
+        }
+      });
+
+      const nextSettings = { 
+        ...appSettings, 
+        enabledSheets: nextEnabledSheets,
+        sheetDefinitions: nextSheetDefs 
+      };
+      
       await storage.saveSettings(nextSettings);
-      if (isOnline) await FirestoreService.updateSettings({ enabledSheets: nextEnabledSheets });
+      if (isOnline) await FirestoreService.updateSettings(nextSettings);
       setAppSettings(nextSettings);
 
       await storage.clearSandbox();

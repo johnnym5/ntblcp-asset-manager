@@ -4,6 +4,7 @@
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Phase 312: Integrated Security section for self-service passphrase management.
  * Phase 313: Activated Sheet Ledger dropdowns for fine-grained schema control.
+ * Phase 314: Restored accordion triggers and added explicit template scan pulse.
  */
 
 import React, { useState } from 'react';
@@ -44,7 +45,8 @@ import {
   Info,
   Smartphone,
   KeyRound,
-  ShieldAlert
+  ShieldAlert,
+  ChevronDown
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent } from '@/components/ui/card';
@@ -100,7 +102,7 @@ export function SettingsWorkstation() {
   
   const { userProfile } = useAuth();
   const { toast } = useToast();
-  const { setTheme, theme } = useTheme();
+  const { setTheme } = useTheme();
 
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
@@ -362,21 +364,30 @@ export function SettingsWorkstation() {
 
         <TabsContent value="groups" className="m-0 outline-none space-y-10 px-1">
           <div className="space-y-6">
-            <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none px-1">Manage Projects</h3>
-            <div className="flex gap-3">
+            <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none px-1">Project Management</h3>
+            <div className="flex flex-col sm:flex-row gap-3">
               <Input 
                 placeholder="New project name..." 
                 value={newProjectName} 
                 onChange={(e) => setNewProjectName(e.target.value)} 
-                className="h-14 bg-black border-white/10 rounded-xl font-medium text-sm text-white" 
+                className="h-12 bg-black border-white/10 rounded-xl font-medium text-sm text-white" 
               />
-              <Button 
-                onClick={handleAddProject} 
-                disabled={!newProjectName.trim()} 
-                className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20"
-              >
-                <PlusCircle className="h-4 w-4" /> Add Project
-              </Button>
+              <div className="flex gap-2">
+                <Button 
+                  onClick={handleAddProject} 
+                  disabled={!newProjectName.trim()} 
+                  className="h-12 px-6 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl"
+                >
+                  <PlusCircle className="h-4 w-4" /> Add Project
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={() => setIsImportScanOpen(true)} 
+                  className="h-12 px-6 rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-white/5"
+                >
+                  <ScanSearch className="h-4 w-4 text-primary" /> Scan Workbook Pulse
+                </Button>
+              </div>
             </div>
           </div>
 
@@ -384,10 +395,9 @@ export function SettingsWorkstation() {
             {appSettings.grants.map((grant) => (
               <AccordionItem key={grant.id} value={grant.id} className={cn("border-2 rounded-[1.5rem] overflow-hidden bg-black", activeGrantId === grant.id ? "border-primary/40 shadow-2xl" : "border-white/5")}>
                 <div className="flex items-center justify-between bg-black pr-6">
-                  <AccordionTrigger className="hover:no-underline p-6 border-none flex-1 justify-start gap-4 [&>svg]:hidden">
-                    <ChevronsUpDown className="h-4 w-4 text-white/20" />
+                  <AccordionTrigger className="hover:no-underline p-6 border-none flex-1 justify-start gap-4">
                     <div className="flex items-center gap-3">
-                      <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
+                      <span className="text-lg font-black uppercase text-white tracking-tight leading-none">{grant.name}</span>
                       {activeGrantId === grant.id && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
                     </div>
                   </AccordionTrigger>
@@ -409,8 +419,8 @@ export function SettingsWorkstation() {
                         <div key={name} className="flex items-center justify-between p-4 bg-black/40 border border-white/10 rounded-2xl group transition-all hover:border-primary/20">
                           <span className="text-xs font-black uppercase text-white/80">{name}</span>
                           <div className="flex items-center gap-3 opacity-20 group-hover:opacity-100 transition-opacity">
-                            <button onClick={() => handleEditSchema(grant.id, def)} className="p-2 hover:bg-primary/10 hover:text-primary rounded-lg"><Wrench className="h-4 w-4" /></button>
-                            <button className="p-2 hover:bg-white/10 rounded-lg"><Eye className="h-4 w-4" /></button>
+                            <button onClick={() => handleEditSchema(grant.id, def)} className="p-2 hover:bg-primary/10 hover:text-primary rounded-lg" title="Edit Columns"><Wrench className="h-4 w-4" /></button>
+                            <button className="p-2 hover:bg-white/10 rounded-lg" title="Toggle View"><Eye className="h-4 w-4" /></button>
                           </div>
                         </div>
                       ))}
@@ -427,7 +437,7 @@ export function SettingsWorkstation() {
                       <PlusCircle className="h-4 w-4" /> Add Manual Asset
                     </Button>
                     <Button onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3">
-                      <ScanSearch className="h-4 w-4" /> Scan & Import Inbound Workbook
+                      <ScanSearch className="h-4 w-4" /> Scan & Import Data Block
                     </Button>
                   </div>
                 </AccordionContent>
