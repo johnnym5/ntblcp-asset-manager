@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Phase 312: Integrated Security section for self-service passphrase management.
+ * Phase 313: Activated Sheet Ledger dropdowns for fine-grained schema control.
  */
 
 import React, { useState } from 'react';
