@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Inventory Dashboard - High-Fidelity Analytics Grid.
- * Phase 1200: Implemented Operational Readiness & Granular Metric Pulses.
- * Replaced static "Field Verify" with 10 intelligent registry health trackers.
+ * Phase 1201: Wrapped Operational Readiness Hub in a closed-by-default dropdown.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -42,6 +41,13 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { motion, AnimatePresence } from 'framer-motion';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Badge } from '@/components/ui/badge';
 
 type DashboardView = 'stats' | 'insights';
 
@@ -167,7 +173,7 @@ export function AssetSummaryDashboard() {
                         <Zap className="h-6 w-6 text-primary" />
                     </div>
                     <div className="space-y-0.5">
-                        <h3 className="text-xl font-black tracking-tight text-white uppercase leading-none">Quick Start Pulse</h3>
+                        <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">Quick Start Pulse</h3>
                         <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">
                             Immediate operational triggers for current registry
                         </p>
@@ -245,77 +251,94 @@ export function AssetSummaryDashboard() {
                             />
                         </div>
 
-                        {/* Readiness Metric Hub - Replaced Field Verify */}
-                        <div className="space-y-6">
-                            <div className="flex items-center gap-3 px-1">
-                                <ShieldCheck className="h-4 w-4 text-primary" />
-                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Operational Readiness Hub</h4>
-                            </div>
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                                <ReadinessPulse 
-                                    label="Verification Coverage" 
-                                    count={`${metrics.coverage}%`} 
-                                    subLabel={`Showing ${metrics.verified} verified items out of ${metrics.total} assets in this scope.`}
-                                    onClick={() => { setSelectedStatuses(['VERIFIED']); setActiveView('REGISTRY'); }}
-                                />
-                                <ReadinessPulse 
-                                    label="Pending Action" 
-                                    count={metrics.pending} 
-                                    subLabel="Assets currently marked as unverified and requiring field inspection."
-                                    onClick={() => setActiveView('VERIFY')}
-                                />
-                                <ReadinessPulse 
-                                    label="Missing Asset ID" 
-                                    count={metrics.missingId} 
-                                    subLabel="Assets lacking a unique tag or system ID code. Crucial for audits."
-                                    onClick={() => { setMissingFieldFilter('assetIdCode'); setActiveView('REGISTRY'); }}
-                                />
-                                <ReadinessPulse 
-                                    label="Missing Serials" 
-                                    count={metrics.missingSerials} 
-                                    subLabel="Items missing manufacturer serial numbers. Risk for identification."
-                                    onClick={() => { setMissingFieldFilter('serialNumber'); setActiveView('REGISTRY'); }}
-                                />
-                                <ReadinessPulse 
-                                    label="Critical Condition" 
-                                    count={metrics.critical} 
-                                    isDestructive={metrics.critical > 0}
-                                    subLabel="Assets reported as stolen, burnt, or unsalvageable."
-                                    onClick={() => setActiveView('ALERTS')}
-                                />
-                                <ReadinessPulse 
-                                    label="Maintenance Alert" 
-                                    count={metrics.maintenance} 
-                                    subLabel="Assets in poor or bad condition requiring technical assessment."
-                                    onClick={() => { setSearchTerm('bad'); setActiveView('REGISTRY'); }}
-                                />
-                                <ReadinessPulse 
-                                    label="Audit Exceptions" 
-                                    count={metrics.exceptions} 
-                                    isDestructive={metrics.exceptions > 0}
-                                    subLabel="Records where field data conflicts with previous system information."
-                                    onClick={() => { setSelectedStatuses(['DISCREPANCY']); setActiveView('REGISTRY'); }}
-                                />
-                                <ReadinessPulse 
-                                    label="Field Feedback" 
-                                    count={metrics.feedback} 
-                                    subLabel="Assets containing specific comments or remarks from field officers."
-                                    onClick={() => { setSearchTerm('remark'); setActiveView('REGISTRY'); }}
-                                />
-                                <ReadinessPulse 
-                                    label="Modified Today" 
-                                    count={metrics.modifiedToday} 
-                                    subLabel="Updates or creations performed in the last 24 hours."
-                                    onClick={() => setActiveView('AUDIT_LOG')}
-                                />
-                                <ReadinessPulse 
-                                    label="New In-Flow" 
-                                    count={metrics.newInFlow} 
-                                    subLabel="Fresh records newly registered in the system this week."
-                                    onClick={() => { setActiveView('REGISTRY'); setSearchTerm('2025'); }}
-                                />
-                            </div>
-                        </div>
+                        {/* Readiness Metric Hub - Collapsible */}
+                        <Accordion type="single" collapsible className="w-full">
+                            <AccordionItem value="readiness-hub" className="border-none">
+                                <AccordionTrigger className="hover:no-underline p-0 py-4 group/trigger">
+                                    <div className="flex items-center justify-between w-full pr-4">
+                                        <div className="flex items-center gap-3 px-1">
+                                            <ShieldCheck className="h-4 w-4 text-primary" />
+                                            <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">Operational Readiness Hub</h4>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Badge variant="outline" className={cn(
+                                                "text-[8px] font-black border-white/10 uppercase transition-all",
+                                                metrics.pending > 0 ? "text-primary border-primary/20" : "text-white/20"
+                                            )}>
+                                                {metrics.pending > 0 ? `${metrics.pending} PULSES PENDING` : 'STATUS: STABLE'}
+                                            </Badge>
+                                            <ChevronDown className="h-3 w-3 text-white/20 group-data-[state=open]:rotate-180 transition-transform" />
+                                        </div>
+                                    </div>
+                                </AccordionTrigger>
+                                <AccordionContent className="pt-4 pb-8 outline-none">
+                                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                                        <ReadinessPulse 
+                                            label="Verification Coverage" 
+                                            count={`${metrics.coverage}%`} 
+                                            subLabel={`Showing ${metrics.verified} verified items out of ${metrics.total} assets in this scope.`}
+                                            onClick={() => { setSelectedStatuses(['VERIFIED']); setActiveView('REGISTRY'); }}
+                                        />
+                                        <ReadinessPulse 
+                                            label="Pending Action" 
+                                            count={metrics.pending} 
+                                            subLabel="Assets currently marked as unverified and requiring field inspection."
+                                            onClick={() => setActiveView('VERIFY')}
+                                        />
+                                        <ReadinessPulse 
+                                            label="Missing Asset ID" 
+                                            count={metrics.missingId} 
+                                            subLabel="Assets lacking a unique tag or system ID code. Crucial for audits."
+                                            onClick={() => { setMissingFieldFilter('assetIdCode'); setActiveView('REGISTRY'); }}
+                                        />
+                                        <ReadinessPulse 
+                                            label="Missing Serials" 
+                                            count={metrics.missingSerials} 
+                                            subLabel="Items missing manufacturer serial numbers. Risk for identification."
+                                            onClick={() => { setMissingFieldFilter('serialNumber'); setActiveView('REGISTRY'); }}
+                                        />
+                                        <ReadinessPulse 
+                                            label="Critical Condition" 
+                                            count={metrics.critical} 
+                                            isDestructive={metrics.critical > 0}
+                                            subLabel="Assets reported as stolen, burnt, or unsalvageable."
+                                            onClick={() => setActiveView('ALERTS')}
+                                        />
+                                        <ReadinessPulse 
+                                            label="Maintenance Alert" 
+                                            count={metrics.maintenance} 
+                                            subLabel="Assets in poor or bad condition requiring technical assessment."
+                                            onClick={() => { setSearchTerm('bad'); setActiveView('REGISTRY'); }}
+                                        />
+                                        <ReadinessPulse 
+                                            label="Audit Exceptions" 
+                                            count={metrics.exceptions} 
+                                            isDestructive={metrics.exceptions > 0}
+                                            subLabel="Records where field data conflicts with previous system information."
+                                            onClick={() => { setSelectedStatuses(['DISCREPANCY']); setActiveView('REGISTRY'); }}
+                                        />
+                                        <ReadinessPulse 
+                                            label="Field Feedback" 
+                                            count={metrics.feedback} 
+                                            subLabel="Assets containing specific comments or remarks from field officers."
+                                            onClick={() => { setSearchTerm('remark'); setActiveView('REGISTRY'); }}
+                                        />
+                                        <ReadinessPulse 
+                                            label="Modified Today" 
+                                            count={metrics.modifiedToday} 
+                                            subLabel="Updates or creations performed in the last 24 hours."
+                                            onClick={() => setActiveView('AUDIT_LOG')}
+                                        />
+                                        <ReadinessPulse 
+                                            label="New In-Flow" 
+                                            count={metrics.newInFlow} 
+                                            subLabel="Fresh records newly registered in the system this week."
+                                            onClick={() => { setActiveView('REGISTRY'); setSearchTerm('2025'); }}
+                                        />
+                                    </div>
+                                </AccordionContent>
+                            </AccordionItem>
+                        </Accordion>
                     </motion.div>
                 ) : (
                     <motion.div 
