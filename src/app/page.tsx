@@ -62,7 +62,8 @@ export default function SPAHub() {
     setIsOnline,
     assets,
     searchTerm,
-    setSearchTerm
+    setSearchTerm,
+    setIsFilterOpen
   } = useAppState();
   
   const { unreadCount } = useNotifications();
@@ -137,7 +138,7 @@ export default function SPAHub() {
               </div>
               <div className="h-6 w-px bg-white/5" />
               <button 
-                onClick={() => setActiveView('REGISTRY')}
+                onClick={() => { setActiveView('REGISTRY'); setIsFilterOpen(true); }}
                 className="p-2 rounded-xl text-white/20 hover:text-primary hover:bg-white/5 transition-all tactile-pulse"
               >
                 <Filter className="h-4 w-4" />

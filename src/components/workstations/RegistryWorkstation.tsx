@@ -3,6 +3,7 @@
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
  * Optimized for high-performance with strict pagination and memoization.
+ * Phase 1000: Integrated full Sort & Filter Logic drawers.
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -27,7 +28,8 @@ import {
   PlusCircle,
   FileSpreadsheet,
   Settings,
-  ChevronLeft
+  ChevronLeft,
+  ListFilter
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -40,6 +42,8 @@ import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
+import { FilterDrawer } from '@/components/registry/FilterDrawer';
+import { SortDrawer } from '@/components/registry/SortDrawer';
 import { transformAssetToRecord } from '@/lib/registry-utils';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -72,7 +76,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { ExcelService } from '@/services/excel-service';
 import { FirestoreService } from '@/services/firebase/firestore';
-import type { SheetDefinition } from '@/types/domain';
+import type { SheetDefinition, Asset } from '@/types/domain';
 
 const ITEMS_PER_PAGE = 50;
 
@@ -93,7 +97,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     selectedCategory,
     setSelectedCategory,
     isOnline,
-    activeGrantId
+    activeGrantId,
+    filters,
+    setFilters,
+    isFilterOpen,
+    setIsFilterOpen,
+    isSortOpen,
+    setIsSortOpen
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -119,14 +129,68 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
   const categories = useMemo(() => Object.keys(activeGrant?.sheetDefinitions || {}).sort(), [activeGrant]);
 
+  // Options Discovery Pulse for the Filter Drawer
+  const optionsMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    headers.forEach(h => {
+      const values = new Set<string>();
+      assets.forEach(a => {
+        let val: any = "";
+        switch(h.normalizedName) {
+          case "sn": val = a.sn; break;
+          case "location": val = a.location; break;
+          case "assignee_location": val = a.custodian; break;
+          case "asset_description": val = a.description; break;
+          case "asset_id_code": val = a.assetIdCode; break;
+          case "asset_class": val = a.category; break;
+          case "condition": val = a.condition; break;
+          case "serial_number": val = a.serialNumber; break;
+          default: val = a.metadata?.[h.rawName];
+        }
+        if (val !== undefined && val !== null && val !== "") values.add(String(val));
+      });
+      map[h.id] = Array.from(values).sort();
+    });
+    return map;
+  }, [headers, assets]);
+
   // Filter & Sort Pulse - Optimized with useMemo
   const processedAssets = useMemo(() => {
     let results = [...assets];
     
+    // 1. Category Scope
     if (selectedCategory) {
       results = results.filter(a => a.category === selectedCategory);
     }
     
+    // 2. Complex Logic Filters
+    filters.forEach(f => {
+      results = results.filter(a => {
+        const header = headers.find(h => h.id === f.headerId);
+        if (!header) return true;
+        
+        let val: any = "";
+        switch(header.normalizedName) {
+          case "sn": val = a.sn; break;
+          case "location": val = a.location; break;
+          case "assignee_location": val = a.custodian; break;
+          case "asset_description": val = a.description; break;
+          case "asset_id_code": val = a.assetIdCode; break;
+          case "asset_class": val = a.category; break;
+          case "condition": val = a.condition; break;
+          case "serial_number": val = a.serialNumber; break;
+          default: val = a.metadata?.[header.rawName];
+        }
+
+        if (f.operator === 'in' && Array.isArray(f.value)) {
+          if (f.value.length === 0) return true;
+          return f.value.includes(String(val || ""));
+        }
+        return true;
+      });
+    });
+
+    // 3. Global Text Search
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       results = results.filter(a => 
@@ -136,17 +200,34 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       );
     }
 
+    // 4. Deterministic Sort Sequence
     if (sortKey) {
+      const sortHeader = headers.find(h => h.id === sortKey);
       results.sort((a, b) => {
-        const valA = String((a as any)[sortKey] || '');
-        const valB = String((b as any)[sortKey] || '');
+        const getVal = (item: Asset) => {
+          if (!sortHeader) return "";
+          switch(sortHeader.normalizedName) {
+            case "sn": return item.sn || "";
+            case "location": return item.location || "";
+            case "assignee_location": return item.custodian || "";
+            case "asset_description": return item.description || "";
+            case "asset_id_code": return item.assetIdCode || "";
+            case "asset_class": return item.category || "";
+            case "condition": return item.condition || "";
+            case "serial_number": return item.serialNumber || "";
+            default: return String(item.metadata?.[sortHeader.rawName] || "");
+          }
+        };
+
+        const valA = String(getVal(a));
+        const valB = String(getVal(b));
         const cmp = valA.localeCompare(valB, undefined, { numeric: true });
         return sortDir === 'asc' ? cmp : -cmp;
       });
     }
 
     return results;
-  }, [assets, searchTerm, sortKey, sortDir, selectedCategory]);
+  }, [assets, searchTerm, sortKey, sortDir, selectedCategory, filters, headers]);
 
   const totalPages = Math.ceil(processedAssets.length / ITEMS_PER_PAGE);
   const paginatedAssets = useMemo(() => {
@@ -207,45 +288,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     }
   };
 
-  const handleAddCategory = async (name: string) => {
-    if (!name.trim() || !appSettings || !activeGrantId) return;
-    setIsProcessing(true);
-    
-    const newSheet: SheetDefinition = {
-      name: name.trim(),
-      headers: ['S/N', 'Description', 'Location', 'Serial Number', 'Condition'],
-      displayFields: [
-        { key: 'sn', label: 'S/N', table: true, quickView: true },
-        { key: 'description', label: 'Description', table: true, quickView: true },
-        { key: 'location', label: 'Location', table: true, quickView: true },
-        { key: 'serialNumber', label: 'Serial Number', table: true, quickView: true },
-        { key: 'condition', label: 'Condition', table: true, quickView: true },
-      ]
-    };
-
-    const nextGrants = appSettings.grants.map(g => {
-      if (g.id === activeGrantId) {
-        return {
-          ...g,
-          sheetDefinitions: { ...g.sheetDefinitions, [name.trim()]: newSheet },
-          enabledSheets: [...g.enabledSheets, name.trim()]
-        };
-      }
-      return g;
-    });
-
-    const nextSettings = { ...appSettings, grants: nextGrants };
-
-    try {
-      await storage.saveSettings(nextSettings);
-      if (isOnline) await FirestoreService.updateSettings({ grants: nextGrants });
-      setAppSettings(nextSettings);
-      toast({ title: "Category Created" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
 
   return (
@@ -274,20 +316,52 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             />
           </div>
           
+          <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => setIsFilterOpen(true)} className={cn("h-12 w-12 md:h-14 md:w-14 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary relative", filters.length > 0 && "border-primary/40")}>
+                    <ListFilter className="h-5 w-5" />
+                    {filters.length > 0 && <span className="absolute -top-1 -right-1 h-5 w-5 bg-primary text-black text-[9px] font-black rounded-full flex items-center justify-center border-2 border-black">{filters.length}</span>}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Logic Filters</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => setIsSortOpen(true)} className="h-12 w-12 md:h-14 md:w-14 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary">
+                    <ArrowUpDown className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Sort Sequence</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-12 w-12 md:h-14 md:w-14 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary">
+                    <Settings2 className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Field Setup</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+
           {!isMobile && (
             <div className="flex items-center bg-black/40 p-1 rounded-xl border border-white/5 shadow-inner">
               <button onClick={() => setViewMode('grid')} className={cn("p-2.5 rounded-lg transition-all", viewMode === 'grid' ? "bg-white/10 text-white" : "text-white/20 hover:text-white")}><Grid className="h-4 w-4" /></button>
               <button onClick={() => setViewMode('table')} className={cn("p-2.5 rounded-lg transition-all", viewMode === 'table' ? "bg-white/10 text-white" : "text-white/20 hover:text-white")}><List className="h-4 w-4" /></button>
             </div>
           )}
-
-          <Button variant="outline" size="icon" onClick={() => setIsHeaderManagerOpen(true)} className="h-12 w-12 md:h-14 md:w-14 rounded-xl border-white/10 bg-white/5 hover:bg-primary/10 text-primary">
-            <Settings2 className="h-5 w-5" />
-          </Button>
         </div>
       </div>
 
-      {/* Registry Metric Bar & Category Dropdown */}
+      {/* Registry Metric Bar & Category Hub */}
       <div className="px-1 flex items-center gap-3 overflow-x-auto no-scrollbar pb-2 shrink-0">
         <Badge variant="outline" className="h-8 px-4 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[9px] tracking-widest whitespace-nowrap">
           {processedAssets.length} RECORDS IN PULSE
@@ -322,27 +396,18 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                         <ChevronRight className="h-4 w-4 text-primary" />
                         <span className="text-[11px] font-black uppercase">Focus Group</span>
                       </DropdownMenuItem>
-                      {isAdmin && (
-                        <DropdownMenuItem onClick={() => handleWipeCategory(cat)} className="rounded-xl p-3 focus:bg-red-600/10 text-red-500 gap-3">
-                          <Trash2 className="h-4 w-4" />
-                          <span className="text-[11px] font-black uppercase">Wipe Group</span>
-                        </DropdownMenuItem>
-                      )}
+                      <DropdownMenuItem onClick={async () => {
+                        const assetsToExport = assets.filter(a => a.category === cat);
+                        await ExcelService.exportRegistry(assetsToExport, headers);
+                      }} className="rounded-xl p-3 focus:bg-primary/10 gap-3">
+                        <FileSpreadsheet className="h-4 w-4 text-green-500" />
+                        <span className="text-[11px] font-black uppercase">Batch Export</span>
+                      </DropdownMenuItem>
                     </DropdownMenuSubContent>
                   </DropdownMenuPortal>
                 </DropdownMenuSub>
               ))}
             </ScrollArea>
-
-            {isAdmin && (
-              <>
-                <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem onClick={() => setIsAddCategoryOpen(true)} className="rounded-xl p-3 focus:bg-primary/10 gap-3 text-primary">
-                  <PlusCircle className="h-4 w-4" />
-                  <span className="text-[11px] font-black uppercase">Create New Group</span>
-                </DropdownMenuItem>
-              </>
-            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
@@ -453,6 +518,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         toast({ title: "Bulk Update Applied" });
       }} />
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
+      <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
+      <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
     </div>
   );
 }

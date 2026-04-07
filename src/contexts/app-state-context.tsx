@@ -14,7 +14,7 @@ import { db } from '@/lib/firebase';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { DiscrepancyEngine } from '@/lib/discrepancy-engine';
 import type { Asset, AppSettings, DataSource, AuthorityNode, WorkstationView } from '@/types/domain';
-import type { RegistryHeader } from '@/types/registry';
+import type { RegistryHeader, HeaderFilter } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
 import { DEFAULT_REGISTRY_HEADERS } from '@/lib/registry-utils';
 import { toast } from '@/hooks/use-toast';
@@ -73,7 +73,15 @@ interface AppStateContextType {
   conditionOptions: OptionType[];
   statusOptions: OptionType[];
 
-  // NEW: Category Hub State
+  // Global UI State
+  isFilterOpen: boolean;
+  setIsFilterOpen: (open: boolean) => void;
+  isSortOpen: boolean;
+  setIsSortOpen: (open: boolean) => void;
+  filters: HeaderFilter[];
+  setFilters: Dispatch<SetStateAction<HeaderFilter[]>>;
+
+  // Category Hub State
   selectedCategory: string | null;
   setSelectedCategory: Dispatch<SetStateAction<string | null>>;
 }
@@ -126,6 +134,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [selectedStatuses, setSelectedStatuses] = useState<string[]>([]);
   const [selectedConditions, setSelectedConditions] = useState<string[]>([]);
   const [missingFieldFilter, setMissingFieldFilter] = useState('');
+
+  // Global Drawers & Filters
+  const [isFilterOpen, setIsFilterOpen] = useState(false);
+  const [isSortOpen, setIsSortOpen] = useState(false);
+  const [filters, setFilters] = useState<HeaderFilter[]>([]);
 
   // Category Hub state
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
@@ -197,7 +210,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
         ? (localAssets || []).filter(a => a.grantId === currentGrantId)
         : (localAssets || []);
 
-      // Optimization: Heuristic scan only when data changes
       setAssets(DiscrepancyEngine.scan(filtered));
       setSandboxAssets(DiscrepancyEngine.scan(localSandbox || []));
     } catch (e) {
@@ -252,7 +264,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, [isOnline, refreshRegistry]);
 
-  // Compute options only when assets change
   const locationOptions = useMemo(() => {
     const counts = new Map<string, number>();
     assets.forEach(a => {
@@ -322,6 +333,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       missingFieldFilter, setMissingFieldFilter,
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
       locationOptions, assigneeOptions, conditionOptions, statusOptions,
+      isFilterOpen, setIsFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
       selectedCategory, setSelectedCategory
     }}>
       <Suspense fallback={null}>
