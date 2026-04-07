@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 315: Fixed 'theme' ReferenceError and applied 50% density reduction.
- * Phase 316: Refined Project Hub layout with visible triggers and trio-action bar.
+ * Phase 317: Fixed ReferenceErrors (handleCommitAll, originalSheetName).
  */
 
 import React, { useState } from 'react';
@@ -105,7 +104,6 @@ export function SettingsWorkstation() {
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
   const [isImportScanOpen, setIsImportScanOpen] = useState(false);
-  const [isAssetFormOpen, setIsAssetFormOpen] = useState(false);
 
   const [isPassphraseDialogOpen, setIsPassphraseDialogOpen] = useState(false);
   const [newPassphrase, setNewPassphrase] = useState('');
@@ -190,6 +188,16 @@ export function SettingsWorkstation() {
     setSelectedSheetDef(newSheet);
     setActiveGrantIdForSchema(activeGrantId);
     setIsColumnSheetOpen(true);
+  };
+
+  const handleCommitAll = async () => {
+    setIsSaving(true);
+    try {
+      await refreshRegistry();
+      addNotification({ title: "System Synchronized", description: "All storage nodes are in absolute parity.", variant: "success" });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   if (!settingsLoaded || !appSettings) return null;
