@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @fileOverview App Settings - Executive Configuration Hub.
+ * @fileOverview App Settings - Configuration Hub.
  */
 
 import React, { useState, useRef } from 'react';
@@ -210,7 +210,7 @@ export function SettingsWorkstation() {
         <div className="flex flex-col gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
-              <h2 className="text-xl font-black uppercase text-white tracking-tight leading-none">App Settings</h2>
+              <h2 className="text-xl font-black uppercase text-white tracking-tight leading-none">Settings</h2>
               <p className="text-[9px] font-bold uppercase text-white/40 tracking-widest">Configuration Center</p>
             </div>
             <button onClick={() => setActiveView('DASHBOARD')} className="h-8 w-8 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all"><X className="h-4 w-4 text-white/40" /></button>
@@ -220,7 +220,7 @@ export function SettingsWorkstation() {
               <TabsTrigger value="general" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><SettingsIcon className="h-3 w-3" /> General</TabsTrigger>
               {isAdmin && <TabsTrigger value="groups" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><LayoutGrid className="h-3 w-3" /> Projects</TabsTrigger>}
               {isAdmin && <TabsTrigger value="users" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><Users className="h-3 w-3" /> Users</TabsTrigger>}
-              {isSuperAdmin && <TabsTrigger value="resilience" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><HeartPulse className="h-3 w-3" /> App Health</TabsTrigger>}
+              {isSuperAdmin && <TabsTrigger value="resilience" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><HeartPulse className="h-3 w-3" /> Health</TabsTrigger>}
               <TabsTrigger value="history" className="px-6 py-2 rounded-lg font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all"><History className="h-3 w-3" /> History</TabsTrigger>
             </TabsList>
           </div>
@@ -230,10 +230,10 @@ export function SettingsWorkstation() {
       <div className="flex-1 min-h-0 pt-2 overflow-y-auto custom-scrollbar pb-20 px-1">
         <TabsContent value="general" className="space-y-8 m-0 outline-none">
           <section>
-            <SectionTitle title="System Version" description="Current software build" icon={Database} />
+            <SectionTitle title="Build Version" description="Current software state" icon={Database} />
             <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl">
               <div className="flex items-center justify-between">
-                <span className="text-xs font-black uppercase text-white">Version Index</span>
+                <span className="text-xs font-black uppercase text-white">System Index</span>
                 <span className="text-2xl font-black text-primary tracking-tighter">v{appSettings.version || 1}.0</span>
               </div>
             </Card>

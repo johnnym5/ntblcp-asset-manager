@@ -10,7 +10,7 @@ runConfig:
   maxInstances: 10
 
 # Environment variables available at build and runtime.
-# Deployment Reroute: NTBLCP Production Pulse
+# Deployment Reroute: Assetain Production Site
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
     value: "AIzaSyDhBbeiAZGWzCHQXbbTcNXdsIT_6Gz3qJU"
@@ -18,7 +18,7 @@ env:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: "ntblcp-asset-manager.firebaseapp.com"
+    value: "assetain.firebaseapp.com"
     availability:
       - BUILD
       - RUNTIME

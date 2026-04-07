@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @fileOverview Root Loading Sequence - Diagnostic Bootstrapping UI.
+ * @fileOverview Root Loading Sequence - System Initialization.
  */
 
 import { Loader2, Zap } from 'lucide-react';
