@@ -3,6 +3,7 @@
 /**
  * @fileOverview ReconciliationView - The Discovery Pulse visualization.
  * Phase 310: Enhanced with Per-Group Validation Summaries and Positional Logging.
+ * Phase 311: Fixed alignment of error logs to ensure visibility.
  */
 
 import React from 'react';
@@ -52,12 +53,12 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-black tracking-tighter">{stats.total}</div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase mt-1 opacity-60">Records Mapped</p>
+            <div className="text-4xl font-black tracking-tighter text-white">{stats.total}</div>
+            <p className="text-[9px] font-bold text-white/40 uppercase mt-1 opacity-60">Records Mapped</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/40 shadow-lg rounded-3xl group hover:border-green-500/20 transition-colors">
+        <Card className="border-white/5 bg-[#080808] shadow-lg rounded-3xl group hover:border-green-500/20 transition-colors">
           <CardHeader className="pb-2">
             <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-green-600 flex items-center gap-2">
               <CheckCircle className="h-3.5 w-3.5" /> Valid Records
@@ -65,11 +66,11 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-black tracking-tighter text-green-600">{stats.valid}</div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase mt-1 opacity-60">Fidelity Confirmed</p>
+            <p className="text-[9px] font-bold text-white/40 uppercase mt-1 opacity-60">Fidelity Confirmed</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/40 shadow-lg rounded-3xl group hover:border-destructive/20 transition-colors">
+        <Card className="border-white/5 bg-[#080808] shadow-lg rounded-3xl group hover:border-destructive/20 transition-colors">
           <CardHeader className="pb-2">
             <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-destructive flex items-center gap-2">
               <XCircle className="h-3.5 w-3.5" /> Rejected Rows
@@ -77,19 +78,19 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
           </CardHeader>
           <CardContent>
             <div className="text-4xl font-black tracking-tighter text-destructive">{stats.invalid}</div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase mt-1 opacity-60">Alignment Failures</p>
+            <p className="text-[9px] font-bold text-white/40 uppercase mt-1 opacity-60">Alignment Failures</p>
           </CardContent>
         </Card>
 
-        <Card className="border-border/40 shadow-lg rounded-3xl">
+        <Card className="border-white/5 bg-[#080808] shadow-lg rounded-3xl">
           <CardHeader className="pb-2">
-            <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
+            <CardTitle className="text-[10px] font-black uppercase tracking-[0.2em] text-white/40 flex items-center gap-2">
               <LayoutGrid className="h-3.5 w-3.5" /> Folder Count
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-4xl font-black tracking-tighter">{stats.groupsCount}</div>
-            <p className="text-[9px] font-bold text-muted-foreground uppercase mt-1 opacity-60">Structural Containers</p>
+            <div className="text-4xl font-black tracking-tighter text-white">{stats.groupsCount}</div>
+            <p className="text-[9px] font-bold text-white/40 uppercase mt-1 opacity-60">Structural Containers</p>
           </CardContent>
         </Card>
       </div>
@@ -124,7 +125,7 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
                   <ScrollArea className="w-full">
                     <div className="flex gap-2 pb-2">
                       {group.headerSet.map((h, i) => (
-                        <Badge key={i} variant="secondary" className="bg-white/5 border-white/5 text-[8px] font-mono whitespace-nowrap px-3 h-6">{h}</Badge>
+                        <Badge key={i} variant="secondary" className="bg-white/5 border-white/5 text-[8px] font-mono whitespace-nowrap px-3 h-6 text-white/60">{h}</Badge>
                       ))}
                     </div>
                   </ScrollArea>
@@ -136,13 +137,13 @@ export function ReconciliationView({ assets, summary }: ReconciliationViewProps)
                       <FileWarning className="h-3 w-3" />
                       <span className="text-[9px] font-black uppercase tracking-widest">Alignment Exceptions</span>
                     </div>
-                    <ScrollArea className="h-24 rounded-xl bg-destructive/5 border border-destructive/10 p-3">
-                      <div className="space-y-2">
-                        {group.assets.filter(a => a.validation.isRejected).map((a, i) => (
-                          <div key={i} className="flex flex-col gap-1">
-                            {a.validation.logs.map((log, lIdx) => (
-                              <div key={lIdx} className="text-[9px] font-medium text-destructive/80 italic flex items-start gap-2">
-                                <span className="font-black opacity-40">ROW {log.rowNumber}:</span>
+                    <ScrollArea className="h-32 rounded-2xl bg-destructive/[0.03] border-2 border-dashed border-destructive/20 p-4">
+                      <div className="space-y-3">
+                        {group.assets.filter(a => (a as any).validation.isRejected).map((a, i) => (
+                          <div key={i} className="space-y-1.5 border-b border-destructive/10 last:border-0 pb-2">
+                            {(a as any).validation.logs.map((log: any, lIdx: number) => (
+                              <div key={lIdx} className="text-[10px] font-medium text-destructive/80 italic flex items-start gap-2 leading-relaxed">
+                                <span className="font-black bg-destructive/10 px-1.5 rounded uppercase shrink-0">Row {log.rowNumber}</span>
                                 <span>{log.message}</span>
                               </div>
                             ))}

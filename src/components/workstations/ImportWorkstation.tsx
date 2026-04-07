@@ -4,7 +4,7 @@
  * @fileOverview ImportWorkstation - Controlled Registry Ingestion.
  * Phase 651: Added specific pulse notifications for discovery and commit.
  * Phase 652: Automatically generate Sheet Definitions for new categories during commit.
- * Phase 653: Hardened commit pulse to ensure data visibility.
+ * Phase 653: Hardened commit pulse to ensure data visibility and filter rejected assets.
  */
 
 import React, { useState, useRef } from 'react';
@@ -127,8 +127,8 @@ export function ImportWorkstation() {
         profileId: 'CONTROLLED_V6',
         totalRows: activeSheetData.data.length,
         groupCount: results.length,
-        dataRowsImported: allStaged.length,
-        rowsRejected: 0,
+        dataRowsImported: allStaged.filter(a => !a.validation.isRejected).length,
+        rowsRejected: allStaged.filter(a => a.validation.isRejected).length,
         duplicatesDetected: 0,
         templatesDiscovered: selectedGroupIds.size,
         sectionBreakdown: {},
@@ -159,16 +159,18 @@ export function ImportWorkstation() {
     setIsProcessing(true);
     addNotification({ title: "Merging Registry", description: "Committing staged records..." });
     try {
-      for (const asset of stagedAssets) {
+      const validAssets = stagedAssets.filter(a => !a.validation.isRejected);
+      
+      for (const asset of validAssets) {
         const assetWithGrant = { ...asset, grantId: activeGrantId };
         await enqueueMutation('CREATE', 'assets', assetWithGrant);
       }
 
       const current = await storage.getAssets();
-      const validAssets = stagedAssets.map(a => ({ ...a, grantId: activeGrantId }));
-      await storage.saveAssets([...validAssets, ...current]);
+      const validAssetsWithGrant = validAssets.map(a => ({ ...a, grantId: activeGrantId }));
+      await storage.saveAssets([...validAssetsWithGrant, ...current]);
       
-      const newCategories = Array.from(new Set(validAssets.map(a => a.category)));
+      const newCategories = Array.from(new Set(validAssetsWithGrant.map(a => a.category)));
       const activeGrant = appSettings.grants.find(g => g.id === activeGrantId);
       
       if (activeGrant) {
@@ -333,7 +335,7 @@ export function ImportWorkstation() {
               <div className="space-y-4 max-w-lg">
                 <h3 className="text-4xl font-black uppercase text-white tracking-tighter leading-none">Merge Successful</h3>
                 <p className="text-sm font-medium text-white/40 italic leading-relaxed">
-                  The {stagedAssets.length} records have been successfully integrated into the active project registry.
+                  The {runSummary?.dataRowsImported || 0} valid records have been successfully integrated into the active project registry.
                 </p>
               </div>
               <div className="flex gap-4">

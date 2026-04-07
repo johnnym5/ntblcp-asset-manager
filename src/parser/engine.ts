@@ -4,7 +4,7 @@
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
  * Implements two-stage structural discovery and group-aware mapping.
  * Phase 900: Integrated LocationEngine for canonical admin mapping.
- * Phase 901: Fixed 'sn' field mapping pulse.
+ * Phase 905: Enhanced error capture to return rejected assets with logs.
  */
 
 import { v4 as uuidv4 } from 'uuid';
@@ -74,13 +74,14 @@ export class ParserEngine {
       if (!tpl) return container;
 
       for (let i = group.startRow; i <= group.endRow; i++) {
-        if (classifyRow(data[i]) === 'DATA_ROW') {
+        const rowType = classifyRow(data[i]);
+        if (rowType === 'DATA_ROW') {
           const asset = this.mapRowToTemplate(data[i], tpl, group, i);
-          if (asset) {
-            container.assets.push(asset);
-            container.metrics.valid++;
-          } else {
+          container.assets.push(asset);
+          if (asset.validation.isRejected) {
             container.metrics.invalid++;
+          } else {
+            container.metrics.valid++;
           }
         }
       }
@@ -88,7 +89,7 @@ export class ParserEngine {
     });
   }
 
-  private mapRowToTemplate(row: any[], tpl: HeaderTemplate, group: DiscoveredGroup, rowNum: number): ParsedAsset | null {
+  private mapRowToTemplate(row: any[], tpl: HeaderTemplate, group: DiscoveredGroup, rowNum: number): ParsedAsset {
     const asset: any = {
       id: uuidv4(),
       category: group.groupName,
@@ -96,10 +97,20 @@ export class ParserEngine {
       condition: 'New',
       lastModified: new Date().toISOString(),
       lastModifiedBy: 'Structural Parser',
-      importMetadata: { sourceFile: this.workbookName, sheetName: group.sheetName, rowNumber: rowNum + 1, importedAt: new Date().toISOString() },
+      importMetadata: { 
+        sourceFile: this.workbookName, 
+        sheetName: group.sheetName, 
+        rowNumber: rowNum + 1, 
+        importedAt: new Date().toISOString() 
+      },
       metadata: {},
       validation: { warnings: [], errors: [], duplicateFlags: [], needsReview: false, isRejected: false, logs: [] },
-      hierarchy: { document: group.sheetName, section: group.groupName, subsection: 'Base Register', assetFamily: 'Uncategorized' }
+      hierarchy: { 
+        document: group.sheetName, 
+        section: group.groupName, 
+        subsection: 'Base Register', 
+        assetFamily: 'Uncategorized' 
+      }
     };
 
     tpl.normalizedHeaders.forEach((key, idx) => {
@@ -107,6 +118,8 @@ export class ParserEngine {
       if (val === undefined || val === null) return;
       
       const strVal = String(val).trim();
+      if (strVal === '') return;
+
       switch(key) {
         case 'sn': asset.sn = strVal; break;
         case 'asset_description': asset.description = strVal; break;
@@ -117,6 +130,24 @@ export class ParserEngine {
         default: asset.metadata[tpl.rawHeaders[idx]] = val;
       }
     });
+
+    const hasDescription = !!asset.description;
+    const hasIdentification = hasDescription || !!asset.assetIdCode || !!asset.serialNumber;
+
+    if (!hasIdentification) {
+      asset.validation.isRejected = true;
+      asset.validation.logs.push({
+        rowNumber: rowNum + 1,
+        type: 'empty_row',
+        message: 'Identification pulse missing (No Description, Tag ID, or Serial discovered).',
+        rawData: row
+      });
+    }
+
+    if (hasIdentification && !hasDescription) {
+      asset.validation.needsReview = true;
+      asset.validation.warnings.push('Asset lacks a description. Registry fidelity might be low.');
+    }
 
     // Integrated Location Intelligence Pulse
     if (asset.location) {
@@ -130,12 +161,11 @@ export class ParserEngine {
         asset.validation.needsReview = true;
         asset.validation.warnings.push(`Location confidence is ${pulse.confidence}. resolved to ${pulse.state}.`);
       }
-    } else {
+    } else if (!asset.validation.isRejected) {
       asset.locationStatus = 'UNASSIGNED';
       asset.normalizedState = 'Unassigned';
     }
 
-    if (!asset.description && !asset.assetIdCode && !asset.serialNumber) return null;
     return asset as ParsedAsset;
   }
 
