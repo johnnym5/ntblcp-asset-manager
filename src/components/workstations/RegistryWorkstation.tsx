@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 309: Implemented Project-scoped category isolation and auto-hiding of empty sheets.
+ * Phase 315: Implemented Category Selection, Batch Actions, and Rename Pulse.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -35,7 +35,8 @@ import {
   Type,
   Globe,
   CloudOff,
-  LayoutGrid
+  LayoutGrid,
+  RefreshCw
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -71,11 +72,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 import {
   Dialog,
   DialogContent,
@@ -130,7 +126,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
   const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
-  const [isHeaderManagerOpen, setIsHeaderManagerOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -144,10 +139,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const canAdd = userProfile?.canAddAssets || isAdmin;
   const canEdit = userProfile?.canEditAssets || isAdmin;
-  const isVerificationMode = appSettings?.appMode === 'verification';
 
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
-  
   const activeAssets = useMemo(() => dataSource === 'PRODUCTION' ? assets : sandboxAssets, [dataSource, assets, sandboxAssets]);
 
   const groupStats = useMemo(() => {
@@ -161,52 +154,16 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return stats;
   }, [activeAssets]);
 
-  // Project-Scoped Categories with Auto-Hide Empty Logic
   const categories = useMemo(() => {
     if (!activeGrant) return [];
-    
-    // 1. Identify all definitions belonging to the active grant pulse
     const allInProject = Object.keys(activeGrant.sheetDefinitions || {}).sort();
-    
-    // 2. Filter by data presence or manual override
     return allInProject.filter(cat => {
       const stats = groupStats[cat];
       const hasData = stats && stats.total > 0;
       const isManuallyEnabled = appSettings?.enabledSheets?.includes(cat);
-      
-      // Rule: Hide empty sheets unless an admin has specifically authorized them via the settings pulse
       return hasData || isManuallyEnabled;
     });
   }, [activeGrant, groupStats, appSettings?.enabledSheets]);
-
-  // Facet Discovery Pulse: Dynamically populate filter options
-  const optionsMap = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    headers.forEach(header => {
-      if (header.filterable) {
-        const values = new Set<string>();
-        activeAssets.forEach(a => {
-          let val: any = "";
-          switch(header.normalizedName) {
-            case "sn": val = a.sn; break;
-            case "location": val = a.location; break;
-            case "assignee_location": val = a.custodian; break;
-            case "asset_description": val = a.description; break;
-            case "asset_id_code": val = a.assetIdCode; break;
-            case "asset_class": val = a.category; break;
-            case "condition": val = a.condition; break;
-            case "serial_number": val = a.serialNumber; break;
-            default: val = a.metadata?.[header.rawName] || a.metadata?.[header.normalizedName];
-          }
-          if (val !== undefined && val !== null && val !== "") {
-            values.add(String(val));
-          }
-        });
-        map[header.id] = Array.from(values).sort();
-      }
-    });
-    return map;
-  }, [headers, activeAssets]);
 
   const processedAssets = useMemo(() => {
     let results = [...activeAssets];
@@ -278,50 +235,97 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const handleInspect = (id: string) => { setSelectedAssetId(id); setIsDetailOpen(true); };
   const handleToggleSelect = (id: string) => { const next = new Set(selectedAssetIds); if (next.has(id)) next.delete(id); else next.add(id); setSelectedAssetIds(next); };
   const handleSearchChange = (val: string) => { setSearchTerm(sanitizeSearch(val)); setCurrentPage(1); };
-  const handleExpandSearch = () => { setIsSearchExpanded(true); setTimeout(() => searchInputRef.current?.focus(), 100); };
+  
+  const toggleCategorySelection = (cat: string) => {
+    const next = new Set(selectedCategories);
+    if (next.has(cat)) next.delete(cat); else next.add(cat);
+    setSelectedCategories(Array.from(next));
+  };
 
-  const handleSelectAll = (checked: boolean) => {
-    if (checked) {
-      setSelectedAssetIds(new Set(processedAssets.map(a => a.id)));
-    } else {
-      setSelectedAssetIds(new Set());
+  const handleSelectAllCategories = (checked: boolean) => {
+    if (checked) setSelectedCategories(categories);
+    else setSelectedCategories([]);
+  };
+
+  const handleBatchDeleteCategories = async () => {
+    if (selectedCategories.length === 0) return;
+    setIsProcessing(true);
+    try {
+      const idsToDelete = activeAssets
+        .filter(a => selectedCategories.includes(a.category))
+        .map(a => a.id);
+      
+      for (const id of idsToDelete) {
+        await enqueueMutation('DELETE', 'assets', { id });
+      }
+      const currentLocal = await storage.getAssets();
+      await storage.saveAssets(currentLocal.filter(a => !idsToDelete.includes(a.id)));
+      await refreshRegistry();
+      setSelectedCategories([]);
+      addNotification({ title: "Categories Deleted", description: `Removed ${idsToDelete.length} records.`, variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
     }
   };
 
-  const handleDeleteSelected = async () => {
-    if (selectedAssetIds.size === 0) return;
-    const count = selectedAssetIds.size;
-    setIsProcessing(true);
-    try {
-      for (const id of Array.from(selectedAssetIds)) { await enqueueMutation('DELETE', 'assets', { id }); }
-      const currentLocal = await storage.getAssets();
-      await storage.saveAssets(currentLocal.filter(a => !selectedAssetIds.has(a.id)));
-      await refreshRegistry();
-      setSelectedAssetIds(new Set());
-      addNotification({ title: "Deletion Pulse", description: `${count} records removed from local register.`, variant: "destructive" });
-    } finally { setIsProcessing(false); }
-  };
-
-  const handleSyncSelected = async () => {
+  const handleSyncSelectedCategories = async () => {
     if (!isOnline) {
-      addNotification({ title: "Sync Interrupted", description: "No internet link discovered.", variant: "destructive" });
+      addNotification({ title: "Offline", variant: "destructive" });
       return;
     }
     setIsProcessing(true);
-    addNotification({ title: "Broadcasting Sync", description: `Preparing ${selectedAssetIds.size} records for cloud update.` });
     try {
+      const idsToSync = activeAssets
+        .filter(a => selectedCategories.includes(a.category))
+        .map(a => a.id);
+      
       const queue = await storage.getQueue();
-      const opsToSync = queue.filter(q => selectedAssetIds.has(String(q.payload.id || ''))).map(q => q.id);
+      const opsToSync = queue.filter(q => idsToSync.includes(String(q.payload.id))).map(q => q.id);
       if (opsToSync.length > 0) {
         await processSelectedSyncQueue(opsToSync);
         await refreshRegistry();
-        setSelectedAssetIds(new Set());
-        addNotification({ title: "Sync Successful", description: `Broadast complete for ${opsToSync.length} records.`, variant: "success" });
-      } else {
-        addNotification({ title: "Already Synced", description: "Selected items match Cloud Authority." });
+        setSelectedCategories([]);
+        addNotification({ title: "Sync Complete", variant: "success" });
       }
-    } catch (e) {
-      addNotification({ title: "Sync Failure", description: "Operational pulse interrupted.", variant: "destructive" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleRenameCommit = async () => {
+    if (!categoryToRename || !newCategoryName.trim() || !appSettings || !activeGrant) return;
+    setIsProcessing(true);
+    try {
+      // 1. Update Assets
+      const assetsToUpdate = activeAssets.filter(a => a.category === categoryToRename);
+      for (const asset of assetsToUpdate) {
+        const updated = { ...asset, category: newCategoryName.trim() };
+        await enqueueMutation('UPDATE', 'assets', updated);
+      }
+      const currentLocal = await storage.getAssets();
+      await storage.saveAssets(currentLocal.map(a => a.category === categoryToRename ? { ...a, category: newCategoryName.trim() } : a));
+
+      // 2. Update Sheet Definition
+      const nextSheetDefs = { ...activeGrant.sheetDefinitions };
+      if (nextSheetDefs[categoryToRename]) {
+        nextSheetDefs[newCategoryName.trim()] = { ...nextSheetDefs[categoryToRename], name: newCategoryName.trim() };
+        delete nextSheetDefs[categoryToRename];
+      }
+
+      const updatedGrants = appSettings.grants.map(g => 
+        g.id === activeGrantId ? { ...g, sheetDefinitions: nextSheetDefs } : g
+      );
+
+      const nextSettings = { ...appSettings, grants: updatedGrants };
+      await storage.saveSettings(nextSettings);
+      if (isOnline) await FirestoreService.updateSettings(nextSettings);
+      setAppSettings(nextSettings);
+
+      await refreshRegistry();
+      setIsRenameDialogOpen(false);
+      setCategoryToRename(null);
+      setNewCategoryName('');
+      addNotification({ title: "Category Renamed", variant: "success" });
     } finally {
       setIsProcessing(false);
     }
@@ -344,12 +348,24 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 {selectedCategories.length === 0 ? 'Inventory Hub' : 'Registry Pulse'}
               </h2>
               <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">
-                {selectedCategories.length === 0 ? 'GROUP OVERVIEW' : 'DETAILED INSPECTION'}
+                {selectedCategories.length === 0 ? 'PROJECT FOLDERS' : 'DETAILED INSPECTION'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
+            {selectedCategories.length === 0 && (
+              <div className="flex items-center gap-3 pr-4 border-r border-white/10 shrink-0">
+                <Checkbox 
+                  id="sel-all-cat" 
+                  checked={selectedCategories.length === categories.length && categories.length > 0} 
+                  onCheckedChange={(c) => handleSelectAllCategories(!!c)}
+                  className="h-5 w-5 rounded-lg border-2 border-white/20 data-[state=checked]:bg-primary"
+                />
+                <label htmlFor="sel-all-cat" className="text-[9px] font-black uppercase tracking-widest text-white/40 cursor-pointer">Select All</label>
+              </div>
+            )}
+
             {selectedCategories.length > 0 && (
               <div className="flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5 mr-1 shrink-0">
                 <Button variant="ghost" size="icon" onClick={() => setViewMode(viewMode === 'grid' ? 'list' : 'grid')} className="h-9 w-9 rounded-lg text-white/40 hover:text-primary"><Grid className="h-4 w-4" /></Button>
@@ -362,7 +378,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <div className="flex items-center justify-end flex-1 min-w-0">
               <AnimatePresence mode="wait">
                 {!isSearchExpanded ? (
-                  <Button variant="outline" size="icon" onClick={handleExpandSearch} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 hover:bg-primary/10 text-primary shrink-0"><Search className="h-4 w-4" /></Button>
+                  <Button variant="outline" size="icon" onClick={() => setIsSearchExpanded(true)} className="h-10 w-10 rounded-lg border-white/10 bg-white/5 hover:bg-primary/10 text-primary shrink-0"><Search className="h-4 w-4" /></Button>
                 ) : (
                   <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: isMobile ? "100%" : "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group min-w-[120px]">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
@@ -388,14 +404,34 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       </div>
 
       <div className="flex-1 min-h-0 px-1 pt-4">
-        {selectedCategories.length === 0 ? (
+        {selectedCategories.length === 0 || viewAll ? (
           <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-40">
             {categories.map(cat => (
-              <Card key={cat} className="bg-[#080808] border-2 border-white/5 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-3xl flex flex-col p-6">
-                <div className="flex justify-between items-start mb-8">
-                  <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{cat}</h3>
+              <Card key={cat} className={cn("bg-[#080808] border-2 rounded-3xl overflow-hidden group hover:border-primary/40 transition-all shadow-3xl flex flex-col p-6 relative", selectedCategories.includes(cat) ? "border-primary/40 bg-primary/[0.02]" : "border-white/5")}>
+                <div className="absolute top-4 left-4 z-20">
+                  <Checkbox 
+                    checked={selectedCategories.includes(cat)} 
+                    onCheckedChange={() => toggleCategorySelection(cat)}
+                    className="h-5 w-5 rounded-lg border-2 border-white/10 data-[state=checked]:bg-primary"
+                  />
                 </div>
-                <div className="space-y-1 mb-8">
+                <div className="flex justify-between items-start mb-8 pl-8">
+                  <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{cat}</h3>
+                  <div onClick={(e) => e.stopPropagation()}>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild><button className="h-6 w-6 flex items-center justify-center text-white/20 hover:text-white"><MoreVertical className="h-4 w-4" /></button></DropdownMenuTrigger>
+                      <DropdownMenuContent align="end" className="bg-black border-white/10 text-white p-1">
+                        <DropdownMenuItem onClick={() => { setCategoryToRename(cat); setNewCategoryName(cat); setIsRenameDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-primary/10">
+                          <Type className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Rename Folder</span>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => setSelectedCategories([cat])} className="gap-2 p-2 rounded-lg focus:bg-primary/10">
+                          <ChevronRight className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Drill Down</span>
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </div>
+                </div>
+                <div className="space-y-1 mb-8 pl-8">
                   <p className="text-4xl font-black tracking-tighter text-white">{groupStats[cat]?.total || 0}</p>
                   <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">Asset Records</p>
                 </div>
@@ -418,28 +454,53 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         )}
       </div>
 
+      {/* Action Bar for Categories */}
       <AnimatePresence>
-        {selectedAssetIds.size > 0 && (
+        {selectedCategories.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center gap-6 shadow-3xl backdrop-blur-3xl">
             <div className="flex items-center gap-3 pl-3">
-              <div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedAssetIds.size}</div>
-              <span className="text-[9px] font-black uppercase text-white tracking-widest">Selected</span>
+              <div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedCategories.length}</div>
+              <span className="text-[9px] font-black uppercase text-white tracking-widest">Folders Selected</span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Button variant="ghost" size="sm" onClick={handleSyncSelected} disabled={isProcessing || !isOnline} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-primary hover:bg-primary/10">
-                <Upload className="h-3.5 w-3.5" /> Sync
+              <Button variant="ghost" size="sm" onClick={handleSyncSelectedCategories} disabled={isProcessing || !isOnline} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-primary hover:bg-primary/10">
+                <Upload className="h-3.5 w-3.5" /> Sync Folder
               </Button>
-              {canEdit && <Button variant="ghost" size="sm" onClick={() => setIsBatchEditOpen(true)} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60"><Edit3 className="h-3.5 w-3.5" /> Edit</Button>}
-              {isAdmin && <Button variant="ghost" size="sm" onClick={handleDeleteSelected} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>}
+              {isAdmin && (
+                <Button variant="ghost" size="sm" onClick={handleBatchDeleteCategories} disabled={isProcessing} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60">
+                  <Trash2 className="h-3.5 w-3.5" /> Purge Folder
+                </Button>
+              )}
             </div>
-            <button onClick={() => setSelectedAssetIds(new Set())} className="p-1.5 text-white/20 hover:text-white transition-all"><X className="h-4 w-4" /></button>
+            <button onClick={() => setSelectedCategories([])} className="p-1.5 text-white/20 hover:text-white transition-all"><X className="h-4 w-4" /></button>
           </motion.div>
         )}
       </AnimatePresence>
 
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} />
-      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={activeAssets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); addNotification({ title: "Asset Updated", description: "Modification pulse broadcasted to local register.", variant: "success" }); }} />
-      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={async (data) => { for (const id of Array.from(selectedAssetIds)) { const asset = activeAssets.find(a => a.id === id); if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data }); } await refreshRegistry(); addNotification({ title: "Batch Update", description: `Applied logic pulse to ${selectedAssetIds.size} records.`, variant: "success" }); setSelectedAssetIds(new Set()); }} />
+      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={activeAssets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
+      
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent className="max-w-md rounded-2xl bg-black border-white/10 text-white p-8">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-black uppercase tracking-tight">Rename Asset Group</DialogTitle>
+            <DialogDescription className="text-[10px] font-bold uppercase text-white/40">Broadcasting structural rename pulse to {groupStats[categoryToRename || '']?.total || 0} records.</DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-4">
+            <div className="space-y-1.5">
+              <Label className="text-[10px] font-black uppercase tracking-widest text-primary">New Category Label</Label>
+              <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="h-12 bg-white/5 border-white/10 rounded-xl font-black uppercase text-sm" />
+            </div>
+          </div>
+          <DialogFooter className="gap-3">
+            <Button variant="ghost" onClick={() => setIsRenameDialogOpen(false)} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] text-white/40">Cancel</Button>
+            <Button onClick={handleRenameCommit} disabled={isProcessing || !newCategoryName.trim()} className="h-12 px-10 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20">
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <ShieldCheck className="h-4 w-4" />} Commit Rename
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
     </div>
