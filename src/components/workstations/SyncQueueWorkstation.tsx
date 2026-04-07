@@ -1,10 +1,8 @@
+
 'use client';
 
 /**
- * @fileOverview SyncQueueWorkstation - Grouped Multi-Select Sync Hub.
- * Phase 500: Implemented compact Dashboard list (last 10) and full-audit pop-up.
- * Grouped by Operation Type (Created, Updated, Deleted) in the pop-up.
- * Phase 501: Fixed ReferenceError for missing Info icon.
+ * @fileOverview Pending Sync - Waiting Cloud Updates.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -69,14 +67,17 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
-  const { isSyncing, refreshRegistry, manualDownload, isOnline, setIsOnline } = useAppState();
+  const { isSyncing, refreshRegistry, manualDownload, isOnline, setIsOnline, appSettings } = useAppState();
   const { toast } = useToast();
   
   const [queue, setQueue] = useState<OfflineQueueEntry[]>([]);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [isFullViewOpen, setIsFullViewOpen] = useState(false);
+
+  const isAdvanced = appSettings?.uxMode === 'advanced';
 
   const loadQueue = async () => { 
     const items = await storage.getQueue(); 
@@ -89,12 +90,10 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
     return () => clearInterval(interval);
   }, []);
 
-  // Last 10 items for the Dashboard view
   const recentQueue = useMemo(() => {
     return [...queue].sort((a, b) => b.timestamp - a.timestamp).slice(0, 10);
   }, [queue]);
 
-  // Grouping by operation for the pop-up
   const opGroups = useMemo(() => {
     return {
       CREATE: queue.filter(q => q.operation === 'CREATE'),
@@ -121,7 +120,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
 
   const handlePushSelected = async () => {
     if (!isOnline) {
-      toast({ variant: "destructive", title: "Connection Latent", description: "Internet required for cloud broadcast." });
+      toast({ variant: "destructive", title: "No Connection", description: "Internet required to sync changes." });
       return;
     }
     const idsToPush = Array.from(selectedIds);
@@ -133,7 +132,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
       await refreshRegistry();
       loadQueue();
     } catch (e) {
-      toast({ variant: "destructive", title: "Sync Interrupted" });
+      toast({ variant: "destructive", title: "Sync Failed" });
     }
   };
 
@@ -143,13 +142,13 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
       await storage.dequeue(id);
     }
     setSelectedIds(new Set());
-    toast({ title: "Selected Pulses Purged" });
+    toast({ title: "Changes Discarded" });
     loadQueue();
   };
 
   const handleRetry = async (entry: OfflineQueueEntry) => {
     await storage.updateQueueEntry({ ...entry, status: 'PENDING', error: undefined });
-    toast({ title: "Retry Initialized" });
+    toast({ title: "Retrying..." });
     loadQueue();
   };
 
@@ -171,7 +170,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-3">
             <h5 className="text-[13px] font-black uppercase tracking-tight text-white truncate leading-none">
-              {(entry.payload as any).description || 'System Update Pulse'}
+              {(entry.payload as any).description || 'Update'}
             </h5>
             <Badge variant="outline" className={cn(
               "h-4 px-1.5 text-[7px] font-black uppercase tracking-[0.2em] rounded-md",
@@ -180,7 +179,6 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
           </div>
           <div className="flex items-center gap-4 mt-2 text-[8px] font-bold text-white/20 uppercase">
             <span className="flex items-center gap-1.5"><Clock className="h-3 w-3" /> {formatDistanceToNow(entry.timestamp, { addSuffix: true })}</span>
-            <span className="flex items-center gap-1.5"><Tag className="h-3 w-3" /> ROW: {(entry.payload as any).importMetadata?.rowNumber || 'MAN'}</span>
           </div>
         </div>
 
@@ -201,7 +199,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
   return (
     <div className={cn("space-y-8 h-full flex flex-col", !isEmbedded && "max-w-5xl mx-auto pb-40 animate-in fade-in duration-700")}>
       
-      {/* 1. Dashboard Mode: Decision Terminal & Last 10 */}
+      {/* Dashboard View */}
       <Card className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden shadow-2xl shrink-0">
         <div className="p-6 md:p-8 flex flex-col md:flex-row items-center justify-between gap-6 border-b border-white/5 bg-white/[0.01]">
           <div className="flex items-center gap-5">
@@ -209,14 +207,14 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
               {isOnline ? <Wifi className="h-8 w-8 text-green-500" /> : <WifiOff className="h-8 w-8 text-red-500" />}
             </div>
             <div className="space-y-1">
-              <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">Sync Decision</h3>
+              <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">{isAdvanced ? 'Sync Hub' : 'Connection'}</h3>
               <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-                {isOnline ? 'Active Connection' : 'Persistence Mode'}
+                {isOnline ? 'Online with Cloud' : 'Working Offline'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-4 bg-black/40 p-2.5 px-6 rounded-2xl border border-white/10 shadow-inner">
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Broadcast</span>
+            <span className="text-[10px] font-black uppercase tracking-widest text-white/60">Connect to Cloud</span>
             <Switch checked={isOnline} onCheckedChange={setIsOnline} className="data-[state=checked]:bg-green-500" />
           </div>
         </div>
@@ -226,23 +224,38 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
             <div className="flex items-center justify-between px-1">
               <div className="flex items-center gap-8">
                 <div className="flex flex-col gap-1">
-                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Pending</span>
+                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{isAdvanced ? 'Pending Pulses' : 'Waiting Changes'}</span>
                   <span className="text-3xl font-black tabular-nums text-white">{pendingCount}</span>
                 </div>
                 <div className="flex flex-col gap-1">
-                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">Errors</span>
+                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{isAdvanced ? 'Exceptions' : 'Errors'}</span>
                   <span className="text-3xl font-black tabular-nums text-red-600">{failedCount}</span>
                 </div>
               </div>
               <div className="flex items-center gap-3">
-                <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 hover:bg-white/5 text-white/60">
-                  <Download className="h-4 w-4 mr-2" /> Fetch
-                </Button>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 hover:bg-white/5 text-white/60">
+                        <Download className="h-4 w-4 mr-2" /> Fetch
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Download latest records from the cloud.</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+                
                 {selectedIds.size > 0 && (
-                  <Button onClick={handlePushSelected} disabled={isSyncing || !isOnline} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-all hover:scale-105">
-                    {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} 
-                    Push {selectedIds.size}
-                  </Button>
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button onClick={handlePushSelected} disabled={isSyncing || !isOnline} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 transition-all hover:scale-105">
+                          {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />} 
+                          Sync {selectedIds.size}
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>Upload selected changes to the cloud database.</TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
                 )}
               </div>
             </div>
@@ -253,7 +266,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
               ) : (
                 <div className="py-12 text-center opacity-20 flex flex-col items-center gap-4">
                   <ShieldCheck className="h-12 w-12 text-white" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Registry at Parity</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Everything is synced</p>
                 </div>
               )}
             </div>
@@ -266,14 +279,14 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                 onClick={() => setIsFullViewOpen(true)}
                 className="h-10 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-primary hover:bg-primary/10 transition-all"
               >
-                View Full Audit Queue <ChevronRight className="h-4 w-4" />
+                See all {queue.length} items <ChevronRight className="h-4 w-4" />
               </Button>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* 2. Full Audit Pop-up: Grouped by Operation */}
+      {/* Full Audit Dialog */}
       <Dialog open={isFullViewOpen} onOpenChange={setIsFullViewOpen}>
         <DialogContent className="max-w-[1000px] w-[95vw] h-[85vh] p-0 overflow-hidden bg-black border-white/10 rounded-[2.5rem] shadow-3xl text-white">
           <div className="flex flex-col h-full">
@@ -283,16 +296,15 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                   <Activity className="h-8 w-8 text-primary" />
                 </div>
                 <div className="space-y-1">
-                  <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-none">Full Audit Queue</DialogTitle>
+                  <DialogTitle className="text-3xl font-black uppercase tracking-tight leading-none">Pending Sync</DialogTitle>
                   <DialogDescription className="text-[10px] font-bold uppercase text-white/40 tracking-[0.3em]">
-                    Batch Adjudication & Global Broadcast Station
+                    Review and send your local changes to the cloud.
                   </DialogDescription>
                 </div>
               </div>
               <button onClick={() => setIsFullViewOpen(false)} className="h-12 w-12 flex items-center justify-center bg-white/5 rounded-2xl text-white/40 hover:text-white transition-all"><X className="h-6 w-6" /></button>
             </div>
 
-            {/* Selection Pulse Toolbar */}
             <div className="px-8 py-4 bg-primary/5 border-b border-primary/10 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-4">
                 <Checkbox 
@@ -305,16 +317,15 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                   className="h-6 w-6 rounded-lg border-2 border-primary/40 data-[state=checked]:bg-primary"
                 />
                 <label htmlFor="pop-select-all" className="text-[11px] font-black uppercase tracking-widest text-primary/80 cursor-pointer">
-                  {selectedIds.size > 0 ? `${selectedIds.size} Pulses Selected` : 'Select All Modifications'}
+                  {selectedIds.size > 0 ? `${selectedIds.size} Items Selected` : 'Select all pending items'}
                 </label>
               </div>
               
               {selectedIds.size > 0 && (
-                <div className="flex items-center gap-3 animate-in slide-in-from-right-2">
-                  <Button variant="ghost" onClick={handleDiscardSelected} className="h-10 px-4 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">Purge Selection</Button>
+                <div className="flex items-center gap-3">
+                  <Button variant="ghost" onClick={handleDiscardSelected} className="h-10 px-4 rounded-xl text-[10px] font-black uppercase text-red-500 hover:bg-red-500/10">Remove Selection</Button>
                   <Button onClick={handlePushSelected} disabled={!isOnline} className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 gap-3">
-                    {isSyncing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Zap className="h-4 w-4" />}
-                    Broadcast Selection
+                    Sync Selected
                   </Button>
                 </div>
               )}
@@ -324,24 +335,15 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
               <div className="p-8 space-y-6 pb-20">
                 <Accordion type="multiple" defaultValue={["create", "update", "delete"]} className="space-y-4">
                   
-                  {/* CREATE GROUP */}
+                  {/* NEW ASSETS */}
                   {opGroups.CREATE.length > 0 && (
                     <AccordionItem value="create" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
                       <AccordionTrigger className="hover:no-underline py-6">
                         <div className="flex items-center justify-between w-full pr-6">
                           <div className="flex items-center gap-4">
                             <div className="p-2.5 bg-green-500/10 rounded-xl text-green-500"><PlusCircle className="h-5 w-5" /></div>
-                            <div className="text-left">
-                              <h4 className="text-sm font-black uppercase text-white leading-none">New Asset Pulses</h4>
-                              <p className="text-[9px] font-bold text-white/20 uppercase mt-1.5">{opGroups.CREATE.length} Pending Records</p>
-                            </div>
+                            <h4 className="text-sm font-black uppercase text-white leading-none">New Records ({opGroups.CREATE.length})</h4>
                           </div>
-                          <Checkbox 
-                            checked={opGroups.CREATE.every(i => selectedIds.has(i.id))} 
-                            onCheckedChange={(c) => handleSelectGroup(opGroups.CREATE, !!c)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-5 w-5 rounded-lg border-2 border-white/10"
-                          />
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="pb-8 space-y-3">
@@ -350,24 +352,15 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                     </AccordionItem>
                   )}
 
-                  {/* UPDATE GROUP */}
+                  {/* UPDATES */}
                   {opGroups.UPDATE.length > 0 && (
                     <AccordionItem value="update" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
                       <AccordionTrigger className="hover:no-underline py-6">
                         <div className="flex items-center justify-between w-full pr-6">
                           <div className="flex items-center gap-4">
                             <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><FileEdit className="h-5 w-5" /></div>
-                            <div className="text-left">
-                              <h4 className="text-sm font-black uppercase text-white leading-none">Modification Pulses</h4>
-                              <p className="text-[9px] font-bold text-white/20 uppercase mt-1.5">{opGroups.UPDATE.length} Field Edits</p>
-                            </div>
+                            <h4 className="text-sm font-black uppercase text-white leading-none">Record Updates ({opGroups.UPDATE.length})</h4>
                           </div>
-                          <Checkbox 
-                            checked={opGroups.UPDATE.every(i => selectedIds.has(i.id))} 
-                            onCheckedChange={(c) => handleSelectGroup(opGroups.UPDATE, !!c)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-5 w-5 rounded-lg border-2 border-white/10"
-                          />
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="pb-8 space-y-3">
@@ -376,24 +369,15 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                     </AccordionItem>
                   )}
 
-                  {/* DELETE GROUP */}
+                  {/* DELETIONS */}
                   {opGroups.DELETE.length > 0 && (
                     <AccordionItem value="delete" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
                       <AccordionTrigger className="hover:no-underline py-6">
                         <div className="flex items-center justify-between w-full pr-6">
                           <div className="flex items-center gap-4">
                             <div className="p-2.5 bg-red-500/10 rounded-xl text-red-500"><Eraser className="h-5 w-5" /></div>
-                            <div className="text-left">
-                              <h4 className="text-sm font-black uppercase text-white leading-none">Removal Pulses</h4>
-                              <p className="text-[9px] font-bold text-white/20 uppercase mt-1.5">{opGroups.DELETE.length} Deletions</p>
-                            </div>
+                            <h4 className="text-sm font-black uppercase text-white leading-none">Deleted Records ({opGroups.DELETE.length})</h4>
                           </div>
-                          <Checkbox 
-                            checked={opGroups.DELETE.every(i => selectedIds.has(i.id))} 
-                            onCheckedChange={(c) => handleSelectGroup(opGroups.DELETE, !!c)}
-                            onClick={(e) => e.stopPropagation()}
-                            className="h-5 w-5 rounded-lg border-2 border-white/10"
-                          />
                         </div>
                       </AccordionTrigger>
                       <AccordionContent className="pb-8 space-y-3">
@@ -409,10 +393,10 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
             <div className="p-8 bg-white/[0.02] border-t border-white/5 flex items-center justify-between shrink-0">
               <div className="flex items-center gap-4 text-[10px] font-bold text-white/40 uppercase italic max-w-sm">
                 <Info className="h-4 w-4 text-primary shrink-0" />
-                <p>Registry modifications are replayed in chronological order to preserve forensic data integrity.</p>
+                <p>Changes are sent to the cloud in the same order they were made to keep data accurate.</p>
               </div>
               <Button variant="ghost" onClick={() => setIsFullViewOpen(false)} className="h-14 px-12 rounded-2xl font-black uppercase text-[11px] tracking-[0.25em] bg-white/5 hover:bg-white/10 text-white">
-                Dismiss Audit
+                Close
               </Button>
             </div>
           </div>

@@ -1,10 +1,8 @@
+
 'use client';
 
 /**
- * @fileOverview Root Shell - Unified Global Command Hub.
- * Phase 305: Implemented global workstation scrolling and consistent container padding.
- * Phase 310: Converted status dot into interactive Online/Offline trigger.
- * Phase 400: Integrated Asset Groups Post-Import Intelligence Hub.
+ * @fileOverview Root Shell - Unified Command Hub.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -26,7 +24,8 @@ import {
   DatabaseZap,
   Menu,
   X,
-  LayoutGrid
+  LayoutGrid,
+  HelpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -52,6 +51,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
@@ -130,8 +130,8 @@ export default function SPAHub() {
     }
   };
 
-  const activeFilterCount = selectedLocations.length + selectedAssignees.length + selectedStatuses.length + selectedConditions.length + (missingFieldFilter ? 1 : 0);
   const isAdmin = userProfile?.isAdmin || false;
+  const isAdvanced = appSettings?.uxMode === 'advanced';
 
   return (
     <div className="app-container bg-black font-sans selection:bg-primary/30 text-white">
@@ -148,7 +148,7 @@ export default function SPAHub() {
                 className="flex items-center gap-2 p-2.5 md:p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-primary group tactile-pulse"
               >
                 <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Dashboard</span>
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Back Home</span>
               </button>
             ) : (
               <div className="flex items-center gap-2 md:gap-4">
@@ -156,14 +156,13 @@ export default function SPAHub() {
                   <Boxes className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex flex-col">
-                  <h1 className="text-lg md:text-xl font-black uppercase text-white tracking-tighter leading-none">NTBLCP</h1>
-                  <span className="text-[7px] md:text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Asset Manager</span>
+                  <h1 className="text-lg md:text-xl font-black uppercase text-white tracking-tighter leading-none">Assetain</h1>
+                  <span className="text-[7px] md:text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Inventory Control</span>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Global Navigation Pulse */}
           <div className="hidden lg:flex items-center bg-white/[0.02] p-1 rounded-2xl border border-white/5 shadow-inner">
             <button 
               onClick={() => setActiveView('REGISTRY')}
@@ -180,49 +179,41 @@ export default function SPAHub() {
           </div>
 
           <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            {/* Mobile Search Trigger */}
-            <button 
-              className="md:hidden p-2.5 bg-white/5 rounded-xl text-white/40 tactile-pulse"
-              onClick={() => setShowMobileSearch(!showMobileSearch)}
-            >
+            <button className="md:hidden p-2.5 bg-white/5 rounded-xl text-white/40 tactile-pulse" onClick={() => setShowMobileSearch(!showMobileSearch)}>
               <Search className="h-4 w-4" />
             </button>
 
-            <div className="hidden sm:flex items-center gap-2 mr-2">
-              <button 
-                onClick={manualDownload} 
-                disabled={isSyncing}
-                title="Fetch updates from cloud"
-                className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
-              >
-                <CloudDownload className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
-              </button>
-              <button 
-                onClick={manualUpload} 
-                disabled={isSyncing}
-                title="Save changes to cloud"
-                className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
-              >
-                <CloudUpload className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-              </button>
-            </div>
+            <TooltipProvider>
+              <div className="hidden sm:flex items-center gap-2 mr-2">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button onClick={manualDownload} disabled={isSyncing} className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                      <CloudDownload className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Download latest records from cloud.</TooltipContent>
+                </Tooltip>
+                
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button onClick={manualUpload} disabled={isSyncing} className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all">
+                      <CloudUpload className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Upload your local changes to cloud.</TooltipContent>
+                </Tooltip>
+              </div>
+            </TooltipProvider>
             
             <div className="flex items-center gap-2 md:gap-3 pr-2 md:pr-4 md:border-r border-white/5">
-              <button 
-                onClick={() => setIsOnline(!isOnline)}
-                className="flex items-center gap-2 md:gap-3 group hover:opacity-80 transition-opacity tactile-pulse"
-                title={isOnline ? "Go Offline" : "Go Online"}
-              >
+              <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 md:gap-3 group hover:opacity-80 transition-opacity tactile-pulse">
                 <div className={cn("h-2 w-2 rounded-full transition-all", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
                 <span className={cn("text-[8px] font-black uppercase tracking-widest hidden lg:inline", isOnline ? "text-green-500" : "text-red-500")}>
                   {isOnline ? 'Online' : 'Offline'}
                 </span>
               </button>
               
-              <button 
-                onClick={() => setIsNotificationsOpen(true)}
-                className="relative p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all tactile-pulse"
-              >
+              <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all">
                 <Bell className="h-4 w-4" />
                 {unreadCount > 0 && (
                   <div className="absolute -top-1 -right-1 h-4 w-4 bg-red-600 rounded-full flex items-center justify-center border-2 border-black animate-in zoom-in duration-300">
@@ -237,9 +228,7 @@ export default function SPAHub() {
                 <button className="flex items-center gap-3 group cursor-pointer pl-1">
                   <div className={cn(
                     "h-9 w-9 md:h-10 md:w-10 rounded-full border transition-all flex items-center justify-center font-black text-[10px] md:text-xs shadow-xl",
-                    activeView === 'SETTINGS' 
-                      ? "bg-primary text-black border-primary" 
-                      : "bg-primary/10 border-primary/20 text-primary group-hover:bg-primary group-hover:text-black"
+                    activeView === 'SETTINGS' ? "bg-primary text-black border-primary" : "bg-primary/10 border-primary/20 text-primary group-hover:bg-primary group-hover:text-black"
                   )}>
                     {userProfile?.displayName?.[0] || 'A'}
                   </div>
@@ -255,11 +244,11 @@ export default function SPAHub() {
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={() => setActiveView('GROUPS')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
                   <LayoutGrid className="mr-2 h-4 w-4" />
-                  <span className="text-[11px] font-black uppercase">Asset Groups</span>
+                  <span className="text-[11px] font-black uppercase">Browse Groups</span>
                 </DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
                   <SettingsIcon className="mr-2 h-4 w-4" />
-                  <span className="text-[11px] font-black uppercase">System Settings</span>
+                  <span className="text-[11px] font-black uppercase">Settings</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator className="bg-white/5" />
                 <DropdownMenuItem onClick={logout} className="p-3 focus:bg-red-600 focus:text-white rounded-xl cursor-pointer m-1 text-red-500">
@@ -271,35 +260,18 @@ export default function SPAHub() {
           </div>
         </header>
 
-        {/* Mobile Search Overlay */}
         {showMobileSearch && (
           <div className="md:hidden bg-black/90 backdrop-blur-2xl border-b border-white/5 p-4 animate-in slide-in-from-top duration-300 z-30">
             <div className="relative">
-              <Input 
-                autoFocus
-                placeholder="Search inventory..." 
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="h-12 bg-white/[0.03] border-white/10 rounded-xl text-white pr-10"
-              />
-              <button 
-                onClick={() => setShowMobileSearch(false)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20"
-              >
-                <X className="h-4 w-4" />
-              </button>
+              <Input autoFocus placeholder="Search records..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-12 bg-white/[0.03] border-white/10 rounded-xl text-white pr-10" />
+              <button onClick={() => setShowMobileSearch(false)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20"><X className="h-4 w-4" /></button>
             </div>
           </div>
         )}
 
         <div className="flex-1 min-h-0 relative">
           <ErrorBoundary module={activeView}>
-            <Suspense fallback={
-              <div className="h-full flex flex-col items-center justify-center gap-6 opacity-40">
-                <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Opening Workspace...</p>
-              </div>
-            }>
+            <Suspense fallback={<div className="h-full flex flex-col items-center justify-center gap-6 opacity-40"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Opening...</p></div>}>
               <ScrollArea className="h-full custom-scrollbar">
                 <div className="min-h-full p-6 md:p-12 lg:p-16">
                   {renderWorkstation()}

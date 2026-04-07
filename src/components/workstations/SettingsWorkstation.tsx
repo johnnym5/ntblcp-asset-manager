@@ -1,12 +1,11 @@
+
 'use client';
 
 /**
- * @fileOverview SettingsWorkstation - Real-Time Control Center.
- * Phase 400: Added Management vs Verification Mode toggle.
- * Phase 410: Converted static pulse badge into interactive Online/Offline trigger.
+ * @fileOverview Settings Workstation - System Preferences & Options.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useState } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
@@ -33,7 +32,8 @@ import {
   Eye,
   ShieldAlert,
   Sun,
-  Moon
+  Moon,
+  GraduationCap
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,7 +49,8 @@ import { storage } from '@/offline/storage';
 import { cn } from '@/lib/utils';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
 import { AuditLogWorkstation } from './AuditLogWorkstation';
-import type { AppSettings, Grant } from '@/types/domain';
+import type { AppSettings, Grant, UXMode } from '@/types/domain';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export function SettingsWorkstation() {
   const { 
@@ -77,17 +78,12 @@ export function SettingsWorkstation() {
     
     try {
       const updatedSettings = { ...appSettings, [key]: value };
-      
-      if (isOnline) {
-        await FirestoreService.updateSettings({ [key]: value });
-      }
-      
+      if (isOnline) await FirestoreService.updateSettings({ [key]: value });
       await storage.saveSettings(updatedSettings);
       setAppSettings(updatedSettings);
-      toast({ title: "Settings Updated", description: "Governance pulse broadcasted successfully." });
-      
+      toast({ title: "Settings Saved" });
     } catch (e: any) {
-      toast({ variant: "destructive", title: "Broadcast Failure" });
+      toast({ variant: "destructive", title: "Save Failed" });
     } finally {
       setIsSaving(false);
     }
@@ -106,35 +102,37 @@ export function SettingsWorkstation() {
   };
 
   if (!settingsLoaded || !appSettings) return (
-    <div className="flex h-[400px] items-center justify-center">
-      <Loader2 className="h-10 w-10 animate-spin text-primary" />
-    </div>
+    <div className="flex h-[400px] items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>
   );
 
   return (
     <div className="max-w-5xl mx-auto animate-in fade-in duration-700 pb-40">
       <div className="flex items-center justify-between px-1 mb-10">
         <div className="space-y-1">
-          <h2 className="text-3xl font-black uppercase text-white tracking-tight">Admin Settings</h2>
-          <p className="text-[11px] font-bold uppercase text-white/40 tracking-widest">SYSTEM CONTROL PANEL</p>
+          <h2 className="text-3xl font-black uppercase text-white tracking-tight">Settings</h2>
+          <p className="text-[11px] font-bold uppercase text-white/40 tracking-widest">Personal & Administrative Preferences</p>
         </div>
         <div className="flex items-center gap-4">
-          <button 
-            onClick={() => setIsOnline(!isOnline)}
-            className={cn(
-              "h-10 px-6 border-2 font-black uppercase text-[10px] tracking-widest gap-2.5 rounded-2xl shadow-sm transition-all flex items-center group tactile-pulse",
-              isOnline 
-                ? "border-green-500/20 bg-green-500/5 text-green-500 hover:bg-green-500/10" 
-                : "border-red-500/20 bg-red-500/5 text-red-500 hover:bg-red-500/10"
-            )}
-            title={isOnline ? "Switch to Offline Mode" : "Switch to Online Mode"}
-          >
-            <Zap className={cn("h-3.5 w-3.5 fill-current", isOnline && "animate-pulse")} /> 
-            {isOnline ? 'Online Heartbeat' : 'Offline Mode'}
-          </button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button 
+                  onClick={() => setIsOnline(!isOnline)}
+                  className={cn(
+                    "h-10 px-6 border-2 font-black uppercase text-[10px] tracking-widest gap-2.5 rounded-2xl shadow-sm transition-all flex items-center group tactile-pulse",
+                    isOnline ? "border-green-500/20 bg-green-500/5 text-green-500" : "border-red-500/20 bg-red-500/5 text-red-500"
+                  )}
+                >
+                  <Zap className={cn("h-3.5 w-3.5 fill-current", isOnline && "animate-pulse")} /> 
+                  {isOnline ? 'Online' : 'Offline'}
+                </button>
+              </TooltipTrigger>
+              <TooltipContent>Switch between connecting to the cloud and working locally.</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
           <button 
             onClick={() => setActiveView('DASHBOARD')}
-            className="h-12 w-12 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl transition-all tactile-pulse"
+            className="h-12 w-12 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-2xl transition-all"
           >
             <X className="h-6 w-6 text-white/40" />
           </button>
@@ -144,86 +142,58 @@ export function SettingsWorkstation() {
       <Tabs defaultValue="general" className="space-y-10">
         <div className="bg-[#080808] p-1 rounded-2xl border border-white/5 shadow-inner overflow-x-auto no-scrollbar">
           <TabsList className="bg-transparent border-none p-0 h-auto gap-1 flex items-center w-full min-w-max">
-            <TabsTrigger value="general" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-              <Settings className="h-3.5 w-3.5" /> General
-            </TabsTrigger>
-            {isAdmin && (
-              <TabsTrigger value="groups" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-                <PlusCircle className="h-3.5 w-3.5" /> Asset Groups
-              </TabsTrigger>
-            )}
-            {isAdmin && (
-              <TabsTrigger value="users" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-                <Users className="h-3.5 w-3.5" /> Auditors
-              </TabsTrigger>
-            )}
-            {isAdmin && (
-              <TabsTrigger value="database" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-                <Terminal className="h-3.5 w-3.5" /> Storage
-              </TabsTrigger>
-            )}
-            {isAdmin && (
-              <TabsTrigger value="history" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">
-                <History className="h-3.5 w-3.5" /> Activity
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="general" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">General</TabsTrigger>
+            {isAdmin && <TabsTrigger value="groups" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">Projects</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="users" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">Auditors</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="database" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">Storage</TabsTrigger>}
+            {isAdmin && <TabsTrigger value="history" className="px-6 py-3 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 data-[state=active]:bg-[#1A1A1A] data-[state=active]:text-white transition-all">Activity</TabsTrigger>}
           </TabsList>
         </div>
 
         <TabsContent value="general" className="space-y-10 m-0 outline-none">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-1">
-            {/* Visual Identity */}
+            {/* Appearance */}
             <Card className="bg-[#050505] border-white/5 rounded-[2.5rem] p-10 shadow-3xl">
               <div className="flex items-center gap-4 mb-8">
                 <div className="p-3 bg-white/5 rounded-xl"><Palette className="h-5 w-5 text-white/40" /></div>
                 <div className="flex flex-col">
-                  <span className="text-sm font-black uppercase text-white tracking-tight leading-none">Visual Identity</span>
-                  <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1">App aesthetic pulse</span>
+                  <span className="text-sm font-black uppercase text-white tracking-tight leading-none">Appearance</span>
+                  <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1">Light or Dark Mode</span>
                 </div>
               </div>
               <div className="flex flex-col gap-3">
                 <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="h-14 rounded-xl font-black uppercase text-[10px] border-2 justify-between px-6">
-                  Light Auditor Mode <Sun className="h-4 w-4" />
+                  Light Mode <Sun className="h-4 w-4" />
                 </Button>
                 <Button variant={theme === 'dark' ? 'secondary' : 'outline'} onClick={() => setTheme('dark')} className="h-14 rounded-xl font-black uppercase text-[10px] border-2 justify-between px-6">
-                  Dark Workstation <Moon className="h-4 w-4" />
+                  Dark Mode <Moon className="h-4 w-4" />
                 </Button>
               </div>
             </Card>
 
-            {/* Operational Mode Toggle */}
+            {/* UX Settings */}
             <Card className="bg-[#050505] border-white/5 rounded-[2.5rem] p-10 shadow-3xl">
               <div className="flex items-center gap-4 mb-8">
-                <div className="p-3 bg-primary/10 rounded-xl"><Wrench className="h-5 w-5 text-primary" /></div>
+                <div className="p-3 bg-primary/10 rounded-xl"><GraduationCap className="h-5 w-5 text-primary" /></div>
                 <div className="flex flex-col">
                   <span className="text-sm font-black uppercase text-white tracking-tight leading-none">Operational Mode</span>
-                  <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1">Governance Lock Control</span>
+                  <span className="text-[9px] font-bold text-white/20 uppercase tracking-widest mt-1">Beginner vs Advanced</span>
                 </div>
               </div>
               <div className="p-6 rounded-2xl bg-white/5 border border-white/5 space-y-6">
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <Label className="text-xs font-black uppercase text-white">Management Mode</Label>
-                    <p className="text-[9px] text-white/40 italic leading-relaxed">Verification fields are locked for auditors.</p>
+                    <Label className="text-xs font-black uppercase text-white">Show Tooltips</Label>
+                    <p className="text-[9px] text-white/40 italic">Explain buttons when you hover over them.</p>
                   </div>
-                  <Switch 
-                    checked={appSettings.appMode === 'management'} 
-                    onCheckedChange={(v) => handleSettingChange('appMode', v ? 'management' : 'verification')}
-                    disabled={isSaving}
-                    className="data-[state=checked]:bg-primary"
-                  />
+                  <Switch checked={appSettings.showHelpTooltips} onCheckedChange={(v) => handleSettingChange('showHelpTooltips', v)} className="data-[state=checked]:bg-primary" />
                 </div>
                 <div className="flex items-center justify-between">
                   <div className="space-y-1">
-                    <Label className="text-xs font-black uppercase text-white">Verification Mode</Label>
-                    <p className="text-[9px] text-white/40 italic leading-relaxed">Full audit, remarks, and condition assessment enabled.</p>
+                    <Label className="text-xs font-black uppercase text-white">Advanced Labels</Label>
+                    <p className="text-[9px] text-white/40 italic">Use compact, technical names for faster navigation.</p>
                   </div>
-                  <Switch 
-                    checked={appSettings.appMode === 'verification'} 
-                    onCheckedChange={(v) => handleSettingChange('appMode', v ? 'verification' : 'management')}
-                    disabled={isSaving}
-                    className="data-[state=checked]:bg-primary"
-                  />
+                  <Switch checked={appSettings.uxMode === 'advanced'} onCheckedChange={(v) => handleSettingChange('uxMode', v ? 'advanced' : 'beginner')} className="data-[state=checked]:bg-primary" />
                 </div>
               </div>
             </Card>
@@ -236,43 +206,24 @@ export function SettingsWorkstation() {
               <h3 className="text-xl font-black uppercase text-white tracking-tight">Project Registry</h3>
               <div className="flex gap-3">
                 <Input placeholder="Enter project name..." value={newProjectName} onChange={e => setNewProjectName(e.target.value)} className="h-14 bg-white/[0.03] border-white/10 rounded-xl font-medium text-sm text-white" />
-                <Button onClick={handleAddProject} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl shadow-primary/20">
-                  <PlusCircle className="h-4 w-4" /> Create Project
-                </Button>
+                <Button onClick={handleAddProject} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl shadow-primary/20">Add Project</Button>
               </div>
             </div>
-            
             <div className="grid grid-cols-1 gap-6">
               {appSettings.grants.map(grant => {
                 const isActive = appSettings.activeGrantId === grant.id;
                 return (
-                  <Card key={grant.id} className={cn("bg-[#050505] border-2 rounded-[2.5rem] overflow-hidden transition-all duration-700 shadow-3xl", isActive ? "border-primary/40" : "border-white/5")}>
+                  <Card key={grant.id} className={cn("bg-[#050505] border-2 rounded-[2.5rem] overflow-hidden transition-all shadow-3xl", isActive ? "border-primary/40" : "border-white/5")}>
                     <CardHeader className="p-8 border-b border-white/5 flex flex-row items-center justify-between bg-white/[0.01]">
                       <div className="flex items-center gap-4">
                         <span className="text-xl font-black uppercase text-white tracking-tight">{grant.name}</span>
-                        {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] px-3 rounded-full">ACTIVE SCOPE</Badge>}
+                        {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] px-3 rounded-full">ACTIVE</Badge>}
                       </div>
                       <div className="flex items-center gap-6">
-                        {!isActive && <button onClick={() => handleSettingChange('activeGrantId', grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80 transition-opacity">Select Project</button>}
-                        <button className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:opacity-80 transition-opacity">Delete Project</button>
+                        {!isActive && <button onClick={() => handleSettingChange('activeGrantId', grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80">Select</button>}
+                        <button className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:opacity-80">Delete</button>
                       </div>
                     </CardHeader>
-                    <CardContent className="p-8 pt-6 space-y-8">
-                      <div className="space-y-4">
-                        <h4 className="text-[11px] font-black uppercase tracking-[0.3em] text-white/40">Technical Groups</h4>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          {Object.keys(grant.sheetDefinitions || {}).map(groupName => (
-                            <div key={groupName} className="flex items-center justify-between p-5 bg-black border border-white/5 rounded-2xl group/sheet hover:border-white/20 transition-all shadow-inner">
-                              <span className="text-xs font-black uppercase text-white/80">{groupName}</span>
-                              <div className="flex items-center gap-4 opacity-20 group-hover:opacity-100 transition-all">
-                                <button className="hover:text-primary transition-colors"><Wrench className="h-4 w-4" /></button>
-                                <button className="hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    </CardContent>
                   </Card>
                 );
               })}
@@ -282,11 +233,7 @@ export function SettingsWorkstation() {
 
         <TabsContent value="users" className="m-0 outline-none px-1">
           <Card className="bg-[#050505] border-white/5 rounded-[2.5rem] p-10 shadow-3xl">
-            <UserManagement 
-              users={appSettings.authorizedUsers} 
-              onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} 
-              adminProfile={userProfile} 
-            />
+            <UserManagement users={appSettings.authorizedUsers} onUsersChange={newUsers => handleSettingChange('authorizedUsers', newUsers)} adminProfile={userProfile} />
           </Card>
         </TabsContent>
 

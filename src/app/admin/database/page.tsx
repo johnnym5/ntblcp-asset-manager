@@ -1,8 +1,9 @@
+
 'use client';
 
 /**
- * @fileOverview Super Admin Database Mission Control.
- * Phase 51: Launched Conflict Resolution Wizard & Cross-Layer Copy/Move logic.
+ * @fileOverview Super Admin Database View.
+ * Renamed from Mission Control to Database View for clarity.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -38,7 +39,8 @@ import {
   ShieldHalf,
   ArrowRightLeft,
   ArrowUpRight,
-  Split
+  Split,
+  Info
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -62,6 +64,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 export default function DatabaseExplorerPage() {
   const { userProfile } = useAuth();
@@ -81,11 +84,8 @@ export default function DatabaseExplorerPage() {
   const [isComparing, setIsComparing] = useState(false);
   const [discrepancyIds, setDiscrepancyIds] = useState<string[]>([]);
 
-  // Advanced Deletion State
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
   const [layerToPurge, setLayerToPurge] = useState<StorageLayer | null>(null);
-
-  // Conflict Resolution State
   const [isConflictView, setIsConflictView] = useState(false);
 
   useEffect(() => {
@@ -157,10 +157,10 @@ export default function DatabaseExplorerPage() {
     try {
       const data = JSON.parse(editedData);
       await VirtualDBService.updateNode(selectedNode.source, selectedNode.path, data);
-      toast({ title: "Mutation Committed", description: `Updated ${selectedNode.displayName} pulse.` });
+      toast({ title: "Changes Saved", description: `Updated ${selectedNode.displayName} successfully.` });
       loadRootNodes();
     } catch (e) {
-      toast({ variant: "destructive", title: "Syntax Error", description: "Invalid JSON schema." });
+      toast({ variant: "destructive", title: "Error", description: "Invalid data format." });
     } finally {
       setIsSaving(false);
     }
@@ -171,11 +171,11 @@ export default function DatabaseExplorerPage() {
     setIsSaving(true);
     try {
       await VirtualDBService.copyNode(selectedNode.path, from, to);
-      toast({ title: "Parity Established", description: `Synchronized ${from} to ${to}.` });
+      toast({ title: "Sync Complete", description: `Synchronized ${from} to ${to}.` });
       loadParity(selectedNode.path);
       runGlobalScan();
     } catch (e) {
-      toast({ variant: "destructive", title: "Sync Failure" });
+      toast({ variant: "destructive", title: "Sync Failed" });
     } finally {
       setIsSaving(false);
     }
@@ -189,11 +189,11 @@ export default function DatabaseExplorerPage() {
     setIsSaving(true);
     try {
       await VirtualDBService.resolveConflict(selectedNode.path, authoritativeData);
-      toast({ title: "Conflict Resolved", description: `Record parity established using ${layer} pulse.` });
+      toast({ title: "Conflict Resolved", description: `Record updated using ${layer} data.` });
       runGlobalScan();
       loadParity(selectedNode.path);
     } catch (e) {
-      toast({ variant: "destructive", title: "Resolution Failure" });
+      toast({ variant: "destructive", title: "Resolution Failed" });
     } finally {
       setIsSaving(false);
     }
@@ -204,11 +204,11 @@ export default function DatabaseExplorerPage() {
     setIsSaving(true);
     try {
       await VirtualDBService.purgeLayer(layerToPurge);
-      toast({ title: "Layer Purged", description: `Deterministic wipe of ${layerToPurge} complete.` });
+      toast({ title: "Layer Wiped", description: `Deleted all records in ${layerToPurge}.` });
       loadRootNodes();
       setSelectedNode(null);
     } catch (e) {
-      toast({ variant: "destructive", title: "Purge Failure", description: "Storage layer is currently locked." });
+      toast({ variant: "destructive", title: "Failed", description: "Storage layer is currently locked." });
     } finally {
       setIsSaving(false);
       setIsPurgeDialogOpen(false);
@@ -229,7 +229,7 @@ export default function DatabaseExplorerPage() {
       <AppLayout>
         <div className="h-full flex flex-col items-center justify-center opacity-20 space-y-4">
           <ShieldAlert className="h-20 w-20" />
-          <h2 className="text-xl font-black uppercase tracking-widest">Clearance Required</h2>
+          <h2 className="text-xl font-black uppercase tracking-widest">Admin Access Required</h2>
         </div>
       </AppLayout>
     );
@@ -246,41 +246,48 @@ export default function DatabaseExplorerPage() {
               <div className="p-3 bg-primary/10 rounded-2xl">
                 <Terminal className="h-8 w-8 text-primary" />
               </div>
-              Mission Control
+              Database View
             </h2>
             <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-              High-Availability Multi-Layer Registry Orchestration
+              Advanced Data Management & Technical View
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center bg-muted/50 p-1 rounded-2xl border-2 border-border/40 shadow-inner">
               <Button variant={displayMode === 'FRIENDLY' ? 'secondary' : 'ghost'} size="sm" onClick={() => setDisplayMode('FRIENDLY')} className="h-9 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest">Friendly</Button>
-              <Button variant={displayMode === 'MIXED' ? 'secondary' : 'ghost'} size="sm" onClick={() => setDisplayMode('MIXED')} className="h-9 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest">Mixed</Button>
+              <Button variant={displayMode === 'MIXED' ? 'secondary' : 'ghost'} size="sm" onClick={() => setDisplayMode('MIXED')} className="h-9 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest">Standard</Button>
               <Button variant={displayMode === 'TECHNICAL' ? 'secondary' : 'ghost'} size="sm" onClick={() => setDisplayMode('TECHNICAL')} className="h-9 px-4 rounded-xl text-[9px] font-black uppercase tracking-widest">Technical</Button>
             </div>
-            <Button 
-              variant="outline" 
-              onClick={() => { setIsConflictView(!isConflictView); setSelectedNode(null); }}
-              className={cn("h-11 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2 transition-all", isConflictView ? "bg-destructive text-white border-destructive" : "text-destructive border-destructive/20 hover:bg-destructive/5")}
-            >
-              <Split className="h-3.5 w-3.5" /> {isConflictView ? 'Exit Conflict Mode' : 'Resolve Conflicts'}
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => { setIsConflictView(!isConflictView); setSelectedNode(null); }}
+                    className={cn("h-11 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 border-2 transition-all", isConflictView ? "bg-destructive text-white border-destructive" : "text-destructive border-destructive/20 hover:bg-destructive/5")}
+                  >
+                    <Split className="h-3.5 w-3.5" /> {isConflictView ? 'Exit Sync Mode' : 'Fix Sync Conflicts'}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Identify and fix data mismatches between cloud and local storage.</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </div>
         </div>
 
         <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-6 overflow-hidden">
-          {/* Tree Explorer */}
+          {/* Data Tree */}
           <Card className="lg:col-span-3 rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
             <CardHeader className="bg-muted/20 border-b p-6 space-y-4">
               <div className="grid grid-cols-3 bg-background/50 p-1 rounded-2xl border-2 border-border/40 shadow-inner h-12">
-                <button onClick={() => setActiveLayer('FIRESTORE')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'FIRESTORE' ? "bg-blue-500 text-white shadow-lg" : "text-muted-foreground hover:bg-muted")}><Server className="h-3 w-3" /> Cloud</button>
-                <button onClick={() => setActiveLayer('RTDB')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'RTDB' ? "bg-green-500 text-white shadow-lg" : "text-muted-foreground hover:bg-muted")}><Activity className="h-3 w-3" /> Mirror</button>
-                <button onClick={() => setActiveLayer('LOCAL')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'LOCAL' ? "bg-amber-500 text-white shadow-lg" : "text-muted-foreground hover:bg-muted")}><HardDrive className="h-3 w-3" /> Local</button>
+                <button onClick={() => setActiveLayer('FIRESTORE')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'FIRESTORE' ? "bg-blue-500 text-white shadow-lg" : "text-muted-foreground hover:bg-muted")}>Cloud</button>
+                <button onClick={() => setActiveLayer('RTDB')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'RTDB' ? "bg-green-500 text-white shadow-lg" : "text-muted-foreground hover:bg-muted")}>Mirror</button>
+                <button onClick={() => setActiveLayer('LOCAL')} className={cn("rounded-xl flex items-center justify-center gap-2 text-[9px] font-black uppercase transition-all", activeLayer === 'LOCAL' ? "bg-amber-500 text-white shadow-lg" : "text-muted-foreground hover:bg-muted")}>Local</button>
               </div>
               <div className="relative group">
                 <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground opacity-40" />
-                <Input placeholder="Scan Nodes..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-10 rounded-xl bg-background border-none shadow-inner text-xs font-bold" />
+                <Input placeholder="Search records..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-10 rounded-xl bg-background border-none shadow-inner text-xs font-bold" />
               </div>
             </CardHeader>
             <ScrollArea className="flex-1 p-4 bg-background/30">
@@ -288,7 +295,7 @@ export default function DatabaseExplorerPage() {
                 {loading ? (
                   <div className="py-20 flex flex-col items-center gap-4 opacity-20">
                     <Loader2 className="h-8 w-8 animate-spin" />
-                    <span className="text-[10px] font-black uppercase">Retrieving...</span>
+                    <span className="text-[10px] font-black uppercase">Loading...</span>
                   </div>
                 ) : nodes.map((node) => {
                   const isConflict = discrepancyIds.includes(node.rawKey);
@@ -313,7 +320,7 @@ export default function DatabaseExplorerPage() {
             </ScrollArea>
           </Card>
 
-          {/* Context & Parity Panel */}
+          {/* Sync & Detail Panel */}
           <Card className="lg:col-span-5 rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
             <CardHeader className="bg-muted/20 border-b p-6">
               {selectedNode ? (
@@ -324,13 +331,13 @@ export default function DatabaseExplorerPage() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="p-4 rounded-2xl bg-background/50 border-2 border-dashed border-border/40 space-y-1">
-                      <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Registry Parity</span>
+                      <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Sync Status</span>
                       <p className={cn("text-[10px] font-bold uppercase", discrepancyIds.includes(selectedNode.rawKey) ? "text-destructive" : "text-green-600")}>
-                        {discrepancyIds.includes(selectedNode.rawKey) ? 'Discrepancy' : 'Synchronized'}
+                        {discrepancyIds.includes(selectedNode.rawKey) ? 'Out of Sync' : 'Synced'}
                       </p>
                     </div>
                     <div className="p-4 rounded-2xl bg-background/50 border-2 border-dashed border-border/40 space-y-1">
-                      <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Last Pulse</span>
+                      <span className="text-[8px] font-black uppercase text-muted-foreground opacity-60">Last Update</span>
                       <p className="text-[10px] font-bold uppercase truncate">{selectedNode.lastUpdated || 'Never'}</p>
                     </div>
                   </div>
@@ -338,7 +345,7 @@ export default function DatabaseExplorerPage() {
               ) : (
                 <div className="py-10 text-center opacity-20 space-y-2">
                   <Layers className="h-10 w-10 mx-auto" />
-                  <p className="text-[10px] font-black uppercase tracking-widest">Awaiting Pulse Selection</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest">Select a record to inspect</p>
                 </div>
               )}
             </CardHeader>
@@ -346,16 +353,16 @@ export default function DatabaseExplorerPage() {
               <div className="p-6">
                 <Tabs defaultValue={isConflictView ? "wizard" : "parity"}>
                   <TabsList className="bg-muted/50 p-1 rounded-xl mb-6">
-                    <TabsTrigger value="parity" className="text-[10px] font-black uppercase">Parity Pulse</TabsTrigger>
-                    {isConflictView && <TabsTrigger value="wizard" className="text-[10px] font-black uppercase">Resolution Wizard</TabsTrigger>}
-                    <TabsTrigger value="forensics" className="text-[10px] font-black uppercase">Forensic Diff</TabsTrigger>
+                    <TabsTrigger value="parity" className="text-[10px] font-black uppercase">Sync View</TabsTrigger>
+                    {isConflictView && <TabsTrigger value="wizard" className="text-[10px] font-black uppercase">Fix Wizard</TabsTrigger>}
+                    <TabsTrigger value="forensics" className="text-[10px] font-black uppercase">History Diff</TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="parity">
                     {isComparing ? (
                       <div className="py-20 flex flex-col items-center gap-4 opacity-20">
                         <Loader2 className="h-8 w-8 animate-spin" />
-                        <span className="text-[10px] font-black uppercase">Auditing Layers...</span>
+                        <span className="text-[10px] font-black uppercase">Scanning layers...</span>
                       </div>
                     ) : parityData ? (
                       <div className="space-y-6">
@@ -369,18 +376,18 @@ export default function DatabaseExplorerPage() {
                                 </div>
                                 <div className="flex flex-col">
                                   <span className="text-[10px] font-black uppercase">{layer} State</span>
-                                  <span className="text-[8px] font-bold opacity-40">{data ? 'RECORD DETECTED' : 'VOID'}</span>
+                                  <span className="text-[8px] font-bold opacity-40">{data ? 'RECORD FOUND' : 'NO RECORD'}</span>
                                 </div>
                               </div>
-                              {data && <Button variant="outline" size="sm" onClick={() => setEditedData(JSON.stringify(data, null, 2))} className="h-8 text-[8px] font-black uppercase">View Pulse</Button>}
+                              {data && <Button variant="outline" size="sm" onClick={() => setEditedData(JSON.stringify(data, null, 2))} className="h-8 text-[8px] font-black uppercase">View Data</Button>}
                             </div>
                           );
                         })}
                         <div className="p-6 rounded-3xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-4">
-                          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Authority Reconciler</h4>
+                          <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-primary">Data Reconciler</h4>
                           <div className="grid grid-cols-2 gap-2">
-                            <Button variant="outline" onClick={() => handleReconcile('LOCAL', 'FIRESTORE')} className="h-10 text-[8px] font-black uppercase gap-2"><Cloud className="h-3 w-3" /> Local &gt; Cloud</Button>
-                            <Button variant="outline" onClick={() => handleReconcile('FIRESTORE', 'LOCAL')} className="h-10 text-[8px] font-black uppercase gap-2"><HardDrive className="h-3 w-3" /> Cloud &gt; Local</Button>
+                            <Button variant="outline" onClick={() => handleReconcile('LOCAL', 'FIRESTORE')} className="h-10 text-[8px] font-black uppercase gap-2"><Cloud className="h-3 w-3" /> Local to Cloud</Button>
+                            <Button variant="outline" onClick={() => handleReconcile('FIRESTORE', 'LOCAL')} className="h-10 text-[8px] font-black uppercase gap-2"><HardDrive className="h-3 w-3" /> Cloud to Local</Button>
                           </div>
                         </div>
                       </div>
@@ -393,9 +400,9 @@ export default function DatabaseExplorerPage() {
                         <div className="p-6 rounded-3xl bg-destructive/5 border-2 border-dashed border-destructive/20 space-y-2">
                           <div className="flex items-center gap-3">
                             <Split className="h-5 w-5 text-destructive" />
-                            <h4 className="text-sm font-black uppercase">Resolution Wizard</h4>
+                            <h4 className="text-sm font-black uppercase">Fix Wizard</h4>
                           </div>
-                          <p className="text-[10px] font-medium text-muted-foreground italic">Pick an authoritative storage pulse to resolve the sync drift for this record.</p>
+                          <p className="text-[10px] font-medium text-muted-foreground italic">Pick the correct version of this record to fix the mismatch.</p>
                         </div>
                         
                         <div className="space-y-3">
@@ -410,7 +417,7 @@ export default function DatabaseExplorerPage() {
                                 <div className={cn("p-2 rounded-xl group-hover:bg-primary group-hover:text-white transition-colors", getSourceColor(layer as StorageLayer))}>
                                   <CheckCircle2 className="h-4 w-4" />
                                 </div>
-                                <span className="text-[10px] font-black uppercase">Enforce {layer} Pulse</span>
+                                <span className="text-[10px] font-black uppercase">Use {layer} Version</span>
                               </div>
                               <ArrowUpRight className="h-4 w-4 opacity-20 group-hover:opacity-100 group-hover:translate-x-1" />
                             </button>
@@ -426,34 +433,34 @@ export default function DatabaseExplorerPage() {
                         <div className="p-6 rounded-[2rem] bg-orange-500/5 border-2 border-dashed border-orange-500/20">
                           <div className="flex items-center gap-3 mb-4">
                             <ScanSearch className="h-5 w-5 text-orange-600" />
-                            <h4 className="text-sm font-black uppercase tracking-tight text-foreground">Audit Buffer Detected</h4>
+                            <h4 className="text-sm font-black uppercase tracking-tight text-foreground">Previous State Found</h4>
                           </div>
                           <p className="text-[10px] font-medium text-muted-foreground italic leading-relaxed">
-                            Compare the current pulse with its previous stable version. Use the reversion pulse to roll back unintended changes.
+                            Compare current values with the previous version. Use the restore button to roll back changes.
                           </p>
                         </div>
                         <div className="grid grid-cols-2 gap-4">
                           <div className="space-y-2">
-                            <span className="text-[8px] font-black uppercase opacity-40">Previous State</span>
+                            <span className="text-[8px] font-black uppercase opacity-40">Previous Version</span>
                             <div className="p-4 rounded-xl bg-muted/20 border-2 border-border/40 font-mono text-[9px] overflow-hidden truncate">
                               {JSON.stringify(forensics).substring(0, 100)}...
                             </div>
                           </div>
                           <div className="space-y-2">
-                            <span className="text-[8px] font-black uppercase opacity-40">Active State</span>
+                            <span className="text-[8px] font-black uppercase opacity-40">Active Version</span>
                             <div className="p-4 rounded-xl bg-primary/5 border-2 border-primary/20 font-mono text-[9px] overflow-hidden truncate">
                               {JSON.stringify(selectedNode?.data).substring(0, 100)}...
                             </div>
                           </div>
                         </div>
                         <Button variant="outline" onClick={() => VirtualDBService.restoreNode(selectedNode!.source, selectedNode!.path)} className="w-full h-12 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-blue-600 border-blue-200">
-                          <RotateCcw className="h-4 w-4" /> Restore Previous Pulse
+                          <RotateCcw className="h-4 w-4" /> Restore Previous Version
                         </Button>
                       </div>
                     ) : (
                       <div className="py-20 text-center opacity-20 space-y-4">
                         <ScanSearch className="h-16 w-16 mx-auto" />
-                        <p className="text-[10px] font-black uppercase tracking-widest">No Historical Buffer Found</p>
+                        <p className="text-[10px] font-black uppercase tracking-widest">No history available</p>
                       </div>
                     )}
                   </TabsContent>
@@ -462,14 +469,14 @@ export default function DatabaseExplorerPage() {
             </ScrollArea>
           </Card>
 
-          {/* Record Mutator Panel */}
+          {/* Editor */}
           <Card className="lg:col-span-4 rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden flex flex-col">
             {selectedNode ? (
               <>
                 <CardHeader className="bg-muted/20 border-b p-6">
                   <div className="flex items-center gap-2">
                     <FileJson className="h-4 w-4 text-primary" />
-                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">Record Mutator</span>
+                    <span className="text-[10px] font-black uppercase tracking-[0.2em]">Record Editor</span>
                   </div>
                 </CardHeader>
                 <ScrollArea className="flex-1 bg-background/30">
@@ -479,12 +486,12 @@ export default function DatabaseExplorerPage() {
                     </div>
                     <div className="space-y-3">
                       <div className="grid grid-cols-2 gap-2">
-                        <Button variant="outline" className="h-12 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2"><Copy className="h-3.5 w-3.5" /> Clone</Button>
-                        <Button variant="outline" className="h-12 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2 text-destructive border-destructive/20"><Trash2 className="h-3.5 w-3.5" /> Purge</Button>
+                        <Button variant="outline" className="h-12 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2"><Copy className="h-3.5 w-3.5" /> Duplicate</Button>
+                        <Button variant="outline" className="h-12 rounded-xl text-[9px] font-black uppercase tracking-widest gap-2 text-destructive border-destructive/20"><Trash2 className="h-3.5 w-3.5" /> Delete</Button>
                       </div>
                       <Button onClick={handleCommit} disabled={isSaving} className="w-full h-14 rounded-2xl font-black uppercase text-xs tracking-[0.2em] shadow-xl shadow-primary/20 bg-primary text-primary-foreground gap-3">
                         {isSaving ? <Loader2 className="h-4 w-4 animate-spin" /> : <Save className="h-4 w-4" />}
-                        Commit Mutation
+                        Save Changes
                       </Button>
                     </div>
                   </div>
@@ -493,7 +500,7 @@ export default function DatabaseExplorerPage() {
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-10 opacity-20 space-y-6">
                 <Database className="h-16 w-14" />
-                <h3 className="text-xl font-black uppercase tracking-[0.2em]">Inspector Inactive</h3>
+                <h3 className="text-xl font-black uppercase tracking-[0.2em]">No Record Selected</h3>
               </div>
             )}
           </Card>
@@ -507,21 +514,21 @@ export default function DatabaseExplorerPage() {
               <Bomb className="h-8 w-8 text-destructive" />
             </div>
             <div className="space-y-2">
-              <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Layer Pulse?</AlertDialogTitle>
+              <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Layer Data?</AlertDialogTitle>
               <AlertDialogDescription className="text-sm font-medium leading-relaxed italic">
-                You are about to perform a deterministic wipe of the <strong>{layerToPurge}</strong> registry. This action is immutable and will clear all logical groups in this source. Recovery is only possible via a Reconstruct Pulse from a peer layer.
+                You are about to delete everything in the <strong>{layerToPurge}</strong> storage layer. This cannot be undone.
               </AlertDialogDescription>
             </div>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Abort Purge</AlertDialogCancel>
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 m-0">Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handlePurgeLayer}
               disabled={isSaving}
               className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/20 bg-destructive text-white m-0"
             >
               {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Hammer className="h-4 w-4 mr-2" />}
-              Commit Wipe Pulse
+              Confirm Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -1,8 +1,8 @@
+
 'use client';
 
 /**
- * @fileOverview Universal Command Palette.
- * Phase 165: Applied professional Asset Manager friendly naming.
+ * @fileOverview Universal Command Search.
  */
 
 import React, { useEffect, useState } from 'react';
@@ -40,7 +40,8 @@ import {
   ShieldX,
   Package,
   ClipboardList,
-  RefreshCw
+  RefreshCw,
+  SearchCode
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -48,8 +49,10 @@ import { useAuth } from '@/contexts/auth-context';
 export function CommandPalette() {
   const [open, setOpen] = useState(false);
   const router = useRouter();
-  const { assets, refreshRegistry } = useAppState();
+  const { assets, refreshRegistry, appSettings } = useAppState();
   const { userProfile, logout } = useAuth();
+
+  const isAdvanced = appSettings?.uxMode === 'advanced';
 
   useEffect(() => {
     const down = (e: KeyboardEvent) => {
@@ -69,74 +72,74 @@ export function CommandPalette() {
 
   return (
     <CommandDialog open={open} onOpenChange={setOpen}>
-      <CommandInput placeholder="Search inventory or run system command..." />
+      <CommandInput placeholder="Type a command or search assets..." />
       <CommandList className="custom-scrollbar">
-        <CommandEmpty>No matching records found.</CommandEmpty>
+        <CommandEmpty>Nothing found.</CommandEmpty>
         
-        <CommandGroup heading="Main Dashboard">
+        <CommandGroup heading="Main Navigation">
           <CommandItem onSelect={() => runCommand(() => router.push('/'))}>
             <LayoutDashboard className="mr-2 h-4 w-4" />
-            <span>Inventory Dashboard</span>
+            <span>Dashboard</span>
           </CommandItem>
         </CommandGroup>
 
         <CommandSeparator />
 
-        <CommandGroup heading="Inventory Management">
+        <CommandGroup heading="Inventory">
           <CommandItem onSelect={() => runCommand(() => router.push('/assets'))}>
             <ClipboardList className="mr-2 h-4 w-4" />
-            <span>Asset Inventory</span>
+            <span>Asset List</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push('/import'))}>
             <FileUp className="mr-2 h-4 w-4" />
-            <span>Import Data</span>
+            <span>Upload Records</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => refreshRegistry())}>
             <RefreshCw className="mr-2 h-4 w-4" />
-            <span>Reconcile Asset Register</span>
+            <span>Sync Records</span>
           </CommandItem>
         </CommandGroup>
 
         <CommandSeparator />
 
-        <CommandGroup heading="Audit & Compliance">
+        <CommandGroup heading="Audit & Reports">
           <CommandItem onSelect={() => runCommand(() => router.push('/verify'))}>
             <CheckCircle2 className="mr-2 h-4 w-4" />
-            <span>Field Audit Queue</span>
+            <span>Records to Review</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push('/sync-queue'))}>
             <ListTodo className="mr-2 h-4 w-4" />
-            <span>Cloud Sync Status</span>
+            <span>Pending Sync</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push('/reports'))}>
             <FileText className="mr-2 h-4 w-4" />
-            <span>Inventory Reports</span>
+            <span>Reports</span>
           </CommandItem>
           <CommandItem onSelect={() => runCommand(() => router.push('/audit-log'))}>
             <History className="mr-2 h-4 w-4" />
-            <span>Audit Trail</span>
+            <span>Activity History</span>
           </CommandItem>
         </CommandGroup>
 
         {userProfile?.isAdmin && (
           <>
             <CommandSeparator />
-            <CommandGroup heading="System Administration">
+            <CommandGroup heading="Admin Tools">
               <CommandItem onSelect={() => runCommand(() => router.push('/users'))}>
                 <Users className="mr-2 h-4 w-4" />
-                <span>User Management</span>
+                <span>Auditors & Users</span>
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => router.push('/infrastructure'))}>
                 <Monitor className="mr-2 h-4 w-4" />
                 <span>System Infrastructure</span>
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => router.push('/admin/database'))}>
-                <Terminal className="mr-2 h-4 w-4" />
-                <span>Database Management</span>
+                <SearchCode className="mr-2 h-4 w-4" />
+                <span>Database View</span>
               </CommandItem>
               <CommandItem onSelect={() => runCommand(() => router.push('/settings'))}>
                 <Settings className="mr-2 h-4 w-4" />
-                <span>System Settings</span>
+                <span>Settings</span>
               </CommandItem>
             </CommandGroup>
           </>
@@ -144,12 +147,12 @@ export function CommandPalette() {
 
         <CommandSeparator />
 
-        <CommandGroup heading="Quick Inventory Search">
+        <CommandGroup heading="Quick Search">
           {assets.slice(0, 5).map(asset => (
             <CommandItem key={asset.id} onSelect={() => runCommand(() => router.push(`/assets?id=${asset.id}`))}>
               <Package className="mr-2 h-4 w-4 text-primary opacity-40" />
               <span className="truncate">{asset.description}</span>
-              <span className="ml-auto text-[8px] font-mono opacity-40">{asset.assetIdCode || 'TAG_ID'}</span>
+              <span className="ml-auto text-[8px] font-mono opacity-40">{asset.assetIdCode || 'NO_TAG'}</span>
             </CommandItem>
           ))}
         </CommandGroup>
