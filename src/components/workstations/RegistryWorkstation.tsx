@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Optimized for Responsive Fidelity & Dense Data Navigation.
+ * Phase 1013: Upgraded to multi-select Group Orchestrator with metrics and renaming.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -31,12 +31,17 @@ import {
   Download,
   Upload,
   Zap,
-  Plus
+  Plus,
+  Check,
+  MoreVertical,
+  Type
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Progress } from '@/components/ui/progress';
 import { RegistryCard } from '@/components/registry/RegistryCard';
 import { RegistryTable } from '@/components/registry/RegistryTable';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
@@ -53,6 +58,7 @@ import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import {
   DropdownMenu,
@@ -62,6 +68,20 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { FirestoreService } from '@/services/firebase/firestore';
 import type { SheetDefinition, Asset } from '@/types/domain';
 
 const ITEMS_PER_PAGE = 60;
@@ -77,12 +97,13 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setHeaders,
     refreshRegistry,
     appSettings,
+    setAppSettings,
     sortKey,
     setSortKey,
     sortDir,
     setSortDir,
-    selectedCategory,
-    setSelectedCategory,
+    selectedCategories,
+    setSelectedCategories,
     isOnline,
     activeGrantId,
     filters,
@@ -112,10 +133,42 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const searchInputRef = useRef<HTMLInputElement>(null);
   
+  // Category Management State
+  const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
+  const [categoryToRename, setCategoryToRename] = useState<string | null>(null);
+  const [newCategoryName, setNewCategoryName] = useState('');
+
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const isVerificationMode = appSettings?.appMode === 'verification';
+
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
   const categories = useMemo(() => Object.keys(activeGrant?.sheetDefinitions || {}).sort(), [activeGrant]);
 
   const activeAssets = useMemo(() => dataSource === 'PRODUCTION' ? assets : sandboxAssets, [dataSource, assets, sandboxAssets]);
+
+  const groupStats = useMemo(() => {
+    const stats: Record<string, { total: number, verified: number }> = {};
+    activeAssets.forEach(a => {
+      const cat = a.category || 'Uncategorized';
+      if (!stats[cat]) stats[cat] = { total: 0, verified: 0 };
+      stats[cat].total++;
+      if (a.status === 'VERIFIED') stats[cat].verified++;
+    });
+    return stats;
+  }, [activeAssets]);
+
+  const selectionMetrics = useMemo(() => {
+    const stats = { total: 0, verified: 0 };
+    const targetAssets = selectedCategories.length > 0 
+      ? activeAssets.filter(a => selectedCategories.includes(a.category))
+      : activeAssets;
+    
+    targetAssets.forEach(a => {
+      stats.total++;
+      if (a.status === 'VERIFIED') stats.verified++;
+    });
+    return stats;
+  }, [activeAssets, selectedCategories]);
 
   const optionsMap = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -143,7 +196,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const processedAssets = useMemo(() => {
     let results = [...activeAssets];
-    if (selectedCategory) results = results.filter(a => a.category === selectedCategory);
+    if (selectedCategories.length > 0) results = results.filter(a => selectedCategories.includes(a.category));
     
     filters.forEach(f => {
       results = results.filter(a => {
@@ -201,7 +254,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       });
     }
     return results;
-  }, [activeAssets, searchTerm, sortKey, sortDir, selectedCategory, filters, headers]);
+  }, [activeAssets, searchTerm, sortKey, sortDir, selectedCategories, filters, headers]);
 
   const paginatedAssets = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -234,6 +287,44 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       setSelectedAssetIds(new Set());
       toast({ title: "Records Removed" });
     } finally { setIsProcessing(false); }
+  };
+
+  const toggleCategorySelection = (cat: string) => {
+    const next = new Set(selectedCategories);
+    if (next.has(cat)) next.delete(cat); else next.add(cat);
+    setSelectedCategories(Array.from(next));
+    setCurrentPage(1);
+  };
+
+  const handleRenameGroup = async () => {
+    if (!categoryToRename || !newCategoryName.trim() || !appSettings || !activeGrantId) return;
+    setIsProcessing(true);
+    try {
+      const assetsToUpdate = activeAssets.filter(a => a.category === categoryToRename);
+      for (const asset of assetsToUpdate) {
+        await enqueueMutation('UPDATE', 'assets', { ...asset, category: newCategoryName });
+      }
+      
+      const nextSettings = { ...appSettings };
+      const grantIdx = nextSettings.grants.findIndex(g => g.id === activeGrantId);
+      if (grantIdx > -1) {
+        const defs = { ...nextSettings.grants[grantIdx].sheetDefinitions };
+        if (defs[categoryToRename]) {
+          defs[newCategoryName] = { ...defs[categoryToRename], name: newCategoryName };
+          delete defs[categoryToRename];
+          nextSettings.grants[grantIdx].sheetDefinitions = defs;
+        }
+      }
+      
+      await storage.saveSettings(nextSettings);
+      if (isOnline) await FirestoreService.updateSettings(nextSettings);
+      setAppSettings(nextSettings);
+      await refreshRegistry();
+      toast({ title: "Group Renamed" });
+      setIsRenameDialogOpen(false);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
@@ -291,23 +382,91 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </div>
       </div>
 
-      {/* Sub-navigation & Pill Indicators */}
+      {/* Multifunctional Group Selector Pulse */}
       <div className="px-1 flex items-center gap-2 overflow-x-auto no-scrollbar shrink-0 pb-2">
         <Badge variant="outline" className="h-7 px-3 rounded-full border-primary/20 bg-primary/5 text-primary font-black uppercase text-[8px] tracking-widest whitespace-nowrap shrink-0">{processedAssets.length} Records</Badge>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+        
+        <Popover>
+          <PopoverTrigger asChild>
             <Button variant="outline" className="h-7 px-3 rounded-full border-white/10 bg-white/5 text-white/40 font-black uppercase text-[8px] tracking-widest whitespace-nowrap gap-1.5 hover:text-white hover:border-primary/20 transition-all shrink-0">
               <FolderOpen className="h-3 w-3 text-primary opacity-60" />
-              Group: {selectedCategory || 'Overall'}
-              <ChevronDown className="h-2.5 w-2.5 opacity-40" />
+              {selectedCategories.length === 0 ? 'Overall Register' : 
+               selectedCategories.length === 1 ? `Group: ${selectedCategories[0]}` : 
+               `${selectedCategories.length} Groups Selected`}
+              
+              {isVerificationMode && selectionMetrics.total > 0 && (
+                <div className="flex items-center gap-2 ml-2 border-l border-white/10 pl-2">
+                  <span className="text-white/60 font-mono">{selectionMetrics.verified}/{selectionMetrics.total}</span>
+                  <div className="w-12 h-1 bg-white/5 rounded-full overflow-hidden">
+                    <div className="h-full bg-primary" style={{ width: `${(selectionMetrics.verified / selectionMetrics.total) * 100}%` }} />
+                  </div>
+                </div>
+              )}
+              <ChevronDown className="h-2.5 w-2.5 opacity-40 ml-1" />
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="start" className="w-56 bg-black border-white/10 rounded-xl p-1 shadow-3xl text-white">
-            <DropdownMenuItem onClick={() => setSelectedCategory(null)} className="rounded-lg p-2 focus:bg-primary/10 gap-2"><Database className="h-3.5 w-3.5 opacity-40" /><span className="text-[10px] font-black uppercase">Overall Registry</span></DropdownMenuItem>
-            <DropdownMenuSeparator className="bg-white/5" />
-            <ScrollArea className="h-48">{categories.map(cat => <DropdownMenuItem key={cat} onClick={() => { setSelectedCategory(cat); setCurrentPage(1); }} className="rounded-lg p-2 focus:bg-primary/10 gap-2"><Boxes className="h-3.5 w-3.5 opacity-40" /><span className="text-[10px] font-black uppercase truncate">{cat}</span></DropdownMenuItem>)}</ScrollArea>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          </PopoverTrigger>
+          <PopoverContent align="start" className="w-[320px] p-0 bg-[#0A0A0A] border-white/10 shadow-3xl overflow-hidden rounded-2xl">
+            <div className="p-4 bg-white/[0.02] border-b border-white/5 flex items-center justify-between">
+              <div className="flex flex-col">
+                <span className="text-[10px] font-black uppercase tracking-widest text-primary">Technical Containers</span>
+                <span className="text-[8px] font-bold text-white/20 uppercase">ORCHESTRATION PULSE</span>
+              </div>
+              <Button variant="ghost" size="sm" onClick={() => setSelectedCategories([])} className="h-7 px-2 text-[8px] font-black uppercase hover:bg-white/5">Clear Selection</Button>
+            </div>
+            
+            <ScrollArea className="h-72">
+              <div className="p-2 space-y-1">
+                {categories.map(cat => {
+                  const stats = groupStats[cat] || { total: 0, verified: 0 };
+                  const isSelected = selectedCategories.includes(cat);
+                  const percent = stats.total > 0 ? (stats.verified / stats.total) * 100 : 0;
+
+                  return (
+                    <div key={cat} className={cn("flex items-center gap-3 p-3 rounded-xl transition-all cursor-pointer group", isSelected ? "bg-primary/10" : "hover:bg-white/5")}>
+                      <Checkbox 
+                        checked={isSelected} 
+                        onCheckedChange={() => toggleCategorySelection(cat)}
+                        className="h-4 w-4 border-white/20"
+                      />
+                      <div className="flex-1 min-w-0" onClick={() => toggleCategorySelection(cat)}>
+                        <div className="flex items-center justify-between">
+                          <span className={cn("text-[11px] font-black uppercase truncate pr-4 transition-colors", isSelected ? "text-primary" : "text-white/60")}>{cat}</span>
+                          <span className="text-[9px] font-mono font-bold text-white/20 shrink-0">{stats.total}</span>
+                        </div>
+                        {isVerificationMode && (
+                          <div className="mt-1.5 space-y-1">
+                            <div className="flex justify-between text-[7px] font-black uppercase opacity-40">
+                              <span>Coverage</span>
+                              <span>{Math.round(percent)}%</span>
+                            </div>
+                            <Progress value={percent} className="h-0.5 bg-white/5" />
+                          </div>
+                        )}
+                      </div>
+                      
+                      {isAdmin && (
+                        <button 
+                          onClick={(e) => { e.stopPropagation(); setCategoryToRename(cat); setNewCategoryName(cat); setIsRenameDialogOpen(true); }}
+                          className="p-1.5 rounded-lg text-white/10 hover:text-primary hover:bg-primary/10 opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          <Edit3 className="h-3 w-3" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </ScrollArea>
+
+            {selectedCategories.length > 0 && (
+              <div className="p-4 bg-primary/5 border-t border-white/5 flex gap-2">
+                <Button onClick={() => setIsBatchEditOpen(true)} className="flex-1 h-9 rounded-xl bg-primary text-black font-black uppercase text-[9px] tracking-widest gap-2">
+                  <Zap className="h-3 w-3 fill-current" /> Bulk Modify Groups
+                </Button>
+              </div>
+            )}
+          </PopoverContent>
+        </Popover>
       </div>
 
       {/* Primary Registry Grid / Table */}
@@ -382,6 +541,38 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         </AnimatePresence>
       </div>
 
+      {/* Rename Logic Dialog */}
+      <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
+        <DialogContent className="max-w-md rounded-[2rem] border-primary/10 bg-black text-white p-8">
+          <DialogHeader className="space-y-4">
+            <div className="p-3 bg-primary/10 rounded-2xl w-fit"><Type className="h-8 w-8 text-primary" /></div>
+            <DialogTitle className="text-2xl font-black uppercase tracking-tight">Rename Container</DialogTitle>
+            <DialogDescription className="text-sm font-medium italic text-white/40 leading-relaxed">
+              Modifying the group name will update the identity pulse for all {groupStats[categoryToRename!]?.total || 0} records in this technical block.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="py-6 space-y-2">
+            <Label className="text-[10px] font-black uppercase text-white/20 tracking-widest pl-1">New Category Identity</Label>
+            <Input 
+              value={newCategoryName} 
+              onChange={(e) => setNewCategoryName(e.target.value)}
+              className="h-14 rounded-xl bg-white/5 border-2 border-white/5 text-sm font-black uppercase focus:border-primary/40 transition-all"
+            />
+          </div>
+          <DialogFooter className="gap-3">
+            <Button variant="ghost" onClick={() => setIsRenameDialogOpen(false)} className="h-12 rounded-xl font-bold">Cancel</Button>
+            <Button 
+              onClick={handleRenameGroup}
+              disabled={isProcessing || !newCategoryName.trim() || newCategoryName === categoryToRename}
+              className="h-12 px-8 rounded-xl bg-primary text-black font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20"
+            >
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
+              Commit Identity Pulse
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
       <AssetDetailSheet 
         isOpen={isDetailOpen} 
         onOpenChange={setIsDetailOpen} 
@@ -404,7 +595,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         onOpenChange={setIsBatchEditOpen} 
         selectedAssetCount={selectedAssetIds.size} 
         onSave={async (data) => { 
-          for (const id of Array.from(selectedAssetIds)) { 
+          const targets = selectedAssetIds.size > 0 ? Array.from(selectedAssetIds) : activeAssets.filter(a => selectedCategories.includes(a.category)).map(a => a.id);
+          for (const id of targets) { 
             const asset = activeAssets.find(a => a.id === id); 
             if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data }); 
           } 

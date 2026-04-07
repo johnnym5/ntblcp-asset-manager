@@ -4,6 +4,7 @@
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 1010: Implemented Project Switch Isolation Pulse.
  * Phase 1012: Integrated Drill-down pulses for Categories and Search.
+ * Phase 1013: Upgraded to multi-select Category state.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -84,6 +85,8 @@ interface AppStateContextType {
 
   // Category Hub State
   selectedCategory: string | null;
+  selectedCategories: string[];
+  setSelectedCategories: (cats: string[]) => void;
   setSelectedCategory: (cat: string | null) => void;
 }
 
@@ -142,7 +145,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
 
   // Category Hub state
-  const [selectedCategory, setSelectedCategoryStatus] = useState<string | null>(null);
+  const [selectedCategories, setSelectedCategoriesStatus] = useState<string[]>([]);
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
@@ -196,12 +199,18 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, [router]);
 
-  const setSelectedCategory = useCallback((cat: string | null) => {
-    setSelectedCategoryStatus(cat);
-    if (cat) {
+  const setSelectedCategories = useCallback((cats: string[]) => {
+    setSelectedCategoriesStatus(cats);
+    if (cats.length > 0) {
       setActiveView('REGISTRY');
     }
   }, [setActiveView]);
+
+  const setSelectedCategory = useCallback((cat: string | null) => {
+    setSelectedCategories(cat ? [cat] : []);
+  }, [setSelectedCategories]);
+
+  const selectedCategory = useMemo(() => selectedCategories.length === 1 ? selectedCategories[0] : null, [selectedCategories]);
 
   const refreshRegistry = useCallback(async () => {
     try {
@@ -362,7 +371,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
       locationOptions, assigneeOptions, conditionOptions, statusOptions,
       isFilterOpen, setIsFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
-      selectedCategory, setSelectedCategory
+      selectedCategory, selectedCategories, setSelectedCategories, setSelectedCategory
     }}>
       <Suspense fallback={null}>
         <ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} />
