@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
  * Phase 307: Integrated granular pulse notifications for all modifications.
+ * Phase 308: Fixed optionsMap ReferenceError.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -162,6 +162,35 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     });
     return stats;
   }, [activeAssets]);
+
+  // Facet Discovery Pulse: Dynamically populate filter options
+  const optionsMap = useMemo(() => {
+    const map: Record<string, string[]> = {};
+    headers.forEach(header => {
+      if (header.filterable) {
+        const values = new Set<string>();
+        activeAssets.forEach(a => {
+          let val: any = "";
+          switch(header.normalizedName) {
+            case "sn": val = a.sn; break;
+            case "location": val = a.location; break;
+            case "assignee_location": val = a.custodian; break;
+            case "asset_description": val = a.description; break;
+            case "asset_id_code": val = a.assetIdCode; break;
+            case "asset_class": val = a.category; break;
+            case "condition": val = a.condition; break;
+            case "serial_number": val = a.serialNumber; break;
+            default: val = a.metadata?.[header.rawName] || a.metadata?.[header.normalizedName];
+          }
+          if (val !== undefined && val !== null && val !== "") {
+            values.add(String(val));
+          }
+        });
+        map[header.id] = Array.from(values).sort();
+      }
+    });
+    return map;
+  }, [headers, activeAssets]);
 
   const processedAssets = useMemo(() => {
     let results = [...activeAssets];
