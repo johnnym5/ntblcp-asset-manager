@@ -1,8 +1,8 @@
 'use client';
 
 /**
- * @fileOverview RegistryWorkstation - Asset Inventory & Category Hub.
- * Phase 705: Hardened ScrollArea with enhanced bottom padding for action bars.
+ * @fileOverview RegistryWorkstation - Condition-Grouped Asset Inventory.
+ * Overhauled to organize assets into canonical condition groups.
  */
 
 import React, { useMemo, useState, useEffect } from 'react';
@@ -19,8 +19,7 @@ import {
   Trash2,
   Loader2,
   X,
-  FileSpreadsheet,
-  ShieldAlert,
+  ShieldCheck,
   Bomb,
   Hammer,
   ChevronDown,
@@ -38,7 +37,8 @@ import {
   ClipboardEdit,
   Zap,
   Tag,
-  Settings2
+  Settings2,
+  AlertTriangle
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -50,13 +50,11 @@ import { RegistryTable } from '@/components/registry/RegistryTable';
 import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
 import { Progress } from '@/components/ui/progress';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 import AssetForm from '@/components/asset-form';
 import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { transformAssetToRecord } from '@/lib/registry-utils';
@@ -68,24 +66,10 @@ import { enqueueMutation } from '@/offline/queue';
 import { storage } from '@/offline/storage';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
 import { FirestoreService } from '@/services/firebase/firestore';
-import type { Asset, SheetDefinition, Grant } from '@/types/domain';
+import { ConditionSummary } from '@/components/registry/ConditionSummary';
+import { getCanonicalGroup, groupAssetsByCondition, CONDITION_GROUPS, GROUP_COLORS, GROUP_BG_COLORS } from '@/lib/condition-logic';
+import type { Asset, SheetDefinition, Grant, ConditionGroup } from '@/types/domain';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -104,16 +88,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
-  // --- Persistent View State ---
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
   const [groupViewMode, setGroupViewMode] = useState<'grid' | 'table'>('grid');
-  const [isHydrated, setIsHydrated] = useState(false);
-
-  // --- Selection State ---
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
-
-  // --- Modals ---
   const [isDetailOpen, setIsDetailOpen] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
@@ -121,67 +99,30 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isProcessing, setIsProcessing] = useState(false);
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [customizingCategory, setCustomizingCategory] = useState<string | null>(null);
-  const [isCategoryWipeDialogOpen, setIsCategoryWipeDialogOpen] = useState(false);
-  const [categoryToWipe, setCategoryToWipe] = useState<string | null>(null);
 
-  // Hydrate state from local storage
-  useEffect(() => {
-    const savedCat = localStorage.getItem('registry-active-category');
-    const savedAssetView = localStorage.getItem('registry-asset-view-mode') as any;
-    const savedGroupView = localStorage.getItem('registry-group-view-mode') as any;
-
-    if (savedCat && savedCat !== 'HUB') setSelectedCategory(savedCat);
-    if (savedAssetView) setViewMode(savedAssetView);
-    if (savedGroupView) setGroupViewMode(savedGroupView);
-    setIsHydrated(true);
-  }, []);
-
-  // Persist state to local storage
-  useEffect(() => {
-    if (!isHydrated) return;
-    localStorage.setItem('registry-active-category', selectedCategory || 'HUB');
-    localStorage.setItem('registry-asset-view-mode', viewMode);
-    localStorage.setItem('registry-group-view-mode', groupViewMode);
-  }, [selectedCategory, viewMode, groupViewMode, isHydrated]);
-
-  // --- Computed Data ---
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === appSettings.activeGrantId), [appSettings]);
   
-  const categoryStats = useMemo(() => {
-    if (!activeGrant) return [];
-    const enabledSheets = new Set(activeGrant.enabledSheets || []);
-    
-    const groups = assets.reduce((acc, a) => {
-      const cat = a.category || 'General';
-      if (!enabledSheets.has(cat)) return acc;
-      
-      if (!acc[cat]) acc[cat] = { total: 0, verified: 0 };
-      acc[cat].total++;
-      if (a.status === 'VERIFIED') acc[cat].verified++;
-      return acc;
-    }, {} as Record<string, { total: number, verified: number }>);
-
-    return Object.entries(groups).map(([name, stats]) => ({ name, ...stats })).sort((a, b) => a.name.localeCompare(b.name));
-  }, [assets, activeGrant]);
-
   const filteredAssets = useMemo(() => {
     let results = assets;
-    if (!userProfile?.isAdmin && userProfile?.state) results = results.filter(a => isWithinScope(userProfile as any, a));
     if (selectedCategory && selectedCategory !== 'ALL') results = results.filter(a => a.category === selectedCategory);
-    
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       results = results.filter(a => 
         (a.description || '').toLowerCase().includes(term) || 
-        (a.assetIdCode || '').toLowerCase().includes(term)
+        (a.assetIdCode || '').toLowerCase().includes(term) ||
+        (a.serialNumber || '').toLowerCase().includes(term)
       );
     }
-    return results.sort((a, b) => {
-      const valA = String((a as any)[sortKey] ?? '');
-      const valB = String((b as any)[sortKey] ?? '');
-      return valA.localeCompare(valB, undefined, { numeric: true }) * (sortDir === 'asc' ? 1 : -1);
-    });
-  }, [assets, selectedCategory, searchTerm, sortKey, sortDir, userProfile]);
+    return results;
+  }, [assets, selectedCategory, searchTerm]);
+
+  const assetsByCondition = useMemo(() => groupAssetsByCondition(filteredAssets), [filteredAssets]);
+  
+  const conditionCounts = useMemo(() => {
+    const counts: any = {};
+    CONDITION_GROUPS.forEach(g => counts[g] = assetsByCondition[g].length);
+    return counts;
+  }, [assetsByCondition]);
 
   const selectedRecord = useMemo(() => {
     if (!selectedAssetId) return undefined;
@@ -189,22 +130,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
   }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
 
-  // --- Handlers ---
   const handleInspect = (id: string) => {
     setSelectedAssetId(id);
     setIsDetailOpen(true);
-  };
-
-  const handleNext = () => {
-    if (!selectedAssetId) return;
-    const idx = filteredAssets.findIndex(a => a.id === selectedAssetId);
-    if (idx < filteredAssets.length - 1) setSelectedAssetId(filteredAssets[idx+1].id);
-  };
-
-  const handlePrevious = () => {
-    if (!selectedAssetId) return;
-    const idx = filteredAssets.findIndex(a => a.id === selectedAssetId);
-    if (idx > 0) setSelectedAssetId(filteredAssets[idx-1].id);
   };
 
   const handleToggleSelect = (id: string) => {
@@ -213,124 +141,50 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setSelectedAssetIds(next);
   };
 
-  const updateActiveGrant = async (updates: Partial<Grant>) => {
-    if (!appSettings || !activeGrant) return;
-    const nextGrants = appSettings.grants.map(g => g.id === activeGrant.id ? { ...g, ...updates } : g);
-    const nextSettings = { ...appSettings, grants: nextGrants };
-    try {
-      if (isOnline) await FirestoreService.updateSettings({ grants: nextGrants });
-      await storage.saveSettings(nextSettings);
-      setAppSettings(nextSettings);
-    } catch (e) {
-      toast({ variant: "destructive", title: "Update Failure" });
-    }
-  };
-
-  const handleHideCategory = async (name: string) => {
-    if (!activeGrant) return;
-    const nextEnabled = activeGrant.enabledSheets.filter(s => s !== name);
-    await updateActiveGrant({ enabledSheets: nextEnabled });
-    toast({ title: "Category Hidden" });
-  };
-
-  const handleWipeCategory = async () => {
-    if (!categoryToWipe || !activeGrant) return;
-    setIsProcessing(true);
-    try {
-      const current = await storage.getAssets();
-      await storage.saveAssets(current.filter(a => a.category !== categoryToWipe));
-      const nextEnabled = activeGrant.enabledSheets.filter(s => s !== categoryToWipe);
-      const nextDefs = { ...activeGrant.sheetDefinitions };
-      delete nextDefs[categoryToWipe];
-      await updateActiveGrant({ enabledSheets: nextEnabled, sheetDefinitions: nextDefs });
-      await refreshRegistry();
-      toast({ title: "Category Data Cleared" });
-      setIsCategoryWipeDialogOpen(false);
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  const handleDeleteSelectedAssets = async () => {
-    if (selectedAssetIds.size === 0) return;
-    setIsProcessing(true);
-    try {
-      const ids = Array.from(selectedAssetIds);
-      for (const id of ids) {
-        await enqueueMutation('DELETE', 'assets', { id });
-      }
-      const current = await storage.getAssets();
-      await storage.saveAssets(current.filter(a => !selectedAssetIds.has(a.id)));
-      await refreshRegistry();
-      setSelectedAssetIds(new Set());
-      toast({ title: "Assets Removed" });
-    } finally {
-      setIsProcessing(false);
-    }
-  };
-
-  if (!isHydrated) return null;
-
   return (
     <div className="space-y-10 h-full flex flex-col">
       
-      {/* 1. Header Control */}
-      <div className="px-1 space-y-6 shrink-0">
+      {/* 1. Global Header Control */}
+      <div className="px-1 space-y-8 shrink-0">
         <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
           <div className="flex items-center gap-4 self-start">
             {selectedCategory ? (
               <div className="flex items-center gap-6">
                 <button 
-                  onClick={() => { setSelectedCategory(null); setSelectedAssetIds(new Set()); }} 
+                  onClick={() => setSelectedCategory(null)} 
                   className="h-12 w-12 flex items-center justify-center bg-white/5 rounded-2xl text-white/40 hover:text-white border border-white/5 transition-all shadow-xl"
                 >
                   <ArrowLeft className="h-6 w-6" />
                 </button>
                 <div className="space-y-1">
                   <h2 className="text-2xl md:text-3xl font-black uppercase text-white tracking-tight leading-none">{selectedCategory}</h2>
-                  <div className="flex items-center gap-2">
-                    <Badge className="bg-primary/10 text-primary border-primary/20 font-black uppercase text-[9px] h-5 px-2">
-                      {filteredAssets.length} RECORDS
-                    </Badge>
-                  </div>
+                  <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.2em]">CATEGORY PULSE</p>
                 </div>
               </div>
             ) : (
               <div className="flex items-center gap-4">
                 <div className="p-3 bg-primary/10 rounded-2xl shadow-inner">
-                  <FolderKanban className="h-6 w-6 md:h-8 md:w-8 text-primary" />
+                  <Database className="h-6 w-6 md:h-8 md:w-8 text-primary" />
                 </div>
                 <div className="space-y-0.5">
-                  <h2 className="text-xl md:text-3xl font-black uppercase text-white tracking-tight leading-none">Inventory Hub</h2>
-                  <p className="text-[10px] md:text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Asset Categories & Registers</p>
+                  <h2 className="text-xl md:text-3xl font-black uppercase text-white tracking-tight leading-none">Condition Registry</h2>
+                  <p className="text-[10px] md:text-[11px] font-bold text-white/40 uppercase tracking-[0.2em]">Canonical Grouping & Audit Control</p>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="flex items-center gap-3 ml-auto sm:ml-0">
-            {selectedCategory && userProfile?.isAdmin && (
-              <Button 
-                variant="outline" 
-                size="icon" 
-                onClick={() => { setCustomizingCategory(selectedCategory); setIsColumnSheetOpen(true); }}
-                className="h-11 w-11 rounded-xl bg-white/5 border-white/10 text-white/40 hover:text-primary transition-all shadow-sm"
-                title="Configure Group Headers"
-              >
-                <Settings2 className="h-5 w-5" />
-              </Button>
-            )}
-
+          <div className="flex items-center gap-3">
             <div className="flex items-center bg-black/40 p-1.5 rounded-[1.25rem] border border-white/5 shadow-inner backdrop-blur-xl">
               <button 
-                onClick={() => selectedCategory ? setViewMode('grid') : setGroupViewMode('grid')} 
-                className={cn("p-2.5 rounded-xl transition-all", (selectedCategory ? viewMode === 'grid' : groupViewMode === 'grid') ? "bg-white/10 text-white shadow-lg" : "text-white/20 hover:text-white")}
+                onClick={() => setViewMode('grid')} 
+                className={cn("p-2.5 rounded-xl transition-all", viewMode === 'grid' ? "bg-white/10 text-white shadow-lg" : "text-white/20 hover:text-white")}
               >
                 <Grid className="h-4 w-4" />
               </button>
               <button 
-                onClick={() => selectedCategory ? setViewMode('table') : setGroupViewMode('table')} 
-                className={cn("p-2.5 rounded-xl transition-all", (selectedCategory ? viewMode === 'table' : groupViewMode === 'table') ? "bg-white/10 text-white shadow-lg" : "text-white/20 hover:text-white")}
+                onClick={() => setViewMode('table')} 
+                className={cn("p-2.5 rounded-xl transition-all", viewMode === 'table' ? "bg-white/10 text-white shadow-lg" : "text-white/20 hover:text-white")}
               >
                 <List className="h-4 w-4" />
               </button>
@@ -338,201 +192,137 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
         </div>
 
-        {/* 2. Top Action Bar */}
-        <AnimatePresence>
-          {(selectedAssetIds.size > 0 && selectedCategory) && (
-            <motion.div 
-              initial={{ opacity: 0, y: -10 }} 
-              animate={{ opacity: 1, y: 0 }} 
-              exit={{ opacity: 0, y: -10 }}
-              className="bg-[#0A0A0A] border-2 border-white/5 rounded-[2rem] p-3 flex items-center gap-6 shadow-3xl overflow-x-auto no-scrollbar"
-            >
-              <div className="bg-primary px-6 py-2.5 rounded-xl flex items-center gap-3 shrink-0 shadow-xl shadow-primary/20">
-                <span className="text-black font-black text-xs uppercase tracking-widest">{selectedAssetIds.size} Selected</span>
-              </div>
-              
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" className="h-11 px-4 text-[10px] font-black uppercase tracking-widest gap-2 text-white/60 hover:text-white hover:bg-white/5 transition-all">
-                  <RefreshCw className="h-4 w-4" /> Sync
-                </Button>
-                <Button variant="ghost" className="h-11 px-4 text-[10px] font-black uppercase tracking-widest gap-2 text-white/60 hover:text-white hover:bg-white/5 transition-all">
-                  <Database className="h-4 w-4" /> Sandbox
-                </Button>
-                <Button variant="ghost" className="h-11 px-4 text-[10px] font-black uppercase tracking-widest gap-2 text-white/60 hover:text-white hover:bg-white/5 transition-all">
-                  <Edit3 className="h-4 w-4" /> Edit
-                </Button>
-                <Button onClick={() => setIsBatchEditOpen(true)} variant="ghost" className="h-11 px-4 text-[10px] font-black uppercase tracking-widest gap-2 text-white/60 hover:text-white hover:bg-white/5 transition-all">
-                  <Layers className="h-4 w-4" /> Batch
-                </Button>
-                <div className="w-px h-6 bg-white/5 mx-2" />
-                <Button onClick={handleDeleteSelectedAssets} variant="ghost" className="h-11 px-4 text-[10px] font-black uppercase tracking-widest gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-all">
-                  <Trash2 className="h-4 w-4" /> Remove
-                </Button>
-              </div>
-              
-              <button onClick={() => setSelectedAssetIds(new Set())} className="ml-auto mr-4 p-2 rounded-xl text-white/20 hover:text-white hover:bg-white/5 transition-all">
-                <X className="h-5 w-5" />
-              </button>
-            </motion.div>
-          )}
-        </AnimatePresence>
+        {/* 2. Condition Summary Bar */}
+        <ConditionSummary 
+          counts={conditionCounts} 
+          total={filteredAssets.length} 
+          className="animate-in fade-in slide-in-from-top-2 duration-700"
+        />
       </div>
 
-      {/* 3. Main Display Area */}
+      {/* 3. Main Display Area - Grouped by Condition */}
       <div className="flex-1 min-h-0 px-1">
         <ScrollArea className="h-full pr-4 custom-scrollbar">
           <div className="pb-40">
-            <AnimatePresence mode="wait">
-              {!selectedCategory ? (
-                groupViewMode === 'grid' ? (
-                  <motion.div key="grid-hub" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                    {categoryStats.map(cat => (
-                      <Card key={cat.name} className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden group hover:border-primary/20 transition-all shadow-3xl">
-                        <CardHeader className="p-8 pb-4 border-b border-white/5 bg-white/[0.01]">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3 min-0">
-                              <div className="p-2.5 bg-primary/10 rounded-xl shrink-0"><TableIcon className="h-5 w-5 text-primary" /></div>
-                              <h3 className="text-sm font-black uppercase text-white tracking-tight leading-none truncate pr-4">{cat.name}</h3>
-                            </div>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <button className="h-9 w-9 flex items-center justify-center bg-white/5 rounded-xl text-white/40 hover:text-white transition-all"><MoreHorizontal className="h-5 w-5" /></button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end" className="w-56 bg-black border-white/10 rounded-2xl p-2 shadow-3xl">
-                                <DropdownMenuItem onClick={() => setSelectedCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
-                                  <LayoutGrid className="h-4 w-4 text-white/40" />
-                                  <span className="text-[11px] font-black uppercase">Open Inventory</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => { setCustomizingCategory(cat.name); setIsColumnSheetOpen(true); }} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
-                                  <Wrench className="h-4 w-4 text-white/40" />
-                                  <span className="text-[11px] font-black uppercase">Field Setup</span>
-                                </DropdownMenuItem>
-                                <DropdownMenuItem onClick={() => handleHideCategory(cat.name)} className="p-3 rounded-xl focus:bg-primary/10 gap-3">
-                                  <EyeOff className="h-4 w-4 text-white/40" />
-                                  <span className="text-[11px] font-black uppercase">Hide Category</span>
-                                </DropdownMenuItem>
-                                <div className="h-px bg-white/5 my-2" />
-                                <DropdownMenuItem onClick={() => { setCategoryToWipe(cat.name); setIsCategoryWipeDialogOpen(true); }} className="p-3 rounded-xl focus:bg-red-600/10 text-red-500 gap-3">
-                                  <Bomb className="h-4 w-4" />
-                                  <span className="text-[11px] font-black uppercase">Clear Records</span>
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
+            <Accordion type="multiple" defaultValue={['Good', 'Discrepancy']} className="space-y-6">
+              {CONDITION_GROUPS.map(group => {
+                const groupAssets = assetsByCondition[group];
+                if (groupAssets.length === 0 && group !== 'Good') return null;
+
+                return (
+                  <AccordionItem 
+                    key={group} 
+                    value={group} 
+                    className={cn(
+                      "border-2 rounded-[2.5rem] overflow-hidden bg-[#080808] transition-all duration-500",
+                      GROUP_BG_COLORS[group]
+                    )}
+                  >
+                    <AccordionTrigger className="p-8 hover:no-underline group">
+                      <div className="flex items-center justify-between w-full pr-6">
+                        <div className="flex items-center gap-6">
+                          <div className={cn("p-4 rounded-[1.5rem] shadow-inner transition-transform group-hover:scale-110", GROUP_BG_COLORS[group])}>
+                            <Boxes className={cn("h-8 w-8", GROUP_COLORS[group])} />
                           </div>
-                        </CardHeader>
-                        <CardContent className="p-8 pt-8 space-y-8">
-                          <div className="flex items-end justify-between">
-                            <div className="space-y-1">
-                              <p className="text-4xl md:text-5xl font-black tracking-tighter text-white">{cat.total}</p>
-                              <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">ASSET COUNT</p>
-                            </div>
-                            <div className="p-4 bg-white/5 rounded-3xl shadow-inner"><Boxes className="h-8 w-8 text-white/10" /></div>
+                          <div className="text-left">
+                            <h3 className={cn("text-2xl font-black uppercase tracking-tight", GROUP_COLORS[group])}>{group} Pulse</h3>
+                            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest mt-1">
+                              {groupAssets.length} Records classified
+                            </p>
                           </div>
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-[0.2em]">
-                              <span className="text-white/40">AUDIT PROGRESS</span>
-                              <span className="text-primary">{cat.verified} / {cat.total}</span>
-                            </div>
-                            <Progress value={(cat.verified / cat.total) * 100} className="h-1.5 bg-white/5" />
+                        </div>
+                        <div className="flex items-center gap-4">
+                          <Badge variant="outline" className={cn("font-black h-8 px-4 rounded-full border-2", GROUP_BG_COLORS[group], GROUP_COLORS[group])}>
+                            {Math.round((groupAssets.length / filteredAssets.length) * 100 || 0)}%
+                          </Badge>
+                          <ChevronDown className="h-6 w-6 text-white/20 transition-transform group-data-[state=open]:rotate-180" />
+                        </div>
+                      </div>
+                    </AccordionTrigger>
+                    
+                    <AccordionContent className="p-8 pt-0 border-t border-white/5 bg-black/20">
+                      <div className="pt-8">
+                        {viewMode === 'grid' || isMobile ? (
+                          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                            {groupAssets.map(asset => (
+                              <RegistryCard 
+                                key={asset.id} 
+                                record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
+                                onInspect={() => handleInspect(asset.id)} 
+                                selected={selectedAssetIds.has(asset.id)} 
+                                onToggleSelect={handleToggleSelect} 
+                              />
+                            ))}
                           </div>
-                        </CardContent>
-                        <CardFooter className="px-8 pb-8 pt-0">
-                          <Button 
-                            onClick={() => setSelectedCategory(cat.name)} 
-                            variant="outline" 
-                            className="w-full h-12 rounded-2xl border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 bg-transparent hover:bg-white/5 text-white/60 hover:text-white transition-all shadow-sm"
-                          >
-                            View Category <ChevronRight className="h-4 w-4" />
-                          </Button>
-                        </CardFooter>
-                      </Card>
-                    ))}
-                  </motion.div>
-                ) : (
-                  <motion.div key="list-hub" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="rounded-[2.5rem] border-2 border-white/5 overflow-hidden bg-[#050505] shadow-2xl">
-                    <Table>
-                      <TableHeader className="bg-white/[0.02]">
-                        <TableRow className="hover:bg-transparent">
-                          <TableHead className="py-6 px-10 text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Inventory Category</TableHead>
-                          <TableHead className="py-6 px-6 text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Total Assets</TableHead>
-                          <TableHead className="py-6 px-6 text-[9px] font-black uppercase tracking-[0.2em] text-white/40 hidden sm:table-cell">Audit Progress</TableHead>
-                          <TableHead className="py-6 px-10 text-right text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Actions</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {categoryStats.map(cat => (
-                          <TableRow key={cat.name} className="group hover:bg-primary/[0.02] border-b border-white/5 last:border-0 cursor-pointer" onClick={() => setSelectedCategory(cat.name)}>
-                            <TableCell className="py-8 px-10">
-                              <div className="flex items-center gap-6">
-                                <div className="p-3.5 bg-white/5 rounded-2xl group-hover:bg-primary/10 group-hover:text-primary transition-all shadow-inner"><TableIcon className="h-5 w-5 opacity-40" /></div>
-                                <span className="font-black text-base uppercase tracking-tight text-white">{cat.name}</span>
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-8 px-6">
-                              <span className="font-black text-2xl text-white tabular-nums">{cat.total}</span>
-                            </TableCell>
-                            <TableCell className="py-8 px-6 w-[350px] hidden sm:table-cell">
-                              <div className="space-y-2.5">
-                                <div className="flex justify-between text-[9px] font-black uppercase tracking-[0.2em]">
-                                  <span className="text-white/40">{cat.verified} VERIFIED</span>
-                                  <span className="text-primary">{Math.round((cat.verified/cat.total)*100)}%</span>
-                                </div>
-                                <Progress value={(cat.verified/cat.total)*100} className="h-1.5 bg-white/5" />
-                              </div>
-                            </TableCell>
-                            <TableCell className="py-8 px-10 text-right">
-                              <Button variant="ghost" size="icon" className="h-11 w-11 rounded-2xl bg-white/5 opacity-40 group-hover:opacity-100 group-hover:bg-primary/10 group-hover:text-primary transition-all shadow-sm"><ChevronRight className="h-5 w-5" /></Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </motion.div>
-                )
-              ) : (
-                <motion.div key="asset-register" initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} className="space-y-8">
-                  {viewMode === 'grid' || isMobile ? (
-                    <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
-                      {filteredAssets.map(asset => (
-                        <RegistryCard 
-                          key={asset.id} 
-                          record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
-                          onInspect={() => handleInspect(asset.id)} 
-                          selected={selectedAssetIds.has(asset.id)} 
-                          onToggleSelect={handleToggleSelect} 
-                        />
-                      ))}
-                    </div>
-                  ) : (
-                    <RegistryTable 
-                      records={filteredAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
-                      onInspect={handleInspect} 
-                      selectedIds={selectedAssetIds} 
-                      onToggleSelect={handleToggleSelect} 
-                      onSelectAll={(c) => setSelectedAssetIds(c ? new Set(filteredAssets.map(a => a.id)) : new Set())} 
-                      onConfigureHeaders={userProfile?.isAdmin ? () => {
-                        if (selectedCategory) {
-                          setCustomizingCategory(selectedCategory);
-                          setIsColumnSheetOpen(true);
-                        }
-                      } : undefined}
-                    />
-                  )}
-                </motion.div>
-              )}
-            </AnimatePresence>
+                        ) : (
+                          <RegistryTable 
+                            records={groupAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
+                            onInspect={handleInspect} 
+                            selectedIds={selectedAssetIds} 
+                            onToggleSelect={handleToggleSelect} 
+                            onSelectAll={(c) => {
+                              const next = new Set(selectedAssetIds);
+                              groupAssets.forEach(a => c ? next.add(a.id) : next.delete(a.id));
+                              setSelectedAssetIds(next);
+                            }}
+                          />
+                        )}
+                        
+                        {groupAssets.length === 0 && (
+                          <div className="py-20 text-center opacity-20 border-2 border-dashed rounded-[2rem] border-white/10">
+                            <ShieldCheck className="h-12 w-12 mx-auto mb-4" />
+                            <p className="text-xs font-black uppercase tracking-widest">Group Empty</p>
+                          </div>
+                        )}
+                      </div>
+                    </AccordionContent>
+                  </AccordionItem>
+                );
+              })}
+            </Accordion>
           </div>
         </ScrollArea>
       </div>
 
-      {/* Dialogs & Sheets */}
+      {/* 4. Action Terminal Pulse */}
+      <AnimatePresence>
+        {selectedAssetIds.size > 0 && (
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }} 
+            animate={{ opacity: 1, y: 0 }} 
+            exit={{ opacity: 0, y: 20 }}
+            className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A] border-2 border-primary/20 rounded-[2.5rem] p-4 flex items-center gap-8 shadow-[0_0_50px_rgba(var(--primary),0.1)] backdrop-blur-3xl min-w-[600px]"
+          >
+            <div className="flex items-center gap-4 pl-4">
+              <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-black font-black text-xs shadow-xl shadow-primary/20">
+                {selectedAssetIds.size}
+              </div>
+              <span className="text-xs font-black uppercase tracking-[0.2em] text-white">Records Selected</span>
+            </div>
+
+            <div className="h-8 w-px bg-white/10" />
+
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" onClick={() => setIsBatchEditOpen(true)} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-white/60 hover:text-white hover:bg-white/5 transition-all">
+                <Edit3 className="h-4 w-4" /> Bulk Condition
+              </Button>
+              <Button variant="ghost" onClick={handleDeleteSelectedAssets} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10 transition-all">
+                <Trash2 className="h-4 w-4" /> Delete Pulses
+              </Button>
+            </div>
+
+            <button onClick={() => setSelectedAssetIds(new Set())} className="ml-auto mr-4 h-10 w-10 rounded-full flex items-center justify-center text-white/20 hover:text-white hover:bg-white/5 transition-all">
+              <X className="h-5 w-5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <AssetDetailSheet 
         isOpen={isDetailOpen} 
         onOpenChange={setIsDetailOpen} 
         record={selectedRecord} 
         onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} 
-        onNext={handleNext}
-        onPrevious={handlePrevious}
       />
       
       <AssetForm 
@@ -540,14 +330,29 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         onOpenChange={setIsFormOpen} 
         asset={assets.find(a => a.id === selectedAssetId)} 
         isReadOnly={false} 
-        onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} 
+        onSave={async (a) => { 
+          await enqueueMutation('UPDATE', 'assets', a); 
+          await refreshRegistry(); 
+          setIsFormOpen(false); 
+        }} 
       />
       
       <AssetBatchEditForm 
         isOpen={isBatchEditOpen} 
         onOpenChange={setIsBatchEditOpen} 
         selectedAssetCount={selectedAssetIds.size} 
-        onSave={async () => { setSelectedAssetIds(new Set()); await refreshRegistry(); }} 
+        onSave={async (data) => { 
+          const ids = Array.from(selectedAssetIds);
+          for (const id of ids) {
+            const asset = assets.find(a => a.id === id);
+            if (asset) {
+              await enqueueMutation('UPDATE', 'assets', { ...asset, ...data });
+            }
+          }
+          await refreshRegistry();
+          setSelectedAssetIds(new Set());
+          toast({ title: "Bulk Update Pulse Committed" });
+        }} 
       />
 
       <AlertDialog open={isCategoryWipeDialogOpen} onOpenChange={setIsCategoryWipeDialogOpen}>
@@ -556,43 +361,19 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
               <Bomb className="h-12 w-12 text-destructive" />
             </div>
-            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Clear Category Data?</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium italic text-white/60">
-              This will permanently delete all local records for <strong>{categoryToWipe}</strong> and remove its configuration from your workstation. Cloud records are not affected.
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Execute Selective Wipe?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/60 leading-relaxed">
+              You are about to perform a deterministic wipe of all records in this condition group. This action is immutable locally and will be broadcast to the cloud authority.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
-            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0 hover:bg-white/5 transition-all text-white">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleWipeCategory} disabled={isProcessing} className="h-14 px-12 rounded-2xl font-black uppercase bg-destructive text-white m-0">
-              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />} Confirm Clear
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0 hover:bg-white/5 transition-all text-white">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handleWipeCategory} disabled={isProcessing} className="h-14 px-12 rounded-2xl font-black uppercase bg-destructive text-white m-0 shadow-2xl shadow-destructive/20">
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />} Commit Wipe Pulse
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      {isColumnSheetOpen && customizingCategory && activeGrant && (
-        <ColumnCustomizationSheet 
-          isOpen={isColumnSheetOpen}
-          onOpenChange={setIsColumnSheetOpen}
-          sheetDefinition={activeGrant.sheetDefinitions[customizingCategory]}
-          originalSheetName={customizingCategory}
-          onSave={async (orig, newDef, applyToAll) => {
-            const currentGrant = appSettings.grants.find(g => g.id === activeGrant.id);
-            if (!currentGrant) return;
-
-            const nextDefs = { ...currentGrant.sheetDefinitions };
-            if (applyToAll) {
-              Object.keys(nextDefs).forEach(k => { nextDefs[k] = { ...newDef, name: k }; });
-            } else {
-              nextDefs[newDef.name] = newDef;
-              if (orig && orig !== newDef.name) delete nextDefs[orig];
-            }
-
-            await updateActiveGrant({ sheetDefinitions: nextDefs });
-            toast({ title: "Inventory Layout Updated" });
-          }}
-        />
-      )}
     </div>
   );
 }

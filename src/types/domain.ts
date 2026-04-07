@@ -4,6 +4,7 @@
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VERIFIER' | 'VIEWER' | 'SUPERADMIN';
 export type VerificationStatus = 'VERIFIED' | 'UNVERIFIED' | 'DISCREPANCY';
+export type ConditionGroup = 'Good' | 'Bad' | 'Stolen' | 'Obsolete' | 'Unsalvageable' | 'Discrepancy';
 export type DataSource = 'PRODUCTION' | 'SANDBOX';
 export type UXMode = 'beginner' | 'advanced';
 export type StorageLayer = 'FIRESTORE' | 'RTDB' | 'LOCAL';
@@ -46,6 +47,15 @@ export interface Geotag {
   timestamp: string;
 }
 
+export interface ConditionAuditEntry {
+  oldCondition: string;
+  newCondition: string;
+  changedBy: string;
+  timestamp: string;
+  reason: string;
+  isBulkAction: boolean;
+}
+
 export interface AssetClassification {
   group: string;
   subgroup: string;
@@ -60,7 +70,7 @@ export interface AssetClassification {
 
 export interface Asset {
   id: string;
-  sn?: string; // Preserved numeric sequence from Column A
+  sn?: string; 
   name?: string;
   description: string;
   category: string;
@@ -79,7 +89,12 @@ export interface Asset {
   
   // State & Assessment
   status: VerificationStatus;
-  condition: string;
+  condition: string; // Human display label
+  conditionGroup: ConditionGroup; // Canonical grouping
+  conditionNotes?: string;
+  conditionHistory?: ConditionAuditEntry[];
+  discrepancyFlag?: boolean;
+  reviewStatus?: 'PENDING' | 'RESOLVED' | 'FLAGGED';
   
   // Financial & Technical
   purchaseDate?: string;

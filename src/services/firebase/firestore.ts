@@ -1,8 +1,6 @@
-
 /**
  * @fileOverview Hardened Firestore Service.
- * Phase 270: Enhanced getProjectAssets to support multi-state scoping for Zonal Admins.
- * Phase 280: Hardened purgeAllAssets for deterministic global registry wipes.
+ * Phase 3: Condition History Audit Pulse & Global Reset.
  */
 
 import { 
@@ -27,6 +25,7 @@ import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
 import { monitoring } from '@/lib/monitoring';
 import { batchSetAssets as mirrorToRtdb, updateSettings as mirrorSettingsToRtdb, clearAssets as clearRtdb } from '@/lib/database';
+import { getCanonicalGroup } from '@/lib/condition-logic';
 import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
 
 export const FirestoreService = {
@@ -61,10 +60,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Fetches assets for the active project scope.
-   * Phase 270: Upgraded to support array-based state filtering for Zonal Admins.
-   */
   async getProjectAssets(grantId: string, stateScopes?: string[]): Promise<Asset[]> {
     if (!db) return [];
     const assetsRef = collection(db, 'assets');
@@ -84,7 +79,15 @@ export const FirestoreService = {
 
     try {
       const snap = await getDocs(q);
-      return snap.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
+      return snap.docs.map(d => {
+        const data = d.data();
+        return { 
+          ...data, 
+          id: d.id,
+          // Runtime deterministic pulse: ensure canonical group is set
+          conditionGroup: data.conditionGroup || getCanonicalGroup(data.condition)
+        } as Asset;
+      });
     } catch (err: any) {
       FirestoreService.handlePermissionError(assetsRef.path, 'list', err);
       throw err;
@@ -94,7 +97,13 @@ export const FirestoreService = {
   async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
     if (!db) return;
 
-    const assetToSave = { ...asset };
+    // Ensure conditionGroup is synchronized with condition pulse
+    const conditionGroup = getCanonicalGroup(asset.condition);
+    const assetToSave = { 
+      ...asset,
+      conditionGroup 
+    };
+
     delete (assetToSave as any).photoUrl;
     delete (assetToSave as any).photoDataUri;
 
@@ -137,6 +146,35 @@ export const FirestoreService = {
     }
   },
 
+  async adjudicateAssetPulse(id: string, action: 'APPROVE' | 'REJECT') {
+    if (!db) return;
+    const assetRef = doc(db, 'assets', id);
+    try {
+      if (action === 'APPROVE') {
+        const snap = await getDoc(assetRef);
+        if (snap.exists()) {
+          const data = snap.data();
+          const pending = data.pendingChanges || {};
+          
+          // Re-evaluate group if condition is in pending changes
+          const condition = pending.condition || data.condition;
+          const conditionGroup = getCanonicalGroup(condition);
+
+          await updateDoc(assetRef, {
+            ...pending,
+            conditionGroup,
+            approvalStatus: 'APPROVED',
+            pendingChanges: null
+          });
+        }
+      } else {
+        await updateDoc(assetRef, { approvalStatus: 'REJECTED', pendingChanges: null });
+      }
+    } catch (err: any) {
+      FirestoreService.handlePermissionError(assetRef, 'update', err);
+    }
+  },
+
   async deleteAsset(id: string): Promise<void> {
     if (!db) return;
     const assetRef = doc(db, 'assets', id);
@@ -148,10 +186,6 @@ export const FirestoreService = {
     }
   },
 
-  /**
-   * Deterministic Global Wipe.
-   * Recursively deletes all documents in the 'assets' collection to prepare for new data.
-   */
   async purgeAllAssets(): Promise<number> {
     if (!db) return 0;
     const assetsRef = collection(db, 'assets');
@@ -167,7 +201,6 @@ export const FirestoreService = {
     const total = snap.size;
     if (total === 0) return 0;
 
-    // Split into batches of 500 (Firestore limit)
     const docs = snap.docs;
     for (let i = 0; i < docs.length; i += 500) {
       const batch = writeBatch(db);
