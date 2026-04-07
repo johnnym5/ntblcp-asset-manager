@@ -13,37 +13,37 @@ runConfig:
 # Deployment Reroute: Assetain Production Pulse
 env:
   - variable: NEXT_PUBLIC_FIREBASE_API_KEY
-    value: "AIzaSyB9O662zXyyJkhtle1snkNLapre3_Sa3rc"
+    value: "AIzaSyDhBbeiAZGWzCHQXbbTcNXdsIT_6Gz3qJU"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN
-    value: "assetain.firebaseapp.com"
+    value: "ntblcp-asset-manager.firebaseapp.com"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_DATABASE_URL
-    value: "https://assetain-default-rtdb.firebaseio.com"
+    value: "https://ntblcp-asset-manager-default-rtdb.firebaseio.com"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_PROJECT_ID
-    value: "assetain"
+    value: "ntblcp-asset-manager"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET
-    value: "assetain.appspot.com"
+    value: "ntblcp-asset-manager.firebasestorage.app"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID
-    value: "45027293772"
+    value: "573481845773"
     availability:
       - BUILD
       - RUNTIME
   - variable: NEXT_PUBLIC_FIREBASE_APP_ID
-    value: "1:45027293772:web:0116cfaa586d17fa4c52e9"
+    value: "1:573481845773:web:5040ae77a51681c05bc144"
     availability:
       - BUILD
       - RUNTIME
