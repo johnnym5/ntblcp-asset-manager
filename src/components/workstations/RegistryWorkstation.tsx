@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 317: Integrated global dynamic pagination (25, 50, 100, All).
+ * Phase 318: Fixed Delete Folder pulse and implemented persistent Select All for categories.
  */
 
 import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
@@ -36,7 +36,8 @@ import {
   Globe,
   CloudOff,
   LayoutGrid,
-  RefreshCw
+  RefreshCw,
+  AlertTriangle
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -81,6 +82,16 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { FirestoreService } from '@/services/firebase/firestore';
 import type { SheetDefinition, Asset } from '@/types/domain';
 import { Card, CardContent } from '../ui/card';
@@ -136,6 +147,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const [isRenameDialogOpen, setIsRenameDialogOpen] = useState(false);
   const [categoryToRename, setCategoryToRename] = useState<string | null>(null);
   const [newCategoryName, setNewCategoryName] = useState('');
+
+  const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
+  const [categoriesToPurge, setCategoriesToPurge] = useState<string[]>([]);
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const canAdd = userProfile?.canAddAssets || isAdmin;
@@ -286,12 +300,12 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     else setSelectedCategories([]);
   };
 
-  const handleBatchDeleteCategories = async () => {
-    if (selectedCategories.length === 0) return;
+  const handleExecutePurge = async () => {
+    if (categoriesToPurge.length === 0) return;
     setIsProcessing(true);
     try {
       const idsToDelete = activeAssets
-        .filter(a => selectedCategories.includes(a.category))
+        .filter(a => categoriesToPurge.includes(a.category))
         .map(a => a.id);
       
       for (const id of idsToDelete) {
@@ -301,7 +315,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await storage.saveAssets(currentLocal.filter(a => !idsToDelete.includes(a.id)));
       await refreshRegistry();
       setSelectedCategories([]);
-      addNotification({ title: "Categories Deleted", description: `Removed ${idsToDelete.length} records.`, variant: "destructive" });
+      setCategoriesToPurge([]);
+      setIsPurgeDialogOpen(false);
+      addNotification({ title: "Registry Purge Complete", description: `Removed ${idsToDelete.length} records.`, variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -325,6 +341,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         await refreshRegistry();
         setSelectedCategories([]);
         addNotification({ title: "Sync Complete", variant: "success" });
+      } else {
+        addNotification({ title: "Folders already synced." });
       }
     } finally {
       setIsProcessing(false);
@@ -335,7 +353,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     if (!categoryToRename || !newCategoryName.trim() || !appSettings || !activeGrant) return;
     setIsProcessing(true);
     try {
-      // 1. Update Assets
       const assetsToUpdate = activeAssets.filter(a => a.category === categoryToRename);
       for (const asset of assetsToUpdate) {
         const updated = { ...asset, category: newCategoryName.trim() };
@@ -344,7 +361,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       const currentLocal = await storage.getAssets();
       await storage.saveAssets(currentLocal.map(a => a.category === categoryToRename ? { ...a, category: newCategoryName.trim() } : a));
 
-      // 2. Update Sheet Definition
       const nextSheetDefs = { ...activeGrant.sheetDefinitions };
       if (nextSheetDefs[categoryToRename]) {
         nextSheetDefs[newCategoryName.trim()] = { ...nextSheetDefs[categoryToRename], name: newCategoryName.trim() };
@@ -393,7 +409,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </div>
 
           <div className="flex items-center gap-2 w-full lg:w-auto overflow-x-auto no-scrollbar pb-1 sm:pb-0">
-            {selectedCategories.length === 0 && (
+            {/* Persistent Select All for Folders */}
+            {(selectedCategories.length === 0 || !viewAll) && (
               <div className="flex items-center gap-3 pr-4 border-r border-white/10 shrink-0">
                 <Checkbox 
                   id="sel-all-cat" 
@@ -466,6 +483,10 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                         <DropdownMenuItem onClick={() => setSelectedCategories([cat])} className="gap-2 p-2 rounded-lg focus:bg-primary/10">
                           <ChevronRight className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Drill Down</span>
                         </DropdownMenuItem>
+                        <DropdownMenuSeparator className="bg-white/5" />
+                        <DropdownMenuItem onClick={() => { setCategoriesToPurge([cat]); setIsPurgeDialogOpen(true); }} className="gap-2 p-2 rounded-lg focus:bg-destructive/10 text-destructive/60">
+                          <Trash2 className="h-3.5 w-3.5" /> <span className="text-[10px] font-black uppercase">Delete Folder</span>
+                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </div>
@@ -506,7 +527,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         )}
       </div>
 
-      {/* Action Bar for Categories */}
+      {/* Batch Action Bar */}
       <AnimatePresence>
         {selectedCategories.length > 0 && (
           <motion.div initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 30 }} className="fixed bottom-8 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center gap-6 shadow-3xl backdrop-blur-3xl">
@@ -519,7 +540,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 <Upload className="h-3.5 w-3.5" /> Sync Folder
               </Button>
               {isAdmin && (
-                <Button variant="ghost" size="sm" onClick={handleBatchDeleteCategories} disabled={isProcessing} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60">
+                <Button variant="ghost" size="sm" onClick={() => { setCategoriesToPurge(selectedCategories); setIsPurgeDialogOpen(true); }} disabled={isProcessing} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10">
                   <Trash2 className="h-3.5 w-3.5" /> Purge Folder
                 </Button>
               )}
@@ -532,6 +553,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} />
       <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={activeAssets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
       
+      {/* Category Rename Pulse */}
       <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
         <DialogContent className="max-w-md rounded-2xl bg-black border-white/10 text-white p-8">
           <DialogHeader>
@@ -552,6 +574,28 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Category Purge Confirmation */}
+      <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
+        <AlertDialogContent className="rounded-[2rem] border-destructive/20 bg-black text-white p-10">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
+              <AlertTriangle className="h-10 w-10 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Execute Category Purge?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/40">
+              This will permanently delete {categoriesToPurge.length} folders and every record contained within them. This action is immutable across local and cloud storage.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 text-white hover:bg-white/5">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handleExecutePurge} disabled={isProcessing} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0">
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} 
+              Commit Purge
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
