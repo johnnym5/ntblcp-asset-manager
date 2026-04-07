@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub.
- * Optimized for full responsiveness across all screen sizes.
+ * Optimized for RBAC and Location-Aware Pulse filtering.
  */
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, Suspense, useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
 import UserProfileSetup from '@/components/user-profile-setup';
@@ -19,15 +19,15 @@ import {
   ArrowLeft,
   Search,
   Filter,
-  ArrowUpDown,
   Settings as SettingsIcon,
-  DatabaseZap,
-  Menu,
-  X,
   LayoutGrid,
-  HelpCircle,
   Wifi,
-  WifiOff
+  WifiOff,
+  ShieldCheck,
+  MapPin,
+  Terminal,
+  ShieldAlert,
+  ChevronDown
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -38,11 +38,8 @@ import { RegistryWorkstation } from '@/components/workstations/RegistryWorkstati
 import { AssetGroupsWorkstation } from '@/components/workstations/AssetGroupsWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
-import { WelcomeExperience } from '@/components/WelcomeExperience';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
 import { useNotifications } from '@/hooks/use-notifications';
-import { AssetFilterSheet } from '@/components/asset-filter-sheet';
-import { SortDrawer } from '@/components/registry/SortDrawer';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   DropdownMenu,
@@ -52,15 +49,14 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Badge } from '@/components/ui/badge';
+import { canPerform } from '@/core/auth/rbac';
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
   const { 
     activeView, 
     setActiveView, 
-    appSettings, 
     isOnline, 
     setIsOnline,
     isSyncing, 
@@ -68,185 +64,111 @@ export default function SPAHub() {
     manualUpload,
     searchTerm,
     setSearchTerm,
-    headers,
-    
-    // Logic States
-    selectedLocations,
-    setSelectedLocations,
-    selectedAssignees,
-    setSelectedAssignees,
-    selectedStatuses,
-    setSelectedStatuses,
-    selectedConditions,
-    setSelectedConditions,
-    missingFieldFilter,
-    setMissingFieldFilter,
-    
-    // Options
-    locationOptions,
-    assigneeOptions,
-    conditionOptions,
-    statusOptions,
-    
-    // Sort
-    sortKey,
-    setSortKey,
-    sortDir,
-    setSortDir
+    assets
   } = useAppState();
   
   const { unreadCount } = useNotifications();
-  const isMobile = useIsMobile();
-  
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(false);
-  const [isFilterOpen, setIsFilterOpen] = useState(false);
-  const [isSortOpen, setIsSortOpen] = useState(false);
-  const [showMobileSearch, setShowMobileSearch] = useState(false);
 
-  useEffect(() => {
-    if (profileSetupComplete && !appSettings?.onboardingComplete) {
-      setShowWelcome(true);
-    }
-  }, [profileSetupComplete, appSettings]);
+  const scopedAssets = useMemo(() => {
+    if (!userProfile) return [];
+    if (userProfile.isAdmin || userProfile.states.includes('All')) return assets;
+    
+    return assets.filter(a => {
+      const state = a.normalizedState || '';
+      const zone = a.normalizedZone || '';
+      const inStates = userProfile.states.includes(state);
+      const inZone = userProfile.isZonalAdmin && userProfile.assignedZone === zone;
+      return inStates || inZone;
+    });
+  }, [assets, userProfile]);
 
-  if (loading) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-black">
-        <Loader2 className="h-10 w-10 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!profileSetupComplete) {
-    return <UserProfileSetup />;
-  }
+  if (loading) return <div className="flex h-screen w-full items-center justify-center bg-black"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
+  if (!profileSetupComplete) return <UserProfileSetup />;
 
   const renderWorkstation = () => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
-      case 'REGISTRY': return <RegistryWorkstation />;
-      case 'GROUPS': return <AssetGroupsWorkstation />;
+      case 'REGISTRY': return <RegistryWorkstation assets={scopedAssets} />;
+      case 'GROUPS': return <AssetGroupsWorkstation assets={scopedAssets} />;
       case 'SETTINGS': return <SettingsWorkstation />;
       default: return <DashboardWorkstation />;
     }
   };
 
-  const isAdmin = userProfile?.isAdmin || false;
-
   return (
-    <div className="app-container bg-black font-sans selection:bg-primary/30 text-white">
+    <div className="app-container bg-black font-sans text-white">
       <CommandPalette />
-      <WelcomeExperience isOpen={showWelcome} onComplete={() => setShowWelcome(false)} />
       <NotificationsCenter isOpen={isNotificationsOpen} onOpenChange={setIsNotificationsOpen} />
       
       <main className="flex-1 flex flex-col relative overflow-hidden bg-black">
-        <header className="h-20 border-b border-white/5 flex items-center justify-between px-4 md:px-8 bg-black/80 backdrop-blur-3xl z-40 gap-4 md:gap-8 shrink-0">
-          <div className="flex items-center gap-3 md:gap-6 shrink-0">
+        <header className="h-20 border-b border-white/5 flex items-center justify-between px-8 bg-black/80 backdrop-blur-3xl z-40 shrink-0">
+          <div className="flex items-center gap-6">
             {activeView !== 'DASHBOARD' ? (
-              <button 
-                onClick={() => setActiveView('DASHBOARD')} 
-                className="flex items-center gap-2 p-2.5 md:p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-primary group tactile-pulse"
-              >
+              <button onClick={() => setActiveView('DASHBOARD')} className="flex items-center gap-2 p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-primary group tactile-pulse">
                 <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
                 <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Back</span>
               </button>
             ) : (
-              <div className="flex items-center gap-2 md:gap-4">
-                <div className="p-2 md:p-2.5 bg-primary/10 rounded-xl">
-                  <Boxes className="h-5 w-5 text-primary" />
-                </div>
+              <div className="flex items-center gap-4">
+                <div className="p-2.5 bg-primary/10 rounded-xl"><Boxes className="h-5 w-5 text-primary" /></div>
                 <div className="flex flex-col">
-                  <h1 className="text-base md:text-xl font-black uppercase text-white tracking-tighter leading-none">Assetain</h1>
-                  <span className="text-[7px] md:text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Control</span>
+                  <h1 className="text-xl font-black uppercase text-white tracking-tighter leading-none">Assetain</h1>
+                  <span className="text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Control</span>
                 </div>
               </div>
             )}
           </div>
 
-          <div className="hidden lg:flex items-center bg-white/[0.02] p-1 rounded-2xl border border-white/5 shadow-inner">
-            <button 
-              onClick={() => setActiveView('REGISTRY')}
-              className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'REGISTRY' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
-            >
-              Inventory
-            </button>
-            <button 
-              onClick={() => setActiveView('GROUPS')}
-              className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'GROUPS' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
-            >
-              Asset Groups
-            </button>
+          <div className="hidden lg:flex items-center bg-white/[0.02] p-1 rounded-2xl border border-white/5">
+            <button onClick={() => setActiveView('REGISTRY')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'REGISTRY' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>Inventory</button>
+            <button onClick={() => setActiveView('GROUPS')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'GROUPS' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>Folders</button>
           </div>
 
-          <div className="flex items-center gap-2 md:gap-4 shrink-0">
-            <button className="md:hidden p-2.5 bg-white/5 rounded-xl text-white/40 tactile-pulse" onClick={() => setShowMobileSearch(!showMobileSearch)}>
-              <Search className="h-4 w-4" />
-            </button>
+          <div className="flex items-center gap-4">
+            <div className="hidden md:flex items-center gap-3 px-4 border-r border-white/5">
+              <Badge variant="outline" className="h-7 px-3 border-primary/20 bg-primary/5 text-primary font-black uppercase text-[8px] tracking-widest gap-2">
+                <ShieldCheck className="h-3 w-3" /> {userProfile.role}
+              </Badge>
+              <Badge variant="outline" className="h-7 px-3 border-white/10 bg-white/5 text-white/40 font-black uppercase text-[8px] tracking-widest gap-2">
+                <MapPin className="h-3 w-3" /> {userProfile.isZonalAdmin ? userProfile.assignedZone : userProfile.state}
+              </Badge>
+            </div>
 
-            <TooltipProvider>
-              <div className="hidden sm:flex items-center gap-2 mr-2">
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button onClick={manualDownload} disabled={isSyncing} className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all">
-                      <CloudDownload className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Download latest records.</TooltipContent>
-                </Tooltip>
-                
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <button onClick={manualUpload} disabled={isSyncing} className="p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all">
-                      <CloudUpload className={cn("h-4 w-4", isSyncing && "animate-spin")} />
-                    </button>
-                  </TooltipTrigger>
-                  <TooltipContent>Upload local changes.</TooltipContent>
-                </Tooltip>
-              </div>
-            </TooltipProvider>
-            
-            <div className="flex items-center gap-2 md:gap-3 pr-2 md:pr-4 md:border-r border-white/5">
-              <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 md:gap-3 group hover:opacity-80 transition-opacity tactile-pulse">
-                <div className={cn("h-2 w-2 rounded-full transition-all", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
-                <span className={cn("text-[8px] font-black uppercase tracking-widest hidden lg:inline", isOnline ? "text-green-500" : "text-red-500")}>
-                  {isOnline ? 'Online' : 'Offline'}
-                </span>
+            <div className="flex items-center gap-3">
+              <button onClick={() => setIsOnline(!isOnline)} className="flex items-center gap-2 group tactile-pulse">
+                <div className={cn("h-2 w-2 rounded-full", isOnline ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-red-500")} />
+                <span className={cn("text-[8px] font-black uppercase tracking-widest hidden lg:inline", isOnline ? "text-green-500" : "text-red-500")}>{isOnline ? 'Online' : 'Offline'}</span>
               </button>
               
-              <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white hover:bg-white/10 transition-all">
+              <button onClick={() => setIsNotificationsOpen(true)} className="relative p-2.5 bg-white/5 rounded-xl text-white/40 hover:text-white transition-all">
                 <Bell className="h-4 w-4" />
-                {unreadCount > 0 && (
-                  <div className="absolute -top-1 -right-1 h-4 w-4 bg-red-600 rounded-full flex items-center justify-center border-2 border-black animate-in zoom-in duration-300">
-                    <span className="text-[8px] font-black text-white leading-none">{unreadCount}</span>
-                  </div>
-                )}
+                {unreadCount > 0 && <div className="absolute -top-1 -right-1 h-4 w-4 bg-red-600 rounded-full flex items-center justify-center border-2 border-black"><span className="text-[8px] font-black text-white">!</span></div>}
               </button>
             </div>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button className="flex items-center gap-3 group cursor-pointer pl-1">
-                  <div className={cn(
-                    "h-9 w-9 md:h-10 md:w-10 rounded-full border transition-all flex items-center justify-center font-black text-[10px] md:text-xs shadow-xl",
-                    activeView === 'SETTINGS' ? "bg-primary text-black border-primary" : "bg-primary/10 border-primary/20 text-primary group-hover:bg-primary group-hover:text-black"
-                  )}>
-                    {userProfile?.displayName?.[0] || 'A'}
+                  <div className={cn("h-10 w-10 rounded-full border transition-all flex items-center justify-center font-black text-xs", activeView === 'SETTINGS' ? "bg-primary text-black border-primary" : "bg-primary/10 border-primary/20 text-primary")}>
+                    {userProfile.displayName[0]}
                   </div>
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-56 bg-black border-white/5 text-white rounded-2xl shadow-3xl">
-                <DropdownMenuLabel className="font-normal p-4">
+                <DropdownMenuLabel className="p-4">
                   <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-black uppercase tracking-tight">{userProfile?.displayName}</p>
-                    <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{userProfile?.role}</p>
+                    <p className="text-sm font-black uppercase">{userProfile.displayName}</p>
+                    <p className="text-[10px] font-bold text-white/40 uppercase">{userProfile.role} • {userProfile.state}</p>
                   </div>
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
-                <DropdownMenuItem onClick={() => setActiveView('GROUPS')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
-                  <LayoutGrid className="mr-2 h-4 w-4" />
-                  <span className="text-[11px] font-black uppercase">Browse Groups</span>
-                </DropdownMenuItem>
+                {canPerform(userProfile as any, 'DATABASE_ADMIN_TOOLS') && (
+                  <DropdownMenuItem onClick={() => setActiveView('DATABASE')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
+                    <Terminal className="mr-2 h-4 w-4" />
+                    <span className="text-[11px] font-black uppercase">Database View</span>
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
                   <SettingsIcon className="mr-2 h-4 w-4" />
                   <span className="text-[11px] font-black uppercase">Settings</span>
@@ -261,56 +183,14 @@ export default function SPAHub() {
           </div>
         </header>
 
-        {showMobileSearch && (
-          <div className="md:hidden bg-black/90 backdrop-blur-2xl border-b border-white/5 p-4 animate-in slide-in-from-top duration-300 z-30">
-            <div className="relative">
-              <Input autoFocus placeholder="Search records..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="h-12 bg-white/[0.03] border-white/10 rounded-xl text-white pr-10" />
-              <button onClick={() => setShowMobileSearch(false)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/20"><X className="h-4 w-4" /></button>
-            </div>
-          </div>
-        )}
-
-        <div className="flex-1 min-h-0 relative">
+        <div className="flex-1 relative overflow-hidden">
           <ErrorBoundary module={activeView}>
-            <Suspense fallback={<div className="h-full flex flex-col items-center justify-center gap-6 opacity-40"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Opening...</p></div>}>
-              <ScrollArea className="h-full custom-scrollbar">
-                <div className="min-h-full p-4 md:p-12 lg:p-16">
-                  {renderWorkstation()}
-                </div>
-              </ScrollArea>
-            </Suspense>
+            <ScrollArea className="h-full custom-scrollbar">
+              <div className="p-12 lg:p-16">{renderWorkstation()}</div>
+            </ScrollArea>
           </ErrorBoundary>
         </div>
       </main>
-
-      <AssetFilterSheet 
-        isOpen={isFilterOpen} 
-        onOpenChange={setIsFilterOpen} 
-        isAdmin={isAdmin}
-        locationOptions={locationOptions}
-        selectedLocations={selectedLocations}
-        setSelectedLocations={setSelectedLocations}
-        assigneeOptions={assigneeOptions}
-        selectedAssignees={selectedAssignees}
-        setSelectedAssignees={setSelectedAssignees}
-        conditionOptions={conditionOptions}
-        selectedConditions={selectedConditions}
-        setSelectedConditions={setSelectedConditions}
-        missingFieldFilter={missingFieldFilter}
-        setMissingFieldFilter={setMissingFieldFilter}
-      />
-
-      <SortDrawer 
-        isOpen={isSortOpen} 
-        onOpenChange={setIsSortOpen} 
-        headers={headers} 
-        sortBy={sortKey} 
-        sortDirection={sortDir} 
-        onUpdateSort={(key, dir) => {
-          setSortKey(key);
-          setSortDir(dir);
-        }} 
-      />
     </div>
   );
 }

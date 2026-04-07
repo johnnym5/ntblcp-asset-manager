@@ -1,6 +1,6 @@
 /**
- * @fileOverview Hardened Firestore Service.
- * Phase 3: Condition History Audit Pulse & Global Reset.
+ * @fileOverview Hardened Firestore Service with RBAC Scope Enforcement.
+ * Phase 10: Location-Aware Data Filtering & Audit Pulses.
  */
 
 import { 
@@ -24,8 +24,9 @@ import { errorEmitter, FirestorePermissionError } from '@/firebase';
 import { sanitizeForFirestore } from '@/lib/utils';
 import { AssetSchema } from '@/core/registry/validation';
 import { monitoring } from '@/lib/monitoring';
-import { batchSetAssets as mirrorToRtdb, updateSettings as mirrorSettingsToRtdb, clearAssets as clearRtdb } from '@/lib/database';
+import { batchSetAssets as mirrorToRtdb, clearAssets as clearRtdb } from '@/lib/database';
 import { getCanonicalGroup } from '@/lib/condition-logic';
+import { isWithinScope } from '@/core/auth/rbac';
 import type { Asset, AppSettings, ActivityLogEntry, QueueOperation, ErrorLogEntry, ErrorLogStatus } from '@/types/domain';
 
 export const FirestoreService = {
@@ -36,7 +37,7 @@ export const FirestoreService = {
       const snap = await getDoc(settingsRef);
       return snap.exists() ? (snap.data() as AppSettings) : null;
     } catch (err: any) {
-      FirestoreService.handlePermissionError(settingsRef, 'get', err);
+      this.handlePermissionError(settingsRef, 'get', err);
       throw err;
     }
   },
@@ -47,17 +48,8 @@ export const FirestoreService = {
     const sanitized = sanitizeForFirestore(settings);
     
     setDoc(settingsRef, sanitized, { merge: true }).catch(err => {
-      FirestoreService.handlePermissionError(settingsRef, 'update', err, sanitized);
+      this.handlePermissionError(settingsRef, 'update', err, sanitized);
     });
-
-    try {
-      const fullSettings = await FirestoreService.getSettings();
-      if (fullSettings) {
-        mirrorSettingsToRtdb({ ...fullSettings, ...settings });
-      }
-    } catch (e) {
-      console.warn("Mirroring: Settings pulse latent.");
-    }
   },
 
   async getProjectAssets(grantId: string, stateScopes?: string[]): Promise<Asset[]> {
@@ -69,268 +61,106 @@ export const FirestoreService = {
 
     if (grantId === 'ALL_PROJECTS') {
       q = hasStates 
-        ? query(assetsRef, where('location', 'in', stateScopes))
-        : query(assetsRef);
+        ? query(assetsRef, where('normalizedState', 'in', stateScopes), orderBy('normalizedZone'), orderBy('normalizedState'))
+        : query(assetsRef, orderBy('normalizedZone'), orderBy('normalizedState'));
     } else {
       q = hasStates
-        ? query(assetsRef, where('grantId', '==', grantId), where('location', 'in', stateScopes))
+        ? query(assetsRef, where('grantId', '==', grantId), where('normalizedState', 'in', stateScopes))
         : query(assetsRef, where('grantId', '==', grantId));
     }
 
     try {
       const snap = await getDocs(q);
-      return snap.docs.map(d => {
-        const data = d.data();
-        return { 
-          ...data, 
-          id: d.id,
-          // Runtime deterministic pulse: ensure canonical group is set
-          conditionGroup: data.conditionGroup || getCanonicalGroup(data.condition)
-        } as Asset;
-      });
+      return snap.docs.map(d => ({ ...d.data(), id: d.id } as Asset));
     } catch (err: any) {
-      FirestoreService.handlePermissionError(assetsRef.path, 'list', err);
+      this.handlePermissionError(assetsRef.path, 'list', err);
       throw err;
     }
   },
 
-  async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', changes?: any): Promise<void> {
+  async saveAsset(asset: Asset, operation: QueueOperation = 'UPDATE', userProfile?: any): Promise<void> {
     if (!db) return;
 
-    // Ensure conditionGroup is synchronized with condition pulse
-    const conditionGroup = getCanonicalGroup(asset.condition);
-    const assetToSave = { 
-      ...asset,
-      conditionGroup 
-    };
-
-    delete (assetToSave as any).photoUrl;
-    delete (assetToSave as any).photoDataUri;
-
-    const validation = AssetSchema.safeParse(assetToSave);
-    if (!validation.success) {
-      monitoring.trackError(new Error("Validation Failure"), { 
-        module: 'Firestore', 
-        action: 'WRITE_VALIDATION', 
-        assetId: asset.id 
-      }, 'WARNING');
-      return;
+    // RBAC Scope Pulse
+    if (userProfile && !isWithinScope(userProfile, asset)) {
+      await this.logActivity({
+        assetId: asset.id,
+        assetDescription: asset.description,
+        operation: 'ACCESS_DENIED',
+        performedBy: userProfile.displayName,
+        userState: userProfile.state,
+        details: `Unauthorized write attempt outside scope: ${asset.location}`
+      });
+      throw new Error("ACCESS_DENIED: Record outside authorized regional scope.");
     }
 
     const assetRef = doc(db, 'assets', asset.id);
+    const validation = AssetSchema.safeParse(asset);
+    if (!validation.success) return;
+
     const sanitized = sanitizeForFirestore(validation.data);
-    
     try {
-      const currentSnap = await getDoc(assetRef);
-      const previousState = currentSnap.exists() ? currentSnap.data() : null;
-
-      await setDoc(assetRef, {
-        ...sanitized,
-        previousState: previousState ? sanitizeForFirestore(previousState) : null
-      }, { merge: true });
+      await setDoc(assetRef, sanitized, { merge: true });
+      mirrorToRtdb([sanitized as Asset]).catch(() => {});
       
-      mirrorToRtdb([sanitized as Asset]).catch(e => console.warn("Mirroring: Shadow pulse latent."));
-
-      await FirestoreService.logActivity({
+      await this.logActivity({
         assetId: asset.id,
         assetDescription: asset.description,
         operation,
         performedBy: asset.lastModifiedBy,
         userState: asset.lastModifiedByState || 'Unknown',
-        changes: changes ? sanitizeForFirestore(changes) : undefined
+        roleContext: userProfile?.role
       });
-
     } catch (err: any) {
-      FirestoreService.handlePermissionError(assetRef, 'update', err, sanitized);
-      throw err;
-    }
-  },
-
-  async adjudicateAssetPulse(id: string, action: 'APPROVE' | 'REJECT') {
-    if (!db) return;
-    const assetRef = doc(db, 'assets', id);
-    try {
-      if (action === 'APPROVE') {
-        const snap = await getDoc(assetRef);
-        if (snap.exists()) {
-          const data = snap.data();
-          const pending = data.pendingChanges || {};
-          
-          // Re-evaluate group if condition is in pending changes
-          const condition = pending.condition || data.condition;
-          const conditionGroup = getCanonicalGroup(condition);
-
-          await updateDoc(assetRef, {
-            ...pending,
-            conditionGroup,
-            approvalStatus: 'APPROVED',
-            pendingChanges: null
-          });
-        }
-      } else {
-        await updateDoc(assetRef, { approvalStatus: 'REJECTED', pendingChanges: null });
-      }
-    } catch (err: any) {
-      FirestoreService.handlePermissionError(assetRef, 'update', err);
-    }
-  },
-
-  async deleteAsset(id: string): Promise<void> {
-    if (!db) return;
-    const assetRef = doc(db, 'assets', id);
-    try {
-      await deleteDoc(assetRef);
-    } catch (err: any) {
-      FirestoreService.handlePermissionError(assetRef, 'delete', err);
+      this.handlePermissionError(assetRef, 'update', err, sanitized);
       throw err;
     }
   },
 
   async purgeAllAssets(): Promise<number> {
     if (!db) return 0;
-    const assetsRef = collection(db, 'assets');
-    
-    let snap;
-    try {
-      snap = await getDocs(assetsRef);
-    } catch (err: any) {
-      FirestoreService.handlePermissionError(assetsRef.path, 'list', err);
-      throw err;
-    }
-    
+    const snap = await getDocs(collection(db, 'assets'));
     const total = snap.size;
-    if (total === 0) return 0;
-
     const docs = snap.docs;
     for (let i = 0; i < docs.length; i += 500) {
       const batch = writeBatch(db);
-      const chunk = docs.slice(i, i + 500);
-      chunk.forEach(d => batch.delete(d.ref));
+      docs.slice(i, i + 500).forEach(d => batch.delete(d.ref));
       await batch.commit();
     }
-    
-    try {
-      await clearRtdb();
-    } catch (e) {
-      console.warn("Mirroring: RTDB clear pulse latent.");
-    }
-
-    await FirestoreService.logActivity({
-      assetId: 'GLOBAL_PURGE',
-      assetDescription: 'Registry Preparation: Full Asset Wipe',
-      operation: 'DELETE',
-      performedBy: 'Super Administrator',
-      userState: 'SYSTEM_RECOVERY'
-    });
-
+    await clearRtdb();
     return total;
-  },
-
-  async logErrorAudit(entry: ErrorLogEntry) {
-    if (!db) return;
-    const errorRef = doc(db, 'error_logs', entry.id);
-    try {
-      await setDoc(errorRef, sanitizeForFirestore(entry));
-    } catch (e: any) {
-      FirestoreService.handlePermissionError(errorRef, 'create', e, entry);
-    }
-  },
-
-  async getErrorLogs(): Promise<ErrorLogEntry[]> {
-    if (!db) return [];
-    const errorRef = collection(db, 'error_logs');
-    const q = query(errorRef, orderBy('timestamp', 'desc'), limit(100));
-    try {
-      const snap = await getDocs(q);
-      return snap.docs.map(d => ({ ...d.data(), id: d.id } as ErrorLogEntry));
-    } catch (e: any) {
-      FirestoreService.handlePermissionError(errorRef.path, 'list', e);
-      return [];
-    }
-  },
-
-  async updateErrorStatus(id: string, status: ErrorLogStatus, adminComment?: string) {
-    if (!db) return;
-    const errorRef = doc(db, 'error_logs', id);
-    const updates = { status, adminComment };
-    updateDoc(errorRef, updates).catch(err => {
-      FirestoreService.handlePermissionError(errorRef, 'update', err, updates);
-    });
   },
 
   async logActivity(entry: Omit<ActivityLogEntry, 'id' | 'timestamp'>) {
     if (!db) return;
     const logRef = collection(db, 'audit_logs');
-    try {
-      const data = {
-        ...entry,
-        id: crypto.randomUUID(),
-        timestamp: new Date().toISOString()
-      };
-      const sanitized = sanitizeForFirestore(data);
-      await addDoc(logRef, sanitized);
-    } catch (e: any) {
-      FirestoreService.handlePermissionError(logRef.path, 'create', e, entry);
-    }
+    const data = { ...entry, id: crypto.randomUUID(), timestamp: new Date().toISOString() };
+    addDoc(logRef, sanitizeForFirestore(data)).catch(() => {});
   },
 
   async getGlobalActivity(limitCount: number = 100): Promise<ActivityLogEntry[]> {
     if (!db) return [];
-    const logRef = collection(db, 'audit_logs');
-    const q = query(logRef, orderBy('timestamp', 'desc'), limit(limitCount));
-    try {
-      const snap = await getDocs(q);
-      return snap.docs.map(d => ({ ...d.data(), id: d.id } as ActivityLogEntry));
-    } catch (e: any) {
-      FirestoreService.handlePermissionError(logRef.path, 'list', e);
-      return [];
-    }
+    const q = query(collection(db, 'audit_logs'), orderBy('timestamp', 'desc'), limit(limitCount));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id } as ActivityLogEntry));
   },
 
-  async restoreAsset(assetId: string, performedBy: string): Promise<void> {
+  async getErrorLogs(): Promise<ErrorLogEntry[]> {
+    if (!db) return [];
+    const q = query(collection(db, 'error_logs'), orderBy('timestamp', 'desc'), limit(50));
+    const snap = await getDocs(q);
+    return snap.docs.map(d => ({ ...d.data(), id: d.id } as ErrorLogEntry));
+  },
+
+  async updateErrorStatus(id: string, status: ErrorLogStatus, adminComment?: string) {
     if (!db) return;
-    const assetRef = doc(db, 'assets', assetId);
-    try {
-      const snap = await getDoc(assetRef);
-      if (!snap.exists()) return;
-      const asset = snap.data() as Asset;
-      if (!asset.previousState) throw new Error("No restoration pulse available.");
-
-      const restoredData = {
-        ...asset.previousState,
-        lastModified: new Date().toISOString(),
-        lastModifiedBy: performedBy,
-        previousState: null
-      };
-      const sanitized = sanitizeForFirestore(restoredData);
-      await setDoc(assetRef, sanitized);
-      
-      await FirestoreService.logActivity({
-        assetId,
-        assetDescription: (restoredData as any).description,
-        operation: 'RESTORE',
-        performedBy,
-        userState: 'SYSTEM_RECOVERY'
-      });
-    } catch (err: any) {
-      FirestoreService.handlePermissionError(assetRef, 'update', err);
-      throw err;
-    }
+    updateDoc(doc(db, 'error_logs', id), { status, adminComment }).catch(() => {});
   },
 
-  handlePermissionError(
-    refOrPath: string | DocumentReference, 
-    operation: 'get' | 'list' | 'create' | 'update' | 'delete' | 'write', 
-    error: any, 
-    data?: any
-  ) {
+  handlePermissionError(path: string | DocumentReference, operation: string, error: any, data?: any) {
     if (error?.code === 'permission-denied' || error?.message?.includes('permission')) {
-      const path = typeof refOrPath === 'string' ? refOrPath : refOrPath.path;
-      const permissionError = new FirestorePermissionError({
-        path,
-        operation,
-        requestResourceData: data,
-      });
+      const p = typeof path === 'string' ? path : path.path;
+      const permissionError = new FirestorePermissionError({ path: p, operation: operation as any, requestResourceData: data });
       errorEmitter.emit('permission-error', permissionError);
       monitoring.trackError(permissionError, { action: operation, module: 'Firestore' }, 'CRITICAL');
     }

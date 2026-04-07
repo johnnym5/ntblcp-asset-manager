@@ -3,33 +3,35 @@
  * Phase 180: Hardened Zonal Administrator scope inheritance logic.
  */
 
-import type { AuthorizedUser, Asset } from '@/types/domain';
-import { NIGERIAN_ZONES } from '@/lib/constants';
+import type { AuthorizedUser, Asset, UserRole } from '@/types/domain';
+import { NIGERIAN_GEO_DATA } from '@/lib/nigeria-geo';
 
 /**
  * Checks if a user has the base permission for an action.
  */
 export function hasPermission(user: AuthorizedUser, action: string): boolean {
-  const role = user.role;
+  const role = user.role as UserRole;
 
   switch (action) {
-    case 'DATABASE_MISSION_CONTROL':
-      return !!user.isSuperAdmin || role === 'SUPERADMIN';
+    case 'DATABASE_ADMIN_TOOLS':
+      return role === 'SUPERADMIN';
 
+    case 'MANAGE_SYSTEM':
     case 'MANAGE_USERS':
-    case 'EDIT_CONFIG':
-    case 'DELETE_ASSET':
-    case 'INFRASTRUCTURE_CONTROL':
+    case 'EDIT_GLOBAL_CONFIG':
+    case 'GLOBAL_WIPE':
       return role === 'ADMIN' || role === 'SUPERADMIN';
 
-    case 'ADD_ASSET':
-    case 'EDIT_ASSET':
-    case 'VIEW_REPORTS':
-    case 'IMPORT_CENTER':
-      return role === 'ADMIN' || role === 'MANAGER' || role === 'SUPERADMIN' || !!user.isZonalAdmin;
+    case 'IMPORT_RECORDS':
+    case 'BATCH_EDIT':
+    case 'REVERT_CHANGES':
+    case 'ADJUDICATE_REQUESTS':
+      return role === 'ADMIN' || role === 'SUPERADMIN' || !!user.isZonalAdmin;
 
+    case 'VIEW_REGISTRY':
     case 'VERIFY_ASSET':
-      return role !== 'VIEWER';
+    case 'EXPORT_REPORTS':
+      return true; // Everyone can view/verify within their scope
 
     default:
       return false;
@@ -38,34 +40,24 @@ export function hasPermission(user: AuthorizedUser, action: string): boolean {
 
 /**
  * Validates if an operation on a specific asset is within the user's regional scope.
- * Supports State-level, Zonal-level, and SuperAdmin global inheritance.
  */
 export function isWithinScope(user: AuthorizedUser, asset: Asset): boolean {
-  // 1. SuperAdmins and Admins bypass regional checks
-  if (user.role === 'ADMIN' || user.role === 'SUPERADMIN' || user.states.includes('All') || user.isAdmin) {
+  // 1. SuperAdmins and Admins bypass regional checks for Asset data
+  if (user.role === 'ADMIN' || user.role === 'SUPERADMIN' || user.states.includes('All')) {
     return true;
   }
 
-  const assetLocation = (asset.location || '').trim().toLowerCase();
+  const assetState = (asset.normalizedState || '').trim();
+  const assetZone = (asset.normalizedZone || '').trim();
   
   // 2. Direct State Match
-  if (user.states.some(s => s.toLowerCase() === assetLocation)) {
+  if (user.states.some(s => s === assetState)) {
     return true;
   }
 
   // 3. Zonal Administrator Check
-  // If a user is a Zonal Admin, we check if the asset's state falls within their assigned zone
   if (user.isZonalAdmin && user.assignedZone) {
-    const zoneStates = NIGERIAN_ZONES[user.assignedZone];
-    if (zoneStates && zoneStates.some(s => s.toLowerCase() === assetLocation)) {
-      return true;
-    }
-  }
-
-  // 4. Fallback: Secondary check for users assigned multiple specific states via zones
-  for (const assignedScope of user.states) {
-    const zoneStates = NIGERIAN_ZONES[assignedScope];
-    if (zoneStates && zoneStates.some(s => s.toLowerCase() === assetLocation)) {
+    if (assetZone === user.assignedZone) {
       return true;
     }
   }
@@ -75,7 +67,6 @@ export function isWithinScope(user: AuthorizedUser, asset: Asset): boolean {
 
 /**
  * Aggregated check for UI and Service layers.
- * Evaluates both role-based and scope-based constraints.
  */
 export function canPerform(user: AuthorizedUser, action: string, asset?: Asset): boolean {
   if (!hasPermission(user, action)) return false;

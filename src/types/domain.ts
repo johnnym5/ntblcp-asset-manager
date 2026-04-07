@@ -10,6 +10,9 @@ export type UXMode = 'beginner' | 'advanced';
 export type StorageLayer = 'FIRESTORE' | 'RTDB' | 'LOCAL';
 export type AuthorityNode = 'FIRESTORE' | 'RTDB';
 
+export type MatchConfidence = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
+export type LocationMatchStatus = 'MATCHED' | 'PARTIAL' | 'UNASSIGNED' | 'NEEDS_REVIEW' | 'INVALID';
+
 export type WorkstationView = 
   | 'DASHBOARD' 
   | 'REGISTRY' 
@@ -82,7 +85,14 @@ export interface Asset {
   assetFamily: string;
   
   // Location & Assignment
-  location: string;
+  location: string; // Raw input
+  normalizedLocation?: string;
+  normalizedState?: string;
+  normalizedZone?: string;
+  normalizedLga?: string;
+  locationConfidence?: MatchConfidence;
+  locationStatus?: LocationMatchStatus;
+  
   custodian: string;
   lga?: string;
   site?: string;
@@ -175,6 +185,8 @@ export interface AuthorizedUser {
   role: UserRole;
   isAdmin: boolean;
   isSuperAdmin?: boolean; 
+  isZonalAdmin?: boolean;
+  assignedZone?: string;
 }
 
 export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE';
@@ -194,14 +206,16 @@ export interface ActivityLogEntry {
   id: string;
   assetId: string;
   assetDescription: string;
-  operation: QueueOperation;
+  operation: QueueOperation | 'ACCESS_DENIED' | 'LOGIN';
   timestamp: string;
   performedBy: string;
   userState: string;
+  roleContext?: UserRole;
   changes?: Record<string, { old: any; new: any }>;
   seenByUids?: string[];
   groupContext?: string;
   conditionContext?: string;
+  details?: string;
 }
 
 export type ErrorSeverity = 'CRITICAL' | 'WARNING' | 'INFO';

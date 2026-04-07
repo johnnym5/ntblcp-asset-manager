@@ -2,13 +2,14 @@
 
 /**
  * @fileOverview High-Fidelity NTBLCP Structural Parser Engine.
- * Implements two-stage structural discovery and group-aware mapping for single-sheet registries.
- * Phase 800: Unified key mapping to fix registry data alignment issue.
+ * Implements two-stage structural discovery and group-aware mapping.
+ * Phase 900: Integrated LocationEngine for canonical admin mapping.
  */
 
 import { v4 as uuidv4 } from 'uuid';
 import { classifyRow } from './classifyRow';
 import { normalizeHeaderName } from '@/lib/registry-utils';
+import { LocationEngine } from '@/services/location-engine';
 import type { 
   ParsedAsset, 
   HeaderTemplate,
@@ -29,9 +30,6 @@ export class ParserEngine {
     this.existingAssets = existingAssets;
   }
 
-  /**
-   * STAGE 1: Template Detection & Structural Inventory Pulse.
-   */
   public discoverGroups(sheetName: string, data: any[][]): DiscoveredGroup[] {
     const discovered: DiscoveredGroup[] = [];
     let pendingGroupLabel: string | null = null;
@@ -39,33 +37,20 @@ export class ParserEngine {
     
     data.forEach((row, idx) => {
       const type = classifyRow(row);
-
       if (type === 'GROUP_HEADER') {
         if (activeGroup) activeGroup.endRow = idx - 1;
         pendingGroupLabel = String(row[0]).trim();
       }
-
       if (type === 'SCHEMA_HEADER') {
         const signature = this.registerTemplate(row, 'real_template');
         const tpl = this.templates.get(signature)!;
-        const name = pendingGroupLabel || "GENERAL";
-        
-        activeGroup = this.createNewGroup(name, tpl, 'explicit', idx, sheetName);
-        activeGroup.headerStart = idx;
-        activeGroup.headerEnd = idx;
+        activeGroup = this.createNewGroup(pendingGroupLabel || "GENERAL", tpl, 'explicit', idx, sheetName);
         discovered.push(activeGroup);
         pendingGroupLabel = null; 
       }
-
       if (type === 'DATA_ROW' && pendingGroupLabel) {
         const matchedTpl = this.matchOrGenerateTemplate(row);
-        activeGroup = this.createNewGroup(
-          pendingGroupLabel, 
-          matchedTpl, 
-          matchedTpl.type === 'inferred_template' ? 'inferred' : 'synthetic', 
-          idx, 
-          sheetName
-        );
+        activeGroup = this.createNewGroup(pendingGroupLabel, matchedTpl, 'inferred', idx, sheetName);
         discovered.push(activeGroup);
         pendingGroupLabel = null;
       }
@@ -74,38 +59,22 @@ export class ParserEngine {
     discovered.forEach((group, idx) => {
       const nextGroup = discovered[idx + 1];
       const stopRow = nextGroup ? nextGroup.startRow : data.length;
-      
-      let count = 0;
-      for (let i = group.startRow; i < stopRow; i++) {
-        if (classifyRow(data[i]) === 'DATA_ROW') count++;
-      }
-      group.rowCount = count;
+      group.rowCount = data.slice(group.startRow, stopRow).filter(r => classifyRow(r) === 'DATA_ROW').length;
       group.endRow = stopRow - 1;
     });
 
     return discovered;
   }
 
-  /**
-   * STAGE 2: Targeted Group Ingestion.
-   */
   public ingestGroups(sheetName: string, data: any[][], selectedGroups: DiscoveredGroup[]): GroupImportContainer[] {
-    const containers: GroupImportContainer[] = [];
-
-    selectedGroups.forEach(group => {
+    return selectedGroups.map(group => {
       const tpl = Array.from(this.templates.values()).find(t => t.id === group.templateId);
-      if (!tpl) return;
-
-      const container: GroupImportContainer = {
-        ...group,
-        assets: [],
-        metrics: { valid: 0, invalid: 0 }
-      };
+      const container: GroupImportContainer = { ...group, assets: [], metrics: { valid: 0, invalid: 0 } };
+      if (!tpl) return container;
 
       for (let i = group.startRow; i <= group.endRow; i++) {
-        const row = data[i];
-        if (classifyRow(row) === 'DATA_ROW') {
-          const asset = this.mapRowToTemplate(row, tpl, group, i);
+        if (classifyRow(data[i]) === 'DATA_ROW') {
+          const asset = this.mapRowToTemplate(data[i], tpl, group, i);
           if (asset) {
             container.assets.push(asset);
             container.metrics.valid++;
@@ -114,10 +83,58 @@ export class ParserEngine {
           }
         }
       }
-      containers.push(container);
+      return container;
+    });
+  }
+
+  private mapRowToTemplate(row: any[], tpl: HeaderTemplate, group: DiscoveredGroup, rowNum: number): ParsedAsset | null {
+    const asset: any = {
+      id: uuidv4(),
+      category: group.groupName,
+      status: 'UNVERIFIED',
+      condition: 'New',
+      lastModified: new Date().toISOString(),
+      lastModifiedBy: 'Structural Parser',
+      importMetadata: { sourceFile: this.workbookName, sheetName: group.sheetName, rowNumber: rowNum + 1, importedAt: new Date().toISOString() },
+      metadata: {},
+      validation: { warnings: [], errors: [], duplicateFlags: [], needsReview: false, isRejected: false, logs: [] },
+      hierarchy: { document: group.sheetName, section: group.groupName, subsection: 'Base Register', assetFamily: 'Uncategorized' }
+    };
+
+    tpl.normalizedHeaders.forEach((key, idx) => {
+      const val = row[idx];
+      if (val === undefined || val === null) return;
+      
+      const strVal = String(val).trim();
+      switch(key) {
+        case 'asset_description': asset.description = strVal; break;
+        case 'asset_id_code': asset.assetIdCode = strVal; break;
+        case 'serial_number': asset.serialNumber = strVal; break;
+        case 'location': asset.location = strVal; break;
+        case 'assignee_location': asset.custodian = strVal; break;
+        default: asset.metadata[tpl.rawHeaders[idx]] = val;
+      }
     });
 
-    return containers;
+    // Integrated Location Intelligence Pulse
+    if (asset.location) {
+      const pulse = LocationEngine.normalize(asset.location);
+      asset.normalizedLocation = pulse.normalized;
+      asset.normalizedState = pulse.state;
+      asset.normalizedZone = pulse.zone;
+      asset.locationConfidence = pulse.confidence;
+      asset.locationStatus = pulse.status;
+      if (pulse.confidence !== 'HIGH') {
+        asset.validation.needsReview = true;
+        asset.validation.warnings.push(`Location confidence is ${pulse.confidence}. resolved to ${pulse.state}.`);
+      }
+    } else {
+      asset.locationStatus = 'UNASSIGNED';
+      asset.normalizedState = 'Unassigned';
+    }
+
+    if (!asset.description && !asset.assetIdCode && !asset.serialNumber) return null;
+    return asset as ParsedAsset;
   }
 
   private createNewGroup(name: string, tpl: HeaderTemplate, source: HeaderSource, start: number, sheet: string): DiscoveredGroup {
@@ -142,16 +159,11 @@ export class ParserEngine {
   }
 
   private registerTemplate(row: any[], type: HeaderSetType): string {
-    const lastPopulatedIndex = row.reduce((max, cell, idx) => 
-      (cell !== null && String(cell).trim() !== '') ? idx : max, 0);
-    
-    const rawHeaders = row.slice(0, lastPopulatedIndex + 1).map(c => String(c || '').trim());
+    const rawHeaders = row.filter(c => c !== null).map(c => String(c).trim());
     const signature = rawHeaders.map(h => h.toUpperCase()).join('|');
-    
     if (!this.templates.has(signature)) {
-      const tplId = `TPL_${this.templates.size + 1}`;
       this.templates.set(signature, {
-        id: tplId,
+        id: `TPL_${this.templates.size + 1}`,
         rawHeaders,
         normalizedHeaders: rawHeaders.map(normalizeHeaderName),
         columnCount: rawHeaders.length,
@@ -163,94 +175,21 @@ export class ParserEngine {
   }
 
   private matchOrGenerateTemplate(row: any[]): HeaderTemplate {
-    const populatedCount = row.filter(c => c !== null && String(c).trim() !== '').length;
     for (const tpl of this.templates.values()) {
-      if (tpl.columnCount === row.length || Math.abs(tpl.columnCount - populatedCount) <= 1) {
-        return { ...tpl, type: 'inferred_template' };
-      }
+      if (Math.abs(tpl.columnCount - row.length) <= 2) return tpl;
     }
-    const syntheticHeaders = row.map((_, i) => `Col ${i + 1}`);
-    const signature = `SYNTH_${row.length}`;
+    const signature = `GEN_${row.length}`;
     if (!this.templates.has(signature)) {
-      const tplId = `GEN_${this.templates.size + 1}`;
+      const headers = row.map((_, i) => `Col ${i + 1}`);
       this.templates.set(signature, {
-        id: tplId,
-        rawHeaders: syntheticHeaders,
-        normalizedHeaders: syntheticHeaders.map(normalizeHeaderName),
+        id: `GEN_${this.templates.size + 1}`,
+        rawHeaders: headers,
+        normalizedHeaders: headers.map(normalizeHeaderName),
         columnCount: row.length,
         signature,
         type: 'generated_template'
       });
     }
     return this.templates.get(signature)!;
-  }
-
-  private mapRowToTemplate(row: any[], tpl: HeaderTemplate, group: DiscoveredGroup, rowNum: number): ParsedAsset | null {
-    const asset: any = {
-      id: uuidv4(),
-      sn: '',
-      category: group.groupName, // Use group name as the logical category
-      description: '',
-      grantId: 'STAGED',
-      section: group.groupName,
-      subsection: 'Base Register',
-      assetFamily: 'Uncategorized',
-      status: 'UNVERIFIED',
-      condition: 'New',
-      lastModified: new Date().toISOString(),
-      lastModifiedBy: 'Structural Parser',
-      hierarchy: { document: group.sheetName, section: group.groupName, subsection: 'Base Register', assetFamily: 'Uncategorized' },
-      importMetadata: { sourceFile: this.workbookName, sheetName: group.sheetName, rowNumber: rowNum + 1, importedAt: new Date().toISOString() },
-      metadata: {},
-      validation: { warnings: [], errors: [], duplicateFlags: [], needsReview: false, isRejected: false, logs: [] },
-      headerSource: group.headerSource,
-      headerSetType: group.headerSetType,
-      sourceGroup: group.groupName,
-      templateId: tpl.id
-    };
-
-    // AUTHORITATIVE KEY MAPPING Pulse
-    const fieldMapping: Record<string, keyof Asset> = {
-      'sn': 'sn' as any,
-      'asset_description': 'description' as any,
-      'location': 'location' as any,
-      'lga': 'lga' as any,
-      'assignee_location': 'custodian' as any,
-      'asset_id_code': 'assetIdCode' as any,
-      'serial_number': 'serialNumber' as any,
-      'manufacturer': 'manufacturer' as any,
-      'model_number': 'modelNumber' as any,
-      'date_purchased_received': 'purchaseDate' as any,
-      'purchase_price_ngn': 'value' as any,
-      'condition': 'condition' as any,
-      'remarks': 'remarks' as any,
-      'chasis_no': 'chassisNo' as any,
-      'chassis_no': 'chassisNo' as any,
-      'engine_no': 'engineNo' as any,
-      'site': 'site' as any
-    };
-
-    tpl.normalizedHeaders.forEach((key, idx) => {
-      const val = row[idx];
-      const headerLabel = tpl.rawHeaders[idx];
-      if (val === undefined || val === null) return;
-      
-      const strVal = String(val).trim();
-      const targetProp = fieldMapping[key];
-
-      if (targetProp) {
-        if (targetProp === 'value') {
-          const numericVal = parseFloat(strVal.replace(/[^0-9.]/g, ''));
-          asset[targetProp] = isNaN(numericVal) ? 0 : numericVal;
-        } else {
-          (asset as any)[targetProp] = strVal;
-        }
-      } else {
-        asset.metadata[headerLabel] = val;
-      }
-    });
-
-    if (!asset.description && !asset.assetIdCode && !asset.serialNumber) return null;
-    return asset as ParsedAsset;
   }
 }
