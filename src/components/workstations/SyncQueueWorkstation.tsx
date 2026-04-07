@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview Pending Sync - Waiting Cloud Updates.
- * Phase 45: Integrated Retry pulse for failed sync operations.
- * Phase 1012: Applied friendlier naming "Pending Sync".
- * Phase 1013: Implemented Select All and Accordion Grouping for Incoming/Outgoing pulses.
+ * Phase 1013: Implemented Dashboard-level Select All and Accordion Grouping.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -34,17 +32,13 @@ import {
   WifiOff,
   ChevronDown,
   Loader2,
-  ExternalLink,
   ChevronRight,
-  PlusCircle,
-  FileEdit,
-  Eraser,
   Info,
   ArrowDownCircle,
   ArrowUpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { useAppState } from '@/contexts/app-state-context';
 import { Badge } from '@/components/ui/badge';
 import { storage } from '@/offline/storage';
@@ -54,7 +48,7 @@ import type { OfflineQueueEntry } from '@/types/domain';
 import { formatDistanceToNow } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
-import { motion, AnimatePresence } from 'framer-motion';
+import { AnimatePresence, motion } from 'framer-motion';
 import { processSelectedSyncQueue } from '@/offline/sync';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
@@ -63,7 +57,6 @@ import {
   DialogHeader,
   DialogTitle,
   DialogDescription,
-  DialogFooter,
 } from '@/components/ui/dialog';
 import {
   Accordion,
@@ -114,6 +107,14 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
     setSelectedIds(next);
   };
 
+  const handleSelectAll = (checked: boolean) => {
+    if (checked) {
+      setSelectedIds(new Set(queue.map(q => q.id)));
+    } else {
+      setSelectedIds(new Set());
+    }
+  };
+
   const handlePushSelected = async () => {
     if (!isOnline) {
       toast({ variant: "destructive", title: "No Connection", description: "Internet required to sync changes." });
@@ -155,9 +156,9 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
       await processSelectedSyncQueue([entry.id]);
       await refreshRegistry();
       await loadQueue();
-      toast({ title: "Retry Pulse Applied", description: "Operation successfully broadcast to Cloud." });
+      toast({ title: "Retry Pulse Applied" });
     } catch (e) {
-      toast({ variant: "destructive", title: "Retry Failed", description: "The anomaly persists in the cloud link." });
+      toast({ variant: "destructive", title: "Retry Failed" });
     } finally {
       setIsRetryingId(null);
     }
@@ -197,16 +198,9 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
 
         <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
           {(entry.status === 'FAILED' || entry.status === 'PENDING') && (
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" onClick={() => handleRetry(entry)} disabled={isRetryingId === entry.id} className="h-8 w-8 rounded-lg bg-white/5 hover:bg-primary/10 text-primary">
-                    {isRetryingId === entry.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Attempt to send this change again</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+            <Button variant="ghost" size="icon" onClick={() => handleRetry(entry)} disabled={isRetryingId === entry.id} className="h-8 w-8 rounded-lg bg-white/5 hover:bg-primary/10 text-primary">
+              {isRetryingId === entry.id ? <Loader2 className="h-4 w-4 animate-spin" /> : <RotateCcw className="h-4 w-4" />}
+            </Button>
           )}
           <Button variant="ghost" size="icon" onClick={() => storage.dequeue(entry.id).then(loadQueue)} className="h-8 w-8 rounded-lg bg-white/5 text-destructive/40 hover:text-destructive hover:bg-destructive/10">
             <Trash2 className="h-4 w-4" />
@@ -242,16 +236,30 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
         <CardContent className="p-0">
           <div className="p-6 md:p-8 space-y-6">
             <div className="flex items-center justify-between px-1">
-              <div className="flex items-center gap-8">
-                <div className="flex flex-col gap-1">
-                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{isAdvanced ? 'Pending' : 'Waiting'}</span>
-                  <span className="text-3xl font-black tabular-nums text-white">{pendingCount}</span>
+              <div className="flex items-center gap-6">
+                {/* Dashboard Select All Pulse */}
+                <div className="flex items-center gap-3 pr-6 border-r border-white/10">
+                  <Checkbox 
+                    id="dash-select-all" 
+                    checked={selectedIds.size === queue.length && queue.length > 0} 
+                    onCheckedChange={(c) => handleSelectAll(!!c)}
+                    className="h-5 w-5 rounded-lg border-2 border-white/20 data-[state=checked]:bg-primary"
+                  />
+                  <label htmlFor="dash-select-all" className="text-[9px] font-black uppercase tracking-widest text-white/40 cursor-pointer">All</label>
                 </div>
-                <div className="flex flex-col gap-1">
-                  <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{isAdvanced ? 'Failures' : 'Errors'}</span>
-                  <span className="text-3xl font-black tabular-nums text-red-600">{failedCount}</span>
+
+                <div className="flex items-center gap-8">
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{isAdvanced ? 'Pending' : 'Waiting'}</span>
+                    <span className="text-3xl font-black tabular-nums text-white">{pendingCount}</span>
+                  </div>
+                  <div className="flex flex-col gap-1">
+                    <span className="text-[9px] font-black text-white/20 uppercase tracking-[0.3em]">{isAdvanced ? 'Failures' : 'Errors'}</span>
+                    <span className="text-3xl font-black tabular-nums text-red-600">{failedCount}</span>
+                  </div>
                 </div>
               </div>
+
               <div className="flex items-center gap-3">
                 <Button variant="outline" onClick={manualDownload} disabled={isSyncing || !isOnline} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest border-2 hover:bg-white/5 text-white/60">
                   <Download className="h-4 w-4 mr-2" /> Sync Down
@@ -316,10 +324,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
                 <Checkbox 
                   id="pop-select-all" 
                   checked={selectedIds.size === queue.length && queue.length > 0} 
-                  onCheckedChange={(c) => {
-                    if (c) setSelectedIds(new Set(queue.map(q => q.id)));
-                    else setSelectedIds(new Set());
-                  }}
+                  onCheckedChange={(c) => handleSelectAll(!!c)}
                   className="h-6 w-6 rounded-lg border-2 border-primary/40 data-[state=checked]:bg-primary"
                 />
                 <label htmlFor="pop-select-all" className="text-[11px] font-black uppercase tracking-widest text-primary/80 cursor-pointer">
@@ -341,7 +346,7 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
               <div className="p-8 space-y-6 pb-20">
                 <Accordion type="multiple" defaultValue={["outgoing"]} className="space-y-4">
                   
-                  {/* INCOMING PULSE (Simulated/Scanned placeholder for Download) */}
+                  {/* INCOMING PULSE */}
                   <AccordionItem value="incoming" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
                     <AccordionTrigger className="hover:no-underline py-6">
                       <div className="flex items-center justify-between w-full pr-6">
