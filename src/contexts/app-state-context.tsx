@@ -3,6 +3,7 @@
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
  * Phase 1000: Hardened for deployment. Optimized initial download and settings pulse.
+ * Phase 1001: Integrated autonomous network detection for PWA awareness.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -150,7 +151,28 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     setIsHydrated(true);
     const savedStatus = localStorage.getItem('assetain-online-status');
     if (savedStatus) setIsOnlineStatus(JSON.parse(savedStatus));
+    else if (typeof navigator !== 'undefined') setIsOnlineStatus(navigator.onLine);
   }, []);
+
+  // Autonomous Network Awareness Logic
+  useEffect(() => {
+    if (!isHydrated) return;
+
+    const handleOnline = () => {
+      if (!isOnline) setIsOnline(true);
+    };
+    const handleOffline = () => {
+      if (isOnline) setIsOnline(false);
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, [isHydrated, isOnline]);
 
   useEffect(() => {
     if (!isHydrated) return;

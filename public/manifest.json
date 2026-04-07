@@ -1,13 +1,12 @@
-
 {
-  "name": "Assetain",
+  "name": "Assetain Registry Intelligence",
   "short_name": "Assetain",
-  "description": "Professional Asset Management & Verification Pulse",
+  "description": "Mission-critical, offline-first asset management and verification platform.",
   "start_url": "/",
   "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
   "orientation": "portrait",
-  "background_color": "#F0F4F8",
-  "theme_color": "#2E3192",
   "icons": [
     {
       "src": "https://picsum.photos/seed/assetain-icon/192/192",
