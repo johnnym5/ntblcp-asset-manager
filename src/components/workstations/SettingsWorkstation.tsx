@@ -3,11 +3,10 @@
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Consolidated for production stability: integrates Database and System Health as tabs.
- * Phase 1016: Fixed clickable AccordionTrigger for Project cards.
- * Phase 1017: Resolved hydration error by removing nested buttons in AccordionTrigger.
+ * Phase 1018: Wired Manual Add, Template Import, and Scan & Import triggers.
  */
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
@@ -31,26 +30,19 @@ import {
   ShieldAlert,
   Sun,
   Moon,
-  KeyRound,
   LayoutGrid,
   FileUp,
   ScanSearch,
   ChevronsUpDown,
   Layers,
-  Search,
   HeartPulse,
   Terminal,
   RotateCcw,
   Bomb,
-  PlaneTakeoff,
-  AlertTriangle,
-  FolderOpen,
   Settings2,
   HelpCircle,
   GraduationCap,
-  DatabaseZap,
-  Plus,
-  Type
+  DatabaseZap
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -72,7 +64,8 @@ import { TravelReportDialog } from '@/components/travel-report-dialog';
 import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
 import AssetForm from '@/components/asset-form';
 import { enqueueMutation } from '@/offline/queue';
-import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
+import { parseExcelForTemplate } from '@/lib/excel-parser';
+import type { AppSettings, Grant, SheetDefinition, UXMode, Asset } from '@/types/domain';
 import {
   Select,
   SelectContent,
@@ -121,6 +114,8 @@ export function SettingsWorkstation() {
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [activeGrantForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
 
+  const templateInputRef = useRef<HTMLInputElement>(null);
+
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const isSuperAdmin = userProfile?.role === 'SUPERADMIN';
 
@@ -164,6 +159,34 @@ export function SettingsWorkstation() {
     await storage.saveSettings(updatedSettings);
     if (isOnline) await FirestoreService.updateSettings(updatedSettings);
     toast({ title: "Project Removed" });
+  };
+
+  const handleTemplateImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !appSettings || !activeGrantId) return;
+
+    try {
+      const templates = await parseExcelForTemplate(file);
+      const nextSettings = { ...appSettings };
+      const grantIdx = nextSettings.grants.findIndex(g => g.id === activeGrantId);
+      
+      if (grantIdx > -1) {
+        const currentDefs = { ...nextSettings.grants[grantIdx].sheetDefinitions };
+        templates.forEach(t => {
+          currentDefs[t.name] = t;
+        });
+        nextSettings.grants[grantIdx].sheetDefinitions = currentDefs;
+        
+        await storage.saveSettings(nextSettings);
+        if (isOnline) await FirestoreService.updateSettings(nextSettings);
+        setAppSettings(nextSettings);
+        toast({ title: "Templates Extracted", description: `Saved ${templates.length} sheet definitions.` });
+      }
+    } catch (err) {
+      toast({ variant: "destructive", title: "Template Failure", description: "Could not discover registry nodes in file." });
+    } finally {
+      if (templateInputRef.current) templateInputRef.current.value = '';
+    }
   };
 
   const handleSystemReset = async () => {
@@ -445,12 +468,13 @@ export function SettingsWorkstation() {
                     </div>
 
                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <Button onClick={() => {}} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                      <Button onClick={() => setIsAssetFormOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
                         <PlusCircle className="h-4 w-4" /> Add Manually
                       </Button>
-                      <Button onClick={() => {}} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                      <Button onClick={() => templateInputRef.current?.click()} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
                         <FileUp className="h-4 w-4" /> Import Template
                       </Button>
+                      <input type="file" ref={templateInputRef} onChange={handleTemplateImport} className="hidden" accept=".xlsx,.xls" />
                       <Button onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
                         <ScanSearch className="h-4 w-4" /> Scan & Import Data
                       </Button>
