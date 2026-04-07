@@ -1,6 +1,6 @@
 /**
  * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
- * Phase 400: Mode-aware UI. Hides status select in Management mode for normal users.
+ * Phase 400: Mode-aware UI. Hides status, condition, and remarks in Management mode.
  */
 
 import React from 'react';
@@ -19,8 +19,6 @@ import {
   Edit3,
   Tag,
   MapPin,
-  Hash,
-  FileText,
   Settings2,
   Lock
 } from 'lucide-react';
@@ -58,7 +56,10 @@ export function RegistryTable({
   
   const allSelected = records.length > 0 && records.every(r => selectedIds.has(r.id));
   const isManagementMode = appSettings?.appMode === 'management';
-  const isAdmin = userProfile?.isAdmin || false;
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+
+  // Define fields that are considered "Verification Pulse"
+  const VERIFICATION_KEYS = ['condition', 'remarks', 'status', 'verified_status'];
 
   return (
     <div className="space-y-4 pb-40 animate-in fade-in duration-700">
@@ -78,7 +79,9 @@ export function RegistryTable({
           <div className="col-span-2 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Asset ID / Tag</div>
           <div className="col-span-3 text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Location Scope</div>
           <div className="col-span-2 flex items-center justify-center gap-2">
-            <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Audit Status</span>
+            {!isManagementMode || isAdmin ? (
+              <span className="text-[9px] font-black uppercase tracking-[0.3em] text-white/30">Audit Status</span>
+            ) : null}
             {onConfigureHeaders && (
               <button 
                 onClick={(e) => { e.stopPropagation(); onConfigureHeaders(); }}
@@ -149,17 +152,7 @@ export function RegistryTable({
 
                 {/* Status Capsule - Mode Sensitive */}
                 <div className="w-[140px] shrink-0 flex justify-end" onClick={(e) => e.stopPropagation()}>
-                  {isManagementMode && !isAdmin ? (
-                    <Badge variant="outline" className={cn(
-                      "h-9 w-32 rounded-full font-black uppercase text-[8px] tracking-[0.25em] border-2",
-                      status === 'VERIFIED' ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-white/5 text-white/20 border-white/10"
-                    )}>
-                      <div className="flex items-center gap-2">
-                        <Lock className="h-2.5 w-2.5 opacity-40" />
-                        <span>{status}</span>
-                      </div>
-                    </Badge>
-                  ) : (
+                  {(!isManagementMode || isAdmin) ? (
                     <Select value={status}>
                       <SelectTrigger className={cn(
                         "h-9 w-32 rounded-full font-black uppercase text-[8px] tracking-[0.25em] border-2 transition-all shadow-xl",
@@ -173,30 +166,39 @@ export function RegistryTable({
                         </div>
                       </SelectTrigger>
                       <SelectContent className="bg-[#0A0A0A] border-white/10 rounded-2xl">
-                        <SelectItem value="VERIFIED" className="text-[9px] font-black uppercase tracking-widest py-3">Verified</SelectItem>
-                        <SelectItem value="UNVERIFIED" className="text-[9px] font-black uppercase tracking-widest py-3">Unverified</SelectItem>
+                        <SelectItem value="VERIFIED" className="text-[9px] font-black uppercase tracking-widest py-3 text-white">Verified</SelectItem>
+                        <SelectItem value="UNVERIFIED" className="text-[9px] font-black uppercase tracking-widest py-3 text-white">Unverified</SelectItem>
                         <SelectItem value="DISCREPANCY" className="text-[9px] font-black uppercase tracking-widest py-3 text-destructive">Discrepancy</SelectItem>
                       </SelectContent>
                     </Select>
-                  )}
+                  ) : null}
                 </div>
               </div>
 
               <AccordionContent className="bg-white/[0.01] border-t border-white/5 p-10 animate-in slide-in-from-top-2 duration-500">
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-x-12 gap-y-10">
-                  {record.fields.filter(f => f.displayValue !== '---').map((field) => {
-                    const header = record.headers.find(h => h.id === field.headerId);
-                    return (
-                      <div key={field.headerId} className="space-y-2.5 group/field">
-                        <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20 group-hover/field:text-primary transition-colors">
-                          {header?.displayName || 'Technical Parameter'}
-                        </p>
-                        <p className="text-sm font-black uppercase text-white/80 leading-tight">
-                          {field.displayValue}
-                        </p>
-                      </div>
-                    );
-                  })}
+                  {record.fields
+                    .filter(f => f.displayValue !== '---')
+                    .filter(f => {
+                      const h = record.headers.find(header => header.id === f.headerId);
+                      const isVerificationField = h ? VERIFICATION_KEYS.includes(h.normalizedName) : false;
+                      // Hide verification fields in Management Mode unless Admin
+                      if (isManagementMode && !isAdmin && isVerificationField) return false;
+                      return true;
+                    })
+                    .map((field) => {
+                      const header = record.headers.find(h => h.id === field.headerId);
+                      return (
+                        <div key={field.headerId} className="space-y-2.5 group/field">
+                          <p className="text-[9px] font-black uppercase tracking-[0.3em] text-white/20 group-hover/field:text-primary transition-colors">
+                            {header?.displayName || 'Technical Parameter'}
+                          </p>
+                          <p className="text-sm font-black uppercase text-white/80 leading-tight">
+                            {field.displayValue}
+                          </p>
+                        </div>
+                      );
+                    })}
                 </div>
                 
                 <div className="mt-12 pt-10 border-t border-dashed border-white/10 flex flex-col sm:flex-row items-center justify-between gap-8">
@@ -212,7 +214,7 @@ export function RegistryTable({
                       <div className="p-2.5 bg-white/5 rounded-xl"><Clock className="h-4 w-4 text-white/20" /></div>
                       <div className="flex flex-col">
                         <span className="text-[8px] font-black text-white/20 uppercase tracking-widest leading-none mb-1.5">Update Timestamp</span>
-                        <span className="text-[10px] font-bold text-white/60 leading-none">{new Date(record.rawRow.lastModified as string).toLocaleDateString()}</span>
+                        <span className="text-[10px] font-bold text-white/60 leading-none">{record.rawRow.lastModified ? new Date(record.rawRow.lastModified as string).toLocaleDateString() : 'N/A'}</span>
                       </div>
                     </div>
                   </div>

@@ -1,11 +1,12 @@
 /**
  * @fileOverview RegistryCard - High-Fidelity "Quick View" Renderer.
  * Optimized for High-Density Grid Pulse.
+ * Phase 405: Mode-aware UI. Hides status pill in Management mode.
  */
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { MoreVertical, LayoutGrid, Edit3, Trash2, ChevronDown, Check, Bell } from 'lucide-react';
+import { MoreVertical, LayoutGrid, Trash2, ChevronDown, Check, Bell } from 'lucide-react';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -14,7 +15,8 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
-import { Badge } from '../ui/badge';
+import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -25,6 +27,12 @@ interface RegistryCardProps {
 }
 
 export function RegistryCard({ record, onInspect, selected, onToggleSelect, densityMode = 'compact' }: RegistryCardProps) {
+  const { appSettings } = useAppState();
+  const { userProfile } = useAuth();
+
+  const isManagementMode = appSettings?.appMode === 'management';
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+
   const orderedFields = [
     { key: 'sn', label: 'S/N' },
     { key: 'location', label: 'Location' },
@@ -81,7 +89,7 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
                       <MoreVertical className="h-4 w-4" />
                     </button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-48 bg-black border-white/10 rounded-xl p-1 shadow-3xl">
+                  <DropdownMenuContent align="end" className="w-48 bg-black border-white/10 rounded-xl p-1 shadow-3xl text-white">
                     <DropdownMenuItem onClick={() => onInspect(record.id)} className="p-2 rounded-lg focus:bg-primary/10 gap-2">
                       <LayoutGrid className="h-3.5 w-3.5 text-white/40" />
                       <span className="text-[10px] font-black uppercase tracking-tight">Audit Profile</span>
@@ -117,17 +125,19 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
           ))}
         </div>
 
-        {/* Footer: Status Pill */}
-        <div className="px-3 py-2 bg-white/[0.02] flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <div className={cn(
-              "h-1 w-1 rounded-full",
-              status === 'VERIFIED' ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]" : "bg-white/20"
-            )} />
-            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-white/60">{status}</span>
+        {/* Footer: Status Pill - Mode Sensitive */}
+        {(!isManagementMode || isAdmin) && (
+          <div className="px-3 py-2 bg-white/[0.02] flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <div className={cn(
+                "h-1 w-1 rounded-full",
+                status === 'VERIFIED' ? "bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.6)]" : "bg-white/20"
+              )} />
+              <span className="text-[8px] font-black uppercase tracking-[0.2em] text-white/60">{status}</span>
+            </div>
+            <ChevronDown className="h-3 w-3 text-white/20" />
           </div>
-          <ChevronDown className="h-3 w-3 text-white/20" />
-        </div>
+        )}
       </CardContent>
     </Card>
   );

@@ -3,6 +3,7 @@
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity "Full View" Workstation.
  * Optimized for high-density, no-scroll responsive layout.
+ * Phase 410: Mode-aware UI. Hides status, condition, and remarks in Management mode.
  */
 
 import React from 'react';
@@ -21,17 +22,18 @@ import {
   ChevronRight, 
   Edit3, 
   Database,
-  Tag,
   X,
   ShieldCheck,
   ClipboardCheck,
-  History
+  History,
+  Lock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { AssetChecklist } from '@/components/asset-checklist';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { motion } from 'framer-motion';
+import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 
 interface AssetDetailSheetProps {
   isOpen: boolean;
@@ -57,7 +59,14 @@ const FullViewField = ({ label, value, isLast }: { label: string, value: string,
 );
 
 export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext, onPrevious }: AssetDetailSheetProps) {
+  const { appSettings } = useAppState();
+  const { userProfile } = useAuth();
+
   if (!record) return null;
+
+  const isManagementMode = appSettings?.appMode === 'management';
+  const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
+  const VERIFICATION_KEYS = ['condition', 'remarks', 'status', 'verified_status'];
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -104,24 +113,37 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
           <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
             {/* Technical Grid */}
             <div className="flex-1 flex flex-col bg-black border-r border-white/5 min-h-0 overflow-hidden">
-              <div className="px-6 md:px-8 py-4 md:pt-6 md:pb-2 shrink-0">
+              <div className="px-6 md:px-8 py-4 md:pt-6 md:pb-2 shrink-0 flex items-center justify-between">
                 <Badge variant="outline" className="h-7 px-4 text-[8px] md:text-[9px] font-black uppercase tracking-widest rounded-full border-2 bg-white/5" style={{ color: record.accentColor, borderColor: `${record.accentColor}40` }}>
                   <Database className="h-3 w-3 mr-2" /> {record.sourceSheet || 'REGISTRY'}
                 </Badge>
+                {isManagementMode && !isAdmin && (
+                  <Badge className="bg-white/5 text-white/20 border-white/10 h-7 px-3 rounded-full font-black uppercase text-[8px] tracking-widest gap-2">
+                    <Lock className="h-2.5 w-2.5" /> Management Lock Active
+                  </Badge>
+                )}
               </div>
 
               <ScrollArea className="flex-1">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-0 pb-20">
-                  {record.fields.map((field) => {
-                    const header = record.headers.find(h => h.id === field.headerId);
-                    return (
-                      <FullViewField 
-                        key={field.headerId} 
-                        label={header?.displayName || 'Parameter'} 
-                        value={field.displayValue} 
-                      />
-                    );
-                  })}
+                  {record.fields
+                    .filter(f => f.displayValue !== '---')
+                    .filter(f => {
+                      const h = record.headers.find(header => header.id === f.headerId);
+                      const isVerificationField = h ? VERIFICATION_KEYS.includes(h.normalizedName) : false;
+                      if (isManagementMode && !isAdmin && isVerificationField) return false;
+                      return true;
+                    })
+                    .map((field) => {
+                      const header = record.headers.find(h => h.id === field.headerId);
+                      return (
+                        <FullViewField 
+                          key={field.headerId} 
+                          label={header?.displayName || 'Parameter'} 
+                          value={field.displayValue} 
+                        />
+                      );
+                    })}
                 </div>
               </ScrollArea>
             </div>
