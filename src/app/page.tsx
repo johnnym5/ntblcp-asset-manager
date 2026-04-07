@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
  * Phase 306: Implemented Bell-Anchored Notification Toast Pulse.
+ * Phase 307: Fixed HelpCircle ReferenceError.
  */
 
 import React, { useState, useEffect, useRef } from 'react';
@@ -23,7 +23,8 @@ import {
   Filter,
   CheckCircle2,
   AlertCircle,
-  Info
+  Info,
+  HelpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, sanitizeSearch } from '@/lib/utils';
