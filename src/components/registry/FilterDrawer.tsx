@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview FilterDrawer - High-Fidelity Logic Engine.
- * Overhauled to provide multi-select checklists for all sortable headers.
- * Phase 150: Implemented Accordion-based value discovery sections.
+ * Phase 155: Enhanced with Empty State and Value Discovery logging.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -11,7 +10,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription, SheetFo
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { ListFilter, Search, X, Check, ChevronDown } from 'lucide-react';
+import { ListFilter, Search, X, Check, Database, Info } from 'lucide-react';
 import type { RegistryHeader, HeaderFilter } from '@/types/registry';
 import { cn } from '@/lib/utils';
 import { Checkbox } from '../ui/checkbox';
@@ -67,19 +66,24 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
     onOpenChange(false);
   };
 
+  const hasAnyOptions = useMemo(() => 
+    Object.values(optionsMap).some(opts => opts.length > 0), 
+    [optionsMap]
+  );
+
   return (
     <Sheet open={isOpen} onOpenChange={(open) => { if (open) setLocalFilters(activeFilters); onOpenChange(open); }}>
       <SheetContent side="right" className="w-full sm:max-w-xl flex flex-col p-0 border-none rounded-l-[2.5rem] shadow-2xl bg-background overflow-hidden">
         <div className="p-8 pb-4 bg-muted/20 border-b">
           <SheetHeader>
             <div className="flex items-center justify-between">
-              <SheetTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase">
+              <SheetTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase text-white">
                 <div className="p-2 bg-primary/10 rounded-xl">
                   <ListFilter className="text-primary h-6 w-6" />
                 </div>
                 Logic Engine
               </SheetTitle>
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl">
+              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-10 w-10 text-white/40">
                 <X className="h-5 w-5" />
               </Button>
             </div>
@@ -96,79 +100,89 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
               placeholder="Find filter category..." 
               value={headerSearch}
               onChange={(e) => setHeaderSearch(e.target.value)}
-              className="pl-10 h-12 rounded-2xl bg-background border-none shadow-inner text-sm font-medium focus-visible:ring-primary/20"
+              className="pl-10 h-12 rounded-2xl bg-background border-none shadow-inner text-sm font-medium focus-visible:ring-primary/20 text-white"
             />
           </div>
         </div>
 
         <ScrollArea className="flex-1 bg-background custom-scrollbar">
           <div className="p-8 pt-4 pb-32">
-            <Accordion type="multiple" className="space-y-4">
-              {sortableHeaders.map((header) => {
-                const filter = localFilters.find(f => f.headerId === header.id);
-                const selected = (filter?.value as string[]) || [];
-                const options = optionsMap[header.id] || [];
-                
-                if (options.length === 0) return null;
+            {!hasAnyOptions ? (
+              <div className="py-24 text-center opacity-20 flex flex-col items-center gap-6 border-4 border-dashed border-white/5 rounded-[3rem]">
+                <Database className="h-16 w-16 text-white" />
+                <div className="space-y-1">
+                  <h4 className="text-xl font-black uppercase text-white">Registry Pulse Silent</h4>
+                  <p className="text-[10px] font-bold uppercase tracking-widest text-white/60">Import data to discover filter pulses.</p>
+                </div>
+              </div>
+            ) : (
+              <Accordion type="multiple" className="space-y-4">
+                {sortableHeaders.map((header) => {
+                  const filter = localFilters.find(f => f.headerId === header.id);
+                  const selected = (filter?.value as string[]) || [];
+                  const options = optionsMap[header.id] || [];
+                  
+                  if (options.length === 0) return null;
 
-                return (
-                  <AccordionItem 
-                    key={header.id} 
-                    value={header.id} 
-                    className="border-2 border-border/40 rounded-[2rem] bg-card/50 overflow-hidden px-6 transition-all data-[state=open]:border-primary/20 data-[state=open]:shadow-lg"
-                  >
-                    <AccordionTrigger className="hover:no-underline py-6">
-                      <div className="flex items-center justify-between w-full pr-4">
-                        <div className="flex flex-col items-start gap-1">
-                          <span className="text-xs font-black uppercase tracking-widest text-foreground">{header.displayName}</span>
+                  return (
+                    <AccordionItem 
+                      key={header.id} 
+                      value={header.id} 
+                      className="border-2 border-border/40 rounded-[2rem] bg-card/50 overflow-hidden px-6 transition-all data-[state=open]:border-primary/20 data-[state=open]:shadow-lg"
+                    >
+                      <AccordionTrigger className="hover:no-underline py-6">
+                        <div className="flex items-center justify-between w-full pr-4">
+                          <div className="flex flex-col items-start gap-1">
+                            <span className="text-xs font-black uppercase tracking-widest text-white">{header.displayName}</span>
+                            {selected.length > 0 && (
+                              <span className="text-[9px] font-black text-primary uppercase tracking-tighter">
+                                {selected.length} values selected
+                              </span>
+                            )}
+                          </div>
                           {selected.length > 0 && (
-                            <span className="text-[9px] font-black text-primary uppercase tracking-tighter">
-                              {selected.length} values selected
-                            </span>
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              onClick={(e) => { e.stopPropagation(); clearFilter(header.id); }}
+                              className="h-7 px-2 text-[8px] font-black uppercase hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
+                            >
+                              Clear
+                            </Button>
                           )}
                         </div>
-                        {selected.length > 0 && (
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            onClick={(e) => { e.stopPropagation(); clearFilter(header.id); }}
-                            className="h-7 px-2 text-[8px] font-black uppercase hover:bg-destructive/10 hover:text-destructive text-muted-foreground"
-                          >
-                            Clear
-                          </Button>
-                        )}
-                      </div>
-                    </AccordionTrigger>
-                    <AccordionContent className="pb-6 pt-2">
-                      <div className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
-                        {options.map(opt => (
-                          <div 
-                            key={opt}
-                            onClick={() => handleToggleValue(header.id, opt)}
-                            className="flex items-center justify-between p-3 rounded-xl cursor-pointer hover:bg-primary/5 transition-all group"
-                          >
-                            <div className="flex items-center gap-3">
-                              <Checkbox 
-                                checked={selected.includes(opt)}
-                                onCheckedChange={() => handleToggleValue(header.id, opt)}
-                                className="h-4 w-4 rounded border-2"
-                              />
-                              <span className={cn(
-                                "text-[10px] font-bold uppercase truncate max-w-[220px]",
-                                selected.includes(opt) ? "text-primary" : "text-muted-foreground opacity-70 group-hover:opacity-100"
-                              )}>
-                                {opt}
-                              </span>
+                      </AccordionTrigger>
+                      <AccordionContent className="pb-6 pt-2">
+                        <div className="space-y-1 max-h-[300px] overflow-y-auto custom-scrollbar pr-2">
+                          {options.map(opt => (
+                            <div 
+                              key={opt}
+                              onClick={() => handleToggleValue(header.id, opt)}
+                              className="flex items-center justify-between p-3 rounded-xl cursor-pointer hover:bg-primary/5 transition-all group"
+                            >
+                              <div className="flex items-center gap-3">
+                                <Checkbox 
+                                  checked={selected.includes(opt)}
+                                  onCheckedChange={() => handleToggleValue(header.id, opt)}
+                                  className="h-4 w-4 rounded border-2 border-white/10"
+                                />
+                                <span className={cn(
+                                  "text-[10px] font-bold uppercase truncate max-w-[220px]",
+                                  selected.includes(opt) ? "text-primary" : "text-white/40 group-hover:text-white/80"
+                                )}>
+                                  {opt}
+                                </span>
+                              </div>
+                              {selected.includes(opt) && <Check className="h-3.5 w-3.5 text-primary" />}
                             </div>
-                            {selected.includes(opt) && <Check className="h-3.5 w-3.5 text-primary" />}
-                          </div>
-                        ))}
-                      </div>
-                    </AccordionContent>
-                  </AccordionItem>
-                );
-              })}
-            </Accordion>
+                          ))}
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            )}
           </div>
         </ScrollArea>
 
@@ -176,13 +190,13 @@ export function FilterDrawer({ isOpen, onOpenChange, headers, activeFilters, onU
           <Button 
             variant="ghost" 
             onClick={() => setLocalFilters([])}
-            className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl hover:bg-destructive/10 hover:text-destructive transition-all"
+            className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl text-white/40 hover:bg-destructive/10 hover:text-destructive transition-all"
           >
             <X className="mr-2 h-3.5 w-3.5" /> Purge Logic
           </Button>
           <Button 
             onClick={applyFilters}
-            className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-primary-foreground"
+            className="flex-1 h-14 rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl shadow-primary/20 bg-primary text-black"
           >
             Apply Filter Pulse
           </Button>

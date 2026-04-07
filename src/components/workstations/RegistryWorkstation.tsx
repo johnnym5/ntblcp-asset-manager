@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Hardened for deployment: unified domain model imports and strict type checks.
+ * Phase 1005: Respects active data source for filtering and value discovery.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -67,6 +67,8 @@ const ITEMS_PER_PAGE = 60;
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
     assets, 
+    sandboxAssets,
+    dataSource,
     searchTerm,
     setSearchTerm,
     headers,
@@ -110,11 +112,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
   const activeGrant = useMemo(() => appSettings?.grants.find(g => g.id === activeGrantId), [appSettings, activeGrantId]);
   const categories = useMemo(() => Object.keys(activeGrant?.sheetDefinitions || {}).sort(), [activeGrant]);
 
+  // Determine active data source
+  const activeAssets = useMemo(() => dataSource === 'PRODUCTION' ? assets : sandboxAssets, [dataSource, assets, sandboxAssets]);
+
+  // Discovery engine for filter options
   const optionsMap = useMemo(() => {
     const map: Record<string, string[]> = {};
     headers.forEach(h => {
       const values = new Set<string>();
-      assets.forEach(a => {
+      activeAssets.forEach(a => {
         let val: any = "";
         switch(h.normalizedName) {
           case "sn": val = a.sn; break;
@@ -125,17 +131,17 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           case "asset_class": val = a.category; break;
           case "condition": val = a.condition; break;
           case "serial_number": val = a.serialNumber; break;
-          default: val = a.metadata?.[h.rawName];
+          default: val = a.metadata?.[h.rawName] || a.metadata?.[h.normalizedName];
         }
         if (val !== undefined && val !== null && val !== "") values.add(String(val));
       });
       map[h.id] = Array.from(values).sort();
     });
     return map;
-  }, [headers, assets]);
+  }, [headers, activeAssets]);
 
   const processedAssets = useMemo(() => {
-    let results = [...assets];
+    let results = [...activeAssets];
     if (selectedCategory) results = results.filter(a => a.category === selectedCategory);
     
     filters.forEach(f => {
@@ -152,7 +158,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           case "asset_class": val = a.category; break;
           case "condition": val = a.condition; break;
           case "serial_number": val = a.serialNumber; break;
-          default: val = a.metadata?.[header.rawName];
+          default: val = a.metadata?.[header.rawName] || a.metadata?.[header.normalizedName];
         }
         if (f.operator === 'in' && Array.isArray(f.value)) {
           if (f.value.length === 0) return true;
@@ -194,7 +200,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       });
     }
     return results;
-  }, [assets, searchTerm, sortKey, sortDir, selectedCategory, filters, headers]);
+  }, [activeAssets, searchTerm, sortKey, sortDir, selectedCategory, filters, headers]);
 
   const paginatedAssets = useMemo(() => {
     const start = (currentPage - 1) * ITEMS_PER_PAGE;
@@ -207,9 +213,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
   const selectedRecord = useMemo(() => {
     if (!selectedAssetId) return undefined;
-    const asset = assets.find(a => a.id === selectedAssetId);
+    const asset = activeAssets.find(a => a.id === selectedAssetId);
     return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
-  }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
+  }, [selectedAssetId, activeAssets, headers, appSettings?.sourceBranding]);
 
   const handleInspect = (id: string) => { setSelectedAssetId(id); setIsDetailOpen(true); };
   const handleToggleSelect = (id: string) => { const next = new Set(selectedAssetIds); if (next.has(id)) next.delete(id); else next.add(id); setSelectedAssetIds(next); };
@@ -304,8 +310,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       </div>
 
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} onNext={handleNext} onPrevious={handlePrevious} />
-      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={assets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
-      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={async (data) => { for (const id of Array.from(selectedAssetIds)) { const asset = assets.find(a => a.id === id); if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data }); } await refreshRegistry(); setSelectedAssetIds(new Set()); }} />
+      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={activeAssets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
+      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={async (data) => { for (const id of Array.from(selectedAssetIds)) { const asset = activeAssets.find(a => a.id === id); if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data }); } await refreshRegistry(); setSelectedAssetIds(new Set()); }} />
       <HeaderManagerDrawer isOpen={isHeaderManagerOpen} onOpenChange={setIsHeaderManagerOpen} headers={headers} onUpdateHeaders={setHeaders} onReset={() => {}} />
       <FilterDrawer isOpen={isFilterOpen} onOpenChange={setIsFilterOpen} headers={headers} activeFilters={filters} onUpdateFilters={setFilters} optionsMap={optionsMap} />
       <SortDrawer isOpen={isSortOpen} onOpenChange={setIsSortOpen} headers={headers} sortBy={sortKey} sortDirection={sortDir} onUpdateSort={(k, dir) => { setSortKey(k); setSortDir(dir); }} />
