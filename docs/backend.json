@@ -1,314 +1,54 @@
 {
   "entities": {
-    "UserProfile": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "UserProfile",
-      "type": "object",
-      "description": "Represents a user's profile information within the asset management system, excluding authentication details. This entity supports features like collaboration and user-specific settings.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the UserProfile entity."
-        },
-        "firebaseUid": {
-          "type": "string",
-          "description": "The unique ID provided by Firebase Authentication for the user. This links the UserProfile to the external authentication system."
-        },
-        "email": {
-          "type": "string",
-          "description": "The user's email address, typically obtained from the authentication provider.",
-          "format": "email"
-        },
-        "displayName": {
-          "type": "string",
-          "description": "The user's display name or full name."
-        },
-        "lastLogin": {
-          "type": "string",
-          "description": "Timestamp of the user's last login.",
-          "format": "date-time"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the user profile record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the user profile record was last updated.",
-          "format": "date-time"
-        },
-        "preferredTheme": {
-          "type": "string",
-          "description": "The user's preferred UI theme (e.g., 'light', 'dark')."
-        }
-      },
-      "required": [
-        "id",
-        "firebaseUid",
-        "email",
-        "displayName",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
     "Asset": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Asset",
+      "description": "Deterministic registry record representing a physical asset.",
       "type": "object",
-      "description": "Represents a single physical or virtual asset managed by the system, covering various types from different Excel sheets.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Asset entity."
-        },
-        "serialNumber": {
-          "type": "string",
-          "description": "The unique serial number of the asset, often found on labels."
-        },
-        "model": {
-          "type": "string",
-          "description": "The model name or number of the asset."
-        },
-        "location": {
-          "type": "string",
-          "description": "The current physical location or assignment of the asset."
-        },
-        "assetType": {
-          "type": "string",
-          "description": "Categorization of the asset (e.g., 'Ntb far', 'Motorcycles', 'Vehicles'), derived from the source Excel sheet or manual entry."
-        },
-        "acquisitionDate": {
-          "type": "string",
-          "description": "The date when the asset was acquired.",
-          "format": "date"
-        },
-        "currentValue": {
-          "type": "number",
-          "description": "The current estimated monetary value of the asset."
-        },
-        "status": {
-          "type": "string",
-          "description": "The current operational status of the asset (e.g., 'Operational', 'Under Repair', 'Disposed')."
-        },
-        "ocrConfidenceScore": {
-          "type": "number",
-          "description": "A confidence score (0-100) indicating the accuracy of data extracted by OCR for this asset."
-        },
-        "ocrLastProcessedAt": {
-          "type": "string",
-          "description": "Timestamp of the last time an OCR process was run for this asset's data.",
-          "format": "date-time"
-        },
-        "createdByUserId": {
-          "type": "string",
-          "description": "Reference to the UserProfile who initially created this asset record. (Relationship: UserProfile 1:N Asset)"
-        },
-        "lastModifiedByUserId": {
-          "type": "string",
-          "description": "Reference to the UserProfile who last modified this asset record. (Relationship: UserProfile 1:N Asset)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the asset record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the asset record was last updated.",
-          "format": "date-time"
+        "id": { "type": "string", "format": "uuid" },
+        "description": { "type": "string" },
+        "category": { "type": "string" },
+        "grantId": { "type": "string" },
+        "location": { "type": "string" },
+        "status": { "type": "string", "enum": ["VERIFIED", "UNVERIFIED", "DISCREPANCY"] },
+        "condition": { "type": "string" },
+        "serialNumber": { "type": "string" },
+        "assetIdCode": { "type": "string" },
+        "lastModified": { "type": "string", "format": "date-time" },
+        "lastModifiedBy": { "type": "string" },
+        "importMetadata": {
+          "type": "object",
+          "properties": {
+            "sourceFile": { "type": "string" },
+            "sheetName": { "type": "string" },
+            "rowNumber": { "type": "number" }
+          }
         }
-      },
-      "required": [
-        "id",
-        "serialNumber",
-        "model",
-        "location",
-        "assetType",
-        "createdByUserId",
-        "createdAt",
-        "updatedAt"
-      ]
+      }
     },
-    "AssetFile": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AssetFile",
+    "AppSettings": {
+      "title": "AppSettings",
+      "description": "Global governance and project orchestration settings.",
       "type": "object",
-      "description": "Represents a file (photo, document, attachment) associated with a specific asset, stored in Firebase Storage.",
       "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the AssetFile entity."
-        },
-        "assetId": {
-          "type": "string",
-          "description": "Reference to the Asset this file belongs to. (Relationship: Asset 1:N AssetFile)"
-        },
-        "fileName": {
-          "type": "string",
-          "description": "The original name of the uploaded file."
-        },
-        "fileType": {
-          "type": "string",
-          "description": "The MIME type of the file (e.g., 'image/jpeg', 'application/pdf')."
-        },
-        "storagePath": {
-          "type": "string",
-          "description": "The path or URI where the file is stored in Firebase Storage."
-        },
-        "fileSize": {
-          "type": "number",
-          "description": "Size of the file in bytes."
-        },
-        "isScannedDocument": {
-          "type": "boolean",
-          "description": "Flag indicating if this file originated from the integrated document scanner."
-        },
-        "uploadedByUserId": {
-          "type": "string",
-          "description": "Reference to the UserProfile who uploaded this file. (Relationship: UserProfile 1:N AssetFile)"
-        },
-        "uploadedAt": {
-          "type": "string",
-          "description": "Timestamp when the file was uploaded.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "assetId",
-        "fileName",
-        "fileType",
-        "storagePath",
-        "fileSize",
-        "uploadedByUserId",
-        "uploadedAt"
-      ]
-    },
-    "ConditionNote": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "ConditionNote",
-      "type": "object",
-      "description": "Records historical condition notes for an asset, providing an audit trail of its state over time.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the ConditionNote entity."
-        },
-        "assetId": {
-          "type": "string",
-          "description": "Reference to the Asset this condition note describes. (Relationship: Asset 1:N ConditionNote)"
-        },
-        "noteDate": {
-          "type": "string",
-          "description": "The date and time when the condition was observed or noted.",
-          "format": "date-time"
-        },
-        "conditionDescription": {
-          "type": "string",
-          "description": "A detailed textual description of the asset's condition at the time the note was recorded."
-        },
-        "notedByUserId": {
-          "type": "string",
-          "description": "Reference to the UserProfile who recorded this condition note. (Relationship: UserProfile 1:N ConditionNote)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the condition note record was created.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "assetId",
-        "noteDate",
-        "conditionDescription",
-        "notedByUserId",
-        "createdAt"
-      ]
+        "activeGrantId": { "type": "string" },
+        "appMode": { "type": "string", "enum": ["management", "verification"] },
+        "lockAssetList": { "type": "boolean" },
+        "readAuthority": { "type": "string", "enum": ["FIRESTORE", "RTDB"] }
+      }
     }
   },
   "auth": {
-    "providers": [
-      "password",
-      "anonymous"
-    ]
+    "providers": ["anonymous", "password"]
   },
   "firestore": {
-    "structure": [
-      {
-        "path": "/userProfiles/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "Stores user-specific profile information. This is private data, accessible only by the authenticated user (`request.auth.uid` matches `{userId}`). The document's 'firebaseUid' field matches the document ID '{userId}'.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The Firebase Authentication UID of the user, serving as the document ID for their profile."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/assets/{assetId}",
-        "definition": {
-          "entityName": "Asset",
-          "schema": {
-            "$ref": "#/backend/entities/Asset"
-          },
-          "description": "Stores core asset details. Each asset document includes an 'ownerId' (the Firebase UID of the user who created it) and a 'members' map for collaborative access (e.g., { 'uid1': 'editor', 'uid2': 'viewer' }). This denormalization ensures authorization independence and supports secure list operations.",
-          "params": [
-            {
-              "name": "assetId",
-              "description": "The unique identifier for the Asset document."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/assets/{assetId}/files/{fileId}",
-        "definition": {
-          "entityName": "AssetFile",
-          "schema": {
-            "$ref": "#/backend/entities/AssetFile"
-          },
-          "description": "Stores metadata for files, photos, and documents associated with a specific asset. Includes denormalized 'assetOwnerId' and 'assetMembers' map from the parent asset for authorization independence, inheriting collaborative permissions.",
-          "params": [
-            {
-              "name": "assetId",
-              "description": "The unique identifier of the parent Asset."
-            },
-            {
-              "name": "fileId",
-              "description": "The unique identifier for the AssetFile document."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/assets/{assetId}/conditionNotes/{noteId}",
-        "definition": {
-          "entityName": "ConditionNote",
-          "schema": {
-            "$ref": "#/backend/entities/ConditionNote"
-          },
-          "description": "Records historical condition notes for an asset, providing an audit trail of its state. Includes denormalized 'assetOwnerId' and 'assetMembers' map from the parent asset for authorization independence, inheriting collaborative permissions.",
-          "params": [
-            {
-              "name": "assetId",
-              "description": "The unique identifier of the parent Asset."
-            },
-            {
-              "name": "noteId",
-              "description": "The unique identifier for the ConditionNote document."
-            }
-          ]
-        }
-      }
-    ],
-    "reasoning": "The Firestore structure is designed following strict security and scalability principles, prioritizing Authorization Independence and secure Queryable Access Patterns (QAPs). \n\n**Authorization Independence via Denormalization (Strategy A):**\nThis is the most critical aspect of the design. For collaborative data, `Asset` documents include an `ownerId` (referencing the creator's Firebase UID) and a `members` map (e.g., `{\"user_uid_1\": \"editor\", \"user_uid_2\": \"viewer\"}`). This denormalized authorization context is then *copied* into all documents within its subcollections, specifically `AssetFile` and `ConditionNote` documents. Each `AssetFile` and `ConditionNote` document will contain `assetOwnerId` and `assetMembers` fields, mirroring their parent `Asset`'s authorization data. This eliminates the need for `get()` calls in security rules when accessing subcollection data, making rules atomic, simpler to write, and vastly more performant. It also enables atomic creation/deletion operations across parent and child documents within transactions or batched writes.\n\n**Secure Queryable Access Patterns (QAPs):**\n1.  For user-specific private data like `UserProfile`, the path `/userProfiles/{userId}` uses `request.auth.uid` directly in the rule `allow read, write: if request.auth.uid == userId;`, ensuring that users can only access their own profiles. List operations on `/userProfiles` (though not typical) would still be restricted by `request.auth.uid` matching the document ID.\n2.  For collaborative `Asset` data, the `ownerId` and `members` map enable secure `list` operations. Security rules can efficiently filter documents by checking `request.auth.uid == resource.data.ownerId` or `resource.data.members[request.auth.uid] != null`. This ensures that a user can only query for assets they own or are a member of, without requiring complex server-side filtering or `get()` calls. This directly supports the 'Collaboration Room' feature where multiple users edit assets in real-time. The same logic applies to `AssetFile` and `ConditionNote` collections, using their denormalized `assetOwnerId` and `assetMembers` fields.\n\n**Structural Segregation (Strategy B):**\nCollections are designed to hold documents with homogeneous security requirements. `/userProfiles/{userId}` is strictly for private user data, while `/assets/{assetId}` is for collaboratively managed assets. This clear separation simplifies security rules significantly; there's no need for complex conditional logic to distinguish between public and private data within the same collection. All assets, regardless of `assetType`, share the same collaborative access model, thus residing in a single `/assets` collection.\n\n**Access Modeling (Strategy C):**\n*   **Private Data:** `UserProfile` follows path-based ownership (`/userProfiles/{userId}`).\n*   **Collaborative Data:** `Asset` uses a `membership map` (`members: {uid: \"role\"}`) combined with an `ownerId` field. This provides flexible role-based access for multiple users on a per-asset basis.\n*   **Hierarchical & Nested Data:** `AssetFile` and `ConditionNote` are subcollections of `Asset`, maintaining logical hierarchy. Their authorization, however, is independent due to denormalization.\n\n**Data Clarity and Predictability (Strategy D):**\n*   **Explicit State Modeling:** The `Asset` entity includes a `status` field (e.g., 'Operational', 'Under Repair') for clear state management.\n*   **Predictable Schema:** All entities adhere to predefined schemas with static keys. Dynamic keys are avoided.\n*   **Radical Consistency:** Standardized field names like `ownerId`, `createdByUserId`, and descriptive wildcards (`{userId}`, `{assetId}`, `{fileId}`, `{noteId}`) are used throughout to improve debuggability and maintainability of rules and application code."
+    "/assets/{assetId}": {
+      "schema": { "$ref": "#/backend/entities/Asset" },
+      "description": "Primary registry storage."
+    },
+    "/config/settings": {
+      "schema": { "$ref": "#/backend/entities/AppSettings" },
+      "description": "Governance configuration."
+    }
   }
 }
