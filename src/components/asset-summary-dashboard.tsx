@@ -3,6 +3,7 @@
 /**
  * @fileOverview Inventory Dashboard - High-Fidelity Analytics Grid.
  * Phase 1100: Reorganized Quick Start tiles to match Folders and Anomalies.
+ * Phase 1101: Renamed 'Drill-down' to 'ACTIONS' per user request.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -152,7 +153,7 @@ export function AssetSummaryDashboard() {
                                 view === 'insights' ? "bg-white/10 text-white" : "text-white/20 hover:text-white"
                             )}
                         >
-                            Drill-down
+                            ACTIONS
                         </button>
                     </div>
                     <Button 
