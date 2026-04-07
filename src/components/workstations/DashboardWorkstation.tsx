@@ -26,6 +26,7 @@ import { ReportsWorkstation } from './ReportsWorkstation';
 import { SyncQueueWorkstation } from './SyncQueueWorkstation';
 import { AssetGroupsWorkstation } from './AssetGroupsWorkstation';
 import { DiscrepancyWorkstation } from './DiscrepancyWorkstation';
+import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 
 type DashboardTab = 'overview' | 'inventory';
