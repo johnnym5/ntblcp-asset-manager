@@ -4,6 +4,7 @@
  * @fileOverview Pending Sync - Waiting Cloud Updates.
  * Phase 45: Integrated Retry pulse for failed sync operations.
  * Phase 1012: Applied friendlier naming "Pending Sync".
+ * Phase 1013: Implemented Select All and Accordion Grouping for Incoming/Outgoing pulses.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -38,7 +39,9 @@ import {
   PlusCircle,
   FileEdit,
   Eraser,
-  Info
+  Info,
+  ArrowDownCircle,
+  ArrowUpCircle
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -147,16 +150,11 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
     
     setIsRetryingId(entry.id);
     try {
-      // 1. Reset status to pending to allow processor to take it
       const resetEntry: OfflineQueueEntry = { ...entry, status: 'PENDING', error: undefined };
       await storage.updateQueueEntry(resetEntry);
-      
-      // 2. Immediate execution attempt
       await processSelectedSyncQueue([entry.id]);
-      
       await refreshRegistry();
       await loadQueue();
-      
       toast({ title: "Retry Pulse Applied", description: "Operation successfully broadcast to Cloud." });
     } catch (e) {
       toast({ variant: "destructive", title: "Retry Failed", description: "The anomaly persists in the cloud link." });
@@ -341,58 +339,72 @@ export function SyncQueueWorkstation({ isEmbedded = false }: { isEmbedded?: bool
 
             <ScrollArea className="flex-1 bg-black">
               <div className="p-8 space-y-6 pb-20">
-                <Accordion type="multiple" defaultValue={["create", "update", "delete"]} className="space-y-4">
+                <Accordion type="multiple" defaultValue={["outgoing"]} className="space-y-4">
                   
-                  {/* NEW ASSETS */}
-                  {opGroups.CREATE.length > 0 && (
-                    <AccordionItem value="create" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
-                      <AccordionTrigger className="hover:no-underline py-6">
-                        <div className="flex items-center justify-between w-full pr-6">
-                          <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-green-500/10 rounded-xl text-green-500"><PlusCircle className="h-5 w-5" /></div>
-                            <h4 className="text-sm font-black uppercase text-white leading-none">New Records ({opGroups.CREATE.length})</h4>
-                          </div>
+                  {/* INCOMING PULSE (Simulated/Scanned placeholder for Download) */}
+                  <AccordionItem value="incoming" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
+                    <AccordionTrigger className="hover:no-underline py-6">
+                      <div className="flex items-center justify-between w-full pr-6">
+                        <div className="flex items-center gap-4">
+                          <div className="p-2.5 bg-blue-500/10 rounded-xl text-blue-500"><ArrowDownCircle className="h-5 w-5" /></div>
+                          <h4 className="text-sm font-black uppercase text-white leading-none">Incoming Pulses (From Cloud)</h4>
                         </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-8 space-y-3">
-                        {opGroups.CREATE.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
-                      </AccordionContent>
-                    </AccordionItem>
-                  )}
+                        <Badge variant="outline" className="text-[8px] font-black uppercase opacity-40">Scanning Required</Badge>
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-8 text-center py-12 opacity-40">
+                      <p className="text-[10px] font-bold uppercase tracking-widest mb-4">Click "Sync Down" to identify incoming cloud state changes.</p>
+                      <Button variant="outline" onClick={manualDownload} size="sm" className="h-10 px-6 rounded-xl border-white/10 font-black uppercase text-[9px] tracking-widest">
+                        Initialize Cloud Scan
+                      </Button>
+                    </AccordionContent>
+                  </AccordionItem>
 
-                  {/* UPDATES */}
-                  {opGroups.UPDATE.length > 0 && (
-                    <AccordionItem value="update" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
-                      <AccordionTrigger className="hover:no-underline py-6">
-                        <div className="flex items-center justify-between w-full pr-6">
-                          <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><FileEdit className="h-5 w-5" /></div>
-                            <h4 className="text-sm font-black uppercase text-white leading-none">Record Edits ({opGroups.UPDATE.length})</h4>
-                          </div>
+                  {/* OUTGOING PULSES (Local mods) */}
+                  <AccordionItem value="outgoing" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
+                    <AccordionTrigger className="hover:no-underline py-6">
+                      <div className="flex items-center justify-between w-full pr-6">
+                        <div className="flex items-center gap-4">
+                          <div className="p-2.5 bg-primary/10 rounded-xl text-primary"><ArrowUpCircle className="h-5 w-5" /></div>
+                          <h4 className="text-sm font-black uppercase text-white leading-none">Outgoing Pulses ({queue.length})</h4>
                         </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-8 space-y-3">
-                        {opGroups.UPDATE.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
-                      </AccordionContent>
-                    </AccordionItem>
-                  )}
-
-                  {/* DELETIONS */}
-                  {opGroups.DELETE.length > 0 && (
-                    <AccordionItem value="delete" className="border-2 border-white/5 rounded-[2rem] bg-white/[0.01] overflow-hidden px-6">
-                      <AccordionTrigger className="hover:no-underline py-6">
-                        <div className="flex items-center justify-between w-full pr-6">
-                          <div className="flex items-center gap-4">
-                            <div className="p-2.5 bg-red-500/10 rounded-xl text-red-500"><Eraser className="h-5 w-5" /></div>
-                            <h4 className="text-sm font-black uppercase text-white leading-none">Deletions ({opGroups.DELETE.length})</h4>
-                          </div>
-                        </div>
-                      </AccordionTrigger>
-                      <AccordionContent className="pb-8 space-y-3">
-                        {opGroups.DELETE.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
-                      </AccordionContent>
-                    </AccordionItem>
-                  )}
+                      </div>
+                    </AccordionTrigger>
+                    <AccordionContent className="pb-8 space-y-6">
+                      <Accordion type="multiple" defaultValue={["create", "update", "delete"]} className="space-y-3">
+                        {opGroups.CREATE.length > 0 && (
+                          <AccordionItem value="create" className="border-none">
+                            <AccordionTrigger className="hover:no-underline py-2 opacity-60 hover:opacity-100 transition-opacity">
+                              <span className="text-[10px] font-black uppercase tracking-widest">New Records ({opGroups.CREATE.length})</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-2 space-y-2">
+                              {opGroups.CREATE.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
+                            </AccordionContent>
+                          </AccordionItem>
+                        )}
+                        {opGroups.UPDATE.length > 0 && (
+                          <AccordionItem value="update" className="border-none">
+                            <AccordionTrigger className="hover:no-underline py-2 opacity-60 hover:opacity-100 transition-opacity">
+                              <span className="text-[10px] font-black uppercase tracking-widest">Record Edits ({opGroups.UPDATE.length})</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-2 space-y-2">
+                              {opGroups.UPDATE.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
+                            </AccordionContent>
+                          </AccordionItem>
+                        )}
+                        {opGroups.DELETE.length > 0 && (
+                          <AccordionItem value="delete" className="border-none">
+                            <AccordionTrigger className="hover:no-underline py-2 opacity-60 hover:opacity-100 transition-opacity">
+                              <span className="text-[10px] font-black uppercase tracking-widest text-red-500">Deletions ({opGroups.DELETE.length})</span>
+                            </AccordionTrigger>
+                            <AccordionContent className="pt-2 space-y-2">
+                              {opGroups.DELETE.map(entry => <SyncItemCard key={entry.id} entry={entry} />)}
+                            </AccordionContent>
+                          </AccordionItem>
+                        )}
+                      </Accordion>
+                    </AccordionContent>
+                  </AccordionItem>
 
                 </Accordion>
               </div>
