@@ -4,45 +4,50 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "UserProfile",
       "type": "object",
-      "description": "Stores additional information about a user, including roles and metadata, complementing Firebase Authentication data.",
+      "description": "Represents a user's profile information within the asset management system, excluding authentication details. This entity supports features like collaboration and user-specific settings.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the UserProfile entity. Corresponds to the Firebase Authentication User ID."
+          "description": "Unique identifier for the UserProfile entity."
+        },
+        "firebaseUid": {
+          "type": "string",
+          "description": "The unique ID provided by Firebase Authentication for the user. This links the UserProfile to the external authentication system."
         },
         "email": {
           "type": "string",
-          "description": "The user's primary email address.",
+          "description": "The user's email address, typically obtained from the authentication provider.",
           "format": "email"
         },
         "displayName": {
           "type": "string",
-          "description": "The user's display name."
+          "description": "The user's display name or full name."
         },
-        "role": {
+        "lastLogin": {
           "type": "string",
-          "description": "The assigned role for the user (e.g., Viewer, Verifier, Manager, Admin, SuperAdmin)."
-        },
-        "photoUrl": {
-          "type": "string",
-          "description": "URL to the user's profile photo.",
-          "format": "uri"
+          "description": "Timestamp of the user's last login.",
+          "format": "date-time"
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp when the user profile was created.",
+          "description": "Timestamp when the user profile record was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp when the user profile was last updated.",
+          "description": "Timestamp when the user profile record was last updated.",
           "format": "date-time"
+        },
+        "preferredTheme": {
+          "type": "string",
+          "description": "The user's preferred UI theme (e.g., 'light', 'dark')."
         }
       },
       "required": [
         "id",
+        "firebaseUid",
         "email",
-        "role",
+        "displayName",
         "createdAt",
         "updatedAt"
       ]
@@ -51,7 +56,7 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "Asset",
       "type": "object",
-      "description": "Represents a single physical asset managed by the system, including its details, status, and traceability.",
+      "description": "Represents a single physical or virtual asset managed by the system, covering various types from different Excel sheets.",
       "properties": {
         "id": {
           "type": "string",
@@ -59,70 +64,49 @@
         },
         "serialNumber": {
           "type": "string",
-          "description": "The unique serial number of the asset."
+          "description": "The unique serial number of the asset, often found on labels."
         },
         "model": {
           "type": "string",
-          "description": "The model name or identifier of the asset."
+          "description": "The model name or number of the asset."
         },
         "location": {
           "type": "string",
-          "description": "The current physical location of the asset."
-        },
-        "description": {
-          "type": "string",
-          "description": "A general description of the asset."
-        },
-        "conditionNotes": {
-          "type": "string",
-          "description": "Detailed notes about the asset's current physical condition."
-        },
-        "status": {
-          "type": "string",
-          "description": "The current operational status of the asset (e.g., Active, Disposed, Under Repair, Missing)."
+          "description": "The current physical location or assignment of the asset."
         },
         "assetType": {
           "type": "string",
-          "description": "The category or type of asset, often derived from the source Excel sheet name (e.g., Ntb far, Motorcycles, GeneXpert)."
+          "description": "Categorization of the asset (e.g., 'Ntb far', 'Motorcycles', 'Vehicles'), derived from the source Excel sheet or manual entry."
         },
-        "grantId": {
+        "acquisitionDate": {
           "type": "string",
-          "description": "Reference to the Grant entity under which this asset is managed. (Relationship: Grant 1:N Asset)"
+          "description": "The date when the asset was acquired.",
+          "format": "date"
         },
-        "sourceWorkbookId": {
-          "type": "string",
-          "description": "Reference to the WorkbookSource entity from which this asset was originally imported. (Relationship: WorkbookSource 1:N Asset)"
-        },
-        "sourceSheetId": {
-          "type": "string",
-          "description": "Reference to the SheetSource entity from which this asset was imported within the workbook. (Relationship: SheetSource 1:N Asset)"
-        },
-        "sourceRowNumber": {
+        "currentValue": {
           "type": "number",
-          "description": "The original row number in the source Excel sheet for traceability."
+          "description": "The current estimated monetary value of the asset."
         },
-        "sourceSectionContext": {
+        "status": {
           "type": "string",
-          "description": "Contextual information from merged cells or section headers in the source Excel sheet for traceability."
+          "description": "The current operational status of the asset (e.g., 'Operational', 'Under Repair', 'Disposed')."
         },
-        "attachmentIds": {
-          "type": "array",
-          "description": "References to Attachment entities associated with this asset. (Relationship: Asset N:N Attachment)",
-          "items": {
-            "type": "string"
-          }
+        "ocrConfidenceScore": {
+          "type": "number",
+          "description": "A confidence score (0-100) indicating the accuracy of data extracted by OCR for this asset."
         },
-        "latestVerificationId": {
+        "ocrLastProcessedAt": {
           "type": "string",
-          "description": "Reference to the latest AssetVerification entity for this asset. (Relationship: Asset 1:1 AssetVerification - latest)"
+          "description": "Timestamp of the last time an OCR process was run for this asset's data.",
+          "format": "date-time"
         },
         "createdByUserId": {
           "type": "string",
-          "description": "Reference to the UserProfile entity that created this asset record. (Relationship: UserProfile 1:N Asset)"
+          "description": "Reference to the UserProfile who initially created this asset record. (Relationship: UserProfile 1:N Asset)"
         },
-        "updatedByUserId": {
+        "lastModifiedByUserId": {
           "type": "string",
-          "description": "Reference to the UserProfile entity that last updated this asset record. (Relationship: UserProfile 1:N Asset)"
+          "description": "Reference to the UserProfile who last modified this asset record. (Relationship: UserProfile 1:N Asset)"
         },
         "createdAt": {
           "type": "string",
@@ -133,10 +117,6 @@
           "type": "string",
           "description": "Timestamp when the asset record was last updated.",
           "format": "date-time"
-        },
-        "ocrData": {
-          "type": "string",
-          "description": "A JSON string containing raw data extracted by OCR from asset labels, for review and audit."
         }
       },
       "required": [
@@ -144,87 +124,25 @@
         "serialNumber",
         "model",
         "location",
-        "status",
         "assetType",
-        "sourceWorkbookId",
-        "sourceSheetId",
-        "sourceRowNumber",
+        "createdByUserId",
         "createdAt",
         "updatedAt"
       ]
     },
-    "AssetVerification": {
+    "AssetFile": {
       "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AssetVerification",
+      "title": "AssetFile",
       "type": "object",
-      "description": "Records a specific physical verification event for an asset, including status, findings, and verifier details.",
+      "description": "Represents a file (photo, document, attachment) associated with a specific asset, stored in Firebase Storage.",
       "properties": {
         "id": {
           "type": "string",
-          "description": "Unique identifier for the AssetVerification entity."
+          "description": "Unique identifier for the AssetFile entity."
         },
         "assetId": {
           "type": "string",
-          "description": "Reference to the Asset entity that was verified. (Relationship: Asset 1:N AssetVerification)"
-        },
-        "verifiedByUserId": {
-          "type": "string",
-          "description": "Reference to the UserProfile entity that performed the verification. (Relationship: UserProfile 1:N AssetVerification)"
-        },
-        "verificationDate": {
-          "type": "string",
-          "description": "The date and time when the physical verification was performed.",
-          "format": "date-time"
-        },
-        "status": {
-          "type": "string",
-          "description": "The outcome status of the verification (e.g., Verified, Pending, Discrepancy, Unavailable)."
-        },
-        "notes": {
-          "type": "string",
-          "description": "Detailed notes recorded during the verification, including discrepancies or observations."
-        },
-        "foundLocation": {
-          "type": "string",
-          "description": "The actual location where the asset was found during verification."
-        },
-        "attachmentIds": {
-          "type": "array",
-          "description": "References to Attachment entities (e.g., photos of the asset) captured during verification. (Relationship: AssetVerification N:N Attachment)",
-          "items": {
-            "type": "string"
-          }
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the verification record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the verification record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "assetId",
-        "verifiedByUserId",
-        "verificationDate",
-        "status",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "Attachment": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Attachment",
-      "type": "object",
-      "description": "Stores metadata for files (photos, documents) uploaded to Firebase Storage and linked to other entities.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Attachment entity."
+          "description": "Reference to the Asset this file belongs to. (Relationship: Asset 1:N AssetFile)"
         },
         "fileName": {
           "type": "string",
@@ -232,278 +150,81 @@
         },
         "fileType": {
           "type": "string",
-          "description": "The MIME type of the file (e.g., image/jpeg, application/pdf)."
+          "description": "The MIME type of the file (e.g., 'image/jpeg', 'application/pdf')."
         },
         "storagePath": {
           "type": "string",
-          "description": "The full path to the file within Firebase Storage."
+          "description": "The path or URI where the file is stored in Firebase Storage."
         },
-        "downloadUrl": {
-          "type": "string",
-          "description": "A public URL to download the file from Firebase Storage.",
-          "format": "uri"
-        },
-        "size": {
+        "fileSize": {
           "type": "number",
-          "description": "The size of the file in bytes."
+          "description": "Size of the file in bytes."
+        },
+        "isScannedDocument": {
+          "type": "boolean",
+          "description": "Flag indicating if this file originated from the integrated document scanner."
         },
         "uploadedByUserId": {
           "type": "string",
-          "description": "Reference to the UserProfile entity that uploaded the file. (Relationship: UserProfile 1:N Attachment)"
+          "description": "Reference to the UserProfile who uploaded this file. (Relationship: UserProfile 1:N AssetFile)"
         },
-        "associatedAssetId": {
+        "uploadedAt": {
           "type": "string",
-          "description": "Reference to the Asset entity this attachment is directly linked to. (Relationship: Asset 1:N Attachment)"
-        },
-        "associatedVerificationId": {
-          "type": "string",
-          "description": "Reference to the AssetVerification entity this attachment is linked to. (Relationship: AssetVerification 1:N Attachment)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the attachment record was created.",
+          "description": "Timestamp when the file was uploaded.",
           "format": "date-time"
         }
       },
       "required": [
         "id",
+        "assetId",
         "fileName",
         "fileType",
         "storagePath",
-        "downloadUrl",
-        "size",
+        "fileSize",
         "uploadedByUserId",
+        "uploadedAt"
+      ]
+    },
+    "ConditionNote": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "ConditionNote",
+      "type": "object",
+      "description": "Records historical condition notes for an asset, providing an audit trail of its state over time.",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier for the ConditionNote entity."
+        },
+        "assetId": {
+          "type": "string",
+          "description": "Reference to the Asset this condition note describes. (Relationship: Asset 1:N ConditionNote)"
+        },
+        "noteDate": {
+          "type": "string",
+          "description": "The date and time when the condition was observed or noted.",
+          "format": "date-time"
+        },
+        "conditionDescription": {
+          "type": "string",
+          "description": "A detailed textual description of the asset's condition at the time the note was recorded."
+        },
+        "notedByUserId": {
+          "type": "string",
+          "description": "Reference to the UserProfile who recorded this condition note. (Relationship: UserProfile 1:N ConditionNote)"
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the condition note record was created.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "id",
+        "assetId",
+        "noteDate",
+        "conditionDescription",
+        "notedByUserId",
         "createdAt"
-      ]
-    },
-    "AuditLog": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "AuditLog",
-      "type": "object",
-      "description": "Records all significant system actions, data changes, and user activities for traceability and compliance.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the AuditLog entry."
-        },
-        "action": {
-          "type": "string",
-          "description": "Describes the type of action performed (e.g., AssetCreated, AssetUpdated, UserRoleChanged, ImportInitiated, Login)."
-        },
-        "entityType": {
-          "type": "string",
-          "description": "The type of entity affected by the action (e.g., Asset, UserProfile, Grant)."
-        },
-        "entityId": {
-          "type": "string",
-          "description": "The ID of the specific entity affected by the action. Null if the action doesn't relate to a specific entity."
-        },
-        "userId": {
-          "type": "string",
-          "description": "Reference to the UserProfile entity that initiated the action. (Relationship: UserProfile 1:N AuditLog)"
-        },
-        "timestamp": {
-          "type": "string",
-          "description": "The date and time when the action occurred.",
-          "format": "date-time"
-        },
-        "beforeState": {
-          "type": "string",
-          "description": "A JSON string representing the state of the entity before the action (for updates/deletes)."
-        },
-        "afterState": {
-          "type": "string",
-          "description": "A JSON string representing the state of the entity after the action (for creations/updates)."
-        },
-        "details": {
-          "type": "string",
-          "description": "Additional relevant details about the action or system event."
-        },
-        "ipAddress": {
-          "type": "string",
-          "description": "The IP address from which the action originated."
-        }
-      },
-      "required": [
-        "id",
-        "action",
-        "entityType",
-        "userId",
-        "timestamp"
-      ]
-    },
-    "Grant": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "Grant",
-      "type": "object",
-      "description": "Defines a grant or project under which a collection of assets is managed and tracked.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the Grant entity."
-        },
-        "name": {
-          "type": "string",
-          "description": "The official name of the grant or project."
-        },
-        "description": {
-          "type": "string",
-          "description": "A detailed description of the grant or project scope."
-        },
-        "startDate": {
-          "type": "string",
-          "description": "The official start date of the grant period.",
-          "format": "date"
-        },
-        "endDate": {
-          "type": "string",
-          "description": "The official end date of the grant period.",
-          "format": "date"
-        },
-        "status": {
-          "type": "string",
-          "description": "The current status of the grant (e.g., Active, Completed, Archived, Upcoming)."
-        },
-        "createdByUserId": {
-          "type": "string",
-          "description": "Reference to the UserProfile entity that created this grant record. (Relationship: UserProfile 1:N Grant)"
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the grant record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the grant record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "name",
-        "startDate",
-        "endDate",
-        "status",
-        "createdByUserId",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "WorkbookSource": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "WorkbookSource",
-      "type": "object",
-      "description": "Tracks metadata about an Excel workbook file uploaded for asset import, maintaining source traceability.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the WorkbookSource entity."
-        },
-        "fileName": {
-          "type": "string",
-          "description": "The original filename of the uploaded Excel workbook."
-        },
-        "uploadDate": {
-          "type": "string",
-          "description": "The date and time when the workbook was uploaded.",
-          "format": "date-time"
-        },
-        "uploadedByUserId": {
-          "type": "string",
-          "description": "Reference to the UserProfile entity that uploaded the workbook. (Relationship: UserProfile 1:N WorkbookSource)"
-        },
-        "storagePath": {
-          "type": "string",
-          "description": "The path to the uploaded workbook file in Firebase Storage."
-        },
-        "status": {
-          "type": "string",
-          "description": "The processing status of the workbook (e.g., Uploaded, Processing, Processed, Failed)."
-        },
-        "processingLogs": {
-          "type": "string",
-          "description": "A summary of parsing and import results, including any warnings or errors."
-        },
-        "originalWorkbookHash": {
-          "type": "string",
-          "description": "A hash of the original workbook content to detect duplicate uploads."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the workbook source record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the workbook source record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "fileName",
-        "uploadDate",
-        "uploadedByUserId",
-        "storagePath",
-        "status",
-        "originalWorkbookHash",
-        "createdAt",
-        "updatedAt"
-      ]
-    },
-    "SheetSource": {
-      "$schema": "http://json-schema.org/draft-07/schema#",
-      "title": "SheetSource",
-      "type": "object",
-      "description": "Tracks metadata about a specific sheet within an imported Excel workbook, crucial for sheet-specific parsing logic and traceability.",
-      "properties": {
-        "id": {
-          "type": "string",
-          "description": "Unique identifier for the SheetSource entity."
-        },
-        "workbookId": {
-          "type": "string",
-          "description": "Reference to the WorkbookSource entity this sheet belongs to. (Relationship: WorkbookSource 1:N SheetSource)"
-        },
-        "sheetName": {
-          "type": "string",
-          "description": "The name of the sheet within the Excel workbook (e.g., Ntb far, Motorcycles)."
-        },
-        "parsingLogicIdentifier": {
-          "type": "string",
-          "description": "An identifier for the specific parsing logic or schema applied to this sheet."
-        },
-        "totalRecordsProcessed": {
-          "type": "number",
-          "description": "The total number of asset records processed from this sheet."
-        },
-        "totalRecordsImported": {
-          "type": "number",
-          "description": "The number of asset records successfully imported from this sheet."
-        },
-        "failedRecordsCount": {
-          "type": "number",
-          "description": "The number of records that failed to import from this sheet."
-        },
-        "createdAt": {
-          "type": "string",
-          "description": "Timestamp when the sheet source record was created.",
-          "format": "date-time"
-        },
-        "updatedAt": {
-          "type": "string",
-          "description": "Timestamp when the sheet source record was last updated.",
-          "format": "date-time"
-        }
-      },
-      "required": [
-        "id",
-        "workbookId",
-        "sheetName",
-        "parsingLogicIdentifier",
-        "createdAt",
-        "updatedAt"
       ]
     }
   },
@@ -516,208 +237,78 @@
   "firestore": {
     "structure": [
       {
-        "path": "/users/{userId}",
+        "path": "/userProfiles/{userId}",
         "definition": {
           "entityName": "UserProfile",
           "schema": {
             "$ref": "#/backend/entities/UserProfile"
           },
-          "description": "Stores additional information about a user, including their assigned role. Access is restricted to the user themselves (for their own profile) or to 'SuperAdmin' for full management."
-        }
-      },
-      {
-        "path": "/app_roles_super_admins/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "An empty document exists here if the user has a 'SuperAdmin' role. Used for fast, atomic authorization checks in security rules, adhering to DBAC and Authorization Independence.",
+          "description": "Stores user-specific profile information. This is private data, accessible only by the authenticated user (`request.auth.uid` matches `{userId}`). The document's 'firebaseUid' field matches the document ID '{userId}'.",
           "params": [
             {
               "name": "userId",
-              "description": "The unique ID of the user."
+              "description": "The Firebase Authentication UID of the user, serving as the document ID for their profile."
             }
           ]
         }
       },
       {
-        "path": "/app_roles_admins/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "An empty document exists here if the user has an 'Admin' role. Used for fast, atomic authorization checks in security rules.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique ID of the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/app_roles_managers/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "An empty document exists here if the user has a 'Manager' role. Used for fast, atomic authorization checks in security rules.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique ID of the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/app_roles_verifiers/{userId}",
-        "definition": {
-          "entityName": "UserProfile",
-          "schema": {
-            "$ref": "#/backend/entities/UserProfile"
-          },
-          "description": "An empty document exists here if the user has a 'Verifier' role. Used for fast, atomic authorization checks in security rules.",
-          "params": [
-            {
-              "name": "userId",
-              "description": "The unique ID of the user."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/grants/{grantId}",
-        "definition": {
-          "entityName": "Grant",
-          "schema": {
-            "$ref": "#/backend/entities/Grant"
-          },
-          "description": "Top-level collection for managing grants or projects. Access is typically for 'Manager' roles and above, based on `createdByUserId` and global role checks.",
-          "params": [
-            {
-              "name": "grantId",
-              "description": "The unique ID of the grant."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/workbooks/{workbookId}",
-        "definition": {
-          "entityName": "WorkbookSource",
-          "schema": {
-            "$ref": "#/backend/entities/WorkbookSource"
-          },
-          "description": "Stores metadata about uploaded Excel workbooks. Primarily accessible and manageable by 'Admin' roles and above. Includes `uploadedByUserId` for ownership traceability.",
-          "params": [
-            {
-              "name": "workbookId",
-              "description": "The unique ID of the workbook."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/workbooks/{workbookId}/sheets/{sheetId}",
-        "definition": {
-          "entityName": "SheetSource",
-          "schema": {
-            "$ref": "#/backend/entities/SheetSource"
-          },
-          "description": "Stores metadata about individual sheets within an uploaded workbook. Includes denormalized `uploadedByUserId` from its parent workbook for Authorization Independence, enabling rule checks without `get()` calls.",
-          "params": [
-            {
-              "name": "workbookId",
-              "description": "The unique ID of the parent workbook."
-            },
-            {
-              "name": "sheetId",
-              "description": "The unique ID of the sheet within the workbook."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/grants/{grantId}/assets/{assetId}",
+        "path": "/assets/{assetId}",
         "definition": {
           "entityName": "Asset",
           "schema": {
             "$ref": "#/backend/entities/Asset"
           },
-          "description": "Core asset records, logically grouped under their respective grants. Access is determined by application-wide roles (e.g., 'Manager' for full management, 'Verifier' for verification-related actions). Includes `createdByUserId` and `grantId` (from path) for authorization.",
+          "description": "Stores core asset details. Each asset document includes an 'ownerId' (the Firebase UID of the user who created it) and a 'members' map for collaborative access (e.g., { 'uid1': 'editor', 'uid2': 'viewer' }). This denormalization ensures authorization independence and supports secure list operations.",
           "params": [
-            {
-              "name": "grantId",
-              "description": "The unique ID of the parent grant."
-            },
             {
               "name": "assetId",
-              "description": "The unique ID of the asset."
+              "description": "The unique identifier for the Asset document."
             }
           ]
         }
       },
       {
-        "path": "/grants/{grantId}/assets/{assetId}/verifications/{verificationId}",
+        "path": "/assets/{assetId}/files/{fileId}",
         "definition": {
-          "entityName": "AssetVerification",
+          "entityName": "AssetFile",
           "schema": {
-            "$ref": "#/backend/entities/AssetVerification"
+            "$ref": "#/backend/entities/AssetFile"
           },
-          "description": "Records physical verification events for assets, nested hierarchically. Includes `verifiedByUserId` for ownership and `grantId` and `assetId` (from path) for context. Denormalizes `assetCreatedByUserId` (owner of the parent asset) for Authorization Independence.",
+          "description": "Stores metadata for files, photos, and documents associated with a specific asset. Includes denormalized 'assetOwnerId' and 'assetMembers' map from the parent asset for authorization independence, inheriting collaborative permissions.",
           "params": [
-            {
-              "name": "grantId",
-              "description": "The unique ID of the grant associated with the asset."
-            },
             {
               "name": "assetId",
-              "description": "The unique ID of the parent asset."
+              "description": "The unique identifier of the parent Asset."
             },
             {
-              "name": "verificationId",
-              "description": "The unique ID of the verification record."
+              "name": "fileId",
+              "description": "The unique identifier for the AssetFile document."
             }
           ]
         }
       },
       {
-        "path": "/attachments/{attachmentId}",
+        "path": "/assets/{assetId}/conditionNotes/{noteId}",
         "definition": {
-          "entityName": "Attachment",
+          "entityName": "ConditionNote",
           "schema": {
-            "$ref": "#/backend/entities/Attachment"
+            "$ref": "#/backend/entities/ConditionNote"
           },
-          "description": "Stores metadata for files (photos, documents) uploaded to Firebase Storage. Includes `uploadedByUserId`. For Authorization Independence, it denormalizes `grantContextId`, `assetContextId`, and `verificationContextId` from its associated primary entity to allow direct access checks without parent lookups. A single attachment should typically have a primary association for security.",
+          "description": "Records historical condition notes for an asset, providing an audit trail of its state. Includes denormalized 'assetOwnerId' and 'assetMembers' map from the parent asset for authorization independence, inheriting collaborative permissions.",
           "params": [
             {
-              "name": "attachmentId",
-              "description": "The unique ID of the attachment."
-            }
-          ]
-        }
-      },
-      {
-        "path": "/audit_logs/{logId}",
-        "definition": {
-          "entityName": "AuditLog",
-          "schema": {
-            "$ref": "#/backend/entities/AuditLog"
-          },
-          "description": "Immutable records of all significant system actions and data changes. Write access is strictly limited to server-side processes (e.g., Firebase Functions) via Admin SDK. Read access is restricted to 'Admin' and 'SuperAdmin' roles.",
-          "params": [
+              "name": "assetId",
+              "description": "The unique identifier of the parent Asset."
+            },
             {
-              "name": "logId",
-              "description": "The unique ID of the audit log entry."
+              "name": "noteId",
+              "description": "The unique identifier for the ConditionNote document."
             }
           ]
         }
       }
     ],
-    "reasoning": "The Firestore data structure for Assetain is designed with a strong emphasis on Authorization Independence and Query-Aware Security Rules (QAPs), ensuring scalability, security, and debuggability. \n\n**Authorization Independence via Denormalization:**\n*   **Role-Based Access Control (DBAC):** Instead of storing roles only within `UserProfile` documents and using `get()` calls in security rules (which would break atomic operations and be hard to debug), dedicated collections like `/app_roles_super_admins/{userId}` are used. An empty document exists in these collections if a user possesses the corresponding role. This enables highly efficient `exists()` checks in security rules, fulfilling Authorization Independence.\n*   **Nested Data Context:** For entities that are conceptually nested but require independent authorization, critical parent data is denormalized. For example, `SheetSource` documents include `uploadedByUserId` (denormalized from its parent `WorkbookSource`) and `AssetVerification` documents include `assetCreatedByUserId` (denormalized from the parent `Asset`). This allows rules to evaluate access to a `SheetSource` or `AssetVerification` document without needing to perform a `get()` call to its parent document.\n*   **Attachment Authorization:** Attachments can be linked to either `Asset` or `AssetVerification` entities. To support flexible and secure access without `get()`, each `Attachment` document denormalizes the `grantContextId`, `assetContextId`, and `verificationContextId` from its associated primary entity. This enables security rules to determine access based on the attachment's context (e.g., who can access the associated asset/grant) directly from the attachment document itself, without requiring additional lookups.\n\n**Query-Aware Security Rules (QAPs):**\n*   **Structural Segregation:** Data is segregated into distinct collections based on its security posture. For instance, `WorkbookSource` and `SheetSource` are administrative collections, `grants` are separate, and assets are nested under grants. This makes it straightforward to write rules that allow `list` operations, as all documents within a given collection or subcollection share a consistent access model.\n*   **Hierarchical Paths:** Assets are structured hierarchically under grants (`/grants/{grantId}/assets/{assetId}`), and verifications are nested under assets (`/grants/{grantId}/assets/{assetId}/verifications/{verificationId}`). This inherently provides `grantId` and `assetId` as path parameters to security rules, allowing for efficient filtering by these IDs in queries and enforcing hierarchical access without complex rule logic. For example, a user can `list` all assets within a specific grant if they are authorized for that grant context.\n*   **Denormalized Fields for Filtering:** Key fields such as `createdByUserId`, `uploadedByUserId`, `grantId`, `assetId`, and various `contextId` fields in `Attachment` documents are directly queryable. This allows client-side `list` queries to include `where` clauses (e.g., `where('grantId', '==', 'abc')`) which can then be securely validated by Firestore rules, ensuring that the rules are not acting as filters but rather as enforcers of already-filtered queries."
+    "reasoning": "The Firestore structure is designed following strict security and scalability principles, prioritizing Authorization Independence and secure Queryable Access Patterns (QAPs). \n\n**Authorization Independence via Denormalization (Strategy A):**\nThis is the most critical aspect of the design. For collaborative data, `Asset` documents include an `ownerId` (referencing the creator's Firebase UID) and a `members` map (e.g., `{\"user_uid_1\": \"editor\", \"user_uid_2\": \"viewer\"}`). This denormalized authorization context is then *copied* into all documents within its subcollections, specifically `AssetFile` and `ConditionNote` documents. Each `AssetFile` and `ConditionNote` document will contain `assetOwnerId` and `assetMembers` fields, mirroring their parent `Asset`'s authorization data. This eliminates the need for `get()` calls in security rules when accessing subcollection data, making rules atomic, simpler to write, and vastly more performant. It also enables atomic creation/deletion operations across parent and child documents within transactions or batched writes.\n\n**Secure Queryable Access Patterns (QAPs):**\n1.  For user-specific private data like `UserProfile`, the path `/userProfiles/{userId}` uses `request.auth.uid` directly in the rule `allow read, write: if request.auth.uid == userId;`, ensuring that users can only access their own profiles. List operations on `/userProfiles` (though not typical) would still be restricted by `request.auth.uid` matching the document ID.\n2.  For collaborative `Asset` data, the `ownerId` and `members` map enable secure `list` operations. Security rules can efficiently filter documents by checking `request.auth.uid == resource.data.ownerId` or `resource.data.members[request.auth.uid] != null`. This ensures that a user can only query for assets they own or are a member of, without requiring complex server-side filtering or `get()` calls. This directly supports the 'Collaboration Room' feature where multiple users edit assets in real-time. The same logic applies to `AssetFile` and `ConditionNote` collections, using their denormalized `assetOwnerId` and `assetMembers` fields.\n\n**Structural Segregation (Strategy B):**\nCollections are designed to hold documents with homogeneous security requirements. `/userProfiles/{userId}` is strictly for private user data, while `/assets/{assetId}` is for collaboratively managed assets. This clear separation simplifies security rules significantly; there's no need for complex conditional logic to distinguish between public and private data within the same collection. All assets, regardless of `assetType`, share the same collaborative access model, thus residing in a single `/assets` collection.\n\n**Access Modeling (Strategy C):**\n*   **Private Data:** `UserProfile` follows path-based ownership (`/userProfiles/{userId}`).\n*   **Collaborative Data:** `Asset` uses a `membership map` (`members: {uid: \"role\"}`) combined with an `ownerId` field. This provides flexible role-based access for multiple users on a per-asset basis.\n*   **Hierarchical & Nested Data:** `AssetFile` and `ConditionNote` are subcollections of `Asset`, maintaining logical hierarchy. Their authorization, however, is independent due to denormalization.\n\n**Data Clarity and Predictability (Strategy D):**\n*   **Explicit State Modeling:** The `Asset` entity includes a `status` field (e.g., 'Operational', 'Under Repair') for clear state management.\n*   **Predictable Schema:** All entities adhere to predefined schemas with static keys. Dynamic keys are avoided.\n*   **Radical Consistency:** Standardized field names like `ownerId`, `createdByUserId`, and descriptive wildcards (`{userId}`, `{assetId}`, `{fileId}`, `{noteId}`) are used throughout to improve debuggability and maintainability of rules and application code."
   }
 }

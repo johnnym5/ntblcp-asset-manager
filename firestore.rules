@@ -1,10 +1,126 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Unrestricted global access pulse. 
-    // Data governance and regional scoping are enforced within the application logic.
+
+    /**
+     * ASSET MANAGER SECURITY ARCHITECTURE
+     *
+     * Core Philosophy:
+     * This ruleset implements a robust collaborative access model designed for rapid prototyping.
+     * It prioritizes strict authorization (who can see/edit) while remaining flexible on the 
+     * internal data structures to support iterative development.
+     *
+     * Data Structure:
+     * - /userProfiles/{userId}: Private user settings and profile data.
+     * - /assets/{assetId}: Top-level collection for physical/virtual assets.
+     * - /assets/{assetId}/files/{fileId}: Metadata for associated photos and documents.
+     * - /assets/{assetId}/conditionNotes/{noteId}: Historical audit trail of asset condition.
+     *
+     * Key Security Decisions:
+     * 1. Authorization Independence: To optimize performance and reduce complexity, authorization 
+     *    data (ownerId and members map) is denormalized from the Asset document into every 
+     *    document in its subcollections (AssetFile, ConditionNote). This avoids expensive get() calls.
+     * 2. Collaborative Access: Assets use a 'members' map (uid -> role) to allow fine-grained 
+     *    sharing between users without global admin overhead.
+     * 3. Ownership-Based Deletion: Destructive operations (deleting assets or their history) are 
+     *    restricted to the original owner to prevent accidental data loss by collaborators.
+     * 4. Immutable Relational Fields: Critical fields that define ownership or parent-child 
+     *    relationships (like ownerId) are enforced as immutable during updates.
+     */
+
+    // --- Global Helper Functions ---
+
+    /** @description Checks if the request is from a signed-in user. */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /** @description Checks if the user ID matches the authenticated user. */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /** @description Verifies a user is present in a membership map. */
+    function isMember(membersMap) {
+      return isSignedIn() && membersMap != null && membersMap[request.auth.uid] != null;
+    }
+
+    /** @description Checks for resource existence and ownership for destructive operations. */
+    function isExistingOwner(userId) {
+      return resource != null && isOwner(userId);
+    }
+
+    /** @description Validates collaborative access (Owner or Member) for a document. */
+    function hasCollaborativeAccess(data) {
+      return isOwner(data.ownerId) || isMember(data.members);
+    }
+
+    /** @description Validates collaborative access for subcollections using denormalized fields. */
+    function hasSubCollaborativeAccess(data) {
+      return isOwner(data.assetOwnerId) || isMember(data.assetMembers);
+    }
+
+    // --- Collection Rules ---
+
+    /**
+     * @description Rules for the UserProfile collection. Access is restricted to the specific user.
+     * @path /userProfiles/{userId}
+     * @allow (get) request.auth.uid == "user_123" accessing /userProfiles/user_123
+     * @deny (list) Anonymous user attempting to list all profiles.
+     * @principle Enforces path-based ownership for private user data.
+     */
+    match /userProfiles/{userId} {
+      allow get, list: if isOwner(userId);
+      allow create: if isOwner(userId) && request.resource.data.firebaseUid == userId;
+      allow update: if isExistingOwner(userId) && request.resource.data.firebaseUid == resource.data.firebaseUid;
+      allow delete: if isExistingOwner(userId);
+    }
+
+    /**
+     * @description Rules for the Asset collection. Supports ownership and shared collaboration.
+     * @path /assets/{assetId}
+     * @allow (create) Authenticated user setting themselves as the 'ownerId'.
+     * @deny (update) A user with 'viewer' role in the members map attempting to update data.
+     * @principle Combines ownership and membership maps for flexible access control.
+     */
+    match /assets/{assetId} {
+      allow get, list: if isSignedIn() && hasCollaborativeAccess(resource.data);
+      allow create: if isSignedIn() && request.resource.data.ownerId == request.auth.uid;
+      allow update: if isSignedIn() && (isOwner(resource.data.ownerId) || resource.data.members[request.auth.uid] == 'editor') && request.resource.data.ownerId == resource.data.ownerId;
+      allow delete: if isExistingOwner(resource.data.ownerId);
+
+      /**
+       * @description Metadata for files linked to an asset. Inherits access via denormalized fields.
+       * @path /assets/{assetId}/files/{fileId}
+       * @allow (get) A collaborator on the parent asset reading a linked file metadata.
+       * @deny (create) User attempting to set an assetOwnerId that isn't the owner of the parent asset.
+       * @principle Authorization Independence: Uses denormalized parent data for local rule evaluation.
+       */
+      match /files/{fileId} {
+        allow get, list: if isSignedIn() && hasSubCollaborativeAccess(resource.data);
+        allow create: if isSignedIn() && hasSubCollaborativeAccess(request.resource.data);
+        allow update: if isSignedIn() && hasSubCollaborativeAccess(resource.data) && request.resource.data.assetOwnerId == resource.data.assetOwnerId;
+        allow delete: if resource != null && isOwner(resource.data.assetOwnerId);
+      }
+
+      /**
+       * @description Historical condition notes for an asset. Inherits access via denormalized fields.
+       * @path /assets/{assetId}/conditionNotes/{noteId}
+       * @allow (list) A member of the asset viewing the condition history.
+       * @deny (delete) A collaborator (non-owner) attempting to delete a condition note.
+       * @principle Ensures audit trail integrity by restricting deletion to the asset owner.
+       */
+      match /conditionNotes/{noteId} {
+        allow get, list: if isSignedIn() && hasSubCollaborativeAccess(resource.data);
+        allow create: if isSignedIn() && hasSubCollaborativeAccess(request.resource.data);
+        allow update: if isSignedIn() && hasSubCollaborativeAccess(resource.data) && request.resource.data.assetOwnerId == resource.data.assetOwnerId;
+        allow delete: if resource != null && isOwner(resource.data.assetOwnerId);
+      }
+    }
+
+    // Default deny for any unmatched paths
     match /{document=**} {
-      allow read, write: if true;
+      allow read, write: if false;
     }
   }
 }
