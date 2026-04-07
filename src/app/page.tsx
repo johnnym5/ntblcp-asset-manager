@@ -2,11 +2,11 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Optimized for High-Density Operational Flow.
- * Phase 400: Reduced size by 50% across all UI elements.
+ * Optimized for High-Density Operational Flow & Smooth Transitions.
+ * Phase 401: Integrated AnimatePresence to eliminate navigation glitches.
  */
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
 import UserProfileSetup from '@/components/user-profile-setup';
@@ -126,6 +126,7 @@ export default function SPAHub() {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
   const [activeToast, setActiveToast] = useState<Notification | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const scrollAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (profileSetupComplete) {
@@ -135,6 +136,14 @@ export default function SPAHub() {
       }
     }
   }, [profileSetupComplete]);
+
+  // Reset scroll on view change to prevent glitchy jumps
+  useEffect(() => {
+    if (scrollAreaRef.current) {
+      const scrollViewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
+      if (scrollViewport) scrollViewport.scrollTop = 0;
+    }
+  }, [activeView]);
 
   useEffect(() => {
     if (lastAddedId) {
@@ -175,7 +184,7 @@ export default function SPAHub() {
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-black"><Loader2 className="h-6 w-6 animate-spin text-primary" /></div>;
   if (!profileSetupComplete) return <UserProfileSetup />;
 
-  const renderWorkstation = () => {
+  const CurrentWorkstation = useMemo(() => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
       case 'REGISTRY': return <RegistryWorkstation />;
@@ -189,7 +198,7 @@ export default function SPAHub() {
       case 'ALERTS': return <AlertsWorkstation />;
       default: return <DashboardWorkstation />;
     }
-  };
+  }, [activeView]);
 
   const showTooltips = appSettings?.showHelpTooltips !== false;
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
@@ -348,10 +357,21 @@ export default function SPAHub() {
       <div className="flex-1 relative flex flex-col p-2 sm:p-2 overflow-hidden bg-black">
         <div className="flex-1 flex flex-col border border-white/10 rounded-xl bg-[#050505]/50 overflow-hidden relative">
           <ErrorBoundary module={activeView}>
-            <ScrollArea className="flex-1 custom-scrollbar">
+            <ScrollArea ref={scrollAreaRef} className="flex-1 custom-scrollbar">
               <div className="min-h-full flex flex-col relative">
                 <div className="flex-1 p-2 sm:p-4 lg:p-4 max-w-[1600px] mx-auto w-full">
-                  {renderWorkstation()}
+                  <AnimatePresence mode="wait">
+                    <motion.div
+                      key={activeView}
+                      initial={{ opacity: 0, scale: 0.99, y: 4 }}
+                      animate={{ opacity: 1, scale: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.99, y: -4 }}
+                      transition={{ duration: 0.2, ease: "easeOut" }}
+                      className="h-full w-full"
+                    >
+                      {CurrentWorkstation}
+                    </motion.div>
+                  </AnimatePresence>
                 </div>
               </div>
             </ScrollArea>
