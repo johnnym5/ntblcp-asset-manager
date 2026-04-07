@@ -51,6 +51,7 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import { storage } from '@/offline/storage';
 import { cn } from '@/lib/utils';
 import { ColumnCustomizationSheet } from '@/components/column-customization-sheet';
+import { AuditLogWorkstation } from './AuditLogWorkstation';
 import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
 import {
   Select,
