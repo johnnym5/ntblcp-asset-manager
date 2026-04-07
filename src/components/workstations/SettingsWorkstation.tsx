@@ -1,9 +1,9 @@
-
 'use client';
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Phase 304: Integrated permission-aware User Management toggles.
+ * Phase 305: Resilience tab content wrapped in closed accordions.
  */
 
 import React, { useState, useRef } from 'react';
@@ -499,9 +499,38 @@ export function SettingsWorkstation() {
           </Card>
         </TabsContent>
 
-        <TabsContent value="resilience" className="m-0 outline-none px-1 space-y-12">
-          <ErrorAuditWorkstation />
-          <DatabaseWorkstation />
+        <TabsContent value="resilience" className="m-0 outline-none px-1">
+          <Accordion type="multiple" className="w-full space-y-4">
+            <AccordionItem value="error-audit" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6">
+              <AccordionTrigger className="hover:no-underline py-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-destructive/10 rounded-xl"><HeartPulse className="h-5 w-5 text-destructive" /></div>
+                  <div className="text-left">
+                    <h4 className="text-sm font-black uppercase text-white">Resilience Audit</h4>
+                    <p className="text-[10px] text-white/40 italic">Autonomous Health Log & Recovery Traceability</p>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-8">
+                <ErrorAuditWorkstation isEmbedded={true} />
+              </AccordionContent>
+            </AccordionItem>
+
+            <AccordionItem value="database-orchestration" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6">
+              <AccordionTrigger className="hover:no-underline py-6">
+                <div className="flex items-center gap-4">
+                  <div className="p-2.5 bg-primary/10 rounded-xl"><Terminal className="h-5 w-5 text-primary" /></div>
+                  <div className="text-left">
+                    <h4 className="text-sm font-black uppercase text-white">Database Management</h4>
+                    <p className="text-[10px] text-white/40 italic">Primary Storage: Firestore & Hybrid Shadow: RTDB</p>
+                  </div>
+                </div>
+              </AccordionTrigger>
+              <AccordionContent className="pb-8">
+                <DatabaseWorkstation isEmbedded={true} />
+              </AccordionContent>
+            </AccordionItem>
+          </Accordion>
         </TabsContent>
 
         <TabsContent value="history" className="m-0 outline-none px-1">

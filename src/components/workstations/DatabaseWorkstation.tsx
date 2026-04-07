@@ -4,6 +4,7 @@
  * @fileOverview DatabaseWorkstation - Database Management.
  * Phase 165: Renamed to Database Management.
  * Phase 167: Hardened specific layer purges and restricted global nuke.
+ * Phase 168: Added isEmbedded support.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -61,7 +62,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 
-export function DatabaseWorkstation() {
+export function DatabaseWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { assets, appSettings, refreshRegistry, isOnline, isSyncing } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
@@ -100,18 +101,20 @@ export function DatabaseWorkstation() {
   if (!userProfile?.isAdmin) return null;
 
   return (
-    <div className="max-w-6xl mx-auto space-y-8 pb-40 animate-in fade-in duration-700">
+    <div className={cn("max-w-6xl mx-auto space-y-8 animate-in fade-in duration-700", !isEmbedded && "pb-40")}>
       
       {/* Header */}
-      <div className="space-y-1 px-1">
-        <div className="flex items-center gap-3">
-          <Terminal className="h-6 w-6 text-primary" />
-          <h2 className="text-2xl font-black uppercase tracking-tight text-white">Database Management</h2>
+      {!isEmbedded && (
+        <div className="space-y-1 px-1">
+          <div className="flex items-center gap-3">
+            <Terminal className="h-6 w-6 text-primary" />
+            <h2 className="text-2xl font-black uppercase tracking-tight text-white">Database Management</h2>
+          </div>
+          <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
+            Primary Storage: Firestore & Hybrid Shadow: RTDB
+          </p>
         </div>
-        <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">
-          Primary Storage: Firestore & Hybrid Shadow: RTDB
-        </p>
-      </div>
+      )}
 
       {/* 1. System Health Audit */}
       <Card className="bg-[#050505] border-white/5 rounded-2xl overflow-hidden shadow-2xl">

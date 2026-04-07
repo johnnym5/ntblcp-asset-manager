@@ -4,6 +4,7 @@
  * @fileOverview ErrorAuditWorkstation - Executive System Health Monitoring.
  * Restricted to SUPERADMIN. Provides deterministic trace of all app anomalies.
  * Phase 1011: Added batch selection and resolution controls.
+ * Phase 1012: Added isEmbedded support for Accordion wrapping.
  */
 
 import React, { useEffect, useState, useMemo } from 'react';
@@ -55,7 +56,7 @@ import { saveAs } from 'file-saver';
 import { useToast } from '@/hooks/use-toast';
 import { motion, AnimatePresence } from 'framer-motion';
 
-export function ErrorAuditWorkstation() {
+export function ErrorAuditWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { userProfile } = useAuth();
   const { isOnline } = useAppState();
   const { toast } = useToast();
@@ -82,6 +83,18 @@ export function ErrorAuditWorkstation() {
       setLogs(data);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResolve = async (id: string) => {
+    setIsProcessing(true);
+    try {
+      await FirestoreService.updateErrorStatus(id, 'RESOLVED', 'Issue audited and resolved.');
+      toast({ title: "Incident Resolved" });
+      setSelectedLog(null);
+      await loadLogs();
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -146,28 +159,42 @@ export function ErrorAuditWorkstation() {
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
-        <div className="space-y-1">
-          <h2 className="text-3xl font-black uppercase text-white tracking-tight flex items-center gap-4">
-            <div className="p-3 bg-destructive/10 rounded-2xl">
-              <HeartPulse className="h-8 w-8 text-destructive animate-pulse" />
-            </div>
-            Resilience Audit
-          </h2>
-          <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em]">
-            Autonomous Health Log & Recovery Traceability
-          </p>
+      {!isEmbedded && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
+          <div className="space-y-1">
+            <h2 className="text-3xl font-black uppercase text-white tracking-tight flex items-center gap-4">
+              <div className="p-3 bg-destructive/10 rounded-2xl">
+                <HeartPulse className="h-8 w-8 text-destructive animate-pulse" />
+              </div>
+              Resilience Audit
+            </h2>
+            <p className="text-[10px] font-bold text-white/40 uppercase tracking-[0.3em]">
+              Autonomous Health Log & Recovery Traceability
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <Button variant="outline" onClick={runDiagnostics} disabled={isDiagnosticRunning} className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-white/5 hover:bg-white/5 text-white">
+              {isDiagnosticRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cpu className="h-4 w-4 text-primary" />}
+              System Test
+            </Button>
+            <Button variant="outline" onClick={handleExport} className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-white/5 hover:bg-white/5 text-white">
+              <FileJson className="h-4 w-4 text-primary" /> Export Audit
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center gap-3">
-          <Button variant="outline" onClick={runDiagnostics} disabled={isDiagnosticRunning} className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-white/5 hover:bg-white/5 text-white">
-            {isDiagnosticRunning ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cpu className="h-4 w-4 text-primary" />}
-            System Test
+      )}
+
+      {isEmbedded && (
+        <div className="flex justify-end gap-3 mb-6 px-1">
+          <Button variant="outline" onClick={runDiagnostics} disabled={isDiagnosticRunning} className="h-10 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 border-2 border-white/5 hover:bg-white/5 text-white">
+            {isDiagnosticRunning ? <Loader2 className="h-3 w-3 animate-spin" /> : <Cpu className="h-3 w-3 text-primary" />}
+            Test Pulse
           </Button>
-          <Button variant="outline" onClick={handleExport} className="h-14 px-8 rounded-2xl font-black uppercase text-[10px] tracking-widest gap-3 border-2 border-white/5 hover:bg-white/5 text-white">
-            <FileJson className="h-4 w-4 text-primary" /> Export Audit
+          <Button variant="outline" onClick={handleExport} className="h-10 px-4 rounded-xl font-black uppercase text-[9px] tracking-widest gap-2 border-2 border-white/5 hover:bg-white/5 text-white">
+            <FileJson className="h-3 w-3 text-primary" /> Export
           </Button>
         </div>
-      </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-1">
         <Card className="bg-black/40 border-2 border-white/5 rounded-[2.5rem] p-8 shadow-3xl">
@@ -339,8 +366,8 @@ export function ErrorAuditWorkstation() {
           <div className="p-8 bg-white/5 border-t border-white/5 flex items-center justify-between gap-4">
             <Button variant="ghost" onClick={() => setSelectedLog(null)} className="font-bold rounded-xl px-10 text-white/40 hover:text-white">Dismiss</Button>
             {selectedLog?.status === 'PENDING' && (
-              <Button onClick={() => handleResolve(selectedLog!.id)} className="h-14 px-12 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl bg-primary text-black gap-3">
-                <CheckCircle2 className="h-4 w-4" /> Resolve Incident
+              <Button onClick={() => handleResolve(selectedLog!.id)} disabled={isProcessing} className="h-14 px-12 rounded-2xl font-black uppercase text-xs tracking-widest shadow-xl bg-primary text-black gap-3">
+                {isProcessing ? <Loader2 className="h-4 w-4 animate-spin" /> : <Check className="h-4 w-4" />} Resolve Incident
               </Button>
             )}
           </div>
