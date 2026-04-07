@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Anomaly Dashboard - Intelligent Discrepancy Review Center.
- * Phase 1001: Implemented Expanding Search bar and input sanitization.
+ * Phase 1100: Added isEmbedded prop to blend into Dashboard Overview.
  */
 
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useRef } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { 
   AlertTriangle, 
@@ -42,7 +42,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 
 const ITEMS_PER_PAGE = 24;
 
-export function DiscrepancyWorkstation() {
+export function DiscrepancyWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { assets, settingsLoaded, headers, appSettings } = useAppState();
   const [searchTerm, setSearchTerm] = useState("");
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
@@ -108,70 +108,74 @@ export function DiscrepancyWorkstation() {
   }
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700 pb-32 max-w-7xl mx-auto relative">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
-        <div className="space-y-2">
-          <h2 className="text-4xl font-black tracking-tighter text-white uppercase flex items-center gap-4 leading-none">
-            <div className="p-3 bg-primary/10 rounded-2xl">
-              <SearchCode className="h-8 w-8 text-primary" />
+    <div className={cn("space-y-10 animate-in fade-in duration-700 pb-32 max-w-7xl mx-auto relative", isEmbedded ? "pb-10" : "")}>
+      {/* Header (Hidden if Embedded) */}
+      {!isEmbedded && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2">
+          <div className="space-y-2">
+            <h2 className="text-4xl font-black tracking-tighter text-white uppercase flex items-center gap-4 leading-none">
+              <div className="p-3 bg-primary/10 rounded-2xl">
+                <SearchCode className="h-8 w-8 text-primary" />
+              </div>
+              Anomaly Dashboard
+            </h2>
+            <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
+              Intelligent Pattern Review & Fidelity Auditing
+            </p>
+          </div>
+          <div className="flex items-center bg-white/5 p-1 rounded-2xl border border-white/5 shadow-xl">
+            <div className="px-6 py-2 flex flex-col items-center">
+              <span className="text-[8px] font-black uppercase text-white/40">Critical Pulse</span>
+              <span className="text-sm font-black text-red-600">{stats.critical}</span>
             </div>
-            Anomaly Dashboard
-          </h2>
-          <p className="font-bold uppercase text-[10px] tracking-[0.3em] text-muted-foreground opacity-70">
-            Intelligent Pattern Review & Fidelity Auditing
-          </p>
-        </div>
-        <div className="flex items-center bg-white/5 p-1 rounded-2xl border border-white/5 shadow-xl">
-          <div className="px-6 py-2 flex flex-col items-center">
-            <span className="text-[8px] font-black uppercase text-white/40">Critical Pulse</span>
-            <span className="text-sm font-black text-red-600">{stats.critical}</span>
-          </div>
-          <div className="w-px h-8 bg-white/10" />
-          <div className="px-6 py-2 flex flex-col items-center">
-            <span className="text-[8px] font-black uppercase text-white/40">Resolved</span>
-            <span className="text-sm font-black text-green-600">{stats.resolved}</span>
+            <div className="w-px h-8 bg-white/10" />
+            <div className="px-6 py-2 flex flex-col items-center">
+              <span className="text-[8px] font-black uppercase text-white/40">Resolved</span>
+              <span className="text-sm font-black text-green-600">{stats.resolved}</span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
-      {/* Stats Matrix */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
-        <Card className="rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.02] p-8 shadow-3xl">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-primary/10 rounded-2xl"><Zap className="h-6 w-6 text-primary" /></div>
-            <Badge className="bg-primary text-black font-black">ACTIVE SCAN</Badge>
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-4xl font-black tracking-tighter text-white">{stats.totalFlagged}</h3>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-tight">Records awaiting heuristic review</p>
-          </div>
-        </Card>
+      {/* Stats Matrix (Hidden if Embedded) */}
+      {!isEmbedded && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 px-2">
+          <Card className="rounded-[2.5rem] border-2 border-primary/20 bg-primary/[0.02] p-8 shadow-3xl">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-3 bg-primary/10 rounded-2xl"><Zap className="h-6 w-6 text-primary" /></div>
+              <Badge className="bg-primary text-black font-black">ACTIVE SCAN</Badge>
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-4xl font-black tracking-tighter text-white">{stats.totalFlagged}</h3>
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-tight">Records awaiting heuristic review</p>
+            </div>
+          </Card>
 
-        <Card className="rounded-[2.5rem] border-2 border-white/5 bg-[#080808] p-8 shadow-3xl">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-white/5 rounded-2xl"><Activity className="h-6 w-6 text-white/40" /></div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Pattern Health</span>
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-4xl font-black tracking-tighter text-white">
-              {assets.length > 0 ? Math.round(((assets.length - stats.totalFlagged) / assets.length) * 100) : 100}%
-            </h3>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-tight">Global register fidelity score</p>
-          </div>
-        </Card>
+          <Card className="rounded-[2.5rem] border-2 border-white/5 bg-[#080808] p-8 shadow-3xl">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-3 bg-white/5 rounded-2xl"><Activity className="h-6 w-6 text-white/40" /></div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Pattern Health</span>
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-4xl font-black tracking-tighter text-white">
+                {assets.length > 0 ? Math.round(((assets.length - stats.totalFlagged) / assets.length) * 100) : 100}%
+              </h3>
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-tight">Global register fidelity score</p>
+            </div>
+          </Card>
 
-        <Card className="rounded-[2.5rem] border-2 border-white/5 bg-[#080808] p-8 shadow-3xl">
-          <div className="flex justify-between items-start mb-4">
-            <div className="p-3 bg-white/5 rounded-2xl"><History className="h-6 w-6 text-white/40" /></div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Review Load</span>
-          </div>
-          <div className="space-y-1">
-            <h3 className="text-4xl font-black tracking-tighter text-white">{stats.totalFlagged}</h3>
-            <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-tight">Unresolved anomaly pulses</p>
-          </div>
-        </Card>
-      </div>
+          <Card className="rounded-[2.5rem] border-2 border-white/5 bg-[#080808] p-8 shadow-3xl">
+            <div className="flex justify-between items-start mb-4">
+              <div className="p-3 bg-white/5 rounded-2xl"><History className="h-6 w-6 text-white/40" /></div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-white/20">Review Load</span>
+            </div>
+            <div className="space-y-1">
+              <h3 className="text-4xl font-black tracking-tighter text-white">{stats.totalFlagged}</h3>
+              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-tight">Unresolved anomaly pulses</p>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Review Queue */}
       <div className="space-y-6 px-2">
@@ -197,7 +201,7 @@ export function DiscrepancyWorkstation() {
                   <Search className="absolute left-5 top-1/2 -translate-y-1/2 h-4 w-4 text-primary" />
                   <Input 
                     ref={searchInputRef}
-                    placeholder="Search by ID, Reason or Description..." 
+                    placeholder="Search anomalies..." 
                     value={searchTerm}
                     onChange={(e) => handleSearchChange(e.target.value)}
                     onBlur={() => !searchTerm && setIsSearchExpanded(false)}

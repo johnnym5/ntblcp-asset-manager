@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview Inventory Dashboard - High-Fidelity Analytics Grid.
- * Phase 500: Implemented interactive drill-down pulses for all metric nodes.
- * Phase 501: Fixed Drill-down toggle bug and implemented Category/Regional health pulses.
+ * Phase 1100: Reorganized Quick Start tiles to match Folders and Anomalies.
  */
 
 import React, { useMemo, useState } from 'react';
@@ -25,7 +24,11 @@ import {
     MapPin,
     Boxes,
     ChevronRight,
-    Activity
+    Activity,
+    FolderOpen,
+    SearchCode,
+    ClipboardCheck,
+    FileUp
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
@@ -37,55 +40,45 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 type DashboardView = 'stats' | 'insights';
 
-interface StatCardProps {
+interface QuickStartTileProps {
     label: string;
-    value: string | number;
     description: string;
     icon: any;
-    iconColor: string;
+    color: string;
     onClick: () => void;
-    isCritical?: boolean;
-    unseenCount?: number;
+    count?: number | string;
+    isDestructive?: boolean;
 }
 
-const StatCard = ({ label, value, description, icon: Icon, iconColor, onClick, isCritical, unseenCount }: StatCardProps) => (
-    <Card 
+const QuickStartTile = ({ label, description, icon: Icon, color, onClick, count, isDestructive }: QuickStartTileProps) => (
+    <button 
         onClick={onClick}
         className={cn(
-            "bg-white/[0.02] border-white/5 rounded-2xl p-6 transition-all group cursor-pointer hover:bg-white/[0.04] relative overflow-hidden",
-            isCritical ? "hover:border-destructive/40" : "hover:border-primary/40"
+            "p-6 rounded-[2rem] border-2 bg-white/[0.02] border-white/5 text-left transition-all group relative overflow-hidden active:scale-95",
+            isDestructive ? "hover:border-destructive/40 hover:bg-destructive/[0.02]" : "hover:border-primary/40 hover:bg-primary/[0.02]"
         )}
     >
-        {unseenCount && unseenCount > 0 ? (
-          <div className="absolute top-0 right-0 p-2">
-            <div className="h-2 w-2 rounded-full bg-red-600 animate-pulse shadow-[0_0_10px_rgba(220,38,38,0.8)]" />
-          </div>
-        ) : null}
-        
-        <div className="flex justify-between items-start mb-4">
-            <span className={cn(
-                "text-[10px] font-black uppercase tracking-[0.2em]",
-                isCritical ? "text-destructive" : "text-white/40"
-            )}>
-                {label}
-            </span>
-            <div className={cn("p-2 rounded-lg bg-opacity-10 shadow-inner", iconColor.replace('text-', 'bg-'))}>
-                <Icon className={cn("h-4 w-4", iconColor)} />
+        <div className="flex justify-between items-start mb-6">
+            <div className={cn("p-3 rounded-2xl transition-colors", color)}>
+                <Icon className="h-6 w-6 text-white" />
             </div>
+            {count !== undefined && (
+                <div className={cn(
+                    "px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest",
+                    isDestructive ? "bg-destructive text-white" : "bg-primary text-black"
+                )}>
+                    {count}
+                </div>
+            )}
         </div>
         <div className="space-y-1">
-            <div className="text-3xl font-black tracking-tighter text-white">
-                {value}
-            </div>
-            <p className="text-[10px] font-medium text-white/30 leading-relaxed italic line-clamp-2">
-                {description}
-            </p>
+            <h4 className="text-sm font-black uppercase text-white tracking-tight">{label}</h4>
+            <p className="text-[10px] font-bold text-white/30 uppercase tracking-tighter leading-tight italic">{description}</p>
         </div>
-        <div className="mt-6 pt-4 border-t border-white/5 flex items-center justify-between opacity-0 group-hover:opacity-100 transition-opacity">
-            <span className="text-[10px] font-black uppercase tracking-widest text-primary">Explore Drill-down</span>
-            <MousePointer2 className="h-3 w-3 text-primary opacity-40" />
+        <div className="absolute bottom-4 right-4 opacity-0 group-hover:opacity-40 transition-opacity">
+            <ArrowRight className="h-4 w-4 text-white" />
         </div>
-    </Card>
+    </button>
 );
 
 export function AssetSummaryDashboard() {
@@ -95,9 +88,7 @@ export function AssetSummaryDashboard() {
         isSyncing, 
         setActiveView,
         setSearchTerm,
-        setMissingFieldFilter,
         setSelectedStatuses,
-        setSelectedConditions,
         setSelectedCategory,
         setSelectedLocations
     } = useAppState();
@@ -108,88 +99,35 @@ export function AssetSummaryDashboard() {
         const total = assets.length;
         const verified = assets.filter(a => a.status === 'VERIFIED').length;
         const coverage = total > 0 ? Math.round((verified / total) * 100) : 0;
-
-        const now = Date.now();
-        const oneDay = 24 * 60 * 60 * 1000;
-        const oneWeek = 7 * oneDay;
+        const anomalyCount = assets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length;
 
         return {
-            coverage: `${coverage}%`,
-            coverageDesc: `Verified ${verified} of ${total} assets in scope.`,
-            
-            pending: assets.filter(a => a.status === 'UNVERIFIED').length,
-            pendingDesc: "Assets awaiting physical field assessment.",
-            
-            missingId: assets.filter(a => !a.assetIdCode).length,
-            missingIdDesc: "Records missing unique Tag IDs.",
-            
-            missingSerial: assets.filter(a => !a.serialNumber || a.serialNumber === 'N/A').length,
-            missingSerialDesc: "Items missing manufacturer serials.",
-            
-            critical: assets.filter(a => ['Stolen', 'Burnt', 'Unsalvageable', 'Writeoff'].includes(a.condition || '')).length,
-            criticalDesc: "Assets reported as stolen or destroyed.",
-            
-            maintenance: assets.filter(a => ['Bad condition', 'F2: Major repairs required-poor condition'].includes(a.condition || '')).length,
-            maintenanceDesc: "Assets requiring technical attention.",
-            
-            exceptions: assets.filter(a => a.status === 'DISCREPANCY').length,
-            exceptionsDesc: "Records with verified audit discrepancies.",
-            
-            feedback: assets.filter(a => a.remarks && a.remarks.trim().length > 0).length,
-            feedbackDesc: "Assets containing officer field notes.",
-            
-            modified: assets.filter(a => {
-                const d = new Date(a.lastModified).getTime();
-                return now - d < oneDay;
-            }).length,
-            modifiedDesc: "Records updated in the last 24 hours.",
-            
-            newInFlow: assets.filter(a => {
-                const d = new Date(a.importMetadata?.importedAt || 0).getTime();
-                return now - d < oneWeek;
-            }).length,
-            newInFlowDesc: "New records added to the system this week."
+            coverage,
+            total,
+            verified,
+            pending: total - verified,
+            anomalies: anomalyCount,
+            folders: new Set(assets.map(a => a.category)).size
         };
     }, [assets]);
 
-    const categoryInsights = useMemo(() => {
-        const groups: Record<string, { total: number, verified: number }> = {};
-        assets.forEach(a => {
-            const cat = a.category || 'Uncategorized';
-            if (!groups[cat]) groups[cat] = { total: 0, verified: 0 };
-            groups[cat].total++;
-            if (a.status === 'VERIFIED') groups[cat].verified++;
-        });
-        return Object.entries(groups).sort((a, b) => b[1].total - a[1].total);
-    }, [assets]);
-
-    const regionalInsights = useMemo(() => {
-        const regions: Record<string, { total: number, verified: number }> = {};
-        assets.forEach(a => {
-            const loc = a.location || 'Unknown';
-            if (!regions[loc]) regions[loc] = { total: 0, verified: 0 };
-            regions[loc].total++;
-            if (a.status === 'VERIFIED') regions[loc].verified++;
-        });
-        return Object.entries(regions).sort((a, b) => b[1].total - a[1].total).slice(0, 10);
-    }, [assets]);
-
-    const navigateTo = (filter: () => void) => {
-        filter();
-        setActiveView('REGISTRY');
+    const scrollTo = (id: string) => {
+        const el = document.getElementById(id);
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-5 rounded-3xl bg-white/[0.03] border border-white/5 shadow-2xl backdrop-blur-md">
-                <div className="flex items-center gap-4">
-                    <div className="p-3 bg-primary/10 rounded-2xl shadow-inner">
-                        <BarChart2 className="h-5 w-5 text-primary" />
+        <div className="space-y-10">
+            {/* Header Terminal */}
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-6 rounded-[2.5rem] bg-white/[0.03] border border-white/5 shadow-2xl backdrop-blur-md">
+                <div className="flex items-center gap-5">
+                    <div className="p-3.5 bg-primary/10 rounded-2xl shadow-inner">
+                        <Zap className="h-6 w-6 text-primary" />
                     </div>
                     <div className="space-y-0.5">
-                        <h3 className="text-lg font-black tracking-tight text-white uppercase leading-none">Intelligence Dashboard</h3>
+                        <h3 className="text-xl font-black tracking-tight text-white uppercase leading-none">Quick Start Pulse</h3>
                         <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest leading-none">
-                            Real-time interactive registry telemetry
+                            Immediate operational triggers for current registry
                         </p>
                     </div>
                 </div>
@@ -199,24 +137,24 @@ export function AssetSummaryDashboard() {
                         <button 
                             onClick={() => setView('stats')} 
                             className={cn(
-                                "px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all", 
+                                "px-6 py-2.5 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all", 
                                 view === 'stats' ? "bg-white/10 text-white" : "text-white/20 hover:text-white"
                             )}
                         >
-                            Quick Stats
+                            Quick Actions
                         </button>
                         <button 
                             onClick={() => setView('insights')} 
                             className={cn(
-                                "px-5 py-2 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all", 
+                                "px-6 py-2.5 rounded-lg font-black uppercase text-[10px] tracking-widest transition-all", 
                                 view === 'insights' ? "bg-white/10 text-white" : "text-white/20 hover:text-white"
                             )}
                         >
                             Drill-down
                         </button>
                     </div>
-                    <Button variant="ghost" size="icon" onClick={refreshRegistry} className="rounded-xl bg-white/5 border border-white/5 text-white/40 hover:text-primary">
-                        <ChevronDown className={cn("h-4 w-4", isSyncing && "animate-spin")} />
+                    <Button variant="ghost" size="icon" onClick={refreshRegistry} className="rounded-xl h-12 w-12 bg-white/5 border border-white/5 text-white/40 hover:text-primary">
+                        <RefreshCw className={cn("h-5 w-5", isSyncing && "animate-spin")} />
                     </Button>
                 </div>
             </div>
@@ -224,94 +162,44 @@ export function AssetSummaryDashboard() {
             <AnimatePresence mode="wait">
                 {view === 'stats' ? (
                     <motion.div 
-                        key="stats"
+                        key="quick-start"
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
-                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-6"
+                        className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6"
                     >
-                        <StatCard 
-                            label="Audit Coverage" 
-                            value={metrics.coverage} 
-                            description={metrics.coverageDesc} 
-                            icon={ShieldCheck} 
-                            iconColor="text-green-500"
-                            onClick={() => navigateTo(() => setSelectedStatuses(['VERIFIED']))}
+                        <QuickStartTile 
+                            label="Browse Registry" 
+                            description="Full Category Inventory" 
+                            icon={Boxes} 
+                            color="bg-primary shadow-primary/20"
+                            count={metrics.total}
+                            onClick={() => setActiveView('REGISTRY')}
                         />
-                        <StatCard 
-                            label="Assessments" 
-                            value={metrics.pending} 
-                            description={metrics.pendingDesc} 
-                            icon={Zap} 
-                            iconColor="text-primary"
-                            onClick={() => navigateTo(() => setSelectedStatuses(['UNVERIFIED']))}
+                        <QuickStartTile 
+                            label="Registry Folders" 
+                            description="Structural Data Tree" 
+                            icon={FolderOpen} 
+                            color="bg-blue-600 shadow-blue-600/20"
+                            count={metrics.folders}
+                            onClick={() => scrollTo('folders-section')}
                         />
-                        <StatCard 
-                            label="Missing Tags" 
-                            value={metrics.missingId} 
-                            description={metrics.missingIdDesc} 
-                            icon={Tag} 
-                            iconColor="text-orange-500"
-                            onClick={() => navigateTo(() => setMissingFieldFilter('assetIdCode'))}
+                        <QuickStartTile 
+                            label="Resolve Anomalies" 
+                            description="Pattern Fidelity Review" 
+                            icon={SearchCode} 
+                            color="bg-red-600 shadow-red-600/20"
+                            count={metrics.anomalies}
+                            isDestructive={metrics.anomalies > 0}
+                            onClick={() => scrollTo('anomalies-section')}
                         />
-                        <StatCard 
-                            label="Serial Gaps" 
-                            value={metrics.missingSerial} 
-                            description={metrics.missingSerialDesc} 
-                            icon={Hash} 
-                            iconColor="text-blue-500"
-                            onClick={() => navigateTo(() => setMissingFieldFilter('serialNumber'))}
-                        />
-                        <StatCard 
-                            label="Loss Pulses" 
-                            value={metrics.critical} 
-                            description={metrics.criticalDesc} 
-                            icon={AlertCircle} 
-                            iconColor="text-destructive"
-                            isCritical
-                            onClick={() => navigateTo(() => setSelectedConditions(['Stolen', 'Burnt', 'Unsalvageable']))}
-                        />
-                        <StatCard 
-                            label="Maintenance" 
-                            value={metrics.maintenance} 
-                            description={metrics.maintenanceDesc} 
-                            icon={Wrench} 
-                            iconColor="text-orange-600"
-                            onClick={() => navigateTo(() => setSelectedConditions(['Bad condition']))}
-                        />
-                        <StatCard 
-                            label="Discrepancies" 
-                            value={metrics.exceptions} 
-                            description={metrics.exceptionsDesc} 
-                            icon={FileWarning} 
-                            iconColor="text-destructive"
-                            isCritical
-                            onClick={() => navigateTo(() => setSelectedStatuses(['DISCREPANCY']))}
-                        />
-                        <StatCard 
-                            label="Field Logs" 
-                            value={metrics.feedback} 
-                            description={metrics.feedbackDesc} 
-                            icon={MessageSquare} 
-                            iconColor="text-teal-500"
-                            onClick={() => navigateTo(() => setSearchTerm('remark'))}
-                        />
-                        <StatCard 
-                            label="Daily Pulse" 
-                            value={metrics.modified} 
-                            description={metrics.modifiedDesc} 
-                            icon={Clock} 
-                            iconColor="text-primary"
-                            onClick={() => navigateTo(() => setSearchTerm('today'))}
-                        />
-                        <StatCard 
-                            label="New Arrivals" 
-                            value={metrics.newInFlow} 
-                            description={metrics.newInFlowDesc} 
-                            icon={PlusCircle} 
-                            iconColor="text-green-600"
-                            onClick={() => navigateTo(() => setSearchTerm('new'))}
+                        <QuickStartTile 
+                            label="Field Verify" 
+                            description="Start Physical Audit" 
+                            icon={ClipboardCheck} 
+                            color="bg-green-600 shadow-green-600/20"
+                            count={`${metrics.coverage}%`}
+                            onClick={() => setActiveView('VERIFY')}
                         />
                     </motion.div>
                 ) : (
@@ -320,7 +208,6 @@ export function AssetSummaryDashboard() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: -10 }}
-                        transition={{ duration: 0.2 }}
                         className="grid grid-cols-1 lg:grid-cols-2 gap-8"
                     >
                         <Card className="bg-white/[0.02] border-white/5 rounded-[2.5rem] p-8 shadow-3xl">
@@ -330,13 +217,19 @@ export function AssetSummaryDashboard() {
                             </div>
                             <ScrollArea className="h-[400px] pr-4">
                                 <div className="space-y-2">
-                                    {categoryInsights.map(([cat, data]) => {
+                                    {Object.entries(assets.reduce((acc, a) => {
+                                        const cat = a.category || 'Uncategorized';
+                                        if (!acc[cat]) acc[cat] = { total: 0, verified: 0 };
+                                        acc[cat].total++;
+                                        if (a.status === 'VERIFIED') acc[cat].verified++;
+                                        return acc;
+                                    }, {} as any)).sort((a: any, b: any) => b[1].total - a[1].total).map(([cat, data]: any) => {
                                         const percent = Math.round((data.verified / data.total) * 100);
                                         return (
                                             <div 
                                                 key={cat} 
                                                 onClick={() => { setSelectedCategory(cat); setActiveView('REGISTRY'); }}
-                                                className="group p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-primary/40 hover:bg-primary/[0.02] transition-all cursor-pointer flex items-center justify-between"
+                                                className="group p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-primary/40 transition-all cursor-pointer flex items-center justify-between"
                                             >
                                                 <div className="flex-1 space-y-2">
                                                     <div className="flex items-center justify-between pr-4">
@@ -356,17 +249,23 @@ export function AssetSummaryDashboard() {
                         <Card className="bg-white/[0.02] border-white/5 rounded-[2.5rem] p-8 shadow-3xl">
                             <div className="flex items-center gap-3 mb-8">
                                 <div className="p-2 bg-primary/10 rounded-xl"><MapPin className="h-4 w-4 text-primary" /></div>
-                                <h4 className="text-xs font-black uppercase tracking-widest text-white">Top Regional Activity</h4>
+                                <h4 className="text-xs font-black uppercase tracking-widest text-white">Regional Activity</h4>
                             </div>
                             <ScrollArea className="h-[400px] pr-4">
                                 <div className="space-y-2">
-                                    {regionalInsights.map(([loc, data]) => {
+                                    {Object.entries(assets.reduce((acc, a) => {
+                                        const loc = a.location || 'Unknown';
+                                        if (!acc[loc]) acc[loc] = { total: 0, verified: 0 };
+                                        acc[loc].total++;
+                                        if (a.status === 'VERIFIED') acc[loc].verified++;
+                                        return acc;
+                                    }, {} as any)).sort((a: any, b: any) => b[1].total - a[1].total).slice(0, 10).map(([loc, data]: any) => {
                                         const percent = Math.round((data.verified / data.total) * 100);
                                         return (
                                             <div 
                                                 key={loc} 
                                                 onClick={() => { setSelectedLocations([loc]); setActiveView('REGISTRY'); }}
-                                                className="group p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-primary/40 hover:bg-primary/[0.02] transition-all cursor-pointer flex items-center justify-between"
+                                                className="group p-4 rounded-2xl bg-white/[0.02] border border-white/5 hover:border-primary/40 transition-all cursor-pointer flex items-center justify-between"
                                             >
                                                 <div className="flex items-center gap-4 flex-1">
                                                     <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center font-black text-[10px] text-white/20 group-hover:text-primary transition-colors">
@@ -375,12 +274,9 @@ export function AssetSummaryDashboard() {
                                                     <div className="flex-1 space-y-1">
                                                         <div className="flex items-center justify-between">
                                                             <span className="text-[11px] font-black uppercase text-white/80">{loc}</span>
-                                                            <span className={cn("text-[9px] font-black uppercase", percent === 100 ? "text-green-500" : "text-white/40")}>{percent}% COMPLETE</span>
+                                                            <span className="text-[9px] font-black uppercase text-white/40">{percent}% COMPLETE</span>
                                                         </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <Activity className="h-2.5 w-2.5 text-primary opacity-40" />
-                                                            <span className="text-[8px] font-bold text-white/20 uppercase tracking-widest">{data.total} Registered Nodes</span>
-                                                        </div>
+                                                        <Progress value={percent} className="h-1 bg-white/5" />
                                                     </div>
                                                 </div>
                                                 <ChevronRight className="h-4 w-4 text-white/10 group-hover:text-primary transition-all ml-4" />

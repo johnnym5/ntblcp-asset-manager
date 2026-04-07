@@ -3,6 +3,7 @@
 /**
  * @fileOverview AssetGroupsWorkstation - Folder-Based Registry Hub.
  * Optimized for High-Density Grid Pulse.
+ * Phase 1100: Added isEmbedded prop to blend into Dashboard Overview.
  */
 
 import React, { useMemo, useState, useCallback } from 'react';
@@ -62,9 +63,9 @@ import { enqueueMutation } from '@/offline/queue';
 import { useToast } from '@/hooks/use-toast';
 import { useIsMobile } from '@/hooks/use-mobile';
 
-const ITEMS_PER_PAGE = 60;
+const ITEMS_PER_PAGE = 24;
 
-export function AssetGroupsWorkstation() {
+export function AssetGroupsWorkstation({ isEmbedded = false }: { isEmbedded?: boolean }) {
   const { assets, searchTerm, headers, refreshRegistry, appSettings } = useAppState();
   const { userProfile } = useAuth();
   const { toast } = useToast();
@@ -127,54 +128,62 @@ export function AssetGroupsWorkstation() {
     setSelectedAssetIds(next);
   };
 
+  const selectedRecord = useMemo(() => {
+    if (!selectedAssetId) return undefined;
+    const asset = assets.find(a => a.id === selectedAssetId);
+    return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
+  }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
+
   return (
-    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-700 pb-40 h-full flex flex-col relative">
+    <div className={cn("space-y-6 md:space-y-10 animate-in fade-in duration-700", !isEmbedded && "pb-40 h-full flex flex-col relative")}>
       
-      {/* 1. Header & Navigation */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1 shrink-0">
-        <div className="flex items-center gap-3 self-start">
-          {selectedGroup ? (
-            <button 
-              onClick={() => { setSelectedGroup(null); setSelectedSubgroup(null); setCurrentPage(1); }}
-              className="h-10 w-10 flex items-center justify-center bg-white/5 rounded-xl text-white/40 hover:text-white border border-white/5 transition-all shadow-xl"
-            >
-              <ArrowLeft className="h-5 w-5" />
-            </button>
-          ) : (
-            <div className="p-2 bg-primary/10 rounded-xl shadow-inner border border-primary/5">
-              <FolderOpen className="h-6 w-6 text-primary" />
+      {/* 1. Header & Navigation (Hidden if Embedded) */}
+      {!isEmbedded && (
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-1 shrink-0">
+          <div className="flex items-center gap-3 self-start">
+            {selectedGroup ? (
+              <button 
+                onClick={() => { setSelectedGroup(null); setSelectedSubgroup(null); setCurrentPage(1); }}
+                className="h-10 w-10 flex items-center justify-center bg-white/5 rounded-xl text-white/40 hover:text-white border border-white/5 transition-all shadow-xl"
+              >
+                <ArrowLeft className="h-5 w-5" />
+              </button>
+            ) : (
+              <div className="p-2 bg-primary/10 rounded-xl shadow-inner border border-primary/5">
+                <FolderOpen className="h-6 w-6 text-primary" />
+              </div>
+            )}
+            <div className="space-y-0.5">
+              <h2 className="text-xl font-black uppercase text-white tracking-tight leading-none">
+                {selectedGroup ? (selectedSubgroup || selectedGroup) : 'Folders'}
+              </h2>
+              <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest leading-none">
+                {selectedGroup ? 'NAVIGATING CONTAINER' : 'STRUCTURAL HUB'}
+              </p>
+            </div>
+          </div>
+
+          {!selectedGroup && (
+            <div className="bg-white/[0.03] p-1 rounded-xl border border-white/5 shadow-inner backdrop-blur-xl flex">
+              <button 
+                onClick={() => setGroupMode('category')}
+                className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'category' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
+              >
+                Groups
+              </button>
+              <button 
+                onClick={() => setGroupMode('condition')}
+                className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'condition' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
+              >
+                Condition
+              </button>
             </div>
           )}
-          <div className="space-y-0.5">
-            <h2 className="text-xl font-black uppercase text-white tracking-tight leading-none">
-              {selectedGroup ? (selectedSubgroup || selectedGroup) : 'Folders'}
-            </h2>
-            <p className="text-[9px] font-bold text-white/40 uppercase tracking-widest leading-none">
-              {selectedGroup ? 'NAVIGATING CONTAINER' : 'STRUCTURAL HUB'}
-            </p>
-          </div>
         </div>
-
-        {!selectedGroup && (
-          <div className="bg-white/[0.03] p-1 rounded-xl border border-white/5 shadow-inner backdrop-blur-xl flex">
-            <button 
-              onClick={() => setGroupMode('category')}
-              className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'category' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
-            >
-              Groups
-            </button>
-            <button 
-              onClick={() => setGroupMode('condition')}
-              className={cn("px-5 py-2 rounded-lg font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'condition' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
-            >
-              Condition
-            </button>
-          </div>
-        )}
-      </div>
+      )}
 
       {/* 2. Content Surface */}
-      <div className="flex-1 min-h-0 px-1">
+      <div className={cn("min-h-0 px-1", !isEmbedded && "flex-1")}>
         {selectedGroup ? (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 h-full">
             {/* Sidebar Subgroups */}
@@ -199,8 +208,8 @@ export function AssetGroupsWorkstation() {
 
             {/* Optimized Grid Drill-down */}
             <div className="lg:col-span-9 h-full flex flex-col">
-              <ScrollArea className="flex-1 border-2 border-white/5 rounded-[2rem] bg-[#050505] p-4 md:p-6 shadow-3xl">
-                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 pb-40">
+              <ScrollArea className={cn("flex-1 border-2 border-white/5 rounded-[2rem] bg-[#050505] p-4 md:p-6 shadow-3xl", isEmbedded ? "h-[500px]" : "")}>
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4 pb-40">
                   <AnimatePresence mode="popLayout">
                     {paginatedDrillDown.map(asset => (
                       <RegistryCard 
@@ -249,7 +258,7 @@ export function AssetGroupsWorkstation() {
         ) : (
           <div className="space-y-6">
             <ConditionSummary counts={groupAssetsByCondition(filteredAssets) as any} total={filteredAssets.length} />
-            <ScrollArea className="h-[calc(100vh-20rem)] pr-4">
+            <ScrollArea className={cn("pr-4", isEmbedded ? "h-[500px]" : "h-[calc(100vh-20rem)]")}>
               <Accordion type="multiple" defaultValue={['Good', 'Discrepancy']} className="space-y-4">
                 {CONDITION_GROUPS.map(group => {
                   const groupAssets = conditionGroups[group];
@@ -282,7 +291,7 @@ export function AssetGroupsWorkstation() {
       {/* Detail Overlay */}
       <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={() => {}} />
       
-      {selectedAssetIds.size > 0 && (
+      {selectedAssetIds.size > 0 && !isEmbedded && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A]/95 border-2 border-primary/20 rounded-2xl p-2.5 flex items-center gap-6 shadow-3xl backdrop-blur-3xl">
           <div className="flex items-center gap-3 pl-3">
             <div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedAssetIds.size}</div>
