@@ -28,7 +28,8 @@ import {
     FolderOpen,
     SearchCode,
     ClipboardCheck,
-    FileUp
+    FileUp,
+    ArrowRight
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { cn } from '@/lib/utils';
