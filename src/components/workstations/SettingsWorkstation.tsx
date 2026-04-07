@@ -3,6 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Consolidated for production stability: integrates Database and System Health as tabs.
+ * Phase 1010: Integrated Project Switch Reset Pulse.
  */
 
 import React, { useState } from 'react';
@@ -40,7 +41,8 @@ import {
   Terminal,
   RotateCcw,
   Bomb,
-  PlaneTakeoff
+  PlaneTakeoff,
+  AlertTriangle
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -89,7 +91,8 @@ export function SettingsWorkstation() {
     settingsLoaded,
     setActiveView,
     setActiveGrantId,
-    activeGrantId 
+    activeGrantId,
+    isSyncing 
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -98,8 +101,6 @@ export function SettingsWorkstation() {
 
   const [isSaving, setIsSaving] = useState(false);
   const [newProjectName, setNewProjectName] = useState('');
-  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
-  const [editNameValue, setEditNameValue] = useState('');
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
   const [isTravelReportOpen, setIsTravelReportOpen] = useState(false);
 
@@ -361,22 +362,43 @@ export function SettingsWorkstation() {
           </div>
 
           <div className="space-y-4 px-1">
-            {appSettings.grants.map((grant) => (
-              <Card key={grant.id} className={cn("border-2 transition-all duration-500 rounded-2xl overflow-hidden", activeGrantId === grant.id ? "bg-white/[0.03] border-white/10 shadow-2xl" : "bg-transparent border-white/5")}>
-                <div className="p-6 flex items-center justify-between">
-                  <div className="flex items-center gap-4 flex-1">
-                    <div className="flex items-center gap-3">
-                      <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
-                      {activeGrantId === grant.id && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active Pulse</Badge>}
+            {appSettings.grants.map((grant) => {
+              const isActive = activeGrantId === grant.id;
+              return (
+                <Card key={grant.id} className={cn("border-2 transition-all duration-500 rounded-2xl overflow-hidden", isActive ? "bg-white/[0.03] border-white/10 shadow-2xl" : "bg-transparent border-white/5")}>
+                  <div className="p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+                    <div className="flex items-center gap-4 flex-1">
+                      <div className="flex flex-col gap-1">
+                        <div className="flex items-center gap-3">
+                          <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
+                          {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active Pulse</Badge>}
+                        </div>
+                        {isActive && (
+                          <div className="flex items-center gap-2 text-[9px] font-bold text-red-500/60 uppercase">
+                            <AlertTriangle className="h-3 w-3" />
+                            <span>Switching will reset the local project cache</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-6">
+                      {!isActive && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={() => setActiveGrantId(grant.id)}
+                          disabled={isSyncing}
+                          className="h-10 px-6 rounded-xl border-primary/20 bg-primary/5 text-primary font-black text-[9px] uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
+                        >
+                          {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Set Active'}
+                        </Button>
+                      )}
+                      <button onClick={() => handleDeleteProject(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500">Purge</button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-6">
-                    {activeGrantId !== grant.id && <button onClick={() => setActiveGrantId(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80">Set Active</button>}
-                    <button onClick={() => handleDeleteProject(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500">Purge</button>
-                  </div>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         </TabsContent>
 

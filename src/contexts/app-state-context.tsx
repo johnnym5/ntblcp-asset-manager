@@ -2,6 +2,7 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
+ * Phase 1010: Implemented Project Switch Isolation Pulse.
  * Optimized for performance with high-speed computational caching and debouncing.
  */
 
@@ -310,6 +311,33 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     await refreshRegistry();
   };
 
+  const setActiveGrantId = useCallback(async (id: string) => {
+    if (!appSettings) return;
+    setIsSyncing(true);
+    
+    // Isolation Protocol: Purge current workspace to prepare for new Project Pulse
+    try {
+      const next = { ...appSettings, activeGrantId: id };
+      
+      // 1. Commit settings switch
+      await storage.saveSettings(next);
+      if (isOnline) {
+        await FirestoreService.updateSettings({ activeGrantId: id });
+      }
+      
+      // 2. Deterministic Wipe of previous project's local cache
+      await storage.clearAssets();
+      
+      // 3. Force Application Restart to re-hydrate from clean state
+      if (typeof window !== 'undefined') {
+        window.location.reload();
+      }
+    } catch (e) {
+      console.error("Project Switch Isolation Failure", e);
+      setIsSyncing(false);
+    }
+  }, [appSettings, isOnline]);
+
   useEffect(() => {
     if (!isHydrated) return;
     refreshRegistry().then(() => setSettingsLoaded(true));
@@ -320,14 +348,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       assets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
       activeGrantId, activeView, setActiveView, refreshRegistry, manualDownload, manualUpload: () => processSyncQueue().then(refreshRegistry),
-      setActiveGrantId: async (id) => {
-        if (!appSettings) return;
-        const next = { ...appSettings, activeGrantId: id };
-        setAppSettings(next);
-        await storage.saveSettings(next);
-        if (isOnline) FirestoreService.updateSettings({ activeGrantId: id });
-        await refreshRegistry();
-      }, setReadAuthority, globalStateFilter, setGlobalStateFilter,
+      setActiveGrantId, setReadAuthority, globalStateFilter, setGlobalStateFilter,
       selectedLocations, setSelectedLocations, selectedAssignees, setSelectedAssignees,
       selectedStatuses, setSelectedStatuses, selectedConditions, setSelectedConditions,
       missingFieldFilter, setMissingFieldFilter,
