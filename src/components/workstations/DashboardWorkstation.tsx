@@ -3,6 +3,7 @@
 /**
  * @fileOverview Dashboard Workstation - Unified Mission Control.
  * Optimized for Responsive Fidelity and Executive Density.
+ * Phase 1105: Wrapped sections in Accordion to start in closed view per user request.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -21,7 +22,8 @@ import {
   PlusCircle,
   ScanSearch,
   DatabaseZap,
-  Settings
+  Settings,
+  ChevronDown
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAppState } from '@/contexts/app-state-context';
@@ -35,19 +37,19 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import AssetForm from '@/components/asset-form';
-import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
-import { enqueueMutation } from '@/offline/queue';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
 
 type DashboardTab = 'overview' | 'inventory';
 
 export function DashboardWorkstation() {
-  const { assets, appSettings, setActiveView, refreshRegistry } = useAppState();
+  const { assets, appSettings, setActiveView } = useAppState();
   const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
   
-  const [isFormOpen, setIsFormOpen] = useState(false);
-  const [isImportScanOpen, setIsImportScanOpen] = useState(false);
-
   const isAdvanced = appSettings?.uxMode === 'advanced';
 
   const anomalyCount = useMemo(() => {
@@ -118,33 +120,49 @@ export function DashboardWorkstation() {
               </div>
             </div>
             
-            {/* 2. Folders Stack */}
-            <div id="folders-section" className="space-y-6 sm:space-y-8">
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="p-2 bg-white/5 rounded-lg sm:rounded-xl"><FolderOpen className="h-5 w-5 text-primary" /></div>
-                  <h3 className="text-lg sm:text-xl font-black uppercase text-white tracking-tight">Registry Folders</h3>
+            {/* 2. Folders & Anomalies - Wrapped in Accordion to start CLOSED */}
+            <Accordion type="multiple" className="space-y-12">
+              <AccordionItem value="folders" className="border-none">
+                <div className="flex items-center justify-between px-1 mb-4">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="p-2 bg-white/5 rounded-lg sm:rounded-xl"><FolderOpen className="h-5 w-5 text-primary" /></div>
+                    <h3 className="text-lg sm:text-xl font-black uppercase text-white tracking-tight">Registry Folders</h3>
+                  </div>
+                  <AccordionTrigger className="hover:no-underline p-0 h-auto w-auto">
+                    <Badge variant="outline" className="border-white/10 text-white/40 uppercase text-[8px] sm:text-[9px] font-black px-3 py-1 cursor-pointer hover:bg-white/5 transition-all gap-2">
+                      View Structural Tree <ChevronDown className="h-3 w-3" />
+                    </Badge>
+                  </AccordionTrigger>
                 </div>
-                <Badge variant="outline" className="border-white/10 text-white/40 uppercase text-[8px] sm:text-[9px] font-black px-3">Structural Discovery</Badge>
-              </div>
-              <AssetGroupsWorkstation isEmbedded={true} />
-            </div>
+                <AccordionContent className="p-0">
+                  <AssetGroupsWorkstation isEmbedded={true} />
+                </AccordionContent>
+              </AccordionItem>
 
-            {/* 3. Anomalies Review */}
-            <div id="anomalies-section" className="space-y-6 sm:space-y-8">
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-3 sm:gap-4">
-                  <div className="p-2 bg-red-600/10 rounded-lg sm:rounded-xl"><SearchCode className="h-5 w-5 text-red-600" /></div>
-                  <h3 className="text-lg sm:text-xl font-black uppercase text-white tracking-tight">Pattern Review</h3>
+              <AccordionItem value="anomalies" className="border-none">
+                <div className="flex items-center justify-between px-1 mb-4">
+                  <div className="flex items-center gap-3 sm:gap-4">
+                    <div className="p-2 bg-red-600/10 rounded-lg sm:rounded-xl"><SearchCode className="h-5 w-5 text-red-600" /></div>
+                    <h3 className="text-lg sm:text-xl font-black uppercase text-white tracking-tight">Pattern Review</h3>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {anomalyCount > 0 && (
+                      <Badge className="bg-red-600 text-white font-black uppercase text-[8px] sm:text-[9px] h-6 px-3 animate-pulse shadow-lg shadow-red-600/20">
+                        {anomalyCount} ANOMALIES
+                      </Badge>
+                    )}
+                    <AccordionTrigger className="hover:no-underline p-0 h-auto w-auto">
+                      <Badge variant="outline" className="border-white/10 text-white/40 uppercase text-[8px] sm:text-[9px] font-black px-3 py-1 cursor-pointer hover:bg-white/5 transition-all gap-2">
+                        Inspect Anomalies <ChevronDown className="h-3 w-3" />
+                      </Badge>
+                    </AccordionTrigger>
+                  </div>
                 </div>
-                {anomalyCount > 0 && (
-                  <Badge className="bg-red-600 text-white font-black uppercase text-[8px] sm:text-[9px] h-6 px-3 animate-pulse shadow-lg shadow-red-600/20">
-                    {anomalyCount} ANOMALIES
-                  </Badge>
-                )}
-              </div>
-              <DiscrepancyWorkstation isEmbedded={true} />
-            </div>
+                <AccordionContent className="p-0">
+                  <DiscrepancyWorkstation isEmbedded={true} />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
 
             {/* 4. Infrastructure & Contextual Sync */}
             <div className="grid grid-cols-1 xl:grid-cols-2 gap-12 sm:gap-24 items-start px-1 border-t border-white/5 pt-16 sm:pt-24">

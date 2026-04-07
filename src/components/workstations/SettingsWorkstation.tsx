@@ -3,8 +3,7 @@
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
  * Consolidated for production stability: integrates Database and System Health as tabs.
- * Phase 1011: Renamed Auditors to Users and merged Database into Resilience.
- * Phase 1012: Integrated Data Orchestration pulse into Projects tab.
+ * Phase 1015: Redesigned Projects & Sheets tab to match user specification image.
  */
 
 import React, { useState } from 'react';
@@ -48,7 +47,9 @@ import {
   Settings2,
   HelpCircle,
   GraduationCap,
-  DatabaseZap
+  DatabaseZap,
+  Plus,
+  Type
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -349,108 +350,115 @@ export function SettingsWorkstation() {
           </div>
         </TabsContent>
 
-        <TabsContent value="groups" className="m-0 outline-none space-y-10">
+        <TabsContent value="groups" className="m-0 outline-none space-y-10 px-1">
           <div className="space-y-6">
-            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Project Orchestration</h3>
-            <div className="flex gap-3 px-1">
-              <Input placeholder="New project identity..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-white/[0.03] border-white/10 rounded-xl font-medium text-sm text-white" />
-              <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20"><PlusCircle className="h-4 w-4" /> Provision Project</Button>
+            <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">Manage Projects (Grants)</h3>
+            <div className="flex gap-3">
+              <Input 
+                placeholder="New project name..." 
+                value={newProjectName} 
+                onChange={(e) => setNewProjectName(e.target.value)} 
+                className="h-14 bg-black border-white/10 rounded-xl font-medium text-sm text-white placeholder:text-white/20" 
+              />
+              <Button 
+                onClick={handleAddProject} 
+                disabled={!newProjectName.trim()} 
+                className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl shadow-primary/20"
+              >
+                <PlusCircle className="h-4 w-4" /> Add Project
+              </Button>
             </div>
           </div>
 
-          <div className="space-y-4 px-1">
+          <Accordion type="single" collapsible className="space-y-4">
             {appSettings.grants.map((grant) => {
               const isActive = activeGrantId === grant.id;
               const categories = Object.keys(grant.sheetDefinitions || {});
               
               return (
-                <Card key={grant.id} className={cn("border-2 transition-all duration-500 rounded-[2.5rem] overflow-hidden", isActive ? "border-primary/40 bg-primary/5 shadow-2xl" : "border-white/5 bg-[#080808]")}>
-                  <div className="p-8 space-y-8">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-                      <div className="flex items-center gap-4 flex-1">
-                        <div className="p-3 bg-white/5 rounded-2xl"><LayoutGrid className="h-6 w-6 text-primary" /></div>
-                        <div className="space-y-1">
-                          <div className="flex items-center gap-3">
-                            <span className="text-2xl font-black uppercase text-white tracking-tighter">{grant.name}</span>
-                            {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active Pulse</Badge>}
-                          </div>
-                          <p className="text-[10px] font-mono text-white/20 uppercase tracking-widest">ID: {grant.id}</p>
-                        </div>
+                <AccordionItem 
+                  key={grant.id} 
+                  value={grant.id}
+                  className={cn(
+                    "border-2 transition-all duration-500 rounded-[1.5rem] overflow-hidden bg-black",
+                    isActive ? "border-primary/40 shadow-2xl" : "border-white/5"
+                  )}
+                >
+                  <div className="p-6 flex items-center justify-between">
+                    <div className="flex items-center gap-4 flex-1">
+                      <ChevronsUpDown className="h-4 w-4 text-white/20 shrink-0" />
+                      <div className="flex items-center gap-3">
+                        <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
+                        {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
                       </div>
-                      <div className="flex items-center gap-6">
-                        {!isActive && (
-                          <Button 
-                            variant="outline" 
-                            size="sm" 
-                            onClick={() => setActiveGrantId(grant.id)}
-                            disabled={isSyncing}
-                            className="h-10 px-6 rounded-xl border-primary/20 bg-primary/5 text-primary font-black text-[9px] uppercase tracking-widest hover:bg-primary hover:text-black transition-all"
-                          >
-                            {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Set Active'}
-                          </Button>
+                    </div>
+                    
+                    <div className="flex items-center gap-6">
+                      {!isActive && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          onClick={(e) => { e.stopPropagation(); setActiveGrantId(grant.id); }}
+                          disabled={isSyncing}
+                          className="h-9 px-5 rounded-xl border-white/10 font-black text-[10px] uppercase tracking-widest bg-black/40 hover:bg-primary hover:text-black transition-all"
+                        >
+                          {isSyncing ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : 'Set Active'}
+                        </Button>
+                      )}
+                      <button className="text-[11px] font-black uppercase tracking-widest text-white/60 hover:text-white transition-colors">Rename</button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteProject(grant.id); }}
+                        className="text-[11px] font-black uppercase tracking-widest text-red-600 hover:text-red-500 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+
+                  <AccordionTrigger className="hidden" />
+
+                  <AccordionContent className="bg-white/[0.02] border-t border-white/5 p-8 space-y-8">
+                    <div className="space-y-4">
+                      <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 px-1">Sheet Definitions for this Project</h4>
+                      <div className="p-10 border-2 border-dashed border-white/5 rounded-2xl bg-black/40 flex items-center justify-center">
+                        {categories.length > 0 ? (
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 w-full">
+                            {categories.map(sheetName => (
+                              <div key={sheetName} className="flex items-center justify-between p-4 bg-black/60 border border-white/10 rounded-xl group/sheet hover:border-primary/20 transition-all">
+                                <span className="text-[10px] font-black uppercase text-white/60 truncate pr-2">{sheetName}</span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
+                                  className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
+                                >
+                                  <Settings2 className="h-3.5 w-3.5" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="text-[10px] font-black uppercase tracking-widest text-white/20">No sheets defined for this project.</p>
                         )}
-                        <button onClick={() => handleDeleteProject(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500">Purge</button>
                       </div>
                     </div>
 
-                    <Accordion type="single" collapsible className="w-full">
-                      <AccordionItem value="categories" className="border-t border-white/5 border-b-0">
-                        <AccordionTrigger className="hover:no-underline py-4">
-                          <div className="flex items-center gap-3">
-                            <FolderOpen className="h-4 w-4 text-primary opacity-40" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-white/60">View Project Categories ({categories.length})</span>
-                          </div>
-                        </AccordionTrigger>
-                        <AccordionContent className="pb-4">
-                          <div className="space-y-6">
-                            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 pt-2">
-                              {categories.map(sheetName => (
-                                <div key={sheetName} className="flex items-center justify-between p-4 bg-black/40 border border-white/5 rounded-2xl group/sheet hover:border-primary/20 transition-all">
-                                  <span className="text-[10px] font-black uppercase text-white/60 truncate pr-2">{sheetName}</span>
-                                  <Button 
-                                    variant="ghost" 
-                                    size="icon" 
-                                    onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
-                                    className="h-8 w-8 rounded-lg text-primary opacity-40 group-hover:opacity-100 hover:bg-primary/10"
-                                  >
-                                    <Settings2 className="h-3.5 w-3.5" />
-                                  </Button>
-                                </div>
-                              ))}
-                              {categories.length === 0 && (
-                                <div className="col-span-full py-10 text-center opacity-20 border-2 border-dashed rounded-2xl">
-                                  <p className="text-[10px] font-black uppercase tracking-widest">No Definitions Configured</p>
-                                </div>
-                              )}
-                            </div>
-
-                            {isActive && (
-                              <div className="p-6 rounded-[2rem] bg-white/[0.02] border-2 border-dashed border-white/5 space-y-6">
-                                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-2">
-                                  <DatabaseZap className="h-3.5 w-3.5" /> Data Orchestration
-                                </h4>
-                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                                  <Button onClick={() => setIsAssetFormOpen(true)} className="h-12 rounded-xl bg-white/5 border border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-3 hover:bg-white/10 transition-all">
-                                    <PlusCircle className="h-4 w-4" /> Add Record
-                                  </Button>
-                                  <Button onClick={() => setIsImportScanOpen(true)} className="h-12 rounded-xl bg-white/5 border border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-3 hover:bg-white/10 transition-all">
-                                    <ScanSearch className="h-4 w-4" /> Import Excel
-                                  </Button>
-                                  <Button variant="outline" className="h-12 rounded-xl bg-white/5 border border-white/10 text-white font-black uppercase text-[9px] tracking-widest gap-3 hover:bg-white/10 transition-all">
-                                    <FileUp className="h-4 w-4" /> Template Setup
-                                  </Button>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </AccordionContent>
-                      </AccordionItem>
-                    </Accordion>
-                  </div>
-                </Card>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <Button onClick={() => {}} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                        <PlusCircle className="h-4 w-4" /> Add Manually
+                      </Button>
+                      <Button onClick={() => {}} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                        <FileUp className="h-4 w-4" /> Import Template
+                      </Button>
+                      <Button onClick={() => setIsImportScanOpen(true)} className="h-14 rounded-2xl bg-black/40 border border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-3 hover:bg-white/10 transition-all">
+                        <ScanSearch className="h-4 w-4" /> Scan & Import Data
+                      </Button>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
               );
             })}
-          </div>
+          </Accordion>
         </TabsContent>
 
         <TabsContent value="users" className="m-0 outline-none px-1">
@@ -485,7 +493,7 @@ export function SettingsWorkstation() {
       </Tabs>
 
       <div className="mt-20 pt-10 border-t border-white/5 flex items-center justify-between px-1">
-        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-14 px-10 rounded-xl bg-white/5 text-white/60 font-black uppercase text-[11px] tracking-widest hover:bg-white/10 transition-all active:scale-95">
+        <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-14 px-10 rounded-xl bg-[#0A0A0A] text-white/60 font-black uppercase text-[11px] tracking-widest hover:bg-white/5 transition-all active:scale-95">
           Cancel
         </Button>
         <Button onClick={handleCommitAll} className="h-14 px-12 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-[0.2em] shadow-2xl shadow-primary/20 transition-all hover:scale-105 active:scale-95">
