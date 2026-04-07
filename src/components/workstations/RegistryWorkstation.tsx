@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Phase 316: Fixed optionsMap and handleSelectAll reference errors.
+ * Phase 317: Integrated global dynamic pagination (25, 50, 100, All).
  */
 
-import React, { useMemo, useState, useCallback, useRef } from 'react';
+import React, { useMemo, useState, useCallback, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Database,
@@ -52,6 +52,7 @@ import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
 import { HeaderManagerDrawer } from '@/components/registry/HeaderManagerDrawer';
 import { FilterDrawer } from '@/components/registry/FilterDrawer';
 import { SortDrawer } from '@/components/registry/SortDrawer';
+import { PaginationControls } from '@/components/pagination-controls';
 import { transformAssetToRecord } from '@/lib/registry-utils';
 import { cn, sanitizeSearch } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
@@ -84,8 +85,6 @@ import { FirestoreService } from '@/services/firebase/firestore';
 import type { SheetDefinition, Asset } from '@/types/domain';
 import { Card, CardContent } from '../ui/card';
 
-const ITEMS_PER_PAGE = 60;
-
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
     assets, 
@@ -114,7 +113,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     setIsSortOpen,
     manualDownload,
     manualUpload,
-    isSyncing
+    isSyncing,
+    itemsPerPage,
+    setItemsPerPage
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -227,10 +228,16 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     return results;
   }, [activeAssets, searchTerm, sortKey, sortDir, selectedCategories, filters, headers]);
 
+  const totalPages = useMemo(() => {
+    if (itemsPerPage === 'all') return 1;
+    return Math.ceil(processedAssets.length / itemsPerPage);
+  }, [processedAssets.length, itemsPerPage]);
+
   const paginatedAssets = useMemo(() => {
-    const start = (currentPage - 1) * ITEMS_PER_PAGE;
-    return processedAssets.slice(start, start + ITEMS_PER_PAGE);
-  }, [processedAssets, currentPage]);
+    if (itemsPerPage === 'all') return processedAssets;
+    const start = (currentPage - 1) * itemsPerPage;
+    return processedAssets.slice(start, start + itemsPerPage);
+  }, [processedAssets, currentPage, itemsPerPage]);
 
   const optionsMap = useMemo(() => {
     const map: Record<string, string[]> = {};
@@ -472,16 +479,29 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             ))}
           </div>
         ) : (
-          <div className={viewMode === 'grid' ? "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-40" : ""}>
-            <AnimatePresence mode="popLayout">
-              {viewMode === 'grid' ? paginatedAssets.map(asset => (
-                <motion.div key={asset.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                  <RegistryCard record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} onInspect={handleInspect} selected={selectedAssetIds.has(asset.id)} onToggleSelect={handleToggleSelect} />
-                </motion.div>
-              )) : (
-                <RegistryTable records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} onInspect={handleInspect} selectedIds={selectedAssetIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} />
-              )}
-            </AnimatePresence>
+          <div className="flex flex-col h-full">
+            <div className={viewMode === 'grid' ? "grid gap-3 grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 2xl:grid-cols-6 pb-10" : ""}>
+              <AnimatePresence mode="popLayout">
+                {viewMode === 'grid' ? paginatedAssets.map(asset => (
+                  <motion.div key={asset.id} layout initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
+                    <RegistryCard record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} onInspect={handleInspect} selected={selectedAssetIds.has(asset.id)} onToggleSelect={handleToggleSelect} />
+                  </motion.div>
+                )) : (
+                  <RegistryTable records={paginatedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} onInspect={handleInspect} selectedIds={selectedAssetIds} onToggleSelect={handleToggleSelect} onSelectAll={handleSelectAll} />
+                )}
+              </AnimatePresence>
+            </div>
+            
+            <div className="mt-auto pt-8 border-t border-white/5">
+              <PaginationControls 
+                currentPage={currentPage}
+                totalPages={totalPages}
+                onPageChange={setCurrentPage}
+                itemsPerPage={itemsPerPage}
+                setItemsPerPage={setItemsPerPage}
+                totalItems={processedAssets.length}
+              />
+            </div>
           </div>
         )}
       </div>

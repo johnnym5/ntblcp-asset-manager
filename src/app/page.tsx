@@ -2,8 +2,6 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub (SPA).
- * Optimized for High-Density Operational Flow & Smooth Transitions.
- * Phase 402: Stabilized hook sequence to prevent "Rendered more hooks" errors.
  */
 
 import React, { useState, useEffect, useRef, useMemo } from 'react';
@@ -24,7 +22,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Info,
-  HelpCircle
+  HelpCircle,
+  ChevronLeft
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -115,7 +114,8 @@ export default function SPAHub() {
     selectedStatuses,
     setSelectedStatuses,
     missingFieldFilter,
-    setMissingFieldFilter
+    setMissingFieldFilter,
+    goBack
   } = useAppState();
   
   const isMobile = useIsMobile();
@@ -128,7 +128,6 @@ export default function SPAHub() {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const scrollAreaRef = useRef<HTMLDivElement>(null);
 
-  // PRE-RENDER DETERMINISTIC HOOKS (Ensures hook count doesn't change during early returns)
   const CurrentWorkstation = useMemo(() => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
@@ -154,7 +153,6 @@ export default function SPAHub() {
     }
   }, [profileSetupComplete]);
 
-  // Reset scroll on view change to prevent glitchy jumps
   useEffect(() => {
     if (scrollAreaRef.current) {
       const scrollViewport = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
@@ -233,6 +231,20 @@ export default function SPAHub() {
       
       <header className="h-11 border-b border-white/5 flex items-center justify-between px-4 sm:px-6 bg-black/80 backdrop-blur-3xl z-[60] shrink-0">
         <div className="flex items-center gap-2 sm:gap-4">
+          <AnimatePresence>
+            {activeView !== 'DASHBOARD' && (
+              <motion.button
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -10 }}
+                onClick={goBack}
+                className="h-8 w-8 flex items-center justify-center bg-white/5 rounded-lg text-white/40 hover:text-primary transition-all border border-white/5 tactile-pulse"
+              >
+                <ChevronLeft className="h-4 w-4" />
+              </motion.button>
+            )}
+          </AnimatePresence>
+
           <TooltipProvider disableHoverableContent={!showTooltips}>
             <Tooltip>
               <TooltipTrigger asChild>

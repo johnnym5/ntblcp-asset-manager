@@ -2,7 +2,6 @@
 
 /**
  * @fileOverview AppStateContext - Central SPA Orchestrator.
- * Consolidated to use the hardened service layer and removed redundant lib imports.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -86,6 +85,9 @@ interface AppStateContextType {
   selectedCategories: string[];
   setSelectedCategories: (cats: string[]) => void;
   setSelectedCategory: (cat: string | null) => void;
+  itemsPerPage: number | 'all';
+  setItemsPerPage: (val: number | 'all') => void;
+  goBack: () => void;
 }
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
@@ -142,6 +144,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [filters, setFilters] = useState<HeaderFilter[]>([]);
 
   const [selectedCategories, setSelectedCategoriesStatus] = useState<string[]>([]);
+  const [itemsPerPage, setItemsPerPage] = useState<number | 'all'>(25);
 
   const activeGrantId = useMemo(() => appSettings?.activeGrantId || null, [appSettings]);
 
@@ -194,6 +197,14 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       router.push(`/?${params.toString()}`, { scroll: false });
     }
   }, [router]);
+
+  const goBack = useCallback(() => {
+    if (activeView === 'REGISTRY' && selectedCategories.length > 0) {
+      setSelectedCategoriesStatus([]);
+    } else {
+      setActiveView('DASHBOARD');
+    }
+  }, [activeView, selectedCategories, setActiveView]);
 
   const setSelectedCategories = useCallback((cats: string[]) => {
     setSelectedCategoriesStatus(cats);
@@ -382,7 +393,8 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       headers, setHeaders, sortKey, setSortKey, sortDir, setSortDir,
       locationOptions, assigneeOptions, conditionOptions, statusOptions,
       isFilterOpen, setIsFilterOpen, isSortOpen, setIsSortOpen, filters, setFilters,
-      selectedCategory, selectedCategories, setSelectedCategories, setSelectedCategory
+      selectedCategory, selectedCategories, setSelectedCategories, setSelectedCategory,
+      itemsPerPage, setItemsPerPage, goBack
     }}>
       <Suspense fallback={null}>
         <ViewParamSync activeView={activeView} setActiveViewStatus={setActiveViewStatus} />
