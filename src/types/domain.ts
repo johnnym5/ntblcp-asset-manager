@@ -10,6 +10,7 @@ export type DataSource = 'PRODUCTION' | 'SANDBOX';
 export type UXMode = 'beginner' | 'advanced';
 export type StorageLayer = 'FIRESTORE' | 'RTDB' | 'LOCAL';
 export type AuthorityNode = 'FIRESTORE' | 'RTDB';
+export type SyncStatus = 'synced' | 'local';
 
 export type MatchConfidence = 'HIGH' | 'MEDIUM' | 'LOW' | 'NONE';
 export type LocationMatchStatus = 'MATCHED' | 'PARTIAL' | 'UNASSIGNED' | 'NEEDS_REVIEW' | 'INVALID';
@@ -91,6 +92,9 @@ export interface Asset {
   category: string;
   grantId: string; 
   
+  // Sync Pulse
+  syncStatus?: SyncStatus;
+
   // Hierarchical Context
   section: string;
   subsection: string;

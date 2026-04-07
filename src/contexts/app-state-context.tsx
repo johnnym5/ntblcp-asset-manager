@@ -5,6 +5,7 @@
  * Phase 1010: Implemented Project Switch Isolation Pulse.
  * Phase 1012: Integrated Drill-down pulses for Categories and Search.
  * Phase 1013: Upgraded to multi-select Category state.
+ * Phase 1014: Resolved Project Switch data loss. Removed destructive wipe.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -119,7 +120,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [dataSource, setDataSourceStatus] = useState<DataSource>('PRODUCTION');
   const [isOnline, setIsOnlineStatus] = useState(() => {
     if (typeof window === 'undefined') return true;
-    const saved = localStorage.getItem('assetain-online-pulse');
+    const saved = localStorage.getItem('assetain-online-status');
     return saved ? JSON.parse(saved) : true;
   });
   const [searchTerm, setSearchTerm] = useState('');
@@ -257,16 +258,18 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
           const localAssets = await storage.getAssets();
           
           let nextAssets;
+          const taggedRemote = remoteAssets.map(a => ({ ...a, syncStatus: 'synced' as const }));
+
           if (stateScopes) {
             const scopeSet = new Set(stateScopes.map(s => s.toLowerCase()));
             const otherAssets = localAssets.filter(a => 
               a.grantId !== remoteSettings.activeGrantId || 
               !scopeSet.has((a.location || '').toLowerCase())
             );
-            nextAssets = [...otherAssets, ...remoteAssets];
+            nextAssets = [...otherAssets, ...taggedRemote];
           } else {
             const otherAssets = localAssets.filter(a => a.grantId !== remoteSettings.activeGrantId);
-            nextAssets = [...otherAssets, ...remoteAssets];
+            nextAssets = [...otherAssets, ...taggedRemote];
           }
             
           await storage.saveAssets(nextAssets);
@@ -327,32 +330,33 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     await refreshRegistry();
   };
 
+  const setIsOnline = useCallback((status: boolean) => {
+    setIsOnlineStatus(status);
+    if (typeof window !== 'undefined') {
+      localStorage.setItem('assetain-online-status', JSON.stringify(status));
+    }
+  }, []);
+
   const setActiveGrantId = useCallback(async (id: string) => {
     if (!appSettings) return;
     setIsSyncing(true);
     
-    // Isolation Protocol: Purge current workspace to prepare for new Project Pulse
     try {
       const next = { ...appSettings, activeGrantId: id };
       
-      // 1. Commit settings switch
+      // Commit settings switch
       await storage.saveSettings(next);
       if (isOnline) {
         await FirestoreService.updateSettings({ activeGrantId: id });
       }
       
-      // 2. Deterministic Wipe of previous project's local cache
-      await storage.clearAssets();
-      
-      // 3. Force Application Restart to re-hydrate from clean state
-      if (typeof window !== 'undefined') {
-        window.location.reload();
-      }
-    } catch (e) {
-      console.error("Project Switch Isolation Failure", e);
+      setAppSettings(next);
+      await refreshRegistry();
+      toast({ title: "Project Scope Switched", description: `Active: ${next.grants.find(g => g.id === id)?.name}` });
+    } finally {
       setIsSyncing(false);
     }
-  }, [appSettings, isOnline]);
+  }, [appSettings, isOnline, refreshRegistry, toast]);
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -361,7 +365,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   return (
     <AppStateContext.Provider value={{
-      assets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline: setIsOnlineStatus,
+      assets, sandboxAssets, dataSource, setDataSource: setDataSourceStatus, isOnline, setIsOnline,
       searchTerm, setSearchTerm, isSyncing, appSettings, setAppSettings, settingsLoaded, isHydrated,
       activeGrantId, activeView, setActiveView, refreshRegistry, manualDownload, manualUpload: () => processSyncQueue().then(refreshRegistry),
       setActiveGrantId, setReadAuthority, globalStateFilter, setGlobalStateFilter,

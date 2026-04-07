@@ -1,6 +1,7 @@
 /**
  * @fileOverview RegistryTable - High-Fidelity "Pill Capsule" List Workstation.
  * Optimized for Responsive Stacking and High-Density Registry Pulse.
+ * Phase 406: Added Sync Status icons to list view.
  */
 
 import React from 'react';
@@ -21,7 +22,9 @@ import {
   MapPin,
   Settings2,
   Lock,
-  ChevronDown
+  ChevronDown,
+  Globe,
+  CloudOff
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
@@ -35,6 +38,7 @@ import {
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RegistryTableProps {
   records: AssetRecord[];
@@ -99,6 +103,7 @@ export function RegistryTable({
       <Accordion type="multiple" className="space-y-3">
         {records.map((record) => {
           const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
+          const syncStatus = (record.rawRow as any).syncStatus || 'local';
           const isSelected = selectedIds.has(record.id);
 
           return (
@@ -114,7 +119,7 @@ export function RegistryTable({
                 <div className="w-[30px] sm:w-[40px] shrink-0 flex items-center justify-center" onClick={(e) => e.stopPropagation()}>
                   <Checkbox 
                     checked={isSelected} 
-                    onToggleSelect={() => onToggleSelect(record.id)}
+                    onCheckedChange={() => onToggleSelect(record.id)}
                     className="h-5 w-5 sm:h-6 sm:w-6 rounded-full border-2 border-white/10 data-[state=checked]:bg-primary data-[state=checked]:border-primary"
                   />
                 </div>
@@ -125,9 +130,29 @@ export function RegistryTable({
                       <span className="text-[10px] sm:text-[11px] font-mono font-black text-white/20">#{record.sn || '---'}</span>
                     </div>
                     <div className="col-span-10 sm:col-span-4 min-w-0 pr-2 sm:pr-6">
-                      <span className="font-black text-xs sm:text-sm uppercase tracking-tight text-white truncate block">
-                        {String(record.rawRow.description || 'Untitled Asset')}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="font-black text-xs sm:text-sm uppercase tracking-tight text-white truncate block">
+                          {String(record.rawRow.description || 'Untitled Asset')}
+                        </span>
+                        
+                        {/* Sync Pulse Icon */}
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <div className={cn(
+                                "p-1 rounded-md border shrink-0",
+                                syncStatus === 'synced' ? "bg-green-500/10 border-green-500/20 text-green-600" : "bg-blue-500/10 border-blue-500/20 text-blue-600"
+                              )}>
+                                {syncStatus === 'synced' ? <Globe className="h-2.5 w-2.5" /> : <CloudOff className="h-2.5 w-2.5" />}
+                              </div>
+                            </TooltipTrigger>
+                            <TooltipContent className="text-[9px] font-black uppercase">
+                              {syncStatus === 'synced' ? 'Synced to Cloud' : 'Stored on Device (Offline)'}
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
+                      </div>
+
                       {isMobile && (
                         <div className="flex items-center gap-2 mt-1 opacity-40">
                           <Tag className="h-2.5 w-2.5 text-primary" />

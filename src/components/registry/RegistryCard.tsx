@@ -2,11 +2,12 @@
  * @fileOverview RegistryCard - High-Fidelity "Quick View" Renderer.
  * Optimized for High-Density Grid Pulse.
  * Phase 405: Mode-aware UI. Hides status pill in Management mode.
+ * Phase 406: Added Sync Status icons.
  */
 
 import React from 'react';
 import { Card, CardContent } from '@/components/ui/card';
-import { MoreVertical, LayoutGrid, Trash2, ChevronDown, Check, Bell } from 'lucide-react';
+import { MoreVertical, LayoutGrid, Trash2, ChevronDown, Check, Bell, Globe, CloudOff } from 'lucide-react';
 import { 
   DropdownMenu, 
   DropdownMenuContent, 
@@ -17,6 +18,7 @@ import { cn } from '@/lib/utils';
 import type { AssetRecord } from '@/types/registry';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface RegistryCardProps {
   record: AssetRecord;
@@ -50,7 +52,7 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
 
   const status = String(record.rawRow.status || 'UNVERIFIED').toUpperCase();
   const updateCount = (record.rawRow as any).updateCount || 0;
-  const hasUnseen = ((record.rawRow as any).unseenUpdateFields?.length || 0) > 0;
+  const syncStatus = (record.rawRow as any).syncStatus || 'local';
 
   return (
     <Card 
@@ -75,9 +77,26 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect, dens
             </div>
             
             <div className="flex items-center gap-2">
+              {/* Sync Pulse Icon */}
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className={cn(
+                      "p-1 rounded-md border",
+                      syncStatus === 'synced' ? "bg-green-500/10 border-green-500/20 text-green-600" : "bg-blue-500/10 border-blue-500/20 text-blue-600"
+                    )}>
+                      {syncStatus === 'synced' ? <Globe className="h-2.5 w-2.5" /> : <CloudOff className="h-2.5 w-2.5" />}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent className="text-[9px] font-black uppercase">
+                    {syncStatus === 'synced' ? 'Synced to Cloud' : 'Stored on Device (Offline)'}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+
               {updateCount > 0 && (
                 <div className="flex items-center gap-1 px-1.5 py-0.5 bg-primary/5 rounded-lg border border-primary/10">
-                  <Bell className={cn("h-2.5 w-2.5", hasUnseen ? "text-red-600 animate-pulse" : "text-primary/40")} />
+                  <Bell className="h-2.5 w-2.5 text-primary/40" />
                   <span className="text-[8px] font-black text-primary">{updateCount}</span>
                 </div>
               )}
