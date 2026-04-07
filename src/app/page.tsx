@@ -1,8 +1,8 @@
-
 'use client';
 
 /**
  * @fileOverview Root Shell - Unified Command Hub.
+ * Optimized for full responsiveness across all screen sizes.
  */
 
 import React, { useState, useEffect, Suspense } from 'react';
@@ -25,7 +25,9 @@ import {
   Menu,
   X,
   LayoutGrid,
-  HelpCircle
+  HelpCircle,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -131,7 +133,6 @@ export default function SPAHub() {
   };
 
   const isAdmin = userProfile?.isAdmin || false;
-  const isAdvanced = appSettings?.uxMode === 'advanced';
 
   return (
     <div className="app-container bg-black font-sans selection:bg-primary/30 text-white">
@@ -148,7 +149,7 @@ export default function SPAHub() {
                 className="flex items-center gap-2 p-2.5 md:p-3 bg-white/5 rounded-xl hover:bg-white/10 transition-all text-primary group tactile-pulse"
               >
                 <ArrowLeft className="h-5 w-5 transition-transform group-hover:-translate-x-1" />
-                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Back Home</span>
+                <span className="text-[10px] font-black uppercase tracking-widest hidden sm:inline">Back</span>
               </button>
             ) : (
               <div className="flex items-center gap-2 md:gap-4">
@@ -156,8 +157,8 @@ export default function SPAHub() {
                   <Boxes className="h-5 w-5 text-primary" />
                 </div>
                 <div className="flex flex-col">
-                  <h1 className="text-lg md:text-xl font-black uppercase text-white tracking-tighter leading-none">Assetain</h1>
-                  <span className="text-[7px] md:text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Inventory Control</span>
+                  <h1 className="text-base md:text-xl font-black uppercase text-white tracking-tighter leading-none">Assetain</h1>
+                  <span className="text-[7px] md:text-[8px] font-black uppercase text-primary tracking-[0.2em] mt-1 opacity-60">Control</span>
                 </div>
               </div>
             )}
@@ -191,7 +192,7 @@ export default function SPAHub() {
                       <CloudDownload className={cn("h-4 w-4", isSyncing && "animate-pulse")} />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Download latest records from cloud.</TooltipContent>
+                  <TooltipContent>Download latest records.</TooltipContent>
                 </Tooltip>
                 
                 <Tooltip>
@@ -200,7 +201,7 @@ export default function SPAHub() {
                       <CloudUpload className={cn("h-4 w-4", isSyncing && "animate-spin")} />
                     </button>
                   </TooltipTrigger>
-                  <TooltipContent>Upload your local changes to cloud.</TooltipContent>
+                  <TooltipContent>Upload local changes.</TooltipContent>
                 </Tooltip>
               </div>
             </TooltipProvider>
@@ -273,7 +274,7 @@ export default function SPAHub() {
           <ErrorBoundary module={activeView}>
             <Suspense fallback={<div className="h-full flex flex-col items-center justify-center gap-6 opacity-40"><Loader2 className="h-12 w-12 animate-spin text-primary" /><p className="text-[10px] font-black uppercase tracking-[0.3em] text-white">Opening...</p></div>}>
               <ScrollArea className="h-full custom-scrollbar">
-                <div className="min-h-full p-6 md:p-12 lg:p-16">
+                <div className="min-h-full p-4 md:p-12 lg:p-16">
                   {renderWorkstation()}
                 </div>
               </ScrollArea>
