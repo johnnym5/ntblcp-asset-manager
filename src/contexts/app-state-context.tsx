@@ -1,4 +1,3 @@
-
 'use client';
 
 /**
@@ -7,6 +6,7 @@
  * Phase 360: Integrated Real-Time Settings Pulse via Firestore onSnapshot.
  * Phase 361: Wrapped search params in Suspense to resolve build pulse bailout.
  * Phase 370: Hardened Online/Offline disconnect logic for total cloud isolation.
+ * Phase 400: Integrated Heuristic Discrepancy Engine.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -16,6 +16,7 @@ import { processSyncQueue } from '@/offline/sync';
 import { FirestoreService } from '@/services/firebase/firestore';
 import { db } from '@/lib/firebase';
 import { onSnapshot, doc } from 'firebase/firestore';
+import { DiscrepancyEngine } from '@/lib/discrepancy-engine';
 import type { Asset, AppSettings, DataSource, AuthorityNode, WorkstationView } from '@/types/domain';
 import type { RegistryHeader } from '@/types/registry';
 import { addNotification } from '@/hooks/use-notifications';
@@ -79,9 +80,6 @@ interface AppStateContextType {
 
 const AppStateContext = createContext<AppStateContextType | undefined>(undefined);
 
-/**
- * Internal component to sync state with URL parameters within a Suspense boundary.
- */
 function ViewParamSync({ 
   activeView, 
   setActiveViewStatus 
@@ -180,11 +178,9 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
     }
   }, [isHydrated]);
 
-  // Establish Real-time Governance Pulse
   useEffect(() => {
     if (!isHydrated) return;
 
-    // 1. Initial Local State Recovery
     storage.getSettings().then(local => {
       if (local) {
         setAppSettings(local);
@@ -192,7 +188,6 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       }
     });
 
-    // 2. Continuous Cloud Synchronization (Strictly Gated by isOnline)
     if (db && isOnline) {
       const settingsRef = doc(db, 'config', 'settings');
       const unsubscribe = onSnapshot(settingsRef, (snapshot) => {
@@ -229,14 +224,18 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       ]);
 
       if (localSettings) setAppSettings(localSettings);
-      setSandboxAssets(localSandbox || []);
       
       const currentGrantId = localSettings?.activeGrantId || null;
       const filtered = currentGrantId 
         ? (localAssets || []).filter(a => a.grantId === currentGrantId)
         : (localAssets || []);
 
-      setAssets(filtered);
+      // INTELLIGENT DISCREPANCY SCAN
+      const analyzedAssets = DiscrepancyEngine.scan(filtered);
+      const analyzedSandbox = DiscrepancyEngine.scan(localSandbox || []);
+
+      setAssets(analyzedAssets);
+      setSandboxAssets(analyzedSandbox);
     } catch (e) {
       console.error("Registry Refresh Failure", e);
     }

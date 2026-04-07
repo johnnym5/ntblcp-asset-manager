@@ -27,7 +27,8 @@ export type WorkstationView =
   | 'INFRASTRUCTURE' 
   | 'DATABASE' 
   | 'SETTINGS'
-  | 'GIS';
+  | 'GIS'
+  | 'ANOMALIES';
 
 export interface SectionHierarchy {
   document: string;
@@ -71,6 +72,21 @@ export interface AssetClassification {
   transferSource: string | null;
 }
 
+export type DiscrepancySeverity = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+export type DiscrepancyStatus = 'PENDING' | 'SUSPICIOUS' | 'NEEDS_REVIEW' | 'IGNORED' | 'CORRECTED' | 'RESOLVED';
+
+export interface AssetDiscrepancy {
+  id: string;
+  field: string;
+  originalValue: any;
+  suggestedValue?: any;
+  reason: string;
+  severity: DiscrepancySeverity;
+  confidence: MatchConfidence;
+  status: DiscrepancyStatus;
+  flaggedAt: string;
+}
+
 export interface Asset {
   id: string;
   sn?: string; 
@@ -106,6 +122,10 @@ export interface Asset {
   discrepancyFlag?: boolean;
   reviewStatus?: 'PENDING' | 'RESOLVED' | 'FLAGGED';
   
+  // Discrepancy Engine Data
+  discrepancies: AssetDiscrepancy[];
+  overallFidelityScore: number; // 0-100
+
   // Financial & Technical
   purchaseDate?: string;
   value: number; // NGN
@@ -189,8 +209,7 @@ export interface AuthorizedUser {
   assignedZone?: string;
 }
 
-export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE';
-export type QueueStatus = 'PENDING' | 'PROCESSING' | 'FAILED';
+export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE' | 'DISCREPANCY_RESOLVED' | 'DISCREPANCY_IGNORED';
 
 export interface OfflineQueueEntry {
   id: string;

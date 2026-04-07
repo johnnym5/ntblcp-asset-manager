@@ -3,6 +3,7 @@
 /**
  * @fileOverview AssetForm - Condition & Audit Workstation.
  * Optimized for mobile fields stacking and touch fidelity.
+ * Phase 150: Integrated Discrepancy Highlighting & Review Triggers.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -41,7 +42,11 @@ import {
   Tag,
   ChevronRight,
   RotateCcw,
-  Info
+  Info,
+  AlertTriangle,
+  CheckCircle2,
+  ThumbsUp,
+  Ban
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -52,8 +57,9 @@ import { AssetSchema } from "@/core/registry/validation";
 import { AssetChecklist } from "./asset-checklist";
 import { Badge } from "./ui/badge";
 import { getCanonicalGroup, GROUP_COLORS } from "@/lib/condition-logic";
-import type { Asset, ConditionAuditEntry } from "@/types/domain";
+import type { Asset, ConditionAuditEntry, AssetDiscrepancy, DiscrepancyStatus } from "@/types/domain";
 import { useToast } from "@/hooks/use-toast";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface AssetFormProps {
   isOpen: boolean;
@@ -72,7 +78,7 @@ export default function AssetForm({
 }: AssetFormProps) {
   const [isSaving, setIsSaving] = useState(false);
   const { userProfile } = useAuth();
-  const { activeGrantId, appSettings } = useAppState();
+  const { activeGrantId, appSettings, refreshRegistry } = useAppState();
   const { toast } = useToast();
   
   const form = useForm<Asset>({
@@ -105,6 +111,7 @@ export default function AssetForm({
           importMetadata: { sourceFile: 'MANUAL', sheetName: 'MANUAL', rowNumber: 0, importedAt: new Date().toISOString() },
           metadata: {},
           conditionHistory: [],
+          discrepancies: [],
           updateCount: 0
         } as Asset);
       }
@@ -141,6 +148,17 @@ export default function AssetForm({
     }
   };
 
+  const handleResolveDiscrepancy = async (discrepancyId: string, status: DiscrepancyStatus) => {
+    if (!asset) return;
+    const nextDiscrepancies = (asset.discrepancies || []).map(d => 
+      d.id === discrepancyId ? { ...d, status } : d
+    );
+    const updated = { ...asset, discrepancies: nextDiscrepancies };
+    await onSave(updated);
+    form.setValue('discrepancies', nextDiscrepancies);
+    toast({ title: `Discrepancy ${status === 'RESOLVED' ? 'Applied' : 'Ignored'}` });
+  };
+
   const isFieldDisabled = (fieldName: string) => {
     if (externalReadOnly) return true;
     if (isAdmin) return false;
@@ -149,6 +167,9 @@ export default function AssetForm({
   };
 
   const formValues = form.watch();
+  const getDiscrepancyForField = (fieldName: string) => {
+    return (formValues.discrepancies || []).find(d => d.field === fieldName && (d.status === 'PENDING' || d.status === 'SUSPICIOUS'));
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onOpenChange}>
@@ -170,6 +191,21 @@ export default function AssetForm({
           <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
             <ScrollArea className="flex-1 border-r border-white/5">
               <div className="p-6 md:p-8 space-y-10 md:space-y-12 pb-32">
+                
+                {/* 1. Anomaly Banner */}
+                {formValues.discrepancies?.some(d => d.status === 'PENDING' || d.status === 'SUSPICIOUS') && (
+                  <div className="p-6 rounded-[2rem] bg-red-600/10 border-2 border-dashed border-red-600/20 flex flex-col sm:flex-row items-center justify-between gap-6 animate-in slide-in-from-top-2">
+                    <div className="flex items-center gap-5">
+                      <div className="p-3 bg-red-600/20 rounded-2xl shadow-inner"><AlertTriangle className="h-6 w-6 text-red-600" /></div>
+                      <div className="space-y-1">
+                        <h4 className="text-sm font-black uppercase tracking-tight text-white">Heuristic Pattern Alert</h4>
+                        <p className="text-[10px] font-medium text-white/40 italic">This record contains data that deviates from the registry norm.</p>
+                      </div>
+                    </div>
+                    <Badge className="bg-red-600 h-8 px-4 font-black uppercase text-[9px] tracking-widest">Awaiting Review</Badge>
+                  </div>
+                )}
+
                 <Form {...form}>
                   <form id="asset-form" onSubmit={form.handleSubmit(onSubmit)} className="space-y-10 md:space-y-12">
                     
@@ -179,24 +215,48 @@ export default function AssetForm({
                         <Tag className="h-3 w-3" /> Identity Markers
                       </h4>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-                        <FormField control={form.control} name="description" render={({ field }) => (
-                          <FormItem className="md:col-span-2">
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Asset Description</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('description')} className="h-12 md:h-14 bg-white/[0.03] border-2 border-white/5 rounded-xl font-black text-sm uppercase" /></FormControl>
-                          </FormItem>
-                        )}/>
-                        <FormField control={form.control} name="serialNumber" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Serial Number</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('serialNumber')} className="h-12 bg-white/[0.03] border-2 border-white/5 rounded-xl text-sm" /></FormControl>
-                          </FormItem>
-                        )}/>
-                        <FormField control={form.control} name="assetIdCode" render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-[9px] font-black uppercase text-white/40">Internal Tag ID</FormLabel>
-                            <FormControl><Input {...field} readOnly={isFieldDisabled('assetIdCode')} className="h-12 bg-white/[0.03] border-2 border-white/5 rounded-xl text-sm" /></FormControl>
-                          </FormItem>
-                        )}/>
+                        <FormField control={form.control} name="description" render={({ field }) => {
+                          const discrepancy = getDiscrepancyForField('description');
+                          return (
+                            <FormItem className="md:col-span-2">
+                              <div className="flex items-center justify-between">
+                                <FormLabel className="text-[9px] font-black uppercase text-white/40">Asset Description</FormLabel>
+                                {discrepancy && <Badge variant="outline" className="h-5 text-[7px] font-black uppercase text-red-500 border-red-500/20">Anomalous</Badge>}
+                              </div>
+                              <FormControl>
+                                <div className="relative group">
+                                  <Input {...field} readOnly={isFieldDisabled('description')} className={cn("h-12 md:h-14 bg-white/[0.03] border-2 rounded-xl font-black text-sm uppercase transition-all", discrepancy ? "border-red-600 animate-pulse ring-4 ring-red-600/10" : "border-white/5")} />
+                                  {discrepancy && (
+                                    <div className="absolute top-1/2 -right-12 -translate-y-1/2 flex gap-2">
+                                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'RESOLVED')} size="icon" className="h-8 w-8 rounded-lg bg-green-600 shadow-xl"><ThumbsUp className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="text-[9px] font-black uppercase">Accept Suggestion</TooltipContent></Tooltip></TooltipProvider>
+                                      <TooltipProvider><Tooltip><TooltipTrigger asChild><Button type="button" onClick={() => handleResolveDiscrepancy(discrepancy.id, 'IGNORED')} size="icon" className="h-8 w-8 rounded-lg bg-white/10 text-white/40"><Ban className="h-4 w-4" /></Button></TooltipTrigger><TooltipContent className="text-[9px] font-black uppercase">Ignore Warning</TooltipContent></Tooltip></TooltipProvider>
+                                    </div>
+                                  )}
+                                </div>
+                              </FormControl>
+                            </FormItem>
+                          );
+                        }}/>
+                        
+                        <FormField control={form.control} name="serialNumber" render={({ field }) => {
+                          const discrepancy = getDiscrepancyForField('serialNumber');
+                          return (
+                            <FormItem>
+                              <FormLabel className="text-[9px] font-black uppercase text-white/40">Serial Number</FormLabel>
+                              <FormControl><Input {...field} readOnly={isFieldDisabled('serialNumber')} className={cn("h-12 bg-white/[0.03] border-2 rounded-xl text-sm transition-all", discrepancy ? "border-red-600 animate-pulse" : "border-white/5")} /></FormControl>
+                            </FormItem>
+                          );
+                        }}/>
+
+                        <FormField control={form.control} name="assetIdCode" render={({ field }) => {
+                          const discrepancy = getDiscrepancyForField('assetIdCode');
+                          return (
+                            <FormItem>
+                              <FormLabel className="text-[9px] font-black uppercase text-white/40">Internal Tag ID</FormLabel>
+                              <FormControl><Input {...field} readOnly={isFieldDisabled('assetIdCode')} className={cn("h-12 bg-white/[0.03] border-2 rounded-xl text-sm transition-all", discrepancy ? "border-red-600 animate-pulse" : "border-white/5")} /></FormControl>
+                            </FormItem>
+                          );
+                        }}/>
                       </div>
                     </div>
 
@@ -255,6 +315,25 @@ export default function AssetForm({
             <ScrollArea className="w-full md:w-[320px] bg-[#050505] p-6 md:p-8 shrink-0 border-t md:border-t-0 border-white/5">
               <div className="space-y-10">
                 <AssetChecklist values={formValues as any} />
+                
+                {/* Heuristic History */}
+                {formValues.discrepancies?.length > 0 && (
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-red-600">Discrepancy Pulse</h4>
+                    <div className="space-y-3">
+                      {formValues.discrepancies.map(d => (
+                        <div key={d.id} className={cn("p-4 rounded-2xl border transition-all", d.status === 'RESOLVED' ? "bg-green-600/5 border-green-600/20 opacity-60" : "bg-red-600/5 border-red-600/20")}>
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant="outline" className="h-4 px-1.5 text-[7px] font-black uppercase border-white/10">{d.severity}</Badge>
+                            <span className="text-[8px] font-black uppercase text-white/20">{d.field}</span>
+                          </div>
+                          <p className="text-[9px] font-medium text-white/60 leading-relaxed italic">{d.reason}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 <div className="p-6 rounded-2xl bg-white/[0.02] border-2 border-dashed border-white/10 space-y-4">
                   <div className="flex items-center gap-2 opacity-40 text-[9px] font-black uppercase tracking-widest"><Info className="h-3 w-3" /> Source Pulse</div>
                   <div className="space-y-2 text-[8px] uppercase">

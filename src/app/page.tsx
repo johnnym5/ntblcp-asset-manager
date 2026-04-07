@@ -3,6 +3,7 @@
 /**
  * @fileOverview Root Shell - Unified Command Hub.
  * Optimized for RBAC and Location-Aware Pulse filtering.
+ * Phase 400: Integrated Discrepancy Review Workstation.
  */
 
 import React, { useState, useEffect, Suspense, useMemo } from 'react';
@@ -13,29 +14,23 @@ import {
   Boxes, 
   Loader2, 
   LogOut, 
-  CloudDownload, 
-  CloudUpload, 
   Bell, 
   ArrowLeft,
-  Search,
-  Filter,
   Settings as SettingsIcon,
-  LayoutGrid,
   Wifi,
   WifiOff,
   ShieldCheck,
   MapPin,
   Terminal,
-  ShieldAlert,
-  ChevronDown
+  SearchCode
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import { DashboardWorkstation } from '@/components/workstations/DashboardWorkstation';
 import { SettingsWorkstation } from '@/components/workstations/SettingsWorkstation';
 import { RegistryWorkstation } from '@/components/workstations/RegistryWorkstation';
 import { AssetGroupsWorkstation } from '@/components/workstations/AssetGroupsWorkstation';
+import { DiscrepancyWorkstation } from '@/components/workstations/DiscrepancyWorkstation';
 import { NotificationsCenter } from '@/components/NotificationsSheet';
 import { CommandPalette } from '@/components/CommandPalette';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -59,16 +54,15 @@ export default function SPAHub() {
     setActiveView, 
     isOnline, 
     setIsOnline,
-    isSyncing, 
-    manualDownload, 
-    manualUpload,
-    searchTerm,
-    setSearchTerm,
     assets
   } = useAppState();
   
   const { unreadCount } = useNotifications();
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
+
+  const anomalyCount = useMemo(() => {
+    return assets.filter(a => a.discrepancies?.some(d => d.status === 'PENDING')).length;
+  }, [assets]);
 
   const scopedAssets = useMemo(() => {
     if (!userProfile) return [];
@@ -89,8 +83,9 @@ export default function SPAHub() {
   const renderWorkstation = () => {
     switch (activeView) {
       case 'DASHBOARD': return <DashboardWorkstation />;
-      case 'REGISTRY': return <RegistryWorkstation assets={scopedAssets} />;
-      case 'GROUPS': return <AssetGroupsWorkstation assets={scopedAssets} />;
+      case 'REGISTRY': return <RegistryWorkstation />;
+      case 'GROUPS': return <AssetGroupsWorkstation />;
+      case 'ANOMALIES': return <DiscrepancyWorkstation />;
       case 'SETTINGS': return <SettingsWorkstation />;
       default: return <DashboardWorkstation />;
     }
@@ -123,6 +118,10 @@ export default function SPAHub() {
           <div className="hidden lg:flex items-center bg-white/[0.02] p-1 rounded-2xl border border-white/5">
             <button onClick={() => setActiveView('REGISTRY')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'REGISTRY' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>Inventory</button>
             <button onClick={() => setActiveView('GROUPS')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all", activeView === 'GROUPS' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>Folders</button>
+            <button onClick={() => setActiveView('ANOMALIES')} className={cn("px-6 py-2 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all flex items-center gap-2", activeView === 'ANOMALIES' ? "bg-primary text-black" : "text-white/40 hover:text-white")}>
+              Anomalies
+              {anomalyCount > 0 && <span className="h-4 w-4 rounded-full bg-red-600 text-[8px] font-black flex items-center justify-center text-white animate-pulse">{anomalyCount}</span>}
+            </button>
           </div>
 
           <div className="flex items-center gap-4">
@@ -164,9 +163,9 @@ export default function SPAHub() {
                 </DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
                 {canPerform(userProfile as any, 'DATABASE_ADMIN_TOOLS') && (
-                  <DropdownMenuItem onClick={() => setActiveView('DATABASE')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
-                    <Terminal className="mr-2 h-4 w-4" />
-                    <span className="text-[11px] font-black uppercase">Database View</span>
+                  <DropdownMenuItem onClick={() => setActiveView('ANOMALIES')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
+                    <SearchCode className="mr-2 h-4 w-4" />
+                    <span className="text-[11px] font-black uppercase">Anomaly Dashboard</span>
                   </DropdownMenuItem>
                 )}
                 <DropdownMenuItem onClick={() => setActiveView('SETTINGS')} className="p-3 focus:bg-primary focus:text-black rounded-xl cursor-pointer m-1">
