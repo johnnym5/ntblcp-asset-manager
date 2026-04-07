@@ -2,6 +2,7 @@
 /**
  * @fileOverview Hardened Firestore Service.
  * Phase 270: Enhanced getProjectAssets to support multi-state scoping for Zonal Admins.
+ * Phase 280: Hardened purgeAllAssets for deterministic global registry wipes.
  */
 
 import { 
@@ -147,9 +148,14 @@ export const FirestoreService = {
     }
   },
 
+  /**
+   * Deterministic Global Wipe.
+   * Recursively deletes all documents in the 'assets' collection to prepare for new data.
+   */
   async purgeAllAssets(): Promise<number> {
     if (!db) return 0;
     const assetsRef = collection(db, 'assets');
+    
     let snap;
     try {
       snap = await getDocs(assetsRef);
@@ -161,15 +167,19 @@ export const FirestoreService = {
     const total = snap.size;
     if (total === 0) return 0;
 
-    const batch = writeBatch(db);
-    snap.docs.forEach(d => batch.delete(d.ref));
+    // Split into batches of 500 (Firestore limit)
+    const docs = snap.docs;
+    for (let i = 0; i < docs.length; i += 500) {
+      const batch = writeBatch(db);
+      const chunk = docs.slice(i, i + 500);
+      chunk.forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
     
     try {
-      await batch.commit();
       await clearRtdb();
-    } catch (err: any) {
-      FirestoreService.handlePermissionError(assetsRef.path, 'delete', err);
-      throw err;
+    } catch (e) {
+      console.warn("Mirroring: RTDB clear pulse latent.");
     }
 
     await FirestoreService.logActivity({

@@ -1,9 +1,11 @@
+
 'use client';
 
 /**
  * @fileOverview InfrastructureWorkstation - System Infrastructure Module.
  * Phase 165: Renamed to System Infrastructure.
  * Phase 167: Updated Purge pulse to be local-only per user request.
+ * Phase 168: Implemented Global Registry Reset to prepare for new Project Pulse.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -67,6 +69,7 @@ export function InfrastructureWorkstation() {
   const [discrepancyCount, setDiscrepancyCount] = useState(0);
   
   const [isPurgeDialogOpen, setIsPurgeDialogOpen] = useState(false);
+  const [isGlobalWipeOpen, setIsGlobalWipeOpen] = useState(false);
 
   const heartbeatData = useMemo(() => Array.from({ length: 20 }).map((_, i) => ({
     time: i,
@@ -104,7 +107,21 @@ export function InfrastructureWorkstation() {
       await refreshRegistry();
       setIsPurgeDialogOpen(false);
     } catch (e) {
-      toast({ variant: "destructive", title: "Wipe Interrupted", description: "Local persistence layer is currently locked." });
+      toast({ variant: "destructive", title: "Wipe Interrupted" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleGlobalWipe = async () => {
+    setIsProcessing(true);
+    try {
+      await VirtualDBService.purgeGlobalRegistry();
+      toast({ title: "Global Registry Reset", description: "All Cloud, Mirror, and Local records have been cleared." });
+      await refreshRegistry();
+      setIsGlobalWipeOpen(false);
+    } catch (e) {
+      toast({ variant: "destructive", title: "Global Reset Failed", description: "Permission denied or latency detected." });
     } finally {
       setIsProcessing(false);
     }
@@ -257,20 +274,20 @@ export function InfrastructureWorkstation() {
         </CardContent>
       </Card>
 
-      {/* Preparation & Purge Zone */}
+      {/* Preparation & Global Wipe Zone */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 px-2">
         <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
           <CardHeader className="p-8 border-b bg-muted/20">
             <CardTitle className="text-xl font-black uppercase flex items-center gap-3">
               <RotateCcw className="h-5 w-5 text-primary" /> Register Preparation
             </CardTitle>
-            <CardDescription className="text-xs font-medium">Reset the workstation to prepare for new data import.</CardDescription>
+            <CardDescription className="text-xs font-medium">Reset the workstation state for a fresh Project Pulse.</CardDescription>
           </CardHeader>
           <CardContent className="p-8 space-y-6">
             <div className="p-6 rounded-2xl bg-primary/5 border-2 border-dashed border-primary/20 space-y-2">
               <h5 className="text-[10px] font-black uppercase text-primary tracking-widest">Wipe local operational state</h5>
               <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed">
-                Selecting this wipe will purge all asset records from your local device cache and sandbox. This ensures your workstation is clear for a new import. Cloud records will not be affected.
+                Purge all asset records from your local device cache and sandbox. Use this before a new workbook import to ensure a clean local registry.
               </p>
             </div>
             <Button 
@@ -278,44 +295,46 @@ export function InfrastructureWorkstation() {
               onClick={() => setIsPurgeDialogOpen(true)}
               className="w-full h-16 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] border-2 text-destructive border-destructive/20 hover:bg-destructive/5 transition-all shadow-sm"
             >
-              <Bomb className="h-4 w-4 mr-3" /> Initialize Local Registry Wipe
+              <Smartphone className="h-4 w-4 mr-3" /> Initialize Local Registry Wipe
             </Button>
           </CardContent>
         </Card>
 
-        <Card className="rounded-[2.5rem] border-2 border-border/40 shadow-2xl bg-card/50 overflow-hidden">
-          <CardHeader className="p-8 border-b bg-muted/20">
-            <CardTitle className="text-xl font-black uppercase flex items-center gap-3">
-              <ArrowRightLeft className="h-5 w-5 text-primary" /> Parity Ledger
+        <Card className="rounded-[2.5rem] border-2 border-destructive/20 shadow-2xl bg-destructive/[0.02] overflow-hidden">
+          <CardHeader className="p-8 border-b bg-destructive/5">
+            <CardTitle className="text-xl font-black uppercase flex items-center gap-3 text-destructive">
+              <Bomb className="h-5 w-5" /> Global Registry Reset
             </CardTitle>
+            <CardDescription className="text-xs font-medium">Permanently clear all records from the global authority.</CardDescription>
           </CardHeader>
-          <CardContent className="p-8 space-y-8">
-            <div className="p-6 rounded-2xl border-2 border-dashed bg-background/40 space-y-2 group hover:border-primary/20 transition-all">
-              <span className="text-[9px] font-black uppercase text-muted-foreground opacity-60">Cross-Layer Drift</span>
-              <p className={cn("text-3xl font-black tabular-nums", discrepancyCount > 0 ? "text-destructive" : "text-green-600")}>
-                {discrepancyCount} Records
+          <CardContent className="p-8 space-y-6">
+            <div className="p-6 rounded-2xl bg-destructive/5 border-2 border-dashed border-destructive/20 space-y-2">
+              <h5 className="text-[10px] font-black uppercase text-destructive tracking-widest">Wipe ALL Cloud & Local Data</h5>
+              <p className="text-[11px] font-medium text-muted-foreground italic leading-relaxed">
+                This action is IRREVERSIBLE. It will delete all asset data across Firestore, the Standby Mirror, and all local device caches. Use this ONLY to prepare the system for a total project restart.
               </p>
             </div>
             <Button 
-              variant="outline" 
-              onClick={() => setActiveView('DATABASE')}
-              className="w-full h-16 rounded-2xl font-black uppercase text-xs tracking-widest border-2 hover:bg-primary/5 tactile-pulse shadow-sm"
+              onClick={() => setIsGlobalWipeOpen(true)}
+              disabled={!isOnline}
+              className="w-full h-16 rounded-2xl font-black uppercase text-xs tracking-[0.2em] bg-destructive text-white shadow-2xl shadow-destructive/30 transition-transform hover:scale-105 active:scale-95 gap-3"
             >
-              <ScanSearch className="h-4 w-4 mr-2" /> Forensic Resolution
+              <Hammer className="h-5 w-5" /> Execute Global Reset Pulse
             </Button>
           </CardContent>
         </Card>
       </div>
 
+      {/* Local Wipe Dialog */}
       <AlertDialog open={isPurgeDialogOpen} onOpenChange={setIsPurgeDialogOpen}>
         <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-background">
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
-              <Bomb className="h-10 w-10 text-destructive" />
+              <Smartphone className="h-10 w-10 text-destructive" />
             </div>
             <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Wipe Local Database?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-muted-foreground">
-              This action will purge all asset records, sync logs, and staging sandboxes <strong>on this device only</strong>. It is intended to prepare your workstation for a fresh workbook import. Cloud Authority data is preserved.
+              This will purge all asset records and staging sandboxes <strong>on this device only</strong>. It is intended to prepare your workstation for a fresh import. Cloud data is preserved.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
@@ -325,8 +344,33 @@ export function InfrastructureWorkstation() {
               disabled={isProcessing}
               className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0"
             >
-              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Hammer className="h-4 w-4 mr-2" />}
+              {isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
               Commit Local Wipe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Global Wipe Dialog */}
+      <AlertDialog open={isGlobalWipeOpen} onOpenChange={setIsGlobalWipeOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-black text-white">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit">
+              <Bomb className="h-12 w-12 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Execute Global Registry Reset?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/60">
+              You are about to permanently delete EVERY record in the global registry pulse. This includes all Cloud storage, the standby mirror, and all synchronized auditor devices. This action is immutable.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-10 gap-3">
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0 hover:bg-white/5 text-white">Abort Global Wipe</AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleGlobalWipe}
+              disabled={isProcessing}
+              className="h-14 px-12 rounded-2xl font-black uppercase bg-destructive text-white m-0"
+            >
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />} Commit Reset Pulse
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

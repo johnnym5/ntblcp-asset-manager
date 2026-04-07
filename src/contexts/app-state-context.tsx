@@ -1,3 +1,4 @@
+
 'use client';
 
 /**
@@ -5,6 +6,7 @@
  * Phase 270: Implemented multi-state scope downloads for Zonal Administrators.
  * Phase 360: Integrated Real-Time Settings Pulse via Firestore onSnapshot.
  * Phase 361: Wrapped search params in Suspense to resolve build pulse bailout.
+ * Phase 370: Hardened Online/Offline disconnect logic for total cloud isolation.
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, Dispatch, SetStateAction, Suspense } from 'react';
@@ -105,7 +107,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
   const [assets, setAssets] = useState<Asset[]>([]);
   const [sandboxAssets, setSandboxAssets] = useState<Asset[]>([]);
   const [dataSource, setDataSourceStatus] = useState<DataSource>('PRODUCTION');
-  const [isOnline, setIsOnlineStatus] = useState(true);
+  const [isOnline, setIsOnlineStatus] = useState(() => {
+    if (typeof window === 'undefined') return true;
+    const saved = localStorage.getItem('assetain-online-pulse');
+    return saved ? JSON.parse(saved) : true;
+  });
   const [searchTerm, setSearchTerm] = useState('');
   const [isSyncing, setIsSyncing] = useState(false);
   const [appSettings, setAppSettings] = useState<AppSettings | null>(null);
@@ -186,14 +192,13 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       }
     });
 
-    // 2. Continuous Cloud Synchronization
-    if (db) {
+    // 2. Continuous Cloud Synchronization (Strictly Gated by isOnline)
+    if (db && isOnline) {
       const settingsRef = doc(db, 'config', 'settings');
       const unsubscribe = onSnapshot(settingsRef, (snapshot) => {
         if (snapshot.exists()) {
           const remoteSettings = snapshot.data() as AppSettings;
           setAppSettings(remoteSettings);
-          // Sync to local IDB for offline parity
           storage.saveSettings(remoteSettings);
           setSettingsLoaded(true);
         } else {
@@ -204,7 +209,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       });
       return () => unsubscribe();
     }
-  }, [isHydrated]);
+  }, [isHydrated, isOnline]);
 
   const setActiveView = useCallback((view: WorkstationView) => {
     setActiveViewStatus(view);
@@ -239,7 +244,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const manualDownload = useCallback(async () => {
     if (!isOnline) {
-      addNotification({ title: "Offline Pulse", description: "Internet connection required for cloud pull.", variant: "destructive" });
+      addNotification({ title: "Offline Scope", description: "Reconnection required for cloud pull.", variant: "destructive" });
       return;
     }
 
@@ -285,7 +290,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
       }
       await refreshRegistry();
     } catch (e) {
-      addNotification({ title: "Connection Latent", description: "Cloud heartbeat failed during download.", variant: "destructive" });
+      addNotification({ title: "Connection Latent", description: "Cloud heartbeat failed.", variant: "destructive" });
     } finally {
       setIsSyncing(false);
     }
@@ -293,7 +298,7 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const manualUpload = useCallback(async () => {
     if (!isOnline) {
-      addNotification({ title: "Offline Pulse", description: "Internet connection required for cloud push.", variant: "destructive" });
+      addNotification({ title: "Offline Mode", description: "Reconnection required for cloud push.", variant: "destructive" });
       return;
     }
     setIsSyncing(true);
@@ -313,7 +318,11 @@ export const AppStateProvider = ({ children }: { children: React.ReactNode }) =>
 
   const setIsOnline = (status: boolean) => {
     setIsOnlineStatus(status);
-    addNotification({ title: status ? "Cloud Pulse Enabled" : "Cloud Pulse Inhibited" });
+    localStorage.setItem('assetain-online-pulse', JSON.stringify(status));
+    addNotification({ 
+      title: status ? "Cloud Reconnection Active" : "Total Cloud Disconnect", 
+      description: status ? "Heartbeat established with Firestore Authority." : "Disconnected from cloud. Operating in local persistence mode."
+    });
   };
 
   const setActiveGrantId = async (id: string) => {
