@@ -21,7 +21,6 @@ import { useAppState } from '@/contexts/app-state-context';
 import { AssetSummaryDashboard } from '@/components/asset-summary-dashboard';
 import { RegistryWorkstation } from './RegistryWorkstation';
 import { ReportsWorkstation } from './ReportsWorkstation';
-import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { SyncQueueWorkstation } from './SyncQueueWorkstation';
 import { AssetGroupsWorkstation } from './AssetGroupsWorkstation';
 import { DiscrepancyWorkstation } from './DiscrepancyWorkstation';
@@ -100,14 +99,6 @@ export function DashboardWorkstation() {
                 </div>
                 <SyncQueueWorkstation isEmbedded={true} />
               </div>
-            </div>
-
-            <div className="space-y-6 md:space-y-8 px-1 pt-12 border-t border-white/5">
-              <div className="flex items-center gap-3 px-1">
-                <History className="h-4 w-4 text-primary" />
-                <h3 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40">{isAdvanced ? 'Audit Trail' : 'Activity History'}</h3>
-              </div>
-              <AuditLogWorkstation isEmbedded={true} />
             </div>
           </TabsContent>
 

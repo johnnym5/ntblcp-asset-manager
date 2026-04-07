@@ -376,7 +376,27 @@ export function SettingsWorkstation() {
         </TabsContent>
 
         <TabsContent value="history" className="m-0 outline-none px-1">
-          <AuditLogWorkstation />
+          <div className="space-y-6">
+            <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Modification History</h3>
+            <Accordion type="single" collapsible className="w-full">
+              <AccordionItem value="audit-log" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6">
+                <AccordionTrigger className="hover:no-underline py-6">
+                  <div className="flex items-center gap-4">
+                    <div className="p-2.5 bg-primary/10 rounded-xl">
+                      <History className="h-5 w-5 text-primary" />
+                    </div>
+                    <div className="text-left">
+                      <h4 className="text-sm font-black uppercase text-white">Full Activity Ledger</h4>
+                      <p className="text-[10px] text-white/40 italic">Review every registry mutation pulse.</p>
+                    </div>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="pb-8">
+                  <AuditLogWorkstation isEmbedded={true} />
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
         </TabsContent>
       </Tabs>
 
