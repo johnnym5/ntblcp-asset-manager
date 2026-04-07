@@ -50,7 +50,7 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
       onClick={() => onInspect(record.id)}
     >
       <CardContent className="p-0">
-        {/* Top Slot: Circular Selection & Row Metadata */}
+        {/* Top Slot: Circular Selection & Metadata */}
         <div className="p-5 flex flex-col gap-1.5 relative border-b border-border/40">
           <div className="flex items-center justify-between">
             <div 
@@ -64,9 +64,6 @@ export function RegistryCard({ record, onInspect, selected, onToggleSelect }: Re
             </div>
             
             <div className="flex items-center gap-4">
-              <span className="text-[10px] font-bold text-muted-foreground opacity-40 uppercase tracking-tighter">
-                Row {record.sourceRow || '---'}
-              </span>
               <div onClick={(e) => e.stopPropagation()}>
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
