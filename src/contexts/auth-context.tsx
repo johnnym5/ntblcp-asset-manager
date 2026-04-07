@@ -1,15 +1,15 @@
-
 'use client';
 
 /**
  * @fileOverview AuthContext - Identity & Access Gateway.
- * Phase 300: Implemented Initialization Pulse flag for session-based onboarding.
+ * Hardened for deployment: Sign out now performs a deterministic wipe of local asset data.
  */
 
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { useAppState } from './app-state-context';
 import { v4 as uuidv4 } from 'uuid';
 import { FirebaseAuthService } from '@/services/firebase/auth';
+import { storage } from '@/offline/storage';
 import type { AuthorizedUser, UserRole } from '@/types/domain';
 
 export interface LocalUserProfile {
@@ -122,18 +122,16 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         canEditAssets: user.canEditAssets || user.isAdmin || user.role === 'ADMIN' || user.role === 'SUPERADMIN',
       };
       
-      // Set session flag to trigger onboarding tour
       sessionStorage.setItem('assetain-fresh-login', 'true');
-      
       localStorage.setItem('assetain-user-session', JSON.stringify(newProfile));
       setUserProfile(newProfile);
       setProfileSetupComplete(true);
 
-      // Automated Initial Download Pulse
+      // Automated Initial Download
       await manualDownload();
       
     } catch (e) {
-      console.error("Auth: Login pulse failed", e);
+      console.error("Auth: Login failed", e);
     } finally {
       setLoading(false);
     }
@@ -141,12 +139,23 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
   const logout = async () => {
     setLoading(true);
-    localStorage.removeItem('assetain-user-session');
-    sessionStorage.removeItem('assetain-fresh-login');
-    setUserProfile(null);
-    setProfileSetupComplete(false);
-    await FirebaseAuthService.terminateSession();
-    window.location.href = '/';
+    try {
+      // Deterministic wipe of local data on logout for security
+      await storage.clearAssets(); 
+      
+      localStorage.removeItem('assetain-user-session');
+      sessionStorage.removeItem('assetain-fresh-login');
+      setUserProfile(null);
+      setProfileSetupComplete(false);
+      await FirebaseAuthService.terminateSession();
+      window.location.href = '/';
+    } catch (e) {
+      console.error("Auth: Logout failure", e);
+      // Fallback redirect even if database wipe fails
+      window.location.href = '/';
+    } finally {
+      setLoading(false);
+    }
   };
 
   const value = { userProfile, loading, profileSetupComplete, login, logout, authInitialized };

@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @fileOverview RegistryWorkstation - Technical Inventory Browser.
+ * @fileOverview Asset Hub - Main Registry Browser.
  */
 
 import React, { useMemo, useState, useCallback, useRef } from 'react';
@@ -149,26 +149,6 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     });
   }, [activeGrant, groupStats, appSettings?.enabledSheets]);
 
-  const optionsMap = useMemo(() => {
-    const map: Record<string, string[]> = {};
-    headers.forEach(header => {
-      const values = new Set<string>();
-      activeAssets.forEach(a => {
-        let val: any = "";
-        switch(header.normalizedName) {
-          case "sn": val = a.sn; break;
-          case "location": val = a.location; break;
-          case "asset_description": val = a.description; break;
-          case "asset_id_code": val = a.assetIdCode; break;
-          default: val = a.metadata?.[header.rawName] || a.metadata?.[header.normalizedName];
-        }
-        if (val !== undefined && val !== null && val !== "") values.add(String(val));
-      });
-      map[header.id] = Array.from(values).sort();
-    });
-    return map;
-  }, [activeAssets, headers]);
-
   const processedAssets = useMemo(() => {
     let results = [...activeAssets];
     if (selectedCategories.length > 0) results = results.filter(a => selectedCategories.includes(a.category));
@@ -222,7 +202,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       await refreshRegistry();
       setSelectedCategories([]);
       setIsPurgeDialogOpen(false);
-      addNotification({ title: "Assets Removed", description: `Removed ${idsToDelete.length} records.`, variant: "destructive" });
+      addNotification({ title: "Folder Removed", description: `Purged ${idsToDelete.length} records.`, variant: "destructive" });
     } finally {
       setIsProcessing(false);
     }
@@ -242,15 +222,15 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <div className="p-2 bg-primary/10 rounded-xl shadow-inner"><Database className="h-5 w-5 text-primary" /></div>
             <div className="space-y-0.5">
               <h2 className="text-lg font-black uppercase text-white tracking-tight leading-none">{selectedCategories.length === 0 ? 'Asset Hub' : 'Asset List'}</h2>
-              <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">{selectedCategories.length === 0 ? 'CATEGORIES' : 'VIEWING ASSETS'}</p>
+              <p className="text-[8px] font-bold text-white/40 uppercase tracking-[0.2em]">{selectedCategories.length === 0 ? 'CATEGORIES' : 'VIEWING FOLDER'}</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 w-full lg:w-auto">
             {(selectedCategories.length === 0 || !viewAll) && (
               <div className="flex items-center gap-3 pr-4 border-r border-white/10 shrink-0">
-                <Checkbox id="sel-all-cat" checked={selectedCategories.length === categories.length && categories.length > 0} onCheckedChange={(c) => setSelectedCategories(c ? categories : [])} className="h-5 w-5 rounded-lg border-2 border-white/20 data-[state=checked]:bg-primary" />
-                <label htmlFor="sel-all-cat" className="text-[9px] font-black uppercase tracking-widest text-white/40 cursor-pointer">Select All</label>
+                <Checkbox id="sel-all-hub" checked={selectedCategories.length === categories.length && categories.length > 0} onCheckedChange={(c) => setSelectedCategories(c ? categories : [])} className="h-5 w-5 rounded-lg border-2 border-white/20 data-[state=checked]:bg-primary" />
+                <label htmlFor="sel-all-hub" className="text-[9px] font-black uppercase tracking-widest text-white/40 cursor-pointer">Select All</label>
               </div>
             )}
 
@@ -261,7 +241,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 ) : (
                   <motion.div initial={{ width: 0, opacity: 0 }} animate={{ width: "280px", opacity: 1 }} exit={{ width: 0, opacity: 0 }} className="relative group">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-primary" />
-                    <Input ref={searchInputRef} placeholder="Search Assets..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-white/[0.05] border-2 border-primary/20 text-white text-xs focus:border-primary" />
+                    <Input ref={searchInputRef} placeholder="Find assets..." value={searchTerm} onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))} onBlur={() => !searchTerm && setIsSearchExpanded(false)} className="h-10 pl-9 pr-8 rounded-lg bg-white/[0.05] border-2 border-primary/20 text-white text-xs focus:border-primary" />
                     <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-2 top-1/2 -translate-y-1/2 text-white/20 hover:text-white"><X className="h-3.5 w-3.5" /></button>
                   </motion.div>
                 )}
@@ -301,9 +281,9 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 </div>
                 <div className="space-y-1 mb-8 pl-8">
                   <p className="text-4xl font-black tracking-tighter text-white">{groupStats[cat]?.total || 0}</p>
-                  <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">Assets</p>
+                  <p className="text-[9px] font-black uppercase text-primary tracking-[0.2em]">TOTAL ASSETS</p>
                 </div>
-                <Button onClick={() => setSelectedCategories([cat])} variant="outline" className="w-full h-12 mt-auto rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-white/5 transition-all">View Assets <ChevronRight className="h-3 w-3" /></Button>
+                <Button onClick={() => setSelectedCategories([cat])} variant="outline" className="w-full h-12 mt-auto rounded-xl border-white/10 text-white font-black uppercase text-[10px] tracking-widest gap-2 hover:bg-white/5 transition-all">Explore Folder <ChevronRight className="h-3 w-3" /></Button>
               </Card>
             ))}
           </div>
@@ -333,7 +313,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
             <div className="flex items-center gap-3 pl-3"><div className="h-7 w-7 bg-primary rounded-full flex items-center justify-center text-black font-black text-[9px]">{selectedCategories.length}</div><span className="text-[9px] font-black uppercase text-white tracking-widest">Folders Selected</span></div>
             <div className="flex items-center gap-1.5">
               <Button variant="ghost" size="sm" onClick={() => setSelectedCategories([])} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-white/60 hover:text-white"><X className="h-3.5 w-3.5" /> Deselect</Button>
-              {isAdmin && <Button variant="ghost" size="sm" onClick={() => { setCategoriesToPurge(selectedCategories); setIsPurgeDialogOpen(true); }} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Delete Folder</Button>}
+              {isAdmin && <Button variant="ghost" size="sm" onClick={() => { setCategoriesToPurge(selectedCategories); setIsPurgeDialogOpen(true); }} className="h-9 px-4 rounded-lg font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10"><Trash2 className="h-3.5 w-3.5" /> Delete Folders</Button>}
             </div>
           </motion.div>
         )}
@@ -344,7 +324,7 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
       
       <Dialog open={isRenameDialogOpen} onOpenChange={setIsRenameDialogOpen}>
         <DialogContent className="max-w-md bg-black border-white/10 text-white p-8">
-          <DialogHeader><DialogTitle className="text-xl font-black uppercase">Rename Category</DialogTitle></DialogHeader>
+          <DialogHeader><DialogTitle className="text-xl font-black uppercase">Rename Folder</DialogTitle></DialogHeader>
           <div className="py-6 space-y-4">
             <Label className="text-[10px] font-black uppercase tracking-widest text-primary">New Folder Label</Label>
             <Input value={newCategoryName} onChange={(e) => setNewCategoryName(e.target.value)} className="h-12 bg-white/5 border-white/10 rounded-xl font-black uppercase text-sm" />
@@ -361,11 +341,11 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
           <AlertDialogHeader className="space-y-4">
             <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><AlertTriangle className="h-10 w-10 text-destructive" /></div>
             <AlertDialogTitle className="text-2xl font-black uppercase tracking-tight text-destructive">Confirm Deletion</AlertDialogTitle>
-            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/40">This will permanently delete {categoriesToPurge.length} folders and all records within them from both local and cloud storage.</AlertDialogDescription>
+            <AlertDialogDescription className="text-sm font-medium leading-relaxed italic text-white/40">This will permanently delete {categoriesToPurge.length} folders and all records within them from both local and cloud storage. This action is irreversible.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-8 gap-3">
             <AlertDialogCancel className="h-12 px-8 rounded-2xl font-bold border-2 border-white/10 m-0 text-white hover:bg-white/5">Cancel</AlertDialogCancel>
-            <AlertDialogAction onClick={handleExecutePurge} disabled={isProcessing} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Delete Folder</AlertDialogAction>
+            <AlertDialogAction onClick={handleExecutePurge} disabled={isProcessing} className="h-12 px-10 rounded-2xl font-black uppercase text-[10px] tracking-[0.2em] shadow-xl shadow-destructive/30 bg-destructive text-white m-0">{isProcessing ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Trash2 className="h-4 w-4 mr-2" />} Confirm Deletion</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

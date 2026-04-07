@@ -1,7 +1,7 @@
 'use client';
 
 /**
- * @fileOverview Dashboard Workstation - Unified Mission Control.
+ * @fileOverview Dashboard - Main Overview Hub.
  */
 
 import React, { useState, useMemo } from 'react';
@@ -61,7 +61,7 @@ export function DashboardWorkstation() {
   return (
     <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as DashboardTab)} className="space-y-6 sm:space-y-8 animate-in fade-in duration-700 h-full flex flex-col">
       
-      {/* PERSISTENT HEADER */}
+      {/* STICKY CONTROL HUB */}
       <div className="sticky top-[-1rem] z-50 bg-[#050505] pt-1 pb-3 px-1 border-b border-white/5 mb-4 -mx-1 shrink-0">
         <div className="flex flex-col lg:flex-row items-center justify-between gap-4 max-w-[1600px] mx-auto w-full">
           <div className="flex items-center gap-3 self-start">
@@ -73,7 +73,7 @@ export function DashboardWorkstation() {
                 Dashboard
               </h2>
               <p className="text-[7px] font-bold text-white/40 uppercase tracking-[0.25em] leading-none">
-                {isAdvanced ? 'System Overview' : 'Inventory Status'}
+                {isAdvanced ? 'SYSTEM OVERVIEW' : 'ASSET STATUS'}
               </p>
             </div>
           </div>
@@ -82,10 +82,10 @@ export function DashboardWorkstation() {
             <div className="w-full lg:w-auto bg-white/[0.03] p-0.5 rounded-lg border border-white/5 flex items-center shrink-0">
               <TabsList className="bg-transparent border-none p-0 h-auto gap-0.5 flex items-center min-w-max">
                 <TabsTrigger value="overview" className="px-6 py-1.5 rounded-md font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                  Overview
+                  Summary
                 </TabsTrigger>
                 <TabsTrigger value="inventory" className="px-6 py-1.5 rounded-md font-black uppercase text-[8px] tracking-widest gap-2 data-[state=active]:bg-primary data-[state=active]:text-black transition-all">
-                  Asset List
+                  Asset Hub
                 </TabsTrigger>
               </TabsList>
             </div>
@@ -114,7 +114,7 @@ export function DashboardWorkstation() {
               <Card className="bg-[#080808] border border-white/5 rounded-[1.25rem] overflow-hidden shadow-xl">
                 <div className="p-4 border-b border-white/5 bg-white/[0.02]">
                   <h4 className="text-[9px] font-black uppercase tracking-[0.3em] text-primary flex items-center gap-2">
-                    <DatabaseZap className="h-3 w-3" /> Quick Settings
+                    <DatabaseZap className="h-3 w-3" /> Quick Access
                   </h4>
                 </div>
                 <CardContent className="p-4 space-y-2">
@@ -125,7 +125,7 @@ export function DashboardWorkstation() {
                   {isAdmin && (
                     <div className="p-3 rounded-lg bg-primary/5 border border-primary/10">
                       <p className="text-[8px] font-bold text-primary uppercase leading-relaxed italic">
-                        Admin access active. You can modify all registry data.
+                        Administrator Access Active.
                       </p>
                     </div>
                   )}
@@ -143,7 +143,7 @@ export function DashboardWorkstation() {
                 </div>
                 <AccordionTrigger className="hover:no-underline p-0 h-auto w-auto">
                   <Badge variant="outline" className="border-white/10 text-white/40 uppercase text-[7px] font-black px-2 py-0.5 cursor-pointer hover:bg-white/5 gap-1.5">
-                    View Folders <ChevronDown className="h-2.5 w-2.5" />
+                    Explore <ChevronDown className="h-2.5 w-2.5" />
                   </Badge>
                 </AccordionTrigger>
               </div>
@@ -156,7 +156,7 @@ export function DashboardWorkstation() {
               <div className="flex items-center justify-between px-1 mb-3">
                 <div className="flex items-center gap-3">
                   <div className="p-1.5 bg-red-600/10 rounded-lg"><SearchCode className="h-4 w-4 text-red-600" /></div>
-                  <h3 className="text-base font-black uppercase text-white tracking-tight">Pattern Review</h3>
+                  <h3 className="text-base font-black uppercase text-white tracking-tight">Data Review</h3>
                 </div>
                 <div className="flex items-center gap-2">
                   {anomalyCount > 0 && (
@@ -181,7 +181,7 @@ export function DashboardWorkstation() {
             <div className="space-y-4">
               <div className="flex items-center gap-2 px-1">
                 <FileText className="h-3 w-3 text-primary" />
-                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Reports</h3>
+                <h3 className="text-[9px] font-black uppercase tracking-[0.3em] text-white/40">Reporting</h3>
               </div>
               <ReportsWorkstation isEmbedded={true} />
             </div>
