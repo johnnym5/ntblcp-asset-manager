@@ -1,8 +1,8 @@
-
 /**
  * @fileOverview Deterministic Structural Row Classifier.
  * Identifies the functional role of a row based on Column A behavior and row density.
  * Phase 701: Relaxed density requirements to prevent data loss in legacy transfers.
+ * Phase 702: Hardened header detection for "ASSETS TAG NO" variants.
  */
 
 import { RowClassification } from './types';
@@ -10,7 +10,7 @@ import { RowClassification } from './types';
 const SCHEMA_ANCHORS = [
   'S/N', 'SN', 'S.N', 'SERIAL NO', 'SERIAL NUMBER', 
   'S/NO', 'S / N', 'S / NO', 'SERIAL', 'TAG NUMBER', 
-  'ASSETS TAG NO', 'TAG NUMBERS'
+  'ASSETS TAG NO', 'TAG NUMBERS', 'TAG NO'
 ];
 
 const KNOWN_MARKERS = [
@@ -34,7 +34,7 @@ export function classifyRow(row: any[]): RowClassification {
   const isNumericColA = firstCellRaw !== '' && !isNaN(Number(firstCellRaw));
 
   // 1. SCHEMA_HEADER
-  // Lowered populatedCount from 4 to 3 to capture simplified tables.
+  // Recognize "ASSETS TAG NO" and similar as anchors even if they aren't strictly Col A.
   const normalizedAnchors = SCHEMA_ANCHORS.map(a => a.replace(/\s+/g, ''));
   if (normalizedAnchors.some(anchor => firstCellNoSpace === anchor || firstCellNoSpace.startsWith(anchor))) {
     if (populatedCount >= 3) {

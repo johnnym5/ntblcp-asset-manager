@@ -6,6 +6,7 @@
  * Phase 900: Integrated LocationEngine for canonical admin mapping.
  * Phase 905: Enhanced error capture to return rejected assets with logs.
  * Phase 910: Replaced generic "Col X" labels with Synthetic Registry Headers.
+ * Phase 911: Fixed mapping for "ASSETS TAG NO" variant in transfer sheets.
  */
 
 import { v4 as uuidv4 } from 'uuid';

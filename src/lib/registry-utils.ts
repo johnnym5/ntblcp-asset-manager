@@ -2,6 +2,7 @@
  * @fileOverview Registry Utilities.
  * Handles header normalization, hierarchical data transformation, and color coding.
  * Phase 800: Updated transformAssetToRecord to use authoritative 'sn' and camelCase properties.
+ * Phase 801: Enhanced normalization for "Assets Tag No" variants.
  */
 
 import type { Asset } from "@/types/domain";
@@ -18,7 +19,7 @@ export function normalizeHeaderName(name: string): string {
   if (n.includes("chq no") || n.includes("goods received note")) return "goods_received_note_no";
   if (n.includes("assignee")) return "assignee_location";
   if (n.includes("asset description")) return "asset_description";
-  if (n.includes("asset id code") || n.includes("tag number") || n.includes("tag numbers")) return "asset_id_code";
+  if (n.includes("asset id code") || n.includes("tag number") || n.includes("tag numbers") || n.includes("tag no")) return "asset_id_code";
   if (n.includes("asset class") || n.includes("classification")) return "asset_class";
   if (n === "s/n" || n === "sn") return "sn";
   if (n === "serial number" || n === "serial numbers") return "serial_number";

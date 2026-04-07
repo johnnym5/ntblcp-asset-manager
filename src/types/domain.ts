@@ -209,6 +209,7 @@ export interface Grant {
 }
 
 export interface AppSettings {
+  version: number;
   authorizedUsers: AuthorizedUser[];
   lockAssetList: boolean;
   appMode: 'management' | 'verification';

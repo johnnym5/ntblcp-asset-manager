@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 322: Corrected ReferenceErrors and hardened parity pulse logic.
+ * Phase 325: Implemented Registry Version Control counter and high-density branding pulse.
  */
 
 import React, { useState, useRef } from 'react';
@@ -62,7 +62,6 @@ import { ColumnCustomizationSheet } from '@/components/column-customization-shee
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
-import { ImportScannerDialog } from '@/components/single-sheet-import-dialog';
 import { parseExcelForTemplate } from '@/lib/excel-parser';
 import { addNotification } from '@/hooks/use-notifications';
 import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
@@ -226,11 +225,20 @@ export function SettingsWorkstation() {
     }
   };
 
-  const handleSaveChange = async () => {
+  const handleSaveChangePulse = async () => {
+    if (!appSettings) return;
     setIsSaving(true);
     try {
+      // Version Control Counter increment on every explicit save pulse
+      const nextVersion = (appSettings.version || 0) + 1;
+      const updatedSettings = { ...appSettings, version: nextVersion };
+      
+      if (isOnline) await FirestoreService.updateSettings({ version: nextVersion });
+      await storage.saveSettings(updatedSettings);
+      setAppSettings(updatedSettings);
+      
       await refreshRegistry();
-      addNotification({ title: "System Synchronized", description: "All storage nodes are in absolute parity.", variant: "success" });
+      addNotification({ title: `Version ${nextVersion} Committed`, description: "Global registry state synchronized.", variant: "success" });
     } finally {
       setIsSaving(false);
     }
@@ -255,7 +263,10 @@ export function SettingsWorkstation() {
           <div className="flex items-center justify-between">
             <div className="space-y-0.5">
               <h2 className="text-xl font-black uppercase text-white tracking-tight leading-none">Settings</h2>
-              <p className="text-[9px] font-bold uppercase text-white/40 tracking-widest mt-0.5">Operational Control Hub</p>
+              <div className="flex items-center gap-2 mt-0.5">
+                <p className="text-[9px] font-bold uppercase text-white/40 tracking-widest">Operational Control Hub</p>
+                <Badge variant="outline" className="h-4 border-primary/20 text-primary text-[7px] font-black uppercase">v{appSettings.version || 1}.0</Badge>
+              </div>
             </div>
             <button onClick={() => setActiveView('DASHBOARD')} className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center bg-white/5 hover:bg-white/10 border border-white/5 rounded-xl transition-all"><X className="h-4 w-4 text-white/40" /></button>
           </div>
@@ -273,6 +284,22 @@ export function SettingsWorkstation() {
 
       <div className="flex-1 min-h-0 pt-2 overflow-y-auto custom-scrollbar pb-20 px-1">
         <TabsContent value="general" className="space-y-8 m-0 outline-none">
+          <section>
+            <SectionTitle title="Version Control" description="Registry Orchestration Pulse" icon={Database} />
+            <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-0.5">
+                  <h4 className="text-xs font-black uppercase text-white">System Index</h4>
+                  <p className="text-[9px] text-white/40 leading-relaxed italic max-w-sm">Every saved configuration pulse increments the global registry version.</p>
+                </div>
+                <div className="flex flex-col items-end">
+                  <span className="text-2xl font-black text-primary tracking-tighter">v{appSettings.version || 1}.0</span>
+                  <span className="text-[7px] font-bold text-white/20 uppercase">STABLE PRODUCTION PULSE</span>
+                </div>
+              </div>
+            </Card>
+          </section>
+
           <section>
             <SectionTitle title="Security" description="Passphrase Management" icon={Lock} />
             <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl">
@@ -312,7 +339,7 @@ export function SettingsWorkstation() {
           <section>
             <SectionTitle title="Appearance" description="Visual Identity" icon={Palette} />
             <Card className="bg-[#050505] border-white/5 rounded-xl p-4 shadow-xl">
-              <div className="flex flex-wrap gap-2">
+              <div className="flex wrap gap-2">
                 <Button variant={theme === 'light' ? 'secondary' : 'outline'} onClick={() => setTheme('light')} className="flex-1 h-10 rounded-lg font-black uppercase text-[9px] border shadow-sm">
                   <Sun className="h-3.5 w-3.5 mr-2" /> Light
                 </Button>
@@ -390,7 +417,7 @@ export function SettingsWorkstation() {
                     <Button variant="outline" onClick={handleImportTemplate} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5 text-white/80">
                       <FileUp className="h-3 w-3" /> Import Template
                     </Button>
-                    <Button variant="outline" onClick={() => setActiveView('IMPORT')} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5 text-white/80">
+                    <Button variant="outline" onClick={() => { setActiveView('IMPORT'); onOpenChange?.(false); }} className="flex-1 h-10 rounded-xl bg-white/[0.02] border-white/10 font-black uppercase text-[8px] tracking-widest gap-2 hover:bg-white/5 text-white/80">
                       <ScanSearch className="h-3.5 w-3.5 text-primary" /> Scan & Import Data
                     </Button>
                   </div>
@@ -422,7 +449,8 @@ export function SettingsWorkstation() {
 
       <div className="mt-2 pt-4 border-t border-white/5 flex items-center justify-between px-1 shrink-0 pb-10">
         <Button variant="ghost" onClick={() => setActiveView('DASHBOARD')} className="h-10 px-8 rounded-lg bg-[#0A0A0A] text-white/60 font-black uppercase text-[9px] tracking-widest">Dismiss</Button>
-        <Button onClick={handleSaveChange} className="h-10 px-10 rounded-lg bg-primary text-black font-black uppercase text-[9px] tracking-[0.2em] shadow-xl transition-all hover:scale-105 active:scale-95">
+        <Button onClick={handleSaveChangePulse} disabled={isSaving} className="h-10 px-10 rounded-lg bg-primary text-black font-black uppercase text-[9px] tracking-[0.2em] shadow-xl transition-all hover:scale-105 active:scale-95">
+          {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <ShieldCheck className="h-4 w-4 mr-2" />}
           Save Change
         </Button>
       </div>
@@ -463,10 +491,11 @@ export function SettingsWorkstation() {
           isOpen={isColumnSheetOpen}
           onOpenChange={setIsColumnSheetOpen}
           sheetDefinition={selectedSheetDef}
-          originalSheetName={selectedSheetDef?.name || null}
+          originalSheetName={selectedSheetDef.name}
           onSave={(orig, newDef, all) => {
+            if (!appSettings) return;
             const updatedGrants = appSettings.grants.map(grant => {
-              if (grant.id === activeGrantId) {
+              if (grant.id === activeGrantForSchema) {
                 const newSheetDefs = { ...grant.sheetDefinitions };
                 if (all) {
                   Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
