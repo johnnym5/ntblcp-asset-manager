@@ -2,11 +2,10 @@
 
 /**
  * @fileOverview SettingsWorkstation - Executive Operational Control.
- * Phase 155: Achieved 100% parity with requested design for Projects, Sheets, and General preferences.
- * Phase 156: Integrated Database Workstation tab for Super Admins.
+ * Hardened for deployment: fixed References and unified domain imports.
  */
 
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { useTheme } from 'next-themes';
@@ -17,7 +16,6 @@ import {
   Users, 
   PlusCircle,
   Database,
-  ChevronDown,
   Wrench,
   X,
   Loader2,
@@ -57,7 +55,7 @@ import { ColumnCustomizationSheet } from '@/components/column-customization-shee
 import { AuditLogWorkstation } from './AuditLogWorkstation';
 import { ErrorAuditWorkstation } from './ErrorAuditWorkstation';
 import { DatabaseWorkstation } from './DatabaseWorkstation';
-import type { AppSettings, Grant, SheetDefinition, UXMode } from '@/types/domain';
+import type { AppSettings, Grant, SheetDefinition } from '@/types/domain';
 import {
   Select,
   SelectContent,
@@ -76,7 +74,8 @@ export function SettingsWorkstation() {
     isOnline, 
     settingsLoaded,
     setActiveView,
-    setActiveGrantId 
+    setActiveGrantId,
+    activeGrantId 
   } = useAppState();
   
   const { userProfile } = useAuth();
@@ -88,12 +87,10 @@ export function SettingsWorkstation() {
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState('');
 
-  // Column Customization State
   const [isColumnSheetOpen, setIsColumnSheetOpen] = useState(false);
   const [selectedSheetDef, setSelectedSheetDef] = useState<SheetDefinition | null>(null);
   const [activeGrantForSchema, setActiveGrantIdForSchema] = useState<string | null>(null);
 
-  // Security State
   const [passwords, setPasswords] = useState({ current: '', next: '', confirm: '' });
 
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
@@ -193,7 +190,6 @@ export function SettingsWorkstation() {
         </div>
 
         <TabsContent value="general" className="space-y-12 m-0 outline-none">
-          {/* Appearance Section */}
           <div className="space-y-6">
             <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Appearance</h3>
             <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-8 shadow-3xl">
@@ -211,7 +207,6 @@ export function SettingsWorkstation() {
             </Card>
           </div>
 
-          {/* Security Section */}
           <div className="space-y-6">
             <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Security</h3>
             <Card className="bg-[#050505] border-white/5 rounded-[2rem] p-10 shadow-3xl">
@@ -241,7 +236,6 @@ export function SettingsWorkstation() {
             </Card>
           </div>
 
-          {/* Admin Row */}
           {isAdmin && (
             <div className="space-y-6">
               <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Global Admin Settings</h3>
@@ -279,91 +273,52 @@ export function SettingsWorkstation() {
           <div className="space-y-6">
             <h3 className="text-xl font-black uppercase text-white tracking-tight px-1">Manage Projects</h3>
             <div className="flex gap-3 px-1">
-              <Input 
-                placeholder="New project name..." 
-                value={newProjectName}
-                onChange={(e) => setNewProjectName(e.target.value)}
-                className="h-14 bg-white/[0.03] border-white/10 rounded-xl font-medium text-sm text-white"
-              />
-              <Button 
-                onClick={handleAddProject}
-                disabled={!newProjectName.trim()}
-                className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl"
-              >
-                <PlusCircle className="h-4 w-4" /> Add Project
-              </Button>
+              <Input placeholder="New project name..." value={newProjectName} onChange={(e) => setNewProjectName(e.target.value)} className="h-14 bg-white/[0.03] border-white/10 rounded-xl font-medium text-sm text-white" />
+              <Button onClick={handleAddProject} disabled={!newProjectName.trim()} className="h-14 px-8 rounded-xl bg-primary text-black font-black uppercase text-[11px] tracking-widest gap-2 shadow-xl"><PlusCircle className="h-4 w-4" /> Add Project</Button>
             </div>
           </div>
 
           <div className="space-y-4 px-1">
             {appSettings.grants.map((grant) => {
               const isActive = appSettings.activeGrantId === grant.id;
-              
               return (
-                <Card key={grant.id} className={cn(
-                  "border-2 transition-all duration-500 rounded-2xl overflow-hidden",
-                  isActive ? "bg-white/[0.03] border-white/10 shadow-2xl" : "bg-transparent border-white/5"
-                )}>
+                <Card key={grant.id} className={cn("border-2 transition-all duration-500 rounded-2xl overflow-hidden", isActive ? "bg-white/[0.03] border-white/10 shadow-2xl" : "bg-transparent border-white/5")}>
                   <div className="p-6 flex items-center justify-between">
                     <div className="flex items-center gap-4 flex-1">
                       <ChevronsUpDown className="h-4 w-4 text-white/20 shrink-0" />
                       <div className="flex items-center gap-3">
                         <span className="text-lg font-black uppercase text-white tracking-tight">{grant.name}</span>
-                        {isActive && (
-                          <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>
-                        )}
+                        {isActive && <Badge className="bg-primary text-black font-black uppercase text-[9px] h-6 px-3 rounded-full">Active</Badge>}
                       </div>
                     </div>
-
                     <div className="flex items-center gap-6">
-                      {!isActive && (
-                        <button onClick={() => setActiveGrantId(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80">Set Active</button>
-                      )}
+                      {!isActive && <button onClick={() => setActiveGrantId(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-primary hover:opacity-80">Set Active</button>}
                       <button className="text-[10px] font-black uppercase tracking-widest text-white/60 hover:text-white">Rename</button>
                       <button onClick={() => handleDeleteProject(grant.id)} className="text-[10px] font-black uppercase tracking-widest text-red-600 hover:text-red-500">Delete</button>
                     </div>
                   </div>
-
                   {isActive && (
                     <div className="px-6 pb-8 pt-2 space-y-8 animate-in fade-in slide-in-from-top-2 duration-500 border-t border-white/5 bg-white/[0.01]">
                       <div className="space-y-4">
                         <h4 className="text-[11px] font-black uppercase tracking-[0.25em] text-white/40 px-1">Sheet Definitions</h4>
                         <div className="space-y-2.5">
-                          {Object.keys(grant.sheetDefinitions || {}).length > 0 ? (
-                            Object.keys(grant.sheetDefinitions).map(sheetName => (
-                              <div key={sheetName} className="flex items-center justify-between p-5 bg-black border border-white/5 rounded-2xl group/sheet hover:border-white/20 transition-all shadow-inner">
-                                <span className="text-xs font-black uppercase text-white/80">{sheetName}</span>
-                                <div className="flex items-center gap-5 text-white/20">
-                                  <button className="hover:text-white transition-colors"><Eye className="h-4 w-4" /></button>
-                                  <button className="hover:text-white transition-colors"><Users className="h-4 w-4" /></button>
-                                  <button 
-                                    onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }}
-                                    className="hover:text-white transition-colors"
-                                  >
-                                    <Wrench className="h-4 w-4" />
-                                  </button>
-                                  <button className="hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
-                                </div>
+                          {Object.keys(grant.sheetDefinitions || {}).map(sheetName => (
+                            <div key={sheetName} className="flex items-center justify-between p-5 bg-black border border-white/5 rounded-2xl group/sheet hover:border-white/20 transition-all shadow-inner">
+                              <span className="text-xs font-black uppercase text-white/80">{sheetName}</span>
+                              <div className="flex items-center gap-5 text-white/20">
+                                <button className="hover:text-white transition-colors"><Eye className="h-4 w-4" /></button>
+                                <button className="hover:text-white transition-colors"><Users className="h-4 w-4" /></button>
+                                <button onClick={() => { setSelectedSheetDef(grant.sheetDefinitions[sheetName]); setActiveGrantIdForSchema(grant.id); setIsColumnSheetOpen(true); }} className="hover:text-white transition-colors"><Wrench className="h-4 w-4" /></button>
+                                <button className="hover:text-red-600 transition-colors"><Trash2 className="h-4 w-4" /></button>
                               </div>
-                            ))
-                          ) : (
-                            <div className="py-12 text-center border-2 border-dashed border-white/5 rounded-2xl opacity-20">
-                              <p className="text-[10px] font-black uppercase tracking-widest">No definitions found in project pulse</p>
                             </div>
-                          )}
+                          ))}
                         </div>
                       </div>
-
                       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                        <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5">
-                          <PlusCircle className="h-4 w-4" /> Add Manually
-                        </Button>
-                        <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5">
-                          <FileUp className="h-4 w-4" /> Import Template
-                        </Button>
-                        <Button onClick={() => setActiveView('IMPORT')} variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5">
-                          <ScanSearch className="h-4 w-4" /> Scan & Import Data
-                        </Button>
+                        <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5"><PlusCircle className="h-4 w-4" /> Add Manually</Button>
+                        <Button variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5"><FileUp className="h-4 w-4" /> Import Template</Button>
+                        <Button onClick={() => setActiveView('IMPORT')} variant="outline" className="h-14 rounded-2xl bg-white/[0.02] border-white/10 font-black uppercase text-[10px] tracking-widest gap-2.5 hover:bg-white/5"><ScanSearch className="h-4 w-4" /> Scan & Import Data</Button>
                       </div>
                     </div>
                   )}
@@ -394,9 +349,7 @@ export function SettingsWorkstation() {
               <AccordionItem value="audit-log" className="border-2 border-white/5 rounded-[2rem] bg-black/40 overflow-hidden px-6">
                 <AccordionTrigger className="hover:no-underline py-6">
                   <div className="flex items-center gap-4">
-                    <div className="p-2.5 bg-primary/10 rounded-xl">
-                      <History className="h-5 w-5 text-primary" />
-                    </div>
+                    <div className="p-2.5 bg-primary/10 rounded-xl"><History className="h-5 w-5 text-primary" /></div>
                     <div className="text-left">
                       <h4 className="text-sm font-black uppercase text-white">Full Activity Ledger</h4>
                       <p className="text-[10px] text-white/40 italic">Review every registry mutation pulse.</p>
@@ -422,12 +375,8 @@ export function SettingsWorkstation() {
             const updatedGrants = appSettings.grants.map(grant => {
               if (grant.id === activeGrantId) {
                 const newSheetDefs = { ...grant.sheetDefinitions };
-                if (all) {
-                  Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; });
-                } else {
-                  newSheetDefs[newDef.name] = newDef;
-                  if (orig && orig !== newDef.name) delete newSheetDefs[orig];
-                }
+                if (all) { Object.keys(newSheetDefs).forEach(k => { newSheetDefs[k] = { ...newDef, name: k }; }); }
+                else { newSheetDefs[newDef.name] = newDef; if (orig && orig !== newDef.name) delete newSheetDefs[orig]; }
                 return { ...grant, sheetDefinitions: newSheetDefs };
               }
               return grant;

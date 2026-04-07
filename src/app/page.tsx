@@ -2,10 +2,10 @@
 
 /**
  * @fileOverview Root Shell - Unified Command Hub.
- * Phase 404: Re-enabled manual Sync controls and optimized global padding.
+ * Hardened for deployment: fixed component ReferenceErrors and simplified workstation routing.
  */
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/contexts/auth-context';
 import { useAppState } from '@/contexts/app-state-context';
 import UserProfileSetup from '@/components/user-profile-setup';
@@ -14,25 +14,16 @@ import {
   Loader2, 
   LogOut, 
   Bell, 
-  ArrowLeft,
   Settings as SettingsIcon,
   Wifi,
   WifiOff,
-  ShieldCheck,
-  MapPin,
-  Terminal,
-  SearchCode,
-  LayoutDashboard,
   Search,
-  Filter,
-  Command,
   X,
-  FileUp,
-  ClipboardCheck,
-  History,
   Download,
   Upload,
-  RefreshCw
+  RefreshCw,
+  LayoutDashboard,
+  Filter
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn, sanitizeSearch } from '@/lib/utils';
@@ -59,9 +50,9 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
-import { canPerform } from '@/core/auth/rbac';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import type { WorkstationView } from '@/types/domain';
 
 export default function SPAHub() {
   const { userProfile, loading, profileSetupComplete, logout } = useAuth();
@@ -70,7 +61,6 @@ export default function SPAHub() {
     setActiveView, 
     isOnline, 
     setIsOnline,
-    assets,
     searchTerm,
     setSearchTerm,
     setIsFilterOpen,
@@ -100,7 +90,7 @@ export default function SPAHub() {
   }, []);
 
   if (loading) return <div className="flex h-screen w-full items-center justify-center bg-black"><Loader2 className="h-10 w-10 animate-spin text-primary" /></div>;
-  if (!profileSetupComplete) return <User { ...null } />; // Trigger auth flow if missing
+  if (!profileSetupComplete) return <UserProfileSetup />;
 
   const renderWorkstation = () => {
     switch (activeView) {
@@ -115,10 +105,6 @@ export default function SPAHub() {
       case 'REPORTS': return <ReportsWorkstation />;
       default: return <DashboardWorkstation />;
     }
-  };
-
-  const handleSearchChange = (val: string) => {
-    setSearchTerm(sanitizeSearch(val));
   };
 
   return (
@@ -138,7 +124,6 @@ export default function SPAHub() {
             </button>
           </div>
 
-          {/* iOS-Style Spotlight Trigger */}
           <div className="hidden lg:flex items-center flex-1 justify-center mx-12">
             <AnimatePresence mode="wait">
               {!isSearchExpanded ? (
@@ -173,7 +158,7 @@ export default function SPAHub() {
                     placeholder="Registry Search..."
                     className="w-full h-10 bg-white/[0.05] border-2 border-primary/20 rounded-xl pl-10 pr-10 text-xs font-bold focus:outline-none focus:border-primary transition-all placeholder:text-white/10"
                     value={searchTerm}
-                    onChange={(e) => handleSearchChange(e.target.value)}
+                    onChange={(e) => setSearchTerm(sanitizeSearch(e.target.value))}
                     onBlur={() => !searchTerm && setIsSearchExpanded(false)}
                   />
                   <button onClick={() => { setSearchTerm(''); setIsSearchExpanded(false); }} className="absolute right-3 p-1 rounded-lg text-white/20 hover:text-white">
@@ -185,7 +170,6 @@ export default function SPAHub() {
           </div>
 
           <div className="flex items-center gap-3">
-            {/* Manual Sync Pulse Cluster */}
             <div className="hidden md:flex items-center bg-white/[0.03] p-1 rounded-xl border border-white/5">
               <TooltipProvider>
                 <Tooltip>
@@ -252,7 +236,7 @@ export default function SPAHub() {
         <div className="flex-1 relative overflow-hidden">
           <ErrorBoundary module={activeView}>
             <ScrollArea className="h-full no-scrollbar">
-              <div className="p-4 md:p-8 lg:p-10">{renderWorkstation()}</div>
+              <div className="p-4 md:p-6 lg:p-8">{renderWorkstation()}</div>
             </ScrollArea>
           </ErrorBoundary>
         </div>

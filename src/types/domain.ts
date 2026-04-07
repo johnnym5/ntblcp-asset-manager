@@ -1,5 +1,6 @@
 /**
  * @fileOverview Unified Domain Models for Assetain.
+ * Authoritative type definitions for the entire application pulse.
  */
 
 export type UserRole = 'ADMIN' | 'MANAGER' | 'VERIFIER' | 'VIEWER' | 'SUPERADMIN';
@@ -104,7 +105,7 @@ export interface Asset {
   assetFamily: string;
   
   // Location & Assignment
-  location: string; // Raw input
+  location: string; 
   normalizedLocation?: string;
   normalizedState?: string;
   normalizedZone?: string;
@@ -118,20 +119,19 @@ export interface Asset {
   
   // State & Assessment
   status: VerificationStatus;
-  condition: string; // Human display label
-  conditionGroup: ConditionGroup; // Canonical grouping
+  condition: string;
+  conditionGroup: ConditionGroup;
   conditionNotes?: string;
   conditionHistory?: ConditionAuditEntry[];
   discrepancyFlag?: boolean;
   reviewStatus?: 'PENDING' | 'RESOLVED' | 'FLAGGED';
   
-  // Discrepancy Engine Data
   discrepancies: AssetDiscrepancy[];
-  overallFidelityScore: number; // 0-100
+  overallFidelityScore: number;
 
   // Financial & Technical
   purchaseDate?: string;
-  value: number; // NGN
+  value: number;
   serialNumber: string;
   assetIdCode?: string;
   manufacturer?: string;
@@ -142,33 +142,24 @@ export interface Asset {
   remarks?: string;
   
   geotag?: Geotag;
-
-  // Smart Classification (Post-Import)
   classification?: AssetClassification;
 
-  // Metadata & Traceability
   hierarchy: SectionHierarchy;
   importMetadata: ImportMetadata;
   metadata: Record<string, unknown>;
   
-  // System Fields
   lastModified: string;
   lastModifiedBy: string;
   lastModifiedByState?: string;
 
-  // Notification & Drill-down layer
   updateCount: number;
   unseenUpdateFields: string[];
-  
-  // Restoration Buffer
   previousState?: Partial<Asset> | null;
   
-  // Structural Parsing Provenance
   sourceGroup?: string;
   sourceColumnAGroup?: string;
   templateId?: string;
 
-  // Governance
   approvalStatus?: 'PENDING' | 'APPROVED' | 'REJECTED';
   pendingChanges?: Partial<Asset>;
   changeSubmittedBy?: {
@@ -177,6 +168,26 @@ export interface Asset {
     state: string;
   };
   yearBucket?: number;
+}
+
+export interface DisplayField {
+  key: keyof Asset;
+  label: string;
+  table: boolean;
+  quickView: boolean;
+}
+
+export interface SheetDefinition {
+  name: string;
+  headers: string[];
+  displayFields: DisplayField[];
+}
+
+export interface Grant {
+  id: string;
+  name: string;
+  enabledSheets: string[];
+  sheetDefinitions: Record<string, SheetDefinition>;
 }
 
 export interface AppSettings {
@@ -192,13 +203,6 @@ export interface AppSettings {
   sourceBranding: Record<string, string>;
 }
 
-export interface Grant {
-  id: string;
-  name: string;
-  enabledSheets: string[];
-  sheetDefinitions: Record<string, any>;
-}
-
 export interface AuthorizedUser {
   loginName: string;
   displayName: string;
@@ -210,10 +214,11 @@ export interface AuthorizedUser {
   isSuperAdmin?: boolean; 
   isZonalAdmin?: boolean;
   assignedZone?: string;
+  canAddAssets?: boolean;
+  canEditAssets?: boolean;
 }
 
 export type QueueStatus = 'PENDING' | 'SYNCING' | 'FAILED' | 'SUCCESS';
-
 export type QueueOperation = 'CREATE' | 'UPDATE' | 'DELETE' | 'RESTORE' | 'DISCREPANCY_RESOLVED' | 'DISCREPANCY_IGNORED';
 
 export interface OfflineQueueEntry {

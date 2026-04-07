@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import type { Asset, AppSettings, SheetDefinition, DisplayField } from './types';
+import type { Asset, AppSettings, SheetDefinition } from '@/types/domain';
 import { v4 as uuidv4 } from 'uuid';
 import { HEADER_ALIASES } from './constants';
 import { Timestamp } from 'firebase/firestore';
@@ -8,7 +8,7 @@ import { normalizeHeaderName } from './registry-utils';
 
 /**
  * @fileOverview Excel Ingestion Layer.
- * Updated: Strictly processes only the first sheet of a workbook.
+ * Hardened for deployment: unified domain models and positional group mapping.
  */
 
 export const sanitizeForFirestore = <T extends object>(obj: T): T => {
@@ -32,6 +32,7 @@ export interface ScannedSheetInfo {
   rowCount: number;
   groupCount: number;
   headers: string[];
+  definitionName?: string;
 }
 
 /**
@@ -48,7 +49,6 @@ export async function scanExcelFile(
         const buffer = fileOrBuffer instanceof File ? await fileOrBuffer.arrayBuffer() : fileOrBuffer;
         const workbook = XLSX.read(buffer, { type: 'array' });
 
-        // CRITICAL: Take only the first and only relevant sheet
         const sheetName = workbook.SheetNames[0];
         if (!sheetName) throw new Error("The workbook contains no sheets.");
 
@@ -63,7 +63,7 @@ export async function scanExcelFile(
                 sheetName: sheetName,
                 rowCount: sheetData.length,
                 groupCount: groups.length,
-                headers: groups[0].headerSet, // Use first discovered template as preview
+                headers: groups[0].headerSet,
             });
         } else {
             errors.push("No structural group blocks discovered in the primary sheet.");
@@ -83,7 +83,8 @@ export async function scanExcelFile(
 export async function parseExcelFile(
     fileOrBuffer: File | ArrayBuffer, 
     sheetDefinitions: Record<string, SheetDefinition>, 
-    existingAssets: Asset[]
+    existingAssets: Asset[],
+    scannedSheets?: any[]
 ): Promise<{ assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] }> {
     const result: { assets: Asset[], updatedAssets: Asset[], skipped: number, errors: string[] } = {
         assets: [],
@@ -97,7 +98,6 @@ export async function parseExcelFile(
         const workbook = XLSX.read(buffer, { type: 'array' });
         const fileName = fileOrBuffer instanceof File ? fileOrBuffer.name : 'Ingested Workbook';
         
-        // CRITICAL: Process only the first sheet
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
@@ -129,7 +129,6 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
   const buffer = await file.arrayBuffer();
   const workbook = XLSX.read(buffer, { type: 'array' });
   
-  // CRITICAL: First sheet only
   const sheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[sheetName];
   const sheetData: any[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
@@ -138,9 +137,8 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
   const groups = engine.discoverGroups(sheetName, sheetData);
 
   if (groups.length > 0) {
-      // Return a virtual sheet definition per group
       groups.forEach(group => {
-          const displayFields: DisplayField[] = group.headerSet.map(h => {
+          const displayFields = group.headerSet.map(h => {
               const key = normalizeHeaderName(h);
               return {
                   key: key as keyof Asset,
@@ -153,8 +151,7 @@ export async function parseExcelForTemplate(file: File): Promise<SheetDefinition
           templates.push({
               name: group.groupName,
               headers: group.headerSet,
-              displayFields,
-              groups: [group]
+              displayFields
           });
       });
   }
