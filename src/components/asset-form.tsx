@@ -2,8 +2,7 @@
 
 /**
  * @fileOverview AssetForm - Condition & Audit Workstation.
- * Optimized for mobile stacking and full-screen touch fidelity.
- * Phase 650: Refined Responsive Layout & Safe Area Support.
+ * Phase 651: Removed redundant manual close button.
  */
 
 import React, { useEffect, useState, useMemo } from "react";
@@ -203,7 +202,7 @@ export default function AssetForm({
       <DialogContent className="max-w-[1100px] w-[100vw] h-[100vh] sm:w-[95vw] sm:h-[85vh] p-0 overflow-hidden bg-black text-white border-none sm:border-white/10 rounded-none sm:rounded-[2.5rem] shadow-3xl">
         <div className="flex flex-col h-full">
           {/* Header */}
-          <div className="p-6 sm:p-8 flex items-center justify-between border-b border-white/5 bg-white/[0.02] shrink-0">
+          <div className="p-6 sm:p-8 border-b border-white/5 bg-white/[0.02] shrink-0">
             <div className="space-y-1">
               <DialogTitle className="text-xl sm:text-3xl font-black uppercase text-white leading-none">
                 {asset ? 'Registry Profile' : 'New Identity Pulse'}
@@ -219,9 +218,6 @@ export default function AssetForm({
                 )}
               </div>
             </div>
-            <button onClick={() => onOpenChange(false)} className="h-10 w-10 sm:h-12 sm:w-12 flex items-center justify-center bg-white/5 rounded-xl sm:rounded-2xl text-white/40 hover:text-white border border-white/5 transition-colors">
-              <X className="h-5 w-5 sm:h-6 sm:w-6" />
-            </button>
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
@@ -364,7 +360,7 @@ export default function AssetForm({
           </div>
 
           <div className="p-6 sm:p-8 border-t border-white/5 bg-black/80 backdrop-blur-3xl flex items-center justify-between shrink-0 pb-safe">
-            <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 sm:h-14 px-6 sm:px-10 rounded-2xl font-black uppercase text-[9px] sm:text-xs text-white/40 hover:text-white">Discard</Button>
+            <Button variant="ghost" onClick={() => onOpenChange(false)} className="h-12 sm:h-14 px-6 sm:px-10 rounded-2xl font-black uppercase text-[9px] masonry-text-white/40 hover:text-white">Discard</Button>
             {!externalReadOnly && (
               <Button type="submit" form="asset-form" disabled={isSaving} className="h-12 sm:h-14 px-8 sm:px-12 rounded-2xl font-black uppercase text-[9px] sm:text-xs tracking-[0.2em] shadow-xl bg-primary text-black transition-transform active:scale-95">
                 {isSaving ? <Loader2 className="h-4 w-4 animate-spin mr-3" /> : <ShieldCheck className="h-4 w-4 mr-3" />}

@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Import Orchestrator - Two-Stage Ingestion Pulse.
- * Phase 185: Synchronized with ParserEngine group discovery logic for structural ingestion.
+ * Phase 186: Removed redundant manual close button.
  */
 
 import React, { useState, useRef, useEffect } from 'react';
@@ -51,17 +51,14 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
         setIsScanning(true);
         setScanResults([]);
         setSelectedSheets([]);
-        
         try {
           const buffer = await file.arrayBuffer();
           const workbook = XLSX.read(buffer, { type: 'array' });
           const sheetName = workbook.SheetNames[0];
           const sheet = workbook.Sheets[sheetName];
           const data = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: null }) as any[][];
-          
           engineRef.current = new ParserEngine(file.name);
           const groups = engineRef.current.discoverGroups(sheetName, data);
-
           setActiveSheetData({ name: sheetName, data });
           setScanResults(groups);
           setSelectedSheets(groups.map(g => g.id));
@@ -84,7 +81,6 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
 
   const handleImport = async () => {
     if (!file || selectedSheets.length === 0 || !activeGrantId || !engineRef.current || !activeSheetData) return;
-
     setIsImporting(true);
     try {
       const selectedGroups = scanResults.filter(g => selectedSheets.includes(g.id));
@@ -95,7 +91,6 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
         lastModified: new Date().toISOString(),
         lastModifiedBy: userProfile?.displayName || 'System Import',
       }));
-
       if (taggedAssets.length > 0) {
         await storage.saveToSandbox(taggedAssets as any[]);
         addNotification({ title: 'Sandbox Ready', description: `Staged ${taggedAssets.length} assets for reconciliation.` });
@@ -126,12 +121,11 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
     <Dialog open={isOpen} onOpenChange={(o) => { if (!o) resetState(); onOpenChange(o); }}>
       <DialogContent className="max-w-3xl bg-black border-white/10 p-0 overflow-hidden rounded-[2.5rem] text-white shadow-3xl">
         <div className="p-8 pb-6 border-b border-white/5 bg-white/[0.02]">
-          <DialogHeader className="flex flex-row items-center justify-between">
+          <DialogHeader>
             <div className="space-y-1">
               <DialogTitle className="text-2xl font-black uppercase text-white tracking-tight">Workbook Scanner</DialogTitle>
               <DialogDescription className="text-[11px] text-white/40 uppercase tracking-widest font-bold">Discovery Pulse: identifying internal registry blocks</DialogDescription>
             </div>
-            <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl h-10 w-10 bg-white/5"><X className="h-5 w-5" /></Button>
           </DialogHeader>
         </div>
 
@@ -158,7 +152,6 @@ export function ImportScannerDialog({ isOpen, onOpenChange }: ImportScannerDialo
                     {scanResults.length} NODES IDENTIFIED
                   </Badge>
                 </div>
-
                 <div className="space-y-3">
                   {isScanning ? (
                     <div className="py-20 flex flex-col items-center justify-center gap-4 opacity-20">

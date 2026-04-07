@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview Import Preview Modal.
- * Provides a sandbox reconciliation view before committing data to the registry.
+ * Phase 2: Removed redundant manual close button.
  */
 
 import React from 'react';
@@ -40,15 +40,10 @@ export function ImportPreviewDialog({
       <DialogContent className="max-w-5xl h-[90vh] flex flex-col p-0 overflow-hidden rounded-3xl border-primary/10 shadow-2xl">
         <div className="p-8 pb-4 bg-muted/20 border-b">
           <DialogHeader>
-            <div className="flex items-center justify-between">
-              <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase">
-                <DatabaseZap className="text-primary h-8 w-8" /> Sandbox Reconciliation
-              </DialogTitle>
-              <Button variant="ghost" size="icon" onClick={() => onOpenChange(false)} className="rounded-xl">
-                <X className="h-5 w-5" />
-              </Button>
-            </div>
-            <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70">
+            <DialogTitle className="flex items-center gap-3 text-3xl font-black tracking-tight uppercase">
+              <DatabaseZap className="text-primary h-8 w-8" /> Sandbox Reconciliation
+            </DialogTitle>
+            <DialogDescription className="font-bold uppercase text-[10px] tracking-widest text-muted-foreground opacity-70 mt-2">
               Reviewing {assets.length} hierarchical records before registry commitment.
             </DialogDescription>
           </DialogHeader>

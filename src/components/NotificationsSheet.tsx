@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview NotificationsCenter - Interactive Drill-Down Audit Panel.
- * Phase 205: Integrated direct drill-down to Registry with ID search.
+ * Phase 206: Resolved button overlap by switching to horizontal flex actions.
  */
 
 import React from 'react';
@@ -49,10 +49,7 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
 
   const handleNotificationClick = (n: any) => {
     if (n.assetId) {
-      // 1. Mark as read
       markAllAsRead(); 
-      
-      // 2. Drill down into the specific asset ID
       const shortId = n.assetId.split('-')[0];
       setSearchTerm(shortId); 
       setActiveView('REGISTRY');
@@ -96,18 +93,18 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
                     n.read ? "bg-transparent border-white/5 opacity-60" : "bg-white/[0.03] border-white/10 shadow-lg hover:border-primary/40"
                   )}
                 >
-                  <div className="flex items-start gap-4">
+                  <div className="flex items-center gap-4">
+                    {/* Icon Pulse */}
                     <div className={cn(
                       "p-2 rounded-lg shrink-0",
                       n.variant === 'destructive' ? "bg-red-500/10 text-red-500" : "bg-primary/10 text-primary"
                     )}>
                       {n.variant === 'destructive' ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
                     </div>
-                    <div className="space-y-2 min-w-0 flex-1">
-                      <div className="flex items-center justify-between">
-                        <h4 className="text-sm font-black uppercase tracking-tight leading-tight pr-6">{n.title}</h4>
-                        <ArrowRight className="h-3.5 w-3.5 text-primary opacity-0 group-hover:opacity-100 transition-all" />
-                      </div>
+
+                    {/* Content Pulse */}
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <h4 className="text-sm font-black uppercase tracking-tight leading-tight truncate">{n.title}</h4>
                       
                       {n.description && (
                         <p className="text-[11px] font-medium text-white/60 leading-relaxed italic line-clamp-2">
@@ -125,14 +122,18 @@ export function NotificationsCenter({ isOpen, onOpenChange }: NotificationsCente
                         </Badge>
                       </div>
                     </div>
+
+                    {/* Action Column - Prevents Overlap */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      <ArrowRight className="h-4 w-4 text-primary opacity-0 group-hover:opacity-100 transition-all -translate-x-2 group-hover:translate-x-0" />
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); removeNotification(n.id); }}
+                        className="p-2 rounded-lg text-white/10 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all shadow-sm"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </div>
                   </div>
-                  
-                  <button 
-                    onClick={(e) => { e.stopPropagation(); removeNotification(n.id); }}
-                    className="absolute top-4 right-4 p-1 rounded-lg text-white/10 hover:text-red-500 hover:bg-red-500/10 opacity-0 group-hover:opacity-100 transition-all"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
                 </div>
               ))
             ) : (

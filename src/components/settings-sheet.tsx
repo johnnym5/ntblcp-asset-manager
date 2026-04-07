@@ -2,7 +2,7 @@
 
 /**
  * @fileOverview SettingsSheet - High-Fidelity Project & Sheet Orchestrator.
- * Phase 155: Achieved 100% screenshot parity for the Projects & Sheets UI.
+ * Phase 156: Removed redundant manual close button in header.
  */
 
 import React, { useState, useEffect, useMemo } from 'react';
@@ -133,18 +133,13 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
       <SheetContent side="right" className="w-full sm:max-w-2xl p-0 border-none bg-black text-white shadow-3xl overflow-hidden flex flex-col rounded-l-[2rem]">
         {/* Header Pulse */}
         <div className="p-8 pb-6 bg-black border-b border-white/5">
-          <SheetHeader className="flex flex-row items-center justify-between space-y-0">
+          <SheetHeader>
             <div className="space-y-1">
               <SheetTitle className="text-2xl font-black uppercase tracking-tight text-white leading-none">Settings</SheetTitle>
               <SheetDescription className="text-sm font-medium text-white/40 mt-1">
                 Manage application settings and preferences.
               </SheetDescription>
             </div>
-            <SheetClose asChild>
-              <Button variant="ghost" size="icon" className="h-10 w-10 text-white/40 hover:text-white hover:bg-white/5 rounded-xl transition-colors">
-                <X className="h-6 w-6" />
-              </Button>
-            </SheetClose>
           </SheetHeader>
         </div>
 
@@ -286,7 +281,7 @@ export function SettingsSheet({ isOpen, onOpenChange }: SettingsSheetProps) {
           <SheetFooter className="flex-row justify-start">
             <SheetClose asChild>
               <Button variant="ghost" className="h-14 px-12 rounded-2xl bg-white/[0.05] text-white font-black uppercase text-[11px] tracking-[0.25em] hover:bg-white/10 transition-all active:scale-95">
-                Cancel
+                Dismiss
               </Button>
             </SheetClose>
           </SheetFooter>

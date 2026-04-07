@@ -2,9 +2,7 @@
 
 /**
  * @fileOverview AssetDetailSheet - High-Fidelity "Full View" Workstation.
- * Optimized for high-density, no-scroll responsive layout.
- * Phase 410: Mode-aware UI. Hides status, condition, and remarks in Management mode.
- * Phase 411: Fixed scrolling and metadata visibility.
+ * Phase 412: Removed redundant manual close button.
  */
 
 import React from 'react';
@@ -71,7 +69,6 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
   const isAdmin = userProfile?.role === 'ADMIN' || userProfile?.role === 'SUPERADMIN';
   const VERIFICATION_KEYS = ['condition', 'remarks', 'status', 'verified_status'];
 
-  // Extract metadata that isn't already in the primary fields
   const primaryFieldKeys = new Set(record.headers.map(h => h.rawName));
   const metadataEntries = Object.entries(record.rawRow.metadata || {})
     .filter(([key]) => !primaryFieldKeys.has(key));
@@ -87,7 +84,7 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
           {/* Header Pulse */}
           <div className="p-6 md:p-8 border-b border-white/5 flex items-center justify-between bg-white/[0.02] shrink-0">
             <div className="flex items-center gap-4">
-              <div className="p-2.5 bg-primary/10 rounded-2xl shadow-inner hidden sm:block">
+              <div className="p-2.5 bg-primary/10 rounded-xl shadow-inner hidden sm:block">
                 <ShieldCheck className="h-6 w-6 text-primary" />
               </div>
               <div className="flex flex-col">
@@ -110,12 +107,10 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                 <div className="w-px h-6 bg-white/10 mx-1" />
                 <Button variant="ghost" size="icon" onClick={onNext} disabled={!onNext} className="h-10 w-10 rounded-xl hover:bg-white/10 text-white/40"><ChevronRight className="h-5 w-5" /></Button>
               </div>
-              <button onClick={() => onOpenChange(false)} className="h-12 w-12 flex items-center justify-center bg-white/5 rounded-2xl text-white/40 hover:text-white border border-white/5"><X className="h-6 w-6" /></button>
             </div>
           </div>
 
           <div className="flex-1 min-h-0 flex flex-col md:flex-row overflow-hidden">
-            {/* Technical Detail Surface */}
             <div className="flex-1 flex flex-col bg-black border-r border-white/5 min-h-0 overflow-hidden">
               <div className="px-8 py-5 shrink-0 flex items-center justify-between bg-white/[0.01] border-b border-white/5">
                 <div className="flex items-center gap-3">
@@ -132,7 +127,6 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
 
               <ScrollArea className="flex-1 custom-scrollbar">
                 <div className="flex flex-col">
-                  {/* Primary Fields Grid */}
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 border-b border-white/5">
                     {record.fields
                       .filter(f => {
@@ -154,7 +148,6 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                       })}
                   </div>
 
-                  {/* Extended Metadata Pulse */}
                   {metadataEntries.length > 0 && (
                     <div className="p-8 space-y-6 bg-white/[0.01]">
                       <div className="flex items-center gap-3 opacity-40">
@@ -171,13 +164,11 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                       </div>
                     </div>
                   )}
-                  
-                  <div className="h-40 shrink-0" /> {/* Spacer for scroll room */}
+                  <div className="h-40 shrink-0" />
                 </div>
               </ScrollArea>
             </div>
 
-            {/* Fidelity Sidebar */}
             <div className="w-full md:w-[340px] lg:w-[400px] bg-[#050505] flex flex-col shrink-0 border-t md:border-t-0 border-white/5 min-h-0 overflow-hidden shadow-2xl">
               <ScrollArea className="flex-1">
                 <div className="p-8 space-y-12 pb-32">
@@ -185,9 +176,7 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
                     <div className="p-2 bg-primary/10 rounded-xl"><ClipboardCheck className="h-5 w-5" /></div>
                     <h4 className="text-xs font-black uppercase tracking-widest">Integrity Pulse</h4>
                   </div>
-                  
                   <AssetChecklist values={record.rawRow as any} />
-                  
                   <div className="p-6 rounded-[2rem] bg-white/[0.02] border-2 border-dashed border-white/10 space-y-6">
                     <div className="flex items-center gap-2 opacity-40">
                       <History className="h-3.5 w-3.5" />
@@ -213,7 +202,6 @@ export function AssetDetailSheet({ isOpen, onOpenChange, record, onEdit, onNext,
             </div>
           </div>
 
-          {/* Footer Terminal */}
           <div className="p-6 md:p-8 bg-black border-t border-white/5 flex flex-row items-center gap-4 shrink-0 pb-safe shadow-3xl">
             <Button variant="ghost" onClick={() => onOpenChange(false)} className="flex-1 h-14 font-black uppercase text-[10px] tracking-widest rounded-2xl bg-white/5 text-white/40 hover:text-white transition-all">
               Dismiss Pulse
