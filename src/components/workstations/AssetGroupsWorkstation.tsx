@@ -1,18 +1,18 @@
 'use client';
 
 /**
- * @fileOverview AssetGroupsWorkstation - Post-Import Intelligence Hub.
- * Phase 100: Hierarchical browsing and smart classification drill-down.
+ * @fileOverview AssetGroupsWorkstation - Unified Grouping Hub.
+ * Centralizes all registry grouping logic: Technical Categories and Condition Registry.
  */
 
 import React, { useMemo, useState } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
+import { useAuth } from '@/contexts/auth-context';
 import { 
   LayoutGrid, 
   Boxes, 
   ChevronRight, 
   Search, 
-  Filter, 
   Database,
   ArrowLeft,
   Activity,
@@ -23,9 +23,17 @@ import {
   ShieldAlert,
   ArrowUpRight,
   TrendingUp,
-  Cpu,
   Layers,
-  ArrowRightLeft
+  ArrowRightLeft,
+  ShieldCheck,
+  ChevronDown,
+  Bomb,
+  Grid,
+  List,
+  Edit3,
+  Trash2,
+  X,
+  Hammer
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -34,26 +42,88 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { ClassificationEngine } from '@/lib/classification-engine';
 import { cn } from '@/lib/utils';
-import type { Asset } from '@/types/domain';
+import type { Asset, ConditionGroup } from '@/types/domain';
 import { Progress } from '@/components/ui/progress';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { ConditionSummary } from '@/components/registry/ConditionSummary';
+import { groupAssetsByCondition, CONDITION_GROUPS, GROUP_COLORS, GROUP_BG_COLORS } from '@/lib/condition-logic';
+import { RegistryCard } from '@/components/registry/RegistryCard';
+import { RegistryTable } from '@/components/registry/RegistryTable';
+import { AssetDetailSheet } from '@/components/registry/AssetDetailSheet';
+import AssetForm from '@/components/asset-form';
+import { AssetBatchEditForm } from '@/components/asset-batch-edit-form';
+import { transformAssetToRecord } from '@/lib/registry-utils';
+import { storage } from '@/offline/storage';
+import { enqueueMutation } from '@/offline/queue';
+import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+type GroupMode = 'category' | 'condition';
 
 export function AssetGroupsWorkstation() {
-  const { assets, setSearchTerm, setActiveView } = useAppState();
+  const { assets, searchTerm, headers, refreshRegistry, appSettings, setSearchTerm, setActiveView } = useAppState();
+  const { userProfile } = useAuth();
+  const { toast } = useToast();
+  const isMobile = useIsMobile();
   
-  // Drill-down state
+  // UI State
+  const [groupMode, setGroupMode] = useState<GroupMode>('category');
   const [selectedGroup, setSelectedGroup] = useState<string | null>(null);
   const [selectedSubgroup, setSelectedSubgroup] = useState<string | null>(null);
   const [groupSearch, setGroupSearch] = useState("");
+  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+  
+  // Selection & Form State
+  const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [selectedAssetId, setSelectedAssetId] = useState<string | null>(null);
+  const [isBatchEditOpen, setIsBatchEditOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [isCategoryWipeDialogOpen, setIsCategoryWipeDialogOpen] = useState(false);
+  const [categoryToWipe, setCategoryToWipe] = useState<ConditionGroup | null>(null);
 
-  // 1. Run Intelligence Pulse
+  // 1. Intelligence Calculation
+  const filteredAssets = useMemo(() => {
+    if (!searchTerm) return assets;
+    const term = searchTerm.toLowerCase();
+    return assets.filter(a => 
+      (a.description || '').toLowerCase().includes(term) || 
+      (a.assetIdCode || '').toLowerCase().includes(term)
+    );
+  }, [assets, searchTerm]);
+
   const classifiedAssets = useMemo(() => {
-    return assets.map(a => ({
+    return filteredAssets.map(a => ({
       ...a,
       classification: ClassificationEngine.classify(a)
     }));
-  }, [assets]);
+  }, [filteredAssets]);
 
   const tree = useMemo(() => ClassificationEngine.getGroupTree(classifiedAssets), [classifiedAssets]);
+  const conditionGroups = useMemo(() => groupAssetsByCondition(filteredAssets), [filteredAssets]);
+  
+  const conditionCounts = useMemo(() => {
+    const counts: any = {};
+    CONDITION_GROUPS.forEach(g => counts[g] = conditionGroups[g].length);
+    return counts;
+  }, [conditionGroups]);
 
   const sortedGroups = useMemo(() => {
     return Object.entries(tree)
@@ -62,7 +132,6 @@ export function AssetGroupsWorkstation() {
       .sort((a, b) => b.count - a.count);
   }, [tree, groupSearch]);
 
-  // Filters for drill-down
   const drillDownAssets = useMemo(() => {
     let list = classifiedAssets;
     if (selectedGroup) list = list.filter(a => a.classification?.group === selectedGroup);
@@ -70,74 +139,73 @@ export function AssetGroupsWorkstation() {
     return list;
   }, [classifiedAssets, selectedGroup, selectedSubgroup]);
 
-  const handleNavigateToRegistry = (filter: string) => {
-    setSearchTerm(filter);
-    setActiveView('REGISTRY');
+  const selectedRecord = useMemo(() => {
+    if (!selectedAssetId) return undefined;
+    const asset = assets.find(a => a.id === selectedAssetId);
+    return asset ? transformAssetToRecord(asset, headers, appSettings?.sourceBranding) : undefined;
+  }, [selectedAssetId, assets, headers, appSettings?.sourceBranding]);
+
+  // Handlers
+  const handleInspect = (id: string) => {
+    setSelectedAssetId(id);
+    setIsDetailOpen(true);
   };
 
-  const GroupCard = ({ name, count, subgroups, conditions }: any) => {
-    const coverage = 100; // Conceptual
-    return (
-      <Card 
-        onClick={() => setSelectedGroup(name)}
-        className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden group hover:border-primary/40 transition-all cursor-pointer shadow-3xl"
-      >
-        <CardHeader className="p-8 pb-4 bg-white/[0.01] border-b border-white/5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-primary/10 rounded-2xl"><Boxes className="h-6 w-6 text-primary" /></div>
-              <div className="space-y-0.5">
-                <h3 className="text-xl font-black uppercase text-white tracking-tight">{name}</h3>
-                <p className="text-[9px] font-bold text-white/20 uppercase tracking-widest">{Object.keys(subgroups).length} Technical Subgroups</p>
-              </div>
-            </div>
-            <div className="h-10 w-10 rounded-xl bg-white/5 flex items-center justify-center text-white/20 group-hover:text-primary group-hover:bg-primary/10 transition-all">
-              <ChevronRight className="h-5 w-5" />
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="p-8 pt-8 space-y-8">
-          <div className="flex items-end justify-between">
-            <div className="space-y-1">
-              <p className="text-5xl font-black tracking-tighter text-white">{count}</p>
-              <p className="text-[10px] font-black text-white/20 uppercase tracking-[0.25em]">Aggregated Pulses</p>
-            </div>
-            <div className="flex gap-2">
-              {conditions['Critical'] && <Badge className="bg-red-600 text-white font-black text-[8px] h-5 px-2">CRITICAL: {conditions['Critical']}</Badge>}
-              {conditions['Loss'] && <Badge className="bg-orange-600 text-white font-black text-[8px] h-5 px-2">LOSS: {conditions['Loss']}</Badge>}
-            </div>
-          </div>
-          
-          <div className="space-y-3">
-            <div className="flex justify-between items-center text-[9px] font-black uppercase tracking-[0.2em]">
-              <span className="text-white/40">Audit Coverage</span>
-              <span className="text-primary">{coverage}%</span>
-            </div>
-            <Progress value={coverage} className="h-1 bg-white/5" />
-          </div>
-        </CardContent>
-        <CardFooter className="px-8 pb-8 pt-0">
-          <div className="flex flex-wrap gap-1.5 opacity-40 group-hover:opacity-100 transition-opacity">
-            {Object.keys(subgroups).slice(0, 3).map(sg => (
-              <Badge key={sg} variant="secondary" className="bg-white/5 text-[8px] font-black uppercase tracking-tighter border-white/5">{sg}</Badge>
-            ))}
-            {Object.keys(subgroups).length > 3 && <span className="text-[8px] font-bold text-white/20">+{Object.keys(subgroups).length - 3} More</span>}
-          </div>
-        </CardFooter>
-      </Card>
-    );
+  const handleToggleSelect = (id: string) => {
+    const next = new Set(selectedAssetIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setSelectedAssetIds(next);
   };
+
+  const handleDeleteSelectedAssets = async () => {
+    if (selectedAssetIds.size === 0) return;
+    setIsProcessing(true);
+    try {
+      for (const id of Array.from(selectedAssetIds)) {
+        await enqueueMutation('DELETE', 'assets', { id });
+      }
+      const currentLocal = await storage.getAssets();
+      await storage.saveAssets(currentLocal.filter(a => !selectedAssetIds.has(a.id)));
+      await refreshRegistry();
+      setSelectedAssetIds(new Set());
+      toast({ title: "Records Removed" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const handleWipeConditionGroup = async () => {
+    if (!categoryToWipe) return;
+    setIsProcessing(true);
+    try {
+      const targetAssets = conditionGroups[categoryToWipe];
+      for (const asset of targetAssets) {
+        await enqueueMutation('DELETE', 'assets', { id: asset.id });
+      }
+      const currentLocal = await storage.getAssets();
+      const idsToWipe = new Set(targetAssets.map(a => a.id));
+      await storage.saveAssets(currentLocal.filter(a => !idsToWipe.has(a.id)));
+      await refreshRegistry();
+      setIsCategoryWipeDialogOpen(false);
+      setCategoryToWipe(null);
+      toast({ title: "Condition Group Wiped" });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
+  const isAdmin = userProfile?.isAdmin || false;
 
   return (
     <div className="space-y-10 animate-in fade-in duration-700 pb-40">
       
-      {/* Header Orchestration */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1">
+      {/* 1. Header & Navigation */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1 shrink-0">
         <div className="flex items-center gap-4">
           {selectedGroup ? (
             <button 
               onClick={() => { setSelectedGroup(null); setSelectedSubgroup(null); }}
-              className="h-12 w-12 flex items-center justify-center bg-white/5 rounded-2xl text-white/40 hover:text-white border border-white/5 transition-all shadow-xl tactile-pulse"
+              className="h-12 w-12 flex items-center justify-center bg-white/5 rounded-2xl text-white/40 hover:text-white border border-white/5 transition-all shadow-xl"
             >
               <ArrowLeft className="h-6 w-6" />
             </button>
@@ -151,77 +219,40 @@ export function AssetGroupsWorkstation() {
               {selectedGroup ? (selectedSubgroup || selectedGroup) : 'Asset Groups'}
             </h2>
             <p className="text-[11px] font-bold text-white/40 uppercase tracking-[0.25em] leading-none">
-              {selectedGroup ? 'HIERARCHICAL RECONCILIATION' : 'INTELLIGENT CLASSIFICATION PULSE'}
+              {selectedGroup ? 'HIERARCHICAL RECONCILIATION' : 'INTELLIGENT CLASSIFICATION HUB'}
             </p>
           </div>
         </div>
 
-        {!selectedGroup && (
-          <div className="relative group min-w-[300px]">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-white/20 group-focus-within:text-primary transition-all" />
-            <Input 
-              placeholder="Search categorized groups..." 
-              value={groupSearch}
-              onChange={(e) => setGroupSearch(e.target.value)}
-              className="h-12 pl-11 rounded-xl bg-white/[0.03] border-white/10 text-sm focus-visible:ring-primary/20 text-white placeholder:text-white/20"
-            />
+        <div className="flex items-center gap-3">
+          {!selectedGroup && (
+            <div className="bg-white/[0.03] p-1 rounded-2xl border border-white/5 shadow-inner backdrop-blur-xl flex">
+              <button 
+                onClick={() => setGroupMode('category')}
+                className={cn("px-6 py-2.5 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'category' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
+              >
+                Categories
+              </button>
+              <button 
+                onClick={() => setGroupMode('condition')}
+                className={cn("px-6 py-2.5 rounded-xl font-black uppercase text-[9px] tracking-widest transition-all", groupMode === 'condition' ? "bg-primary text-black" : "text-white/40 hover:text-white")}
+              >
+                Conditions
+              </button>
+            </div>
+          )}
+          <div className="flex items-center bg-black/40 p-1.5 rounded-xl border border-white/5 shadow-inner">
+            <button onClick={() => setViewMode('grid')} className={cn("p-2 rounded-lg transition-all", viewMode === 'grid' ? "bg-white/10 text-white" : "text-white/20")}><Grid className="h-3.5 w-3.5" /></button>
+            <button onClick={() => setViewMode('table')} className={cn("p-2 rounded-lg transition-all", viewMode === 'table' ? "bg-white/10 text-white" : "text-white/20")}><List className="h-3.5 w-3.5" /></button>
           </div>
-        )}
+        </div>
       </div>
 
-      {/* Main Surface */}
-      <div className="min-h-screen">
-        {!selectedGroup ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-            {sortedGroups.map(group => (
-              <GroupCard key={group.name} {...group} />
-            ))}
-            
-            {/* Year Buckets Quick Filter */}
-            <Card className="bg-primary/5 border-2 border-dashed border-primary/20 rounded-[2.5rem] p-8 flex flex-col justify-between shadow-2xl group hover:border-primary/40 transition-all">
-              <div className="space-y-2">
-                <div className="p-3 bg-primary/10 rounded-2xl w-fit"><TrendingUp className="h-6 w-6 text-primary" /></div>
-                <h3 className="text-xl font-black uppercase text-white tracking-tight">Year Addition Pulses</h3>
-                <p className="text-[10px] font-medium text-white/40 italic">Sorted by procurement batch.</p>
-              </div>
-              <div className="space-y-2 mt-8">
-                {[2023, 2024, 2025].map(year => (
-                  <button 
-                    key={year} 
-                    onClick={() => handleNavigateToRegistry(String(year))}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-black/40 border border-white/5 hover:border-primary/20 transition-all group/btn"
-                  >
-                    <span className="text-[11px] font-black text-white/60 group-hover/btn:text-white transition-colors">{year} Additions</span>
-                    <ArrowUpRight className="h-3 w-3 text-primary opacity-0 group-hover/btn:opacity-100 transition-all" />
-                  </button>
-                ))}
-              </div>
-            </Card>
-
-            {/* Transfer Groups Quick Filter */}
-            <Card className="bg-blue-500/5 border-2 border-dashed border-blue-500/20 rounded-[2.5rem] p-8 flex flex-col justify-between shadow-2xl group hover:border-blue-500/40 transition-all">
-              <div className="space-y-2">
-                <div className="p-3 bg-blue-500/10 rounded-2xl w-fit"><ArrowRightLeft className="h-6 w-6 text-blue-500" /></div>
-                <h3 className="text-xl font-black uppercase text-white tracking-tight">Transferred Assets</h3>
-                <p className="text-[10px] font-medium text-white/40 italic">Isolated partner registers.</p>
-              </div>
-              <div className="space-y-2 mt-8">
-                {['LSMOH', 'IHVN', 'FHI360'].map(source => (
-                  <button 
-                    key={source}
-                    onClick={() => handleNavigateToRegistry(source)}
-                    className="w-full flex items-center justify-between p-3 rounded-xl bg-black/40 border border-white/5 hover:border-blue-500/20 transition-all group/btn"
-                  >
-                    <span className="text-[11px] font-black text-white/60 group-hover/btn:text-white transition-colors">{source} Registry</span>
-                    <ArrowUpRight className="h-3 w-3 text-blue-500 opacity-0 group-hover/btn:opacity-100 transition-all" />
-                  </button>
-                ))}
-              </div>
-            </Card>
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 px-1">
-            {/* Drill-down Sidebar */}
+      {/* 2. Grouping Content */}
+      <div className="min-h-screen px-1">
+        {selectedGroup ? (
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+            {/* Drill-down Results */}
             <div className="lg:col-span-3 space-y-8">
               <div className="space-y-4">
                 <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 px-1">Technical Subgroups</h4>
@@ -231,76 +262,185 @@ export function AssetGroupsWorkstation() {
                       key={sg} 
                       onClick={() => setSelectedSubgroup(sg === selectedSubgroup ? null : sg)}
                       className={cn(
-                        "w-full flex items-center justify-between p-5 rounded-2xl border-2 transition-all group",
+                        "w-full flex items-center justify-between p-5 rounded-2xl border-2 transition-all",
                         selectedSubgroup === sg ? "bg-primary border-primary text-black" : "bg-[#0A0A0A] border-white/5 hover:border-white/20"
                       )}
                     >
                       <span className="text-xs font-black uppercase tracking-tight">{sg}</span>
-                      <div className={cn(
-                        "h-6 px-2 rounded-lg flex items-center justify-center font-mono text-[10px] font-bold",
-                        selectedSubgroup === sg ? "bg-black/20 text-black" : "bg-white/5 text-white/40"
-                      )}>{count}</div>
+                      <Badge variant="outline" className={cn("h-6 border-none font-mono", selectedSubgroup === sg ? "bg-black/20 text-black" : "bg-white/5 text-white/40")}>{count}</Badge>
                     </button>
                   ))}
                 </div>
               </div>
-
-              <div className="p-8 rounded-[2rem] bg-white/[0.02] border-2 border-dashed border-white/10 space-y-4">
-                <div className="flex items-center gap-3 text-primary">
-                  <ShieldAlert className="h-4 w-4" />
-                  <span className="text-[10px] font-black uppercase tracking-widest">Group Analytics</span>
-                </div>
-                <div className="space-y-4">
-                  {Object.entries(tree[selectedGroup].conditions).map(([cond, count]) => (
-                    <div key={cond} className="flex items-center justify-between">
-                      <span className="text-[10px] font-bold text-white/40 uppercase tracking-tighter">{cond} Pulse</span>
-                      <Badge variant="outline" className="h-5 text-[9px] font-black border-white/5">{count}</Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
             </div>
 
-            {/* Drill-down Result Grid */}
             <div className="lg:col-span-9 space-y-6">
-              <div className="flex items-center justify-between px-1">
-                <div className="flex items-center gap-3">
-                  <Activity className="h-4 w-4 text-primary" />
-                  <span className="text-[11px] font-black uppercase tracking-widest text-white">Active Classification Pulse</span>
-                </div>
-                <Button 
-                  onClick={() => handleNavigateToRegistry(selectedSubgroup || selectedGroup)}
-                  className="h-10 px-6 rounded-xl bg-white/5 text-white font-black uppercase text-[9px] tracking-widest hover:bg-white/10"
-                >
-                  Open in Main Registry
-                </Button>
-              </div>
-
               <ScrollArea className="h-[calc(100vh-25rem)] border-2 border-white/5 rounded-[2.5rem] bg-[#050505] p-8 shadow-3xl">
-                <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-                  {drillDownAssets.map(asset => (
-                    <Card key={asset.id} className="bg-black/40 border-white/10 rounded-2xl p-6 group hover:border-primary/20 transition-all">
-                      <div className="flex justify-between items-start mb-4">
-                        <Badge className="bg-white/5 text-white/40 border-none font-black text-[8px] h-5">{asset.classification?.brand || 'Generic'}</Badge>
-                        <Badge variant="outline" className={cn(
-                          "h-5 text-[8px] font-black border-none",
-                          asset.status === 'VERIFIED' ? "text-green-500" : "text-orange-500"
-                        )}>{asset.status}</Badge>
-                      </div>
-                      <h5 className="text-sm font-black uppercase text-white truncate group-hover:text-primary transition-colors">{asset.description}</h5>
-                      <div className="mt-4 flex items-center justify-between text-[9px] font-bold text-white/20 uppercase">
-                        <span className="flex items-center gap-1.5"><Tag className="h-3 w-3" /> {asset.assetIdCode || 'NO_TAG'}</span>
-                        <span className="flex items-center gap-1.5"><Layers className="h-3 w-3" /> {asset.classification?.subgroup}</span>
-                      </div>
-                    </Card>
-                  ))}
-                </div>
+                {viewMode === 'grid' ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                    {drillDownAssets.map(asset => (
+                      <RegistryCard 
+                        key={asset.id} 
+                        record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
+                        onInspect={handleInspect}
+                        selected={selectedAssetIds.has(asset.id)}
+                        onToggleSelect={handleToggleSelect}
+                      />
+                    ))}
+                  </div>
+                ) : (
+                  <RegistryTable 
+                    records={drillDownAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
+                    onInspect={handleInspect} 
+                    selectedIds={selectedAssetIds} 
+                    onToggleSelect={handleToggleSelect} 
+                    onSelectAll={(c) => {
+                      const next = new Set(selectedAssetIds);
+                      drillDownAssets.forEach(a => c ? next.add(a.id) : next.delete(a.id));
+                      setSelectedAssetIds(next);
+                    }}
+                  />
+                )}
               </ScrollArea>
             </div>
+          </div>
+        ) : groupMode === 'category' ? (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+            {sortedGroups.map(group => (
+              <Card 
+                key={group.name} 
+                onClick={() => setSelectedGroup(group.name)}
+                className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden group hover:border-primary/40 transition-all cursor-pointer"
+              >
+                <CardHeader className="p-8 pb-4 bg-white/[0.01] border-b border-white/5">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="p-3 bg-primary/10 rounded-2xl"><Boxes className="h-6 w-6 text-primary" /></div>
+                      <h3 className="text-xl font-black uppercase text-white tracking-tight">{group.name}</h3>
+                    </div>
+                    <ChevronRight className="h-5 w-5 text-white/20 group-hover:text-primary transition-all" />
+                  </div>
+                </CardHeader>
+                <CardContent className="p-8 space-y-6">
+                  <div className="space-y-1">
+                    <p className="text-5xl font-black tracking-tighter text-white">{group.count}</p>
+                    <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">Records Identified</p>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {Object.keys(group.subgroups).slice(0, 3).map(sg => (
+                      <Badge key={sg} variant="secondary" className="bg-white/5 text-[8px] font-black uppercase">{sg}</Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="space-y-10">
+            <ConditionSummary counts={conditionCounts} total={filteredAssets.length} />
+            <ScrollArea className="h-[calc(100vh-25rem)] pr-4">
+              <Accordion type="multiple" defaultValue={['Good', 'Discrepancy']} className="space-y-6">
+                {CONDITION_GROUPS.map(group => {
+                  const groupAssets = conditionGroups[group];
+                  if (groupAssets.length === 0 && group !== 'Good') return null;
+
+                  return (
+                    <AccordionItem 
+                      key={group} 
+                      value={group} 
+                      className={cn("border-2 rounded-[2.5rem] overflow-hidden bg-[#080808] transition-all", GROUP_BG_COLORS[group])}
+                    >
+                      <AccordionTrigger className="p-8 hover:no-underline group">
+                        <div className="flex items-center justify-between w-full pr-6">
+                          <div className="flex items-center gap-6">
+                            <div className={cn("p-4 rounded-2xl shadow-inner", GROUP_BG_COLORS[group])}>
+                              <Boxes className={cn("h-8 w-8", GROUP_COLORS[group])} />
+                            </div>
+                            <div className="text-left">
+                              <h3 className={cn("text-2xl font-black uppercase tracking-tight", GROUP_COLORS[group])}>{group} Pulse</h3>
+                              <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{groupAssets.length} Records</p>
+                            </div>
+                          </div>
+                          <ChevronDown className="h-6 w-6 text-white/20 transition-transform group-data-[state=open]:rotate-180" />
+                        </div>
+                      </AccordionTrigger>
+                      <AccordionContent className="p-8 pt-0 border-t border-white/5 bg-black/20">
+                        <div className="pt-8">
+                          <div className="flex justify-end mb-6">
+                            {isAdmin && groupAssets.length > 0 && (
+                              <Button variant="ghost" onClick={() => { setCategoryToWipe(group); setIsCategoryWipeDialogOpen(true); }} className="h-9 px-4 rounded-xl font-black uppercase text-[9px] gap-2 text-destructive/60 hover:text-destructive hover:bg-destructive/10">
+                                <Bomb className="h-3.5 w-3.5" /> Wipe Group
+                              </Button>
+                            )}
+                          </div>
+                          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                            {groupAssets.map(asset => (
+                              <RegistryCard 
+                                key={asset.id} 
+                                record={transformAssetToRecord(asset, headers, appSettings?.sourceBranding)} 
+                                onInspect={handleInspect}
+                                selected={selectedAssetIds.has(asset.id)}
+                                onToggleSelect={handleToggleSelect}
+                              />
+                            ))}
+                          </div>
+                        </div>
+                      </AccordionContent>
+                    </AccordionItem>
+                  );
+                })}
+              </Accordion>
+            </ScrollArea>
           </div>
         )}
       </div>
 
+      {/* 3. Global Modals */}
+      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} />
+      <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={assets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
+      <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={async (data) => { 
+        for (const id of Array.from(selectedAssetIds)) {
+          const asset = assets.find(a => a.id === id);
+          if (asset) await enqueueMutation('UPDATE', 'assets', { ...asset, ...data });
+        }
+        await refreshRegistry();
+        setSelectedAssetIds(new Set());
+        toast({ title: "Bulk Update Pulse Committed" });
+      }} />
+
+      <AlertDialog open={isCategoryWipeDialogOpen} onOpenChange={setIsCategoryWipeDialogOpen}>
+        <AlertDialogContent className="rounded-[2.5rem] border-destructive/20 p-10 shadow-3xl bg-black text-white">
+          <AlertDialogHeader className="space-y-4">
+            <div className="p-4 bg-destructive/10 rounded-2xl w-fit"><Bomb className="h-12 w-12 text-destructive" /></div>
+            <AlertDialogTitle className="text-2xl font-black uppercase text-destructive tracking-tight">Execute Selective Wipe?</AlertDialogTitle>
+            <AlertDialogDescription className="text-sm font-medium italic text-white/60">This action is immutable locally and will be broadcast to the cloud authority.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-8 gap-3">
+            <AlertDialogCancel className="h-14 px-10 rounded-2xl font-bold border-2 border-white/10 m-0 hover:bg-white/5 text-white">Abort</AlertDialogCancel>
+            <AlertDialogAction onClick={handleWipeConditionGroup} disabled={isProcessing} className="h-14 px-12 rounded-2xl font-black uppercase bg-destructive text-white m-0">
+              {isProcessing ? <Loader2 className="h-5 w-5 animate-spin mr-3" /> : <Hammer className="h-5 w-5 mr-3" />} Commit Wipe
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Floating Action Bar */}
+      <AnimatePresence>
+        {selectedAssetIds.size > 0 && (
+          <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A] border-2 border-primary/20 rounded-[2.5rem] p-4 flex items-center gap-8 shadow-3xl backdrop-blur-3xl min-w-[500px]">
+            <div className="flex items-center gap-4 pl-4">
+              <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-black font-black text-xs">{selectedAssetIds.size}</div>
+              <span className="text-xs font-black uppercase text-white">Selected</span>
+            </div>
+            <div className="h-8 w-px bg-white/10" />
+            <div className="flex items-center gap-3">
+              <Button variant="ghost" onClick={() => setIsBatchEditOpen(true)} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-white/60 hover:text-white"><Edit3 className="h-4 w-4" /> Bulk Edit</Button>
+              <Button variant="ghost" onClick={handleDeleteSelectedAssets} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-destructive/60 hover:text-destructive"><Trash2 className="h-4 w-4" /> Delete</Button>
+            </div>
+            <button onClick={() => setSelectedAssetIds(new Set())} className="ml-auto mr-4 text-white/20 hover:text-white"><X className="h-5 w-5" /></button>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
