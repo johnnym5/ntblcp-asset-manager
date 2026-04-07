@@ -41,8 +41,8 @@ export function sanitizeForFirestore<T>(obj: T): T {
       const value = (obj as any)[key];
       
       // Sanitize the key for Firebase compatibility (RTDB/Firestore)
-      // Restricted characters: . $ # [ ] /
-      const safeKey = key.replace(/[.#$/[\]]/g, '_');
+      // Restricted characters: . $ # [ ] / and control characters/newlines
+      const safeKey = key.replace(/[.#$/[\]\n\r]/g, '_').trim();
       
       if (value !== undefined) {
         // Only recurse if value is an object or array
