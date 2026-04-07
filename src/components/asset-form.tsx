@@ -41,7 +41,9 @@ import {
   Info,
   History,
   Activity,
-  AlertTriangle
+  AlertTriangle,
+  Tag,
+  ChevronRight
 } from "lucide-react";
 import { useAuth } from "@/contexts/auth-context";
 import { useAppState } from "@/contexts/app-state-context";
@@ -282,7 +284,7 @@ export default function AssetForm({
                                   <ChevronRight className="h-3 w-3 text-white/20" />
                                   <span className="text-[10px] font-black uppercase text-primary">{h.newCondition}</span>
                                 </div>
-                                <p className="text-[11px] font-medium text-white/60 italic leading-relaxed">"{h.reason}"</p>
+                                <p className="text-11px] font-medium text-white/60 italic leading-relaxed">"{h.reason}"</p>
                               </div>
                               <div className="text-right flex flex-col items-end">
                                 <span className="text-[8px] font-black uppercase tracking-widest text-white/20">{new Date(h.timestamp).toLocaleDateString()}</span>
