@@ -2,11 +2,10 @@
 
 /**
  * @fileOverview RegistryWorkstation - Technical Inventory Browser.
- * Returns the registry to a high-performance flat view optimized for technical auditing.
- * Grouping logic is now managed in AssetGroupsWorkstation.
+ * Phase 850: Integrated adjacent navigation pulse for the Detail Sheet.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Database,
@@ -20,7 +19,8 @@ import {
   Settings2,
   Search,
   Filter,
-  ArrowUpDown
+  ArrowUpDown,
+  ChevronRight
 } from 'lucide-react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
@@ -42,6 +42,15 @@ import { storage } from '@/offline/storage';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Input } from '@/components/ui/input';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Progress } from '@/components/ui/progress';
 
 export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) {
   const { 
@@ -96,6 +105,23 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
 
     return results;
   }, [assets, searchTerm, sortKey, sortDir]);
+
+  const currentIndex = useMemo(() => {
+    if (!selectedAssetId) return -1;
+    return processedAssets.findIndex(a => a.id === selectedAssetId);
+  }, [selectedAssetId, processedAssets]);
+
+  const handleNext = useCallback(() => {
+    if (currentIndex < processedAssets.length - 1) {
+      setSelectedAssetId(processedAssets[currentIndex + 1].id);
+    }
+  }, [currentIndex, processedAssets]);
+
+  const handlePrevious = useCallback(() => {
+    if (currentIndex > 0) {
+      setSelectedAssetId(processedAssets[currentIndex - 1].id);
+    }
+  }, [currentIndex, processedAssets]);
 
   const selectedRecord = useMemo(() => {
     if (!selectedAssetId) return undefined;
@@ -206,13 +232,51 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
                 ))}
               </div>
             ) : (
-              <RegistryTable 
-                records={processedAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
-                onInspect={handleInspect} 
-                selectedIds={selectedAssetIds} 
-                onToggleSelect={handleToggleSelect} 
-                onSelectAll={(c) => setSelectedAssetIds(c ? new Set(processedAssets.map(a => a.id)) : new Set())} 
-              />
+              <div className="rounded-[2.5rem] border-2 border-white/5 overflow-hidden bg-[#050505] shadow-2xl">
+                <Table>
+                  <TableHeader className="bg-white/[0.02]">
+                    <TableRow className="hover:bg-transparent">
+                      <TableHead className="w-12 px-6">
+                        <Checkbox checked={selectedAssetIds.size === processedAssets.length && processedAssets.length > 0} onCheckedChange={(c) => setSelectedAssetIds(c ? new Set(processedAssets.map(a => a.id)) : new Set())} className="h-5 w-5 rounded-lg border-2 border-white/20" />
+                      </TableHead>
+                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Identity</TableHead>
+                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Location Scope</TableHead>
+                      <TableHead className="py-5 px-4 text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Audit Status</TableHead>
+                      <TableHead className="py-5 px-6 text-right text-[9px] font-black uppercase tracking-[0.2em] text-white/40">Profile</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {processedAssets.map((asset) => (
+                      <TableRow key={asset.id} className="hover:bg-white/[0.02] border-b border-white/5 last:border-0 group cursor-pointer" onClick={() => handleInspect(asset.id)}>
+                        <TableCell className="px-6" onClick={(e) => e.stopPropagation()}>
+                          <Checkbox checked={selectedAssetIds.has(asset.id)} onCheckedChange={() => handleToggleSelect(asset.id)} className="h-5 w-5 rounded-lg border-2 border-white/10" />
+                        </TableCell>
+                        <TableCell className="py-4 px-4">
+                          <div className="flex flex-col gap-1">
+                            <span className="font-black text-sm uppercase tracking-tight text-white group-hover:text-primary transition-colors">{asset.description}</span>
+                            <span className="text-[9px] font-mono font-bold text-white/20 uppercase tracking-widest">{asset.assetIdCode || 'UNTAGGED'}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4">
+                          <div className="flex flex-col gap-0.5">
+                            <span className="text-[10px] font-black uppercase text-white/60">{asset.location}</span>
+                            <span className="text-[8px] font-bold uppercase text-white/20 tracking-tighter">{asset.custodian}</span>
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-4">
+                          <div className={cn("flex items-center gap-2 h-7 px-3 rounded-full border-2 text-[9px] font-black uppercase w-fit", asset.status === 'VERIFIED' ? "bg-green-500/10 text-green-500 border-green-500/20" : "bg-white/5 text-white/40 border-white/10")}>
+                            <div className={cn("h-1.5 w-1.5 rounded-full", asset.status === 'VERIFIED' ? "bg-green-500 shadow-[0_0_8px_rgba(34,197,94,0.6)]" : "bg-white/20")} />
+                            {asset.status}
+                          </div>
+                        </TableCell>
+                        <TableCell className="py-4 px-6 text-right">
+                          <Button variant="ghost" size="icon" className="h-10 w-10 rounded-xl bg-white/5 opacity-40 group-hover:opacity-100 group-hover:text-primary transition-all"><ChevronRight className="h-5 w-5" /></Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
             )}
 
             {processedAssets.length === 0 && (
@@ -256,6 +320,8 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
         onOpenChange={setIsDetailOpen} 
         record={selectedRecord} 
         onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} 
+        onNext={currentIndex < processedAssets.length - 1 ? handleNext : undefined}
+        onPrevious={currentIndex > 0 ? handlePrevious : undefined}
       />
       <AssetForm 
         isOpen={isFormOpen} 
@@ -288,3 +354,4 @@ export function RegistryWorkstation({ viewAll = false }: { viewAll?: boolean }) 
     </div>
   );
 }
+

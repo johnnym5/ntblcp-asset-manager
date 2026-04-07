@@ -1,11 +1,11 @@
 'use client';
 
 /**
- * @fileOverview AssetGroupsWorkstation - Unified Grouping Hub.
- * Phase 500: Implemented interactive notification drill-downs for Categories and Conditions.
+ * @fileOverview AssetGroupsWorkstation - Folder-Based Registry Hub.
+ * Phase 550: Enhanced with Folder visual language and contiguous navigation pulse.
  */
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useCallback } from 'react';
 import { useAppState } from '@/contexts/app-state-context';
 import { useAuth } from '@/contexts/auth-context';
 import { 
@@ -34,7 +34,8 @@ import {
   Trash2,
   X,
   Hammer,
-  Bell
+  Bell,
+  FolderOpen
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -140,6 +141,24 @@ export function AssetGroupsWorkstation() {
     return list;
   }, [classifiedAssets, selectedGroup, selectedSubgroup]);
 
+  // Contiguous Navigation Pulse Logic
+  const currentIndex = useMemo(() => {
+    if (!selectedAssetId) return -1;
+    return drillDownAssets.findIndex(a => a.id === selectedAssetId);
+  }, [selectedAssetId, drillDownAssets]);
+
+  const handleNext = useCallback(() => {
+    if (currentIndex < drillDownAssets.length - 1) {
+      setSelectedAssetId(drillDownAssets[currentIndex + 1].id);
+    }
+  }, [currentIndex, drillDownAssets]);
+
+  const handlePrevious = useCallback(() => {
+    if (currentIndex > 0) {
+      setSelectedAssetId(drillDownAssets[currentIndex - 1].id);
+    }
+  }, [currentIndex, drillDownAssets]);
+
   const selectedRecord = useMemo(() => {
     if (!selectedAssetId) return undefined;
     const asset = assets.find(a => a.id === selectedAssetId);
@@ -198,7 +217,7 @@ export function AssetGroupsWorkstation() {
   const isAdmin = userProfile?.isAdmin || false;
 
   return (
-    <div className="space-y-10 animate-in fade-in duration-700 pb-40">
+    <div className="space-y-10 animate-in fade-in duration-700 pb-40 h-full flex flex-col">
       
       {/* 1. Header & Navigation */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-1 shrink-0">
@@ -212,15 +231,15 @@ export function AssetGroupsWorkstation() {
             </button>
           ) : (
             <div className="p-3 bg-primary/10 rounded-2xl shadow-inner border border-primary/5">
-              <LayoutGrid className="h-8 w-8 text-primary" />
+              <FolderOpen className="h-8 w-8 text-primary" />
             </div>
           )}
           <div className="space-y-0.5">
             <h2 className="text-3xl font-black uppercase text-white tracking-tight leading-none">
-              {selectedGroup ? (selectedSubgroup || selectedGroup) : 'Asset Groups'}
+              {selectedGroup ? (selectedSubgroup || selectedGroup) : 'Inventory Folders'}
             </h2>
             <p className="text-[11px] font-bold text-white/40 uppercase tracking-[0.25em] leading-none">
-              {selectedGroup ? 'HIERARCHICAL RECONCILIATION' : 'INTELLIGENT CLASSIFICATION HUB'}
+              {selectedGroup ? 'NAVIGATING CONTAINER PULSE' : 'STRUCTURAL CATEGORY HUB'}
             </p>
           </div>
         </div>
@@ -250,13 +269,13 @@ export function AssetGroupsWorkstation() {
       </div>
 
       {/* 2. Grouping Content */}
-      <div className="min-h-screen px-1">
+      <div className="flex-1 min-h-0 px-1">
         {selectedGroup ? (
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10 h-full">
             {/* Drill-down Results */}
             <div className="lg:col-span-3 space-y-8">
               <div className="space-y-4">
-                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 px-1">Technical Subgroups</h4>
+                <h4 className="text-[10px] font-black uppercase tracking-[0.3em] text-white/40 px-1">Subgroup pulse</h4>
                 <div className="space-y-2">
                   {Object.entries(tree[selectedGroup].subgroups).map(([sg, count]) => (
                     <button 
@@ -275,10 +294,10 @@ export function AssetGroupsWorkstation() {
               </div>
             </div>
 
-            <div className="lg:col-span-9 space-y-6">
-              <ScrollArea className="h-[calc(100vh-25rem)] border-2 border-white/5 rounded-[2.5rem] bg-[#050505] p-8 shadow-3xl">
+            <div className="lg:col-span-9 h-full">
+              <ScrollArea className="h-full border-2 border-white/5 rounded-[2.5rem] bg-[#050505] p-8 shadow-3xl">
                 {viewMode === 'grid' ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6 pb-40">
                     {drillDownAssets.map(asset => (
                       <RegistryCard 
                         key={asset.id} 
@@ -290,17 +309,19 @@ export function AssetGroupsWorkstation() {
                     ))}
                   </div>
                 ) : (
-                  <RegistryTable 
-                    records={drillDownAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
-                    onInspect={handleInspect} 
-                    selectedIds={selectedAssetIds} 
-                    onToggleSelect={handleToggleSelect} 
-                    onSelectAll={(c) => {
-                      const next = new Set(selectedAssetIds);
-                      drillDownAssets.forEach(a => c ? next.add(a.id) : next.delete(a.id));
-                      setSelectedAssetIds(next);
-                    }}
-                  />
+                  <div className="pb-40">
+                    <RegistryTable 
+                      records={drillDownAssets.map(a => transformAssetToRecord(a, headers, appSettings?.sourceBranding))} 
+                      onInspect={handleInspect} 
+                      selectedIds={selectedAssetIds} 
+                      onToggleSelect={handleToggleSelect} 
+                      onSelectAll={(c) => {
+                        const next = new Set(selectedAssetIds);
+                        drillDownAssets.forEach(a => c ? next.add(a.id) : next.delete(a.id));
+                        setSelectedAssetIds(next);
+                      }}
+                    />
+                  </div>
                 )}
               </ScrollArea>
             </div>
@@ -308,14 +329,17 @@ export function AssetGroupsWorkstation() {
         ) : groupMode === 'category' ? (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
             {sortedGroups.map(group => {
-              // Mock unseen logic: if any asset in this group has unseen updates
               const hasUnseen = false; 
               return (
                 <Card 
                   key={group.name} 
                   onClick={() => setSelectedGroup(group.name)}
-                  className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden group hover:border-primary/40 transition-all cursor-pointer relative"
+                  className="bg-[#080808] border-2 border-white/5 rounded-[2.5rem] overflow-hidden group hover:border-primary/40 transition-all cursor-pointer relative shadow-3xl"
                 >
+                  <div className="absolute top-0 right-0 p-6 opacity-5 group-hover:opacity-10 transition-opacity">
+                    <FolderOpen className="h-24 w-24 text-primary" />
+                  </div>
+
                   {hasUnseen && (
                     <div className="absolute top-4 right-4">
                       <div className="h-2 w-2 rounded-full bg-red-600 animate-pulse shadow-[0_0_8px_rgba(220,38,38,0.8)]" />
@@ -325,20 +349,20 @@ export function AssetGroupsWorkstation() {
                   <CardHeader className="p-8 pb-4 bg-white/[0.01] border-b border-white/5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
-                        <div className="p-3 bg-primary/10 rounded-2xl"><Boxes className="h-6 w-6 text-primary" /></div>
-                        <h3 className="text-xl font-black uppercase text-white tracking-tight">{group.name}</h3>
+                        <div className="p-3 bg-primary/10 rounded-2xl shadow-inner border border-primary/5"><Boxes className="h-6 w-6 text-primary" /></div>
+                        <h3 className="text-xl font-black uppercase text-white tracking-tight leading-none">{group.name}</h3>
                       </div>
-                      <ChevronRight className="h-5 w-5 text-white/20 group-hover:text-primary transition-all" />
+                      <ChevronRight className="h-5 w-5 text-white/20 group-hover:text-primary transition-all group-hover:translate-x-1" />
                     </div>
                   </CardHeader>
                   <CardContent className="p-8 space-y-6">
                     <div className="space-y-1">
                       <p className="text-5xl font-black tracking-tighter text-white">{group.count}</p>
-                      <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">Registry Capacity</p>
+                      <p className="text-[9px] font-black text-white/20 uppercase tracking-[0.25em]">Records indexing</p>
                     </div>
                     <div className="flex flex-wrap gap-1.5">
                       {Object.keys(group.subgroups).slice(0, 3).map(sg => (
-                        <Badge key={sg} variant="secondary" className="bg-white/5 text-[8px] font-black uppercase">{sg}</Badge>
+                        <Badge key={sg} variant="secondary" className="bg-white/5 border border-white/5 text-[8px] font-black uppercase text-white/40">{sg}</Badge>
                       ))}
                     </div>
                   </CardContent>
@@ -364,16 +388,15 @@ export function AssetGroupsWorkstation() {
                       <AccordionTrigger className="p-8 hover:no-underline group">
                         <div className="flex items-center justify-between w-full pr-6">
                           <div className="flex items-center gap-6">
-                            <div className={cn("p-4 rounded-2xl shadow-inner", GROUP_BG_COLORS[group])}>
+                            <div className={cn("p-4 rounded-2xl shadow-inner border border-white/5", GROUP_BG_COLORS[group])}>
                               <Boxes className={cn("h-8 w-8", GROUP_COLORS[group])} />
                             </div>
                             <div className="text-left">
-                              <h3 className={cn("text-2xl font-black uppercase tracking-tight", GROUP_COLORS[group])}>{group} Pulse</h3>
+                              <h3 className={cn("text-2xl font-black uppercase tracking-tight", GROUP_COLORS[group])}>{group} Container</h3>
                               <p className="text-[10px] font-bold text-white/40 uppercase tracking-widest">{groupAssets.length} Records</p>
                             </div>
                           </div>
                           <div className="flex items-center gap-6">
-                            {/* Drill-down notification badge */}
                             {groupAssets.some(a => (a as any).unseenUpdateFields?.length > 0) && (
                               <div className="flex items-center gap-2 px-3 py-1.5 bg-red-600/10 rounded-xl border border-red-600/20">
                                 <Bell className="h-3 w-3 text-red-600 animate-pulse" />
@@ -393,7 +416,7 @@ export function AssetGroupsWorkstation() {
                               </Button>
                             )}
                           </div>
-                          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
+                          <div className="grid gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 pb-32">
                             {groupAssets.map(asset => (
                               <RegistryCard 
                                 key={asset.id} 
@@ -416,7 +439,14 @@ export function AssetGroupsWorkstation() {
       </div>
 
       {/* 3. Global Modals */}
-      <AssetDetailSheet isOpen={isDetailOpen} onOpenChange={setIsDetailOpen} record={selectedRecord} onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }} />
+      <AssetDetailSheet 
+        isOpen={isDetailOpen} 
+        onOpenChange={setIsDetailOpen} 
+        record={selectedRecord} 
+        onEdit={(id) => { setSelectedAssetId(id); setIsFormOpen(true); setIsDetailOpen(false); }}
+        onNext={currentIndex < drillDownAssets.length - 1 ? handleNext : undefined}
+        onPrevious={currentIndex > 0 ? handlePrevious : undefined}
+      />
       <AssetForm isOpen={isFormOpen} onOpenChange={setIsFormOpen} asset={assets.find(a => a.id === selectedAssetId)} isReadOnly={false} onSave={async (a) => { await enqueueMutation('UPDATE', 'assets', a); await refreshRegistry(); setIsFormOpen(false); }} />
       <AssetBatchEditForm isOpen={isBatchEditOpen} onOpenChange={setIsBatchEditOpen} selectedAssetCount={selectedAssetIds.size} onSave={async (data) => { 
         for (const id of Array.from(selectedAssetIds)) {
@@ -449,15 +479,15 @@ export function AssetGroupsWorkstation() {
         {selectedAssetIds.size > 0 && (
           <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 20 }} className="fixed bottom-10 left-1/2 -translate-x-1/2 z-50 bg-[#0A0A0A] border-2 border-primary/20 rounded-[2.5rem] p-4 flex items-center gap-8 shadow-3xl backdrop-blur-3xl min-w-[500px]">
             <div className="flex items-center gap-4 pl-4">
-              <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-black font-black text-xs">{selectedAssetIds.size}</div>
-              <span className="text-xs font-black uppercase text-white">Selected Records</span>
+              <div className="h-10 w-10 bg-primary rounded-full flex items-center justify-center text-black font-black text-xs shadow-xl shadow-primary/20">{selectedAssetIds.size}</div>
+              <span className="text-xs font-black uppercase text-white tracking-widest">Selected Records</span>
             </div>
             <div className="h-8 w-px bg-white/10" />
             <div className="flex items-center gap-3">
-              <Button variant="ghost" onClick={() => setIsBatchEditOpen(true)} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-white/60 hover:text-white"><Edit3 className="h-4 w-4" /> Bulk Audit</Button>
-              <Button variant="ghost" onClick={handleDeleteSelectedAssets} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-destructive/60 hover:text-destructive"><Trash2 className="h-4 w-4" /> Delete</Button>
+              <Button variant="ghost" onClick={() => setIsBatchEditOpen(true)} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-white/60 hover:text-white transition-all"><Edit3 className="h-4 w-4" /> Bulk Audit</Button>
+              <Button variant="ghost" onClick={handleDeleteSelectedAssets} className="h-12 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 text-destructive/60 hover:text-destructive transition-all"><Trash2 className="h-4 w-4" /> Delete</Button>
             </div>
-            <button onClick={() => setSelectedAssetIds(new Set())} className="ml-auto mr-4 text-white/20 hover:text-white"><X className="h-5 w-5" /></button>
+            <button onClick={() => setSelectedAssetIds(new Set())} className="ml-auto mr-4 text-white/20 hover:text-white transition-all"><X className="h-5 w-5" /></button>
           </motion.div>
         )}
       </AnimatePresence>
