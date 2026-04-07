@@ -61,13 +61,13 @@ class MonitoringService {
       },
       context: {
         page: window.location.pathname,
-        module: context.module || 'Unknown Module',
-        action: context.action || 'Unknown Action',
+        module: context.module || 'System',
+        action: context.action || 'Operational Pulse',
         browser: navigator.userAgent,
         isOnline: navigator.onLine
       },
       error: {
-        type: error?.name || 'UnexpectedError',
+        type: error?.name || 'PulseAnomaly',
         message: technicalMessage,
         technicalMessage,
         laymanExplanation,
@@ -87,7 +87,7 @@ class MonitoringService {
       console.groupEnd();
     }
 
-    // Direct cloud archival
+    // Direct cloud archival using the dedicated firestore service
     try {
       await FirestoreService.logErrorAudit(logEntry);
     } catch (e) {
@@ -111,28 +111,28 @@ class MonitoringService {
     const msg = message.toLowerCase();
 
     if (msg.includes('permission-denied') || msg.includes('insufficient permissions')) {
-      return "Administrative clearance denied for this mutation pulse.";
+      return "Administrative clearance denied for this action.";
     }
     if (msg.includes('network-error') || msg.includes('failed to fetch') || msg.includes('timeout')) {
-      return "The cloud heartbeat was interrupted. Operation enqueued for background sync.";
+      return "Cloud heartbeat interrupted. Operation enqueued for background sync.";
     }
     if (msg.includes('not-found') || msg.includes('document missing')) {
-      return "The requested record pulse could not be found in the active registry.";
+      return "Requested record could not be found in the registry.";
     }
     if (msg.includes('quota-exceeded')) {
-      return "Registry data capacity reached. Contact system architecture team.";
+      return "Cloud storage capacity reached. Contact system administrator.";
     }
     if (msg.includes('offline')) {
-      return "Working in offline regional scope. Changes saved to local persistence.";
+      return "Working in offline regional scope. Changes saved locally.";
     }
     if (msg.includes('parsing failed') || msg.includes('invalid workbook')) {
-      return "Deterministic parsing failed. Workbook structure deviates from registry contract.";
+      return "Workbook structure mismatch. Deterministic ingestion failed.";
     }
     if (msg.includes('validation')) {
-      return "Record fidelity check failed. Required parameters missing or malformed.";
+      return "Data fidelity check failed. Required parameters are missing.";
     }
 
-    return "An unexpected operational pulse anomaly occurred. Recovery protocols active.";
+    return "An unexpected operational pulse anomaly occurred. Resilience protocols active.";
   }
 }
 

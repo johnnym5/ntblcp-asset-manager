@@ -1,5 +1,9 @@
-
 "use client";
+
+/**
+ * @fileOverview User Management Directory.
+ * Phase 1011: Renamed from Auditor Directory to User Directory.
+ */
 
 import React, { useState } from 'react';
 import {
@@ -11,7 +15,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Button } from '@/components/ui/button';
-import { Loader2, UserPlus, Edit, Trash2, MapPin, ShieldCheck, User as UserIcon } from 'lucide-react';
+import { Loader2, UserPlus, Edit, Trash2, ShieldCheck, User as UserIcon } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import type { AuthorizedUser } from '@/types/domain';
 import { UserEditForm } from './user-edit-form';
@@ -74,7 +78,7 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
     
     onUsersChange(newUsers);
     setIsEditFormOpen(false);
-    toast({ title: "Identity Staged", description: "Save workstation changes to commit to cloud." });
+    toast({ title: "User Profile Updated" });
   };
 
   const handleDeleteUser = () => {
@@ -82,7 +86,7 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
     const newUsers = (users || []).filter(u => u.loginName !== userToDelete.loginName);
     onUsersChange(newUsers);
     setUserToDelete(null);
-    toast({ title: "Identity Removed", description: "The auditor has been staged for deletion." });
+    toast({ title: "User Account Revoked" });
   };
   
   return (
@@ -90,12 +94,12 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
       <div className="flex justify-between items-center">
         <div className="space-y-1">
           <h3 className="text-sm font-black uppercase tracking-widest text-primary flex items-center gap-2">
-            <UserIcon className="h-4 w-4" /> Auditor Directory
+            <UserIcon className="h-4 w-4" /> User Directory
           </h3>
-          <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 tracking-tighter">Authorized personnel and regional jurisdictions.</p>
+          <p className="text-[10px] font-bold text-muted-foreground uppercase opacity-60 tracking-tighter">Authorized personnel and regional scopes.</p>
         </div>
         <Button onClick={handleAddNewUser} className="h-10 px-6 rounded-xl font-black uppercase text-[10px] tracking-widest gap-2 shadow-lg shadow-primary/10">
-          <UserPlus className="h-3.5 w-3.5" /> Provision Auditor
+          <UserPlus className="h-3.5 w-3.5" /> Add New User
         </Button>
       </div>
 
@@ -103,9 +107,9 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
         <Table>
           <TableHeader className="bg-muted/30">
             <TableRow className="hover:bg-transparent border-b-2">
-              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4 pl-6">Auditor Identity</TableHead>
-              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4">Auth Tier</TableHead>
-              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4">Jurisdiction</TableHead>
+              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4 pl-6">User Identity</TableHead>
+              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4">Security Tier</TableHead>
+              <TableHead className="font-black uppercase text-[10px] tracking-widest py-4">Scope</TableHead>
               <TableHead className="font-black uppercase text-[10px] tracking-widest py-4 text-right pr-6">Pulse Control</TableHead>
             </TableRow>
           </TableHeader>
@@ -134,7 +138,7 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
                         {s}
                       </Badge>
                     ))}
-                    {user.states?.length > 3 && <span className="text-[9px] font-bold text-muted-foreground">+{user.states.length - 3} More</span>}
+                    {user.states?.length > 3 && <span className="text-[9px] font-bold text-muted-foreground">+{user.states.length - 3}</span>}
                   </div>
                 </TableCell>
                 <TableCell className="py-4 text-right pr-6">
@@ -159,25 +163,20 @@ export function UserManagement({ users, onUsersChange, adminProfile }: UserManag
         </Table>
       </div>
       
-      <UserEditForm 
-        isOpen={isEditFormOpen} 
-        onOpenChange={setIsEditFormOpen} 
-        user={userToEdit}
-        onSave={handleSaveUser}
-      />
+      <UserEditForm isOpen={isEditFormOpen} onOpenChange={setIsEditFormOpen} user={userToEdit} onSave={handleSaveUser} />
       
       <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
         <AlertDialogContent className="rounded-[2rem] border-primary/10">
           <AlertDialogHeader>
-            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Revoke Identity?</AlertDialogTitle>
+            <AlertDialogTitle className="text-xl font-black uppercase tracking-tight">Revoke Account?</AlertDialogTitle>
             <AlertDialogDescription className="text-sm font-medium">
-              This will permanently revoke all access for <strong>{userToDelete?.displayName}</strong>. This auditor will no longer be able to synchronize pulses to the central registry.
+              This will permanently revoke all access for <strong>{userToDelete?.displayName}</strong>.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4">
-            <AlertDialogCancel className="font-bold rounded-xl">Discard Action</AlertDialogCancel>
+            <AlertDialogCancel className="font-bold rounded-xl">Cancel</AlertDialogCancel>
             <AlertDialogAction onClick={handleDeleteUser} className="bg-destructive hover:bg-destructive/90 font-black uppercase text-[10px] tracking-widest h-11 px-6 rounded-xl">
-              Revoke Authorization
+              Confirm Revocation
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
